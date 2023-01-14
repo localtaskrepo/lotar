@@ -2,6 +2,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::Path;
 use include_dir::{include_dir, Dir};
 use crate::api_server;
 
@@ -35,10 +37,26 @@ pub fn serve(api_server: &api_server::ApiServer) {
                         Ok(mut file) => {
                             let mut file_content = String::new();
                             file.read_to_string(&mut file_content).unwrap();
-                            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}",
+
+                            let path: &Path = Path::new(&file_path);
+                            let extension = match path.extension() {
+                                Some(ext) => ext,
+                                None => OsStr::new(""),
+                            };
+
+                            let content_type = match extension.to_str() {
+                                Some("html") => "text/html",
+                                Some("jpg") => "image/jpeg",
+                                Some("png") => "image/png",
+                                Some("css") => "text/css",
+                                Some("js") => "application/javascript",
+                                _ => "application/octet-stream",
+                            };
+
+                            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n{}",
+                                                   content_type,
                                                    file_content.len(),
                                                    file_content);
-                            stream.write(response.as_bytes()).unwrap();
                             stream.write(response.as_bytes()).unwrap();
                             stream.flush().unwrap();
                         }

@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "description": "A task and project management tool that runs locally and can be synced via repo",
   "scripts": {
-    "build": "parcel build view/index.html --dist-dir public",
-    "compile": "cargo build --release"
+    "parcel": "parcel build view/index.html --dist-dir public",
+    "rust": "cargo build",
+    "rust_release": "cargo build --release",
+    "build": "npm run parcel && npm run rust",
+    "build_release": "npm run parcel && npm run rust_release",
+    "clean": "cargo clean && rm -rf public/*"
   },
   "keywords": [
     "local",
@@ -22,5 +26,8 @@
     "react-dom": "^18.2.0",
     "react-router": "^6.4.2",
     "react-router-dom": "^6.4.2"
+  },
+  "devDependencies": {
+    "@parcel/transformer-stylus": "^2.8.2"
   }
 }
