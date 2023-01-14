@@ -1,0 +1,11 @@
+[package]
+name = "local_task_repo"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+regex = "1.7.1"
+log = "0.4.17"
+include_dir = "0.7.3"
