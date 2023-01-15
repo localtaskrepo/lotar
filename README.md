@@ -96,7 +96,7 @@ Priority: 1
 Due: 2019-01-01
 Created: 2019-01-01
 Modified: 2019-01-01
-Tags: [tag1, tag2]
+Tags: [tag1, tag2
 Custom-X: value
 ```
 

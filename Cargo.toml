@@ -9,3 +9,6 @@ edition = "2021"
 regex = "1.7.1"
 log = "0.4.17"
 include_dir = "0.7.3"
+chrono = "0.4.23"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_yaml = "0.9.16"

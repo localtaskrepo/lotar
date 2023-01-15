@@ -7,9 +7,11 @@ use std::path::Path;
 use include_dir::{include_dir, Dir};
 use crate::api_server;
 
-pub fn serve(api_server: &api_server::ApiServer) {
+const PUBLIC_FILES: Dir = include_dir!("public");
+
+pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     add_files_to_executable();
-    let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
+    let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
     println!("Listening on port 8000");
     for stream in listener.incoming() {
         match stream {
@@ -78,8 +80,6 @@ pub fn serve(api_server: &api_server::ApiServer) {
         }
     }
 }
-
-const PUBLIC_FILES: Dir = include_dir!("public");
 
 fn add_files_to_executable() -> HashMap<String, &'static [u8]> {
     let mut file_map = HashMap::new();
