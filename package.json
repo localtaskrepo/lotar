@@ -21,13 +21,17 @@
   "author": "Ravi Gairola <mallox@pyxzl.net>",
   "license": "ISC",
   "dependencies": {
+    "@material-ui/core": "^4.12.4",
     "parcel": "^2.7.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "react-i18next": "^12.1.4",
     "react-router": "^6.4.2",
-    "react-router-dom": "^6.4.2"
+    "react-router-dom": "^6.4.2",
+    "recharts": "^2.3.2"
   },
   "devDependencies": {
-    "@parcel/transformer-stylus": "^2.8.2"
+    "@parcel/transformer-stylus": "^2.8.2",
+    "process": "^0.11.10"
   }
 }

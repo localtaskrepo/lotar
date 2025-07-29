@@ -1,14 +1,14 @@
 mod api_server;
-mod config;
 mod project;
 mod routes;
 mod web_server;
 mod tasks;
 mod store;
+mod scanner;
 
 use std::collections::HashMap;
-
 use std::env;
+use std::path::PathBuf;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -47,13 +47,23 @@ fn task_command(args: &[String]) {
 
 fn scan_command(args: &[String]) {
     let path = match args.get(2) {
-        Some(p) => p,
+        Some(p) => PathBuf::from(p),
         None => {
-            println!("No path specified. Using current directory.");
-            "."
+            let result = match project::get_project_path() {
+                Some(project_path) => project_path,
+                None => {
+                    println!("No path specified. Using current directory.");
+                    PathBuf::from(".")
+                }
+            };
+            result
         }
     };
-    println!("TODO: Scanning {}", path);
+    println!("Scanning {}", path.to_str().unwrap());
+    let results = scanner::Scanner::new(path).scan();
+    for entry in results {
+        println!("{:?}", entry);
+    }
 }
 
 fn config_command(args: &[String]) {

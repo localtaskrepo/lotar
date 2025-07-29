@@ -177,3 +177,7 @@ fn extract_project_name_from_cargo(file_content: &str) -> Option<String> {
         None => None,
     }
 }
+
+pub fn get_project_path() -> Option<PathBuf> {
+    Some(std::env::current_dir().unwrap())
+}

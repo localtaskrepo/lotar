@@ -4,18 +4,16 @@
 
 ## Overview
 
-This document outlines the comprehensive testing strategy for LoTaR, combining traditional software testing with real-world dogfooding to ensure the system works reliably for git-native requirements management.
+This document outlines the comprehensive testing strategy for the Local Task Repository (LoTaR) project. Our testing approach focuses on ensuring reliability, maintainability, and correctness across all components.
 
 ## Testing Philosophy
 
-### Core Principles
-1. **Dogfooding First**: Use LoTaR to manage its own development from day one
-2. **Git-Native Testing**: Test git integration as thoroughly as the application logic
-3. **Multi-Interface Testing**: Ensure CLI, web, IDE, and MCP interfaces work consistently
-4. **Real-World Scenarios**: Test with actual project workflows, not just toy examples
-5. **Regression Prevention**: Comprehensive test coverage to prevent breaking changes
+1. **Test Early, Test Often**: Every feature should have tests before implementation is considered complete
+2. **Dogfooding**: Use LoTaR to manage its own development tasks
+3. **Multiple Test Levels**: Unit tests, integration tests, and end-to-end tests
+4. **Real-world Scenarios**: Test with actual git repositories and realistic task workflows
 
-### Testing Pyramid Approach
+## Testing Pyramid Approach
 ```
                     Manual/Exploratory
                    ↗                   ↖
