@@ -3,6 +3,10 @@ name = "local_task_repo"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "lotar"
+path = "src/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -12,7 +16,10 @@ include_dir = "0.7"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
+serde_json = "1.0"
 uuid = { version = "1.8", features = ["v4", "fast-rng"] }
+walkdir = "2.4"
+git2 = "0.20.2"
 
 [dev-dependencies]
 tempfile = "3.10"

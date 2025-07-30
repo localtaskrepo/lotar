@@ -12,7 +12,7 @@ const PUBLIC_FILES: Dir = include_dir!("public");
 pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     add_files_to_executable();
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
-    println!("Listening on port 8000");
+    println!("Listening on port {}", port);
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {

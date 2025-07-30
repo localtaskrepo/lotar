@@ -1,49 +1,110 @@
 use local_task_repo::store::Task;
+use local_task_repo::types::{Priority};
 
 mod common;
 use common::{TestFixtures, assertions};
 
 #[test]
-fn test_task_creation() {
+fn test_enhanced_task_creation() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
 
     let task = Task::new(
         fixtures.tasks_root.clone(),
-        "Test Task Creation".to_string(),
+        "Enhanced Task Creation".to_string(),
         "test-project".to_string(),
-        1
+        Priority::High
     );
 
     let task_id = storage.add(&task);
-    assert!(task_id > 0, "Task ID should be assigned");
+    assert!(!task_id.is_empty(), "Task ID should be assigned");
+    assert!(task_id.starts_with("TEST-"), "First task should have formatted ID");
 
-    // Verify task file was created
-    assertions::assert_task_exists(&fixtures.tasks_root, "test-project", task_id);
+    // Verify task file was created with .yml extension
+    assertions::assert_task_exists(&fixtures.tasks_root, "test-project", &task_id);
+
+    // Verify metadata was created properly
+    assertions::assert_metadata_updated(&fixtures.tasks_root, "test-project", 1, 1);
 }
 
 #[test]
-fn test_task_retrieval() {
+fn test_enhanced_task_retrieval() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
 
-    let original_task = Task::new(
+    let task = Task::new(
         fixtures.tasks_root.clone(),
-        "Retrievable Task".to_string(),
+        "Retrieval Test Task".to_string(),
         "test-project".to_string(),
-        2
+        Priority::Medium
     );
 
-    let task_id = storage.add(&original_task);
-    let retrieved_task = storage.get(task_id, "test-project".to_string());
+    let task_id = storage.add(&task);
 
+    // Test retrieval
+    let retrieved_task = storage.get(&task_id, "test-project".to_string());
     assert!(retrieved_task.is_some(), "Task should be retrievable");
 
-    if let Some(task) = retrieved_task {
-        assert_eq!(task.title, "Retrievable Task");
-        assert_eq!(task.project, "test-project");
-        assert_eq!(task.priority, 2);
-    }
+    let retrieved = retrieved_task.unwrap();
+    assert_eq!(retrieved.title, "Retrieval Test Task");
+    assert_eq!(retrieved.project, "test-project");
+    assert_eq!(retrieved.priority, Priority::Medium);
+}
+
+#[test]
+fn test_task_deletion() {
+    let fixtures = TestFixtures::new();
+    let mut storage = fixtures.create_storage();
+
+    let task = Task::new(
+        fixtures.tasks_root.clone(),
+        "Task to Delete".to_string(),
+        "test-project".to_string(),
+        Priority::Low
+    );
+
+    let task_id = storage.add(&task);
+
+    // Verify task exists
+    assert!(storage.get(&task_id, "test-project".to_string()).is_some());
+
+    // Delete the task
+    let deleted = storage.delete(&task_id, "test-project".to_string());
+    assert!(deleted, "Task should be successfully deleted");
+
+    // Verify task no longer exists
+    assert!(storage.get(&task_id, "test-project".to_string()).is_none());
+
+    // Verify metadata was updated
+    assertions::assert_metadata_updated(&fixtures.tasks_root, "test-project", 0, 1);
+}
+
+#[test]
+fn test_sequential_task_ids() {
+    let fixtures = TestFixtures::new();
+    let mut storage = fixtures.create_storage();
+
+    let task1 = Task::new(
+        fixtures.tasks_root.clone(),
+        "First Task".to_string(),
+        "test-project".to_string(),
+        Priority::Medium
+    );
+
+    let task2 = Task::new(
+        fixtures.tasks_root.clone(),
+        "Second Task".to_string(),
+        "test-project".to_string(),
+        Priority::High
+    );
+
+    let id1 = storage.add(&task1);
+    let id2 = storage.add(&task2);
+
+    // IDs should be different and sequential
+    assert_ne!(id1, id2, "Task IDs should be different");
+    assert_eq!(id1, "TEST-001", "First task should be TEST-001");
+    assert_eq!(id2, "TEST-002", "Second task should be TEST-002");
 }
 
 #[test]
@@ -81,32 +142,32 @@ fn test_multiple_projects() {
         fixtures.tasks_root.clone(),
         "Project A Task".to_string(),
         "project-a".to_string(),
-        1
+        Priority::High
     );
 
     let task2 = Task::new(
         fixtures.tasks_root.clone(),
         "Project B Task".to_string(),
         "project-b".to_string(),
-        2
+        Priority::Medium
     );
 
     let id1 = storage.add(&task1);
     let id2 = storage.add(&task2);
 
     // Verify tasks are stored in correct project directories
-    assertions::assert_task_exists(&fixtures.tasks_root, "project-a", id1);
-    assertions::assert_task_exists(&fixtures.tasks_root, "project-b", id2);
+    assertions::assert_task_exists(&fixtures.tasks_root, "project-a", &id1);
+    assertions::assert_task_exists(&fixtures.tasks_root, "project-b", &id2);
 
     // Verify cross-project retrieval works correctly
-    let retrieved_a = storage.get(id1, "project-a".to_string());
-    let retrieved_b = storage.get(id2, "project-b".to_string());
+    let retrieved_a = storage.get(&id1, "project-a".to_string());
+    let retrieved_b = storage.get(&id2, "project-b".to_string());
 
     assert!(retrieved_a.is_some());
     assert!(retrieved_b.is_some());
 
     // Verify cross-project isolation
-    let wrong_project = storage.get(id1, "project-b".to_string());
+    let wrong_project = storage.get(&id1, "project-b".to_string());
     assert!(wrong_project.is_none(), "Task should not be accessible from wrong project");
 }
 
@@ -117,7 +178,7 @@ fn test_task_with_all_fields() {
         fixtures.tasks_root.clone(),
         "Complete Task".to_string(),
         "full-test".to_string(),
-        1
+        Priority::High
     );
 
     // Set all optional fields
@@ -130,7 +191,7 @@ fn test_task_with_all_fields() {
     let mut storage = fixtures.create_storage();
     let task_id = storage.add(&task);
 
-    let retrieved = storage.get(task_id, "full-test".to_string()).unwrap();
+    let retrieved = storage.get(&task_id, "full-test".to_string()).unwrap();
 
     // Verify all fields are preserved
     assert_eq!(retrieved.title, "Complete Task");
@@ -148,32 +209,37 @@ fn test_task_id_increment() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
 
-    let task1 = fixtures.create_sample_task("increment-test");
-    let task2 = fixtures.create_sample_task("increment-test");
-    let task3 = fixtures.create_sample_task("increment-test");
+    // Create tasks with unique titles to avoid file conflicts
+    let mut task1 = fixtures.create_sample_task("increment-test");
+    task1.title = "First Task".to_string();
+    let mut task2 = fixtures.create_sample_task("increment-test");
+    task2.title = "Second Task".to_string();
+    let mut task3 = fixtures.create_sample_task("increment-test");
+    task3.title = "Third Task".to_string();
 
     let id1 = storage.add(&task1);
     let id2 = storage.add(&task2);
     let id3 = storage.add(&task3);
 
     // IDs should increment
-    assert!(id2 > id1, "Second task ID should be greater than first");
-    assert!(id3 > id2, "Third task ID should be greater than second");
-    assert_eq!(id2, id1 + 1, "IDs should increment by 1");
-    assert_eq!(id3, id2 + 1, "IDs should increment by 1");
+    assert_eq!(id1, "INCR-001", "First task should be INCR-001");
+    assert_eq!(id2, "INCR-002", "Second task should be INCR-002");
+    assert_eq!(id3, "INCR-003", "Third task should be INCR-003");
 }
 
 #[test]
 fn test_task_priority_validation() {
     let fixtures = TestFixtures::new();
 
-    // Test valid priorities (1-5 range assumed)
-    for priority in 1..=5 {
+    // Test all valid Priority enum values
+    let priorities = vec![Priority::Low, Priority::Medium, Priority::High, Priority::Critical];
+
+    for priority in priorities {
         let task = Task::new(
             fixtures.tasks_root.clone(),
-            format!("Priority {} Task", priority),
+            format!("Priority {:?} Task", priority),
             "priority-test".to_string(),
-            priority
+            priority.clone()
         );
         assert_eq!(task.priority, priority);
     }
@@ -187,7 +253,7 @@ fn test_empty_project_name_handling() {
         fixtures.tasks_root.clone(),
         "Empty Project Task".to_string(),
         "".to_string(),  // Empty project name
-        1
+        Priority::Medium
     );
 
     // Should handle empty project gracefully
@@ -195,7 +261,7 @@ fn test_empty_project_name_handling() {
 
     let mut storage = fixtures.create_storage();
     let task_id = storage.add(&task);
-    assert!(task_id > 0, "Should still create task with empty project");
+    assert!(!task_id.is_empty(), "Should still create task with empty project");
 }
 
 #[test]
@@ -205,7 +271,7 @@ fn test_special_characters_in_task_fields() {
         fixtures.tasks_root.clone(),
         "Task with 特殊字符 and émojis 🚀".to_string(),
         "unicode-test".to_string(),
-        1
+        Priority::Medium
     );
 
     task.description = Some("Description with\nnewlines and\ttabs".to_string());
@@ -214,7 +280,7 @@ fn test_special_characters_in_task_fields() {
     let mut storage = fixtures.create_storage();
     let task_id = storage.add(&task);
 
-    let retrieved = storage.get(task_id, "unicode-test".to_string()).unwrap();
+    let retrieved = storage.get(&task_id, "unicode-test".to_string()).unwrap();
 
     // Verify special characters are preserved
     assert_eq!(retrieved.title, "Task with 特殊字符 and émojis 🚀");
@@ -251,11 +317,17 @@ mod performance_tests {
         assert_performance_threshold(
             || {
                 for i in 0..100 {
+                    let priority = match i % 4 {
+                        0 => Priority::Low,
+                        1 => Priority::Medium,
+                        2 => Priority::High,
+                        _ => Priority::Critical,
+                    };
                     let task = Task::new(
                         fixtures.tasks_root.clone(),
                         format!("Bulk Task {}", i),
                         "bulk-test".to_string(),
-                        (i % 5) as u8 + 1
+                        priority
                     );
                     storage.add(&task);
                 }

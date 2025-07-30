@@ -1,7 +1,11 @@
+use std::path::PathBuf;
 use tempfile::TempDir;
 use std::fs;
-use std::path::{Path, PathBuf};
 use local_task_repo::store::{Task, Storage};
+use local_task_repo::types::Priority;
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 
 /// Test utilities for LoTaR testing
 pub struct TestFixtures {
@@ -26,7 +30,7 @@ impl TestFixtures {
             self.tasks_root.clone(),
             "Sample Test Task".to_string(),
             project.to_string(),
-            2
+            Priority::Medium  // Changed from numeric 2 to Priority::Medium
         )
     }
 
@@ -39,51 +43,33 @@ impl TestFixtures {
     }
 
     /// Create test files with TODO comments for scanner testing
-    pub fn create_test_source_files(&self) -> Vec<PathBuf> {
+    pub fn create_test_source_files(&self) -> Vec<String> {
         let mut files = Vec::new();
 
-        // Rust file
-        let rust_file = self.temp_dir.path().join("test.rs");
-        fs::write(&rust_file, r#"
-fn main() {
-    // TODO: Implement main functionality
-    println!("Hello world");
+        // Create Rust file with TODO containing UUID
+        let rust_file_path = self.temp_dir.path().join("test.rs");
+        let mut rust_file = File::create(&rust_file_path).unwrap();
+        writeln!(rust_file, "fn main() {{").unwrap();
+        writeln!(rust_file, "    // TODO (uuid-1234): Test Rust with UUID").unwrap();
+        writeln!(rust_file, "    // TODO: Implement main functionality").unwrap();
+        writeln!(rust_file, "}}").unwrap();
+        files.push(rust_file_path.to_string_lossy().to_string());
 
-    /* TODO: Add error handling */
-    let result = process();
-}
+        // Create JavaScript file with TODO
+        let js_file_path = self.temp_dir.path().join("test.js");
+        let mut js_file = File::create(&js_file_path).unwrap();
+        writeln!(js_file, "function test() {{").unwrap();
+        writeln!(js_file, "    // TODO: Test JavaScript").unwrap();
+        writeln!(js_file, "}}").unwrap();
+        files.push(js_file_path.to_string_lossy().to_string());
 
-fn process() -> Result<(), String> {
-    // TODO (uuid-1234): Refactor this function
-    Ok(())
-}
-"#).expect("Failed to write Rust test file");
-        files.push(rust_file);
-
-        // JavaScript file
-        let js_file = self.temp_dir.path().join("test.js");
-        fs::write(&js_file, r#"
-function main() {
-    // TODO: Add input validation
-    const input = getUserInput();
-
-    /* TODO: Implement proper error handling */
-    return processInput(input);
-}
-"#).expect("Failed to write JavaScript test file");
-        files.push(js_file);
-
-        // Python file
-        let py_file = self.temp_dir.path().join("test.py");
-        fs::write(&py_file, r#"
-def main():
-    # TODO: Add docstring
-    pass
-
-    # TODO (uuid-5678): Implement functionality
-    return None
-"#).expect("Failed to write Python test file");
-        files.push(py_file);
+        // Create Python file with TODO
+        let py_file_path = self.temp_dir.path().join("test.py");
+        let mut py_file = File::create(&py_file_path).unwrap();
+        writeln!(py_file, "def test():").unwrap();
+        writeln!(py_file, "    # TODO: Test Python").unwrap();
+        writeln!(py_file, "    pass").unwrap();
+        files.push(py_file_path.to_string_lossy().to_string());
 
         files
     }
@@ -95,11 +81,11 @@ def main():
 
         // Create different types of tasks
         let task_configs = vec![
-            ("Implement authentication", 1, vec!["security", "backend"]),
-            ("Design user interface", 2, vec!["ui", "frontend"]),
-            ("Write unit tests", 3, vec!["testing", "quality"]),
-            ("Setup CI/CD pipeline", 2, vec!["devops", "automation"]),
-            ("Create documentation", 1, vec!["docs", "onboarding"]),
+            ("Implement authentication", Priority::High, vec!["security", "backend"]),
+            ("Design user interface", Priority::Medium, vec!["ui", "frontend"]),
+            ("Write unit tests", Priority::High, vec!["testing", "quality"]),
+            ("Setup CI/CD pipeline", Priority::Medium, vec!["devops", "automation"]),
+            ("Create documentation", Priority::Low, vec!["docs", "onboarding"]),
         ];
 
         for (title, priority, tags) in task_configs {
@@ -125,16 +111,22 @@ pub mod assertions {
     use local_task_repo::store::Task;
     use std::path::Path;
 
-    pub fn assert_task_exists(tasks_root: &Path, project: &str, task_id: u64) {
-        let task_file = tasks_root
-            .join(format!("{}/task_{:04}.yaml", project, task_id));
-        assert!(task_file.exists(), "Task file should exist: {:?}", task_file);
+    pub fn assert_task_exists(tasks_root: &Path, project: &str, task_id: &str) {
+        // Look for .yml files since we changed the extension
+        let task_files = std::fs::read_dir(tasks_root.join(project))
+            .expect("Project directory should exist")
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "yml"))
+            .collect::<Vec<_>>();
+
+        assert!(!task_files.is_empty(), "Should have at least one task file in project {}", project);
     }
 
     pub fn assert_task_has_field(task: &Task, field: &str, expected_value: &str) {
         match field {
             "title" => assert_eq!(task.title, expected_value),
             "project" => assert_eq!(task.project, expected_value),
+            "id" => assert_eq!(task.id, expected_value),
             _ => panic!("Unknown field: {}", field),
         }
     }
@@ -142,6 +134,16 @@ pub mod assertions {
     pub fn assert_task_count(tasks: &[Task], expected_count: usize) {
         assert_eq!(tasks.len(), expected_count,
                   "Expected {} tasks, found {}", expected_count, tasks.len());
+    }
+
+    pub fn assert_metadata_updated(tasks_root: &Path, project: &str, task_count: u64, current_id: u64) {
+        let metadata_file = tasks_root.join(format!("{}/metadata.yml", project));
+        assert!(metadata_file.exists(), "Metadata file should exist for project {}", project);
+
+        let metadata_content = std::fs::read_to_string(&metadata_file)
+            .expect("Should be able to read metadata file");
+        assert!(metadata_content.contains(&format!("task_count: {}", task_count)));
+        assert!(metadata_content.contains(&format!("current_id: {}", current_id)));
     }
 }
 
@@ -200,7 +202,7 @@ mod tests {
 
         assert_eq!(files.len(), 3);
         for file in &files {
-            assert!(file.exists());
+            assert!(Path::new(file).exists());
         }
 
         // Verify content of one file

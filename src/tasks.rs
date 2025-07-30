@@ -1,172 +1,320 @@
 use std::path::PathBuf;
-use crate::store;
-use crate::store::Task;
-
-fn validate_args(min_args: usize, args: &[String]) -> bool {
-    if args.len() < min_args {
-        println!("Not enough arguments");
-        return false;
-    }
-    true
-}
-
-fn assign_task_properties(
-    task: &mut Task,
-    args: &[String],
-    start_index: usize
-) {
-    for i in start_index..args.len() {
-        let arg = args[i].as_str();
-        let key_value: Vec<&str> = arg.splitn(2, '=').collect();
-        let key = key_value[0];
-        let value = key_value[1];
-        match key {
-            "--title" | "-t" => task.title = value.to_string(),
-            "--subtitle" | "-s" => task.subtitle = Some(value.to_string()),
-            "--description" | "-d" => task.description = Some(value.to_string()),
-            "--priority" | "-p" => task.priority = value.parse::<u8>().unwrap_or(3),
-            "--category" | "-c" => task.category = Some(value.to_string()),
-            "--due-date" | "-dd" => task.due_date = Some(value.to_string()),
-            "--tag" | "-x" => task.tags.push(value.to_string()),
-            "--project" | "-g" => {
-                    if !value.is_empty() && value.chars().any(|c| c.is_ascii_alphanumeric()) {
-                        task.project = value.to_string()
-                    };
-            }
-            _ => {
-                println!("Invalid argument: {}", arg);
-                return;
-            }
-        }
-    }
-}
+use crate::store::{self, Task};
+use crate::types::{TaskStatus, TaskType, Priority};
+use crate::index::TaskFilter;
 
 pub fn task_command(args: &[String], default_project: &str) {
-    if !validate_args(3, args) {
-        return;
+    if args.len() < 3 {
+        println!("Error: No task operation specified.");
+        println!("Available operations: add, edit, list, status, search, delete");
+        println!("Use 'lotar help' for more information.");
+        std::process::exit(1);
     }
-    let operation = args[2].as_str();
-    // TODO find project root or get tasks from options
 
+    let operation = args[2].as_str();
     let root_path = PathBuf::from(std::env::current_dir().unwrap().join(".tasks/"));
     let mut store = store::Storage::new(root_path.clone());
+
     match operation {
         "add" => {
-            if !validate_args(4, args) {
-                return;
-            }
             let mut task = Task::new(
                 root_path.clone(),
                 "".to_string(),
                 default_project.to_string(),
-                3
+                Priority::Medium
             );
-            assign_task_properties(&mut task, args, 3);
-            if task.title.is_empty() {
-                println!("Title is required");
-                return;
+
+            if args.len() < 4 {
+                println!("Error: No task title specified.");
+                println!("Usage: lotar task add --title=\"Task Title\" [OPTIONS]");
+                std::process::exit(1);
             }
+
+            assign_task_properties(&mut task, args, 3);
+
+            if task.title.is_empty() {
+                eprintln!("Error: Title is required");
+                eprintln!("Usage: lotar task add --title=\"Task Title\" [OPTIONS]");
+                std::process::exit(1);
+            }
+
             let id = store.add(&task);
             println!("Added task with id: {}", id);
         }
         "edit" => {
-            if !validate_args(4, args) {
-                return;
+            if args.len() < 4 {
+                println!("Error: No task ID specified.");
+                println!("Usage: lotar task edit <ID> [OPTIONS]");
+                std::process::exit(1);
             }
-            let id = match args[3].parse::<u64>() {
-                Ok(i) => i,
-                Err(e) => {
-                    println!("Invalid id: {}", e);
-                    return;
-                }
-            };
-            let project = if args.len() > 4 {
-                let key_value: Vec<&str> = args[4].splitn(2, '=').collect();
-                let key = key_value[0];
-                let value = key_value[1];
-                if (key == "--project" || key == "-g") && !value.is_empty() {
-                    value.to_string()
-                } else {
-                    println!("Invalid argument: {}", args[4]);
-                    return;
-                }
-            } else {
-                default_project.to_string()
-            };
-            let mut task = match store.get(id, project) {
+
+            let id = &args[3]; // Now accepting string IDs like "TEST-001"
+
+            let project = extract_project_from_args(args, 4, default_project);
+
+            let mut task = match store.get(id, project.clone()) {
                 Some(t) => t,
                 None => {
-                    println!("Task with id '{}' not found", id);
-                    return;
+                    println!("Error: Task with id '{}' not found in project '{}'", id, project);
+                    std::process::exit(1);
                 }
             };
+
             assign_task_properties(&mut task, args, 4);
+            task.update_modified();
             store.edit(id, &task);
-            println!("Task with id {} updated", id);
+            println!("Task {} updated successfully", id);
+        }
+        "status" => {
+            if args.len() < 5 {
+                println!("Error: Status command requires task ID and new status.");
+                println!("Usage: lotar task status <ID> <STATUS>");
+                println!("Available statuses: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE");
+                std::process::exit(1);
+            }
+
+            let id = &args[3]; // Now accepting string IDs like "TEST-001"
+
+            let new_status = match args[4].parse::<TaskStatus>() {
+                Ok(status) => status,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    println!("Available statuses: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE");
+                    std::process::exit(1);
+                }
+            };
+
+            let project = extract_project_from_args(args, 5, default_project);
+
+            let mut task = match store.get(id, project.clone()) {
+                Some(t) => t,
+                None => {
+                    println!("Error: Task with id '{}' not found in project '{}'", id, project);
+                    std::process::exit(1);
+                }
+            };
+
+            let old_status = task.status.clone();
+            match task.update_status(new_status.clone()) {
+                Ok(_) => {
+                    store.edit(id, &task);
+                    println!("Task {} status updated: {} → {}", id, old_status, new_status);
+                },
+                Err(e) => {
+                    eprintln!("Error updating status: {}", e);
+                }
+            }
+        }
+        "list" => {
+            let project = extract_project_from_args(args, 3, default_project);
+            println!("Listing tasks for project: {}", project);
+
+            let tasks = store.list_by_project(&project);
+            if tasks.is_empty() {
+                println!("No tasks found in project '{}'", project);
+            } else {
+                println!("Found {} tasks:", tasks.len());
+                for task in tasks {
+                    println!("  [{}] {} - {} (Priority: {}, Status: {})",
+                            task.id, task.title, task.project, task.priority, task.status);
+                }
+            }
+        }
+        "search" => {
+            if args.len() < 4 {
+                println!("Error: Search requires a query.");
+                println!("Usage: lotar task search <QUERY> [--project=PROJECT] [--status=STATUS] [--priority=N] [--tag=TAG]");
+                std::process::exit(1);
+            }
+
+            let query = &args[3];
+            let mut filter = TaskFilter {
+                text_query: Some(query.clone()),
+                ..Default::default()
+            };
+
+            // Parse additional filter arguments
+            for i in 4..args.len() {
+                let arg = &args[i];
+                if let Some(stripped) = arg.strip_prefix("--project=") {
+                    filter.project = Some(stripped.to_string());
+                } else if let Some(stripped) = arg.strip_prefix("--status=") {
+                    if let Ok(status) = stripped.parse::<TaskStatus>() {
+                        filter.status = Some(status);
+                    }
+                } else if let Some(stripped) = arg.strip_prefix("--priority=") {
+                    if let Ok(priority) = stripped.parse::<u8>() {
+                        filter.priority = Some(priority);
+                    }
+                } else if let Some(stripped) = arg.strip_prefix("--tag=") {
+                    filter.tags.push(stripped.to_string());
+                }
+            }
+
+            println!("Searching for: '{}'", query);
+            if filter.project.is_some() || filter.status.is_some() || filter.priority.is_some() || !filter.tags.is_empty() {
+                println!("Filters: project={:?}, status={:?}, priority={:?}, tags={:?}",
+                        filter.project, filter.status, filter.priority, filter.tags);
+            }
+
+            let results = store.search(&filter);
+            if results.is_empty() {
+                println!("No tasks found matching the search criteria.");
+            } else {
+                println!("Found {} matching tasks:", results.len());
+                for task in results {
+                    println!("  [{}] {} - {} (Priority: {}, Status: {})",
+                            task.id, task.title, task.project, task.priority, task.status);
+                    if !task.tags.is_empty() {
+                        println!("    Tags: {}", task.tags.join(", "));
+                    }
+                }
+            }
         }
         "delete" => {
-            if !validate_args(4, args) {
-                return;
+            if args.len() < 4 {
+                println!("Error: No task ID specified.");
+                println!("Usage: lotar task delete <ID> [--project=PROJECT]");
+                std::process::exit(1);
             }
-            let id = match args[3].parse::<u64>() {
-                Ok(i) => i,
-                Err(e) => {
-                    println!("Invalid id: {}", e);
-                    return;
-                }
-            };
-            let project = if args.len() > 4 {
-                let key_value: Vec<&str> = args[4].splitn(2, '=').collect();
-                let key = key_value[0];
-                let value = key_value[1];
-                if (key == "--project" || key == "-g") && !value.is_empty() {
-                    value.to_string()
-                } else {
-                    println!("Invalid argument: {}", args[4]);
-                    return;
-                }
+
+            let id = &args[3]; // Now accepting string IDs like "TEST-001"
+
+            let project = extract_project_from_args(args, 4, default_project);
+
+            if store.delete(id, project.clone()) {
+                println!("Task {} deleted successfully from project '{}'", id, project);
             } else {
-                default_project.to_string()
-            };
-            if store.delete(id, project) {
-                println!("Task with id {} deleted", id);
-            } else {
-                println!("Task with id {} not found", id);
-            }
-        }
-        "get" => {
-            if !validate_args(4, args) {
-                return;
-            }
-            let id = match args[3].parse::<u64>() {
-                Ok(i) => i,
-                Err(e) => {
-                    println!("Invalid id: {}", e);
-                    return;
-                }
-            };
-            let project = if args.len() > 4 {
-                let key_value: Vec<&str> = args[4].splitn(2, '=').collect();
-                let key = key_value[0];
-                let value = key_value[1];
-                if (key == "--project" || key == "-g") && !value.is_empty() {
-                    value.to_string()
-                } else {
-                    println!("Invalid argument: {}", args[4]);
-                    return;
-                }
-            } else {
-                default_project.to_string()
-            };
-            let task = store.get(id, project);
-            if task.is_some() {
-                println!("{}", task.unwrap());
-            } else {
-                println!("Task with id {} not found", id);
+                println!("Error: Task with id '{}' not found in project '{}'", id, project);
+                std::process::exit(1);
             }
         }
         _ => {
-            println!("Invalid operation: {}", operation);
+            println!("Error: Invalid task operation '{}'", operation);
+            println!("Available operations: add, edit, list, status, search, delete");
         }
+    }
+}
+
+fn extract_project_from_args(args: &[String], start_index: usize, default_project: &str) -> String {
+    for i in start_index..args.len() {
+        let arg = &args[i];
+        if let Some(stripped) = arg.strip_prefix("--project=") {
+            return stripped.to_string();
+        }
+    }
+    default_project.to_string()
+}
+
+fn assign_task_properties(task: &mut Task, args: &[String], start_index: usize) {
+    let mut i = start_index;
+    while i < args.len() {
+        let arg = &args[i];
+
+        if let Some(stripped) = arg.strip_prefix("--title=") {
+            task.title = stripped.to_string();
+        } else if arg == "--title" || arg == "-t" {
+            if i + 1 < args.len() {
+                task.title = args[i + 1].clone();
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--type=") {
+            if let Ok(task_type) = stripped.parse::<TaskType>() {
+                task.task_type = task_type;
+            }
+        } else if arg == "--type" {
+            if i + 1 < args.len() {
+                if let Ok(task_type) = args[i + 1].parse::<TaskType>() {
+                    task.task_type = task_type;
+                }
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--assignee=") {
+            task.assignee = Some(stripped.to_string());
+        } else if arg == "--assignee" || arg == "-a" {
+            if i + 1 < args.len() {
+                task.assignee = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--effort=") {
+            task.effort = Some(stripped.to_string());
+        } else if arg == "--effort" || arg == "-e" {
+            if i + 1 < args.len() {
+                task.effort = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--priority=") {
+            if let Ok(priority) = stripped.parse::<Priority>() {
+                task.priority = priority;
+            }
+        } else if arg == "--priority" || arg == "-p" {
+            if i + 1 < args.len() {
+                if let Ok(priority) = args[i + 1].parse::<Priority>() {
+                    task.priority = priority;
+                }
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--acceptance-criteria=") {
+            task.acceptance_criteria.push(stripped.to_string());
+        } else if arg == "--acceptance-criteria" || arg == "--ac" {
+            if i + 1 < args.len() {
+                task.acceptance_criteria.push(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--depends-on=") {
+            task.relationships.depends_on.push(stripped.to_string());
+        } else if let Some(stripped) = arg.strip_prefix("--blocks=") {
+            task.relationships.blocks.push(stripped.to_string());
+        } else if let Some(stripped) = arg.strip_prefix("--related=") {
+            task.relationships.related.push(stripped.to_string());
+        } else if let Some(stripped) = arg.strip_prefix("--parent=") {
+            task.relationships.parent = Some(stripped.to_string());
+        } else if let Some(stripped) = arg.strip_prefix("--fixes=") {
+            task.relationships.fixes.push(stripped.to_string());
+        // Legacy fields for backward compatibility
+        } else if let Some(stripped) = arg.strip_prefix("--subtitle=") {
+            task.subtitle = Some(stripped.to_string());
+        } else if arg == "--subtitle" || arg == "-s" {
+            if i + 1 < args.len() {
+                task.subtitle = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--description=") {
+            task.description = Some(stripped.to_string());
+        } else if arg == "--description" || arg == "-d" {
+            if i + 1 < args.len() {
+                task.description = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--project=") {
+            task.project = stripped.to_string();
+        } else if arg == "--project" || arg == "-g" {
+            if i + 1 < args.len() {
+                task.project = args[i + 1].clone();
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--category=") {
+            task.category = Some(stripped.to_string());
+        } else if arg == "--category" || arg == "-c" {
+            if i + 1 < args.len() {
+                task.category = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--due-date=") {
+            task.due_date = Some(stripped.to_string());
+        } else if arg == "--due-date" || arg == "-dd" {
+            if i + 1 < args.len() {
+                task.due_date = Some(args[i + 1].clone());
+                i += 1;
+            }
+        } else if let Some(stripped) = arg.strip_prefix("--tag=") {
+            task.tags.push(stripped.to_string());
+        } else if arg == "--tag" {
+            if i + 1 < args.len() {
+                task.tags.push(args[i + 1].clone());
+                i += 1;
+            }
+        }
+        i += 1;
     }
 }

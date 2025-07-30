@@ -90,12 +90,38 @@ fn test_cli_scan_with_path() {
 
 #[test]
 fn test_cli_serve_command_starts() {
-    // Test that serve command starts without immediate error
-    let mut cmd = Command::cargo_bin("local_task_repo").unwrap();
-    cmd.args(&["serve", "8001"])
-        .timeout(std::time::Duration::from_secs(2))
-        .assert()
-        .success();
+    // Test that serve command starts successfully (it should keep running)
+    // We spawn the process and check it starts, then kill it
+    use std::process::{Command, Stdio};
+    use std::time::Duration;
+    use std::thread;
+    
+    let mut child = Command::new("cargo")
+        .args(&["run", "--", "serve", "8002"]) // Use different port to avoid conflicts
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to start server");
+    
+    // Give the server time to start
+    thread::sleep(Duration::from_millis(500));
+    
+    // Check if the process is still running (which means it started successfully)
+    match child.try_wait() {
+        Ok(Some(_status)) => {
+            // Process has exited - this is unexpected for a server
+            panic!("Server process exited unexpectedly");
+        }
+        Ok(None) => {
+            // Process is still running - this is what we expect
+            // Server started successfully, now terminate it
+            child.kill().expect("Failed to kill server process");
+            child.wait().expect("Failed to wait for server process");
+        }
+        Err(e) => {
+            panic!("Error checking server process status: {}", e);
+        }
+    }
 }
 
 #[test]

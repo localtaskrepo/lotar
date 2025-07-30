@@ -33,101 +33,53 @@ Write a module in Rust called Scanner that implements the following features:
 * Write concise, readable, and maintainable code, but skip any tests for now
 */
 
-const FILE_TYPES: &[(&str, &str, &str, &str)] = &[
-    ("py", "#", "'''", "'''"),
-    ("go", "//", "/*", "*/"),
-    ("rs", "//", "/*", "*/"),
-    ("java", "//", "/*", "*/"),
-    ("js", "//", "/*", "*/"),
-    ("cpp", "//", "/*", "*/"),
-    ("cs", "//", "/*", "*/"),
-    ("scala", "//", "/*", "*/"),
-    ("hs", "--", "{-", "-}"),
-    ("groovy", "//", "/*", "*/"),
-    ("rb", "#", "=begin", "=end"),
-    ("c", "//", "/*", "*/"),
-    ("h", "//", "/*", "*/"),
-    ("swift", "//", "/*", "*/"),
-    ("php", "//", "/*", "*/"),
-    ("elixir", "#", "'''", "'''"),
-    ("erlang", "%", "%%", "%%"),
-    ("clojure", ";", ";;", ";;"),
-    ("elm", "--", "{-", "-}"),
-    ("kotlin", "//", "/*", "*/"),
-    ("dart", "//", "/*", "*/"),
-    ("haxe", "//", "{", "}"),
-    ("rust", "//", "/*", "*/"),
-    ("fsharp", "//", "(*", "*)"),
-    ("ocaml", "(*", "(*", "*)"),
-    ("haskell", "--", "{-", "-}"),
-    ("pascal", "//", "{", "}"),
-    ("perl", "#", "=pod", "=cut"),
-    ("r", "#", "'''", "'''"),
-    ("powershell", "#", "<#", "#>"),
-    ("nim", "#", "\"\"", "\"\""),
-    ("scheme", ";;", "#|", "|#"),
-    ("commonlisp", ";;", "", ""),
-    ("racket", ";", "#|", "|#"),
-    ("c", "//", "/", "/"),
-    ("c++", "//", "/", "/"),
-    ("c#", "//", "/", "/"),
-    ("java", "//", "/", "/"),
-    ("javascript", "//", "/", "/"),
-    ("python", "#", "\"\"\"", "\"\"\""),
-    ("go", "//", "/", "/"),
-    ("rust", "//", "/", "/"),
-    ("scala", "//", "/", "/"),
-    ("haskell", "--", "{-", "-}"),
-    ("groovy", "//", "/", "/"),
-    ("ruby", "#", "=begin", "=end"),
+// Optimized file types configuration - removed duplicates and organized by comment style
+const FILE_TYPES: &[(&str, &str)] = &[
+    // Single-line comment languages with //
+    ("rs", "//"), ("rust", "//"), ("go", "//"), ("java", "//"), ("js", "//"), ("ts", "//"),
+    ("cpp", "//"), ("cc", "//"), ("cxx", "//"), ("c", "//"), ("h", "//"), ("hpp", "//"),
+    ("cs", "//"), ("scala", "//"), ("groovy", "//"), ("swift", "//"), ("php", "//"),
+    ("kotlin", "//"), ("dart", "//"), ("fsharp", "//"),
+
+    // Hash-based comment languages
+    ("py", "#"), ("rb", "#"), ("sh", "#"), ("bash", "#"), ("perl", "#"), ("r", "#"),
+    ("elixir", "#"), ("powershell", "#"), ("nim", "#"), ("yaml", "#"), ("yml", "#"),
+
+    // Double-dash comment languages
+    ("hs", "--"), ("haskell", "--"), ("elm", "--"), ("pascal", "--"),
+
+    // Semicolon comment languages
+    ("clojure", ";"), ("scheme", ";"), ("commonlisp", ";"), ("racket", ";"),
+
+    // Percent comment languages
+    ("erlang", "%"), ("matlab", "%"), ("tex", "%"),
 ];
 
 use std::fs;
-use uuid::Uuid;
 use regex::Regex;
-use std::collections::HashMap;
-use std::clone::Clone;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 
-// Define a struct to hold the reference information
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct Reference {
-    pub id: String,
     pub file_path: PathBuf,
     pub line_number: usize,
-    pub title: String,  // Changed from annotation to title for test compatibility
-    pub uuid: String,   // Added uuid field for test compatibility
+    pub title: String,
+    pub uuid: String,
     pub annotation: String,
     pub code_block: String,
     pub comment_block: String,
 }
 
-struct Search {
-    start_comment: Regex,
-    end_comment: Regex,
-    todo: Regex,
-}
-
 pub struct Scanner {
     path: PathBuf,
     last_scan: Vec<Reference>,
-    search: HashMap<String, Search>,
 }
 
 impl Scanner {
     pub fn new(path: PathBuf) -> Scanner {
-        let mut search = HashMap::new();
-        for (file_type, start_comment, _, _) in FILE_TYPES {
-            search.insert(file_type.to_string(), Search {
-                start_comment: Regex::new(start_comment).unwrap(),
-                end_comment: Regex::new("\n").unwrap(),
-                todo: Regex::new(r"@todo").unwrap(),
-            });
-        }
         Scanner {
             path,
             last_scan: vec![],
-            search,
         }
     }
 
@@ -135,80 +87,101 @@ impl Scanner {
         let mut references = vec![];
 
         // Recursively search through the directory for source code files
-        for entry in fs::read_dir(&self.path).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            let extension = match path.extension() {
-                Some(ext) => ext.to_str().unwrap(),
-                None => continue,
-            };
-
-            if path.is_dir() {
-                references.append(&mut self.scan());
-            } else {
-                let search = match self.search.get(extension) {
-                    Some(search) => search,
-                    None => continue,
-                };
-
-                let path_buf = path.clone();
-                let file_contents = fs::read_to_string(path).unwrap();
-                let (mut in_block, mut comment_block, mut code_block) = (false, String::new(), String::new());
-
-                for line in file_contents.lines() {
-                    if search.start_comment.is_match(line) {
-                        in_block = true;
-                    } else if search.end_comment.is_match(line) {
-                        in_block = false;
-                    }
-                    if in_block {
-                        comment_block.push_str(line);
-                        comment_block.push_str("\n");
-                    } else {
-                        code_block.push_str(line);
-                        code_block.push_str("\n");
-                    }
-                }
-                for (line_number, line) in code_block.lines().enumerate() {
-                    if search.todo.is_match(line) {
-                        let reference = Reference {
-                            id: Uuid::new_v4().to_string(),
-                            file_path: path_buf.clone(),
-                            line_number,
-                            title: line.to_string(),  // Changed from annotation to title for test compatibility
-                            uuid: Uuid::new_v4().to_string(),   // Added uuid field for test compatibility
-                            annotation: line.to_string(),
-                            code_block: code_block.clone(),
-                            comment_block: comment_block.clone(),
-                        };
-                        references.push(reference);
-                    }
-                }
-            }
-        }
+        self.scan_directory(&self.path.clone(), &mut references);
 
         // Save the current scan results for later comparison
         self.last_scan = references.clone();
-
         references
     }
 
-    pub fn detect_changes(&self) -> Vec<Reference> {
-        let mut new_references = vec![];
-        for reference in &self.last_scan {
-            if !self.contains(&reference) {
-                new_references.push(reference.clone());
-            }
-        }
-        new_references
+    // Add a method to get the last scan results for potential future use
+    pub fn get_last_scan(&self) -> &Vec<Reference> {
+        &self.last_scan
     }
 
-    fn contains(&self, reference: &Reference) -> bool {
-        for r in &self.last_scan {
-            if r.id == reference.id {
+    fn scan_directory(&self, dir_path: &PathBuf, references: &mut Vec<Reference>) {
+        if let Ok(entries) = fs::read_dir(dir_path) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+
+                    if path.is_dir() {
+                        // Recursive directory scanning
+                        self.scan_directory(&path, references);
+                    } else if let Some(extension) = path.extension() {
+                        if let Some(ext_str) = extension.to_str() {
+                            // Check for file extension match in our supported types
+                            if self.is_supported_file_type(ext_str) {
+                                self.scan_file(&path, references);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn is_supported_file_type(&self, extension: &str) -> bool {
+        // Check if this extension is supported
+        for (file_type, _) in FILE_TYPES {
+            if file_type == &extension {
                 return true;
             }
         }
         false
+    }
+
+    fn scan_file(&self, file_path: &PathBuf, references: &mut Vec<Reference>) {
+        if let Ok(file_contents) = fs::read_to_string(file_path) {
+            if let Some(extension) = file_path.extension() {
+                if let Some(ext_str) = extension.to_str() {
+                    // Find the correct comment pattern for this file type
+                    if let Some((_, start_comment)) = FILE_TYPES.iter()
+                        .find(|(file_type, _)| file_type == &ext_str) {
+
+                        let comment_regex = Regex::new(start_comment).unwrap();
+                        let todo_regex = Regex::new(r"(?i)todo").unwrap();
+                        let uuid_extract_regex = Regex::new(r"(?i)todo\s*\(([^)]+)\)\s*:?\s*(.*)").unwrap();
+                        let simple_todo_regex = Regex::new(r"(?i)todo\s*:?\s*(.*)").unwrap();
+
+                        // Process each line to find TODOs in comments
+                        for (line_number, line) in file_contents.lines().enumerate() {
+                            // Check if line contains a comment and TODO (case insensitive)
+                            if comment_regex.is_match(line) && todo_regex.is_match(line) {
+                                let (uuid, title) = if let Some(uuid_captures) = uuid_extract_regex.captures(line) {
+                                    // Extract UUID and title from UUID format
+                                    let uuid = uuid_captures.get(1).map_or(String::new(), |m| m.as_str().to_string());
+                                    let title = uuid_captures.get(2).map_or(String::new(), |m| m.as_str().trim().to_string());
+                                    (uuid, title)
+                                } else if let Some(simple_captures) = simple_todo_regex.captures(line) {
+                                    // Extract title from simple TODO format
+                                    let title = simple_captures.get(1).map_or(String::new(), |m| m.as_str().trim().to_string());
+                                    (String::new(), title)
+                                } else {
+                                    // Fallback: extract whatever comes after TODO
+                                    if let Some(todo_pos) = line.to_lowercase().find("todo") {
+                                        let after_todo = &line[todo_pos + 4..].trim();
+                                        (String::new(), after_todo.to_string())
+                                    } else {
+                                        (String::new(), String::new())
+                                    }
+                                };
+
+                                let reference = Reference {
+                                    file_path: file_path.clone(),
+                                    line_number: line_number + 1, // 1-based line numbers
+                                    title,
+                                    uuid,
+                                    annotation: line.trim().to_string(),
+                                    code_block: String::new(),
+                                    comment_block: String::new(),
+                                };
+                                references.push(reference);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

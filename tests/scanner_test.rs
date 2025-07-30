@@ -48,12 +48,13 @@ fn test_scan_with_uuid_in_comment() {
     // Should find multiple TODO comments
     assert!(references.len() >= 3);
 
-    // Check for UUID extraction
-    let uuid_todo = references.iter().find(|r| r.title.contains("uuid-1234"));
+    // Check for UUID extraction - look in the uuid field, not the title
+    let uuid_todo = references.iter().find(|r| r.uuid.contains("uuid-1234"));
     assert!(uuid_todo.is_some());
 
     if let Some(todo) = uuid_todo {
         assert!(todo.uuid.contains("uuid-1234"));
+        assert!(todo.title.contains("Test Rust with UUID"));
     }
 }
 
@@ -66,9 +67,15 @@ fn test_scan_multiple_languages() {
     let references = scanner.scan();
 
     // Should find TODOs in Rust, JavaScript, and Python files
-    let rust_todos = references.iter().filter(|r| r.file_path.ends_with(".rs")).count();
-    let js_todos = references.iter().filter(|r| r.file_path.ends_with(".js")).count();
-    let py_todos = references.iter().filter(|r| r.file_path.ends_with(".py")).count();
+    let rust_todos = references.iter().filter(|r| {
+        r.file_path.extension().map_or(false, |ext| ext == "rs")
+    }).count();
+    let js_todos = references.iter().filter(|r| {
+        r.file_path.extension().map_or(false, |ext| ext == "js")
+    }).count();
+    let py_todos = references.iter().filter(|r| {
+        r.file_path.extension().map_or(false, |ext| ext == "py")
+    }).count();
 
     assert!(rust_todos > 0, "Should find Rust TODOs");
     assert!(js_todos > 0, "Should find JavaScript TODOs");
