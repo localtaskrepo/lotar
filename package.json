@@ -3,12 +3,16 @@
   "version": "0.1.0",
   "description": "A task and project management tool that runs locally and can be synced via repo",
   "scripts": {
-    "parcel": "parcel build view/index.html --dist-dir public",
-    "rust": "cargo build",
-    "rust_release": "cargo build --release",
-    "build": "npm run parcel && npm run rust",
-    "build_release": "npm run parcel && npm run rust_release",
-    "clean": "cargo clean && rm -rf public/*"
+    "start": "parcel serve view/index.html --dist-dir target/web --port 3000",
+    "dev": "npm run build:web:dev && cargo run",
+    "build": "npm run build:web && cargo build --release",
+    "build:web": "parcel build view/index.html --dist-dir target/web --no-source-maps --no-content-hash",
+    "build:web:dev": "parcel build view/index.html --dist-dir target/web",
+    "test": "cargo test",
+    "test:integration": "./test_integration.sh",
+    "clean": "cargo clean && rm -rf .parcel-cache",
+    "clean:all": "npm run clean && rm -rf node_modules",
+    "release": "npm run clean && npm run build"
   },
   "keywords": [
     "local",

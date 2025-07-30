@@ -7,10 +7,12 @@ use std::path::Path;
 use include_dir::{include_dir, Dir};
 use crate::api_server;
 
-const PUBLIC_FILES: Dir = include_dir!("public");
+// Use the target/web folder to keep all build artifacts together
+const STATIC_FILES: Dir = include_dir!("target/web");
 
 pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     add_files_to_executable();
+
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).unwrap();
     println!("Listening on port {}", port);
     for stream in listener.incoming() {
@@ -34,7 +36,7 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                     stream.flush().unwrap();
                 } else {
                     // Get the file path to serve based on the request path
-                    let file_path = format!("public{}", request_path);
+                    let file_path = format!("target/web{}", request_path);
                     match fs::File::open(&file_path) {
                         Ok(mut file) => {
                             let mut file_content = String::new();
@@ -83,9 +85,9 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
 
 fn add_files_to_executable() -> HashMap<String, &'static [u8]> {
     let mut file_map = HashMap::new();
-    for file in PUBLIC_FILES.files() {
-        let path = format!("{}{}", "public", file.path().display());
-        let key = path.strip_prefix("public").unwrap().to_owned();
+    for file in STATIC_FILES.files() {
+        let path = format!("{}{}", "target/web", file.path().display());
+        let key = path.strip_prefix("target/web").unwrap().to_owned();
         let data = file.contents();
         file_map.insert(key, data);
     }
