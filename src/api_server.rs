@@ -9,8 +9,8 @@ pub struct ApiServer {
 }
 
 impl ApiServer {
-    pub(crate) fn new() -> ApiServer {
-        ApiServer {
+    pub fn new() -> Self {
+        Self {
             handlers: HashMap::new(),
         }
     }

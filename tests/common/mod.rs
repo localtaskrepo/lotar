@@ -73,37 +73,6 @@ impl TestFixtures {
 
         files
     }
-
-    /// Create a project structure with multiple tasks
-    pub fn create_sample_project(&self, project_name: &str) -> Vec<Task> {
-        let mut storage = self.create_storage();
-        let mut tasks = Vec::new();
-
-        // Create different types of tasks
-        let task_configs = vec![
-            ("Implement authentication", Priority::High, vec!["security", "backend"]),
-            ("Design user interface", Priority::Medium, vec!["ui", "frontend"]),
-            ("Write unit tests", Priority::High, vec!["testing", "quality"]),
-            ("Setup CI/CD pipeline", Priority::Medium, vec!["devops", "automation"]),
-            ("Create documentation", Priority::Low, vec!["docs", "onboarding"]),
-        ];
-
-        for (title, priority, tags) in task_configs {
-            let mut task = Task::new(
-                self.tasks_root.clone(),
-                title.to_string(),
-                project_name.to_string(),
-                priority
-            );
-            task.tags = tags.into_iter().map(|s| s.to_string()).collect();
-
-            let task_id = storage.add(&task);
-            task.id = task_id;
-            tasks.push(task);
-        }
-
-        tasks
-    }
 }
 
 /// Assertion helpers for testing
@@ -111,7 +80,7 @@ pub mod assertions {
     use local_task_repo::store::Task;
     use std::path::Path;
 
-    pub fn assert_task_exists(tasks_root: &Path, project: &str, task_id: &str) {
+    pub fn assert_task_exists(tasks_root: &Path, project: &str, _task_id: &str) {
         // Look for .yml files since we changed the extension
         let task_files = std::fs::read_dir(tasks_root.join(project))
             .expect("Project directory should exist")
@@ -122,28 +91,45 @@ pub mod assertions {
         assert!(!task_files.is_empty(), "Should have at least one task file in project {}", project);
     }
 
-    pub fn assert_task_has_field(task: &Task, field: &str, expected_value: &str) {
-        match field {
-            "title" => assert_eq!(task.title, expected_value),
-            "project" => assert_eq!(task.project, expected_value),
-            "id" => assert_eq!(task.id, expected_value),
-            _ => panic!("Unknown field: {}", field),
-        }
-    }
-
-    pub fn assert_task_count(tasks: &[Task], expected_count: usize) {
-        assert_eq!(tasks.len(), expected_count,
-                  "Expected {} tasks, found {}", expected_count, tasks.len());
-    }
-
     pub fn assert_metadata_updated(tasks_root: &Path, project: &str, task_count: u64, current_id: u64) {
-        let metadata_file = tasks_root.join(format!("{}/metadata.yml", project));
-        assert!(metadata_file.exists(), "Metadata file should exist for project {}", project);
+        // Removed metadata file existence check since we've eliminated metadata.yml files
+        // With the new filesystem-based approach, we verify the data by counting files and finding max ID
+        let project_path = tasks_root.join(project);
 
-        let metadata_content = std::fs::read_to_string(&metadata_file)
-            .expect("Should be able to read metadata file");
-        assert!(metadata_content.contains(&format!("task_count: {}", task_count)));
-        assert!(metadata_content.contains(&format!("current_id: {}", current_id)));
+        // Count actual task files in the directory (no longer need to exclude metadata.yml)
+        let actual_task_count = if let Ok(entries) = std::fs::read_dir(&project_path) {
+            entries
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry.path().is_file() &&
+                    entry.path().extension().map_or(false, |ext| ext == "yml")
+                })
+                .count() as u64
+        } else {
+            0
+        };
+
+        // Find the highest numbered file to verify current_id
+        let actual_current_id = if let Ok(entries) = std::fs::read_dir(&project_path) {
+            entries
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| {
+                    let file_name = entry.file_name();
+                    let name_str = file_name.to_string_lossy();
+                    if name_str.ends_with(".yml") {
+                        name_str.strip_suffix(".yml")?.parse::<u64>().ok()
+                    } else {
+                        None
+                    }
+                })
+                .max()
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        assert_eq!(actual_task_count, task_count, "Task count mismatch for project {}", project);
+        assert_eq!(actual_current_id, current_id, "Current ID mismatch for project {}", project);
     }
 }
 

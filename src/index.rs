@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
-use crate::types::TaskStatus;
+use crate::types::{TaskStatus, Priority};
 use crate::store::{Task};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskFilter {
     pub status: Option<TaskStatus>,
-    pub priority: Option<u8>,
+    pub priority: Option<Priority>,  // Changed from u8 to Priority enum
     pub project: Option<String>,
     pub category: Option<String>,
     pub tags: Vec<String>,
@@ -30,142 +30,53 @@ impl Default for TaskFilter {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TaskIndex {
-    pub id2file: HashMap<String, String>,
+    // Global cross-project indexes only
     pub tag2id: HashMap<String, Vec<String>>,
-    pub status2id: HashMap<String, Vec<String>>,
-    pub project2id: HashMap<String, Vec<String>>,
-    pub priority2id: HashMap<String, Vec<String>>,
     pub last_updated: String,
 }
 
 impl TaskIndex {
     pub fn new() -> Self {
         Self {
-            id2file: HashMap::new(),
             tag2id: HashMap::new(),
-            status2id: HashMap::new(),
-            project2id: HashMap::new(),
-            priority2id: HashMap::new(),
             last_updated: chrono::Utc::now().to_rfc3339(),
         }
     }
 
-    pub fn add_task(&mut self, task: &Task, file_path: &str) {
-        let task_id = task.id.to_string();
-
-        // Update id2file mapping
-        self.id2file.insert(task_id.clone(), file_path.to_string());
-
-        // Update tag index
+    pub fn add_task_with_id(&mut self, task_id: &str, task: &Task, _file_path: &str) {
+        // Only update tag index (global cross-project data)
         for tag in &task.tags {
             self.tag2id.entry(tag.clone())
                 .or_insert_with(Vec::new)
-                .push(task_id.clone());
+                .push(task_id.to_string());
         }
-
-        // Update status index
-        let status_key = task.status.to_string();
-        self.status2id.entry(status_key)
-            .or_insert_with(Vec::new)
-            .push(task_id.clone());
-
-        // Update project index
-        self.project2id.entry(task.project.clone())
-            .or_insert_with(Vec::new)
-            .push(task_id.clone());
-
-        // Update priority index
-        let priority_key = task.priority.to_string();
-        self.priority2id.entry(priority_key)
-            .or_insert_with(Vec::new)
-            .push(task_id.clone());
 
         self.last_updated = chrono::Utc::now().to_rfc3339();
     }
 
-    pub fn remove_task(&mut self, task: &Task) {
-        let task_id = task.id.to_string();
-
-        // Remove from id2file
-        self.id2file.remove(&task_id);
-
-        // Remove from tag index
+    pub fn remove_task_with_id(&mut self, task_id: &str, task: &Task) {
+        // Remove from tag index only
         for tag in &task.tags {
             if let Some(ids) = self.tag2id.get_mut(tag) {
-                ids.retain(|id| id != &task_id);
+                ids.retain(|id| id != task_id);
                 if ids.is_empty() {
                     self.tag2id.remove(tag);
                 }
             }
         }
 
-        // Remove from status index
-        let status_key = task.status.to_string();
-        if let Some(ids) = self.status2id.get_mut(&status_key) {
-            ids.retain(|id| id != &task_id);
-            if ids.is_empty() {
-                self.status2id.remove(&status_key);
-            }
-        }
-
-        // Remove from project index
-        if let Some(ids) = self.project2id.get_mut(&task.project) {
-            ids.retain(|id| id != &task_id);
-            if ids.is_empty() {
-                self.project2id.remove(&task.project);
-            }
-        }
-
-        // Remove from priority index
-        let priority_key = task.priority.to_string();
-        if let Some(ids) = self.priority2id.get_mut(&priority_key) {
-            ids.retain(|id| id != &task_id);
-            if ids.is_empty() {
-                self.priority2id.remove(&priority_key);
-            }
-        }
-
         self.last_updated = chrono::Utc::now().to_rfc3339();
     }
 
-    pub fn update_task(&mut self, old_task: &Task, new_task: &Task, file_path: &str) {
-        self.remove_task(old_task);
-        self.add_task(new_task, file_path);
+    pub fn update_task_with_id(&mut self, task_id: &str, old_task: &Task, new_task: &Task, file_path: &str) {
+        self.remove_task_with_id(task_id, old_task);
+        self.add_task_with_id(task_id, new_task, file_path);
     }
 
     pub fn find_by_filter(&self, filter: &TaskFilter) -> Vec<String> {
+        // With the simplified index, we only handle tag filtering here
+        // Other filters (status, priority, project) will be handled at the storage level
         let mut candidates: Option<Vec<String>> = None;
-
-        // Start with the most restrictive filter
-        if let Some(status) = &filter.status {
-            candidates = Some(self.status2id.get(&status.to_string())
-                .map(|ids| ids.clone())
-                .unwrap_or_default());
-        }
-
-        if let Some(project) = &filter.project {
-            let project_ids = self.project2id.get(project)
-                .map(|ids| ids.clone())
-                .unwrap_or_default();
-            candidates = Some(match candidates {
-                Some(existing) => existing.into_iter()
-                    .filter(|id| project_ids.contains(id))
-                    .collect(),
-                None => project_ids,
-            });
-        }
-
-        if let Some(priority) = filter.priority {
-            let priority_ids = self.priority2id.get(&priority.to_string())
-                .map(|ids| ids.clone())
-                .unwrap_or_default();
-            candidates = Some(match candidates {
-                Some(existing) => existing.into_iter()
-                    .filter(|id| priority_ids.contains(id))
-                    .collect(),
-                None => priority_ids,
-            });
-        }
 
         // Filter by tags (intersection)
         for tag in &filter.tags {
@@ -180,10 +91,8 @@ impl TaskIndex {
             });
         }
 
-        candidates.unwrap_or_else(|| {
-            // If no specific filters, return all task IDs
-            self.id2file.keys().cloned().collect()
-        })
+        // If no tag filters, return empty vec - let storage handle other filters
+        candidates.unwrap_or_default()
     }
 
     pub fn save_to_file(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -242,27 +151,29 @@ impl TaskIndex {
                     .and_then(|n| n.to_str())
                     .unwrap_or("");
 
-                // Skip metadata files
-                if file_name == "metadata.yml" {
-                    continue;
-                }
-
-                // Process task files (both .yaml and .yml)
+                // Process task files (both .yaml and .yml) - removed metadata.yml skip since we're eliminating those files
                 if file_name.ends_with(".yaml") || file_name.ends_with(".yml") {
                     if let Ok(content) = fs::read_to_string(&path) {
                         if let Ok(task) = serde_yaml::from_str::<Task>(&content) {
-                            // Fix: Calculate relative path correctly from root_path
+                            // Calculate relative path correctly from root_path
                             let relative_path = path.strip_prefix(root_path)
                                 .unwrap_or(&path)
                                 .to_string_lossy()
                                 .to_string();
-                            self.add_task(&task, &relative_path);
+
+                            // Extract ID from folder+filename (e.g., AUTH/5.yml -> AUTH-5)
+                            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                                if let Ok(numeric_id) = stem.parse::<u64>() {
+                                    let task_id = format!("{}-{}", project_name, numeric_id);
+                                    self.add_task_with_id(&task_id, &task, &relative_path);
+                                }
+                            }
                         }
                     }
+                } else if path.is_dir() {
+                    // Recursively scan subdirectories (for categories)
+                    self.scan_project_directory(&path, project_name, root_path)?;
                 }
-            } else if path.is_dir() {
-                // Recursively scan subdirectories (for categories)
-                self.scan_project_directory(&path, project_name, root_path)?;
             }
         }
 

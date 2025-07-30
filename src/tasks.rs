@@ -50,7 +50,14 @@ pub fn task_command(args: &[String], default_project: &str) {
 
             let id = &args[3]; // Now accepting string IDs like "TEST-001"
 
+            // Extract project from task ID if no explicit project is provided
             let project = extract_project_from_args(args, 4, default_project);
+            let project = if project == default_project && id.contains('-') {
+                // If using default project and task ID contains project prefix, extract it
+                id.split('-').next().unwrap_or(default_project).to_string()
+            } else {
+                project
+            };
 
             let mut task = match store.get(id, project.clone()) {
                 Some(t) => t,
@@ -75,16 +82,22 @@ pub fn task_command(args: &[String], default_project: &str) {
 
             let id = &args[3]; // Now accepting string IDs like "TEST-001"
 
+            // Extract project from task ID if no explicit project is provided
+            let project = extract_project_from_args(args, 5, default_project);
+            let project = if project == default_project && id.contains('-') {
+                // If using default project and task ID contains project prefix, extract it
+                id.split('-').next().unwrap_or(default_project).to_string()
+            } else {
+                project
+            };
+
             let new_status = match args[4].parse::<TaskStatus>() {
                 Ok(status) => status,
                 Err(e) => {
                     eprintln!("Error: {}", e);
-                    println!("Available statuses: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE");
                     std::process::exit(1);
                 }
             };
-
-            let project = extract_project_from_args(args, 5, default_project);
 
             let mut task = match store.get(id, project.clone()) {
                 Some(t) => t,
@@ -94,16 +107,9 @@ pub fn task_command(args: &[String], default_project: &str) {
                 }
             };
 
-            let old_status = task.status.clone();
-            match task.update_status(new_status.clone()) {
-                Ok(_) => {
-                    store.edit(id, &task);
-                    println!("Task {} status updated: {} → {}", id, old_status, new_status);
-                },
-                Err(e) => {
-                    eprintln!("Error updating status: {}", e);
-                }
-            }
+            task.update_status(new_status.clone()).unwrap();
+            store.edit(id, &task);
+            println!("Task {} status updated to {}", id, new_status);
         }
         "list" => {
             let project = extract_project_from_args(args, 3, default_project);
@@ -114,9 +120,9 @@ pub fn task_command(args: &[String], default_project: &str) {
                 println!("No tasks found in project '{}'", project);
             } else {
                 println!("Found {} tasks:", tasks.len());
-                for task in tasks {
+                for (task_id, task) in tasks {
                     println!("  [{}] {} - {} (Priority: {}, Status: {})",
-                            task.id, task.title, task.project, task.priority, task.status);
+                            task_id, task.title, task.project, task.priority, task.status);
                 }
             }
         }
@@ -143,7 +149,7 @@ pub fn task_command(args: &[String], default_project: &str) {
                         filter.status = Some(status);
                     }
                 } else if let Some(stripped) = arg.strip_prefix("--priority=") {
-                    if let Ok(priority) = stripped.parse::<u8>() {
+                    if let Ok(priority) = stripped.parse::<Priority>() {
                         filter.priority = Some(priority);
                     }
                 } else if let Some(stripped) = arg.strip_prefix("--tag=") {
@@ -162,9 +168,9 @@ pub fn task_command(args: &[String], default_project: &str) {
                 println!("No tasks found matching the search criteria.");
             } else {
                 println!("Found {} matching tasks:", results.len());
-                for task in results {
+                for (task_id, task) in results {
                     println!("  [{}] {} - {} (Priority: {}, Status: {})",
-                            task.id, task.title, task.project, task.priority, task.status);
+                            task_id, task.title, task.project, task.priority, task.status);
                     if !task.tags.is_empty() {
                         println!("    Tags: {}", task.tags.join(", "));
                     }

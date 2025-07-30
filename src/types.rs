@@ -11,6 +11,12 @@ pub enum TaskStatus {
     Done,
 }
 
+impl TaskStatus {
+    pub fn is_default(&self) -> bool {
+        matches!(self, TaskStatus::Todo)
+    }
+}
+
 impl Default for TaskStatus {
     fn default() -> Self {
         TaskStatus::Todo
@@ -53,6 +59,12 @@ pub enum TaskType {
     Chore,
 }
 
+impl TaskType {
+    pub fn is_default(&self) -> bool {
+        matches!(self, TaskType::Feature)
+    }
+}
+
 impl Default for TaskType {
     fn default() -> Self {
         TaskType::Feature
@@ -86,12 +98,58 @@ impl std::str::FromStr for TaskType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct TaskRelationships {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub depends_on: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub blocks: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub related: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub parent: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub children: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub fixes: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub duplicate_of: Option<String>,
+}
+
+impl TaskRelationships {
+    pub fn is_empty(&self) -> bool {
+        self.depends_on.is_empty() &&
+        self.blocks.is_empty() &&
+        self.related.is_empty() &&
+        self.parent.is_none() &&
+        self.children.is_empty() &&
+        self.fixes.is_empty() &&
+        self.duplicate_of.is_none()
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TaskComment {
+    pub author: String,
+    pub date: String,
+    pub text: String,
+}
+
+// Type alias for custom fields - can hold any YAML-serializable value
+pub type CustomFields = HashMap<String, serde_yaml::Value>;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Copy)]
 pub enum Priority {
     Low,
     Medium,
     High,
     Critical,
+}
+
+impl Priority {
+    pub fn is_default(&self) -> bool {
+        matches!(self, Priority::Medium)
+    }
 }
 
 impl Default for Priority {
@@ -124,24 +182,3 @@ impl std::str::FromStr for Priority {
         }
     }
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
-pub struct TaskRelationships {
-    pub depends_on: Vec<String>,
-    pub blocks: Vec<String>,
-    pub related: Vec<String>,
-    pub parent: Option<String>,
-    pub children: Vec<String>,
-    pub fixes: Vec<String>,
-    pub duplicate_of: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TaskComment {
-    pub author: String,
-    pub date: String,
-    pub text: String,
-}
-
-// Type alias for custom fields - can hold any YAML-serializable value
-pub type CustomFields = HashMap<String, serde_yaml::Value>;

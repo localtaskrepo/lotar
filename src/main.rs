@@ -20,8 +20,6 @@ trait Command {
 struct ServeCommand;
 struct TaskCommand;
 struct ScanCommand;
-struct ConfigCommand;
-struct IndexCommand;
 
 impl Command for ServeCommand {
     fn execute(&self, args: &[String]) -> Result<(), String> {
@@ -95,19 +93,66 @@ fn config_command(args: &[String]) -> Result<(), String> {
     let operation = match args.get(2) {
         Some(o) => o,
         None => {
-            return Err("No config operation specified. Available options are: set, get, delete".to_string());
+            return Err("No config operation specified. Available options are: set, get, delete, prefix".to_string());
         }
     };
     let mut config = HashMap::new();
 
-    let key = match args.get(3) {
-        Some(k) => k,
-        None => {
-            return Err("No config key specified.".to_string());
-        }
-    };
     match operation.as_str() {
+        "prefix" => {
+            // Handle project prefix configuration
+            let subcommand = match args.get(3) {
+                Some(s) => s,
+                None => {
+                    return Err("No prefix operation specified. Usage: lotar config prefix <set|get> <project> [prefix]".to_string());
+                }
+            };
+
+            let project = match args.get(4) {
+                Some(p) => p,
+                None => {
+                    return Err("No project specified. Usage: lotar config prefix <set|get> <project> [prefix]".to_string());
+                }
+            };
+
+            let root_path = PathBuf::from(std::env::current_dir().unwrap().join(".tasks/"));
+            let mut storage = store::Storage::new(root_path);
+
+            match subcommand.as_str() {
+                "set" => {
+                    let prefix = match args.get(5) {
+                        Some(p) => p,
+                        None => {
+                            return Err("No prefix specified. Usage: lotar config prefix set <project> <prefix>".to_string());
+                        }
+                    };
+
+                    match storage.set_project_prefix(project, prefix) {
+                        Ok(_) => println!("✅ Project '{}' prefix set to '{}'", project, prefix.to_uppercase()),
+                        Err(e) => return Err(format!("Failed to set prefix: {}", e)),
+                    }
+                }
+                "get" => {
+                    // In the new architecture, just show the folder name as the prefix
+                    let project_path = storage.root_path.join(project);
+                    if project_path.exists() {
+                        println!("Project '{}' prefix: {}", project, project);
+                    } else {
+                        println!("Project '{}' not found", project);
+                    }
+                }
+                _ => {
+                    return Err("Invalid prefix operation. Available options are: set, get".to_string());
+                }
+            }
+        }
         "set" => {
+            let key = match args.get(3) {
+                Some(k) => k,
+                None => {
+                    return Err("No config key specified.".to_string());
+                }
+            };
             let value = match args.get(4) {
                 Some(v) => v,
                 None => {
@@ -117,16 +162,32 @@ fn config_command(args: &[String]) -> Result<(), String> {
             config.insert(key.to_string(), value.to_string());
             println!("Setting {} to {}", key, value);
         },
-        "get" => match config.get(key) {
-            Some(value) => println!("{} = {}", key, value),
-            None => println!("No value found for key {}", key),
+        "get" => {
+            let key = match args.get(3) {
+                Some(k) => k,
+                None => {
+                    return Err("No config key specified.".to_string());
+                }
+            };
+            match config.get(key) {
+                Some(value) => println!("{} = {}", key, value),
+                None => println!("No value found for key {}", key),
+            }
         },
-        "delete" => match config.remove(key) {
-            Some(value) => println!("{} = {} has been deleted", key, value),
-            None => println!("No value found for key {}", key),
+        "delete" => {
+            let key = match args.get(3) {
+                Some(k) => k,
+                None => {
+                    return Err("No config key specified.".to_string());
+                }
+            };
+            match config.remove(key) {
+                Some(value) => println!("{} = {} has been deleted", key, value),
+                None => println!("No value found for key {}", key),
+            }
         },
         _ => {
-            return Err("Invalid config operation. Available options are: set, get, delete".to_string());
+            return Err("Invalid config operation. Available options are: set, get, delete, prefix".to_string());
         }
     }
     Ok(())

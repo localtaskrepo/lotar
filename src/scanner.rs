@@ -57,7 +57,7 @@ const FILE_TYPES: &[(&str, &str)] = &[
 
 use std::fs;
 use regex::Regex;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Reference {
@@ -76,10 +76,10 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    pub fn new(path: PathBuf) -> Scanner {
-        Scanner {
+    pub fn new(path: PathBuf) -> Self {
+        Self {
             path,
-            last_scan: vec![],
+            last_scan: Vec::new(),
         }
     }
 
@@ -92,11 +92,6 @@ impl Scanner {
         // Save the current scan results for later comparison
         self.last_scan = references.clone();
         references
-    }
-
-    // Add a method to get the last scan results for potential future use
-    pub fn get_last_scan(&self) -> &Vec<Reference> {
-        &self.last_scan
     }
 
     fn scan_directory(&self, dir_path: &PathBuf, references: &mut Vec<Reference>) {
@@ -183,5 +178,44 @@ impl Scanner {
                 }
             }
         }
+    }
+
+    pub fn extract_todos_from_content(&self, content: &str, file_path: &Path) -> Vec<Reference> {
+        let mut references = vec![];
+
+        // Create the regex patterns needed for this method
+        let uuid_extract_regex = Regex::new(r"(?i)todo\s*\(([^)]+)\)\s*:?\s*(.*)").unwrap();
+        let simple_todo_regex = Regex::new(r"(?i)todo\s*:?\s*(.*)").unwrap();
+
+        for (line_number, line) in content.lines().enumerate() {
+            // Check if line contains TODO (case insensitive)
+            if line.to_lowercase().contains("todo") {
+                let (uuid, title) = if let Some(uuid_captures) = uuid_extract_regex.captures(line) {
+                    // Extract UUID and title from UUID format
+                    let uuid = uuid_captures.get(1).map_or(String::new(), |m| m.as_str().to_string());
+                    let title = uuid_captures.get(2).map_or(String::new(), |m| m.as_str().trim().to_string());
+                    (uuid, title)
+                } else if let Some(simple_captures) = simple_todo_regex.captures(line) {
+                    // Extract title from simple TODO format
+                    let title = simple_captures.get(1).map_or(String::new(), |m| m.as_str().trim().to_string());
+                    (String::new(), title)
+                } else {
+                    (String::new(), String::new())
+                };
+
+                let reference = Reference {
+                    file_path: file_path.to_path_buf(),
+                    line_number: line_number + 1, // Convert to 1-based line number
+                    title,
+                    uuid,
+                    annotation: line.trim().to_string(),
+                    code_block: String::new(),
+                    comment_block: String::new(),
+                };
+                references.push(reference);
+            }
+        }
+
+        references
     }
 }
