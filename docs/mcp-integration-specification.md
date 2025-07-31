@@ -1,26 +1,30 @@
-# MCP Integration Specification (Simplified)
+# MCP Integration Specification (Future Development)
 
-*Last Updated: 2025-07-29*
+*Last Updated: July 30, 2025*
+*Status: **FUTURE SPECIFICATION** - Not Currently Implemented*
 
-## Overview
+## ⚠️ Important Notice
 
-This specification defines the Model Context Protocol (MCP) integration for LoTaR, providing AI agents with efficient task management capabilities without complex NLP features.
+This document describes **planned future functionality** for Model Context Protocol (MCP) integration with LoTaR. **None of these features are currently implemented** in the production codebase.
 
-## Vision Statement
+## Current Status
 
-**AI agents as first-class citizens** - LoTaR provides a clean MCP interface that enables AI agents to manage tasks efficiently, leveraging their existing language understanding capabilities rather than building redundant NLP features.
+LoTaR v1.0 is production-ready without MCP integration. The system currently provides:
+- ✅ Complete CLI interface for task management
+- ✅ Web server with REST API
+- ✅ Source code scanning for TODOs  
+- ✅ Project isolation and search capabilities
 
-## MCP Server Architecture
+## Future MCP Integration Vision
 
-### Core Components
+### Planned MCP Server Architecture
+
+The future MCP integration would provide AI agents with efficient task management capabilities:
 
 ```rust
-// Simplified MCP server structure
+// Future implementation concept
 pub struct LoTaRMCPServer {
-    // Core data access
-    repository: Arc<RwLock<LoTaRRepository>>,
-    
-    // Configuration
+    repository: Arc<RwLock<Storage>>,
     config: MCPServerConfig,
 }
 
@@ -31,269 +35,77 @@ pub struct MCPServerConfig {
 }
 ```
 
-## MCP Tool Categories (Phase 1)
+### Planned Tool Categories
 
-### Category 1: Task Management Tools
-**Purpose**: Efficient CRUD operations optimized for AI workflows
+#### 1. Task Management Tools
+Basic CRUD operations optimized for AI workflows:
+- `create_task()` - Create new tasks
+- `update_task()` - Modify existing tasks  
+- `get_task()` - Retrieve task details
+- `list_tasks()` - List with filtering
+- `delete_task()` - Remove tasks
+- `bulk_operations()` - Batch processing for efficiency
 
-```typescript
-interface TaskManagementTools {
-  // Basic operations
-  create_task(params: CreateTaskParams): Promise<CreateTaskResult>;
-  update_task(params: UpdateTaskParams): Promise<UpdateTaskResult>;
-  get_task(params: GetTaskParams): Promise<GetTaskResult>;
-  list_tasks(params: ListTasksParams): Promise<ListTasksResult>;
-  delete_task(params: DeleteTaskParams): Promise<DeleteTaskResult>;
-  
-  // Batch operations for efficiency
-  bulk_update_tasks(params: BulkUpdateParams): Promise<BulkUpdateResult>;
-  bulk_create_tasks(params: BulkCreateParams): Promise<BulkCreateResult>;
-  
-  // Relationship management with external system support
-  add_relationship(params: AddRelationshipParams): Promise<RelationshipResult>;
-  remove_relationship(params: RemoveRelationshipParams): Promise<RelationshipResult>;
-  get_related_tasks(params: GetRelatedParams): Promise<RelatedTasksResult>;
-  
-  // External system integration
-  link_external_ticket(params: LinkExternalParams): Promise<LinkResult>;
-  get_external_links(params: GetExternalParams): Promise<ExternalLinksResult>;
-}
-```
+#### 2. Relationship Management
+Enhanced task relationships with external system support:
+- Internal task dependencies (`depends_on`, `blocks`, `related`)
+- External ticket references (`github:org/repo#123`, `jira:PROJ-456`)
+- Hierarchical relationships (`parent`, `children`)
 
-### Category 2: Git History and Context Tools
-**Purpose**: Leverage git history for decision context
+#### 3. Context and History Tools
+Git-integrated decision tracking:
+- Task history with git commit context
+- Project context and statistics
+- Similar task finding based on content
 
-```typescript
-interface GitContextTools {
-  // Git history analysis
-  get_task_history(params: {
-    task_id: string;
-    include_diffs?: boolean;
-  }): Promise<{
-    history: GitHistoryEntry[];
-    decision_timeline: DecisionEvent[];
-  }>;
-  
-  // Project context
-  get_project_context(params: {
-    project: string;
-    include_stats?: boolean;
-  }): Promise<{
-    project_info: ProjectInfo;
-    task_summary: TaskSummary;
-    recent_activity: ActivityEvent[];
-  }>;
-  
-  // Find similar tasks based on content similarity
-  find_similar_tasks(params: {
-    task_id?: string;
-    title?: string;
-    description?: string;
-    project?: string;
-    limit?: number;
-  }): Promise<{
-    similar_tasks: SimilarTask[];
-  }>;
-}
-```
+### Planned External System Integration
 
-## Enhanced Relationship System with External Tickets
-
-### External Ticket Prefixes
-```typescript
-// Support for external system references
-type ExternalTicketRef = 
-  | `github:${string}/${string}#${number}`     // github:org/repo#123
-  | `github:${string}#${number}`               // github:repo#123 (current org)
-  | `github:#${number}`                        // github:#123 (current repo)
-  | `jira:${string}-${number}`                 // jira:PROJ-123
-  | `linear:${string}`                         // linear:LIN-123
-  | `azure:${number}`                          // azure:12345
-  | `asana:${number}`;                         // asana:12345
-
-interface EnhancedTaskRelationships {
-  // Internal task relationships
-  depends_on: string[];
-  blocks: string[];
-  related: string[];
-  parent: string[];
-  child: string[];
-  fixes: string[];
-  duplicate_of: string[];
-  
-  // External ticket relationships
-  external_links: {
-    depends_on: ExternalTicketRef[];
-    blocks: ExternalTicketRef[];
-    related: ExternalTicketRef[];
-    implements: ExternalTicketRef[];    // This task implements external requirement
-    references: ExternalTicketRef[];    // General reference
-  };
-}
-```
-
-### External Link Examples
+Support for external ticket references:
 ```yaml
-# Task file with external links
+# Future YAML format with external links
 relationships:
   depends_on: ["AUTH-002"]
   external_links:
     implements: ["github:org/frontend#456", "jira:PROJ-789"]
-    depends_on: ["github:#123"]  # Current repo issue
+    depends_on: ["github:#123"]
     references: ["linear:LIN-456"]
 ```
 
-## Simplified AI Agent Use Cases
+### Implementation Priority
 
-### Use Case 1: Task Management Assistant
-```typescript
-class TaskManager {
-  async createTasksFromList(descriptions: string[], project: string) {
-    // AI agent creates multiple tasks efficiently
-    const tasks = descriptions.map(desc => ({
-      title: this.extractTitle(desc),
-      description: desc,
-      project: project,
-      type: this.inferType(desc),
-      priority: this.inferPriority(desc)
-    }));
-    
-    return await mcp.bulk_create_tasks({ tasks });
-  }
-  
-  async linkToGitHubIssue(taskId: string, repoUrl: string, issueNumber: number) {
-    // Link LoTaR task to GitHub issue
-    const githubRef = this.formatGitHubRef(repoUrl, issueNumber);
-    return await mcp.link_external_ticket({
-      task_id: taskId,
-      external_ref: githubRef,
-      relationship_type: "implements"
-    });
-  }
-}
-```
+**Phase 1** (Future):
+- Basic MCP server implementation
+- Core task management tools
+- Simple AI agent interface
 
-### Use Case 2: Project Synchronization Agent
-```typescript
-class ProjectSync {
-  async syncWithGitHub(project: string, repoUrl: string) {
-    // Get current tasks
-    const tasks = await mcp.list_tasks({ project });
-    
-    // Find GitHub links
-    const githubLinks = await mcp.get_external_links({
-      project,
-      system: "github"
-    });
-    
-    // Sync status or create reports
-    return this.generateSyncReport(tasks, githubLinks);
-  }
-}
-```
+**Phase 2** (Future):
+- External system integration
+- Advanced relationship management
+- Git history context tools
 
-## Phase 2: Advanced Analytics (Future)
+**Phase 3** (Future):
+- Bulk operations and optimization
+- Advanced AI workflow support
+- Enterprise integrations
 
-Future analytics features (not in initial implementation):
-- Project risk analysis
-- Timeline prediction
-- Decision pattern analysis
-- Resource optimization
-- Process improvement suggestions
+## Current Alternatives
 
-These will be added later as separate tools available through CLI, web interface, and MCP.
+While MCP integration is planned for the future, AI agents can currently interact with LoTaR through:
 
-## Implementation Requirements
+1. **CLI Interface**: Execute `lotar` commands programmatically
+2. **REST API**: HTTP endpoints via the web server (`lotar serve`)
+3. **File System**: Direct YAML file manipulation
+4. **Git Integration**: Standard git operations on `.tasks/` directory
 
-### MCP Protocol Implementation
-```rust
-impl MCPServer for LoTaRMCPServer {
-    fn get_tools(&self) -> Vec<MCPTool> {
-        vec![
-            // Core task management
-            MCPTool::new("create_task", "Create a new task"),
-            MCPTool::new("update_task", "Update an existing task"),
-            MCPTool::new("list_tasks", "List tasks with filtering"),
-            MCPTool::new("bulk_update_tasks", "Update multiple tasks"),
-            
-            // External integration
-            MCPTool::new("link_external_ticket", "Link to external ticket"),
-            MCPTool::new("get_external_links", "Get external ticket links"),
-            
-            // Git context
-            MCPTool::new("get_task_history", "Get task change history"),
-            MCPTool::new("find_similar_tasks", "Find similar tasks"),
-            MCPTool::new("get_project_context", "Get project overview"),
-        ]
-    }
-}
-```
+## Development Timeline
 
-### External System Integration
-```rust
-pub struct ExternalSystemManager {
-    github_config: Option<GitHubConfig>,
-    jira_config: Option<JiraConfig>,
-    // Other systems...
-}
+MCP integration is **not scheduled** for implementation in the current development cycle. The core LoTaR system is complete and production-ready without these features.
 
-impl ExternalSystemManager {
-    pub fn parse_external_ref(&self, reference: &str) -> Result<ExternalTicket> {
-        if reference.starts_with("github:") {
-            self.parse_github_ref(reference)
-        } else if reference.starts_with("jira:") {
-            self.parse_jira_ref(reference)
-        } else {
-            Err(LoTaRError::InvalidExternalRef(reference.to_string()))
-        }
-    }
-    
-    pub async fn validate_external_ref(&self, reference: &str) -> Result<bool> {
-        // Optional: validate that external ticket exists
-        // This would require API access to external systems
-    }
-}
-```
+Future MCP development would require:
+- MCP protocol library integration
+- Server architecture implementation  
+- Tool interface development
+- External system connectors
+- Comprehensive testing
 
-## Security and Configuration
-
-### Simple Configuration
-```yaml
-# mcp-config.yaml
-mcp:
-  enabled: true
-  port: 3000
-  max_concurrent_agents: 5
-  
-  tools:
-    task_management: true
-    git_context: true
-    external_links: true
-  
-  external_systems:
-    github:
-      enabled: true
-      default_org: "myorg"
-      default_repo: "myrepo"
-    jira:
-      enabled: true
-      base_url: "https://mycompany.atlassian.net"
-  
-  security:
-    require_api_key: true
-    rate_limit: 100  # requests per minute
-```
-
-## Success Metrics
-
-### Adoption Metrics
-- Number of AI agents using MCP interface
-- Task operations per minute through MCP
-- External system integration usage
-
-### Quality Metrics
-- Response time for basic operations (target: <100ms)
-- Batch operation efficiency
-- External link validation accuracy
-
-This simplified specification focuses on the core value: making LoTaR accessible to AI agents while maintaining the git-native approach and adding practical external system integration.
+This specification serves as a design document for potential future development when MCP integration becomes a priority.

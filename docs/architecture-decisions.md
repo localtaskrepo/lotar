@@ -1,386 +1,194 @@
-# Architecture Decisions - Git-Native Requirements Management
+# Architecture & Technical Reference
 
-*Last Updated: 2025-07-28*
-*Revision: Updated with MCP integration for AI agents*
+*Last Updated: July 30, 2025*
 
-## Overview
+## System Architecture
 
-This document captures the **bold architectural decisions** for LoTaR as the first **git-native requirements management system**. Every decision serves the primary goal: creating immutable decision audit trails.
+LoTaR follows a clean, modular architecture built around Rust's type safety and performance characteristics.
 
-## AD-001: Git as the Single Source of Truth
+### Core Components
 
-### Decision
-**Git IS the database** - no external storage, no separate audit logs, no secondary systems.
+**Storage Layer (`store.rs`)**
+- YAML-based persistence with human-readable `.yml` files
+- Project isolation with separate directories
+- Automatic ID generation (`PROJECT-001` format)
+- Metadata management for task counting and file mapping
 
-### Rationale
-- **Immutable History**: Git's cryptographic hashing ensures tamper-proof audit trails
-- **Distributed Collaboration**: Every clone has complete project history
-- **Proven Merge Algorithms**: 15+ years of conflict resolution refinement
-- **Compliance Ready**: Cryptographic signatures satisfy SOX/FDA requirements
-- **Developer Native**: Zero learning curve for git-proficient teams
+**Type System (`types.rs`)**
+- TaskStatus enum: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE
+- Priority enum: LOW, MEDIUM, HIGH, CRITICAL
+- TaskType enum: Feature, Bug, Epic, Spike, Chore
+- Relationships struct for dependencies and hierarchies
+- Custom fields HashMap for team-specific data
 
-### Implementation Details
-```rust
-// No database connections, no external dependencies
-pub struct LoTaRRepository {
-    git_repo: git2::Repository,
-    tasks_path: PathBuf,        // .tasks/ directory
-    current_branch: String,
-}
+**Indexing System (`index.rs`)**
+- Global tag index for fast cross-project searches
+- ID to file path mapping for O(1) lookups
+- Sub-100ms query performance optimization
+- YAML persistence consistent with task format
 
-// All operations go through git
-impl LoTaRRepository {
-    pub fn update_task(&mut self, task: &Task) -> Result<CommitId> {
-        self.write_task_file(task)?;
-        self.git_add_task_file(task)?;
-        self.git_commit_with_context(task)
-    }
-}
-```
+**Scanner Engine (`scanner.rs`)**
+- Multi-language support (25+ programming languages)
+- Comment detection for //, #, --, ;, %, /* */ styles
+- UUID tracking for persistent TODO identification
+- File type recognition via extension mapping
 
-### Alternatives Rejected
-- **SQLite + Git**: Dual storage adds complexity and sync issues
-- **JSON in Git**: Binary formats don't diff/merge well
-- **External Database**: Breaks distributed model and audit trail integrity
+**CLI Interface (`main.rs`, `tasks.rs`)**
+- Command pattern for extensible command structure
+- Robust enum-based argument validation
+- Custom error types with proper propagation
+- Automatic project context detection
 
-### Implications
-- Every task change creates git commit
-- Complete audit trail is automatic
-- No database administration required
-- Performance depends on git repository size
-- Conflict resolution uses git merge tools
+**Web Server (`web_server.rs`, `api_server.rs`)**
+- Embedded React frontend built into binary
+- REST API with JSON endpoints
+- Static file serving with proper MIME types
+- Configurable port and path settings
 
-## AD-002: Human-First File Format for Git Optimization
+## Task File Format
 
-### Decision
-**Markdown files with YAML frontmatter** - optimized for human readability and git diff clarity.
-
-### File Structure Design
+### YAML Structure
 ```yaml
----
-# YAML frontmatter: structured metadata
-id: "AUTH-001"
 title: "Implement OAuth Authentication"
-status: "IN_PROGRESS"
----
+status: "TODO"                          # Required enum
+priority: "HIGH"                        # Required enum
+task_type: "feature"                    # Required enum
+assignee: "john.doe@company.com"        # Optional
+project: "webapp"                       # Auto-set
+created: "2025-07-30T10:00:00Z"         # Auto-generated
+modified: "2025-07-30T14:30:00Z"        # Auto-updated
+due_date: "2025-08-15"                  # Optional
+effort: "5d"                            # Optional
 
-# Markdown body: rich content for humans
-## Context and Background
-[Rich formatted content...]
+# Structured fields
+acceptance_criteria:
+  - "User can login with Google OAuth"
+  - "User can login with GitHub OAuth"
+
+relationships:
+  depends_on: ["AUTH-002", "SEC-001"]
+  blocks: ["USER-005"]
+  related: ["AUTH-003"]
+  parent: "EPIC-USER-AUTH"
+
+comments:
+  - author: "jane.smith@company.com"
+    date: "2025-07-30T15:00:00Z"
+    text: "Added security requirements"
+
+# Legacy fields (backward compatibility)
+subtitle: "OAuth integration for web app"
+description: "Detailed implementation notes..."
+category: "authentication"
+tags: ["auth", "security", "oauth"]
+
+# Custom fields (team-specific)
+custom_fields:
+  epic: "user-management"
+  story_points: 8
+  security_review_required: true
 ```
 
-### Git Diff Optimization
-```diff
-# Beautiful, meaningful diffs
-+oauth_providers: ["google", "github"]  # Was just ["google"]
-+decision_context: "Customer integration request"
+### File Organization
+```
+.tasks/
+├── index.yml                 # Global search index
+├── PROJECT-A/               # Project folder (matches task ID prefix)
+│   ├── metadata.yml         # Project metadata
+│   ├── 1.yml               # Task files (numeric names)
+│   ├── 2.yml
+│   └── 3.yml
+└── PROJECT-B/
+    ├── metadata.yml
+    └── 1.yml
 ```
 
-### Rationale
-- **Human Readable**: Developers can read raw files without tools
-- **Git Friendly**: YAML produces clean, meaningful diffs
-- **Rich Content**: Markdown supports formatting, links, code blocks
-- **Tool Compatible**: Standard formats work with existing tools
-- **Merge Friendly**: Structured format enables intelligent merging
+## Architecture Decisions
 
-### Alternatives Rejected
-- **Pure JSON**: Not human-readable, poor git diffs
-- **Custom Binary**: Vendor lock-in, no tool compatibility
-- **XML**: Verbose, poor readability
-- **Database Records**: Not git-friendly, no offline access
+### AD-001: YAML Over JSON
+**Decision**: Use YAML for all data persistence  
+**Rationale**: Human-readable, git-friendly diffs, comment support, consistent format
 
-## AD-003: Primary Interface Strategy
+### AD-002: Project-Based Directories
+**Decision**: Store tasks in project-specific directories  
+**Rationale**: Isolation, scalability, performance, clear boundaries
 
-### Decision
-**Web interface as primary daily-use tool, IDE plugins for code integration, CLI for essential operations** - focus development effort where users spend most time.
+### AD-003: Formatted Task IDs
+**Decision**: Use `PROJECT-001` format for external references  
+**Rationale**: Human-readable, unique, sortable, professional
 
-### Interface Hierarchy
-```rust
-// Primary interfaces by use case
-pub enum InterfaceType {
-    WebInterface,    // Primary: Daily task management, planning, reporting
-    IDEPlugin,       // Secondary: Code-task integration, contextual info
-    CLI,             // Supporting: Automation, git operations, essential CRUD
-    MCPServer,       // AI Interface: Agent-optimized operations
-}
-```
+### AD-004: Command Pattern for CLI
+**Decision**: Implement CLI using Command trait pattern  
+**Rationale**: Extensibility, testability, maintainability, consistent error handling
 
-### Web Interface (Primary)
-- **Daily task management**: Create, edit, update tasks with rich UI
-- **Project management**: Burndown charts, velocity tracking, timeline views
-- **Team collaboration**: Assignment, workload balancing, status dashboards
-- **Filtering and search**: Advanced filtering with auto-generated components
-- **Git history visualization**: Show decision trails from git commits
+### AD-005: Enum-Based Type Safety
+**Decision**: Use Rust enums for status, priority, task type  
+**Rationale**: Compile-time validation, performance, consistency, evolution support
 
-### IDE Plugins (Code Integration)
-- **Task context**: Show related tasks without leaving editor
-- **TODO linking**: Connect code comments to formal tasks
-- **Quick operations**: Status updates, commenting from editor
-- **Branch integration**: Tasks associated with current git branch
+### AD-006: Global Index for Performance
+**Decision**: Maintain global index file for searches  
+**Rationale**: Sub-100ms performance, cross-project search, scalability
 
-### CLI (Essential Operations)
-- **Core CRUD**: Create, update, list, show tasks
-- **Git integration**: Commit generation, history analysis
-- **Automation**: Scripting, CI/CD integration
-- **Configuration**: Schema setup, field definitions
+### AD-007: Embedded Web Interface
+**Decision**: Include React frontend in Rust binary  
+**Rationale**: Single binary deployment, no external dependencies, portability
 
-### Rationale
-- **User Focus**: Most time spent in web interface for management tasks
-- **Context Switching**: IDE plugins eliminate switching for code-related tasks
-- **Automation**: CLI enables scripting and integration workflows
-- **Development Efficiency**: Focus UI effort where it provides most value
+### AD-008: Multi-Language Scanner
+**Decision**: Support 25+ programming languages  
+**Rationale**: Universal compatibility, flexibility, accuracy, maintainability
 
-### Implications
-- Web interface gets majority of development attention
-- CLI focused on essential operations, not comprehensive UI
-- IDE plugins provide seamless integration without duplication
-- Consistent data model across all interfaces
+### AD-009: Project Isolation Security
+**Decision**: Enforce strict project boundaries  
+**Rationale**: Security, data integrity, team separation, compliance
 
-## AD-004: Pragmatic Field System Design
+## Performance Characteristics
 
-### Decision
-**Built-in standard fields for project management + configurable custom fields with generic UI treatment** - balance standardization where it matters with flexibility where teams differ.
+### Response Times
+- **Task operations**: < 50ms for typical workloads
+- **Search operations**: < 100ms for 100+ tasks
+- **Index rebuilds**: < 500ms for moderate datasets
+- **File operations**: Atomic writes with error handling
 
-### Field Architecture
-```rust
-// Built-in fields with special handling
-pub struct Task {
-    // Core identity (always required)
-    pub id: String,
-    pub title: String,
-    pub status: TaskStatus,                    // Built-in enum with extensions
-    
-    // Standard project management fields
-    pub priority: Priority,                    // Built-in enum: LOW, MEDIUM, HIGH, CRITICAL
-    pub task_type: TaskType,                   // Built-in enum: feature, bug, epic, spike, chore
-    pub assignee: Option<String>,              // Autocomplete from git history
-    pub project: String,                       // String with autocomplete
-    pub created: DateTime<Utc>,                // Auto-generated
-    pub modified: DateTime<Utc>,               // Auto-updated
-    pub due_date: Option<NaiveDate>,          // Date picker in UI
-    pub effort: Option<Effort>,               // Special effort field with unit conversion
-    
-    // Built-in structured fields
-    pub acceptance_criteria: Vec<String>,      // Multi-line editor
-    pub relationships: TaskRelationships,      // Special relationship UI
-    pub comments: Vec<Comment>,                // Special commenting interface
-    
-    // Custom fields (generic handling)
-    pub custom_fields: HashMap<String, CustomFieldValue>,
-}
-```
+### Memory Usage
+- **Minimal footprint**: Lazy loading of task content
+- **No memory leaks**: Rust ownership prevents issues
+- **Efficient serialization**: Optimized YAML processing
+- **Zero-copy operations**: Where possible
 
-### Rationale
-- **Project Management Features**: Built-in fields enable proper burndown charts, velocity tracking, timeline views
-- **Team Flexibility**: Custom fields adapt to team-specific needs (regulatory, business value, etc.)
-- **Automatic UI**: Custom fields get appropriate components without manual UI development
-- **Data Integrity**: Built-in fields have validation, custom fields have type safety
-- **Git Optimization**: Both field types produce clean, meaningful diffs
+## Security Model
 
-## AD-005: Zero External Dependencies for Core Functions
+### Project Isolation
+- Each project stored in separate directory
+- Task IDs include project prefix for uniqueness
+- Cross-project access explicitly prevented
+- Security boundaries enforced at storage layer
 
-### Decision
-**Core functionality works offline with zero external services** - only git and filesystem required.
+### File System Safety
+- All paths validated and sanitized
+- No external access beyond `.tasks/` directory
+- Atomic file operations where possible
+- Proper error handling for failures
 
-### Dependency Strategy
-```toml
-# Cargo.toml - Minimal dependencies for core functionality
-[dependencies]
-# Core functionality (always included)
-git2 = "0.18"           # Git operations
-serde = "1.0"           # YAML/JSON serialization  
-chrono = "0.4"          # Date/time handling
-clap = "4.0"            # CLI interface
-thiserror = "1.0"       # Error handling
+## Extension Points
 
-# Optional features
-[dependencies.tokio]
-version = "1.0"
-optional = true
+### Custom Fields
+Tasks support arbitrary custom fields via `custom_fields` HashMap:
+- Sprint numbers, story points, team assignments
+- Custom workflow states, external system IDs
+- Any YAML-serializable data type
 
-[dependencies.warp]
-version = "0.3"
-optional = true
+### Scanner Languages
+New programming languages added by extending `FILE_TYPES` configuration
 
-[features]
-default = ["web-interface", "mcp-server"]
-web-interface = ["tokio", "warp"]
-mcp-server = ["tokio", "serde_json"]
-```
+### Command Extensions
+New CLI commands via Command trait implementation and registration
 
-### Self-Contained Operation
-- **No Database**: Git repository IS the database
-- **No Cloud Services**: Everything works offline
-- **No Network Required**: Full functionality without internet
-- **No External APIs**: Self-contained decision audit trails
+## Design Principles
 
-### Rationale
-- **Reliability**: No external service failures
-- **Security**: No data leaves local environment
-- **Compliance**: Data sovereignty for regulated industries
-- **Performance**: No network latency for core operations
-- **Simplicity**: Single binary deployment
-
-## AD-006: Compliance-First Design
-
-### Decision
-**Audit trail and compliance features are built-in from day one** - not added later.
-
-### Compliance Architecture
-```rust
-pub struct AuditTrail {
-    task_id: String,
-    complete_history: Vec<GitCommit>,
-    field_changes: Vec<FieldChange>,
-    decision_context: Vec<DecisionContext>,
-    compliance_markers: ComplianceData,
-}
-
-impl AuditTrail {
-    pub fn generate_sox_report(&self) -> SoxComplianceReport {
-        // Analyzes git history for SOX compliance
-        // - All changes with timestamps and attribution
-        // - Decision makers and decision context
-        // - Change impact analysis
-    }
-    
-    pub fn generate_fda_validation(&self) -> FdaValidationReport {
-        // FDA 21 CFR Part 11 compliance
-        // - Electronic signatures via git commits
-        // - Complete audit trail
-        // - Change control documentation
-    }
-}
-```
-
-### Regulatory Support
-- **SOX Compliance**: Complete audit trail of business decisions
-- **FDA 21 CFR Part 11**: Electronic records and signatures
-- **ISO 27001**: Information security management
-- **Government Contracts**: Decision accountability requirements
-
-### Rationale
-- **Enterprise Ready**: Compliance features drive enterprise adoption
-- **Competitive Advantage**: No other task management tool provides this
-- **Future Proof**: Regulatory requirements only increase over time
-- **Built-In**: Easier to design in than retrofit later
-
-## AD-007: MCP Integration for AI Agent Accessibility
-
-### Decision
-**First-class MCP (Model Context Protocol) support** - AI agents get specialized tools and interfaces optimized for their workflows, making LoTaR the first AI-native project management system.
-
-### MCP Architecture Design
-```rust
-// Dual interface approach: human-optimized and AI-optimized
-pub struct LoTaRSystem {
-    // Human interfaces
-    web_interface: WebServer,
-    cli_interface: CLIHandler,
-    ide_plugins: IDEIntegrationManager,
-    
-    // AI interface
-    mcp_server: LoTaRMCPServer,
-}
-
-pub struct LoTaRMCPServer {
-    repository: Arc<RwLock<LoTaRRepository>>,
-    nlp_engine: NaturalLanguageProcessor,     // Parse natural language descriptions
-    analysis_engine: ProjectAnalysisEngine,   // High-level project insights
-    git_analyzer: GitHistoryAnalyzer,        // Decision pattern analysis
-    similarity_engine: TaskSimilarityEngine, // Find related tasks
-}
-```
-
-### AI-Optimized Tool Categories
-```rust
-// MCP tools organized by AI use cases
-pub enum MCPToolCategory {
-    // Basic operations (optimized for AI efficiency)
-    TaskManagement {
-        create_task,
-        update_task,
-        bulk_update_tasks,
-        list_tasks_with_context,
-    },
-    
-    // Natural language processing
-    NaturalLanguageOps {
-        create_task_from_description,
-        parse_requirements_text,
-        extract_acceptance_criteria,
-        suggest_task_improvements,
-    },
-    
-    // Project analysis and insights
-    ProjectAnalysis {
-        analyze_project_risks,
-        get_critical_path,
-        predict_delivery_timeline,
-        identify_resource_conflicts,
-    },
-    
-    // Decision and pattern analysis
-    DecisionAnalysis {
-        analyze_decision_patterns,
-        trace_requirement_evolution,
-        identify_decision_bottlenecks,
-        suggest_process_improvements,
-    },
-}
-```
-
-### Rationale
-- **AI Agent Efficiency**: Higher-level operations reduce API calls and improve agent performance
-- **Context Awareness**: AI gets project context and historical patterns automatically
-- **Natural Language Support**: AI can work with unstructured descriptions naturally
-- **Pattern Recognition**: Built-in analysis tools provide insights humans might miss
-- **Batch Operations**: Efficient bulk operations for AI workflows
-- **Decision Intelligence**: Git history analysis provides decision context
-
-### Alternatives Rejected
-- **Generic REST API Only**: Would require AI agents to make many low-level calls
-- **File-Only Access**: AI agents would need to parse files manually, losing efficiency
-- **External AI Service**: Would break the zero-dependency principle
-- **Separate AI Database**: Would duplicate data and break git-native approach
-
-### Implications
-- MCP server runs alongside other interfaces
-- AI agents get specialized, efficient operations
-- Natural language processing enables intuitive task creation
-- Project analysis tools provide strategic insights
-- Maintains all git-native benefits while optimizing for AI workflows
-- Creates feedback loop where AI usage improves the system for humans
-
-### Enterprise AI Benefits
-- **AI Project Managers**: Agents can analyze risks, optimize resources, predict timelines
-- **Requirements Engineers**: AI can improve acceptance criteria and find gaps
-- **Development Coaches**: AI can analyze team patterns and suggest improvements
-- **Compliance Assistants**: AI can ensure regulatory requirements are met
-
-## Decision Impact Matrix (Updated)
-
-| Decision | Implementation Complexity | Performance Impact | Compliance Value | Developer Experience | AI Agent Value |
-|----------|--------------------------|-------------------|------------------|---------------------|----------------|
-| AD-001: Git as Database | Medium | High+ | Excellent | Excellent | Excellent |
-| AD-002: Human-First Format | Low | Medium | Good | Excellent | Good |
-| AD-003: Primary Interface Strategy | Medium | High+ | Good | Excellent | Good |
-| AD-004: Pragmatic Field System | High | Medium | Good | Excellent | Excellent |
-| AD-005: Zero Dependencies | Medium | High+ | Excellent | Good | Good |
-| AD-006: Compliance-First | High | Medium | Excellent | Medium | High |
-| AD-007: MCP Integration | High | Medium | Good | Good | Excellent |
-
-## Revolutionary Technical Outcome (Updated)
-
-These architectural decisions create a **genuinely unique system**:
-
-1. **First git-native requirements management** - no other tool does this
-2. **Pragmatic field system** - balances standardization with flexibility
-3. **Primary interface focus** - development effort where users spend time
-4. **AI-native design** - first project management tool designed for AI agents
-5. **Immutable decision audit trails** - perfect for compliance
-6. **Distributed collaboration** - works like git, feels like git
-7. **Zero vendor lock-in** - standard formats, open source
-8. **Enterprise ready** - compliance and audit from day one
-
-This architecture positions LoTaR as **revolutionary requirements engineering** with practical project management capabilities that both humans and AI agents can use effectively.
+1. **Git-Native**: All data structures designed for version control
+2. **Human-Readable**: Files can be manually edited and reviewed
+3. **Type Safety**: Leverage Rust's type system for correctness
+4. **Performance**: Sub-100ms operations for typical workloads
+5. **Portability**: Single binary with no external dependencies
+6. **Security**: Project isolation and input validation
+7. **Extensibility**: Clean interfaces for adding features
