@@ -9,7 +9,6 @@
     "build:web": "parcel build view/index.html --dist-dir target/web --no-source-maps --no-content-hash",
     "build:web:dev": "parcel build view/index.html --dist-dir target/web",
     "test": "cargo test",
-    "test:integration": "./test_integration.sh",
     "clean": "cargo clean && rm -rf .parcel-cache",
     "clean:all": "npm run clean && rm -rf node_modules",
     "release": "npm run clean && npm run build"
