@@ -10,6 +10,7 @@ pub mod tasks;
 pub mod types;
 pub mod utils;
 pub mod web_server; // Add utilities module
+pub mod workspace; // Add workspace resolution module
 
 pub use errors::{LoTaRError, LoTaRResult};
 pub use index::{TaskFilter, TaskIndex};
@@ -18,3 +19,4 @@ pub use scanner::Scanner;
 pub use storage::{Storage, Task};
 pub use tasks::task_command;
 pub use types::TaskStatus; // Export error types
+pub use workspace::TasksDirectoryResolver;

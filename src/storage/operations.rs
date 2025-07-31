@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::storage::task::Task;
 use crate::index::TaskIndex;
 use crate::utils::generate_project_prefix;
+use crate::config::commands::persistence::auto_initialize_project_if_needed;
 
 /// Core CRUD operations for task storage
 pub struct StorageOperations;
@@ -25,6 +26,9 @@ impl StorageOperations {
         // The project folder name IS the prefix
         let project_folder = desired_prefix.clone();
         let project_path = root_path.join(&project_folder);
+
+        // Auto-initialize project configuration if needed
+        auto_initialize_project_if_needed(&root_path.to_path_buf(), &project_folder)?;
 
         // Ensure project directory exists
         fs::create_dir_all(&project_path)?;
@@ -232,18 +236,27 @@ impl StorageOperations {
             return Ok(project_name.to_string());
         }
 
-        // Check existing project folders to avoid collisions
-        if let Ok(entries) = fs::read_dir(root_path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() && !path.file_name().unwrap_or_default().to_string_lossy().starts_with('.') {
-                    // This folder already exists, so generate a different prefix
-                    continue;
+        // Generate the expected prefix for this project name
+        let expected_prefix = generate_project_prefix(project_name);
+
+        // Check if a folder with this prefix already exists
+        let prefix_path = root_path.join(&expected_prefix);
+        if prefix_path.exists() && prefix_path.is_dir() {
+            // Verify this is for the same project by checking config
+            let config_path = prefix_path.join("config.yml");
+            if config_path.exists() {
+                if let Ok(content) = fs::read_to_string(&config_path) {
+                    if let Ok(config) = serde_yaml::from_str::<crate::config::types::ProjectConfig>(&content) {
+                        // Check if the project name in config matches (either exact or prefix)
+                        if config.project_name == project_name || config.project_name == expected_prefix {
+                            return Ok(expected_prefix);
+                        }
+                    }
                 }
             }
         }
 
-        // Generate a new prefix for this project name
+        // If no existing folder found, generate a new unique prefix
         Self::generate_unique_folder_prefix(root_path, project_name)
     }
 

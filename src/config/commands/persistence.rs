@@ -1,18 +1,20 @@
+use crate::config::{ConfigError, ConfigManager, GlobalConfig, ProjectConfig};
+use crate::project;
 use std::fs;
 use std::path::PathBuf;
-use crate::config::{ConfigManager, GlobalConfig, ProjectConfig, ConfigError};
-use crate::project;
 
 /// Create a project configuration from a template
-pub fn create_config_from_template(template: &str, project_name: &str) -> Result<String, ConfigError> {
+pub fn create_config_from_template(
+    tasks_dir: &PathBuf,
+    template: &str,
+    project_name: &str,
+) -> Result<String, ConfigError> {
     // First, ensure global config exists by creating a ConfigManager
     // This will trigger auto-generation of global config if it doesn't exist
-    let _config_manager = ConfigManager::new()?;
+    let _config_manager = ConfigManager::new_with_tasks_dir(tasks_dir)?;
 
     let config = match ConfigManager::load_template(template) {
-        Ok(template_data) => {
-            ConfigManager::apply_template_to_project(&template_data, project_name)
-        }
+        Ok(template_data) => ConfigManager::apply_template_to_project(&template_data, project_name),
         Err(e) => {
             eprintln!("Error: Template '{}' not found: {}", template, e);
             eprintln!("Available templates can be seen with: lotar config templates");
@@ -24,10 +26,11 @@ pub fn create_config_from_template(template: &str, project_name: &str) -> Result
     let project_prefix = crate::utils::generate_project_prefix(project_name);
 
     // Create project directory using the prefix
-    let project_dir = PathBuf::from(".tasks").join(&project_prefix);
+    let project_dir = tasks_dir.join(&project_prefix);
     if !project_dir.exists() {
-        fs::create_dir_all(&project_dir)
-            .map_err(|e| ConfigError::IoError(format!("Failed to create project directory: {}", e)))?;
+        fs::create_dir_all(&project_dir).map_err(|e| {
+            ConfigError::IoError(format!("Failed to create project directory: {}", e))
+        })?;
     }
 
     // Write config file
@@ -41,20 +44,45 @@ pub fn create_config_from_template(template: &str, project_name: &str) -> Result
     Ok(project_prefix)
 }
 
+/// Auto-initialize a project with default configuration if it doesn't exist
+/// This is called automatically when adding tasks to ensure the project is properly set up
+pub fn auto_initialize_project_if_needed(
+    tasks_dir: &PathBuf,
+    project_name: &str,
+) -> Result<String, ConfigError> {
+    // Generate the 4-letter prefix for the project folder
+    let project_prefix = crate::utils::generate_project_prefix(project_name);
+    let project_dir = tasks_dir.join(&project_prefix);
+    let config_path = project_dir.join("config.yml");
+
+    // Check if project config already exists
+    if config_path.exists() {
+        return Ok(project_prefix); // Project already initialized
+    }
+
+    // Project doesn't exist, auto-initialize with default template
+    println!("Auto-initializing project '{}' with default configuration...", project_name);
+    create_config_from_template(tasks_dir, "default", project_name)
+}
+
 /// Save a project configuration field using a closure to modify the config
-pub fn save_project_config_field<F>(project_name: Option<&str>, update_fn: F) -> Result<(), ConfigError>
+pub fn save_project_config_field<F>(
+    tasks_dir: &PathBuf,
+    project_name: Option<&str>,
+    update_fn: F,
+) -> Result<(), ConfigError>
 where
     F: FnOnce(&mut ProjectConfig),
 {
-    let project_name_owned = project_name.map(|s| s.to_string()).unwrap_or_else(|| {
-        project::detect_project_name().unwrap_or_else(|| "default".to_string())
-    });
+    let project_name_owned = project_name
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| project::detect_project_name().unwrap_or_else(|| "default".to_string()));
 
     // Generate the 4-letter prefix for the project folder
     let project_prefix = crate::utils::generate_project_prefix(&project_name_owned);
 
     // Load existing project config or create new one
-    let config_path = PathBuf::from(".tasks").join(&project_prefix).join("config.yml");
+    let config_path = tasks_dir.join(&project_prefix).join("config.yml");
     let mut config = if config_path.exists() {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| ConfigError::IoError(format!("Failed to read config: {}", e)))?;
@@ -64,8 +92,9 @@ where
         // Create project directory if it doesn't exist
         let project_dir = config_path.parent().unwrap();
         if !project_dir.exists() {
-            fs::create_dir_all(project_dir)
-                .map_err(|e| ConfigError::IoError(format!("Failed to create project directory: {}", e)))?;
+            fs::create_dir_all(project_dir).map_err(|e| {
+                ConfigError::IoError(format!("Failed to create project directory: {}", e))
+            })?;
         }
         ProjectConfig::new(project_name_owned.clone())
     };
@@ -87,23 +116,24 @@ where
 }
 
 /// Save a global configuration field using a closure to modify the config
-pub fn save_global_config_field<F>(update_fn: F) -> Result<(), ConfigError>
+pub fn save_global_config_field<F>(tasks_dir: &PathBuf, update_fn: F) -> Result<(), ConfigError>
 where
     F: FnOnce(&mut GlobalConfig),
 {
     // Load existing global config or create new one
-    let config_path = PathBuf::from(".tasks/config.yml");
+    let config_path = tasks_dir.join("config.yml");
     let mut config = if config_path.exists() {
         let content = fs::read_to_string(&config_path)
             .map_err(|e| ConfigError::IoError(format!("Failed to read config: {}", e)))?;
         serde_yaml::from_str(&content)
             .map_err(|e| ConfigError::ParseError(format!("Failed to parse config: {}", e)))?
     } else {
-        // Create .tasks directory if it doesn't exist
-        let tasks_dir = config_path.parent().unwrap();
-        if !tasks_dir.exists() {
-            fs::create_dir_all(tasks_dir)
-                .map_err(|e| ConfigError::IoError(format!("Failed to create .tasks directory: {}", e)))?;
+        // Create tasks directory if it doesn't exist
+        let parent_dir = config_path.parent().unwrap();
+        if !parent_dir.exists() {
+            fs::create_dir_all(parent_dir).map_err(|e| {
+                ConfigError::IoError(format!("Failed to create tasks directory: {}", e))
+            })?;
         }
         GlobalConfig::default()
     };

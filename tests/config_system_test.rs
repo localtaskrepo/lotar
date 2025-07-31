@@ -547,3 +547,219 @@ fn test_config_wildcard_and_strict_modes() {
     assert!(config_content.contains("urgent"));
     assert!(config_content.contains("'*'"));
 }
+
+#[test]
+fn test_custom_tasks_directory_flag() {
+    let test_fixtures = TestFixtures::new();
+    let temp_dir = test_fixtures.temp_dir.path();
+    let custom_tasks_dir = temp_dir.join("custom-tasks");
+
+    // Ensure custom directory doesn't exist initially
+    assert!(!custom_tasks_dir.exists());
+
+    // Test that using --tasks-dir with non-existent directory gives error
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .arg("--tasks-dir=custom-tasks")
+        .arg("config")
+        .arg("show")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Specified tasks directory does not exist",
+        ));
+
+    // Create the custom directory
+    fs::create_dir_all(&custom_tasks_dir).unwrap();
+
+    // Test config set command with custom directory - should create config.yml
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .arg("--tasks-dir=custom-tasks")
+        .arg("config")
+        .arg("set")
+        .arg("server_port")
+        .arg("9001")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Successfully updated server_port"));
+
+    // Verify config.yml was created in custom directory
+    let custom_config_path = custom_tasks_dir.join("config.yml");
+    assert!(custom_config_path.exists());
+
+    // Verify the config contains our setting
+    let config_content = fs::read_to_string(&custom_config_path).unwrap();
+    assert!(config_content.contains("server_port: 9001"));
+
+    // Test config show with custom directory
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .arg("--tasks-dir=custom-tasks")
+        .arg("config")
+        .arg("show")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Port: 9001"));
+
+    // Verify default .tasks directory is not affected
+    let default_tasks_dir = temp_dir.join(".tasks");
+    if default_tasks_dir.exists() {
+        let default_config_path = default_tasks_dir.join("config.yml");
+        if default_config_path.exists() {
+            let default_config_content = fs::read_to_string(&default_config_path).unwrap();
+            assert!(!default_config_content.contains("server_port: 9001"));
+        }
+    }
+}
+
+#[test]
+fn test_tasks_directory_environment_variable() {
+    let test_fixtures = TestFixtures::new();
+    let temp_dir = test_fixtures.temp_dir.path();
+    let env_tasks_dir = temp_dir.join("env-tasks");
+
+    // Create the environment-specified directory
+    fs::create_dir_all(&env_tasks_dir).unwrap();
+
+    // Test with LOTAR_TASKS_FOLDER environment variable
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .env("LOTAR_TASKS_FOLDER", "env-tasks")
+        .arg("config")
+        .arg("set")
+        .arg("default_project")
+        .arg("env-project")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Successfully updated default_project",
+        ));
+
+    // Verify config.yml was created in environment-specified directory
+    let env_config_path = env_tasks_dir.join("config.yml");
+    assert!(env_config_path.exists());
+
+    // Verify the config contains our setting
+    let config_content = fs::read_to_string(&env_config_path).unwrap();
+    assert!(config_content.contains("default_project: env-project"));
+
+    // Test that command line flag overrides environment variable
+    let override_tasks_dir = temp_dir.join("override-tasks");
+    fs::create_dir_all(&override_tasks_dir).unwrap();
+
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .env("LOTAR_TASKS_FOLDER", "env-tasks")
+        .arg("--tasks-dir=override-tasks")
+        .arg("config")
+        .arg("set")
+        .arg("server_port")
+        .arg("8888")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Successfully updated server_port"));
+
+    // Verify config.yml was created in override directory, not env directory
+    let override_config_path = override_tasks_dir.join("config.yml");
+    assert!(override_config_path.exists());
+
+    let override_config_content = fs::read_to_string(&override_config_path).unwrap();
+    assert!(override_config_content.contains("server_port: 8888"));
+}
+
+#[test]
+fn test_tasks_directory_parent_search() {
+    let test_fixtures = TestFixtures::new();
+    let temp_dir = test_fixtures.temp_dir.path();
+
+    // Create a parent directory with .tasks
+    let parent_tasks_dir = temp_dir.join(".tasks");
+    fs::create_dir_all(&parent_tasks_dir).unwrap();
+
+    // Create a config file in the parent tasks directory
+    let parent_config_path = parent_tasks_dir.join("config.yml");
+    fs::write(&parent_config_path, "server_port: 7777\ntask_file_extension: yml\ndefault_project: parent-project\ntasks_folder: .tasks\n").unwrap();
+
+    // Create a subdirectory
+    let sub_dir = temp_dir.join("subdir");
+    fs::create_dir_all(&sub_dir).unwrap();
+
+    // Test from subdirectory - should find parent .tasks directory
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(&sub_dir)
+        .arg("config")
+        .arg("show")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Port: 7777"))
+        .stdout(predicate::str::contains("Default Project: parent-project"));
+}
+
+#[test]
+fn test_task_commands_with_custom_directory() {
+    let test_fixtures = TestFixtures::new();
+    let temp_dir = test_fixtures.temp_dir.path();
+    let custom_tasks_dir = temp_dir.join("project-tasks");
+
+    // Create the custom directory
+    fs::create_dir_all(&custom_tasks_dir).unwrap();
+
+    // Test task creation with custom directory
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .arg("--tasks-dir=project-tasks")
+        .arg("task")
+        .arg("add")
+        .arg("--title=Custom Task")
+        .arg("--description=Task in custom directory")
+        .arg("--project=test-project")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Using tasks directory: project-tasks",
+        ))
+        .stdout(predicate::str::contains("Added task with id:"));
+
+    // Verify task files were created in custom directory
+    assert!(custom_tasks_dir.join("index.yml").exists());
+
+    // Check that project directory was created
+    let project_dirs: Vec<_> = fs::read_dir(&custom_tasks_dir)
+        .unwrap()
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            if entry.file_type().ok()?.is_dir() {
+                Some(entry.file_name().to_string_lossy().to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert!(
+        !project_dirs.is_empty(),
+        "At least one project directory should be created"
+    );
+
+    // Test task listing with custom directory
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .arg("--tasks-dir=project-tasks")
+        .arg("task")
+        .arg("list")
+        .arg("--project=test-project")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Custom Task"));
+
+    // Verify default .tasks directory is not affected
+    let default_tasks_dir = temp_dir.join(".tasks");
+    if default_tasks_dir.exists() {
+        let default_index = default_tasks_dir.join("index.yml");
+        if default_index.exists() {
+            let index_content = fs::read_to_string(&default_index).unwrap();
+            assert!(!index_content.contains("Custom Task"));
+        }
+    }
+}

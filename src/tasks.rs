@@ -1,9 +1,14 @@
-use std::path::PathBuf;
-use crate::storage::{Storage, Task};
-use crate::types::{TaskStatus, TaskType, Priority};
 use crate::index::TaskFilter;
+use crate::storage::{Storage, Task};
+use crate::types::{Priority, TaskStatus, TaskType};
+use crate::workspace::TasksDirectoryResolver;
 
-pub fn task_command(args: &[String], default_project: &str) {
+pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDirectoryResolver) {
+    // Display info message if tasks directory is not in current directory
+    if let Some(info_msg) = resolver.get_info_message() {
+        println!("{}", info_msg);
+    }
+
     if args.len() < 3 {
         println!("Error: No task operation specified.");
         println!("Available operations: add, edit, list, status, search, delete");
@@ -12,16 +17,15 @@ pub fn task_command(args: &[String], default_project: &str) {
     }
 
     let operation = args[2].as_str();
-    let root_path = PathBuf::from(std::env::current_dir().unwrap().join(".tasks/"));
-    let mut store = Storage::new(root_path.clone());
+    let mut store = Storage::new(resolver.path.clone());
 
     match operation {
         "add" => {
             let mut task = Task::new(
-                root_path.clone(),
+                resolver.path.clone(),
                 "".to_string(),
                 default_project.to_string(),
-                Priority::Medium
+                Priority::Medium,
             );
 
             if args.len() < 4 {
@@ -35,6 +39,12 @@ pub fn task_command(args: &[String], default_project: &str) {
             if task.title.is_empty() {
                 eprintln!("Error: Title is required");
                 eprintln!("Usage: lotar task add --title=\"Task Title\" [OPTIONS]");
+                std::process::exit(1);
+            }
+
+            // Ensure tasks directory exists before creating task
+            if let Err(e) = resolver.ensure_exists() {
+                eprintln!("Error creating tasks directory: {}", e);
                 std::process::exit(1);
             }
 
@@ -62,7 +72,10 @@ pub fn task_command(args: &[String], default_project: &str) {
             let mut task = match store.get(id, project.clone()) {
                 Some(t) => t,
                 None => {
-                    println!("Error: Task with id '{}' not found in project '{}'", id, project);
+                    println!(
+                        "Error: Task with id '{}' not found in project '{}'",
+                        id, project
+                    );
                     std::process::exit(1);
                 }
             };
@@ -102,7 +115,10 @@ pub fn task_command(args: &[String], default_project: &str) {
             let mut task = match store.get(id, project.clone()) {
                 Some(t) => t,
                 None => {
-                    println!("Error: Task with id '{}' not found in project '{}'", id, project);
+                    println!(
+                        "Error: Task with id '{}' not found in project '{}'",
+                        id, project
+                    );
                     std::process::exit(1);
                 }
             };
@@ -121,15 +137,19 @@ pub fn task_command(args: &[String], default_project: &str) {
             } else {
                 println!("Found {} tasks:", tasks.len());
                 for (task_id, task) in tasks {
-                    println!("  [{}] {} - {} (Priority: {}, Status: {})",
-                            task_id, task.title, task.project, task.priority, task.status);
+                    println!(
+                        "  [{}] {} - {} (Priority: {}, Status: {})",
+                        task_id, task.title, task.project, task.priority, task.status
+                    );
                 }
             }
         }
         "search" => {
             if args.len() < 4 {
                 println!("Error: Search requires a query.");
-                println!("Usage: lotar task search <QUERY> [--project=PROJECT] [--status=STATUS] [--priority=N] [--tag=TAG]");
+                println!(
+                    "Usage: lotar task search <QUERY> [--project=PROJECT] [--status=STATUS] [--priority=N] [--tag=TAG]"
+                );
                 std::process::exit(1);
             }
 
@@ -158,9 +178,15 @@ pub fn task_command(args: &[String], default_project: &str) {
             }
 
             println!("Searching for: '{}'", query);
-            if filter.project.is_some() || filter.status.is_some() || filter.priority.is_some() || !filter.tags.is_empty() {
-                println!("Filters: project={:?}, status={:?}, priority={:?}, tags={:?}",
-                        filter.project, filter.status, filter.priority, filter.tags);
+            if filter.project.is_some()
+                || filter.status.is_some()
+                || filter.priority.is_some()
+                || !filter.tags.is_empty()
+            {
+                println!(
+                    "Filters: project={:?}, status={:?}, priority={:?}, tags={:?}",
+                    filter.project, filter.status, filter.priority, filter.tags
+                );
             }
 
             let results = store.search(&filter);
@@ -169,8 +195,10 @@ pub fn task_command(args: &[String], default_project: &str) {
             } else {
                 println!("Found {} matching tasks:", results.len());
                 for (task_id, task) in results {
-                    println!("  [{}] {} - {} (Priority: {}, Status: {})",
-                            task_id, task.title, task.project, task.priority, task.status);
+                    println!(
+                        "  [{}] {} - {} (Priority: {}, Status: {})",
+                        task_id, task.title, task.project, task.priority, task.status
+                    );
                     if !task.tags.is_empty() {
                         println!("    Tags: {}", task.tags.join(", "));
                     }
@@ -189,9 +217,15 @@ pub fn task_command(args: &[String], default_project: &str) {
             let project = extract_project_from_args(args, 4, default_project);
 
             if store.delete(id, project.clone()) {
-                println!("Task {} deleted successfully from project '{}'", id, project);
+                println!(
+                    "Task {} deleted successfully from project '{}'",
+                    id, project
+                );
             } else {
-                println!("Error: Task with id '{}' not found in project '{}'", id, project);
+                println!(
+                    "Error: Task with id '{}' not found in project '{}'",
+                    id, project
+                );
                 std::process::exit(1);
             }
         }

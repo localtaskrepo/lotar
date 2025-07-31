@@ -22,7 +22,7 @@ pub fn handle_show_config(args: &[String]) {
                     let global_config = config_manager.get_global_config();
                     println!("Server Settings:");
                     println!("  Port: {}", global_config.server_port);
-                    println!("  Tasks Directory: {}", global_config.tasks_dir_name);
+                    println!("  Task File Extension: {}", global_config.task_file_extension);
                     println!("  Task File Extension: {}", global_config.task_file_extension);
                     println!();
 

@@ -1,30 +1,79 @@
 mod api_server;
+mod config;
+mod index;
 mod project;
 mod routes;
-mod web_server;
-mod tasks;
-mod storage;
 mod scanner;
-mod index;
+mod storage;
+mod tasks;
 mod types;
-mod config;
 mod utils;
+mod web_server;
+mod workspace;
 
 use std::env;
 use std::path::PathBuf;
+use workspace::TasksDirectoryResolver;
 
 // Command trait for better organization
 trait Command {
-    fn execute(&self, args: &[String]) -> Result<(), String>;
+    fn execute(&self, args: &[String], resolver: &TasksDirectoryResolver) -> Result<(), String>;
 }
 
+/// Parse command line arguments to extract --tasks-dir flag and return cleaned args
+fn parse_tasks_dir_flag(args: &[String]) -> (Option<String>, Vec<String>) {
+    let mut tasks_dir = None;
+    let mut cleaned_args = Vec::new();
+    let mut i = 0;
+
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--tasks-dir" && i + 1 < args.len() {
+            tasks_dir = Some(args[i + 1].clone());
+            i += 2; // Skip both --tasks-dir and its value
+        } else if arg.starts_with("--tasks-dir=") {
+            tasks_dir = Some(arg[12..].to_string());
+            i += 1; // Skip this argument
+        } else {
+            cleaned_args.push(arg.clone());
+            i += 1;
+        }
+    }
+
+    (tasks_dir, cleaned_args)
+}
+
+/// Resolve the tasks directory based on config and command line arguments
+fn resolve_tasks_directory_with_override(
+    override_path: Option<String>,
+) -> Result<TasksDirectoryResolver, String> {
+    // TODO: Load home config to get global tasks_folder preference
+    // For now, we'll use the default folder name (.tasks) without loading global config
+    TasksDirectoryResolver::resolve(
+        override_path.as_deref(),
+        None, // Use default .tasks folder name
+    )
+}
+
+/// Resolve tasks directory with home config override (for testing)
+fn resolve_tasks_directory_with_home_override(
+    override_path: Option<String>,
+    home_config_override: Option<PathBuf>,
+) -> Result<TasksDirectoryResolver, String> {
+    TasksDirectoryResolver::resolve_with_home_override(
+        override_path.as_deref(),
+        None, // Use default .tasks folder name
+        home_config_override,
+    )
+}
 struct ServeCommand;
 struct TaskCommand;
 struct ScanCommand;
 
 impl Command for ServeCommand {
-    fn execute(&self, args: &[String]) -> Result<(), String> {
-        let port = args.get(2)
+    fn execute(&self, args: &[String], _resolver: &TasksDirectoryResolver) -> Result<(), String> {
+        let port = args
+            .get(2)
             .and_then(|p| p.parse::<u16>().ok())
             .unwrap_or(8000);
 
@@ -36,16 +85,17 @@ impl Command for ServeCommand {
 }
 
 impl Command for TaskCommand {
-    fn execute(&self, args: &[String]) -> Result<(), String> {
+    fn execute(&self, args: &[String], resolver: &TasksDirectoryResolver) -> Result<(), String> {
         let project = project::get_project_name().unwrap_or_else(|| "None".to_string());
-        tasks::task_command(args, &project);
+        tasks::task_command(args, &project, resolver);
         Ok(())
     }
 }
 
 impl Command for ScanCommand {
-    fn execute(&self, args: &[String]) -> Result<(), String> {
-        let path = args.get(2)
+    fn execute(&self, args: &[String], _resolver: &TasksDirectoryResolver) -> Result<(), String> {
+        let path = args
+            .get(2)
             .map(PathBuf::from)
             .or_else(|| project::get_project_path())
             .unwrap_or_else(|| {
@@ -70,20 +120,35 @@ impl Command for ScanCommand {
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let result = match args.get(1).map(|s| s.as_str()) {
-        Some("serve") => ServeCommand.execute(&args),
-        Some("task") => TaskCommand.execute(&args),
-        Some("scan") => ScanCommand.execute(&args),
+    // Parse tasks directory flag and get cleaned arguments
+    let (override_tasks_dir, cleaned_args) = parse_tasks_dir_flag(&args);
+
+    // Resolve tasks directory early for commands that need it
+    let resolver = match resolve_tasks_directory_with_override(override_tasks_dir) {
+        Ok(resolver) => resolver,
+        Err(error) => {
+            eprintln!("Error resolving tasks directory: {}", error);
+            std::process::exit(1);
+        }
+    };
+
+    let result = match cleaned_args.get(1).map(|s| s.as_str()) {
+        Some("serve") => ServeCommand.execute(&cleaned_args, &resolver),
+        Some("task") => TaskCommand.execute(&cleaned_args, &resolver),
+        Some("scan") => ScanCommand.execute(&cleaned_args, &resolver),
         Some("config") => {
-            config::config_command(&args);
+            config::config_command(&cleaned_args, &resolver.path);
             Ok(())
         }
-        Some("index") => index_command(&args),
+        Some("index") => index_command(&cleaned_args, &resolver),
         Some("help") => {
             print_help();
             Ok(())
-        },
-        Some(command) => Err(format!("Invalid command '{}'. Use 'help' for available commands", command)),
+        }
+        Some(command) => Err(format!(
+            "Invalid command '{}'. Use 'help' for available commands",
+            command
+        )),
         None => Err("No command specified. Use 'help' for available commands".to_string()),
     };
 
@@ -93,32 +158,30 @@ fn main() {
     }
 }
 
-fn index_command(args: &[String]) -> Result<(), String> {
+fn index_command(args: &[String], resolver: &TasksDirectoryResolver) -> Result<(), String> {
     if args.len() < 3 {
         return Err("No index operation specified. Available operations: rebuild. Usage: lotar index rebuild".to_string());
     }
 
     let operation = args[2].as_str();
-    let root_path = PathBuf::from(std::env::current_dir().unwrap().join(".tasks/"));
 
     match operation {
         "rebuild" => {
             println!("Rebuilding index from storage...");
-            let mut store = storage::Storage::new(root_path);
+            let mut store = storage::Storage::new(resolver.path.clone());
 
             match store.rebuild_index() {
                 Ok(_) => {
                     println!("✅ Index rebuilt successfully");
                     Ok(())
                 }
-                Err(e) => {
-                    Err(format!("Error rebuilding index: {}", e))
-                }
+                Err(e) => Err(format!("Error rebuilding index: {}", e)),
             }
         }
-        _ => {
-            Err(format!("Invalid index operation '{}'. Available operations: rebuild", operation))
-        }
+        _ => Err(format!(
+            "Invalid index operation '{}'. Available operations: rebuild",
+            operation
+        )),
     }
 }
 
@@ -161,7 +224,9 @@ fn print_help() {
     println!("    lotar task edit <ID> [OPTIONS]");
     println!("    lotar task status <ID> <STATUS>");
     println!("        Available statuses: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE");
-    println!("    lotar task search <QUERY> [--project=PROJECT] [--status=STATUS] [--priority=PRIORITY]");
+    println!(
+        "    lotar task search <QUERY> [--project=PROJECT] [--status=STATUS] [--priority=PRIORITY]"
+    );
     println!("    lotar task delete <ID> [--project=PROJECT]");
     println!();
     println!("INDEX COMMANDS:");

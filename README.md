@@ -14,7 +14,7 @@ git clone https://github.com/mallox/lotar
 cd lotar
 cargo build --release
 
-# Create your first task
+# Create your first task (auto-initializes project with defaults)
 lotar task add --title="Setup project" --project=myapp --priority=HIGH
 
 # List tasks
@@ -23,8 +23,8 @@ lotar task list --project=myapp
 # Start web interface
 lotar serve 8080
 
-# Configure your workflow (optional)
-lotar config init --template=agile
+# Customize your workflow (optional)
+lotar config init --template=agile  # Only needed for custom settings
 lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE
 ```
 
@@ -39,12 +39,14 @@ LoTaR is a **production-ready task management system** designed for developers w
 - 🔍 **Integrated**: Scan source code for TODO comments
 - 🌐 **Complete**: CLI, web interface, and REST API
 - 🛡️ **Secure**: Project isolation and input validation
+- ⚡ **Zero-config**: Auto-initializes projects with sensible defaults
 
 ## 🎯 Core Features
 
 ### Task Management
 ```bash
 # Full CRUD operations with formatted IDs
+# Auto-initializes project configs with sensible defaults
 lotar task add --title="OAuth Implementation" --type=feature --priority=HIGH
 lotar task status PROJ-001 IN_PROGRESS
 lotar task search "authentication" --priority=HIGH
@@ -92,6 +94,23 @@ created: "2025-07-30T10:00:00Z"
 
 LoTaR uses a flexible configuration system that supports both global and project-specific settings.
 
+### Zero-Configuration Setup
+
+**For most users, no configuration is needed!** LoTaR automatically initializes projects with sensible defaults when you create your first task:
+
+```bash
+# This automatically creates default configuration for "myproject"
+lotar task add --title="First task" --project=myproject
+
+# Subsequent tasks reuse the existing configuration
+lotar task add --title="Second task" --project=myproject  # No auto-init message
+```
+
+The auto-initialization creates:
+- Global config (`.tasks/config.yml`) if it doesn't exist
+- Project-specific config (`.tasks/{PROJECT}/config.yml`) with default template
+- Proper project folder structure with consistent naming
+
 ### Configuration Hierarchy
 
 1. **Built-in defaults** (lowest priority)
@@ -106,7 +125,7 @@ LoTaR uses a flexible configuration system that supports both global and project
 # View current configuration
 lotar config show
 
-# Initialize project with template
+# Manual initialization (only needed for custom templates/settings)
 lotar config init --template=agile --project=myapp
 
 # Set global configuration
@@ -120,6 +139,8 @@ lotar config set tags backend,frontend,* --project=myapp
 # List available templates
 lotar config templates
 ```
+
+> **Note**: The `config init` command is only needed when you want to use custom templates or settings. For basic usage, just start adding tasks and LoTaR will handle the setup automatically.
 
 ### Available Templates
 
@@ -200,7 +221,7 @@ cargo fmt
 ## 📝 Example Workflow
 
 ```bash
-# Start a new feature
+# Start a new feature (auto-initializes with defaults)
 lotar task add --title="Add user authentication" --type=feature --priority=HIGH
 
 # Work on it (scan finds TODOs automatically)
@@ -208,6 +229,9 @@ lotar scan ./src
 
 # Update status as you progress
 lotar task status AUTH-001 IN_PROGRESS
+
+# Add more tasks to the same project (reuses existing config)
+lotar task add --title="Add password reset" --project=auth --type=feature
 
 # Search related tasks
 lotar task search "auth" --status=TODO
@@ -224,5 +248,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🌟 Why LoTaR?
 
 Unlike external task trackers that become outdated and disconnected from your code, LoTaR keeps your task management **in sync with your development workflow**. Every requirement change, status update, and decision is version-controlled alongside the code it affects.
+
+With **zero-configuration setup**, you can start tracking tasks immediately without any upfront configuration. LoTaR automatically creates sensible defaults, but still gives you full control to customize your workflow when needed.
 
 Perfect for teams who want the benefits of structured task management without losing the simplicity and reliability of git-based workflows.

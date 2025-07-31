@@ -1,5 +1,5 @@
-use serde::{Serialize, Deserialize};
-use crate::types::{TaskStatus, TaskType, Priority};
+use crate::types::{Priority, TaskStatus, TaskType};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTemplate {
@@ -13,8 +13,7 @@ pub struct ConfigurableField<T> {
     pub values: Vec<T>,
 }
 
-impl<T> ConfigurableField<T>
-where
+impl<T> ConfigurableField<T> where
     T: Clone + PartialEq + std::fmt::Debug + for<'de> serde::Deserialize<'de>
 {
 }
@@ -27,7 +26,9 @@ pub struct StringConfigField {
 
 impl StringConfigField {
     pub fn new_wildcard() -> Self {
-        Self { values: vec!["*".to_string()] }
+        Self {
+            values: vec!["*".to_string()],
+        }
     }
 
     pub fn new_strict(values: Vec<String>) -> Self {
@@ -39,10 +40,7 @@ impl StringConfigField {
     }
 
     pub fn get_suggestions(&self) -> Vec<String> {
-        self.values.iter()
-            .filter(|v| *v != "*")
-            .cloned()
-            .collect()
+        self.values.iter().filter(|v| *v != "*").cloned().collect()
     }
 }
 
@@ -86,10 +84,10 @@ pub struct GlobalConfig {
     pub server_port: u16,
     #[serde(default = "default_task_file_extension")]
     pub task_file_extension: String,
-    #[serde(default = "default_tasks_dir_name")]
-    pub tasks_dir_name: String,
     #[serde(default = "default_project_name")]
     pub default_project: String,
+    #[serde(default = "default_tasks_folder")]
+    pub tasks_folder: String,
 
     // Default configurations for all projects
     #[serde(default = "default_issue_states")]
@@ -113,7 +111,6 @@ pub struct GlobalConfig {
 pub struct ResolvedConfig {
     pub server_port: u16,
     pub task_file_extension: String,
-    pub tasks_dir_name: String,
     pub default_project: String,
     pub issue_states: ConfigurableField<TaskStatus>,
     pub issue_types: ConfigurableField<TaskType>,
@@ -144,22 +141,38 @@ impl std::fmt::Display for ConfigError {
 impl std::error::Error for ConfigError {}
 
 // Default value functions
-fn default_port() -> u16 { 8080 }
-fn default_task_file_extension() -> String { "yml".to_string() }
-fn default_tasks_dir_name() -> String { ".tasks".to_string() }
-fn default_project_name() -> String { "auto".to_string() }
-fn default_priority() -> Priority { Priority::Medium }
+fn default_port() -> u16 {
+    8080
+}
+fn default_task_file_extension() -> String {
+    "yml".to_string()
+}
+fn default_tasks_folder() -> String {
+    ".tasks".to_string()
+}
+fn default_project_name() -> String {
+    "auto".to_string()
+}
+fn default_priority() -> Priority {
+    Priority::Medium
+}
 
 fn default_issue_states() -> ConfigurableField<TaskStatus> {
-    ConfigurableField { values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done] }
+    ConfigurableField {
+        values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+    }
 }
 
 fn default_issue_types() -> ConfigurableField<TaskType> {
-    ConfigurableField { values: vec![TaskType::Feature, TaskType::Bug, TaskType::Chore] }
+    ConfigurableField {
+        values: vec![TaskType::Feature, TaskType::Bug, TaskType::Chore],
+    }
 }
 
 fn default_issue_priorities() -> ConfigurableField<Priority> {
-    ConfigurableField { values: vec![Priority::Low, Priority::Medium, Priority::High] }
+    ConfigurableField {
+        values: vec![Priority::Low, Priority::Medium, Priority::High],
+    }
 }
 
 fn default_categories() -> StringConfigField {
@@ -175,8 +188,8 @@ impl Default for GlobalConfig {
         Self {
             server_port: default_port(),
             task_file_extension: default_task_file_extension(),
-            tasks_dir_name: default_tasks_dir_name(),
             default_project: default_project_name(),
+            tasks_folder: default_tasks_folder(),
             issue_states: default_issue_states(),
             issue_types: default_issue_types(),
             issue_priorities: default_issue_priorities(),
