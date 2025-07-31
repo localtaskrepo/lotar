@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
 use crate::types::{TaskStatus, Priority};
-use crate::store::{Task};
+use crate::storage::{Task};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskFilter {

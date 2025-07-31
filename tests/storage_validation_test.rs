@@ -1,8 +1,8 @@
-use local_task_repo::store::Task;
+use local_task_repo::storage::Task;
 use local_task_repo::types::Priority;
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, utils};
 
 /// Task validation and serialization tests
 #[cfg(test)]
@@ -53,7 +53,7 @@ mod task_validation_tests {
 
         let mut storage = fixtures.create_storage();
         let task_id = storage.add(&task);
-        let actual_project = storage.get_project_for_task(&task_id).unwrap();
+        let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         let retrieved = storage.get(&task_id, actual_project.clone()).unwrap();
 
@@ -101,7 +101,7 @@ mod task_validation_tests {
 
         let mut storage = fixtures.create_storage();
         let task_id = storage.add(&task);
-        let actual_project = storage.get_project_for_task(&task_id).unwrap();
+        let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         let retrieved = storage.get(&task_id, actual_project).unwrap();
         assert_eq!(retrieved.title, "Task with 特殊字符 and émojis 🚀");

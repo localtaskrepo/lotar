@@ -1,8 +1,8 @@
-use local_task_repo::store::Task;
+use local_task_repo::storage::Task;
 use local_task_repo::types::Priority;
 
 mod common;
-use common::{TestFixtures, assertions};
+use common::{TestFixtures, assertions, utils};
 
 /// Basic storage CRUD operations
 #[cfg(test)]
@@ -25,7 +25,7 @@ mod storage_crud_tests {
         assert!(!task_id.is_empty(), "Task ID should be assigned");
 
         // Get the actual project prefix that was generated
-        let actual_project = storage.get_project_for_task(&task_id).unwrap();
+        let actual_project = utils::get_project_for_task(&task_id).unwrap();
         assert!(task_id.starts_with(&format!("{}-", actual_project)), "Task should have generated prefix");
 
         // Verify task file was created
@@ -46,7 +46,7 @@ mod storage_crud_tests {
         );
 
         let task_id = storage.add(&original_task);
-        let actual_project = storage.get_project_for_task(&task_id).unwrap();
+        let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         // Test successful retrieval
         let retrieved_task = storage.get(&task_id, actual_project.clone());
@@ -71,7 +71,7 @@ mod storage_crud_tests {
         );
 
         let task_id = storage.add(&task);
-        let actual_project = storage.get_project_for_task(&task_id).unwrap();
+        let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         // Verify task exists
         assert!(storage.get(&task_id, actual_project.clone()).is_some());
@@ -105,7 +105,7 @@ mod storage_crud_tests {
         );
 
         let id1 = storage.add(&task1);
-        let actual_project = storage.get_project_for_task(&id1).unwrap();
+        let actual_project = utils::get_project_for_task(&id1).unwrap();
 
         // Use the same project prefix for the second task
         let mut task2_updated = task2.clone();
@@ -128,7 +128,7 @@ mod storage_crud_tests {
         task1.title = "First Task".to_string();
 
         let id1 = storage.add(&task1);
-        let actual_project = storage.get_project_for_task(&id1).unwrap();
+        let actual_project = utils::get_project_for_task(&id1).unwrap();
 
         // Create second and third tasks using the same actual project prefix
         let mut task2 = fixtures.create_sample_task(&actual_project);

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use tempfile::TempDir;
 use std::fs;
-use local_task_repo::store::{Task, Storage};
+use local_task_repo::storage::{Task, Storage};
 use local_task_repo::types::Priority;
 use std::fs::File;
 use std::io::Write;
@@ -34,10 +34,12 @@ impl TestFixtures {
         )
     }
 
+    #[allow(dead_code)] // Used across multiple test modules
     pub fn create_storage(&self) -> Storage {
         Storage::new(self.tasks_root.clone())
     }
 
+    #[allow(dead_code)] // Used across multiple test modules
     pub fn get_temp_path(&self) -> &std::path::Path {
         self.temp_dir.path()
     }
@@ -75,11 +77,20 @@ impl TestFixtures {
     }
 }
 
+/// Test utility functions
+pub mod utils {
+    /// Extract project prefix from task ID (e.g., "PROJ-123" -> "PROJ")
+    #[allow(dead_code)] // Used across multiple test modules
+    pub fn get_project_for_task(task_id: &str) -> Option<String> {
+        task_id.split('-').next().map(|s| s.to_string())
+    }
+}
+
 /// Assertion helpers for testing
 pub mod assertions {
-    use local_task_repo::store::Task;
     use std::path::Path;
 
+    #[allow(dead_code)] // Used in storage_crud_test.rs
     pub fn assert_task_exists(tasks_root: &Path, project: &str, _task_id: &str) {
         // Look for .yml files since we changed the extension
         let task_files = std::fs::read_dir(tasks_root.join(project))
@@ -91,6 +102,7 @@ pub mod assertions {
         assert!(!task_files.is_empty(), "Should have at least one task file in project {}", project);
     }
 
+    #[allow(dead_code)] // Used in storage_crud_test.rs
     pub fn assert_metadata_updated(tasks_root: &Path, project: &str, task_count: u64, current_id: u64) {
         // Removed metadata file existence check since we've eliminated metadata.yml files
         // With the new filesystem-based approach, we verify the data by counting files and finding max ID
@@ -130,40 +142,6 @@ pub mod assertions {
 
         assert_eq!(actual_task_count, task_count, "Task count mismatch for project {}", project);
         assert_eq!(actual_current_id, current_id, "Current ID mismatch for project {}", project);
-    }
-}
-
-/// Performance testing utilities
-pub mod performance {
-    use std::time::{Duration, Instant};
-
-    pub fn measure_execution_time<F, R>(operation: F) -> (R, Duration)
-    where
-        F: FnOnce() -> R,
-    {
-        let start = Instant::now();
-        let result = operation();
-        let duration = start.elapsed();
-        (result, duration)
-    }
-
-    pub fn assert_performance_threshold<F, R>(
-        operation: F,
-        max_duration: Duration,
-        operation_name: &str
-    ) -> R
-    where
-        F: FnOnce() -> R,
-    {
-        let (result, duration) = measure_execution_time(operation);
-        assert!(
-            duration <= max_duration,
-            "{} took {:?}, expected <= {:?}",
-            operation_name,
-            duration,
-            max_duration
-        );
-        result
     }
 }
 

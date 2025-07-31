@@ -21,9 +21,7 @@ mod basic_commands {
     #[test]
     fn test_invalid_command() {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.arg("invalid_command")
-            .assert()
-            .failure();
+        cmd.arg("invalid_command").assert().failure();
     }
 
     #[test]
@@ -46,10 +44,10 @@ mod config_commands {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["config", "set", "tasks_root", ".custom_tasks"])
+            .args(&["config", "set", "server_port", "9000"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Setting tasks_root"));
+            .stdout(predicate::str::contains("Successfully updated server_port"));
     }
 
     #[test]
@@ -57,8 +55,10 @@ mod config_commands {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.args(&["config"])
             .assert()
-            .failure()
-            .stderr(predicate::str::contains("No config operation specified"));
+            .success() // Changed from failure to success since it now shows help
+            .stdout(predicate::str::contains(
+                "Configuration management commands",
+            ));
     }
 }
 
@@ -72,10 +72,7 @@ mod scan_commands {
         let temp_dir = TempDir::new().unwrap();
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(&temp_dir)
-            .arg("scan")
-            .assert()
-            .success();
+        cmd.current_dir(&temp_dir).arg("scan").assert().success();
     }
 
     #[test]
@@ -95,7 +92,11 @@ mod scan_commands {
 
         // Create a test file with TODO comments
         let test_file = temp_dir.path().join("test.js");
-        std::fs::write(&test_file, "// TODO: This is a test todo comment\nfunction test() {}").unwrap();
+        std::fs::write(
+            &test_file,
+            "// TODO: This is a test todo comment\nfunction test() {}",
+        )
+        .unwrap();
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
@@ -108,19 +109,16 @@ mod scan_commands {
     #[test]
     fn test_scan_nonexistent_directory() {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.args(&["scan", "/nonexistent/path"])
-            .assert()
-            .failure();
+        cmd.args(&["scan", "/nonexistent/path"]).assert().failure();
     }
 }
 
 /// Serve command tests
 #[cfg(test)]
 mod serve_commands {
-    use super::*;
     use std::process::{Command as StdCommand, Stdio};
-    use std::time::Duration;
     use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_serve_command_starts() {
@@ -137,12 +135,20 @@ mod serve_commands {
         // Try to kill the process gracefully first
         match child.try_wait() {
             Ok(Some(status)) => {
-                assert!(status.success() || status.code().is_some(), "Process should exit with a status code");
+                assert!(
+                    status.success() || status.code().is_some(),
+                    "Process should exit with a status code"
+                );
             }
             Ok(None) => {
                 let _ = child.kill();
-                let _output = child.wait_with_output().expect("Failed to wait for process");
-                assert!(true, "Serve command started and was terminated successfully");
+                let _output = child
+                    .wait_with_output()
+                    .expect("Failed to wait for process");
+                assert!(
+                    true,
+                    "Serve command started and was terminated successfully"
+                );
             }
             Err(_) => {
                 let _ = child.kill();

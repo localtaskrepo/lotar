@@ -15,12 +15,14 @@ mod workflow_tests {
 
         // Create a task
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let output = cmd.current_dir(&temp_dir)
+        let output = cmd
+            .current_dir(&temp_dir)
             .args(&[
-                "task", "add",
+                "task",
+                "add",
                 "--title=Workflow Test Task",
                 "--description=Testing complete workflow",
-                "--priority=1"
+                "--priority=1",
             ])
             .output()
             .unwrap();
@@ -42,10 +44,7 @@ mod workflow_tests {
         // Edit the task
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&[
-                "task", "edit", task_id,
-                "--title=Updated Workflow Task"
-            ])
+            .args(&["task", "edit", task_id, "--title=Updated Workflow Task"])
             .assert()
             .success();
     }
@@ -58,9 +57,10 @@ mod workflow_tests {
         let mut cmd1 = Command::cargo_bin("lotar").unwrap();
         cmd1.current_dir(&temp_dir)
             .args(&[
-                "task", "add",
+                "task",
+                "add",
                 "--title=Project A Task",
-                "--project=project-a"
+                "--project=project-a",
             ])
             .assert()
             .success();
@@ -68,23 +68,30 @@ mod workflow_tests {
         let mut cmd2 = Command::cargo_bin("lotar").unwrap();
         cmd2.current_dir(&temp_dir)
             .args(&[
-                "task", "add",
+                "task",
+                "add",
                 "--title=Project B Task",
-                "--project=project-b"
+                "--project=project-b",
             ])
             .assert()
             .success();
 
         // Verify task directories were created
         let tasks_root = temp_dir.path().join(".tasks");
-        assert!(tasks_root.exists(), "Tasks root directory should be created");
+        assert!(
+            tasks_root.exists(),
+            "Tasks root directory should be created"
+        );
 
         let tasks_dirs: Vec<_> = std::fs::read_dir(&tasks_root)
             .unwrap()
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().is_dir())
             .collect();
-        assert!(tasks_dirs.len() >= 2, "At least two project directories should be created");
+        assert!(
+            tasks_dirs.len() >= 2,
+            "At least two project directories should be created"
+        );
     }
 
     #[test]
@@ -100,30 +107,46 @@ mod workflow_tests {
             .output()
             .unwrap();
 
+        // Debug: Print actual output if test fails
+        if !scan_output.status.success() {
+            eprintln!("Scan command failed!");
+            eprintln!("Exit code: {}", scan_output.status);
+            eprintln!("Stdout: {}", String::from_utf8_lossy(&scan_output.stdout));
+            eprintln!("Stderr: {}", String::from_utf8_lossy(&scan_output.stderr));
+        }
+
         assert!(scan_output.status.success());
         let scan_stdout = String::from_utf8(scan_output.stdout).unwrap();
         assert!(scan_stdout.contains("TODO"));
 
         // Then create a task in the same directory
         let mut task_cmd = Command::cargo_bin("lotar").unwrap();
-        task_cmd.current_dir(fixtures.get_temp_path())
+        task_cmd
+            .current_dir(fixtures.get_temp_path())
             .args(&[
-                "task", "add",
+                "task",
+                "add",
                 "--title=Task for scanned project",
-                "--project=scanned-project"
+                "--project=scanned-project",
             ])
             .assert()
             .success();
 
         // Verify task directory was created
         let tasks_root = fixtures.get_temp_path().join(".tasks");
-        assert!(tasks_root.exists(), "Tasks root directory should be created");
+        assert!(
+            tasks_root.exists(),
+            "Tasks root directory should be created"
+        );
 
         let tasks_dirs: Vec<_> = std::fs::read_dir(&tasks_root)
             .unwrap()
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().is_dir())
             .collect();
-        assert!(!tasks_dirs.is_empty(), "At least one project directory should be created");
+        assert!(
+            !tasks_dirs.is_empty(),
+            "At least one project directory should be created"
+        );
     }
 }

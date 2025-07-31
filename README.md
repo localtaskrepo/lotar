@@ -3,7 +3,7 @@
 > A git-integrated task management system that lives in your repository.
 
 [![Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)](docs/README.md)
-[![Tests](https://img.shields.io/badge/tests-66%20passing-brightgreen)](docs/README.md#testing--quality)
+[![Tests](https://img.shields.io/badge/tests-129%20passing-brightgreen)](docs/README.md#testing--quality)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 
 ## 🚀 Quick Start
@@ -22,6 +22,10 @@ lotar task list --project=myapp
 
 # Start web interface
 lotar serve 8080
+
+# Configure your workflow (optional)
+lotar config init --template=agile
+lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE
 ```
 
 ## ✨ What is LoTaR?
@@ -64,14 +68,14 @@ LoTaR creates a `.tasks/` directory in your repository:
 
 ```
 .tasks/
-├── index.yml                 # Global search index
+├── index.yml                 # Global search index and project metadata
+├── config.yml               # Global configuration
 ├── BACKEND/                 # Project folders
-│   ├── metadata.yml         # Project metadata
-│   ├── 1.yml               # Individual task files
-│   └── 2.yml
+│   ├── config.yml          # Project-specific configuration (optional)
+│   ├── 001.yml             # Individual task files
+│   └── 002.yml
 └── FRONTEND/
-    ├── metadata.yml
-    └── 1.yml
+    └── 001.yml
 ```
 
 Each task is stored as a readable YAML file with structured data:
@@ -84,10 +88,65 @@ assignee: "john.doe@company.com"
 created: "2025-07-30T10:00:00Z"
 ```
 
+## ⚙️ Configuration
+
+LoTaR uses a flexible configuration system that supports both global and project-specific settings.
+
+### Configuration Hierarchy
+
+1. **Built-in defaults** (lowest priority)
+2. **Global config** (`.tasks/config.yml`)
+3. **Home config** (`~/.lotar`) 
+4. **Project config** (`.tasks/{project}/config.yml`)
+5. **Environment variables** (highest priority)
+
+### Configuration Commands
+
+```bash
+# View current configuration
+lotar config show
+
+# Initialize project with template
+lotar config init --template=agile --project=myapp
+
+# Set global configuration
+lotar config set server_port 9000
+lotar config set default_project myapp
+
+# Set project-specific configuration
+lotar config set issue_states TODO,WORKING,REVIEW,DONE --project=myapp
+lotar config set tags backend,frontend,* --project=myapp
+
+# List available templates
+lotar config templates
+```
+
+### Available Templates
+
+- **simple**: Minimal workflow (TODO/IN_PROGRESS/DONE)
+- **agile**: Full agile workflow with epics, sprints, and stories
+- **kanban**: Continuous flow with assignee requirements
+- **default**: Basic configuration using global defaults
+
+### Configurable Fields
+
+**Global Settings:**
+- `server_port`: Web interface port (default: 8080)
+- `default_project`: Default project name
+- `tasks_dir_name`: Task storage directory name
+
+**Project Settings:**
+- `issue_states`: Valid task statuses (TODO, IN_PROGRESS, DONE, etc.)
+- `issue_types`: Task types (feature, bug, chore, epic, etc.)
+- `issue_priorities`: Priority levels (LOW, MEDIUM, HIGH, etc.)
+- `categories`: Organizational categories (wildcard by default)
+- `tags`: Task tags (wildcard by default)
+- `default_assignee`: Default task assignee
+- `default_priority`: Default priority level
+
 ## 🧪 Production Ready
 
-- ✅ **66 tests passing** with comprehensive coverage
-- ✅ **Zero compilation errors** 
+- ✅ **129 tests passing** with comprehensive coverage
 - ✅ **Memory safe** with Rust's ownership system
 - ✅ **Performance optimized** for large task sets
 - ✅ **Security validated** with project isolation

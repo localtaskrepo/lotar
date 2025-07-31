@@ -1,9 +1,9 @@
-use local_task_repo::store::Task;
+use local_task_repo::storage::Task;
 use local_task_repo::types::{TaskStatus, Priority};
 use local_task_repo::index::TaskFilter;
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, utils};
 
 #[test]
 fn test_basic_task_status_update() {
@@ -14,7 +14,7 @@ fn test_basic_task_status_update() {
     let task_id = storage.add(&task);
     
     // Get the actual project name that was created
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Initial status should be default (TODO)
     let task = storage.get(&task_id, actual_project.clone()).unwrap();
@@ -38,7 +38,7 @@ fn test_task_search_by_text() {
     // Create test tasks with different content
     let task1 = Task::new(fixtures.tasks_root.clone(), "Authentication system".to_string(), "search-test".to_string(), Priority::High);
     let task1_id = storage.add(&task1);
-    let actual_project = storage.get_project_for_task(&task1_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task1_id).unwrap();
 
     let mut task2 = Task::new(fixtures.tasks_root.clone(), "User interface design".to_string(), actual_project.clone(), Priority::Medium);
     let mut task3 = Task::new(fixtures.tasks_root.clone(), "Database authentication".to_string(), actual_project.clone(), Priority::High);
@@ -71,9 +71,9 @@ fn test_task_filtering_by_status() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
     
-    let mut task1 = fixtures.create_sample_task("filter-test");
+    let task1 = fixtures.create_sample_task("filter-test");
     let task1_id = storage.add(&task1);
-    let actual_project = storage.get_project_for_task(&task1_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task1_id).unwrap();
 
     let mut task2 = fixtures.create_sample_task(&actual_project);
     task2.title = "In Progress Task".to_string();
@@ -105,7 +105,7 @@ fn test_task_filtering_by_priority() {
 
     let task1 = Task::new(fixtures.tasks_root.clone(), "High priority".to_string(), "priority-test".to_string(), Priority::High);
     let task1_id = storage.add(&task1);
-    let actual_project = storage.get_project_for_task(&task1_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task1_id).unwrap();
 
     let task2 = Task::new(fixtures.tasks_root.clone(), "Low priority".to_string(), actual_project.clone(), Priority::Low);
     storage.add(&task2);
@@ -131,7 +131,7 @@ fn test_task_filtering_by_tags() {
     task1.title = "Backend Task".to_string();
     task1.tags = vec!["backend".to_string(), "api".to_string()];
     let task1_id = storage.add(&task1);
-    let actual_project = storage.get_project_for_task(&task1_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task1_id).unwrap();
 
     let mut task2 = fixtures.create_sample_task(&actual_project);
     task2.title = "Frontend Task".to_string();
@@ -171,7 +171,7 @@ fn test_complex_task_filtering() {
     task.description = Some("Implement secure authentication API endpoint".to_string());
 
     let task_id = storage.add(&task);
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Complex filter: text + status + tags using the correct project name
     let filter = TaskFilter {

@@ -36,28 +36,57 @@ Write a module in Rust called Scanner that implements the following features:
 // Optimized file types configuration - removed duplicates and organized by comment style
 const FILE_TYPES: &[(&str, &str)] = &[
     // Single-line comment languages with //
-    ("rs", "//"), ("rust", "//"), ("go", "//"), ("java", "//"), ("js", "//"), ("ts", "//"),
-    ("cpp", "//"), ("cc", "//"), ("cxx", "//"), ("c", "//"), ("h", "//"), ("hpp", "//"),
-    ("cs", "//"), ("scala", "//"), ("groovy", "//"), ("swift", "//"), ("php", "//"),
-    ("kotlin", "//"), ("dart", "//"), ("fsharp", "//"),
-
+    ("rs", "//"),
+    ("rust", "//"),
+    ("go", "//"),
+    ("java", "//"),
+    ("js", "//"),
+    ("ts", "//"),
+    ("cpp", "//"),
+    ("cc", "//"),
+    ("cxx", "//"),
+    ("c", "//"),
+    ("h", "//"),
+    ("hpp", "//"),
+    ("cs", "//"),
+    ("scala", "//"),
+    ("groovy", "//"),
+    ("swift", "//"),
+    ("php", "//"),
+    ("kotlin", "//"),
+    ("dart", "//"),
+    ("fsharp", "//"),
     // Hash-based comment languages
-    ("py", "#"), ("rb", "#"), ("sh", "#"), ("bash", "#"), ("perl", "#"), ("r", "#"),
-    ("elixir", "#"), ("powershell", "#"), ("nim", "#"), ("yaml", "#"), ("yml", "#"),
-
+    ("py", "#"),
+    ("rb", "#"),
+    ("sh", "#"),
+    ("bash", "#"),
+    ("perl", "#"),
+    ("r", "#"),
+    ("elixir", "#"),
+    ("powershell", "#"),
+    ("nim", "#"),
+    ("yaml", "#"),
+    ("yml", "#"),
     // Double-dash comment languages
-    ("hs", "--"), ("haskell", "--"), ("elm", "--"), ("pascal", "--"),
-
+    ("hs", "--"),
+    ("haskell", "--"),
+    ("elm", "--"),
+    ("pascal", "--"),
     // Semicolon comment languages
-    ("clojure", ";"), ("scheme", ";"), ("commonlisp", ";"), ("racket", ";"),
-
+    ("clojure", ";"),
+    ("scheme", ";"),
+    ("commonlisp", ";"),
+    ("racket", ";"),
     // Percent comment languages
-    ("erlang", "%"), ("matlab", "%"), ("tex", "%"),
+    ("erlang", "%"),
+    ("matlab", "%"),
+    ("tex", "%"),
 ];
 
-use std::fs;
 use regex::Regex;
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Reference {
@@ -131,26 +160,40 @@ impl Scanner {
             if let Some(extension) = file_path.extension() {
                 if let Some(ext_str) = extension.to_str() {
                     // Find the correct comment pattern for this file type
-                    if let Some((_, start_comment)) = FILE_TYPES.iter()
-                        .find(|(file_type, _)| file_type == &ext_str) {
-
+                    if let Some((_, start_comment)) = FILE_TYPES
+                        .iter()
+                        .find(|(file_type, _)| file_type == &ext_str)
+                    {
                         let comment_regex = Regex::new(start_comment).unwrap();
-                        let todo_regex = Regex::new(r"(?i)todo").unwrap();
-                        let uuid_extract_regex = Regex::new(r"(?i)todo\s*\(([^)]+)\)\s*:?\s*(.*)").unwrap();
-                        let simple_todo_regex = Regex::new(r"(?i)todo\s*:?\s*(.*)").unwrap();
+                        let todo_regex = Regex::new(r"[Tt][Oo][Dd][Oo]").unwrap();
+                        let uuid_extract_regex =
+                            Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*\(([^)]+)\)[ \t]*:?[ \t]*(.*)")
+                                .unwrap();
+                        let simple_todo_regex =
+                            Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*:?[ \t]*(.*)").unwrap();
 
                         // Process each line to find TODOs in comments
                         for (line_number, line) in file_contents.lines().enumerate() {
                             // Check if line contains a comment and TODO (case insensitive)
                             if comment_regex.is_match(line) && todo_regex.is_match(line) {
-                                let (uuid, title) = if let Some(uuid_captures) = uuid_extract_regex.captures(line) {
+                                let (uuid, title) = if let Some(uuid_captures) =
+                                    uuid_extract_regex.captures(line)
+                                {
                                     // Extract UUID and title from UUID format
-                                    let uuid = uuid_captures.get(1).map_or(String::new(), |m| m.as_str().to_string());
-                                    let title = uuid_captures.get(2).map_or(String::new(), |m| m.as_str().trim().to_string());
+                                    let uuid = uuid_captures
+                                        .get(1)
+                                        .map_or(String::new(), |m| m.as_str().to_string());
+                                    let title = uuid_captures
+                                        .get(2)
+                                        .map_or(String::new(), |m| m.as_str().trim().to_string());
                                     (uuid, title)
-                                } else if let Some(simple_captures) = simple_todo_regex.captures(line) {
+                                } else if let Some(simple_captures) =
+                                    simple_todo_regex.captures(line)
+                                {
                                     // Extract title from simple TODO format
-                                    let title = simple_captures.get(1).map_or(String::new(), |m| m.as_str().trim().to_string());
+                                    let title = simple_captures
+                                        .get(1)
+                                        .map_or(String::new(), |m| m.as_str().trim().to_string());
                                     (String::new(), title)
                                 } else {
                                     // Fallback: extract whatever comes after TODO
@@ -178,44 +221,5 @@ impl Scanner {
                 }
             }
         }
-    }
-
-    pub fn extract_todos_from_content(&self, content: &str, file_path: &Path) -> Vec<Reference> {
-        let mut references = vec![];
-
-        // Create the regex patterns needed for this method
-        let uuid_extract_regex = Regex::new(r"(?i)todo\s*\(([^)]+)\)\s*:?\s*(.*)").unwrap();
-        let simple_todo_regex = Regex::new(r"(?i)todo\s*:?\s*(.*)").unwrap();
-
-        for (line_number, line) in content.lines().enumerate() {
-            // Check if line contains TODO (case insensitive)
-            if line.to_lowercase().contains("todo") {
-                let (uuid, title) = if let Some(uuid_captures) = uuid_extract_regex.captures(line) {
-                    // Extract UUID and title from UUID format
-                    let uuid = uuid_captures.get(1).map_or(String::new(), |m| m.as_str().to_string());
-                    let title = uuid_captures.get(2).map_or(String::new(), |m| m.as_str().trim().to_string());
-                    (uuid, title)
-                } else if let Some(simple_captures) = simple_todo_regex.captures(line) {
-                    // Extract title from simple TODO format
-                    let title = simple_captures.get(1).map_or(String::new(), |m| m.as_str().trim().to_string());
-                    (String::new(), title)
-                } else {
-                    (String::new(), String::new())
-                };
-
-                let reference = Reference {
-                    file_path: file_path.to_path_buf(),
-                    line_number: line_number + 1, // Convert to 1-based line number
-                    title,
-                    uuid,
-                    annotation: line.trim().to_string(),
-                    code_block: String::new(),
-                    comment_block: String::new(),
-                };
-                references.push(reference);
-            }
-        }
-
-        references
     }
 }

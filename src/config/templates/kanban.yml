@@ -1,0 +1,21 @@
+# Kanban Project Template
+# Continuous flow methodology with assignee tracking
+# Emphasizes work-in-progress limits and assignee accountability
+
+name: "Kanban"
+description: "Continuous flow workflow with assignee requirements"
+config:
+  project_name: "{{project_name}}"
+  issue_states:
+    values:
+      - Todo        # Backlog
+      - InProgress  # Active work
+      - Verify      # Review/Testing
+      - Done        # Completed
+  issue_types:
+    values:
+      - Feature
+      - Bug
+      - Epic
+      - Chore
+  require_assignee: true  # Kanban emphasizes accountability

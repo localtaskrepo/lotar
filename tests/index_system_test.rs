@@ -1,9 +1,9 @@
-use local_task_repo::store::Task;
+use local_task_repo::storage::Task;
 use local_task_repo::types::TaskStatus;
 use local_task_repo::index::{TaskFilter, TaskIndex};
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, utils};
 
 #[test]
 fn test_id_to_file_index() {
@@ -21,7 +21,7 @@ fn test_id_to_file_index() {
     
     // With our simplified architecture, we verify the task exists by checking the filesystem
     // Get the actual project folder from the task ID instead of hardcoding "TP"
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
     assert!(fixtures.tasks_root.join(&actual_project).join("1.yml").exists(), 
             "Task file should exist in filesystem at {}/1.yml", actual_project);
 }
@@ -51,7 +51,7 @@ fn test_index_update_on_task_modification() {
     let task_id = storage.add(&task);
 
     // Get the actual project name that was created (the prefix)
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Modify the task using the correct project name
     let mut updated_task = storage.get(&task_id, actual_project.clone()).unwrap();
@@ -80,7 +80,7 @@ fn test_index_performance() {
     let first_task_id = storage.add(&first_task);
 
     // Get the actual project name that was created (the prefix)
-    let actual_project = storage.get_project_for_task(&first_task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&first_task_id).unwrap();
 
     // Create remaining tasks using the actual project prefix
     for i in 1..100 { // Reduced from 1000 for faster testing

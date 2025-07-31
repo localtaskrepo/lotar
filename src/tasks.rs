@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use crate::store::{self, Task};
+use crate::storage::{Storage, Task};
 use crate::types::{TaskStatus, TaskType, Priority};
 use crate::index::TaskFilter;
 
@@ -13,7 +13,7 @@ pub fn task_command(args: &[String], default_project: &str) {
 
     let operation = args[2].as_str();
     let root_path = PathBuf::from(std::env::current_dir().unwrap().join(".tasks/"));
-    let mut store = store::Storage::new(root_path.clone());
+    let mut store = Storage::new(root_path.clone());
 
     match operation {
         "add" => {

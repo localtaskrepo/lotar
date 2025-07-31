@@ -1,8 +1,8 @@
-use local_task_repo::store::Task;
+use local_task_repo::storage::Task;
 use local_task_repo::types::Priority;
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, utils};
 
 /// Multi-project storage functionality tests
 #[cfg(test)]
@@ -42,9 +42,9 @@ mod storage_projects_tests {
         let id3 = storage.add(&task3);
 
         // Get actual project prefixes that were generated
-        let project_a = storage.get_project_for_task(&id1).unwrap();
-        let project_b = storage.get_project_for_task(&id2).unwrap();
-        let project_a_second = storage.get_project_for_task(&id3).unwrap();
+        let project_a = utils::get_project_for_task(&id1).unwrap();
+        let project_b = utils::get_project_for_task(&id2).unwrap();
+        let project_a_second = utils::get_project_for_task(&id3).unwrap();
 
         // Verify projects are isolated (different project names get different prefixes)
         assert_ne!(project_a, project_b, "Different projects should have different prefixes");

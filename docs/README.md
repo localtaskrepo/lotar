@@ -39,7 +39,7 @@ lotar scan ./src
 - **Status System**: TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE
 - **Priority Levels**: LOW, MEDIUM, HIGH, CRITICAL
 - **Task Types**: Feature, Bug, Epic, Spike, Chore
-- **Formatted IDs**: PROJECT-001, PROJECT-002 format
+- **Formatted IDs**: PROJ-1, PROJ-2 format with 4-character prefixes
 
 ### Storage & Organization
 - **YAML Format**: Human-readable `.yml` files

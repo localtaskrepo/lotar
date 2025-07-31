@@ -1,9 +1,9 @@
-use local_task_repo::store::{Storage};
+use local_task_repo::storage::{Storage};
 use local_task_repo::types::{TaskStatus, Priority};
 use local_task_repo::index::{TaskIndex, TaskFilter};
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, utils};
 
 #[test]
 fn test_index_status_change_tracking() {
@@ -16,7 +16,7 @@ fn test_index_status_change_tracking() {
     let task_id = storage.add(&task);
 
     // Get the actual project name from the task ID
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Verify we can find the task with TODO status
     let filter = TaskFilter {
@@ -58,7 +58,7 @@ fn test_index_priority_change_tracking() {
     let task_id = storage.add(&task);
 
     // Get the actual project name from the task ID
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Verify we can find the task with MEDIUM priority
     let filter = TaskFilter {
@@ -100,7 +100,7 @@ fn test_index_tag_removal() {
     let task_id = storage.add(&task);
 
     // Get the actual project name from the task ID
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Verify all tags are in index
     let index_file = fixtures.tasks_root.join("index.yml");
@@ -132,7 +132,7 @@ fn test_index_delete_cleanup() {
     let task1_id = storage.add(&task1);
     
     // Get the actual project name from the task ID
-    let actual_project = storage.get_project_for_task(&task1_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task1_id).unwrap();
     
     // Create second task using the actual project prefix
     let mut task2 = fixtures.create_sample_task("second-task");
@@ -211,7 +211,7 @@ fn test_index_handles_corrupted_file() {
     let task_id = storage.add(&task);
 
     // Get the actual project name that was created
-    let actual_project = storage.get_project_for_task(&task_id).unwrap();
+    let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Corrupt the index file
     let index_file = fixtures.tasks_root.join("index.yml");

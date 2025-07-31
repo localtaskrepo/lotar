@@ -87,7 +87,7 @@ mod performance_tests {
 #[cfg(test)]
 mod storage_performance_tests {
     use super::*;
-    use local_task_repo::store::Task;
+    use local_task_repo::storage::Task;
     use local_task_repo::types::Priority;
     use common::TestFixtures;
 

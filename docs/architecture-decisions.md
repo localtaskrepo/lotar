@@ -11,7 +11,7 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 **Storage Layer (`store.rs`)**
 - YAML-based persistence with human-readable `.yml` files
 - Project isolation with separate directories
-- Automatic ID generation (`PROJECT-001` format)
+- Automatic ID generation (`PROJ-1` format with 4-character prefixes)
 - Metadata management for task counting and file mapping
 
 **Type System (`types.rs`)**
@@ -114,8 +114,8 @@ custom_fields:
 **Rationale**: Isolation, scalability, performance, clear boundaries
 
 ### AD-003: Formatted Task IDs
-**Decision**: Use `PROJECT-001` format for external references  
-**Rationale**: Human-readable, unique, sortable, professional
+**Decision**: Use `PROJ-1` format for external references (4-character prefix + sequential number)  
+**Rationale**: Human-readable, unique, sortable, professional, compact
 
 ### AD-004: Command Pattern for CLI
 **Decision**: Implement CLI using Command trait pattern  
