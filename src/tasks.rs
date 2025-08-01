@@ -3,7 +3,12 @@ use crate::storage::{Storage, Task};
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::workspace::TasksDirectoryResolver;
 
-pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDirectoryResolver) {
+pub fn task_command(
+    args: &[String],
+    default_project: &str,
+    original_project_name: &Option<String>,
+    resolver: &TasksDirectoryResolver,
+) {
     // Display info message if tasks directory is not in current directory
     if let Some(info_msg) = resolver.get_info_message() {
         println!("{}", info_msg);
@@ -21,12 +26,7 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
 
     match operation {
         "add" => {
-            let mut task = Task::new(
-                resolver.path.clone(),
-                "".to_string(),
-                default_project.to_string(),
-                Priority::Medium,
-            );
+            let mut task = Task::new(resolver.path.clone(), "".to_string(), Priority::Medium);
 
             if args.len() < 4 {
                 println!("Error: No task title specified.");
@@ -48,7 +48,7 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
                 std::process::exit(1);
             }
 
-            let id = store.add(&task);
+            let id = store.add(&task, default_project, original_project_name.as_deref());
             println!("Added task with id: {}", id);
         }
         "edit" => {
@@ -61,12 +61,13 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
             let id = &args[3]; // Now accepting string IDs like "TEST-001"
 
             // Extract project from task ID if no explicit project is provided
-            let project = extract_project_from_args(args, 4, default_project);
-            let project = if project == default_project && id.contains('-') {
+            let project_input = extract_project_from_args(args, 4, default_project);
+            let project = if project_input == default_project && id.contains('-') {
                 // If using default project and task ID contains project prefix, extract it
                 id.split('-').next().unwrap_or(default_project).to_string()
             } else {
-                project
+                // Resolve the project name to the correct prefix
+                crate::utils::resolve_project_input(&project_input, &resolver.path)
             };
 
             let mut task = match store.get(id, project.clone()) {
@@ -74,7 +75,7 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
                 None => {
                     println!(
                         "Error: Task with id '{}' not found in project '{}'",
-                        id, project
+                        id, project_input
                     );
                     std::process::exit(1);
                 }
@@ -96,12 +97,13 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
             let id = &args[3]; // Now accepting string IDs like "TEST-001"
 
             // Extract project from task ID if no explicit project is provided
-            let project = extract_project_from_args(args, 5, default_project);
-            let project = if project == default_project && id.contains('-') {
+            let project_input = extract_project_from_args(args, 5, default_project);
+            let project = if project_input == default_project && id.contains('-') {
                 // If using default project and task ID contains project prefix, extract it
                 id.split('-').next().unwrap_or(default_project).to_string()
             } else {
-                project
+                // Resolve the project name to the correct prefix
+                crate::utils::resolve_project_input(&project_input, &resolver.path)
             };
 
             let new_status = match args[4].parse::<TaskStatus>() {
@@ -117,7 +119,7 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
                 None => {
                     println!(
                         "Error: Task with id '{}' not found in project '{}'",
-                        id, project
+                        id, project_input
                     );
                     std::process::exit(1);
                 }
@@ -128,19 +130,47 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
             println!("Task {} status updated to {}", id, new_status);
         }
         "list" => {
-            let project = extract_project_from_args(args, 3, default_project);
-            println!("Listing tasks for project: {}", project);
+            // Check if --project filter is specified
+            let project_filter = extract_project_from_args(args, 3, "");
 
-            let tasks = store.list_by_project(&project);
-            if tasks.is_empty() {
-                println!("No tasks found in project '{}'", project);
+            if project_filter.is_empty() {
+                // No project filter specified - list all tasks across all projects
+                println!("Listing all tasks:");
+                let all_tasks = store.search(&TaskFilter::default());
+                if all_tasks.is_empty() {
+                    println!("No tasks found.");
+                } else {
+                    println!("Found {} tasks:", all_tasks.len());
+                    for (task_id, task) in all_tasks {
+                        // Extract project from task ID for display
+                        let project_display = if task_id.contains('-') {
+                            task_id.split('-').next().unwrap_or("unknown")
+                        } else {
+                            "unknown"
+                        };
+                        println!(
+                            "  [{}] {} - {} (Priority: {}, Status: {})",
+                            task_id, task.title, project_display, task.priority, task.status
+                        );
+                    }
+                }
             } else {
-                println!("Found {} tasks:", tasks.len());
-                for (task_id, task) in tasks {
-                    println!(
-                        "  [{}] {} - {} (Priority: {}, Status: {})",
-                        task_id, task.title, task.project, task.priority, task.status
-                    );
+                // Project filter specified - resolve and filter by that project
+                let resolved_project =
+                    crate::utils::resolve_project_input(&project_filter, &resolver.path);
+                println!("Listing tasks for project: {}", project_filter);
+
+                let tasks = store.list_by_project(&resolved_project);
+                if tasks.is_empty() {
+                    println!("No tasks found in project '{}'", project_filter);
+                } else {
+                    println!("Found {} tasks:", tasks.len());
+                    for (_task_id, task) in tasks {
+                        println!(
+                            "  {} (Priority: {}, Status: {})",
+                            task.title, task.priority, task.status
+                        );
+                    }
                 }
             }
         }
@@ -163,7 +193,10 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
             for i in 4..args.len() {
                 let arg = &args[i];
                 if let Some(stripped) = arg.strip_prefix("--project=") {
-                    filter.project = Some(stripped.to_string());
+                    // Resolve the project name to the correct prefix
+                    let resolved_project =
+                        crate::utils::resolve_project_input(stripped, &resolver.path);
+                    filter.project = Some(resolved_project);
                 } else if let Some(stripped) = arg.strip_prefix("--status=") {
                     if let Ok(status) = stripped.parse::<TaskStatus>() {
                         filter.status = Some(status);
@@ -195,9 +228,19 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
             } else {
                 println!("Found {} matching tasks:", results.len());
                 for (task_id, task) in results {
+                    // Extract project prefix from task ID and resolve to full name
+                    let project_display = if task_id.contains('-') {
+                        let prefix = task_id.split('-').next().unwrap_or("unknown");
+                        // Try to resolve prefix to full project name
+                        crate::utils::resolve_prefix_to_project_name(prefix, &resolver.path)
+                            .unwrap_or_else(|| prefix.to_string())
+                    } else {
+                        "unknown".to_string()
+                    };
+
                     println!(
                         "  [{}] {} - {} (Priority: {}, Status: {})",
-                        task_id, task.title, task.project, task.priority, task.status
+                        task_id, task.title, project_display, task.priority, task.status
                     );
                     if !task.tags.is_empty() {
                         println!("    Tags: {}", task.tags.join(", "));
@@ -214,17 +257,18 @@ pub fn task_command(args: &[String], default_project: &str, resolver: &TasksDire
 
             let id = &args[3]; // Now accepting string IDs like "TEST-001"
 
-            let project = extract_project_from_args(args, 4, default_project);
+            let project_input = extract_project_from_args(args, 4, default_project);
+            let project = crate::utils::resolve_project_input(&project_input, &resolver.path);
 
             if store.delete(id, project.clone()) {
                 println!(
                     "Task {} deleted successfully from project '{}'",
-                    id, project
+                    id, project_input
                 );
             } else {
                 println!(
                     "Error: Task with id '{}' not found in project '{}'",
-                    id, project
+                    id, project_input
                 );
                 std::process::exit(1);
             }
@@ -326,11 +370,13 @@ fn assign_task_properties(task: &mut Task, args: &[String], start_index: usize) 
                 task.description = Some(args[i + 1].clone());
                 i += 1;
             }
-        } else if let Some(stripped) = arg.strip_prefix("--project=") {
-            task.project = stripped.to_string();
+        } else if let Some(_stripped) = arg.strip_prefix("--project=") {
+            // Project is handled at the command level, not as a task field
+            // Skip this argument
         } else if arg == "--project" || arg == "-g" {
             if i + 1 < args.len() {
-                task.project = args[i + 1].clone();
+                // Project is handled at the command level, not as a task field
+                // Skip this argument
                 i += 1;
             }
         } else if let Some(stripped) = arg.strip_prefix("--category=") {

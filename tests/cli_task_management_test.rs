@@ -275,3 +275,169 @@ mod task_errors {
             .stdout(predicate::str::contains("not found"));
     }
 }
+
+/// Tests for smart project parameter parsing in task operations
+#[cfg(test)]
+mod smart_project_parameters {
+    use super::*;
+
+    #[test]
+    fn test_task_add_with_full_project_name() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Add task with full project name
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "add",
+                "--title=Test Task with Full Name",
+                "--project=MY-AWESOME-PROJECT"
+            ])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Added task with id"));
+
+        // Verify the task can be listed using the generated prefix
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "list", "--project=MAP"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Test Task with Full Name"));
+    }
+
+    #[test]
+    fn test_task_list_with_both_prefix_and_full_name() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Add a task
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "add",
+                "--title=Smart Resolution Test",
+                "--project=FRONTEND-COMPONENTS"
+            ])
+            .assert()
+            .success();
+
+        // List using prefix
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "list", "--project=FC"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Smart Resolution Test"));
+
+        // List using full name
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "list", "--project=FRONTEND-COMPONENTS"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Smart Resolution Test"));
+    }
+
+    #[test]
+    fn test_task_edit_with_smart_project_resolution() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Add a task
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "add",
+                "--title=Editable Task",
+                "--project=API-GATEWAY"
+            ])
+            .assert()
+            .success();
+
+        // Edit using full project name
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "edit", "AG-1",
+                "--title=Edited Task Title",
+                "--project=API-GATEWAY"
+            ])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("updated successfully"));
+
+        // Verify the edit worked by listing with prefix
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "list", "--project=AG"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Edited Task Title"));
+    }
+
+    #[test]
+    fn test_task_delete_with_smart_project_resolution() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Add a task
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "add",
+                "--title=Task to Delete",
+                "--project=USER-INTERFACE"
+            ])
+            .assert()
+            .success();
+
+        // Delete using full project name
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "delete", "UI-1",
+                "--project=USER-INTERFACE"
+            ])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("deleted successfully"));
+
+        // Verify the task is gone
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "list", "--project=UI"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("No tasks found"));
+    }
+
+    #[test]
+    fn test_task_status_update_with_smart_project_resolution() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Add a task
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&[
+                "task", "add",
+                "--title=Status Test Task",
+                "--project=DATABASE-LAYER"
+            ])
+            .assert()
+            .success();
+
+        // Update status using full project name in search to verify it worked
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "status", "DL-1", "IN_PROGRESS"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("status updated"));
+
+        // Verify status change by searching with full project name
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(&["task", "search", "Status", "--project=DATABASE-LAYER", "--status=IN_PROGRESS"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Status Test Task"));
+    }
+}

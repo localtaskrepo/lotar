@@ -15,31 +15,19 @@ mod storage_projects_tests {
         let mut storage = fixtures.create_storage();
 
         // Create tasks in different projects
-        let task1 = Task::new(
-            fixtures.tasks_root.clone(),
-            "Task in Project A".to_string(),
-            "project-a".to_string(),
-            Priority::High
+        let task1 = Task::new(fixtures.tasks_root.clone(), "Task in Project A".to_string(), Priority::High
         );
 
-        let task2 = Task::new(
-            fixtures.tasks_root.clone(),
-            "Task in Project B".to_string(),
-            "project-b".to_string(),
-            Priority::Medium
+        let task2 = Task::new(fixtures.tasks_root.clone(), "Task in Project B".to_string(), Priority::Medium
         );
 
-        let task3 = Task::new(
-            fixtures.tasks_root.clone(),
-            "Another task in Project A".to_string(),
-            "project-a".to_string(),
-            Priority::Low
+        let task3 = Task::new(fixtures.tasks_root.clone(), "Another task in Project A".to_string(), Priority::Low
         );
 
         // Add tasks
-        let id1 = storage.add(&task1);
-        let id2 = storage.add(&task2);
-        let id3 = storage.add(&task3);
+        let id1 = storage.add(&task1, "PA", None);
+        let id2 = storage.add(&task2, "PB", None);
+        let id3 = storage.add(&task3, "PA", None);
 
         // Get actual project prefixes that were generated
         let project_a = utils::get_project_for_task(&id1).unwrap();

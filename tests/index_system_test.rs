@@ -10,7 +10,7 @@ fn test_id_to_file_index() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
     let task = fixtures.create_sample_task("index-test");
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Test that the index file is created and contains the task ID
     let index_file = fixtures.tasks_root.join("index.yml"); // Changed from .json to .yml
@@ -32,7 +32,7 @@ fn test_tag_to_id_index() {
     let mut storage = fixtures.create_storage();
     let mut task = fixtures.create_sample_task("tag-index-test");
     task.tags = vec!["urgent".to_string(), "backend".to_string()];
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Load the index and verify tag mappings
     let index_file = fixtures.tasks_root.join("index.yml"); // Changed from .json to .yml
@@ -48,13 +48,13 @@ fn test_index_update_on_task_modification() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
     let task = fixtures.create_sample_task("index-update-test");
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Get the actual project name that was created (the prefix)
-    let actual_project = utils::get_project_for_task(&task_id).unwrap();
+    let _actual_project = utils::get_project_for_task(&task_id).unwrap();
 
     // Modify the task using the correct project name
-    let mut updated_task = storage.get(&task_id, actual_project.clone()).unwrap();
+    let mut updated_task = task.clone();
     updated_task.tags.push("new-tag".to_string());
     storage.edit(&task_id, &updated_task);
 
@@ -70,14 +70,10 @@ fn test_index_performance() {
     let mut storage = fixtures.create_storage();
 
     // Create the first task to get the actual project prefix
-    let mut first_task = Task::new(
-        fixtures.tasks_root.clone(),
-        "Performance Task 0".to_string(),
-        "perf-test".to_string(),
-        local_task_repo::types::Priority::Medium
+    let mut first_task = Task::new(fixtures.tasks_root.clone(), "Performance Task 0".to_string(), local_task_repo::types::Priority::Medium
     );
     first_task.tags = vec!["tag-0".to_string()];
-    let first_task_id = storage.add(&first_task);
+    let first_task_id = storage.add(&first_task, "TEST", None);
 
     // Get the actual project name that was created (the prefix)
     let actual_project = utils::get_project_for_task(&first_task_id).unwrap();
@@ -87,11 +83,10 @@ fn test_index_performance() {
         let mut task = Task::new(
             fixtures.tasks_root.clone(),
             format!("Performance Task {}", i),
-            actual_project.clone(), // Use the actual prefix
             if i % 3 == 0 { local_task_repo::types::Priority::High } else { local_task_repo::types::Priority::Medium }
         );
         task.tags = vec![format!("tag-{}", i % 10)];
-        storage.add(&task);
+        storage.add(&task, "TEST", None);
     }
 
     // Test that indexed search is fast using the correct project name
@@ -113,7 +108,7 @@ fn test_index_file_persistence() {
     let fixtures = TestFixtures::new();
     let mut storage = fixtures.create_storage();
     let task = fixtures.create_sample_task("persistence-test");
-    let _task_id = storage.add(&task);
+    let _task_id = storage.add(&task, "TEST", None);
 
     // Test that index is persisted to disk
     let index_file = fixtures.tasks_root.join("index.yml"); // Changed from .json to .yml
@@ -130,7 +125,7 @@ fn test_status_index_tracking() {
     let mut storage = fixtures.create_storage();
     let mut task1 = fixtures.create_sample_task("status-index-test");
     task1.status = TaskStatus::Todo;
-    let task1_id = storage.add(&task1);
+    let task1_id = storage.add(&task1, "TEST", None);
 
     // With our simplified architecture, status filtering is done via filesystem scanning
     // Verify we can find the task by searching

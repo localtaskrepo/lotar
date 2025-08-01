@@ -100,13 +100,8 @@ mod storage_performance_tests {
 
         // Create 50 tasks and measure performance
         for i in 0..50 {
-            let task = Task::new(
-                fixtures.tasks_root.clone(),
-                format!("Performance Task {}", i),
-                "perf-test".to_string(),
-                Priority::Medium
-            );
-            storage.add(&task);
+            let task = Task::new(fixtures.tasks_root.clone(), format!("Performance Task {}", i), Priority::Medium);
+            storage.add(&task, "TEST", None);
         }
 
         let duration = start.elapsed();
@@ -123,13 +118,8 @@ mod storage_performance_tests {
 
         // Create 100 tasks in bulk
         for i in 0..100 {
-            let task = Task::new(
-                fixtures.tasks_root.clone(),
-                format!("Bulk Task {}", i),
-                "bulk-test".to_string(),
-                Priority::Low
-            );
-            storage.add(&task);
+            let task = Task::new(fixtures.tasks_root.clone(), format!("Bulk Task {}", i), Priority::Low);
+            storage.add(&task, "TEST", None);
         }
 
         let duration = start.elapsed();

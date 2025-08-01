@@ -39,6 +39,7 @@ impl StringConfigField {
         self.values.contains(&"*".to_string())
     }
 
+    #[allow(dead_code)]
     pub fn get_suggestions(&self) -> Vec<String> {
         self.values.iter().filter(|v| *v != "*").cloned().collect()
     }
@@ -82,12 +83,8 @@ impl ProjectConfig {
 pub struct GlobalConfig {
     #[serde(default = "default_port")]
     pub server_port: u16,
-    #[serde(default = "default_task_file_extension")]
-    pub task_file_extension: String,
-    #[serde(default = "default_project_name")]
-    pub default_project: String,
-    #[serde(default = "default_tasks_folder")]
-    pub tasks_folder: String,
+    #[serde(default = "default_prefix_name", rename = "default_project")]
+    pub default_prefix: String,
 
     // Default configurations for all projects
     #[serde(default = "default_issue_states")]
@@ -110,8 +107,7 @@ pub struct GlobalConfig {
 #[derive(Debug, Clone)]
 pub struct ResolvedConfig {
     pub server_port: u16,
-    pub task_file_extension: String,
-    pub default_project: String,
+    pub default_prefix: String,
     pub issue_states: ConfigurableField<TaskStatus>,
     pub issue_types: ConfigurableField<TaskType>,
     pub issue_priorities: ConfigurableField<Priority>,
@@ -144,14 +140,10 @@ impl std::error::Error for ConfigError {}
 fn default_port() -> u16 {
     8080
 }
-fn default_task_file_extension() -> String {
-    "yml".to_string()
-}
-fn default_tasks_folder() -> String {
-    ".tasks".to_string()
-}
-fn default_project_name() -> String {
-    "auto".to_string()
+fn default_prefix_name() -> String {
+    // Don't default to "auto" - this should only be set during initial config creation
+    // with actual auto-detection. Empty string means no default project is set.
+    "".to_string()
 }
 fn default_priority() -> Priority {
     Priority::Medium
@@ -187,9 +179,7 @@ impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
             server_port: default_port(),
-            task_file_extension: default_task_file_extension(),
-            default_project: default_project_name(),
-            tasks_folder: default_tasks_folder(),
+            default_prefix: default_prefix_name(),
             issue_states: default_issue_states(),
             issue_types: default_issue_types(),
             issue_priorities: default_issue_priorities(),

@@ -37,11 +37,7 @@ mod task_validation_tests {
     #[test]
     fn test_task_with_all_fields() {
         let fixtures = TestFixtures::new();
-        let mut task = Task::new(
-            fixtures.tasks_root.clone(),
-            "Complete Task".to_string(),
-            "complete-test".to_string(),
-            Priority::High
+        let mut task = Task::new(fixtures.tasks_root.clone(), "Complete Task".to_string(), Priority::High
         );
 
         // Set all optional fields
@@ -52,7 +48,7 @@ mod task_validation_tests {
         task.tags = vec!["comprehensive".to_string(), "testing".to_string(), "complete".to_string()];
 
         let mut storage = fixtures.create_storage();
-        let task_id = storage.add(&task);
+        let task_id = storage.add(&task, "VT", None);
         let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         let retrieved = storage.get(&task_id, actual_project.clone()).unwrap();
@@ -79,7 +75,6 @@ mod task_validation_tests {
             let task = Task::new(
                 fixtures.tasks_root.clone(),
                 format!("Priority {:?} Task", priority),
-                "priority-test".to_string(),
                 priority.clone()
             );
             assert_eq!(task.priority, priority);
@@ -89,18 +84,14 @@ mod task_validation_tests {
     #[test]
     fn test_special_characters_in_task_fields() {
         let fixtures = TestFixtures::new();
-        let mut task = Task::new(
-            fixtures.tasks_root.clone(),
-            "Task with 特殊字符 and émojis 🚀".to_string(),
-            "unicode-test".to_string(),
-            Priority::Medium
+        let mut task = Task::new(fixtures.tasks_root.clone(), "Task with 特殊字符 and émojis 🚀".to_string(), Priority::Medium
         );
 
         task.description = Some("Description with\nnewlines and\ttabs".to_string());
         task.tags = vec!["tag-with-dashes".to_string(), "tag_with_underscores".to_string()];
 
         let mut storage = fixtures.create_storage();
-        let task_id = storage.add(&task);
+        let task_id = storage.add(&task, "VT", None);
         let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         let retrieved = storage.get(&task_id, actual_project).unwrap();
@@ -113,18 +104,15 @@ mod task_validation_tests {
     fn test_empty_project_name_handling() {
         let fixtures = TestFixtures::new();
 
-        let task = Task::new(
-            fixtures.tasks_root.clone(),
-            "Empty Project Task".to_string(),
-            "".to_string(),  // Empty project name
+        let task = Task::new(fixtures.tasks_root.clone(), "Empty Project Task".to_string(), // Empty project name
             Priority::Medium
         );
 
         // Should handle empty project gracefully
-        assert_eq!(task.project, "");
+        // Note: project field no longer exists
 
         let mut storage = fixtures.create_storage();
-        let task_id = storage.add(&task);
+        let task_id = storage.add(&task, "VT", None);
         assert!(!task_id.is_empty(), "Should still create task with empty project");
     }
 }

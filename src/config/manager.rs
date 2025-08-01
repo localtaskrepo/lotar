@@ -20,20 +20,34 @@ impl ConfigManager {
     }
 
     pub fn new_with_tasks_dir(tasks_dir: &Path) -> Result<ResolvedConfig, ConfigError> {
-        Self::new_with_tasks_dir_and_home_override(tasks_dir, None)
+        Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, false)
     }
 
-    pub fn new_with_tasks_dir_and_home_override(
+    /// Create a ConfigManager that ensures global config exists (for write operations)
+    pub fn new_with_tasks_dir_ensure_config(tasks_dir: &Path) -> Result<ResolvedConfig, ConfigError> {
+        Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, true)
+    }
+
+    /// Create a ConfigManager instance that ensures global config exists (for write operations)
+    pub fn new_manager_with_tasks_dir_ensure_config(tasks_dir: &Path) -> Result<Self, ConfigError> {
+        let resolved_config = Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, true)?;
+        Ok(Self { resolved_config })
+    }
+
+    fn new_with_tasks_dir_and_home_override_internal(
         tasks_dir: &Path,
         home_config_override: Option<&PathBuf>,
+        ensure_config_exists: bool,
     ) -> Result<ResolvedConfig, ConfigError> {
         let mut config = GlobalConfig::default();
 
         // Convert Path to PathBuf for the existing API
         let tasks_dir_buf = tasks_dir.to_path_buf();
 
-        // Ensure global config exists
-        Self::ensure_global_config_exists(Some(&tasks_dir_buf))?;
+        // Only ensure global config exists if explicitly requested (for write operations)
+        if ensure_config_exists {
+            Self::ensure_global_config_exists(Some(&tasks_dir_buf))?;
+        }
 
         // 4. Global config (.tasks/config.yml or custom dir) - lowest priority (after defaults)
         if let Ok(global_config) = Self::load_global_config(Some(&tasks_dir_buf)) {
@@ -73,8 +87,8 @@ impl ConfigManager {
         // Start with built-in defaults
         let mut config = GlobalConfig::default();
 
-        // Ensure global config exists
-        Self::ensure_global_config_exists(tasks_dir)?;
+        // Don't ensure global config exists for read-only operations
+        // Only create it when actually needed for task operations
 
         // 4. Global config (.tasks/config.yml or custom dir) - lowest priority (after defaults)
         if let Ok(global_config) = Self::load_global_config(tasks_dir) {
@@ -103,14 +117,8 @@ impl ConfigManager {
         if override_config.server_port != defaults.server_port {
             base.server_port = override_config.server_port;
         }
-        if override_config.task_file_extension != defaults.task_file_extension {
-            base.task_file_extension = override_config.task_file_extension;
-        }
-        if override_config.tasks_folder != defaults.tasks_folder {
-            base.tasks_folder = override_config.tasks_folder;
-        }
-        if override_config.default_project != defaults.default_project {
-            base.default_project = override_config.default_project;
+        if override_config.default_prefix != defaults.default_prefix {
+            base.default_prefix = override_config.default_prefix;
         }
 
         // For configurable fields, we do full replacement if they differ
@@ -205,7 +213,8 @@ impl ConfigManager {
         }
 
         if let Ok(project) = env::var("LOTAR_PROJECT") {
-            config.default_project = project;
+            // Convert project name to prefix for storage
+            config.default_prefix = crate::utils::generate_project_prefix(&project);
         }
 
         if let Ok(assignee) = env::var("LOTAR_DEFAULT_ASSIGNEE") {
@@ -228,8 +237,19 @@ impl ConfigManager {
             }
         }
 
-        // Write default global config
-        let default_config = GlobalConfig::default();
+        // Create default config with auto-detected prefix
+        let mut default_config = GlobalConfig::default();
+        
+        // Auto-detect the default prefix from the tasks directory structure
+        // This only happens during initial global config creation
+        if let Some(tasks_dir_path) = tasks_dir {
+            if let Some(detected_prefix) = Self::auto_detect_prefix(tasks_dir_path) {
+                default_config.default_prefix = detected_prefix;
+            }
+            // If no existing projects found, leave default_prefix empty
+            // It will be set when the first project is created
+        }
+        
         let config_yaml = serde_yaml::to_string(&default_config).map_err(|e| {
             ConfigError::ParseError(format!("Failed to serialize default config: {}", e))
         })?;
@@ -243,6 +263,41 @@ impl ConfigManager {
             config_path.display()
         );
         Ok(())
+    }
+
+    /// Auto-detect the default prefix from existing project directories
+    /// This scans for existing project directories and their configurations
+    fn auto_detect_prefix(tasks_dir: &PathBuf) -> Option<String> {
+        let mut project_prefixes = Vec::new();
+        
+        // Look for project directories that exist and have config files
+        if let Ok(entries) = fs::read_dir(tasks_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() && !path.file_name().unwrap_or_default().to_string_lossy().starts_with('.') {
+                    let config_path = path.join("config.yml");
+                    if config_path.exists() {
+                        // Found a project directory with config - add its prefix
+                        if let Some(prefix) = path.file_name()
+                            .and_then(|name| name.to_str())
+                            .map(|s| s.to_string()) {
+                            project_prefixes.push(prefix);
+                        }
+                    }
+                }
+            }
+        }
+        
+        if !project_prefixes.is_empty() {
+            // If we have existing projects, sort them and return the first one alphabetically
+            // This provides deterministic behavior
+            project_prefixes.sort();
+            return Some(project_prefixes[0].clone());
+        }
+        
+        // No existing project directories found
+        // Return None so default_prefix remains empty until first project is created
+        None
     }
 
     pub fn get_project_config(&self, project_name: &str) -> Result<ResolvedConfig, ConfigError> {
@@ -276,8 +331,40 @@ impl ConfigManager {
         Ok(resolved)
     }
 
-    pub fn get_global_config(&self) -> &ResolvedConfig {
-        &self.resolved_config
+    /// Update the global config's default_prefix if it's currently empty
+    /// This is called when creating the first project to set a sensible default
+    pub fn set_default_prefix_if_empty(&mut self, prefix: &str, tasks_dir: &PathBuf) -> Result<(), ConfigError> {
+        // Only update if the current default_prefix is empty (not manually set)
+        if self.resolved_config.default_prefix.is_empty() {
+            self.resolved_config.default_prefix = prefix.to_string();
+            
+            // Also update the global config file
+            let global_config_path = tasks_dir.join("config.yml");
+            if global_config_path.exists() {
+                // Read current config
+                let content = fs::read_to_string(&global_config_path).map_err(|e| {
+                    ConfigError::IoError(format!("Failed to read global config: {}", e))
+                })?;
+                
+                let mut global_config: GlobalConfig = serde_yaml::from_str(&content)
+                    .map_err(|e| ConfigError::ParseError(format!("Failed to parse global config: {}", e)))?;
+                
+                // Update default_prefix only if it's empty
+                if global_config.default_prefix.is_empty() {
+                    global_config.default_prefix = prefix.to_string();
+                    
+                    // Write back to file
+                    let updated_content = serde_yaml::to_string(&global_config).map_err(|e| {
+                        ConfigError::ParseError(format!("Failed to serialize global config: {}", e))
+                    })?;
+                    
+                    fs::write(&global_config_path, updated_content).map_err(|e| {
+                        ConfigError::IoError(format!("Failed to write global config: {}", e))
+                    })?;
+                }
+            }
+        }
+        Ok(())
     }
 
     // Template management functions
@@ -375,8 +462,7 @@ impl ResolvedConfig {
     pub fn from_global(global: GlobalConfig) -> Self {
         Self {
             server_port: global.server_port,
-            task_file_extension: global.task_file_extension,
-            default_project: global.default_project,
+            default_prefix: global.default_prefix,
             issue_states: global.issue_states,
             issue_types: global.issue_types,
             issue_priorities: global.issue_priorities,

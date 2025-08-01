@@ -143,7 +143,8 @@ pub fn set_server_port(tasks_dir: &PathBuf, value: &str) {
 /// Set default project configuration (global setting)
 pub fn set_default_project(tasks_dir: &PathBuf, value: &str) {
     if let Err(e) = save_global_config_field(tasks_dir, |config| {
-        config.default_project = value.to_string();
+        // Store the original project name, not a prefix
+        config.default_prefix = value.to_string();
     }) {
         eprintln!("Error saving global config: {}", e);
         std::process::exit(1);

@@ -15,6 +15,44 @@ use std::env;
 use std::path::PathBuf;
 use workspace::TasksDirectoryResolver;
 
+/// Get the effective project name by checking global config first, then falling back to auto-detection
+fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
+    // Try to read from global config first
+    let global_config_path = resolver.path.join("config.yml");
+    if global_config_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&global_config_path) {
+            if let Ok(config) = serde_yaml::from_str::<config::types::GlobalConfig>(&content) {
+                // If default_prefix is set (not empty), use it
+                if !config.default_prefix.is_empty() {
+                    return config.default_prefix;
+                }
+            }
+        }
+    }
+
+    // Fall back to auto-detection (but generate prefix from detected name)
+    if let Some(project_name) = project::get_project_name() {
+        crate::utils::generate_project_prefix(&project_name)
+    } else {
+        "DEFAULT".to_string()
+    }
+}
+
+/// Extract --project parameter from task command arguments
+/// Returns (original_name, resolved_prefix)
+fn extract_project_from_task_args(
+    args: &[String],
+    resolver: &TasksDirectoryResolver,
+) -> Option<(String, String)> {
+    for arg in args.iter() {
+        if let Some(stripped) = arg.strip_prefix("--project=") {
+            let resolved_prefix = crate::utils::resolve_project_input(stripped, &resolver.path);
+            return Some((stripped.to_string(), resolved_prefix));
+        }
+    }
+    None
+}
+
 // Command trait for better organization
 trait Command {
     fn execute(&self, args: &[String], resolver: &TasksDirectoryResolver) -> Result<(), String>;
@@ -55,17 +93,6 @@ fn resolve_tasks_directory_with_override(
     )
 }
 
-/// Resolve tasks directory with home config override (for testing)
-fn resolve_tasks_directory_with_home_override(
-    override_path: Option<String>,
-    home_config_override: Option<PathBuf>,
-) -> Result<TasksDirectoryResolver, String> {
-    TasksDirectoryResolver::resolve_with_home_override(
-        override_path.as_deref(),
-        None, // Use default .tasks folder name
-        home_config_override,
-    )
-}
 struct ServeCommand;
 struct TaskCommand;
 struct ScanCommand;
@@ -86,8 +113,13 @@ impl Command for ServeCommand {
 
 impl Command for TaskCommand {
     fn execute(&self, args: &[String], resolver: &TasksDirectoryResolver) -> Result<(), String> {
-        let project = project::get_project_name().unwrap_or_else(|| "None".to_string());
-        tasks::task_command(args, &project, resolver);
+        // First try to extract --project parameter from CLI args
+        let (original_project_name, project_prefix) =
+            extract_project_from_task_args(args, resolver)
+                .map(|(orig, prefix)| (Some(orig), prefix))
+                .unwrap_or_else(|| (None, get_effective_project_name(resolver)));
+
+        tasks::task_command(args, &project_prefix, &original_project_name, resolver);
         Ok(())
     }
 }

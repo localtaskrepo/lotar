@@ -5,9 +5,7 @@ use std::fs;
 #[derive(Debug, Clone)]
 pub struct TasksDirectoryResolver {
     pub path: PathBuf,
-    pub is_in_current_dir: bool,
     pub source: TasksDirectorySource,
-    pub home_config_override: Option<PathBuf>, // For testing
 }
 
 #[derive(Debug, Clone)]
@@ -15,8 +13,6 @@ pub enum TasksDirectorySource {
     CommandLineFlag,
     FoundInParent(PathBuf), // The parent directory where it was found
     CurrentDirectory,
-    Created,
-    HomeConfig,
 }
 
 impl TasksDirectoryResolver {
@@ -25,11 +21,24 @@ impl TasksDirectoryResolver {
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
     ) -> Result<Self, String> {
-        Self::resolve_with_home_override(explicit_path, global_config_tasks_folder, None)
+        Self::resolve_internal(explicit_path, global_config_tasks_folder, None)
     }
 
-    /// Resolve with optional home directory override (for testing)
+    /// Function to resolve with home directory override (primarily for testing)
+    /// 
+    /// This function allows tests to specify a custom home directory path for configuration
+    /// loading, enabling isolated testing of home config functionality.
+    #[allow(dead_code)] // Used in integration tests
     pub fn resolve_with_home_override(
+        explicit_path: Option<&str>,
+        global_config_tasks_folder: Option<&str>,
+        home_config_override: Option<PathBuf>,
+    ) -> Result<Self, String> {
+        Self::resolve_internal(explicit_path, global_config_tasks_folder, home_config_override)
+    }
+
+    /// Internal resolve function with optional home config override for testing
+    fn resolve_internal(
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
         home_config_override: Option<PathBuf>,
@@ -40,12 +49,9 @@ impl TasksDirectoryResolver {
             if !path_buf.exists() {
                 return Err(format!("Specified tasks directory does not exist: {}", path));
             }
-            let is_current = Self::is_current_directory(&path_buf);
             return Ok(TasksDirectoryResolver {
                 path: path_buf,
-                is_in_current_dir: is_current,
                 source: TasksDirectorySource::CommandLineFlag,
-                home_config_override,
             });
         }
 
@@ -59,13 +65,11 @@ impl TasksDirectoryResolver {
         if let Some((found_path, parent_dir)) = Self::find_tasks_folder_in_parents(&folder_name)? {
             return Ok(TasksDirectoryResolver {
                 path: found_path.clone(),
-                is_in_current_dir: Self::is_current_directory(&parent_dir),
                 source: if Self::is_current_directory(&parent_dir) {
                     TasksDirectorySource::CurrentDirectory
                 } else {
                     TasksDirectorySource::FoundInParent(parent_dir)
                 },
-                home_config_override,
             });
         }
 
@@ -76,9 +80,7 @@ impl TasksDirectoryResolver {
 
         Ok(TasksDirectoryResolver {
             path: tasks_path,
-            is_in_current_dir: true,
             source: TasksDirectorySource::CurrentDirectory,
-            home_config_override,
         })
     }
 
@@ -210,12 +212,6 @@ impl TasksDirectoryResolver {
                 Some(format!("ℹ️  Using tasks directory: {}", self.path.display()))
             }
             TasksDirectorySource::CurrentDirectory => None, // No message needed for current directory
-            TasksDirectorySource::Created => {
-                Some(format!("ℹ️  Created tasks directory: {}", self.path.display()))
-            }
-            TasksDirectorySource::HomeConfig => {
-                Some(format!("ℹ️  Using tasks directory from home config: {}", self.path.display()))
-            }
         }
     }
 }

@@ -14,21 +14,18 @@ impl StorageOperations {
         root_path: &Path,
         index: &mut TaskIndex,
         task: &Task,
+        project_prefix: &str,
+        original_project_name: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        // For new architecture, we need to determine the prefix first
-        let desired_prefix = if task.project.trim().is_empty() {
-            "DEFAULT".to_string()
-        } else {
-            // Generate a prefix for this project if it doesn't exist as a folder
-            Self::get_or_create_project_prefix(root_path, &task.project)?
-        };
-
-        // The project folder name IS the prefix
-        let project_folder = desired_prefix.clone();
+        // Use the provided project prefix
+        let project_folder = project_prefix.to_string();
         let project_path = root_path.join(&project_folder);
 
+        // Use original project name for config initialization, fall back to prefix
+        let config_project_name = original_project_name.unwrap_or(project_prefix);
+
         // Auto-initialize project configuration if needed
-        auto_initialize_project_if_needed(&root_path.to_path_buf(), &project_folder)?;
+        auto_initialize_project_if_needed(&root_path.to_path_buf(), config_project_name)?;
 
         // Ensure project directory exists
         fs::create_dir_all(&project_path)?;
@@ -39,9 +36,8 @@ impl StorageOperations {
         // Create the formatted ID for external use
         let formatted_id = format!("{}-{}", project_folder, next_numeric_id);
 
-        // Create a mutable copy of the task and update project
-        let mut task_to_store = task.clone();
-        task_to_store.project = project_folder.clone();
+        // Create a mutable copy of the task (no project field to set)
+        let task_to_store = task.clone();
 
         // Get file path using the numeric ID
         let file_path = Self::get_file_path(&project_folder, next_numeric_id, root_path);
@@ -112,14 +108,14 @@ impl StorageOperations {
         id: &str,
         new_task: &Task,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Get old task for index update and determine the actual project folder
-        let old_task = Self::get(root_path, id, new_task.project.clone());
-
         // Extract the project folder from the task ID
         let project_folder = match Self::get_project_for_task(id) {
             Some(folder) => folder,
             None => return Err("Invalid task ID format".into()),
         };
+
+        // Get old task for index update
+        let old_task = Self::get(root_path, id, project_folder.clone());
 
         let project_path = root_path.join(&project_folder);
 
@@ -129,9 +125,8 @@ impl StorageOperations {
             None => return Err("Task file not found".into()),
         };
 
-        // Update the task's project field to match the actual folder
-        let mut task_to_save = new_task.clone();
-        task_to_save.project = project_folder.clone();
+        // Save the task (no project field to update)
+        let task_to_save = new_task.clone();
 
         let file_string = serde_yaml::to_string(&task_to_save)?;
         fs::write(&file_path, file_string)?;
@@ -229,6 +224,7 @@ impl StorageOperations {
     }
 
     /// Get or create a project prefix, ensuring it's unique and consistent
+    #[allow(dead_code)]
     pub fn get_or_create_project_prefix(root_path: &Path, project_name: &str) -> Result<String, String> {
         // Check if we already have a folder for this exact project name
         let direct_path = root_path.join(project_name);
@@ -261,6 +257,7 @@ impl StorageOperations {
     }
 
     /// Generate a unique folder name (prefix) for a project
+    #[allow(dead_code)]
     pub fn generate_unique_folder_prefix(root_path: &Path, project_name: &str) -> Result<String, String> {
         // Generate candidate prefix using the shared utility
         let candidate = generate_project_prefix(project_name);

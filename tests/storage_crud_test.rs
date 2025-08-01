@@ -14,14 +14,10 @@ mod storage_crud_tests {
         let fixtures = TestFixtures::new();
         let mut storage = fixtures.create_storage();
 
-        let task = Task::new(
-            fixtures.tasks_root.clone(),
-            "Test Task".to_string(),
-            "test-project".to_string(),
-            Priority::High
+        let task = Task::new(fixtures.tasks_root.clone(), "Test Task".to_string(), Priority::High
         );
 
-        let task_id = storage.add(&task);
+        let task_id = storage.add(&task, "TP", None);
         assert!(!task_id.is_empty(), "Task ID should be assigned");
 
         // Get the actual project prefix that was generated
@@ -38,14 +34,10 @@ mod storage_crud_tests {
         let fixtures = TestFixtures::new();
         let mut storage = fixtures.create_storage();
 
-        let original_task = Task::new(
-            fixtures.tasks_root.clone(),
-            "Retrievable Task".to_string(),
-            "retrieval-test".to_string(),
-            Priority::Medium
+        let original_task = Task::new(fixtures.tasks_root.clone(), "Retrievable Task".to_string(), Priority::Medium
         );
 
-        let task_id = storage.add(&original_task);
+        let task_id = storage.add(&original_task, "TP", None);
         let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         // Test successful retrieval
@@ -54,7 +46,7 @@ mod storage_crud_tests {
 
         let task = retrieved_task.unwrap();
         assert_eq!(task.title, "Retrievable Task");
-        assert_eq!(task.project, actual_project);
+        // Note: project field no longer exists
         assert_eq!(task.priority, Priority::Medium);
     }
 
@@ -63,14 +55,10 @@ mod storage_crud_tests {
         let fixtures = TestFixtures::new();
         let mut storage = fixtures.create_storage();
 
-        let task = Task::new(
-            fixtures.tasks_root.clone(),
-            "Task to Delete".to_string(),
-            "test-project".to_string(),
-            Priority::Low
+        let task = Task::new(fixtures.tasks_root.clone(), "Task to Delete".to_string(), Priority::Low
         );
 
-        let task_id = storage.add(&task);
+        let task_id = storage.add(&task, "TP", None);
         let actual_project = utils::get_project_for_task(&task_id).unwrap();
 
         // Verify task exists
@@ -90,27 +78,19 @@ mod storage_crud_tests {
         let fixtures = TestFixtures::new();
         let mut storage = fixtures.create_storage();
 
-        let task1 = Task::new(
-            fixtures.tasks_root.clone(),
-            "First Task".to_string(),
-            "test-project".to_string(),
-            Priority::Medium
+        let task1 = Task::new(fixtures.tasks_root.clone(), "First Task".to_string(), Priority::Medium
         );
 
-        let task2 = Task::new(
-            fixtures.tasks_root.clone(),
-            "Second Task".to_string(),
-            "test-project".to_string(),
-            Priority::High
+        let task2 = Task::new(fixtures.tasks_root.clone(), "Second Task".to_string(), Priority::High
         );
 
-        let id1 = storage.add(&task1);
+        let id1 = storage.add(&task1, "TP", None);
         let actual_project = utils::get_project_for_task(&id1).unwrap();
 
         // Use the same project prefix for the second task
-        let mut task2_updated = task2.clone();
-        task2_updated.project = actual_project.clone();
-        let id2 = storage.add(&task2_updated);
+        let task2_updated = task2.clone();
+        // Note: project field no longer exists
+        let id2 = storage.add(&task2_updated, "TP", None);
 
         // IDs should be different and sequential
         assert_ne!(id1, id2, "Task IDs should be different");
@@ -127,7 +107,7 @@ mod storage_crud_tests {
         let mut task1 = fixtures.create_sample_task("increment-test");
         task1.title = "First Task".to_string();
 
-        let id1 = storage.add(&task1);
+        let id1 = storage.add(&task1, "TP", None);
         let actual_project = utils::get_project_for_task(&id1).unwrap();
 
         // Create second and third tasks using the same actual project prefix
@@ -136,8 +116,8 @@ mod storage_crud_tests {
         let mut task3 = fixtures.create_sample_task(&actual_project);
         task3.title = "Third Task".to_string();
 
-        let id2 = storage.add(&task2);
-        let id3 = storage.add(&task3);
+        let id2 = storage.add(&task2, "TP", None);
+        let id3 = storage.add(&task3, "TP", None);
 
         // IDs should increment with natural numbering
         assert_eq!(id1, format!("{}-1", actual_project), "First task should use natural numbering");

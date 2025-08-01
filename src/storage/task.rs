@@ -17,7 +17,6 @@ pub struct Task {
     pub task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub assignee: Option<String>,
-    pub project: String,
     pub created: String,
     pub modified: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -49,7 +48,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new(_root_path: PathBuf, title: String, project: String, priority: Priority) -> Self {
+    pub fn new(_root_path: PathBuf, title: String, priority: Priority) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
 
         Self {
@@ -58,7 +57,6 @@ impl Task {
             priority,
             task_type: TaskType::default(),
             assignee: None,
-            project,
             created: now.clone(),
             modified: now,
             due_date: None,
@@ -88,7 +86,7 @@ impl Task {
 
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\nproject: {}\ncategory: {:?}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
-               self.title, self.status, self.subtitle, self.description, self.priority, self.project, self.category, self.created, self.modified, self.due_date, self.tags)
+        write!(f, "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\ncategory: {:?}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
+               self.title, self.status, self.subtitle, self.description, self.priority, self.category, self.created, self.modified, self.due_date, self.tags)
     }
 }

@@ -1,9 +1,9 @@
-use std::fs;
-use std::path::PathBuf;
-use crate::storage::task::Task;
+use crate::index::{TaskFilter, TaskIndex};
 use crate::storage::operations::StorageOperations;
 use crate::storage::search::StorageSearch;
-use crate::index::{TaskIndex, TaskFilter};
+use crate::storage::task::Task;
+use std::fs;
+use std::path::PathBuf;
 
 /// Main storage manager that orchestrates all storage operations
 pub struct Storage {
@@ -17,8 +17,7 @@ impl Storage {
 
         // Load or create index - changed from index.json to index.yml
         let index_path = root_path.join("index.yml");
-        let index = TaskIndex::load_from_file(&index_path)
-            .unwrap_or_else(|_| TaskIndex::new());
+        let index = TaskIndex::load_from_file(&index_path).unwrap_or_else(|_| TaskIndex::new());
 
         Self { root_path, index }
     }
@@ -28,8 +27,8 @@ impl Storage {
         self.index.save_to_file(&index_path)
     }
 
-    pub fn add(&mut self, task: &Task) -> String {
-        match StorageOperations::add(&self.root_path, &mut self.index, task) {
+    pub fn add(&mut self, task: &Task, project_prefix: &str, original_project_name: Option<&str>) -> String {
+        match StorageOperations::add(&self.root_path, &mut self.index, task, project_prefix, original_project_name) {
             Ok(formatted_id) => {
                 let _ = self.save_index();
                 formatted_id

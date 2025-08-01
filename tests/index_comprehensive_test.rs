@@ -13,7 +13,7 @@ fn test_index_status_change_tracking() {
     // Create a task with TODO status
     let mut task = fixtures.create_sample_task("status-test");
     task.status = TaskStatus::Todo;
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Get the actual project name from the task ID
     let actual_project = utils::get_project_for_task(&task_id).unwrap();
@@ -55,7 +55,7 @@ fn test_index_priority_change_tracking() {
     // Create a task with MEDIUM priority
     let mut task = fixtures.create_sample_task("priority-test");
     task.priority = Priority::Medium;
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Get the actual project name from the task ID
     let actual_project = utils::get_project_for_task(&task_id).unwrap();
@@ -97,7 +97,7 @@ fn test_index_tag_removal() {
     // Create a task with multiple tags
     let mut task = fixtures.create_sample_task("tag-removal-test");
     task.tags = vec!["urgent".to_string(), "bug".to_string(), "frontend".to_string()];
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Get the actual project name from the task ID
     let actual_project = utils::get_project_for_task(&task_id).unwrap();
@@ -129,16 +129,16 @@ fn test_index_delete_cleanup() {
     // Create multiple tasks with same tags
     let mut task1 = fixtures.create_sample_task("shared-project");
     task1.tags = vec!["shared-tag".to_string()];
-    let task1_id = storage.add(&task1);
+    let task1_id = storage.add(&task1, "TEST", None);
     
     // Get the actual project name from the task ID
     let actual_project = utils::get_project_for_task(&task1_id).unwrap();
     
     // Create second task using the actual project prefix
     let mut task2 = fixtures.create_sample_task("second-task");
-    task2.project = actual_project.clone(); // Use the actual prefix
+    // Note: project field no longer exists // Use the actual prefix
     task2.tags = vec!["shared-tag".to_string()];
-    let task2_id = storage.add(&task2);
+    let task2_id = storage.add(&task2, "TEST", None);
     
     // Verify both tasks are in index
     let index_file = fixtures.tasks_root.join("index.yml");
@@ -175,7 +175,7 @@ fn test_index_consistency_after_rebuild() {
     for i in 0..5 {
         let mut task = fixtures.create_sample_task(&format!("rebuild-test-{}", i));
         task.tags = vec![format!("tag-{}", i % 2)];
-        storage.add(&task);
+        storage.add(&task, "TEST", None);
     }
 
     // Capture original index state
@@ -208,7 +208,7 @@ fn test_index_handles_corrupted_file() {
 
     // Create a task to generate index
     let task = fixtures.create_sample_task("corruption-test");
-    let task_id = storage.add(&task);
+    let task_id = storage.add(&task, "TEST", None);
 
     // Get the actual project name that was created
     let actual_project = utils::get_project_for_task(&task_id).unwrap();

@@ -3,7 +3,7 @@
 > A git-integrated task management system that lives in your repository.
 
 [![Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)](docs/README.md)
-[![Tests](https://img.shields.io/badge/tests-129%20passing-brightgreen)](docs/README.md#testing--quality)
+[![Tests](https://img.shields.io/badge/tests-174%20passing-brightgreen)](docs/README.md#testing--quality)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 
 ## 🚀 Quick Start
@@ -17,8 +17,13 @@ cargo build --release
 # Create your first task (auto-initializes project with defaults)
 lotar task add --title="Setup project" --project=myapp --priority=HIGH
 
-# List tasks
-lotar task list --project=myapp
+# List tasks (works with full names or auto-generated prefixes)
+lotar task list --project=myapp    # Full project name
+lotar task list --project=MY       # Auto-generated prefix
+
+# Search with intelligent project resolution
+lotar task search "auth" --project=authentication-service
+# Shows: [AUTH-001] Login system - AUTHENTICATION-SERVICE
 
 # Start web interface
 lotar serve 8080
@@ -40,6 +45,7 @@ LoTaR is a **production-ready task management system** designed for developers w
 - 🌐 **Complete**: CLI, web interface, and REST API
 - 🛡️ **Secure**: Project isolation and input validation
 - ⚡ **Zero-config**: Auto-initializes projects with sensible defaults
+- 🧠 **Smart**: Intelligent project resolution and auto-detection
 
 ## 🎯 Core Features
 
@@ -51,6 +57,21 @@ lotar task add --title="OAuth Implementation" --type=feature --priority=HIGH
 lotar task status PROJ-001 IN_PROGRESS
 lotar task search "authentication" --priority=HIGH
 ```
+
+### 🧠 Smart Project Management
+```bash
+# Use either full project names or prefixes - LoTaR figures it out
+lotar task add --title="Add routing" --project=frontend      # Full name
+lotar task add --title="Fix bug" --project=FRON             # Auto-generated prefix
+
+# Search shows full project context
+lotar task search "auth" 
+# → [AUTH-001] OAuth login - AUTHENTICATION-SERVICE (Priority: HIGH)
+
+# Auto-detection sets intelligent defaults
+# First task in repo creates global config with smart defaults
+```
+> **[📖 Smart Project Management Guide](docs/smart-project-management.md)** - Detailed documentation on intelligent project resolution, auto-detection, and flexible naming
 
 ### Source Code Integration
 ```bash
@@ -167,7 +188,7 @@ lotar config templates
 
 ## 🧪 Production Ready
 
-- ✅ **129 tests passing** with comprehensive coverage
+- ✅ **174 tests passing** with comprehensive coverage
 - ✅ **Memory safe** with Rust's ownership system
 - ✅ **Performance optimized** for large task sets
 - ✅ **Security validated** with project isolation
@@ -176,6 +197,7 @@ lotar config templates
 
 **Getting Started:**
 - [📚 Complete Documentation](docs/README.md) - Features, commands, and usage
+- [🧠 Smart Project Management](docs/smart-project-management.md) - Intelligent project resolution and auto-detection
 - [🏗️ Architecture & Technical Reference](docs/architecture-decisions.md) - System design and file formats
 
 **Advanced:**
@@ -222,19 +244,24 @@ cargo fmt
 
 ```bash
 # Start a new feature (auto-initializes with defaults)
-lotar task add --title="Add user authentication" --type=feature --priority=HIGH
+# Works with full project names or prefixes
+lotar task add --title="Add user authentication" --type=feature --priority=HIGH --project=authentication
 
 # Work on it (scan finds TODOs automatically)
 lotar scan ./src
 
-# Update status as you progress
+# Update status as you progress (smart project resolution)
 lotar task status AUTH-001 IN_PROGRESS
 
-# Add more tasks to the same project (reuses existing config)
-lotar task add --title="Add password reset" --project=auth --type=feature
+# Add more tasks to the same project (multiple naming options)
+lotar task add --title="Add password reset" --project=auth          # Prefix
+lotar task add --title="Add 2FA support" --project=authentication   # Full name
 
-# Search related tasks
+# Search shows full project context
 lotar task search "auth" --status=TODO
+# Found 2 matching tasks:
+#   [AUTH-002] Add password reset - AUTHENTICATION (Priority: MEDIUM, Status: TODO)  
+#   [AUTH-003] Add 2FA support - AUTHENTICATION (Priority: HIGH, Status: TODO)
 
 # Complete and track
 lotar task status AUTH-001 DONE
@@ -249,6 +276,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 Unlike external task trackers that become outdated and disconnected from your code, LoTaR keeps your task management **in sync with your development workflow**. Every requirement change, status update, and decision is version-controlled alongside the code it affects.
 
-With **zero-configuration setup**, you can start tracking tasks immediately without any upfront configuration. LoTaR automatically creates sensible defaults, but still gives you full control to customize your workflow when needed.
+With **zero-configuration setup** and **intelligent project management**, you can start tracking tasks immediately without any upfront configuration. LoTaR automatically creates sensible defaults and intelligently resolves project names, but still gives you full control to customize your workflow when needed.
 
 Perfect for teams who want the benefits of structured task management without losing the simplicity and reliability of git-based workflows.

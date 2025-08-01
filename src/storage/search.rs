@@ -1,18 +1,14 @@
+use crate::index::{TaskFilter, TaskIndex};
+use crate::storage::task::Task;
 use std::fs;
 use std::path::Path;
-use crate::storage::task::Task;
-use crate::index::{TaskIndex, TaskFilter};
 
 /// Search and filtering functionality for task storage
 pub struct StorageSearch;
 
 impl StorageSearch {
     /// Search for tasks based on filter criteria
-    pub fn search(
-        root_path: &Path,
-        index: &TaskIndex,
-        filter: &TaskFilter,
-    ) -> Vec<(String, Task)> {
+    pub fn search(root_path: &Path, index: &TaskIndex, filter: &TaskFilter) -> Vec<(String, Task)> {
         let mut results = Vec::new();
 
         // If we have tag filters, use the index to get candidate task IDs
@@ -39,7 +35,8 @@ impl StorageSearch {
                                     let task_id = format!("{}-{}", project_folder, numeric_id);
 
                                     // If we have tag filters, check if this task matches
-                                    if !filter.tags.is_empty() && !tag_candidates.contains(&task_id) {
+                                    if !filter.tags.is_empty() && !tag_candidates.contains(&task_id)
+                                    {
                                         continue;
                                     }
 
@@ -62,26 +59,42 @@ impl StorageSearch {
             if let Ok(entries) = fs::read_dir(root_path) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.is_dir() && !path.file_name().unwrap_or_default().to_string_lossy().starts_with('.') {
-                        let project_folder = path.file_name().unwrap().to_string_lossy().to_string();
+                    if path.is_dir()
+                        && !path
+                            .file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .starts_with('.')
+                    {
+                        let project_folder =
+                            path.file_name().unwrap().to_string_lossy().to_string();
 
                         if let Ok(project_entries) = fs::read_dir(&path) {
                             for project_entry in project_entries.flatten() {
                                 let task_path = project_entry.path();
-                                if task_path.is_file() && task_path.extension().map_or(false, |ext| ext == "yml") {
+                                if task_path.is_file()
+                                    && task_path.extension().map_or(false, |ext| ext == "yml")
+                                {
                                     // Extract task ID from filename
-                                    if let Some(stem) = task_path.file_stem().and_then(|s| s.to_str()) {
+                                    if let Some(stem) =
+                                        task_path.file_stem().and_then(|s| s.to_str())
+                                    {
                                         if let Ok(numeric_id) = stem.parse::<u64>() {
-                                            let task_id = format!("{}-{}", project_folder, numeric_id);
+                                            let task_id =
+                                                format!("{}-{}", project_folder, numeric_id);
 
                                             // If we have tag filters, check if this task matches
-                                            if !filter.tags.is_empty() && !tag_candidates.contains(&task_id) {
+                                            if !filter.tags.is_empty()
+                                                && !tag_candidates.contains(&task_id)
+                                            {
                                                 continue;
                                             }
 
                                             // Load and filter the task
                                             if let Ok(content) = fs::read_to_string(&task_path) {
-                                                if let Ok(task) = serde_yaml::from_str::<Task>(&content) {
+                                                if let Ok(task) =
+                                                    serde_yaml::from_str::<Task>(&content)
+                                                {
                                                     if Self::task_matches_filter(&task, filter) {
                                                         results.push((task_id, task));
                                                     }
@@ -117,23 +130,9 @@ impl StorageSearch {
     pub fn get_project_folders_for_name(root_path: &Path, project_name: &str) -> Vec<String> {
         let mut folders = Vec::new();
 
-        // First, try the project name as-is
+        // Only add the project if the directory actually exists
         if root_path.join(project_name).exists() {
             folders.push(project_name.to_string());
-        }
-
-        // Then try to find folders that might correspond to this project
-        if let Ok(entries) = fs::read_dir(root_path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    let folder_name = path.file_name().unwrap().to_string_lossy().to_string();
-                    if !folder_name.starts_with('.') && folder_name != project_name {
-                        // Could check metadata or use heuristics here
-                        folders.push(folder_name);
-                    }
-                }
-            }
         }
 
         folders
@@ -176,10 +175,19 @@ impl StorageSearch {
     pub fn matches_text_filter(task: &Task, text_query: &Option<String>) -> bool {
         if let Some(query) = text_query {
             let query_lower = query.to_lowercase();
-            task.title.to_lowercase().contains(&query_lower) ||
-            task.subtitle.as_ref().map_or(false, |s| s.to_lowercase().contains(&query_lower)) ||
-            task.description.as_ref().map_or(false, |s| s.to_lowercase().contains(&query_lower)) ||
-            task.tags.iter().any(|tag| tag.to_lowercase().contains(&query_lower))
+            task.title.to_lowercase().contains(&query_lower)
+                || task
+                    .subtitle
+                    .as_ref()
+                    .map_or(false, |s| s.to_lowercase().contains(&query_lower))
+                || task
+                    .description
+                    .as_ref()
+                    .map_or(false, |s| s.to_lowercase().contains(&query_lower))
+                || task
+                    .tags
+                    .iter()
+                    .any(|tag| tag.to_lowercase().contains(&query_lower))
         } else {
             true
         }

@@ -11,7 +11,7 @@ pub fn create_config_from_template(
 ) -> Result<String, ConfigError> {
     // First, ensure global config exists by creating a ConfigManager
     // This will trigger auto-generation of global config if it doesn't exist
-    let _config_manager = ConfigManager::new_with_tasks_dir(tasks_dir)?;
+    let _config_manager = ConfigManager::new_with_tasks_dir_ensure_config(tasks_dir)?;
 
     let config = match ConfigManager::load_template(template) {
         Ok(template_data) => ConfigManager::apply_template_to_project(&template_data, project_name),
@@ -60,9 +60,48 @@ pub fn auto_initialize_project_if_needed(
         return Ok(project_prefix); // Project already initialized
     }
 
-    // Project doesn't exist, auto-initialize with default template
-    println!("Auto-initializing project '{}' with default configuration...", project_name);
-    create_config_from_template(tasks_dir, "default", project_name)
+    // For auto-initialization, create a minimal config that only contains the project name
+    // and inherits everything else from global config
+    create_minimal_project_config(tasks_dir, project_name)
+}
+
+/// Create a minimal project config that only contains the project name
+/// All other settings will be inherited from global config
+fn create_minimal_project_config(
+    tasks_dir: &PathBuf,
+    project_name: &str,
+) -> Result<String, ConfigError> {
+    // First, ensure global config exists by creating a ConfigManager
+    // This will trigger auto-generation of global config if it doesn't exist
+    let mut config_manager = ConfigManager::new_manager_with_tasks_dir_ensure_config(tasks_dir)?;
+
+    // Create a minimal project config with only the project name
+    let config = crate::config::types::ProjectConfig::new(project_name.to_string());
+
+    // Generate the 4-letter prefix for the project folder
+    let project_prefix = crate::utils::generate_project_prefix(project_name);
+
+    // Create project directory using the prefix
+    let project_dir = tasks_dir.join(&project_prefix);
+    if !project_dir.exists() {
+        std::fs::create_dir_all(&project_dir).map_err(|e| {
+            ConfigError::IoError(format!("Failed to create project directory: {}", e))
+        })?;
+    }
+
+    // Write minimal config file - only contains project_name, everything else is None/defaults
+    let config_path = project_dir.join("config.yml");
+    let config_yaml = serde_yaml::to_string(&config)
+        .map_err(|e| ConfigError::ParseError(format!("Failed to serialize config: {}", e)))?;
+
+    std::fs::write(&config_path, config_yaml)
+        .map_err(|e| ConfigError::IoError(format!("Failed to write config file: {}", e)))?;
+
+    // Update global config's default_prefix if it's currently empty
+    // This sets the first created project as the default
+    config_manager.set_default_prefix_if_empty(&project_prefix, tasks_dir)?;
+
+    Ok(project_prefix)
 }
 
 /// Save a project configuration field using a closure to modify the config

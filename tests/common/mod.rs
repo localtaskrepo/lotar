@@ -25,11 +25,10 @@ impl TestFixtures {
         }
     }
 
-    pub fn create_sample_task(&self, project: &str) -> Task {
+    pub fn create_sample_task(&self, _project: &str) -> Task {
         Task::new(
             self.tasks_root.clone(),
             "Sample Test Task".to_string(),
-            project.to_string(),
             Priority::Medium  // Changed from numeric 2 to Priority::Medium
         )
     }
@@ -108,13 +107,18 @@ pub mod assertions {
         // With the new filesystem-based approach, we verify the data by counting files and finding max ID
         let project_path = tasks_root.join(project);
 
-        // Count actual task files in the directory (no longer need to exclude metadata.yml)
+        // Count actual task files in the directory (exclude config.yml)
         let actual_task_count = if let Ok(entries) = std::fs::read_dir(&project_path) {
             entries
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| {
-                    entry.path().is_file() &&
-                    entry.path().extension().map_or(false, |ext| ext == "yml")
+                    let path = entry.path();
+                    let file_name = path.file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("");
+                    path.is_file() &&
+                    path.extension().map_or(false, |ext| ext == "yml") &&
+                    file_name != "config.yml" // Exclude config files from task count
                 })
                 .count() as u64
         } else {
@@ -155,7 +159,6 @@ mod tests {
         assert!(fixtures.tasks_root.exists());
 
         let task = fixtures.create_sample_task("test-project");
-        assert_eq!(task.project, "test-project");
         assert_eq!(task.title, "Sample Test Task");
     }
 

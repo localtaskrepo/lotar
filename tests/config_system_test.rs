@@ -6,7 +6,7 @@ mod common;
 use common::TestFixtures;
 
 #[test]
-fn test_global_config_auto_generation() {
+fn test_global_config_read_only_behavior() {
     let test_fixtures = TestFixtures::new();
     let temp_dir = test_fixtures.temp_dir.path();
 
@@ -17,27 +17,36 @@ fn test_global_config_auto_generation() {
     }
     assert!(!tasks_dir.exists());
 
-    // Run config show command, which should auto-generate global config
+    // Run config show command, which should NOT create any files (read-only operation)
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("show")
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Created default global configuration",
-        ))
-        .stdout(predicate::str::contains("Configuration for project:"));
+        .stdout(predicate::str::contains("Configuration for project:"))
+        .stdout(predicate::str::contains("(none set - will auto-detect on first task creation)"));
 
-    // Verify global config file was created
+    // Verify no files were created by the read-only operation
+    assert!(!tasks_dir.exists(), "Config show should not create any directories");
+
+    // Now test that write operations DO create config files when needed
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp_dir)
+        .arg("task")
+        .arg("add")
+        .arg("--title=Test task")
+        .assert()
+        .success();
+
+    // Now verify the config was created by the write operation
     let global_config_path = tasks_dir.join("config.yml");
-    assert!(global_config_path.exists());
+    assert!(global_config_path.exists(), "Task creation should create global config");
 
     // Verify the config content doesn't contain null values
     let config_content = fs::read_to_string(&global_config_path).unwrap();
     assert!(!config_content.contains("null"));
     assert!(config_content.contains("server_port: 8080"));
-    assert!(config_content.contains("default_project: auto"));
 }
 
 #[test]
@@ -486,7 +495,7 @@ fn test_config_inheritance_and_priority() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Port: 9000")) // From global
-        .stdout(predicate::str::contains("Default Priority: MEDIUM")); // Default value since project override may not be working yet
+        .stdout(predicate::str::contains("Default Priority: HIGH")); // Project-specific value should override global default
 }
 
 #[test]
