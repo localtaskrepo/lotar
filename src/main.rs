@@ -1,6 +1,9 @@
 mod api_server;
+mod cli;
 mod config;
+mod help;
 mod index;
+mod output;
 mod project;
 mod routes;
 mod scanner;
@@ -14,29 +17,6 @@ mod workspace;
 use std::env;
 use std::path::PathBuf;
 use workspace::TasksDirectoryResolver;
-
-/// Get the effective project name by checking global config first, then falling back to auto-detection
-fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
-    // Try to read from global config first
-    let global_config_path = resolver.path.join("config.yml");
-    if global_config_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&global_config_path) {
-            if let Ok(config) = serde_yaml::from_str::<config::types::GlobalConfig>(&content) {
-                // If default_prefix is set (not empty), use it
-                if !config.default_prefix.is_empty() {
-                    return config.default_prefix;
-                }
-            }
-        }
-    }
-
-    // Fall back to auto-detection (but generate prefix from detected name)
-    if let Some(project_name) = project::get_project_name() {
-        crate::utils::generate_project_prefix(&project_name)
-    } else {
-        "DEFAULT".to_string()
-    }
-}
 
 /// Extract --project parameter from task command arguments
 /// Returns (original_name, resolved_prefix)
@@ -117,7 +97,7 @@ impl Command for TaskCommand {
         let (original_project_name, project_prefix) =
             extract_project_from_task_args(args, resolver)
                 .map(|(orig, prefix)| (Some(orig), prefix))
-                .unwrap_or_else(|| (None, get_effective_project_name(resolver)));
+                .unwrap_or_else(|| (None, project::get_effective_project_name(resolver)));
 
         tasks::task_command(args, &project_prefix, &original_project_name, resolver);
         Ok(())
@@ -151,6 +131,12 @@ impl Command for ScanCommand {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    // Check if user wants to use the new CLI
+    if args.len() > 1 && (args[1] == "--new-cli" || args[1] == "--experimental") {
+        run_new_cli(args);
+        return;
+    }
 
     // Parse tasks directory flag and get cleaned arguments
     let (override_tasks_dir, cleaned_args) = parse_tasks_dir_flag(&args);
@@ -186,6 +172,178 @@ fn main() {
 
     if let Err(error) = result {
         eprintln!("Error: {}", error);
+        std::process::exit(1);
+    }
+}
+
+/// Run the new Clap-based CLI
+fn run_new_cli(mut args: Vec<String>) {
+    use clap::Parser;
+    use cli::{Cli, Commands};
+    use cli::handlers::{CommandHandler, AddHandler, ListHandler};
+    use cli::handlers::status::{StatusHandler, StatusArgs};
+
+    // Remove the --new-cli or --experimental flag
+    if let Some(pos) = args.iter().position(|arg| arg == "--new-cli" || arg == "--experimental") {
+        args.remove(pos);
+    }
+    
+    // Handle help and version manually for flexibility
+    // But skip if this is a subcommand help like "lotar help add"
+    if !(args.len() >= 3 && args[1] == "help") {
+        for arg in &args {
+            if arg == "help" || arg == "--help" || arg == "-h" {
+                // Show enhanced help using our help system
+                let help_system = help::HelpSystem::new(output::OutputFormat::Text, false);
+                match help_system.show_global_help() {
+                    Ok(help_text) => {
+                        println!("{}", help_text);
+                        return;
+                    }
+                    Err(_) => {
+                        // Fall back to clap's help
+                        let _ = Cli::try_parse_from(&["lotar", "--help"]);
+                        return;
+                    }
+                }
+            }
+            if arg == "version" || arg == "--version" || arg == "-V" {
+                println!("lotar {}", env!("CARGO_PKG_VERSION"));
+                return;
+            }
+        }
+    }
+
+    // Handle subcommand help (e.g., "lotar help add" or "lotar add --help")
+    if args.len() >= 3 && args[1] == "help" {
+        let command = &args[2];
+        let help_system = help::HelpSystem::new(output::OutputFormat::Text, false);
+        match help_system.show_command_help(command) {
+            Ok(help_text) => {
+                println!("{}", help_text);
+                return;
+            }
+            Err(e) => {
+                eprintln!("Error showing help for '{}': {}", command, e);
+                eprintln!("Try 'lotar help' for available commands.");
+                std::process::exit(1);
+            }
+        }
+    }
+    
+    // Parse with Clap
+    let cli = match Cli::try_parse_from(args) {
+        Ok(cli) => cli,
+        Err(e) => {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Resolve tasks directory
+    let resolver = match resolve_tasks_directory_with_override(None) {
+        Ok(resolver) => resolver,
+        Err(error) => {
+            eprintln!("Error resolving tasks directory: {}", error);
+            std::process::exit(1);
+        }
+    };
+
+    // Execute the command
+    let result = match cli.command {
+        Commands::Add(args) => {
+            let renderer = output::OutputRenderer::new(cli.format, cli.verbose);
+            match AddHandler::execute(args, cli.project.as_deref(), &resolver) {
+                Ok(task_id) => {
+                    match renderer.format {
+                        output::OutputFormat::Json => {
+                            let response = serde_json::json!({
+                                "status": "success",
+                                "message": format!("Created task: {}", task_id),
+                                "task_id": task_id
+                            });
+                            println!("{}", response);
+                        }
+                        _ => {
+                            let message = format!("Created task: {}", task_id);
+                            println!("{}", renderer.render_success(&message));
+                        }
+                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    println!("{}", renderer.render_error(&e));
+                    Err(e)
+                }
+            }
+        }
+        Commands::List(args) => {
+            let renderer = output::OutputRenderer::new(cli.format, cli.verbose);
+            match ListHandler::execute(args, cli.project.as_deref(), &resolver) {
+                Ok(tasks) => {
+                    if tasks.is_empty() {
+                        println!("{}", renderer.render_warning("No tasks found matching the criteria."));
+                    } else {
+                        let output = renderer.render_list(&tasks, Some("Tasks"));
+                        println!("{}", output);
+                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    println!("{}", renderer.render_error(&e));
+                    Err(e)
+                }
+            }
+        }
+        Commands::Status { id, status } | Commands::StatusShort { id, status } => {
+            let renderer = output::OutputRenderer::new(cli.format, cli.verbose);
+            let status_args = StatusArgs::new(id, status, cli.project.clone());
+            match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver) {
+                Ok(()) => {
+                    println!("{}", renderer.render_success("Status changed successfully"));
+                    Ok(())
+                }
+                Err(e) => {
+                    println!("{}", renderer.render_error(&e));
+                    Err(e)
+                }
+            }
+        }
+        Commands::Set { id, property, value } => {
+            // TODO: Implement set handler
+            println!("🚧 Set command not yet implemented: {} {} = {}", id, property, value);
+            Ok(())
+        }
+        Commands::Task { action: _ } => {
+            // Fall back to existing task implementation
+            println!("🔄 Falling back to existing task command implementation");
+            TaskCommand.execute(&std::env::args().collect::<Vec<_>>(), &resolver)
+        }
+        Commands::Config { action: _ } => {
+            // Fall back to existing config implementation
+            println!("🔄 Falling back to existing config command implementation");
+            config::config_command(&std::env::args().collect::<Vec<_>>(), &resolver.path);
+            Ok(())
+        }
+        Commands::Scan(_args) => {
+            // Fall back to existing scan implementation
+            println!("🔄 Falling back to existing scan command implementation");
+            ScanCommand.execute(&std::env::args().collect::<Vec<_>>(), &resolver)
+        }
+        Commands::Serve(_args) => {
+            // Fall back to existing serve implementation
+            println!("🔄 Falling back to existing serve command implementation");
+            ServeCommand.execute(&std::env::args().collect::<Vec<_>>(), &resolver)
+        }
+        Commands::Index(_args) => {
+            // Fall back to existing index implementation
+            println!("🔄 Falling back to existing index command implementation");
+            index_command(&std::env::args().collect::<Vec<_>>(), &resolver)
+        }
+    };
+
+    if let Err(error) = result {
+        eprintln!("❌ Error: {}", error);
         std::process::exit(1);
     }
 }

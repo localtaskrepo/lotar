@@ -52,6 +52,46 @@ lotar task list --project=FRON
 lotar task list --project=fron
 ```
 
+## 🔒 Enhanced Project Resolution with Conflict Detection
+
+LoTaR includes robust project resolution logic that intelligently handles task IDs and project arguments with conflict detection:
+
+### Four Resolution Scenarios
+
+1. **Task ID with prefix + matching project argument**:
+   ```bash
+   lotar task status AUTH-123 DONE --project=AUTH        # ✅ Works
+   lotar task status AUTH-123 DONE --project=authentication  # ✅ Works (resolves to AUTH)
+   ```
+
+2. **Task ID with prefix + conflicting project argument**:
+   ```bash
+   lotar task status AUTH-123 DONE --project=FRONTEND    # ❌ Error: Project mismatch
+   # Error: "Project mismatch: task ID 'AUTH-123' belongs to project 'AUTH', but 'FRONTEND' was specified"
+   ```
+
+3. **Task ID without prefix + project argument**:
+   ```bash
+   lotar task status 123 DONE --project=MOBILE          # ✅ Works (uses MOBILE)
+   ```
+
+4. **Task ID with prefix + no project argument (auto-detection)**:
+   ```bash
+   lotar task status AUTH-123 DONE                       # ✅ Works (auto-detects AUTH)
+   ```
+
+5. **No task ID + no project argument (default fallback)**:
+   ```bash
+   lotar task add --title="New task"                     # ✅ Uses default project from config
+   ```
+
+### Validation Benefits
+
+- **Prevents mistakes**: Catches when you specify the wrong project for a task
+- **Data integrity**: Ensures task operations happen on the correct project
+- **Clear errors**: Provides helpful error messages when conflicts occur
+- **Smart fallbacks**: Uses sensible defaults when information is missing
+
 ## ⚙️ Auto-Detection & Zero Configuration
 
 ### Global Config Auto-Detection

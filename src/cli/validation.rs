@@ -1,0 +1,436 @@
+use crate::config::types::ResolvedConfig;
+use crate::types::{Priority, TaskStatus, TaskType};
+
+/// Configuration-aware validation for CLI inputs
+pub struct CliValidator<'a> {
+    config: &'a ResolvedConfig,
+}
+
+impl<'a> CliValidator<'a> {
+    pub fn new(config: &'a ResolvedConfig) -> Self {
+        Self { config }
+    }
+    
+    /// Validate task status against project configuration
+    pub fn validate_status(&self, status: &str) -> Result<TaskStatus, String> {
+        // Try to parse as our known enum first
+        if let Ok(parsed_status) = status.parse::<TaskStatus>() {
+            // Check if it's allowed in this project's configuration
+            if self.config.issue_states.values.contains(&parsed_status) {
+                Ok(parsed_status)
+            } else {
+                let valid_states: Vec<String> = self.config.issue_states.values
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                Err(format!(
+                    "Status '{}' is not allowed in this project. Valid statuses: {}", 
+                    status, 
+                    valid_states.join(", ")
+                ))
+            }
+        } else {
+            // Provide helpful suggestions
+            let valid_states: Vec<String> = self.config.issue_states.values
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+                
+            let suggestion = find_closest_match(status, &valid_states);
+            let suggestion_text = match suggestion {
+                Some(s) => format!(" Did you mean '{}'?", s),
+                None => String::new(),
+            };
+            
+            Err(format!(
+                "Invalid status '{}'. Valid statuses: {}.{}", 
+                status, 
+                valid_states.join(", "),
+                suggestion_text
+            ))
+        }
+    }
+    
+    /// Validate task type against project configuration
+    pub fn validate_task_type(&self, task_type: &str) -> Result<TaskType, String> {
+        if let Ok(parsed_type) = task_type.parse::<TaskType>() {
+            if self.config.issue_types.values.contains(&parsed_type) {
+                Ok(parsed_type)
+            } else {
+                let valid_types: Vec<String> = self.config.issue_types.values
+                    .iter()
+                    .map(|t| t.to_string())
+                    .collect();
+                Err(format!(
+                    "Task type '{}' is not allowed in this project. Valid types: {}", 
+                    task_type,
+                    valid_types.join(", ")
+                ))
+            }
+        } else {
+            let valid_types: Vec<String> = self.config.issue_types.values
+                .iter()
+                .map(|t| t.to_string())
+                .collect();
+                
+            let suggestion = find_closest_match(task_type, &valid_types);
+            let suggestion_text = match suggestion {
+                Some(s) => format!(" Did you mean '{}'?", s),
+                None => String::new(),
+            };
+            
+            Err(format!(
+                "Invalid task type '{}'. Valid types: {}.{}", 
+                task_type,
+                valid_types.join(", "),
+                suggestion_text
+            ))
+        }
+    }
+    
+    /// Validate priority against project configuration
+    pub fn validate_priority(&self, priority: &str) -> Result<Priority, String> {
+        if let Ok(parsed_priority) = priority.parse::<Priority>() {
+            if self.config.issue_priorities.values.contains(&parsed_priority) {
+                Ok(parsed_priority)
+            } else {
+                let valid_priorities: Vec<String> = self.config.issue_priorities.values
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect();
+                Err(format!(
+                    "Priority '{}' is not allowed in this project. Valid priorities: {}", 
+                    priority,
+                    valid_priorities.join(", ")
+                ))
+            }
+        } else {
+            let valid_priorities: Vec<String> = self.config.issue_priorities.values
+                .iter()
+                .map(|p| p.to_string())
+                .collect();
+                
+            let suggestion = find_closest_match(priority, &valid_priorities);
+            let suggestion_text = match suggestion {
+                Some(s) => format!(" Did you mean '{}'?", s),
+                None => String::new(),
+            };
+            
+            Err(format!(
+                "Invalid priority '{}'. Valid priorities: {}.{}", 
+                priority,
+                valid_priorities.join(", "),
+                suggestion_text
+            ))
+        }
+    }
+    
+    /// Validate category against project configuration
+    pub fn validate_category(&self, category: &str) -> Result<String, String> {
+        if self.config.categories.has_wildcard() {
+            // Any category is allowed
+            Ok(category.to_string())
+        } else {
+            if self.config.categories.values.contains(&category.to_string()) {
+                Ok(category.to_string())
+            } else {
+                let suggestion = find_closest_match(category, &self.config.categories.values);
+                let suggestion_text = match suggestion {
+                    Some(s) => format!(" Did you mean '{}'?", s),
+                    None => String::new(),
+                };
+                
+                Err(format!(
+                    "Category '{}' is not allowed in this project. Valid categories: {}.{}", 
+                    category,
+                    self.config.categories.values.join(", "),
+                    suggestion_text
+                ))
+            }
+        }
+    }
+    
+    /// Validate tag against project configuration
+    pub fn validate_tag(&self, tag: &str) -> Result<String, String> {
+        if self.config.tags.has_wildcard() {
+            // Any tag is allowed
+            Ok(tag.to_string())
+        } else {
+            if self.config.tags.values.contains(&tag.to_string()) {
+                Ok(tag.to_string())
+            } else {
+                let suggestion = find_closest_match(tag, &self.config.tags.values);
+                let suggestion_text = match suggestion {
+                    Some(s) => format!(" Did you mean '{}'?", s),
+                    None => String::new(),
+                };
+                
+                Err(format!(
+                    "Tag '{}' is not allowed in this project. Valid tags: {}.{}", 
+                    tag,
+                    self.config.tags.values.join(", "),
+                    suggestion_text
+                ))
+            }
+        }
+    }
+    
+    /// Validate custom field name against project configuration
+    pub fn validate_custom_field_name(&self, field_name: &str) -> Result<String, String> {
+        if self.config.custom_fields.has_wildcard() {
+            // Any custom field is allowed
+            Ok(field_name.to_string())
+        } else {
+            if self.config.custom_fields.values.contains(&field_name.to_string()) {
+                Ok(field_name.to_string())
+            } else {
+                let suggestion = find_closest_match(field_name, &self.config.custom_fields.values);
+                let suggestion_text = match suggestion {
+                    Some(s) => format!(" Did you mean '{}'?", s),
+                    None => String::new(),
+                };
+                
+                Err(format!(
+                    "Custom field '{}' is not allowed in this project. Valid custom fields: {}.{}", 
+                    field_name,
+                    self.config.custom_fields.values.join(", "),
+                    suggestion_text
+                ))
+            }
+        }
+    }
+    
+    /// Validate custom field key-value pair
+    pub fn validate_custom_field(&self, field_name: &str, field_value: &str) -> Result<(String, String), String> {
+        // First validate the field name
+        let validated_name = self.validate_custom_field_name(field_name)?;
+        
+        // For now, allow any value for custom fields
+        // In the future, this could be extended to validate values based on field type
+        Ok((validated_name, field_value.to_string()))
+    }
+    
+    /// Validate assignee format (basic email validation)
+    pub fn validate_assignee(&self, assignee: &str) -> Result<String, String> {
+        // Handle special cases
+        if assignee == "@me" {
+            // Will be resolved to actual user later
+            return Ok(assignee.to_string());
+        }
+        
+        if assignee.starts_with('@') {
+            // Username format - validate it's a reasonable username
+            let username = &assignee[1..];
+            if !username.is_empty() && username.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+                Ok(assignee.to_string())
+            } else {
+                Err("Invalid username format. Usernames can only contain letters, numbers, underscore, and dash.".to_string())
+            }
+        } else if assignee.contains('@') {
+            // Email format - basic validation
+            if assignee.matches('@').count() == 1 && 
+               assignee.contains('.') && 
+               !assignee.starts_with('@') && 
+               !assignee.ends_with('@') {
+                Ok(assignee.to_string())
+            } else {
+                Err("Invalid email format".to_string())
+            }
+        } else {
+            Err("Assignee must be an email address or username starting with @".to_string())
+        }
+    }
+    
+    /// Parse and validate due date (supports relative dates)
+    pub fn parse_due_date(&self, due_date: &str) -> Result<String, String> {
+        match due_date.to_lowercase().as_str() {
+            "today" => {
+                let today = chrono::Local::now().date_naive();
+                Ok(today.format("%Y-%m-%d").to_string())
+            },
+            "tomorrow" => {
+                let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
+                Ok(tomorrow.format("%Y-%m-%d").to_string())
+            },
+            "next week" | "nextweek" => {
+                let next_week = chrono::Local::now().date_naive() + chrono::Duration::weeks(1);
+                Ok(next_week.format("%Y-%m-%d").to_string())
+            },
+            _ => {
+                // Try to parse as YYYY-MM-DD
+                if let Ok(parsed) = chrono::NaiveDate::parse_from_str(due_date, "%Y-%m-%d") {
+                    Ok(parsed.format("%Y-%m-%d").to_string())
+                } else {
+                    Err(format!(
+                        "Invalid date format: '{}'. Use YYYY-MM-DD or relative terms like 'today', 'tomorrow', 'next week'", 
+                        due_date
+                    ))
+                }
+            }
+        }
+    }
+    
+    /// Validate effort estimate format
+    pub fn validate_effort(&self, effort: &str) -> Result<String, String> {
+        // Support formats like: 2h, 3d, 1w, 0.5d, etc.
+        let effort_lower = effort.to_lowercase();
+        
+        if effort_lower.ends_with('h') || effort_lower.ends_with('d') || effort_lower.ends_with('w') {
+            let number_part = &effort_lower[..effort_lower.len()-1];
+            if number_part.parse::<f64>().is_ok() {
+                Ok(effort.to_string())
+            } else {
+                Err("Invalid effort format. Use number followed by h (hours), d (days), or w (weeks). Example: 2h, 1.5d, 1w".to_string())
+            }
+        } else {
+            Err("Invalid effort format. Use number followed by h (hours), d (days), or w (weeks). Example: 2h, 1.5d, 1w".to_string())
+        }
+    }
+}
+
+/// Find the closest match for a string in a list (simple edit distance)
+fn find_closest_match(input: &str, candidates: &[String]) -> Option<String> {
+    if candidates.is_empty() {
+        return None;
+    }
+    
+    let input_lower = input.to_lowercase();
+    let mut best_match = None;
+    let mut best_distance = usize::MAX;
+    
+    for candidate in candidates {
+        let candidate_lower = candidate.to_lowercase();
+        let distance = edit_distance(&input_lower, &candidate_lower);
+        
+        // Only suggest if the edit distance is reasonable (less than half the input length)
+        if distance < input.len() / 2 + 1 && distance < best_distance {
+            best_distance = distance;
+            best_match = Some(candidate.clone());
+        }
+    }
+    
+    best_match
+}
+
+/// Simple edit distance calculation (Levenshtein distance)
+fn edit_distance(s1: &str, s2: &str) -> usize {
+    let len1 = s1.len();
+    let len2 = s2.len();
+    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
+    
+    // Initialize first row and column
+    for i in 0..=len1 {
+        matrix[i][0] = i;
+    }
+    for j in 0..=len2 {
+        matrix[0][j] = j;
+    }
+    
+    // Fill the matrix
+    for (i, c1) in s1.chars().enumerate() {
+        for (j, c2) in s2.chars().enumerate() {
+            let cost = if c1 == c2 { 0 } else { 1 };
+            matrix[i + 1][j + 1] = (matrix[i][j + 1] + 1)
+                .min(matrix[i + 1][j] + 1)
+                .min(matrix[i][j] + cost);
+        }
+    }
+    
+    matrix[len1][len2]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::types::{ConfigurableField, StringConfigField};
+    
+    fn create_test_config() -> ResolvedConfig {
+        ResolvedConfig {
+            server_port: 8080,
+            default_prefix: "TEST".to_string(),
+            issue_states: ConfigurableField { 
+                values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done] 
+            },
+            issue_types: ConfigurableField { 
+                values: vec![TaskType::Feature, TaskType::Bug, TaskType::Epic] 
+            },
+            issue_priorities: ConfigurableField { 
+                values: vec![Priority::Low, Priority::Medium, Priority::High] 
+            },
+            categories: StringConfigField::new_wildcard(),
+            tags: StringConfigField::new_wildcard(),
+            default_assignee: None,
+            default_priority: Priority::Medium,
+            custom_fields: StringConfigField::new_wildcard(),
+        }
+    }
+    
+    #[test]
+    fn test_validate_status() {
+        let config = create_test_config();
+        let validator = CliValidator::new(&config);
+        
+        // Valid statuses - using the actual string format expected by the parser
+        assert!(validator.validate_status("TODO").is_ok());
+        assert!(validator.validate_status("IN_PROGRESS").is_ok());
+        assert!(validator.validate_status("DONE").is_ok());
+        
+        // Case insensitive should work
+        assert!(validator.validate_status("todo").is_ok());
+        assert!(validator.validate_status("in_progress").is_ok());
+        assert!(validator.validate_status("done").is_ok());
+        
+        // Invalid status
+        assert!(validator.validate_status("Invalid").is_err());
+    }
+    
+    #[test]
+    fn test_validate_assignee() {
+        let config = create_test_config();
+        let validator = CliValidator::new(&config);
+        
+        // Valid formats
+        assert!(validator.validate_assignee("@me").is_ok());
+        assert!(validator.validate_assignee("@john").is_ok());
+        assert!(validator.validate_assignee("john@example.com").is_ok());
+        
+        // Invalid formats
+        assert!(validator.validate_assignee("not-an-email").is_err());
+        assert!(validator.validate_assignee("@").is_err());
+        assert!(validator.validate_assignee("john@").is_err());
+    }
+    
+    #[test]
+    fn test_parse_due_date() {
+        let config = create_test_config();
+        let validator = CliValidator::new(&config);
+        
+        // Relative dates
+        assert!(validator.parse_due_date("today").is_ok());
+        assert!(validator.parse_due_date("tomorrow").is_ok());
+        assert!(validator.parse_due_date("next week").is_ok());
+        
+        // Absolute dates
+        assert!(validator.parse_due_date("2024-12-25").is_ok());
+        
+        // Invalid formats
+        assert!(validator.parse_due_date("invalid-date").is_err());
+        assert!(validator.parse_due_date("12/25/2024").is_err()); // Wrong format
+    }
+    
+    #[test]
+    fn test_validate_effort() {
+        let config = create_test_config();
+        let validator = CliValidator::new(&config);
+        
+        // Valid formats
+        assert!(validator.validate_effort("2h").is_ok());
+        assert!(validator.validate_effort("1.5d").is_ok());
+        assert!(validator.validate_effort("1w").is_ok());
+        
+        // Invalid formats
+        assert!(validator.validate_effort("2").is_err());
+        assert!(validator.validate_effort("2x").is_err());
+        assert!(validator.validate_effort("abc").is_err());
+    }
+}

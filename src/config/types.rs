@@ -8,9 +8,34 @@ pub struct ProjectTemplate {
     pub config: ProjectConfig,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ConfigurableField<T> {
     pub values: Vec<T>,
+}
+
+impl<T> Serialize for ConfigurableField<T> 
+where 
+    T: Serialize
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.values.serialize(serializer)
+    }
+}
+
+impl<'de, T> Deserialize<'de> for ConfigurableField<T>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let values = Vec::<T>::deserialize(deserializer)?;
+        Ok(ConfigurableField { values })
+    }
 }
 
 impl<T> ConfigurableField<T> where
@@ -19,9 +44,29 @@ impl<T> ConfigurableField<T> where
 }
 
 // Specialized implementation for String fields that support wildcard
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// This will serialize as a direct array without the "values" wrapper
+#[derive(Debug, Clone)]
 pub struct StringConfigField {
     pub values: Vec<String>,
+}
+
+impl Serialize for StringConfigField {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.values.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for StringConfigField {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let values = Vec::<String>::deserialize(deserializer)?;
+        Ok(StringConfigField { values })
+    }
 }
 
 impl StringConfigField {
@@ -62,6 +107,8 @@ pub struct ProjectConfig {
     pub default_assignee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_priority: Option<Priority>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub custom_fields: Option<StringConfigField>,
 }
 
 impl ProjectConfig {
@@ -75,6 +122,7 @@ impl ProjectConfig {
             tags: None,
             default_assignee: None,
             default_priority: None,
+            custom_fields: None,
         }
     }
 }
@@ -102,6 +150,8 @@ pub struct GlobalConfig {
     pub default_assignee: Option<String>,
     #[serde(default = "default_priority")]
     pub default_priority: Priority,
+    #[serde(default = "default_custom_fields")]
+    pub custom_fields: StringConfigField,
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +165,7 @@ pub struct ResolvedConfig {
     pub tags: StringConfigField,
     pub default_assignee: Option<String>,
     pub default_priority: Priority,
+    pub custom_fields: StringConfigField,
 }
 
 #[derive(Debug)]
@@ -175,6 +226,10 @@ fn default_tags() -> StringConfigField {
     StringConfigField::new_wildcard()
 }
 
+fn default_custom_fields() -> StringConfigField {
+    StringConfigField::new_wildcard()
+}
+
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
@@ -187,6 +242,7 @@ impl Default for GlobalConfig {
             tags: default_tags(),
             default_assignee: None,
             default_priority: default_priority(),
+            custom_fields: default_custom_fields(),
         }
     }
 }

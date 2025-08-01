@@ -14,6 +14,12 @@ impl ConfigManager {
         Ok(Self { resolved_config })
     }
 
+    /// Create a ConfigManager from an existing ResolvedConfig (for testing)
+    #[cfg(test)]
+    pub fn from_resolved_config(resolved_config: ResolvedConfig) -> Self {
+        Self { resolved_config }
+    }
+
     /// Get a reference to the resolved configuration
     pub fn get_resolved_config(&self) -> &ResolvedConfig {
         &self.resolved_config
@@ -327,6 +333,9 @@ impl ConfigManager {
         if let Some(priority) = project_config.default_priority {
             resolved.default_priority = priority;
         }
+        if let Some(custom_fields) = project_config.custom_fields {
+            resolved.custom_fields = custom_fields;
+        }
 
         Ok(resolved)
     }
@@ -470,6 +479,7 @@ impl ResolvedConfig {
             tags: global.tags,
             default_assignee: global.default_assignee,
             default_priority: global.default_priority,
+            custom_fields: global.custom_fields,
         }
     }
 }

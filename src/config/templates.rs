@@ -21,6 +21,7 @@ pub fn create_default_template() -> ProjectTemplate {
             tags: Some(StringConfigField::new_wildcard()),
             default_assignee: None,
             default_priority: Some(Priority::Medium),
+            custom_fields: Some(StringConfigField::new_wildcard()),
         },
     }
 }
@@ -49,6 +50,7 @@ pub fn create_simple_template() -> ProjectTemplate {
             tags: Some(StringConfigField::new_wildcard()),
             default_assignee: None,
             default_priority: Some(Priority::Medium),
+            custom_fields: Some(StringConfigField::new_wildcard()),
         },
     }
 }
@@ -89,6 +91,11 @@ pub fn create_agile_template() -> ProjectTemplate {
             tags: Some(StringConfigField::new_wildcard()),
             default_assignee: None,
             default_priority: Some(Priority::Medium),
+            custom_fields: Some(StringConfigField::new_strict(vec![
+                "sprint".to_string(),
+                "story_points".to_string(),
+                "epic".to_string(),
+            ])),
         },
     }
 }
@@ -119,6 +126,10 @@ pub fn create_kanban_template() -> ProjectTemplate {
             tags: Some(StringConfigField::new_wildcard()),
             default_assignee: None,
             default_priority: Some(Priority::Medium),
+            custom_fields: Some(StringConfigField::new_strict(vec![
+                "swimlane".to_string(),
+                "priority_lane".to_string(),
+            ])),
         },
     }
 }

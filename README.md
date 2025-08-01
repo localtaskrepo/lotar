@@ -3,7 +3,7 @@
 > A git-integrated task management system that lives in your repository.
 
 [![Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)](docs/README.md)
-[![Tests](https://img.shields.io/badge/tests-174%20passing-brightgreen)](docs/README.md#testing--quality)
+[![Tests](https://img.shields.io/badge/tests-225%20passing-brightgreen)](docs/README.md#testing--quality)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 
 ## 🚀 Quick Start
@@ -188,7 +188,7 @@ lotar config templates
 
 ## 🧪 Production Ready
 
-- ✅ **174 tests passing** with comprehensive coverage
+- ✅ **225 tests passing** with comprehensive coverage
 - ✅ **Memory safe** with Rust's ownership system
 - ✅ **Performance optimized** for large task sets
 - ✅ **Security validated** with project isolation
