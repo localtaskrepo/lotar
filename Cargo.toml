@@ -32,6 +32,16 @@ strip = "symbols"
 opt-level = "z"
 debug = false
 
+# Test profile optimization for faster test compilation and execution
+[profile.test]
+opt-level = 0        
+debug = 1            
+incremental = true   
+codegen-units = 256
+lto = false          
+debug-assertions = true
+overflow-checks = true
+
 [dev-dependencies]
 tokio-test = "0.4"
 assert_cmd = "2.0"

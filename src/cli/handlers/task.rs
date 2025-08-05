@@ -247,14 +247,12 @@ impl CommandHandler for SearchHandler {
         if let Some(category) = args.category {
             task_filter.category = Some(category);
         }
-        
+
         if let Some(project) = project {
             // Resolve project name to prefix, just like in AddHandler
             let project_prefix = crate::utils::resolve_project_input(project, &resolver.path);
             task_filter.project = Some(project_prefix);
-        }
-        
-        // Execute search/list
+        }        // Execute search/list
         let task_tuples = storage.search(&task_filter);
         let mut tasks: Vec<(String, Task)> = task_tuples.into_iter().collect();
         

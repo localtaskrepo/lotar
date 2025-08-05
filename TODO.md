@@ -21,7 +21,10 @@
 Other refactor jobs:
 - Error system
 - Log system
-- Overall code quality (can functions be combined into utility functions)
+- Overall code quality \
+    - can functions be combined into utility functions
+    - Empty files
+    - Unnecessary folders
 - Check if the test system can be improved
 - We have hard coded issue priority everywhere when it should be read from config file.
     - when no default_priority is set we use the first value.

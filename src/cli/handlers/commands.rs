@@ -259,12 +259,30 @@ impl ConfigHandler {
             println!("🔍 DRY RUN: Would initialize config with template '{}'", template);
             if let Some(ref prefix) = prefix {
                 println!("  • Project prefix: {}", prefix);
+                // Validate explicit prefix
+                if let Some(ref project_name) = project {
+                    if let Err(conflict) = crate::utils::validate_explicit_prefix(prefix, project_name, &resolver.path) {
+                        println!("  ❌ Conflict detected: {}", conflict);
+                        return Err(conflict);
+                    }
+                    println!("  ✅ Prefix '{}' is available", prefix);
+                }
             }
             if let Some(ref project) = project {
                 println!("  • Project name: {}", project);
-                // Show what prefix would be generated
-                let generated_prefix = crate::utils::generate_project_prefix(project);
-                println!("  • Generated prefix: {}", generated_prefix);
+                // Show what prefix would be generated and check for conflicts
+                if prefix.is_none() {
+                    match crate::utils::generate_unique_project_prefix(project, &resolver.path) {
+                        Ok(generated_prefix) => {
+                            println!("  • Generated prefix: {} ✅", generated_prefix);
+                        }
+                        Err(conflict) => {
+                            println!("  • Generated prefix: {} ❌", crate::utils::generate_project_prefix(project));
+                            println!("  ❌ Conflict detected: {}", conflict);
+                            return Err(conflict);
+                        }
+                    }
+                }
             }
             if let Some(ref copy_from) = copy_from {
                 println!("  • Copy settings from: {}", copy_from);
@@ -273,7 +291,14 @@ impl ConfigHandler {
                 println!("  • Target: Global configuration (.tasks/config.yml)");
             } else {
                 let project_name = project.as_deref().unwrap_or("DEFAULT");
-                let project_prefix = crate::utils::generate_project_prefix(project_name);
+                let project_prefix = if let Some(ref prefix) = prefix {
+                    prefix.clone()
+                } else {
+                    match crate::utils::generate_unique_project_prefix(project_name, &resolver.path) {
+                        Ok(prefix) => prefix,
+                        Err(_) => crate::utils::generate_project_prefix(project_name), // For display purposes
+                    }
+                };
                 println!("  • Target: Project configuration (.tasks/{}/config.yml)", project_prefix);
             }
             println!("✅ Dry run completed. Use the same command without --dry-run to apply.");
@@ -355,10 +380,10 @@ impl ConfigHandler {
         // Apply customizations
         if let Some(config_map) = config.as_mapping_mut() {
             // Set project prefix if provided
-            if let Some(prefix) = prefix {
+            if let Some(ref prefix) = prefix {
                 config_map.insert(
                     serde_yaml::Value::String("prefix".to_string()),
-                    serde_yaml::Value::String(prefix),
+                    serde_yaml::Value::String(prefix.clone()),
                 );
             }
             
@@ -387,10 +412,17 @@ impl ConfigHandler {
                 })
                 .unwrap_or("DEFAULT");
             
-            // Generate prefix from project name
-            let project_prefix = crate::utils::generate_project_prefix(project_name);
+            // Generate prefix from project name with conflict detection
+            let project_prefix = if let Some(explicit_prefix) = prefix {
+                // User provided explicit prefix, validate it doesn't conflict
+                crate::utils::validate_explicit_prefix(&explicit_prefix, project_name, &resolver.path)?;
+                explicit_prefix
+            } else {
+                // Generate prefix with conflict detection
+                crate::utils::generate_unique_project_prefix(project_name, &resolver.path)?
+            };
             
-            let project_dir = resolver.path.join(project_prefix);
+            let project_dir = resolver.path.join(&project_prefix);
             fs::create_dir_all(&project_dir)
                 .map_err(|e| format!("Failed to create project directory: {}", e))?;
             project_dir.join("config.yml")

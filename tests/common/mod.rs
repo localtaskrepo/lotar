@@ -1,11 +1,10 @@
-use std::path::PathBuf;
-use tempfile::TempDir;
-use std::fs;
-use lotar::storage::{Task, Storage};
+use lotar::storage::{Storage, Task};
 use lotar::types::Priority;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::path::PathBuf;
+use tempfile::TempDir;
 
 /// Test utilities for LoTaR testing
 pub struct TestFixtures {
@@ -25,12 +24,10 @@ impl TestFixtures {
         }
     }
 
-    pub fn create_sample_task(&self, _project: &str) -> Task {
-        Task::new(
-            self.tasks_root.clone(),
-            "Sample Test Task".to_string(),
-            Priority::Medium  // Changed from numeric 2 to Priority::Medium
-        )
+    // Clean up after test
+    #[allow(dead_code)]
+    pub fn cleanup(&self) {
+        // Temporary directory is automatically cleaned up when TestFixtures is dropped
     }
 
     #[allow(dead_code)] // Used across multiple test modules
@@ -44,6 +41,7 @@ impl TestFixtures {
     }
 
     /// Create test files with TODO comments for scanner testing
+    #[allow(dead_code)] // Used by scanner tests
     pub fn create_test_source_files(&self) -> Vec<String> {
         let mut files = Vec::new();
 
@@ -74,6 +72,16 @@ impl TestFixtures {
 
         files
     }
+
+    /// Create a sample task for testing
+    #[allow(dead_code)]
+    pub fn create_sample_task(&self, _project: &str) -> Task {
+        Task::new(
+            self.tasks_root.clone(),
+            "Sample Test Task".to_string(),
+            Priority::Medium,
+        )
+    }
 }
 
 /// Test utility functions
@@ -98,11 +106,20 @@ pub mod assertions {
             .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "yml"))
             .collect::<Vec<_>>();
 
-        assert!(!task_files.is_empty(), "Should have at least one task file in project {}", project);
+        assert!(
+            !task_files.is_empty(),
+            "Should have at least one task file in project {}",
+            project
+        );
     }
 
     #[allow(dead_code)] // Used in storage_crud_test.rs
-    pub fn assert_metadata_updated(tasks_root: &Path, project: &str, task_count: u64, current_id: u64) {
+    pub fn assert_metadata_updated(
+        tasks_root: &Path,
+        project: &str,
+        task_count: u64,
+        current_id: u64,
+    ) {
         // Removed metadata file existence check since we've eliminated metadata.yml files
         // With the new filesystem-based approach, we verify the data by counting files and finding max ID
         let project_path = tasks_root.join(project);
@@ -113,12 +130,13 @@ pub mod assertions {
                 .filter_map(|entry| entry.ok())
                 .filter(|entry| {
                     let path = entry.path();
-                    let file_name = path.file_name()
+                    let file_name = path
+                        .file_name()
                         .and_then(|name| name.to_str())
                         .unwrap_or("");
-                    path.is_file() &&
-                    path.extension().map_or(false, |ext| ext == "yml") &&
-                    file_name != "config.yml" // Exclude config files from task count
+                    path.is_file()
+                        && path.extension().map_or(false, |ext| ext == "yml")
+                        && file_name != "config.yml" // Exclude config files from task count
                 })
                 .count() as u64
         } else {
@@ -144,37 +162,18 @@ pub mod assertions {
             0
         };
 
-        assert_eq!(actual_task_count, task_count, "Task count mismatch for project {}", project);
-        assert_eq!(actual_current_id, current_id, "Current ID mismatch for project {}", project);
+        assert_eq!(
+            actual_task_count, task_count,
+            "Task count mismatch for project {}",
+            project
+        );
+        assert_eq!(
+            actual_current_id, current_id,
+            "Current ID mismatch for project {}",
+            project
+        );
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fixtures_creation() {
-        let fixtures = TestFixtures::new();
-        assert!(fixtures.tasks_root.exists());
-
-        let task = fixtures.create_sample_task("test-project");
-        assert_eq!(task.title, "Sample Test Task");
-    }
-
-    #[test]
-    fn test_source_file_creation() {
-        let fixtures = TestFixtures::new();
-        let files = fixtures.create_test_source_files();
-
-        assert_eq!(files.len(), 3);
-        for file in &files {
-            assert!(Path::new(file).exists());
-        }
-
-        // Verify content of one file
-        let rust_content = fs::read_to_string(&files[0]).unwrap();
-        assert!(rust_content.contains("TODO: Implement main functionality"));
-        assert!(rust_content.contains("TODO (uuid-1234)"));
-    }
-}
+// Note: Test functions for common utilities have been removed to prevent duplication
+// across all test files that import this module. Each test file should test its own functionality.
