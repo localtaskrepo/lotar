@@ -1,20 +1,29 @@
-- Rework help system and show help per command in addition to global help
-    Maybe there's a way to reuse the help in the docs to keep them in sync
-- Make sure project name is used when talking about the config.yml setting, otherwise we're working with prefixes and they should be implicit if modifying e.g.a task with id PROJ-12
-- Wire up config to be used as validation values for status and other fields
 - inconsistent variable naming with snake and camel case mixed
 - Need to validate scaning for TODOs actually works and creates issues
-- Check how well the search system works
-- Update architecture so that commands can be executed via MCP, web-interface, or CLI
-- we have different help args for CLI:
-    lotar help
-    lotar config --help
 - Add ways to control output verbosity to allow more control as a tool
     Add debug logging for better error tracing
 - MCP
 - Web
 - Index files is generated when there's no content (no mappings)
 - We need to add an author to issues ideally read from the current git user, otherwise fallback to environment value or .lotar config
-- Add some command short cuts for most commonly used commands, e.g. lotar task edit <id> --status=IN_PROGRESS  do lotar status <id> <status>
 - Add github actions to run tests and link the results in the readme
-- Also check the help output of the binary
+- we're using default_project instead of default_prefix in the global config.
+- Add config validate command that checks that no unknown fields are set, not invalid values, and that no project name is the same as a different prefix (which would break the storage logic. On that note, we should never allow auto creating a prefix that is a project name)
+- List/search op only supports project filter right now, should allow sort
+- Tasks have relationships, so we should have commands to show them.
+- Bug: State changes to same state are allowed. Should at least show a warning.
+- Feature: context with references to relevant files for the task. how does this work together with scanning for TODOs?
+- Make sure new tasks automatically take the first state from the config as default start state.
+- Are all commands supporting the --tasks-dir and evironment variable settings? Do they all resolve parent project dirs?
+- When creating a project automatically by adding a new issue, we detect the project name, but we don't store it in config.yml (the project folder has no config.yml)
+- The main help does not reflect the actual output and has some useless info
+
+Other refactor jobs:
+- Error system
+- Log system
+- Overall code quality (can functions be combined into utility functions)
+- Check if the test system can be improved
+- We have hard coded issue priority everywhere when it should be read from config file.
+    - when no default_priority is set we use the first value.
+    - maybe the same issue exists with types and other fields
+- Check if there are more tests we need for better coverage and documentation of current features

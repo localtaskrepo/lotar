@@ -63,10 +63,6 @@ impl Storage {
         StorageSearch::search(&self.root_path, &self.index, filter)
     }
 
-    pub fn list_by_project(&self, project: &str) -> Vec<(String, Task)> {
-        StorageSearch::list_by_project(&self.root_path, &self.index, project)
-    }
-
     pub fn rebuild_index(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.index = TaskIndex::rebuild_from_storage(&self.root_path)?;
         self.save_index()?;

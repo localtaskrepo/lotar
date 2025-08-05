@@ -12,12 +12,9 @@
 //! - `manager`: Main configuration management logic
 //! - `commands`: CLI command handlers for configuration operations
 
-pub mod types;
-pub mod templates;
-pub mod manager;
 pub mod commands;
+pub mod manager;
+pub mod templates;
+pub mod types;
 
-// Re-export main types for convenience
-pub use types::*;
 pub use manager::ConfigManager;
-pub use commands::config_command;

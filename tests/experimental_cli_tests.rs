@@ -251,13 +251,13 @@ mod experimental_cli_tests {
         let harness = TestDataBuilder::basic_environment();
         
         // Test empty task title - currently the system allows this, so test for success instead
-        harness.experimental_cmd()
+        harness.cmd()
             .args(["add", ""])
             .assert()
             .success(); // The system currently allows empty titles
         
         // Test invalid project name
-        harness.experimental_cmd()
+        harness.cmd()
             .args(["--project", "INVALID!", "add", "Test task"])
             .assert()
             .failure();
@@ -267,7 +267,7 @@ mod experimental_cli_tests {
             .failure();
         
         // Test malformed custom field (missing value)
-        harness.experimental_cmd()
+        harness.cmd()
             .args(["add", "Test task", "--field", "invalidformat"])
             .assert()
             .failure();

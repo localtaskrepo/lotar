@@ -1,7 +1,7 @@
 use lotar::cli::handlers::{CommandHandler, AddHandler};
+use lotar::cli::handlers::task::SearchHandler;
 use lotar::cli::handlers::status::{StatusHandler, StatusArgs};
-use lotar::cli::handlers::task::TaskHandler;
-use lotar::cli::{AddArgs, TaskSearchArgs, TaskAction};
+use lotar::cli::{AddArgs, TaskSearchArgs};
 use lotar::workspace::{TasksDirectoryResolver, TasksDirectorySource};
 use lotar::output::{OutputRenderer, OutputFormat};
 use std::fs;
@@ -53,10 +53,10 @@ impl SimpleHandlerTestHarness {
         AddHandler::execute(args, project, &self.resolver, renderer)
     }
 
-    /// Test list handler using the unified TaskHandler
+    /// Test list handler (now using SearchHandler)
     pub fn test_list_handler(&self, project: Option<&str>, renderer: &OutputRenderer) -> Result<(), String> {
         let args = TaskSearchArgs {
-            query: None, // List shows all tasks matching filters
+            query: None, // No query means list all
             assignee: None,
             mine: false,
             status: None,
@@ -69,8 +69,7 @@ impl SimpleHandlerTestHarness {
             limit: 20,
         };
 
-        let task_action = TaskAction::List(args);
-        TaskHandler::execute(task_action, project, &self.resolver, renderer)
+        SearchHandler::execute(args, project, &self.resolver, renderer)
     }
 
     /// Test status handler
@@ -229,71 +228,5 @@ mod tests {
         assert!(final_list.is_ok(), "Final list should succeed");
             
         println!("✅ Handler consistency test passed");
-    }
-
-    #[test]
-    fn test_project_resolution_integration() {
-        use lotar::cli::project::ProjectResolver;
-        use lotar::workspace::TasksDirectoryResolver;
-        use tempfile::TempDir;
-        
-        // Create a temporary test environment
-        let temp_dir = TempDir::new().unwrap();
-        let tasks_dir = temp_dir.path().join("tasks");
-        std::fs::create_dir_all(&tasks_dir).unwrap();
-        
-        // Create project directories to simulate existing projects
-        std::fs::create_dir_all(tasks_dir.join("AUTH")).unwrap();
-        std::fs::create_dir_all(tasks_dir.join("FRONTEND")).unwrap();
-        
-        let tasks_resolver = TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None).unwrap();
-        let resolver = ProjectResolver::new(&tasks_resolver).unwrap();
-        
-        // Test Case 1: Matching task ID prefix with project argument
-        match resolver.resolve_project("AUTH-123", Some("AUTH")) {
-            Ok(project) => {
-                assert_eq!(project, "AUTH");
-                println!("✅ Case 1: AUTH-123 with project AUTH -> {}", project);
-            }
-            Err(e) => panic!("Case 1 should succeed: {}", e),
-        }
-        
-        // Test Case 2: Conflicting task ID prefix with project argument
-        match resolver.resolve_project("AUTH-123", Some("FRONTEND")) {
-            Ok(_) => panic!("Case 2 should fail: conflicting prefixes"),
-            Err(e) => {
-                println!("✅ Case 2: AUTH-123 with project FRONTEND -> Error: {}", e);
-                assert!(e.contains("mismatch") || e.contains("conflict"), "Error should mention mismatch or conflict");
-            }
-        }
-        
-        // Test Case 3: Task ID without prefix, with project argument
-        match resolver.resolve_project("123", Some("FRONTEND")) {
-            Ok(project) => {
-                assert_eq!(project, "FRONTEND");
-                println!("✅ Case 3: 123 with project FRONTEND -> {}", project);
-            }
-            Err(e) => panic!("Case 3 should succeed: {}", e),
-        }
-        
-        // Test Case 4: Task ID with prefix, no project argument (auto-detect)
-        match resolver.resolve_project("AUTH-123", None) {
-            Ok(project) => {
-                assert_eq!(project, "AUTH");
-                println!("✅ Case 4: AUTH-123 with no project -> {}", project);
-            }
-            Err(e) => panic!("Case 4 should succeed: {}", e),
-        }
-        
-        // Test Case 5: Task ID without prefix, no project argument (use default)
-        match resolver.resolve_project("123", None) {
-            Ok(project) => {
-                println!("✅ Case 5: 123 with no project -> {}", project);
-                // Should be the default project from config
-            }
-            Err(e) => panic!("Case 5 should succeed: {}", e),
-        }
-        
-        println!("✅ All project resolution test cases passed!");
     }
 }

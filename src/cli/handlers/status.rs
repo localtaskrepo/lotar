@@ -3,6 +3,7 @@ use crate::cli::validation::CliValidator;
 use crate::storage::Storage;
 use crate::workspace::TasksDirectoryResolver;
 use crate::cli::handlers::CommandHandler;
+use crate::output::OutputRenderer;
 
 /// Handler for status change commands
 pub struct StatusHandler;
@@ -11,7 +12,7 @@ impl CommandHandler for StatusHandler {
     type Args = StatusArgs;
     type Result = Result<(), String>;
     
-    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
         // Create project resolver and validator
         let project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
@@ -110,10 +111,11 @@ mod tests {
         );
         
         let resolver = create_test_resolver();
+        let renderer = OutputRenderer::new(crate::output::OutputFormat::Text, false);
         
         // This would fail in a real test because we need actual config files and tasks
         // But it demonstrates the structure
-        match StatusHandler::execute(args, None, &resolver) {
+        match StatusHandler::execute(args, None, &resolver, &renderer) {
             Ok(()) => println!("Success: Status changed"),
             Err(e) => println!("Expected error in test: {}", e),
         }

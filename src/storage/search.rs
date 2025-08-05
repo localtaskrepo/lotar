@@ -113,19 +113,6 @@ impl StorageSearch {
         results
     }
 
-    /// List all tasks for a specific project
-    pub fn list_by_project(
-        root_path: &Path,
-        index: &TaskIndex,
-        project: &str,
-    ) -> Vec<(String, Task)> {
-        let filter = TaskFilter {
-            project: Some(project.to_string()),
-            ..Default::default()
-        };
-        Self::search(root_path, index, &filter)
-    }
-
     /// Helper method to get potential project folders for a given project name
     pub fn get_project_folders_for_name(root_path: &Path, project_name: &str) -> Vec<String> {
         let mut folders = Vec::new();

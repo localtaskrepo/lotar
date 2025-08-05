@@ -1,6 +1,6 @@
 [package]
-name = "local_task_repo"
-version = "0.1.0"
+name = "lotar"
+version = "0.2.0"
 edition = "2024"
 
 [[bin]]
@@ -25,17 +25,11 @@ console = { version = "0.15", default-features = false }
 
 # Production release profile optimized for minimal binary size
 [profile.release]
-# Enable link-time optimization for smaller binaries
 lto = "fat"
-# Use a single codegen unit for better optimization
 codegen-units = 1
-# Enable panic abort - safe since we don't use panic recovery anywhere
 panic = "abort"
-# Strip symbols from the binary
 strip = "symbols"
-# Optimize for size instead of speed
 opt-level = "z"
-# Reduce debug info
 debug = false
 
 [dev-dependencies]

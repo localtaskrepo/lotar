@@ -43,7 +43,7 @@ impl HelpSystem {
     }
 
     pub fn show_global_help(&self) -> Result<String, String> {
-        self.show_command_help("index")
+        self.show_command_help("main")
     }
 
     /// List all available help topics

@@ -29,7 +29,7 @@ mod basic_commands {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.assert()
             .failure()
-            .stderr(predicate::str::contains("Error"));
+            .stderr(predicate::str::contains("Usage"));
     }
 }
 
@@ -55,10 +55,8 @@ mod config_commands {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.args(&["config"])
             .assert()
-            .success() // Changed from failure to success since it now shows help
-            .stdout(predicate::str::contains(
-                "Configuration management commands",
-            ));
+            .failure() // Now expects failure since no subcommand provided
+            .stderr(predicate::str::contains("Usage"));
     }
 }
 

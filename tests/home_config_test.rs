@@ -56,7 +56,7 @@ default_project: "HomeProject"
     #[test]
     fn test_cross_platform_home_config_paths() {
         // Test that we can determine appropriate config paths on different platforms
-        use local_task_repo::workspace::TasksDirectoryResolver;
+        use lotar::workspace::TasksDirectoryResolver;
         
         // This should not panic on any platform
         let result = TasksDirectoryResolver::get_default_home_config_path();
@@ -100,7 +100,7 @@ default_project: "TestProject"
         fs::write(&test_home_config, home_config_content).unwrap();
 
         // Test that our workspace resolver can use the override
-        use local_task_repo::workspace::TasksDirectoryResolver;
+        use lotar::workspace::TasksDirectoryResolver;
         
         // Create the custom tasks directory so resolution succeeds
         let custom_tasks_dir = temp_dir.join(".test-tasks");
@@ -147,7 +147,7 @@ default_project: "test"
             fs::write(&test_config_path, config_content).unwrap();
 
             // Test the parsing function
-            use local_task_repo::workspace::TasksDirectoryResolver;
+            use lotar::workspace::TasksDirectoryResolver;
             let result = TasksDirectoryResolver::get_home_config_tasks_folder(&Some(test_config_path.clone()));
             
             assert!(result.is_ok());
@@ -164,7 +164,7 @@ default_project: "test"
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
         
-        use local_task_repo::workspace::TasksDirectoryResolver;
+        use lotar::workspace::TasksDirectoryResolver;
         
         // Test with non-existent home config
         let non_existent_path = temp_dir.join("does-not-exist.yml");
@@ -264,7 +264,7 @@ default_project: "HomeDefault"
     #[test]
     fn test_windows_config_path_handling() {
         // This test ensures we handle Windows-specific paths correctly
-        use local_task_repo::workspace::TasksDirectoryResolver;
+        use lotar::workspace::TasksDirectoryResolver;
         
         // Should work on all platforms without panicking
         let result = TasksDirectoryResolver::get_default_home_config_path();

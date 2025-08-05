@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use crate::storage::task::Task;
 use crate::index::TaskIndex;
 use crate::utils::generate_project_prefix;
-use crate::config::commands::persistence::auto_initialize_project_if_needed;
 
 /// Core CRUD operations for task storage
 pub struct StorageOperations;
@@ -22,10 +21,7 @@ impl StorageOperations {
         let project_path = root_path.join(&project_folder);
 
         // Use original project name for config initialization, fall back to prefix
-        let config_project_name = original_project_name.unwrap_or(project_prefix);
-
-        // Auto-initialize project configuration if needed
-        auto_initialize_project_if_needed(&root_path.to_path_buf(), config_project_name)?;
+        let _config_project_name = original_project_name.unwrap_or(project_prefix);
 
         // Ensure project directory exists
         fs::create_dir_all(&project_path)?;

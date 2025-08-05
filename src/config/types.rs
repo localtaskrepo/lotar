@@ -76,6 +76,7 @@ impl StringConfigField {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_strict(values: Vec<String>) -> Self {
         Self { values }
     }

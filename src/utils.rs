@@ -50,12 +50,12 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::PathBuf) -> Str
         for entry in entries.flatten() {
             if entry.file_type().map_or(false, |ft| ft.is_dir()) {
                 let dir_name = entry.file_name().to_string_lossy().to_string();
-                
+
                 // Skip hidden directories
                 if dir_name.starts_with('.') {
                     continue;
                 }
-                
+
                 // Check if this directory has a config file with matching project_name
                 let config_path = entry.path().join("config.yml");
                 if config_path.exists() {
@@ -89,33 +89,6 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::PathBuf) -> Str
     // Neither direct prefix nor full project name found
     // This could be a new project being created, so return the generated prefix
     return generated_prefix;
-}
-
-/// Resolve a project prefix back to its full project name by reading the config file
-/// Returns the full project name if found, or None if the prefix doesn't exist or has no config
-pub fn resolve_prefix_to_project_name(prefix: &str, tasks_dir: &std::path::PathBuf) -> Option<String> {
-    let prefix_dir = tasks_dir.join(prefix);
-    if !prefix_dir.exists() || !prefix_dir.is_dir() {
-        return None;
-    }
-
-    let config_path = prefix_dir.join("config.yml");
-    if !config_path.exists() {
-        return None;
-    }
-
-    if let Ok(config_content) = std::fs::read_to_string(&config_path) {
-        // Parse the config file to find project_name
-        if let Ok(config) = serde_yaml::from_str::<serde_yaml::Value>(&config_content) {
-            if let Some(project_name) = config.get("project_name") {
-                if let Some(name_str) = project_name.as_str() {
-                    return Some(name_str.to_string());
-                }
-            }
-        }
-    }
-
-    None
 }
 
 #[cfg(test)]

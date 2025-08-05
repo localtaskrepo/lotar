@@ -14,6 +14,18 @@ pub enum OutputFormat {
     Markdown,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct TaskDisplayInfo {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub priority: String,
+    pub task_type: String,
+    pub description: Option<String>,
+    pub assignee: Option<String>,
+    pub project: Option<String>,
+}
+
 pub trait Outputable {
     fn to_text(&self) -> String;
     fn to_table_row(&self) -> Vec<String>;
@@ -146,6 +158,7 @@ impl OutputRenderer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn render_list<T: Outputable + Serialize>(&self, items: &[T], title: Option<&str>) -> String {
         match self.format {
             OutputFormat::Text => self.render_text_list(items, title),
@@ -197,6 +210,7 @@ impl OutputRenderer {
         item.to_text()
     }
 
+    #[allow(dead_code)]
     fn render_text_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
         let mut output = String::new();
         
@@ -237,6 +251,7 @@ impl OutputRenderer {
         table.to_string()
     }
 
+    #[allow(dead_code)]
     fn render_table_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
         let mut output = String::new();
         
@@ -273,6 +288,7 @@ impl OutputRenderer {
         }
     }
 
+    #[allow(dead_code)]
     fn render_json_list<T: Serialize>(&self, items: &[T]) -> String {
         if self.verbose {
             serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string())
@@ -293,6 +309,7 @@ impl OutputRenderer {
         output
     }
 
+    #[allow(dead_code)]
     fn render_markdown_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
         let mut output = String::new();
         

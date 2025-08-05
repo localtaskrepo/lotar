@@ -71,17 +71,6 @@ impl Task {
             custom_fields: HashMap::new(),
         }
     }
-
-    pub fn update_status(&mut self, new_status: TaskStatus) -> Result<(), String> {
-        // TODO: Add transition validation once we implement transitions.yaml
-        self.status = new_status;
-        self.modified = chrono::Utc::now().to_rfc3339();
-        Ok(())
-    }
-
-    pub fn update_modified(&mut self) {
-        self.modified = chrono::Utc::now().to_rfc3339();
-    }
 }
 
 impl fmt::Display for Task {

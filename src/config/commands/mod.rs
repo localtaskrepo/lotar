@@ -14,4 +14,6 @@ pub mod persistence;
 pub mod utils;
 
 // Re-export the main entry point for convenience
-pub use router::config_command;
+// Legacy config command system has been removed
+// All functionality now handled by modern CLI handlers
+// This module kept for potential future config utilities

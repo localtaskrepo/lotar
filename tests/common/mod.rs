@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use tempfile::TempDir;
 use std::fs;
-use local_task_repo::storage::{Task, Storage};
-use local_task_repo::types::Priority;
+use lotar::storage::{Task, Storage};
+use lotar::types::Priority;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;

@@ -18,12 +18,12 @@ mod task_creation {
             .args(&[
                 "task", "add",
                 "--title=Basic Test Task",
-                "--priority=2",
+                "--priority=Low",
                 "--project=basic-test"
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Added task with id"));
+            .stdout(predicate::str::contains("✅ Created task:"));
 
         // Verify task directory was created
         let tasks_root = temp_dir.path().join(".tasks");
@@ -51,7 +51,7 @@ mod task_creation {
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Added task with id"));
+            .stdout(predicate::str::contains("✅ Created task:"));
     }
 
     #[test]
@@ -63,7 +63,7 @@ mod task_creation {
             .args(&["task", "add"])
             .assert()
             .failure()
-            .stdout(predicate::str::contains("Error"));
+            .stderr(predicate::str::contains("required arguments were not provided"));
     }
 }
 
@@ -93,7 +93,7 @@ mod task_operations {
             .args(&["task", "list", "--project=list-test"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Listing tasks for project"));
+            .stdout(predicate::str::contains("Found"));
     }
 
     #[test]
@@ -117,7 +117,7 @@ mod task_operations {
             .args(&["task", "search", "Search", "--project=search-test"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Searching for"));
+            .stdout(predicate::str::contains("Found"));
     }
 
     #[test]
@@ -137,28 +137,29 @@ mod task_operations {
 
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout).unwrap();
-        assert!(stdout.contains("Added task with id"));
+        assert!(stdout.contains("✅ Created task:"));
 
         // Extract task ID
         let task_id = stdout
-            .split("Added task with id: ")
+            .lines()
+            .find(|line| line.contains("✅ Created task:"))
+            .unwrap()
+            .split("✅ Created task: ")
             .nth(1)
             .unwrap()
-            .trim()
-            .split_whitespace()
-            .next()
-            .unwrap();
+            .trim();
 
         // Edit the task
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
             .args(&[
                 "task", "edit", task_id,
-                "--description=Updated description"
+                "--description=Updated description",
+                "--project=edit-test"
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("updated successfully"));
+            .stdout(predicate::str::contains("✅ Task"));
     }
 
     #[test]
@@ -181,13 +182,13 @@ mod task_operations {
 
         // Extract task ID
         let task_id = stdout
-            .split("Added task with id: ")
+            .lines()
+            .find(|line| line.contains("✅ Created task:"))
+            .unwrap()
+            .split("✅ Created task: ")
             .nth(1)
             .unwrap()
-            .trim()
-            .split_whitespace()
-            .next()
-            .unwrap();
+            .trim();
 
         // Update task status
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -197,7 +198,7 @@ mod task_operations {
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("status updated"));
+            .stdout(predicate::str::contains("status changed"));
     }
 
     #[test]
@@ -217,13 +218,13 @@ mod task_operations {
 
         let stdout = String::from_utf8(output.stdout).unwrap();
         let task_id = stdout
-            .split("Added task with id: ")
+            .lines()
+            .find(|line| line.contains("✅ Created task:"))
+            .unwrap()
+            .split("✅ Created task: ")
             .nth(1)
             .unwrap()
-            .trim()
-            .split_whitespace()
-            .next()
-            .unwrap();
+            .trim();
 
         // Update status
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -242,7 +243,7 @@ mod task_operations {
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Searching for"));
+            .stdout(predicate::str::contains("Found"));
     }
 }
 
@@ -295,7 +296,7 @@ mod smart_project_parameters {
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Added task with id"));
+            .stdout(predicate::str::contains("✅ Created task:"));
 
         // Verify the task can be listed using the generated prefix
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -394,11 +395,12 @@ mod smart_project_parameters {
         cmd.current_dir(&temp_dir)
             .args(&[
                 "task", "delete", "UI-1",
-                "--project=USER-INTERFACE"
+                "--project=USER-INTERFACE",
+                "--force"
             ])
             .assert()
             .success()
-            .stdout(predicate::str::contains("deleted successfully"));
+            .stdout(predicate::str::contains("✅ Task"));
 
         // Verify the task is gone
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -430,7 +432,7 @@ mod smart_project_parameters {
             .args(&["task", "status", "DL-1", "IN_PROGRESS"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("status updated"));
+            .stdout(predicate::str::contains("status changed"));
 
         // Verify status change by searching with full project name
         let mut cmd = Command::cargo_bin("lotar").unwrap();

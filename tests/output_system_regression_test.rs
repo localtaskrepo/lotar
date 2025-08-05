@@ -17,7 +17,7 @@ fn test_project_prefix_resolution_not_project_name() {
     // Run add command without explicit project - should use default prefix
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "add", "Test task", "--task-type=feature"])
+       .args(&["add", "Test task", "--type=feature"])
        .assert()
        .success()
        .stdout(predicate::str::contains("Created task: DEFA-1"));
@@ -46,7 +46,7 @@ fn test_json_output_includes_task_id() {
     
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     let output = cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--format=json", "add", "JSON test task"])
+       .args(&["--format=json", "add", "JSON test task"])
        .assert()
        .success()
        .get_output()
@@ -75,7 +75,7 @@ fn test_json_error_output_format() {
     // Run add command with invalid priority to trigger validation error
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     let output = cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--format=json", "add", "Error test", "--task-type=epic"])
+       .args(&["--format=json", "add", "Error test", "--type=invalid_type"])
        .assert()
        .failure() // Should fail due to validation
        .get_output()
@@ -100,7 +100,7 @@ fn test_json_error_output_format() {
     
     // Verify error message content
     let message = json_value["message"].as_str().unwrap();
-    assert!(message.contains("not allowed"), "Error should mention validation failure");
+    assert!(message.contains("validation failed"), "Error should mention validation failure");
 }
 
 /// Test that multiple tasks get sequential IDs with correct prefix
@@ -115,7 +115,7 @@ fn test_sequential_task_ids_with_prefix() {
     // Create first task
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--format=json", "add", "First task", "--task-type=feature"])
+       .args(&["--format=json", "add", "First task", "--type=feature"])
        .assert()
        .success()
        .stdout(predicate::str::contains(r#""task_id":"DEFA-1""#));
@@ -123,7 +123,7 @@ fn test_sequential_task_ids_with_prefix() {
     // Create second task
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--format=json", "add", "Second task", "--task-type=bug"])
+       .args(&["--format=json", "add", "Second task", "--type=bug"])
        .assert()
        .success()
        .stdout(predicate::str::contains(r#""task_id":"DEFA-2""#));
@@ -142,7 +142,7 @@ fn test_explicit_project_resolution() {
     // Create task with explicit project
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--project=test", "--format=json", "add", "Explicit project task"])
+       .args(&["--project=test", "--format=json", "add", "Explicit project task"])
        .assert()
        .success()
        .stdout(predicate::str::contains(r#""task_id":"TEST-1""#));
@@ -165,14 +165,14 @@ fn test_output_format_consistency() {
     // Create a task first
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "add", "Test task for list"])
+       .args(&["add", "Test task for list"])
        .assert()
        .success();
     
     // Test list command with JSON format
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     let output = cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--format=json", "list"])
+       .args(&["--format=json", "list"])
        .assert()
        .success()
        .get_output()
@@ -181,12 +181,15 @@ fn test_output_format_consistency() {
     
     let stdout = String::from_utf8(output).unwrap();
     
-    // Should be valid JSON array
+    // Should be valid JSON object with tasks array
     let json_value: serde_json::Value = serde_json::from_str(&stdout)
         .expect("List output should be valid JSON");
     
-    assert!(json_value.is_array(), "JSON list should be an array");
-    assert!(!json_value.as_array().unwrap().is_empty(), "Should contain at least one task");
+    assert!(json_value.is_object(), "JSON output should be an object");
+    let json_obj = json_value.as_object().unwrap();
+    assert!(json_obj.contains_key("tasks"), "JSON should contain tasks field");
+    assert!(json_obj["tasks"].is_array(), "Tasks field should be an array");
+    assert!(!json_obj["tasks"].as_array().unwrap().is_empty(), "Should contain at least one task");
 }
 
 /// Test that project prefix is used consistently in task operations
@@ -201,7 +204,7 @@ fn test_project_prefix_consistency_in_operations() {
     // Create task
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "add", "Status test task"])
+       .args(&["add", "Status test task"])
        .assert()
        .success()
        .stdout(predicate::str::contains("DEFA-1"));
@@ -209,7 +212,7 @@ fn test_project_prefix_consistency_in_operations() {
     // Update status using the prefix-based ID
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "status", "DEFA-1", "in_progress"])
+       .args(&["status", "DEFA-1", "in_progress"])
        .assert()
        .success()
        .stdout(predicate::str::contains("Status changed successfully"));
@@ -233,7 +236,7 @@ fn test_no_default_directory_regression() {
     for i in 1..=3 {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir.path())
-           .args(&["--experimental", "add", &format!("Task {}", i)])
+           .args(&["add", &format!("Task {}", i)])
            .assert()
            .success();
     }
@@ -263,7 +266,7 @@ fn test_json_output_schema_compliance() {
     // Test successful add
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     let output = cmd.current_dir(temp_dir.path())
-       .args(&["--experimental", "--format=json", "add", "Schema test"])
+       .args(&["--format=json", "add", "Schema test"])
        .assert()
        .success()
        .get_output()

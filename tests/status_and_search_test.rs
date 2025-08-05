@@ -1,6 +1,6 @@
-use local_task_repo::storage::Task;
-use local_task_repo::types::{TaskStatus, Priority};
-use local_task_repo::index::TaskFilter;
+use lotar::storage::Task;
+use lotar::types::{TaskStatus, Priority};
+use lotar::index::TaskFilter;
 
 mod common;
 use common::{TestFixtures, utils};

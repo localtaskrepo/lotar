@@ -1,9 +1,11 @@
 # Default Project Template
 # Basic configuration with standard defaults
-# This template uses all global defaults and only sets project_name
 
 name: "Default"
 description: "Basic project configuration using global defaults"
 config:
-  # Only project_name is required, all other fields use defaults
   project_name: "{{project_name}}"
+  custom_fields:
+    - epic
+    - sprint
+    - story_points

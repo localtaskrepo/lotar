@@ -1,4 +1,4 @@
-use local_task_repo::scanner::Scanner;
+use lotar::scanner::Scanner;
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;

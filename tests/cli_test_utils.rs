@@ -4,8 +4,8 @@ use serde_yaml;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
-use local_task_repo::config::types::{GlobalConfig, ProjectConfig, StringConfigField, ConfigurableField};
-use local_task_repo::types::{Priority, TaskStatus, TaskType};
+use lotar::config::types::{GlobalConfig, ProjectConfig, StringConfigField, ConfigurableField};
+use lotar::types::{Priority, TaskStatus, TaskType};
 
 /// Comprehensive test utilities for the new CLI system
 pub struct CliTestHarness {
@@ -40,13 +40,6 @@ impl CliTestHarness {
     pub fn cmd(&self) -> Command {
         let mut cmd = Command::cargo_bin("lotar").expect("Failed to get lotar binary");
         cmd.current_dir(self.root_path());
-        cmd
-    }
-
-    /// Create an experimental CLI command (with --experimental flag)
-    pub fn experimental_cmd(&self) -> Command {
-        let mut cmd = self.cmd();
-        cmd.arg("--experimental");
         cmd
     }
 
@@ -132,14 +125,14 @@ impl CliTestHarness {
 
     /// Execute an add command and return the result
     pub fn add_task(&self, title: &str) -> assert_cmd::assert::Assert {
-        self.experimental_cmd()
+        self.cmd()
             .args(["add", title])
             .assert()
     }
 
     /// Execute an add command with project override
     pub fn add_task_to_project(&self, project: &str, title: &str) -> assert_cmd::assert::Assert {
-        self.experimental_cmd()
+        self.cmd()
             .args(["--project", project, "add", title])
             .assert()
     }
@@ -148,7 +141,7 @@ impl CliTestHarness {
     /// This is a utility method designed for future test expansion
     #[allow(dead_code)]
     pub fn add_task_with_fields(&self, title: &str, fields: &[(&str, &str)]) -> assert_cmd::assert::Assert {
-        let mut cmd = self.experimental_cmd();
+        let mut cmd = self.cmd();
         cmd.args(["add", title]);
         for (key, value) in fields {
             cmd.args(["--field", &format!("{}={}", key, value)]);
@@ -158,7 +151,7 @@ impl CliTestHarness {
 
     /// Execute an add command with project and custom fields
     pub fn add_task_to_project_with_fields(&self, project: &str, title: &str, fields: &[(&str, &str)]) -> assert_cmd::assert::Assert {
-        let mut cmd = self.experimental_cmd();
+        let mut cmd = self.cmd();
         cmd.args(["--project", project, "add", title]);
         for (key, value) in fields {
             cmd.args(["--field", &format!("{}={}", key, value)]);
@@ -168,28 +161,28 @@ impl CliTestHarness {
 
     /// Execute a list command
     pub fn list_tasks(&self) -> assert_cmd::assert::Assert {
-        self.experimental_cmd()
+        self.cmd()
             .args(["list"])
             .assert()
     }
 
     /// Execute a list command with project filter
     pub fn list_tasks_for_project(&self, project: &str) -> assert_cmd::assert::Assert {
-        self.experimental_cmd()
+        self.cmd()
             .args(["--project", project, "list"])
             .assert()
     }
 
     /// Execute a status change command
     pub fn change_status(&self, task_id: &str, status: &str) -> assert_cmd::assert::Assert {
-        self.experimental_cmd()
+        self.cmd()
             .args(["status", task_id, status])
             .assert()
     }
 
     /// Execute a status change command with project override
     pub fn change_status_for_project(&self, project: &str, task_id: &str, status: &str) -> assert_cmd::assert::Assert {
-        self.experimental_cmd()
+        self.cmd()
             .args(["--project", project, "status", task_id, status])
             .assert()
     }
@@ -276,16 +269,16 @@ impl CliAssertions {
     pub fn assert_validation_error(assert: assert_cmd::assert::Assert, field_name: &str) -> assert_cmd::assert::Assert {
         assert
             .failure()
-            .stderr(predicate::str::contains("validation failed"))
-            .stderr(predicate::str::contains(field_name))
+            .stdout(predicate::str::contains("validation failed"))
+            .stdout(predicate::str::contains(field_name))
     }
 
     /// Assert that command failed with custom field validation error
     pub fn assert_custom_field_error(assert: assert_cmd::assert::Assert, field_name: &str) -> assert_cmd::assert::Assert {
         assert
             .failure()
-            .stderr(predicate::str::contains("Custom field validation failed"))
-            .stderr(predicate::str::contains(field_name))
+            .stdout(predicate::str::contains("Custom field validation failed"))
+            .stdout(predicate::str::contains(field_name))
     }
 
     /// Assert that list command shows expected number of tasks
@@ -295,15 +288,18 @@ impl CliAssertions {
                 .success()
                 .stdout(predicate::str::contains("No tasks found"))
         } else {
-            // With the new output format, we just check that there are the right number of task lines
-            // Each task appears on its own line with emoji prefix (📋, ✅, etc.)
+            // With the current output format, tasks appear as "  TASKID - Title [STATUS] (Priority)"
+            // We look for lines that start with "  " and contain " - " and "[" and "]"
             let assert = assert.success();
             
             // Get the stdout to count tasks
             let output = assert.get_output();
             let stdout = String::from_utf8(output.stdout.clone()).unwrap();
             let task_lines = stdout.lines()
-                .filter(|line| line.contains("📋") || line.contains("✅") || line.contains("🔴") || line.contains("⏸"))
+                .filter(|line| line.trim_start().starts_with(char::is_uppercase) && 
+                              line.contains(" - ") && 
+                              line.contains("[") && 
+                              line.contains("]"))
                 .count();
             
             if task_lines != count {

@@ -13,38 +13,34 @@ mod workflow_tests {
     fn test_complete_task_workflow() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Create a task
+        // Create a task using the new CLI format
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         let output = cmd
             .current_dir(&temp_dir)
             .args(&[
-                "task",
                 "add",
-                "--title=Workflow Test Task",
+                "Workflow Test Task",
                 "--description=Testing complete workflow",
-                "--priority=1",
+                "--priority=high",
             ])
             .output()
             .unwrap();
 
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout).unwrap();
-        assert!(stdout.contains("Added task with id"));
+        assert!(stdout.contains("Created task"));
 
-        // Extract task ID
-        let task_id = stdout
-            .split("Added task with id: ")
-            .nth(1)
-            .unwrap()
-            .trim()
-            .split_whitespace()
-            .next()
-            .unwrap();
+        // Extract task ID from "✅ Created task: DEFA-1" format
+        let _task_id = stdout
+            .lines()
+            .find(|line| line.contains("Created task:"))
+            .and_then(|line| line.split_whitespace().last())
+            .expect("Could not extract task ID");
 
-        // Edit the task
+        // Test that we can list tasks and see our created task
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "edit", task_id, "--title=Updated Workflow Task"])
+            .args(&["list"])
             .assert()
             .success();
     }

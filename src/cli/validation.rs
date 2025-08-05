@@ -11,32 +11,28 @@ impl<'a> CliValidator<'a> {
         Self { config }
     }
     
-    /// Validate task status against project configuration
+    /// Validate status against project configuration (case-insensitive, returns canonical form)
     pub fn validate_status(&self, status: &str) -> Result<TaskStatus, String> {
-        // Try to parse as our known enum first
-        if let Ok(parsed_status) = status.parse::<TaskStatus>() {
-            // Check if it's allowed in this project's configuration
-            if self.config.issue_states.values.contains(&parsed_status) {
-                Ok(parsed_status)
+        let config_states: Vec<String> = self.config.issue_states.values
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+
+        // Check for wildcard - if present, allow any value
+        if config_states.contains(&"*".to_string()) {
+            // For wildcard, try to find exact match first, otherwise use input as-is
+            if let Some(canonical) = find_exact_match_case_insensitive(status, &config_states) {
+                return canonical.parse::<TaskStatus>().map_err(|_| format!("Invalid status format: {}", canonical));
             } else {
-                let valid_states: Vec<String> = self.config.issue_states.values
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect();
-                Err(format!(
-                    "Status '{}' is not allowed in this project. Valid statuses: {}", 
-                    status, 
-                    valid_states.join(", ")
-                ))
+                return status.parse::<TaskStatus>().map_err(|_| format!("Invalid status format: {}", status));
             }
+        }
+
+        // Find case-insensitive match in config
+        if let Some(canonical_status) = find_exact_match_case_insensitive(status, &config_states) {
+            canonical_status.parse::<TaskStatus>().map_err(|_| format!("Invalid status format: {}", canonical_status))
         } else {
-            // Provide helpful suggestions
-            let valid_states: Vec<String> = self.config.issue_states.values
-                .iter()
-                .map(|s| s.to_string())
-                .collect();
-                
-            let suggestion = find_closest_match(status, &valid_states);
+            let suggestion = find_closest_match(status, &config_states);
             let suggestion_text = match suggestion {
                 Some(s) => format!(" Did you mean '{}'?", s),
                 None => String::new(),
@@ -45,35 +41,34 @@ impl<'a> CliValidator<'a> {
             Err(format!(
                 "Invalid status '{}'. Valid statuses: {}.{}", 
                 status, 
-                valid_states.join(", "),
+                config_states.join(", "),
                 suggestion_text
             ))
         }
     }
     
-    /// Validate task type against project configuration
+    /// Validate task type against project configuration (case-insensitive, returns canonical form)
     pub fn validate_task_type(&self, task_type: &str) -> Result<TaskType, String> {
-        if let Ok(parsed_type) = task_type.parse::<TaskType>() {
-            if self.config.issue_types.values.contains(&parsed_type) {
-                Ok(parsed_type)
+        let config_types: Vec<String> = self.config.issue_types.values
+            .iter()
+            .map(|t| t.to_string())
+            .collect();
+
+        // Check for wildcard - if present, allow any value
+        if config_types.contains(&"*".to_string()) {
+            // For wildcard, try to find exact match first, otherwise use input as-is
+            if let Some(canonical) = find_exact_match_case_insensitive(task_type, &config_types) {
+                return canonical.parse::<TaskType>().map_err(|_| format!("Invalid task type format: {}", canonical));
             } else {
-                let valid_types: Vec<String> = self.config.issue_types.values
-                    .iter()
-                    .map(|t| t.to_string())
-                    .collect();
-                Err(format!(
-                    "Task type '{}' is not allowed in this project. Valid types: {}", 
-                    task_type,
-                    valid_types.join(", ")
-                ))
+                return task_type.parse::<TaskType>().map_err(|_| format!("Invalid task type format: {}", task_type));
             }
+        }
+
+        // Find case-insensitive match in config
+        if let Some(canonical_type) = find_exact_match_case_insensitive(task_type, &config_types) {
+            canonical_type.parse::<TaskType>().map_err(|_| format!("Invalid task type format: {}", canonical_type))
         } else {
-            let valid_types: Vec<String> = self.config.issue_types.values
-                .iter()
-                .map(|t| t.to_string())
-                .collect();
-                
-            let suggestion = find_closest_match(task_type, &valid_types);
+            let suggestion = find_closest_match(task_type, &config_types);
             let suggestion_text = match suggestion {
                 Some(s) => format!(" Did you mean '{}'?", s),
                 None => String::new(),
@@ -82,35 +77,34 @@ impl<'a> CliValidator<'a> {
             Err(format!(
                 "Invalid task type '{}'. Valid types: {}.{}", 
                 task_type,
-                valid_types.join(", "),
+                config_types.join(", "),
                 suggestion_text
             ))
         }
     }
     
-    /// Validate priority against project configuration
+    /// Validate priority against project configuration (case-insensitive, returns canonical form)
     pub fn validate_priority(&self, priority: &str) -> Result<Priority, String> {
-        if let Ok(parsed_priority) = priority.parse::<Priority>() {
-            if self.config.issue_priorities.values.contains(&parsed_priority) {
-                Ok(parsed_priority)
+        let config_priorities: Vec<String> = self.config.issue_priorities.values
+            .iter()
+            .map(|p| p.to_string())
+            .collect();
+
+        // Check for wildcard - if present, allow any value
+        if config_priorities.contains(&"*".to_string()) {
+            // For wildcard, try to find exact match first, otherwise use input as-is
+            if let Some(canonical) = find_exact_match_case_insensitive(priority, &config_priorities) {
+                return canonical.parse::<Priority>().map_err(|_| format!("Invalid priority format: {}", canonical));
             } else {
-                let valid_priorities: Vec<String> = self.config.issue_priorities.values
-                    .iter()
-                    .map(|p| p.to_string())
-                    .collect();
-                Err(format!(
-                    "Priority '{}' is not allowed in this project. Valid priorities: {}", 
-                    priority,
-                    valid_priorities.join(", ")
-                ))
+                return priority.parse::<Priority>().map_err(|_| format!("Invalid priority format: {}", priority));
             }
+        }
+
+        // Find case-insensitive match in config
+        if let Some(canonical_priority) = find_exact_match_case_insensitive(priority, &config_priorities) {
+            canonical_priority.parse::<Priority>().map_err(|_| format!("Invalid priority format: {}", canonical_priority))
         } else {
-            let valid_priorities: Vec<String> = self.config.issue_priorities.values
-                .iter()
-                .map(|p| p.to_string())
-                .collect();
-                
-            let suggestion = find_closest_match(priority, &valid_priorities);
+            let suggestion = find_closest_match(priority, &config_priorities);
             let suggestion_text = match suggestion {
                 Some(s) => format!(" Did you mean '{}'?", s),
                 None => String::new(),
@@ -119,7 +113,7 @@ impl<'a> CliValidator<'a> {
             Err(format!(
                 "Invalid priority '{}'. Valid priorities: {}.{}", 
                 priority,
-                valid_priorities.join(", "),
+                config_priorities.join(", "),
                 suggestion_text
             ))
         }
@@ -433,4 +427,15 @@ mod tests {
         assert!(validator.validate_effort("2x").is_err());
         assert!(validator.validate_effort("abc").is_err());
     }
+}
+
+/// Find exact case-insensitive match in candidates, returning the canonical form
+fn find_exact_match_case_insensitive(input: &str, candidates: &[String]) -> Option<String> {
+    let input_lower = input.to_lowercase();
+    for candidate in candidates {
+        if candidate.to_lowercase() == input_lower {
+            return Some(candidate.clone());
+        }
+    }
+    None
 }

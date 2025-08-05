@@ -1,6 +1,6 @@
-use local_task_repo::storage::Task;
-use local_task_repo::types::TaskStatus;
-use local_task_repo::index::{TaskFilter, TaskIndex};
+use lotar::storage::Task;
+use lotar::types::TaskStatus;
+use lotar::index::{TaskFilter, TaskIndex};
 
 mod common;
 use common::{TestFixtures, utils};
@@ -70,7 +70,7 @@ fn test_index_performance() {
     let mut storage = fixtures.create_storage();
 
     // Create the first task to get the actual project prefix
-    let mut first_task = Task::new(fixtures.tasks_root.clone(), "Performance Task 0".to_string(), local_task_repo::types::Priority::Medium
+    let mut first_task = Task::new(fixtures.tasks_root.clone(), "Performance Task 0".to_string(), lotar::types::Priority::Medium
     );
     first_task.tags = vec!["tag-0".to_string()];
     let first_task_id = storage.add(&first_task, "TEST", None);
@@ -83,7 +83,7 @@ fn test_index_performance() {
         let mut task = Task::new(
             fixtures.tasks_root.clone(),
             format!("Performance Task {}", i),
-            if i % 3 == 0 { local_task_repo::types::Priority::High } else { local_task_repo::types::Priority::Medium }
+            if i % 3 == 0 { lotar::types::Priority::High } else { lotar::types::Priority::Medium }
         );
         task.tags = vec![format!("tag-{}", i % 10)];
         storage.add(&task, "TEST", None);

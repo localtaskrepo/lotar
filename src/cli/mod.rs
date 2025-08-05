@@ -11,6 +11,10 @@ pub struct Cli {
     #[arg(short = 'p', long, global = true)]
     pub project: Option<String>,
     
+    /// Tasks directory path (overrides default)
+    #[arg(long, global = true)]
+    pub tasks_dir: Option<String>,
+    
     /// Output format
     #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Text)]
     pub format: OutputFormat,
@@ -29,7 +33,7 @@ pub enum Commands {
     Add(AddArgs),
     
     /// Quick list tasks  
-    List(ListArgs),
+    List(TaskSearchArgs),
     
     /// Change task status (validates against project config)
     Status {
@@ -86,12 +90,12 @@ pub struct AddArgs {
     pub title: String,
     
     /// Task type
-    #[arg(long, value_enum)]
-    pub task_type: Option<CliTaskType>,
+    #[arg(long = "type")]
+    pub task_type: Option<String>,
     
     /// Priority level
-    #[arg(long, value_enum)]  
-    pub priority: Option<CliPriority>,
+    #[arg(long)]  
+    pub priority: Option<String>,
     
     /// Assignee (email or @username)
     #[arg(long, alias = "assign")]
@@ -138,49 +142,6 @@ pub struct AddArgs {
     pub high: bool,
 }
 
-#[derive(Args)]
-pub struct ListArgs {
-    /// Filter by assignee (@me for current user)
-    #[arg(long)]
-    pub assignee: Option<String>,
-    
-    /// Show only my tasks
-    #[arg(long)]
-    pub mine: bool,
-    
-    /// Filter by status
-    #[arg(long)]
-    pub status: Option<String>,
-    
-    /// Filter by priority
-    #[arg(long, value_enum)]
-    pub priority: Option<CliPriority>,
-    
-    /// Filter by type
-    #[arg(long, value_enum)]
-    pub task_type: Option<CliTaskType>,
-    
-    /// Filter by category
-    #[arg(long)]
-    pub category: Option<String>,
-    
-    /// Filter by tag
-    #[arg(long)]
-    pub tag: Option<String>,
-    
-    /// Show only high priority tasks
-    #[arg(long)]
-    pub high: bool,
-    
-    /// Show only critical priority tasks
-    #[arg(long)]
-    pub critical: bool,
-    
-    /// Limit number of results
-    #[arg(short = 'n', long, default_value = "20")]
-    pub limit: usize,
-}
-
 // CLI-compatible enums that map to our internal types
 #[derive(Clone, Debug, ValueEnum)]
 pub enum CliTaskType {
@@ -225,34 +186,288 @@ impl From<CliPriority> for Priority {
 // Existing command structures (placeholder - will use existing implementations)
 #[derive(Subcommand)]
 pub enum TaskAction {
-    Add,
-    List, 
-    Edit,
-    Status,
-    Search,
-    Delete,
+    /// Add a new task
+    Add(TaskAddArgs),
+    /// List tasks (with optional filters)
+    List(TaskSearchArgs),
+    /// Edit an existing task
+    Edit(TaskEditArgs),
+    /// Change task status
+    Status(TaskStatusArgs),
+    /// Search tasks with text query and filters
+    Search(TaskSearchArgs),
+    /// Delete a task
+    Delete(TaskDeleteArgs),
+}
+
+#[derive(Args)]
+pub struct TaskAddArgs {
+    /// Task title
+    #[arg(long)]
+    pub title: String,
+    
+    /// Task type
+    #[arg(long = "type")]
+    pub task_type: Option<String>,
+    
+    /// Priority level
+    #[arg(long)]
+    pub priority: Option<String>,
+    
+    /// Assignee
+    #[arg(long)]
+    pub assignee: Option<String>,
+    
+    /// Effort estimate
+    #[arg(long)]
+    pub effort: Option<String>,
+    
+    /// Due date
+    #[arg(long)]
+    pub due: Option<String>,
+    
+    /// Description
+    #[arg(long)]
+    pub description: Option<String>,
+    
+    /// Category
+    #[arg(long)]
+    pub category: Option<String>,
+    
+    /// Tags
+    #[arg(long = "tag")]
+    pub tags: Vec<String>,
+    
+    /// Custom fields
+    #[arg(long = "field", value_parser = parse_key_value)]
+    pub fields: Vec<(String, String)>,
+}
+
+#[derive(Args)]
+pub struct TaskEditArgs {
+    /// Task ID to edit
+    pub id: String,
+    
+    /// New title
+    #[arg(long)]
+    pub title: Option<String>,
+    
+    /// New type
+    #[arg(long = "type")]
+    pub task_type: Option<String>,
+    
+    /// New priority
+    #[arg(long)]
+    pub priority: Option<String>,
+    
+    /// New assignee
+    #[arg(long)]
+    pub assignee: Option<String>,
+    
+    /// New effort estimate
+    #[arg(long)]
+    pub effort: Option<String>,
+    
+    /// New due date
+    #[arg(long)]
+    pub due: Option<String>,
+    
+    /// New description
+    #[arg(long)]
+    pub description: Option<String>,
+    
+    /// New category
+    #[arg(long)]
+    pub category: Option<String>,
+    
+    /// Add tags (can be used multiple times)
+    #[arg(long = "tag")]
+    pub tags: Vec<String>,
+    
+    /// Set custom fields
+    #[arg(long = "field", value_parser = parse_key_value)]
+    pub fields: Vec<(String, String)>,
+}
+
+#[derive(Args)]
+pub struct TaskStatusArgs {
+    /// Task ID
+    pub id: String,
+    
+    /// New status
+    pub status: String,
+}
+
+#[derive(Args)]
+pub struct TaskSearchArgs {
+    /// Search query (optional - if not provided, lists all tasks matching filters)
+    pub query: Option<String>,
+    
+    /// Filter by assignee (@me for current user)
+    #[arg(long)]
+    pub assignee: Option<String>,
+    
+    /// Show only my tasks
+    #[arg(long)]
+    pub mine: bool,
+    
+    /// Filter by status
+    #[arg(long)]
+    pub status: Option<String>,
+    
+    /// Filter by priority
+    #[arg(long)]
+    pub priority: Option<String>,
+    
+    /// Filter by type
+    #[arg(long = "type")]
+    pub task_type: Option<String>,
+    
+    /// Filter by tag
+    #[arg(long)]
+    pub tag: Option<String>,
+    
+    /// Filter by category
+    #[arg(long)]
+    pub category: Option<String>,
+    
+    /// Show only high priority tasks
+    #[arg(long)]
+    pub high: bool,
+    
+    /// Show only critical priority tasks
+    #[arg(long)]
+    pub critical: bool,
+    
+    /// Limit results
+    #[arg(short = 'n', long, default_value = "20")]
+    pub limit: usize,
+}
+
+#[derive(Args)]
+pub struct TaskDeleteArgs {
+    /// Task ID to delete
+    pub id: String,
+    
+    /// Confirm deletion without prompt
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Subcommand)]
 pub enum ConfigAction {
-    Get,
-    Set,
-    List,
+    /// Show current configuration
+    Show(ConfigShowArgs),
+    /// Set a configuration value
+    Set(ConfigSetArgs),
+    /// Initialize project configuration
+    Init(ConfigInitArgs),
+    /// List available templates
+    Templates,
+}
+
+#[derive(Args)]
+pub struct ConfigShowArgs {
+    /// Show project-specific configuration
+    #[arg(long)]
+    pub project: Option<String>,
+}
+
+#[derive(Args)]
+pub struct ConfigSetArgs {
+    /// Configuration field name
+    pub field: String,
+    
+    /// Configuration value
+    pub value: String,
+    
+    /// Perform a dry-run without making changes
+    #[arg(long)]
+    pub dry_run: bool,
+    
+    /// Skip validation warnings
+    #[arg(long)]
+    pub force: bool,
+    
+    /// Apply to global configuration instead of project
+    #[arg(long)]
+    pub global: bool,
+}
+
+#[derive(Args)]
+pub struct ConfigInitArgs {
+    /// Template to use
+    #[arg(long, default_value = "default")]
+    pub template: String,
+    
+    /// Project prefix (e.g., 'PROJ' for PROJ-1, PROJ-2, etc.)
+    #[arg(long)]
+    pub prefix: Option<String>,
+    
+    /// Project name
+    #[arg(long)]
+    pub project: Option<String>,
+    
+    /// Copy settings from another project
+    #[arg(long)]
+    pub copy_from: Option<String>,
+    
+    /// Initialize global configuration instead of project
+    #[arg(long)]
+    pub global: bool,
+    
+    /// Perform a dry-run without making changes
+    #[arg(long)]
+    pub dry_run: bool,
+    
+    /// Force initialization even if config exists
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Args)]
 pub struct ScanArgs {
-    // Use existing scan arguments
+    /// Path to scan (defaults to current directory)
+    pub path: Option<String>,
+    
+    /// Include specific file extensions
+    #[arg(long)]
+    pub include: Vec<String>,
+    
+    /// Exclude specific file extensions
+    #[arg(long)]
+    pub exclude: Vec<String>,
+    
+    /// Show detailed output
+    #[arg(long)]
+    pub detailed: bool,
 }
 
 #[derive(Args)]
 pub struct ServeArgs {
-    // Use existing serve arguments
+    /// Port to serve on
+    #[arg(default_value = "8080")]
+    pub port: Option<u16>,
+    
+    /// Host to bind to
+    #[arg(long, default_value = "localhost")]
+    pub host: String,
+    
+    /// Open browser automatically
+    #[arg(long)]
+    pub open: bool,
 }
 
 #[derive(Args)]
 pub struct IndexArgs {
-    // Use existing index arguments
+    #[command(subcommand)]
+    pub action: IndexAction,
+}
+
+#[derive(Subcommand)]
+pub enum IndexAction {
+    /// Rebuild the search index
+    Rebuild,
 }
 
 // Helper function for parsing key=value pairs

@@ -35,7 +35,7 @@ mod performance_tests {
                 .args(&[
                     "task", "add",
                     &format!("--title=Bulk Task {}", i),
-                    "--priority=2"
+                    "--priority=MEDIUM"
                 ])
                 .assert()
                 .success();
@@ -72,7 +72,7 @@ mod performance_tests {
             .args(&["task", "list", "--project=perf-test"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Listing tasks for project"));
+            .stdout(predicate::str::contains("Found"));
         let list_duration = start.elapsed();
 
         // Performance assertions (generous thresholds)
@@ -87,8 +87,8 @@ mod performance_tests {
 #[cfg(test)]
 mod storage_performance_tests {
     use super::*;
-    use local_task_repo::storage::Task;
-    use local_task_repo::types::Priority;
+    use lotar::storage::Task;
+    use lotar::types::Priority;
     use common::TestFixtures;
 
     #[test]

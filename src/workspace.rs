@@ -5,10 +5,12 @@ use std::fs;
 #[derive(Debug, Clone)]
 pub struct TasksDirectoryResolver {
     pub path: PathBuf,
+    #[allow(dead_code)]
     pub source: TasksDirectorySource,
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum TasksDirectorySource {
     CommandLineFlag,
     FoundInParent(PathBuf), // The parent directory where it was found
@@ -82,15 +84,6 @@ impl TasksDirectoryResolver {
             path: tasks_path,
             source: TasksDirectorySource::CurrentDirectory,
         })
-    }
-
-    /// Create the tasks directory if it doesn't exist (for operations that create tasks)
-    pub fn ensure_exists(&self) -> Result<(), String> {
-        if !self.path.exists() {
-            fs::create_dir_all(&self.path)
-                .map_err(|e| format!("Failed to create tasks directory {}: {}", self.path.display(), e))?;
-        }
-        Ok(())
     }
 
     /// Get the tasks folder name from environment, config, or default
@@ -199,19 +192,6 @@ impl TasksDirectoryResolver {
             path == current_dir
         } else {
             false
-        }
-    }
-
-    /// Get a user-friendly message about which tasks directory is being used
-    pub fn get_info_message(&self) -> Option<String> {
-        match &self.source {
-            TasksDirectorySource::CommandLineFlag => {
-                Some(format!("ℹ️  Using tasks directory: {}", self.path.display()))
-            }
-            TasksDirectorySource::FoundInParent(_parent_dir) => {
-                Some(format!("ℹ️  Using tasks directory: {}", self.path.display()))
-            }
-            TasksDirectorySource::CurrentDirectory => None, // No message needed for current directory
         }
     }
 }

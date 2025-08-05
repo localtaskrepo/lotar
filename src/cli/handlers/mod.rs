@@ -1,19 +1,25 @@
-use crate::cli::{AddArgs, ListArgs};
+use crate::cli::AddArgs;
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
+use crate::output::OutputRenderer;
 use crate::storage::{Storage, task::Task};
-use crate::types::{Priority, TaskType};
+use crate::types::TaskType;
 use crate::workspace::TasksDirectoryResolver;
-use crate::index::TaskFilter;
 
 pub mod status;
+pub mod task;
+pub mod commands;
+
+// Re-export handlers for easy access
+pub use task::TaskHandler;
+pub use commands::{ConfigHandler, ScanHandler, ServeHandler, IndexHandler};
 
 /// Trait for command handlers
 pub trait CommandHandler {
     type Args;
     type Result;
     
-    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Self::Result;
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result;
 }
 
 /// Handler for adding tasks with the new CLI
@@ -23,7 +29,7 @@ impl CommandHandler for AddHandler {
     type Args = AddArgs;
     type Result = Result<String, String>;
     
-    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Self::Result {
+    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
         // Create project resolver and validator
         let project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
@@ -59,31 +65,33 @@ impl CommandHandler for AddHandler {
         let validator = CliValidator::new(&config);
         
         // Process and validate arguments
-        let task_type = if args.bug {
-            TaskType::Bug
+        let validated_type = if args.bug {
+            validator.validate_task_type("Bug")
+                .map_err(|e| format!("Task type validation failed: {}", e))?
         } else if args.epic {
-            TaskType::Epic
+            validator.validate_task_type("Epic")
+                .map_err(|e| format!("Task type validation failed: {}", e))?
         } else {
-            args.task_type.map(Into::into).unwrap_or(TaskType::Feature)
+            match args.task_type {
+                Some(task_type) => validator.validate_task_type(&task_type)
+                    .map_err(|e| format!("Task type validation failed: {}", e))?,
+                None => TaskType::Feature // Default
+            }
         };
         
-        // Validate task type
-        let task_type_str = task_type.to_string();
-        let validated_type = validator.validate_task_type(&task_type_str)
-            .map_err(|e| format!("Task type validation failed: {}", e))?;
-        
-        let priority = if args.critical {
-            Priority::Critical
+        let validated_priority = if args.critical {
+            validator.validate_priority("Critical")
+                .map_err(|e| format!("Priority validation failed: {}", e))?
         } else if args.high {
-            Priority::High
+            validator.validate_priority("High")
+                .map_err(|e| format!("Priority validation failed: {}", e))?
         } else {
-            args.priority.map(Into::into).unwrap_or(config.default_priority.clone())
+            match args.priority {
+                Some(priority) => validator.validate_priority(&priority)
+                    .map_err(|e| format!("Priority validation failed: {}", e))?,
+                None => config.default_priority.clone()
+            }
         };
-        
-        // Validate priority
-        let priority_str = priority.to_string();
-        let validated_priority = validator.validate_priority(&priority_str)
-            .map_err(|e| format!("Priority validation failed: {}", e))?;
         
         // Validate assignee if provided
         let validated_assignee = if let Some(ref assignee) = args.assignee {
@@ -169,105 +177,6 @@ impl CommandHandler for AddHandler {
     }
 }
 
-/// Handler for listing tasks with the new CLI
-pub struct ListHandler;
-
-impl CommandHandler for ListHandler {
-    type Args = ListArgs;
-    type Result = Result<Vec<Task>, String>;
-    
-    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver) -> Self::Result {
-        let project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
-        
-        let config = project_resolver.get_config();
-        let validator = CliValidator::new(config);
-        
-        // Create storage instance
-        let storage = Storage::new(resolver.path.clone());
-        
-        // Create task filter with project if specified
-        let mut task_filter = TaskFilter::default();
-        if let Some(project_filter) = project {
-            task_filter.project = Some(project_filter.to_string());
-        }
-        
-        let task_tuples = storage.search(&task_filter);
-        let mut tasks: Vec<Task> = task_tuples.into_iter().map(|(_, task)| task).collect();
-        
-        // Apply additional filters
-        
-        // Filter by assignee
-        if let Some(ref assignee) = args.assignee {
-            let filter_assignee = if assignee == "@me" {
-                // TODO: Resolve @me to actual user
-                "@me".to_string()
-            } else {
-                assignee.clone()
-            };
-            tasks.retain(|task| {
-                task.assignee.as_ref().map_or(false, |a| a == &filter_assignee)
-            });
-        }
-        
-        if args.mine {
-            // TODO: Resolve current user and filter by that
-            // For now, filter by @me placeholder
-            tasks.retain(|task| {
-                task.assignee.as_ref().map_or(false, |a| a == "@me")
-            });
-        }
-        
-        // Filter by status
-        if let Some(ref status) = args.status {
-            // Validate the status first
-            let validated_status = validator.validate_status(status)
-                .map_err(|e| format!("Status filter validation failed: {}", e))?;
-            
-            tasks.retain(|task| task.status == validated_status);
-        }
-        
-        // Filter by priority
-        if let Some(ref priority) = args.priority {
-            let target_priority: Priority = priority.clone().into();
-            tasks.retain(|task| task.priority == target_priority);
-        }
-        
-        if args.high {
-            tasks.retain(|task| task.priority == Priority::High);
-        }
-        
-        if args.critical {
-            tasks.retain(|task| task.priority == Priority::Critical);
-        }
-        
-        // Filter by type
-        if let Some(ref task_type) = args.task_type {
-            let target_type: TaskType = task_type.clone().into();
-            tasks.retain(|task| task.task_type == target_type);
-        }
-        
-        // Filter by category
-        if let Some(ref category) = args.category {
-            tasks.retain(|task| {
-                task.category.as_ref().map_or(false, |c| c == category)
-            });
-        }
-        
-        // Filter by tag
-        if let Some(ref tag) = args.tag {
-            tasks.retain(|task| task.tags.contains(tag));
-        }
-        
-        // Apply limit
-        if tasks.len() > args.limit {
-            tasks.truncate(args.limit);
-        }
-        
-        Ok(tasks)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -300,10 +209,11 @@ mod tests {
         };
         
         let resolver = create_test_resolver();
+        let renderer = OutputRenderer::new(crate::output::OutputFormat::Text, false);
         
         // This would fail in a real test because we need actual config files
         // But it demonstrates the structure
-        match AddHandler::execute(args, None, &resolver) {
+        match AddHandler::execute(args, None, &resolver, &renderer) {
             Ok(task_id) => println!("Created task: {}", task_id),
             Err(e) => println!("Expected error in test: {}", e),
         }

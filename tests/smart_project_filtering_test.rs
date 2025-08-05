@@ -60,7 +60,7 @@ modified: "2024-01-01T00:00:00Z"
             .assert()
             .success()
             .stdout(predicate::str::contains("Frontend Task 1"))
-            .stdout(predicate::str::contains("FRON-1").not()); // Should not show task ID in list
+            .stdout(predicate::str::contains("FRON-1")); // Should show task ID in list (same as search)
     }
 
     #[test]
@@ -136,7 +136,7 @@ modified: "2024-01-01T00:00:00Z"
             .args(&["task", "search", "Task", "--project=AB"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("API-BACKEND")); // Should show full project name in results
+            .stdout(predicate::str::contains("AB-1")); // Should show task ID (same format as list)
     }
 
     #[test]

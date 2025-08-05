@@ -1,5 +1,5 @@
-use local_task_repo::storage::Task;
-use local_task_repo::types::Priority;
+use lotar::storage::Task;
+use lotar::types::Priority;
 
 mod common;
 use common::{TestFixtures, utils};

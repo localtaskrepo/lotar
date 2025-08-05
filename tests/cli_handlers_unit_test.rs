@@ -1,7 +1,7 @@
-use local_task_repo::cli::handlers::{CommandHandler, AddHandler};
-use local_task_repo::cli::{AddArgs, CliTaskType, CliPriority};
-use local_task_repo::workspace::TasksDirectoryResolver;
-use local_task_repo::output::{OutputRenderer, OutputFormat};
+use lotar::cli::handlers::{CommandHandler, AddHandler};
+use lotar::cli::AddArgs;
+use lotar::workspace::TasksDirectoryResolver;
+use lotar::output::{OutputRenderer, OutputFormat};
 use tempfile::TempDir;
 use std::fs;
 
@@ -25,13 +25,13 @@ tasks_dir_name: .tasks
     
     let resolver = TasksDirectoryResolver {
         path: tasks_dir.clone(),
-        source: local_task_repo::workspace::TasksDirectorySource::CurrentDirectory,
+        source: lotar::workspace::TasksDirectorySource::CurrentDirectory,
     };
     
     let args = AddArgs {
         title: "Test task".to_string(),
-        task_type: Some(CliTaskType::Feature),
-        priority: Some(CliPriority::High),
+        task_type: Some("Feature".to_string()),
+        priority: Some("High".to_string()),
         assignee: None,
         effort: None,
         due: None,
@@ -45,8 +45,9 @@ tasks_dir_name: .tasks
         high: false,
     };
     
+    let renderer = OutputRenderer::new(OutputFormat::Text, false);
     // Execute the handler with explicit project to avoid dependency on file system project detection
-    let result = AddHandler::execute(args, Some("DEFA"), &resolver);
+    let result = AddHandler::execute(args, Some("DEFA"), &resolver, &renderer);
     assert!(result.is_ok(), "AddHandler should succeed");
     
     let task_id = result.unwrap();
@@ -75,13 +76,15 @@ tasks_dir_name: .tasks
     
     let resolver = TasksDirectoryResolver {
         path: tasks_dir.clone(),
-        source: local_task_repo::workspace::TasksDirectorySource::CurrentDirectory,
+        source: lotar::workspace::TasksDirectorySource::CurrentDirectory,
     };
+    
+    let renderer = OutputRenderer::new(OutputFormat::Text, false);
     
     let args = AddArgs {
         title: "Explicit project task".to_string(),
-        task_type: Some(CliTaskType::Bug),
-        priority: Some(CliPriority::Medium),
+        task_type: Some("Bug".to_string()),
+        priority: Some("Medium".to_string()),
         assignee: None,
         effort: None,
         due: None,
@@ -96,7 +99,7 @@ tasks_dir_name: .tasks
     };
     
     // Execute with explicit project
-    let result = AddHandler::execute(args, Some("test"), &resolver);
+    let result = AddHandler::execute(args, Some("test"), &resolver, &renderer);
     assert!(result.is_ok(), "AddHandler should succeed with explicit project");
     
     let task_id = result.unwrap();
@@ -184,13 +187,15 @@ issue_types:
     
     let resolver = TasksDirectoryResolver {
         path: tasks_dir.clone(),
-        source: local_task_repo::workspace::TasksDirectorySource::CurrentDirectory,
+        source: lotar::workspace::TasksDirectorySource::CurrentDirectory,
     };
+    
+    let renderer = OutputRenderer::new(OutputFormat::Text, false);
     
     let args = AddArgs {
         title: "Invalid epic task".to_string(),
-        task_type: Some(CliTaskType::Epic), // This should be rejected
-        priority: Some(CliPriority::Medium),
+        task_type: Some("Epic".to_string()), // This should be rejected
+        priority: Some("Medium".to_string()),
         assignee: None,
         effort: None,
         due: None,
@@ -205,10 +210,10 @@ issue_types:
     };
     
     // Execute the handler - should fail validation
-    let result = AddHandler::execute(args, None, &resolver);
+    let result = AddHandler::execute(args, None, &resolver, &renderer);
     assert!(result.is_err(), "AddHandler should fail validation for epic task type");
     
     let error_msg = result.unwrap_err();
-    assert!(error_msg.contains("not allowed"), "Error should mention task type not allowed");
-    assert!(error_msg.contains("epic"), "Error should mention epic type specifically");
+    assert!(error_msg.contains("Invalid task type"), "Error should mention invalid task type");
+    assert!(error_msg.contains("Epic"), "Error should mention Epic type specifically");
 }
