@@ -15,6 +15,7 @@
 - Comments feature (can we allow references to code?)
 - project templates need to be reviewed and updated for the latest features
 - show global info says we use file type yml, when that's the only type we support
+- Add console output still only shows a single line of info without any details about priority or status in some cases
 
 Other refactor jobs:
 - Error system
