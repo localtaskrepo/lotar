@@ -40,6 +40,34 @@ impl TestFixtures {
         self.temp_dir.path()
     }
 
+    /// Run a lotar command with the given arguments and return the output
+    #[allow(dead_code)] // Used by output format consistency tests
+    pub fn run_command(&self, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
+        use assert_cmd::Command;
+        
+        // Create a basic Cargo.toml if it doesn't exist for project detection
+        let cargo_toml_path = self.temp_dir.path().join("Cargo.toml");
+        if !cargo_toml_path.exists() {
+            std::fs::write(&cargo_toml_path, "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"")?;
+            
+            // Create src directory and main.rs for a valid Rust project
+            let src_dir = self.temp_dir.path().join("src");
+            std::fs::create_dir_all(&src_dir)?;
+            std::fs::write(src_dir.join("main.rs"), "fn main() { println!(\"Hello, world!\"); }")?;
+        }
+        
+        let output = Command::cargo_bin("lotar")?
+            .args(args)
+            .current_dir(self.temp_dir.path())
+            .output()?;
+            
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err(format!("Command failed: {}", String::from_utf8_lossy(&output.stderr)).into())
+        }
+    }
+
     /// Create test files with TODO comments for scanner testing
     #[allow(dead_code)] // Used by scanner tests
     pub fn create_test_source_files(&self) -> Vec<String> {

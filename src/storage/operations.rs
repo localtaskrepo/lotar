@@ -1,8 +1,9 @@
+use crate::config::{ConfigManager, types::ProjectConfig};
+use crate::index::TaskIndex;
+use crate::storage::task::Task;
+use crate::utils::generate_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::storage::task::Task;
-use crate::index::TaskIndex;
-use crate::utils::generate_project_prefix;
 
 /// Core CRUD operations for task storage
 pub struct StorageOperations;
@@ -21,10 +22,25 @@ impl StorageOperations {
         let project_path = root_path.join(&project_folder);
 
         // Use original project name for config initialization, fall back to prefix
-        let _config_project_name = original_project_name.unwrap_or(project_prefix);
+        let config_project_name = original_project_name.unwrap_or(project_prefix);
 
         // Ensure project directory exists
         fs::create_dir_all(&project_path)?;
+
+        // Create project config.yml if it doesn't exist and we have a project name
+        let config_file_path = project_path.join("config.yml");
+        if !config_file_path.exists() && original_project_name.is_some() {
+            // Create a basic project config with the project name
+            let project_config = ProjectConfig::new(config_project_name.to_string());
+
+            // Save the project config
+            if let Err(e) =
+                ConfigManager::save_project_config(root_path, project_prefix, &project_config)
+            {
+                eprintln!("Warning: Failed to create project config: {}", e);
+                // Continue execution - this is not a fatal error
+            }
+        }
 
         // Get the next numeric ID by finding the highest existing ID
         let next_numeric_id = Self::get_current_id(&project_path) + 1;
@@ -42,7 +58,8 @@ impl StorageOperations {
         fs::write(&file_path, file_string)?;
 
         // Update index
-        let relative_path = file_path.strip_prefix(root_path)
+        let relative_path = file_path
+            .strip_prefix(root_path)
             .unwrap_or(&file_path)
             .to_string_lossy()
             .to_string();
@@ -129,7 +146,8 @@ impl StorageOperations {
 
         // Update index using new method with explicit ID
         if let Some(old) = old_task {
-            let relative_path = file_path.strip_prefix(root_path)
+            let relative_path = file_path
+                .strip_prefix(root_path)
                 .unwrap_or(&file_path)
                 .to_string_lossy()
                 .to_string();
@@ -165,7 +183,7 @@ impl StorageOperations {
                 }
                 Ok(true)
             }
-            Err(_) => Ok(false)
+            Err(_) => Ok(false),
         }
     }
 
@@ -221,7 +239,10 @@ impl StorageOperations {
 
     /// Get or create a project prefix, ensuring it's unique and consistent
     #[allow(dead_code)]
-    pub fn get_or_create_project_prefix(root_path: &Path, project_name: &str) -> Result<String, String> {
+    pub fn get_or_create_project_prefix(
+        root_path: &Path,
+        project_name: &str,
+    ) -> Result<String, String> {
         // Check if we already have a folder for this exact project name
         let direct_path = root_path.join(project_name);
         if direct_path.exists() && direct_path.is_dir() {
@@ -238,9 +259,13 @@ impl StorageOperations {
             let config_path = prefix_path.join("config.yml");
             if config_path.exists() {
                 if let Ok(content) = fs::read_to_string(&config_path) {
-                    if let Ok(config) = serde_yaml::from_str::<crate::config::types::ProjectConfig>(&content) {
+                    if let Ok(config) =
+                        serde_yaml::from_str::<crate::config::types::ProjectConfig>(&content)
+                    {
                         // Check if the project name in config matches (either exact or prefix)
-                        if config.project_name == project_name || config.project_name == expected_prefix {
+                        if config.project_name == project_name
+                            || config.project_name == expected_prefix
+                        {
                             return Ok(expected_prefix);
                         }
                     }
@@ -254,7 +279,10 @@ impl StorageOperations {
 
     /// Generate a unique folder name (prefix) for a project
     #[allow(dead_code)]
-    pub fn generate_unique_folder_prefix(root_path: &Path, project_name: &str) -> Result<String, String> {
+    pub fn generate_unique_folder_prefix(
+        root_path: &Path,
+        project_name: &str,
+    ) -> Result<String, String> {
         // Generate candidate prefix using the shared utility
         let candidate = generate_project_prefix(project_name);
 
@@ -276,6 +304,9 @@ impl StorageOperations {
             }
         }
 
-        Err(format!("Could not generate unique prefix for project '{}'", project_name))
+        Err(format!(
+            "Could not generate unique prefix for project '{}'",
+            project_name
+        ))
     }
 }

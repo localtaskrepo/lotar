@@ -25,10 +25,10 @@ pub fn generate_project_prefix(project_name: &str) -> String {
         clean_name.to_uppercase()
     } else {
         let normalized = clean_name.to_uppercase();
-        if normalized.contains('-') || normalized.contains('_') {
-            // For hyphenated/underscored names, take first letters of each word
+        if normalized.contains('-') || normalized.contains('_') || normalized.contains(' ') {
+            // For hyphenated/underscored/spaced names, take first letters of each word
             normalized
-                .split(&['-', '_'][..])
+                .split(&['-', '_', ' '][..])
                 .filter_map(|word| word.chars().next())
                 .take(4)
                 .collect::<String>()
@@ -300,6 +300,15 @@ mod tests {
         assert_eq!(generate_project_prefix("MyProject"), "MYPR");
         assert_eq!(generate_project_prefix("my-Cool-Project"), "MCP");
         assert_eq!(generate_project_prefix("Test_Project"), "TP");
+    }
+
+    #[test]
+    fn test_spaced_names() {
+        assert_eq!(generate_project_prefix("My Test Project"), "MTP");
+        assert_eq!(generate_project_prefix("Super Awesome Tool"), "SAT");
+        assert_eq!(generate_project_prefix("A B C D"), "ABCD");
+        assert_eq!(generate_project_prefix("my project"), "MP");
+        assert_eq!(generate_project_prefix("Local Task Repository"), "LTR");
     }
 
     #[test]

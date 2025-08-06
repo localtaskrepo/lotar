@@ -415,26 +415,47 @@ mod smart_features {
 
         // Add tasks with different states
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let first_task_output = cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Todo Task")
             .arg("--project=StatusTest")
             .assert()
-            .success();
+            .success()
+            .get_output()
+            .stdout
+            .clone();
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let second_task_output = cmd.current_dir(temp_dir)
             .arg("add")
             .arg("In Progress Task")
             .arg("--project=StatusTest")
             .assert()
-            .success();
+            .success()
+            .get_output()
+            .stdout
+            .clone();
 
-        // Set the task state to InProgress
+        // Extract task IDs from the output
+        let _first_task_output_str = String::from_utf8_lossy(&first_task_output);
+        let _first_task_id = _first_task_output_str
+            .lines()
+            .find(|line| line.contains("Created task:"))
+            .and_then(|line| line.split("Created task: ").nth(1))
+            .expect("Should find first task ID in output");
+
+        let second_task_output_str = String::from_utf8_lossy(&second_task_output);
+        let second_task_id = second_task_output_str
+            .lines()
+            .find(|line| line.contains("Created task:"))
+            .and_then(|line| line.split("Created task: ").nth(1))
+            .expect("Should find second task ID in output");
+
+        // Set the second task state to InProgress
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
-            .arg("2")
+            .arg(second_task_id)
             .arg("in_progress")
             .assert()
             .success();
@@ -490,13 +511,16 @@ mod integration {
 
         // Step 4: Add tasks for different workflow stages
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let first_task_output = cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Setup CI/CD")
             .arg("--project=WorkflowTest")
             .arg("--priority=high")
             .assert()
-            .success();
+            .success()
+            .get_output()
+            .stdout
+            .clone();
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -506,6 +530,14 @@ mod integration {
             .arg("--priority=medium")
             .assert()
             .success();
+
+        // Extract the first task ID for later use
+        let first_task_output_str = String::from_utf8_lossy(&first_task_output);
+        let first_task_id = first_task_output_str
+            .lines()
+            .find(|line| line.contains("Created task:"))
+            .and_then(|line| line.split("Created task: ").nth(1))
+            .expect("Should find first task ID in output");
 
         // Step 5: List and verify tasks
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -531,7 +563,7 @@ mod integration {
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
-            .arg("1")
+            .arg(first_task_id)
             .arg("in_progress")
             .assert()
             .success();

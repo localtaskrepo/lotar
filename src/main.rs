@@ -17,12 +17,12 @@ use clap::Parser;
 use std::env;
 use workspace::TasksDirectoryResolver;
 
-use cli::{Cli, Commands};
+use cli::handlers::priority::{PriorityArgs, PriorityHandler};
+use cli::handlers::status::{StatusArgs, StatusHandler};
 use cli::handlers::{
-    CommandHandler, AddHandler,
-    TaskHandler, ConfigHandler, ScanHandler, ServeHandler, IndexHandler
+    AddHandler, CommandHandler, ConfigHandler, IndexHandler, ScanHandler, ServeHandler, TaskHandler,
 };
-use cli::handlers::status::{StatusHandler, StatusArgs};
+use cli::{Cli, Commands};
 
 /// Resolve the tasks directory based on config and command line arguments
 fn resolve_tasks_directory_with_override(
@@ -36,11 +36,12 @@ fn resolve_tasks_directory_with_override(
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    
+
     // Handle help and version manually for enhanced output
     // But skip if this is a subcommand help like "lotar help add"
     if !(args.len() >= 3 && args[1] == "help") {
-        for arg in &args[1..] {  // Skip program name
+        for arg in &args[1..] {
+            // Skip program name
             if arg == "help" || arg == "--help" || arg == "-h" {
                 show_enhanced_help();
                 return;
@@ -58,7 +59,7 @@ fn main() {
         show_command_help(command);
         return;
     }
-    
+
     // Parse with Clap
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
@@ -85,20 +86,8 @@ fn main() {
         Commands::Add(args) => {
             match AddHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(task_id) => {
-                    match renderer.format {
-                        output::OutputFormat::Json => {
-                            let response = serde_json::json!({
-                                "status": "success",
-                                "message": format!("Created task: {}", task_id),
-                                "task_id": task_id
-                            });
-                            println!("{}", response);
-                        }
-                        _ => {
-                            let message = format!("Created task: {}", task_id);
-                            println!("{}", renderer.render_success(&message));
-                        }
-                    }
+                    // Use the shared output rendering function
+                    AddHandler::render_add_success(&task_id, cli.project.as_deref(), &resolver, &renderer);
                     Ok(())
                 }
                 Err(e) => {
@@ -117,22 +106,59 @@ fn main() {
                 }
             }
         }
-        Commands::Status { id, status } | Commands::StatusShort { id, status } => {
+        Commands::Status { id, status } => {
             let status_args = StatusArgs::new(id, status, cli.project.clone());
-            match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => {
-                    println!("{}", renderer.render_success("Status changed successfully"));
-                    Ok(())
-                }
+            match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver, &renderer)
+            {
+                Ok(()) => Ok(()),
                 Err(e) => {
                     println!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
         }
-        Commands::Set { id, property, value } => {
+        Commands::Priority { id, priority } | Commands::PriorityShort { id, priority } => {
+            let priority_args = PriorityArgs::new(id, priority, cli.project.clone());
+            match PriorityHandler::execute(
+                priority_args,
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
+                Ok(()) => Ok(()),
+                Err(e) => {
+                    println!("{}", renderer.render_error(&e));
+                    Err(e)
+                }
+            }
+        }
+        Commands::DueDate { id, due_date } => {
+            // TODO: Create a dedicated DueDateHandler similar to StatusHandler and PriorityHandler
+            if let Some(new_due_date) = due_date {
+                let message = format!(
+                    "Set {} due_date = {} (placeholder implementation)",
+                    id, new_due_date
+                );
+                println!("{}", renderer.render_warning(&message));
+            } else {
+                let message = format!(
+                    "Show {} due_date (placeholder implementation)",
+                    id
+                );
+                println!("{}", renderer.render_warning(&message));
+            }
+            Ok(())
+        }
+        Commands::Set {
+            id,
+            property,
+            value,
+        } => {
             // TODO: Implement proper set handler
-            let message = format!("Set {} {} = {} (placeholder implementation)", id, property, value);
+            let message = format!(
+                "Set {} {} = {} (placeholder implementation)",
+                id, property, value
+            );
             println!("{}", renderer.render_warning(&message));
             Ok(())
         }

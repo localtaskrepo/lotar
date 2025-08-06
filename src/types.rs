@@ -1,6 +1,7 @@
-use serde::{Serialize, Deserialize};
-use std::fmt;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::str::FromStr;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum TaskStatus {
@@ -47,6 +48,58 @@ impl std::str::FromStr for TaskStatus {
             "DONE" => Ok(TaskStatus::Done),
             _ => Err(format!("Invalid task status: {}", s)),
         }
+    }
+}
+
+impl TaskStatus {
+    /// Parse status string with project configuration context
+    /// This method respects the project's configured issue_states
+    /// Supports mixed config with specific values + wildcard (e.g., ["Todo", "InProgress", "*"])
+    pub fn parse_with_config(
+        s: &str,
+        config: &crate::config::types::ResolvedConfig,
+    ) -> Result<Self, String> {
+        let input_upper = s.to_uppercase();
+
+        // Get valid statuses from config (excluding wildcard for matching)
+        let valid_statuses: Vec<String> = config
+            .issue_states
+            .values
+            .iter()
+            .map(|status| status.to_string())
+            .filter(|status| status != "*") // Exclude wildcard from matching list
+            .collect();
+
+        let has_wildcard = config
+            .issue_states
+            .values
+            .iter()
+            .any(|status| status.to_string() == "*");
+
+        // First, try to find case-insensitive match in configured values
+        for valid_status in &valid_statuses {
+            if valid_status.to_uppercase() == input_upper {
+                // Found a match, parse using the canonical form
+                return Self::from_str(valid_status);
+            }
+        }
+
+        // If no match found but wildcard is present, try to parse with hardcoded enum
+        if has_wildcard {
+            return Self::from_str(s);
+        }
+
+        // No match found and no wildcard - reject
+        Err(format!(
+            "Invalid status '{}'. Valid statuses for this project: {}{}",
+            s,
+            valid_statuses.join(", "),
+            if has_wildcard {
+                " (or any other value)"
+            } else {
+                ""
+            }
+        ))
     }
 }
 
@@ -98,6 +151,58 @@ impl std::str::FromStr for TaskType {
     }
 }
 
+impl TaskType {
+    /// Parse task type string with project configuration context
+    /// This method respects the project's configured issue_types
+    /// Supports mixed config with specific values + wildcard (e.g., ["Feature", "Bug", "*"])
+    pub fn parse_with_config(
+        s: &str,
+        config: &crate::config::types::ResolvedConfig,
+    ) -> Result<Self, String> {
+        let input_lower = s.to_lowercase();
+
+        // Get valid types from config (excluding wildcard for matching)
+        let valid_types: Vec<String> = config
+            .issue_types
+            .values
+            .iter()
+            .map(|task_type| task_type.to_string())
+            .filter(|task_type| task_type != "*") // Exclude wildcard from matching list
+            .collect();
+
+        let has_wildcard = config
+            .issue_types
+            .values
+            .iter()
+            .any(|task_type| task_type.to_string() == "*");
+
+        // First, try to find case-insensitive match in configured values
+        for valid_type in &valid_types {
+            if valid_type.to_lowercase() == input_lower {
+                // Found a match, parse using the canonical form
+                return Self::from_str(valid_type);
+            }
+        }
+
+        // If no match found but wildcard is present, try to parse with hardcoded enum
+        if has_wildcard {
+            return Self::from_str(s);
+        }
+
+        // No match found and no wildcard - reject
+        Err(format!(
+            "Invalid task type '{}'. Valid types for this project: {}{}",
+            s,
+            valid_types.join(", "),
+            if has_wildcard {
+                " (or any other value)"
+            } else {
+                ""
+            }
+        ))
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct TaskRelationships {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -118,13 +223,13 @@ pub struct TaskRelationships {
 
 impl TaskRelationships {
     pub fn is_empty(&self) -> bool {
-        self.depends_on.is_empty() &&
-        self.blocks.is_empty() &&
-        self.related.is_empty() &&
-        self.parent.is_none() &&
-        self.children.is_empty() &&
-        self.fixes.is_empty() &&
-        self.duplicate_of.is_none()
+        self.depends_on.is_empty()
+            && self.blocks.is_empty()
+            && self.related.is_empty()
+            && self.parent.is_none()
+            && self.children.is_empty()
+            && self.fixes.is_empty()
+            && self.duplicate_of.is_none()
     }
 }
 
@@ -173,12 +278,64 @@ impl std::str::FromStr for Priority {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_uppercase().as_str() {
-            "LOW" => Ok(Priority::Low),
-            "MEDIUM" => Ok(Priority::Medium),
-            "HIGH" => Ok(Priority::High),
-            "CRITICAL" => Ok(Priority::Critical),
+        match s.to_lowercase().as_str() {
+            "critical" => Ok(Priority::Critical),
+            "high" => Ok(Priority::High),
+            "medium" => Ok(Priority::Medium),
+            "low" => Ok(Priority::Low),
             _ => Err(format!("Invalid priority: {}", s)),
         }
+    }
+}
+
+impl Priority {
+    /// Parse priority string with project configuration context
+    /// This method respects the project's configured issue_priorities
+    /// Supports mixed config with specific values + wildcard (e.g., ["High", "Medium", "*"])
+    pub fn parse_with_config(
+        s: &str,
+        config: &crate::config::types::ResolvedConfig,
+    ) -> Result<Self, String> {
+        let input_lower = s.to_lowercase();
+
+        // Get valid priorities from config (excluding wildcard for matching)
+        let valid_priorities: Vec<String> = config
+            .issue_priorities
+            .values
+            .iter()
+            .map(|priority| priority.to_string())
+            .filter(|priority| priority != "*") // Exclude wildcard from matching list
+            .collect();
+
+        let has_wildcard = config
+            .issue_priorities
+            .values
+            .iter()
+            .any(|priority| priority.to_string() == "*");
+
+        // First, try to find case-insensitive match in configured values
+        for valid_priority in &valid_priorities {
+            if valid_priority.to_lowercase() == input_lower {
+                // Found a match, parse using the canonical form
+                return Self::from_str(valid_priority);
+            }
+        }
+
+        // If no match found but wildcard is present, try to parse with hardcoded enum
+        if has_wildcard {
+            return Self::from_str(s);
+        }
+
+        // No match found and no wildcard - reject
+        Err(format!(
+            "Invalid priority '{}'. Valid priorities for this project: {}{}",
+            s,
+            valid_priorities.join(", "),
+            if has_wildcard {
+                " (or any other value)"
+            } else {
+                ""
+            }
+        ))
     }
 }

@@ -2,10 +2,14 @@
 
 Full task management with legacy command structure.
 
+**Alias:** `lotar tasks` (both singular and plural work identically)
+
 ## Usage
 
 ```bash
 lotar task <ACTION> [OPTIONS]
+# or
+lotar tasks <ACTION> [OPTIONS]
 ```
 
 ## Actions
@@ -18,10 +22,10 @@ lotar task add --title="Task title" [OPTIONS]
 ```
 
 ### list
-List tasks with filtering options.
+List tasks with advanced filtering options.
 
 ```bash
-lotar task list [--project=PROJECT]
+lotar task list [OPTIONS]
 ```
 
 ### edit
@@ -32,17 +36,31 @@ lotar task edit <TASK_ID> [OPTIONS]
 ```
 
 ### status
-Change task status.
+Change or view task status.
 
 ```bash
-lotar task status <TASK_ID> <STATUS>
+lotar task status <TASK_ID> [NEW_STATUS]
 ```
 
-### search
-Search tasks by query.
+### priority
+Change or view task priority.
 
 ```bash
-lotar task search <QUERY> [OPTIONS]
+lotar task priority <TASK_ID> [NEW_PRIORITY]
+```
+
+### assignee
+Change or view task assignee.
+
+```bash
+lotar task assignee <TASK_ID> [NEW_ASSIGNEE]
+```
+
+### due-date
+Change or view task due date.
+
+```bash
+lotar task due-date <TASK_ID> [NEW_DATE]
 ```
 
 ### delete
@@ -58,14 +76,23 @@ lotar task delete <TASK_ID>
 # Create task with full options
 lotar task add --title="Implement API" --type=feature --priority=high
 
-# List tasks in specific project
-lotar task list --project=backend
+# List tasks in specific project (using alias)
+lotar tasks list --project=backend
 
 # Change task status
 lotar task status PROJ-123 done
 
-# Search for tasks
-lotar task search "authentication" --status=todo
+# Change task priority (using alias)
+lotar tasks priority PROJ-123 high
+
+# Set task assignee
+lotar task assignee PROJ-123 john.doe@example.com
+
+# View task due date (using alias)
+lotar tasks due-date PROJ-123
+
+# Set task due date
+lotar task due-date PROJ-123 2025-12-31
 ```
 
 ## Notes

@@ -51,7 +51,7 @@ mod global_config {
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
-            .arg("--title=Test task")
+            .arg("Test task")
             .assert()
             .success();
 
@@ -506,7 +506,7 @@ mod custom_tasks_directory {
             .arg("--tasks-dir=project-tasks")
             .arg("task")
             .arg("add")
-            .arg("--title=Custom Task")
+            .arg("Custom Task")
             .arg("--description=Task in custom directory")
             .arg("--project=test-project")
             .assert()

@@ -43,6 +43,54 @@ impl ConfigManager {
         Ok(Self { resolved_config })
     }
 
+    /// Ensure default_prefix is set in global config, auto-detecting if necessary
+    pub fn ensure_default_prefix(&mut self, tasks_dir: &Path) -> Result<String, ConfigError> {
+        // Check if default_prefix is already set
+        if !self.resolved_config.default_prefix.is_empty() {
+            return Ok(self.resolved_config.default_prefix.clone());
+        }
+
+        // Default prefix is empty, need to auto-detect and update
+        let detected_prefix = if let Some(detected) = Self::auto_detect_prefix(&tasks_dir.to_path_buf()) {
+            detected
+        } else {
+            // No existing projects, generate from current directory
+            if let Some(project_name) = crate::project::get_project_name() {
+                crate::utils::generate_project_prefix(&project_name)
+            } else {
+                "DEFAULT".to_string()
+            }
+        };
+
+        // Update the global config with the detected prefix
+        let config_path = tasks_dir.join("config.yml");
+        if config_path.exists() {
+            // Load current config
+            let content = fs::read_to_string(&config_path).map_err(|e| {
+                ConfigError::IoError(format!("Failed to read global config: {}", e))
+            })?;
+            let mut global_config: GlobalConfig = serde_yaml::from_str(&content).map_err(|e| {
+                ConfigError::ParseError(format!("Failed to parse global config: {}", e))
+            })?;
+
+            // Update the default_prefix
+            global_config.default_prefix = detected_prefix.clone();
+
+            // Save updated config
+            let updated_yaml = serde_yaml::to_string(&global_config).map_err(|e| {
+                ConfigError::ParseError(format!("Failed to serialize updated config: {}", e))
+            })?;
+            fs::write(&config_path, updated_yaml).map_err(|e| {
+                ConfigError::IoError(format!("Failed to write updated global config: {}", e))
+            })?;
+
+            // Update our resolved config too
+            self.resolved_config.default_prefix = detected_prefix.clone();
+        }
+
+        Ok(detected_prefix)
+    }
+
     /// Save updated global configuration to tasks_dir/config.yml
     pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(), ConfigError> {
         let config_path = tasks_dir.join("config.yml");

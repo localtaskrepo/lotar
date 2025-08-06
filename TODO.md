@@ -9,14 +9,13 @@
 - Add github actions to run tests and link the results in the readme
 - we're using default_project instead of default_prefix in the global config.
 - Add config validate command that checks that no unknown fields are set, not invalid values, and that no project name is the same as a different prefix (which would break the storage logic. On that note, we should never allow auto creating a prefix that is a project name)
-- List/search op only supports project filter right now, should allow sort
 - Tasks have relationships, so we should have commands to show them.
 - Bug: State changes to same state are allowed. Should at least show a warning.
 - Feature: context with references to relevant files for the task. how does this work together with scanning for TODOs?
-- Make sure new tasks automatically take the first state from the config as default start state.
+- Make sure new tasks automatically take the first state from the config as default start state (when there's not default_state defined).
 - Are all commands supporting the --tasks-dir and evironment variable settings? Do they all resolve parent project dirs?
-- When creating a project automatically by adding a new issue, we detect the project name, but we don't store it in config.yml (the project folder has no config.yml)
-- The main help does not reflect the actual output and has some useless info
+- arguments help and --help don't work everywhere (that will be confusing).
+- Tags are the only ones using an index. Not sure we need it since we do all other search operations without.
 
 Other refactor jobs:
 - Error system
@@ -25,8 +24,3 @@ Other refactor jobs:
     - can functions be combined into utility functions
     - Empty files
     - Unnecessary folders
-- Check if the test system can be improved
-- We have hard coded issue priority everywhere when it should be read from config file.
-    - when no default_priority is set we use the first value.
-    - maybe the same issue exists with types and other fields
-- Check if there are more tests we need for better coverage and documentation of current features

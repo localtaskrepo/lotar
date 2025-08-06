@@ -127,16 +127,23 @@ impl StorageSearch {
 
     /// Helper method to check if a task matches all filter criteria
     pub fn task_matches_filter(task: &Task, filter: &TaskFilter) -> bool {
-        // Check status filter
-        if let Some(status) = &filter.status {
-            if task.status != *status {
+        // Check status filter (OR logic - match any of the specified statuses)
+        if !filter.status.is_empty() {
+            if !filter.status.contains(&task.status) {
                 return false;
             }
         }
 
-        // Check priority filter
-        if let Some(priority) = filter.priority {
-            if task.priority != priority {
+        // Check priority filter (OR logic - match any of the specified priorities)
+        if !filter.priority.is_empty() {
+            if !filter.priority.contains(&task.priority) {
+                return false;
+            }
+        }
+
+        // Check task type filter (OR logic - match any of the specified types)
+        if !filter.task_type.is_empty() {
+            if !filter.task_type.contains(&task.task_type) {
                 return false;
             }
         }

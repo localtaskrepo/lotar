@@ -10,7 +10,7 @@ pub struct ProjectResolver {
 
 impl ProjectResolver {
     pub fn new(resolver: &TasksDirectoryResolver) -> Result<Self, String> {
-        let config_manager = ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path)
+        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
             .map_err(|e| format!("Failed to load config: {}", e))?;
             
         Ok(Self {
@@ -20,7 +20,7 @@ impl ProjectResolver {
     }
     
     /// Resolve project from task ID, explicit project arg, or default
-    pub fn resolve_project(&self, task_id: &str, explicit_project: Option<&str>) -> Result<String, String> {
+    pub fn resolve_project(&mut self, task_id: &str, explicit_project: Option<&str>) -> Result<String, String> {
         // Extract project from task ID if present
         let id_project = self.extract_project_from_task_id(task_id);
         
@@ -58,7 +58,9 @@ impl ProjectResolver {
                 if let Err(e) = self.validate_project_name(explicit) {
                     return Err(e);
                 }
-                Ok(explicit.to_string())
+                // Resolve project name to its prefix
+                let resolved_prefix = self.resolve_project_name_to_prefix(explicit);
+                Ok(resolved_prefix)
             },
             // Only task ID prefix provided
             (None, Some(id_prefix)) => {
@@ -66,14 +68,16 @@ impl ProjectResolver {
             },
             // Neither provided - use default
             (None, None) => {
-                let global_config = self.config_manager.get_resolved_config();
-                Ok(global_config.default_prefix.clone())
+                // Ensure default_prefix is set, auto-detecting if necessary
+                let default_prefix = self.config_manager.ensure_default_prefix(&self.tasks_dir)
+                    .map_err(|e| format!("Failed to determine default project: {}", e))?;
+                Ok(default_prefix)
             }
         }
     }
     
     /// Resolve a project name (which could be a full name) to its prefix
-    fn resolve_project_name_to_prefix(&self, project_name: &str) -> String {
+    pub fn resolve_project_name_to_prefix(&self, project_name: &str) -> String {
         // Use the existing utility function that handles project name -> prefix mapping
         crate::utils::resolve_project_input(project_name, &self.tasks_dir)
     }
@@ -84,10 +88,10 @@ impl ProjectResolver {
             return Err("Project name cannot be empty".to_string());
         }
         
-        // Project names should be alphanumeric (allowing underscores and hyphens)
+        // Project names should be alphanumeric (allowing underscores, hyphens, and spaces)
         // but not special characters like ! ? @ etc.
-        if !project_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
-            return Err(format!("Invalid project name '{}'. Project names can only contain letters, numbers, underscores, and hyphens", project_name));
+        if !project_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ' ') {
+            return Err(format!("Invalid project name '{}'. Project names can only contain letters, numbers, underscores, hyphens, and spaces", project_name));
         }
         
         // Should not start or end with special characters
@@ -100,7 +104,7 @@ impl ProjectResolver {
     }
     
     /// Extract project prefix from task ID (e.g., "AUTH-123" -> "AUTH")
-    fn extract_project_from_task_id(&self, task_id: &str) -> Option<String> {
+    pub fn extract_project_from_task_id(&self, task_id: &str) -> Option<String> {
         // Look for pattern: LETTERS-NUMBERS (e.g., AUTH-123, TI-456, MOBILE-789)
         if let Some(dash_pos) = task_id.find('-') {
             let prefix = &task_id[..dash_pos];
@@ -145,7 +149,7 @@ impl ProjectResolver {
     }
     
     /// Get the full task ID with project prefix
-    pub fn get_full_task_id(&self, task_id: &str, explicit_project: Option<&str>) -> Result<String, String> {
+    pub fn get_full_task_id(&mut self, task_id: &str, explicit_project: Option<&str>) -> Result<String, String> {
         // If task ID already has a prefix, use as-is
         if self.extract_project_from_task_id(task_id).is_some() {
             return Ok(task_id.to_string());
@@ -210,7 +214,7 @@ mod tests {
     
     #[test]
     fn test_resolve_project() {
-        let resolver = create_test_resolver();
+        let mut resolver = create_test_resolver();
         
         // Case 1: Explicit project matches task ID prefix (direct match)
         assert_eq!(resolver.resolve_project("AUTH-123", Some("AUTH")).unwrap(), "AUTH");
@@ -224,7 +228,7 @@ mod tests {
         assert!(result.unwrap_err().contains("Project mismatch"));
         
         // Case 4: Only explicit project provided (no task ID prefix)
-        assert_eq!(resolver.resolve_project("123", Some("MOBILE")).unwrap(), "MOBILE");
+        assert_eq!(resolver.resolve_project("123", Some("MOBILE")).unwrap(), "MOBI");
         
         // Case 5: Only task ID prefix provided (no explicit project)
         assert_eq!(resolver.resolve_project("AUTH-123", None).unwrap(), "AUTH");
@@ -241,7 +245,7 @@ mod tests {
     
     #[test]
     fn test_resolve_project_original_behavior() {
-        let resolver = create_test_resolver();
+        let mut resolver = create_test_resolver();
         
         // Test edge cases from original implementation
         assert_eq!(resolver.resolve_project("no-prefix", None).unwrap(), "TEST"); // No uppercase prefix gets default
@@ -249,7 +253,7 @@ mod tests {
     
     #[test]
     fn test_get_full_task_id() {
-        let resolver = create_test_resolver();
+        let mut resolver = create_test_resolver();
         
         // Already has prefix
         assert_eq!(resolver.get_full_task_id("AUTH-123", None).unwrap(), "AUTH-123");
@@ -258,6 +262,6 @@ mod tests {
         assert_eq!(resolver.get_full_task_id("123", None).unwrap(), "TEST-123");
         
         // Numeric ID with explicit project
-        assert_eq!(resolver.get_full_task_id("123", Some("MOBILE")).unwrap(), "MOBILE-123");
+        assert_eq!(resolver.get_full_task_id("123", Some("MOBILE")).unwrap(), "MOBI-123");
     }
 }

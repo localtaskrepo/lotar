@@ -7,8 +7,9 @@ use crate::storage::{Task};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskFilter {
-    pub status: Option<TaskStatus>,
-    pub priority: Option<Priority>,  // Changed from u8 to Priority enum
+    pub status: Vec<TaskStatus>,
+    pub priority: Vec<Priority>,
+    pub task_type: Vec<crate::types::TaskType>,
     pub project: Option<String>,
     pub category: Option<String>,
     pub tags: Vec<String>,
@@ -18,8 +19,9 @@ pub struct TaskFilter {
 impl Default for TaskFilter {
     fn default() -> Self {
         Self {
-            status: None,
-            priority: None,
+            status: vec![],
+            priority: vec![],
+            task_type: vec![],
             project: None,
             category: None,
             tags: vec![],

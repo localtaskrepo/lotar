@@ -8,16 +8,11 @@ Change task status with validation and different output formats.
 lotar status <TASK_ID> <NEW_STATUS>
 ```
 
-**Alias:** `lotar s <TASK_ID> <NEW_STATUS>`
-
 ## Quick Examples
 
 ```bash
 # Basic status change
 lotar status AUTH-001 in_progress
-
-# Using alias
-lotar s AUTH-002 done
 
 # With explicit project
 lotar status 123 verify --project=backend
