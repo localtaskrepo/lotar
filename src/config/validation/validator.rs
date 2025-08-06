@@ -1,0 +1,226 @@
+use std::path::Path;
+use crate::config::types::{ProjectConfig, GlobalConfig, ResolvedConfig};
+use crate::config::validation::errors::{ValidationError, ValidationResult};
+use crate::config::validation::conflicts::PrefixConflictDetector;
+
+pub struct ConfigValidator {
+    tasks_dir: std::path::PathBuf,
+}
+
+impl ConfigValidator {
+    pub fn new(tasks_dir: &Path) -> Self {
+        Self {
+            tasks_dir: tasks_dir.to_path_buf(),
+        }
+    }
+
+    pub fn validate_project_config(&self, config: &ProjectConfig) -> ValidationResult {
+        let mut result = ValidationResult::new();
+
+        // Validate project name
+        self.validate_project_name(&config.project_name, &mut result);
+
+        // Note: Project prefix validation is done separately as it's not stored in ProjectConfig
+
+        // Validate that defaults exist in their respective lists
+        self.validate_defaults_consistency(config, &mut result);
+
+        // Validate enum values
+        self.validate_enum_fields(config, &mut result);
+
+        // Validate field formats
+        self.validate_field_formats(config, &mut result);
+
+        result
+    }
+
+    pub fn validate_global_config(&self, config: &GlobalConfig) -> ValidationResult {
+        let mut result = ValidationResult::new();
+
+        // Validate server port
+        if config.server_port < 1024 {
+            result.add_error(ValidationError::warning(
+                Some("server_port".to_string()),
+                format!("Port {} may require elevated privileges", config.server_port)
+            ).with_fix("Consider using a port >= 1024".to_string()));
+        }
+
+        // Note: u16 max value is 65535, so no need to check config.server_port > 65535
+
+        // Validate default prefix
+        if !config.default_prefix.is_empty() {
+            self.validate_prefix(&config.default_prefix, &mut result);
+        }
+
+        // Validate that lists are not empty
+        if config.issue_states.values.is_empty() {
+            result.add_error(ValidationError::error(
+                Some("issue_states".to_string()),
+                "Issue states list cannot be empty".to_string()
+            ).with_fix("Add at least one status like 'todo', 'in_progress', 'done'".to_string()));
+        }
+
+        if config.issue_types.values.is_empty() {
+            result.add_error(ValidationError::error(
+                Some("issue_types".to_string()),
+                "Issue types list cannot be empty".to_string()
+            ).with_fix("Add at least one type like 'feature', 'bug', 'chore'".to_string()));
+        }
+
+        if config.issue_priorities.values.is_empty() {
+            result.add_error(ValidationError::error(
+                Some("issue_priorities".to_string()),
+                "Issue priorities list cannot be empty".to_string()
+            ).with_fix("Add at least one priority like 'low', 'medium', 'high'".to_string()));
+        }
+
+        // Validate default values exist in lists
+        if let Some(default_status) = &config.default_status {
+            if !config.issue_states.values.contains(default_status) {
+                result.add_error(ValidationError::error(
+                    Some("default_status".to_string()),
+                    format!("Default status '{}' not found in issue_states list", default_status)
+                ).with_fix("Add the status to issue_states or choose a different default".to_string()));
+            }
+        }
+
+        if !config.issue_priorities.values.contains(&config.default_priority) {
+            result.add_error(ValidationError::error(
+                Some("default_priority".to_string()),
+                format!("Default priority '{}' not found in issue_priorities list", config.default_priority)
+            ).with_fix("Add the priority to issue_priorities or choose a different default".to_string()));
+        }
+
+        result
+    }
+
+    #[allow(dead_code)]
+    pub fn validate_resolved_config(&self, config: &ResolvedConfig) -> ValidationResult {
+        let mut result = ValidationResult::new();
+
+        // This validates the final resolved configuration for consistency
+        // Similar validations as global config but for the resolved state
+
+        if !config.issue_states.values.is_empty() && config.default_status.is_some() {
+            let default_status = config.default_status.as_ref().unwrap();
+            if !config.issue_states.values.contains(default_status) {
+                result.add_error(ValidationError::error(
+                    Some("default_status".to_string()),
+                    "Resolved default status not found in resolved issue states".to_string()
+                ));
+            }
+        }
+
+        result
+    }
+
+    pub fn check_prefix_conflicts(&self, prefix: &str) -> ValidationResult {
+        match PrefixConflictDetector::new(&self.tasks_dir) {
+            Ok(detector) => detector.check_conflicts(prefix),
+            Err(e) => {
+                let mut result = ValidationResult::new();
+                result.add_error(ValidationError::warning(
+                    None,
+                    format!("Could not check for prefix conflicts: {}", e)
+                ));
+                result
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn validate_prefix_format(&self, prefix: &str) -> ValidationResult {
+        let mut result = ValidationResult::new();
+        self.validate_prefix(prefix, &mut result);
+        result
+    }
+
+    fn validate_project_name(&self, name: &str, result: &mut ValidationResult) {
+        if name.is_empty() {
+            result.add_error(ValidationError::error(
+                Some("project_name".to_string()),
+                "Project name cannot be empty".to_string()
+            ));
+        }
+
+        if name.len() > 100 {
+            result.add_error(ValidationError::warning(
+                Some("project_name".to_string()),
+                "Project name is very long (>100 characters)".to_string()
+            ).with_fix("Consider using a shorter, more descriptive name".to_string()));
+        }
+    }
+
+    fn validate_prefix(&self, prefix: &str, result: &mut ValidationResult) {
+        if prefix.is_empty() {
+            result.add_error(ValidationError::warning(
+                Some("default_prefix".to_string()),
+                "Default prefix is empty, will auto-generate from project name".to_string()
+            ));
+            return;
+        }
+
+        if prefix.len() > 10 {
+            result.add_error(ValidationError::warning(
+                Some("default_prefix".to_string()),
+                "Prefix is quite long, shorter prefixes are more practical".to_string()
+            ).with_fix("Consider using a 2-4 character prefix".to_string()));
+        }
+
+        if !prefix.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+            result.add_error(ValidationError::error(
+                Some("default_prefix".to_string()),
+                "Prefix contains invalid characters".to_string()
+            ).with_fix("Use only letters, numbers, underscores, and hyphens".to_string()));
+        }
+    }
+
+    fn validate_defaults_consistency(&self, config: &ProjectConfig, result: &mut ValidationResult) {
+        // Check if default status exists in issue states
+        if let (Some(default_status), Some(issue_states)) = (&config.default_status, &config.issue_states) {
+            if !issue_states.values.contains(default_status) {
+                result.add_error(ValidationError::error(
+                    Some("default_status".to_string()),
+                    format!("Default status '{}' not found in issue_states", default_status)
+                ).with_fix("Add the status to issue_states or remove default_status".to_string()));
+            }
+        }
+
+        // Check if default priority exists in issue priorities
+        if let (Some(default_priority), Some(issue_priorities)) = (&config.default_priority, &config.issue_priorities) {
+            if !issue_priorities.values.contains(default_priority) {
+                result.add_error(ValidationError::error(
+                    Some("default_priority".to_string()),
+                    format!("Default priority '{}' not found in issue_priorities", default_priority)
+                ).with_fix("Add the priority to issue_priorities or remove default_priority".to_string()));
+            }
+        }
+    }
+
+    fn validate_enum_fields(&self, _config: &ProjectConfig, _result: &mut ValidationResult) {
+        // The enum validation is handled by serde deserialization
+        // This is here for future custom enum validation if needed
+    }
+
+    fn validate_field_formats(&self, config: &ProjectConfig, result: &mut ValidationResult) {
+        // Validate assignee email format if present
+        if let Some(assignee) = &config.default_assignee {
+            if !assignee.is_empty() && !self.is_valid_email_or_username(assignee) {
+                result.add_error(ValidationError::warning(
+                    Some("default_assignee".to_string()),
+                    "Assignee format doesn't look like an email or @username".to_string()
+                ).with_fix("Use email format (user@domain.com) or @username format".to_string()));
+            }
+        }
+    }
+
+    fn is_valid_email_or_username(&self, value: &str) -> bool {
+        // Simple validation for email or @username format
+        if value.starts_with('@') {
+            return value.len() > 1 && value[1..].chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-');
+        }
+
+        // Basic email validation
+        value.contains('@') && value.contains('.') && value.len() > 5
+    }
+}

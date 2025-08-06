@@ -1,4 +1,4 @@
-use crate::cli::{ConfigAction, ConfigShowArgs, ScanArgs, ServeArgs, IndexArgs, IndexAction};
+use crate::cli::{ConfigAction, ConfigShowArgs, ConfigValidateArgs, ScanArgs, ServeArgs, IndexArgs, IndexAction};
 use crate::cli::handlers::CommandHandler;
 use crate::output::OutputRenderer;
 use crate::workspace::TasksDirectoryResolver;
@@ -44,6 +44,14 @@ impl CommandHandler for ConfigHandler {
                 force 
             }) => {
                 Self::handle_config_init(resolver, template, prefix, project, copy_from, global, dry_run, force)
+            }
+            ConfigAction::Validate(ConfigValidateArgs {
+                project,
+                global,
+                fix,
+                errors_only,
+            }) => {
+                Self::handle_config_validate(resolver, project, global, fix, errors_only)
             }
             ConfigAction::Templates => {
                 println!("📚 Available Configuration Templates:");
@@ -418,6 +426,9 @@ impl ConfigHandler {
         
         // Determine target path
         let config_path = if global {
+            // Ensure tasks directory exists for global config
+            fs::create_dir_all(&resolver.path)
+                .map_err(|e| format!("Failed to create tasks directory: {}", e))?;
             resolver.path.join("config.yml")
         } else {
             let project_name = project.as_deref()
@@ -510,6 +521,138 @@ impl ConfigHandler {
                 }
             }
         }
+    }
+
+    fn handle_config_validate(
+        resolver: &TasksDirectoryResolver,
+        project: Option<String>,
+        global: bool,
+        fix: bool,
+        errors_only: bool,
+    ) -> Result<(), String> {
+        use crate::config::validation::{ConfigValidator, ValidationSeverity};
+
+        // Load global config from tasks directory
+        let global_config_path = resolver.path.join("config.yml");
+        let global_config = if global_config_path.exists() {
+            match std::fs::read_to_string(&global_config_path) {
+                Ok(content) => {
+                    serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
+                        .map_err(|e| format!("Failed to parse global config: {}", e))?
+                }
+                Err(e) => {
+                    return Err(format!("Failed to read global config file: {}", e));
+                }
+            }
+        } else {
+            crate::config::types::GlobalConfig::default()
+        };
+
+        let validator = ConfigValidator::new(&resolver.path);
+        let mut all_results = Vec::new();
+        let mut has_errors = false;
+
+        // Validate global config if requested or no specific scope given
+        if global || (!project.is_some() && !global) {
+            println!("🔍 Validating global configuration...");
+            let result = validator.validate_global_config(&global_config);
+            
+            if result.has_errors() || result.has_warnings() {
+                has_errors |= result.has_errors(); // Only actual errors affect exit code
+                all_results.push(("Global Config".to_string(), result));
+            } else {
+                println!("✅ Global configuration is valid");
+            }
+        }
+
+        // Validate project config if requested or available
+        if let Some(project_name) = project {
+            println!("🔍 Validating project configuration for '{}'...", project_name);
+            
+            // Load project config directly from file
+            let project_config_path = resolver.path
+                .join(&project_name)
+                .join("config.yml");
+                
+            if project_config_path.exists() {
+                match std::fs::read_to_string(&project_config_path) {
+                    Ok(config_content) => {
+                        match serde_yaml::from_str::<crate::config::types::ProjectConfig>(&config_content) {
+                            Ok(project_config) => {
+                                let result = validator.validate_project_config(&project_config);
+                                
+                                // For prefix conflicts, we need to determine the actual prefix used
+                                // This would typically come from the project directory name or config
+                                let prefix = &project_name; // Simple fallback
+                                let conflict_result = validator.check_prefix_conflicts(prefix);
+                                
+                                let mut combined_result = result;
+                                combined_result.merge(conflict_result);
+                                
+                                if combined_result.has_errors() || combined_result.has_warnings() {
+                                    has_errors |= combined_result.has_errors(); // Only actual errors affect exit code
+                                    all_results.push((format!("Project Config ({})", project_name), combined_result));
+                                } else {
+                                    println!("✅ Project configuration is valid");
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Could not parse project config YAML: {}", e);
+                                has_errors = true;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Could not read project config file: {}", e);
+                        has_errors = true;
+                    }
+                }
+            } else {
+                eprintln!("❌ Project config file not found: {}", project_config_path.display());
+                has_errors = true;
+            }
+        }
+
+        // Display results
+        for (scope, result) in all_results {
+            println!("\n📋 {} Validation Results:", scope);
+            
+            // Display errors
+            for error in &result.errors {
+                if errors_only && error.severity != ValidationSeverity::Error {
+                    continue;
+                }
+                println!("{}", error);
+            }
+            
+            // Display warnings (unless errors_only is set)
+            if !errors_only {
+                for warning in &result.warnings {
+                    println!("{}", warning);
+                }
+                
+                // Display info messages
+                for info in &result.info {
+                    println!("{}", info);
+                }
+            }
+        }
+
+        // Handle validation outcome
+        if has_errors {
+            println!("\n❌ Configuration validation failed with errors");
+            
+            if fix {
+                println!("🔧 Auto-fix functionality not yet implemented");
+                println!("   Please review the suggestions above and make manual corrections");
+            }
+            
+            return Err("Configuration validation failed".to_string());
+        } else {
+            println!("\n✅ All configurations are valid!");
+        }
+
+        Ok(())
     }
 }
 

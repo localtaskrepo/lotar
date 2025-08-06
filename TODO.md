@@ -5,13 +5,10 @@
 - We need to add an author to issues ideally read from the current git user, otherwise fallback to environment value or .lotar config
 - Add github actions to run tests and link the results in the readme
 - we're using default_project instead of default_prefix in the global config.
-- Add config validate command that checks that no unknown fields are set, not invalid values, and that no project name is the same as a different prefix (which would break the storage logic. On that note, we should never allow auto creating a prefix that is a project name)
 - Tasks have relationships, so we should have commands to show them.
 - Feature: context with references to relevant files for the task. how does this work together with scanning for TODOs?
-- arguments help and --help don't work everywhere (that will be confusing).
 - Comments feature (can we allow references to code?)
 - project templates need to be reviewed and updated for the latest features
-- show global info says we use file type yml, when that's the only type we support
 - Add console output still only shows a single line of info without any details about priority or status in some cases
 
 Other refactor jobs:

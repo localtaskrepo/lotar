@@ -59,7 +59,7 @@ pub fn handle_show(
         // Format priority to uppercase
         let priority_str = format!("{:?}", resolved_config.default_priority).to_uppercase();
         println!("  Default Priority: {}", priority_str);
-        
+
         // Show default status if configured
         if let Some(status) = &resolved_config.default_status {
             let status_str = format!("{:?}", status).to_uppercase();
@@ -133,7 +133,7 @@ pub fn handle_show(
             println!("  Default assignee: {}", assignee);
         }
         println!("  Default Priority: {:?}", resolved_config.default_priority);
-        
+
         // Show default status if configured
         if let Some(status) = &resolved_config.default_status {
             println!("  Default Status: {:?}", status);

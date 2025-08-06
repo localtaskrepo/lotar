@@ -39,6 +39,13 @@ List available configuration templates.
 lotar config templates
 ```
 
+### validate
+Validate configuration files for errors and warnings.
+
+```bash
+lotar config validate [--project=PROJECT] [--global] [--fix] [--errors-only]
+```
+
 ## Examples
 
 ```bash
@@ -71,6 +78,18 @@ lotar config set server_port 9000 --global
 
 # List available templates
 lotar config templates
+
+# Validate global configuration
+lotar config validate --global
+
+# Validate specific project configuration
+lotar config validate --project=backend
+
+# Show only errors, not warnings
+lotar config validate --global --errors-only
+
+# Validate and attempt auto-fixes
+lotar config validate --project=my-project --fix
 ```
 
 ## Advanced Features
@@ -115,17 +134,29 @@ lotar config templates
 ## Configuration Keys
 
 ### Project-Level
-- `default_assignee` - Default task assignee
-- `default_priority` - Default task priority
+- `project_name` - Project name/identifier
 - `issue_states` - Available task statuses
-- `issue_types` - Available task types
+- `issue_types` - Available task types  
 - `issue_priorities` - Available priorities
 - `categories` - Available categories
 - `tags` - Available tags
+- `default_assignee` - Default task assignee
+- `default_priority` - Default task priority
+- `default_status` - Default task status
+- `custom_fields` - Custom field definitions
 
 ### Global
 - `server_port` - Web server port
-- `default_project` - Default project name
+- `default_project` - Default project prefix
+- `issue_states` - Default task statuses for all projects
+- `issue_types` - Default task types for all projects
+- `issue_priorities` - Default priorities for all projects
+- `categories` - Default categories for all projects
+- `tags` - Default tags for all projects
+- `default_assignee` - Default task assignee for all projects
+- `default_priority` - Default task priority for all projects
+- `default_status` - Default task status for all projects
+- `custom_fields` - Default custom fields for all projects
 
 ## Templates
 

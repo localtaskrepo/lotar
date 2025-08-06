@@ -417,6 +417,8 @@ pub enum ConfigAction {
     Init(ConfigInitArgs),
     /// List available templates
     Templates,
+    /// Validate configuration files
+    Validate(ConfigValidateArgs),
 }
 
 #[derive(Args)]
@@ -476,6 +478,25 @@ pub struct ConfigInitArgs {
     /// Force initialization even if config exists
     #[arg(long)]
     pub force: bool,
+}
+
+#[derive(Args)]
+pub struct ConfigValidateArgs {
+    /// Validate specific project configuration
+    #[arg(long)]
+    pub project: Option<String>,
+
+    /// Validate global configuration instead of project
+    #[arg(long)]
+    pub global: bool,
+
+    /// Attempt to automatically fix simple issues
+    #[arg(long)]
+    pub fix: bool,
+
+    /// Only show errors, not warnings
+    #[arg(long)]
+    pub errors_only: bool,
 }
 
 #[derive(Args)]

@@ -11,10 +11,12 @@
 //! - `templates`: Template loading and management
 //! - `manager`: Main configuration management logic
 //! - `commands`: CLI command handlers for configuration operations
+//! - `validation`: Configuration validation system
 
 pub mod commands;
 pub mod manager;
 pub mod templates;
 pub mod types;
+pub mod validation;
 
 pub use manager::ConfigManager;
