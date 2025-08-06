@@ -109,6 +109,8 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_priority: Option<Priority>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_status: Option<TaskStatus>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom_fields: Option<StringConfigField>,
 }
 
@@ -123,6 +125,7 @@ impl ProjectConfig {
             tags: None,
             default_assignee: None,
             default_priority: None,
+            default_status: None,
             custom_fields: None,
         }
     }
@@ -151,6 +154,8 @@ pub struct GlobalConfig {
     pub default_assignee: Option<String>,
     #[serde(default = "default_priority")]
     pub default_priority: Priority,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_status: Option<TaskStatus>,
     #[serde(default = "default_custom_fields")]
     pub custom_fields: StringConfigField,
 }
@@ -166,6 +171,7 @@ pub struct ResolvedConfig {
     pub tags: StringConfigField,
     pub default_assignee: Option<String>,
     pub default_priority: Priority,
+    pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
 }
 
@@ -243,6 +249,7 @@ impl Default for GlobalConfig {
             tags: default_tags(),
             default_assignee: None,
             default_priority: default_priority(),
+            default_status: None,
             custom_fields: default_custom_fields(),
         }
     }

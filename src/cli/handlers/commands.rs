@@ -3,7 +3,7 @@ use crate::cli::handlers::CommandHandler;
 use crate::output::OutputRenderer;
 use crate::workspace::TasksDirectoryResolver;
 use crate::config::ConfigManager;
-use crate::types::Priority;
+use crate::types::{Priority, TaskStatus};
 use crate::scanner;
 use crate::api_server;
 use crate::web_server;
@@ -74,21 +74,27 @@ impl ConfigHandler {
             println!("Configuration for project: {}", project_name);
             println!();
             
-            // Server Settings section
-            println!("Server Settings:");
-            println!("  Port: {}", project_config.server_port);
-            println!();
-
-            // Project Settings section
+            // Project Settings section (no server settings for project config)
             println!("Project Settings:");
             println!("  Tasks directory: {}", resolver.path.display());
             println!("  Task file extension: yml");
-            println!("  Default Project: {}", project_config.default_prefix);
+            println!("  Project prefix: {}", project_config.default_prefix);
 
             if let Some(assignee) = &project_config.default_assignee {
                 println!("  Default assignee: {}", assignee);
             }
             println!("  Default Priority: {:?}", project_config.default_priority);
+            
+            // Show default status if configured
+            if let Some(status) = &project_config.default_status {
+                println!("  Default Status: {:?}", status);
+            }
+            println!();
+
+            // Issue Types, States, and Priorities
+            println!("Issue States: {:?}", project_config.issue_states.values);
+            println!("Issue Types: {:?}", project_config.issue_types.values);
+            println!("Issue Priorities: {:?}", project_config.issue_priorities.values);
         } else {
             // Show global config
             let resolved_config = config_manager.get_resolved_config();
@@ -120,6 +126,11 @@ impl ConfigHandler {
                 println!("  Default assignee: {}", assignee);
             }
             println!("  Default Priority: {:?}", resolved_config.default_priority);
+            
+            // Show default status if configured
+            if let Some(status) = &resolved_config.default_status {
+                println!("  Default Status: {:?}", status);
+            }
         }
         
         Ok(())
@@ -230,6 +241,11 @@ impl ConfigHandler {
                 "default_priority" => {
                     if let Ok(priority) = value.parse::<Priority>() {
                         return priority == global_config.default_priority;
+                    }
+                }
+                "default_status" => {
+                    if let Ok(status) = value.parse::<TaskStatus>() {
+                        return global_config.default_status.as_ref() == Some(&status);
                     }
                 }
                 "default_assignee" => {

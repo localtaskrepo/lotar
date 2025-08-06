@@ -282,6 +282,7 @@ mod tests {
             tags: StringConfigField::new_wildcard(),
             default_assignee: None,
             default_priority: Priority::Medium,
+            default_status: None,
             custom_fields: StringConfigField::new_wildcard(),
         }
     }

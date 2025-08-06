@@ -41,12 +41,7 @@ pub fn handle_show(
         println!("Configuration for project: {}", project);
         println!();
 
-        // Server Settings section
-        println!("Server Settings:");
-        println!("  Port: {}", resolved_config.server_port);
-        println!();
-
-        // Project Settings section
+        // Project Settings section (no server settings for project config)
         println!("Project Settings:");
         println!(
             "  Tasks directory: {}",
@@ -56,7 +51,7 @@ pub fn handle_show(
                 .unwrap_or_else(|| ".tasks".to_string())
         );
         println!("  Task file extension: yml");
-        println!("  Default Project: {}", resolved_config.default_prefix);
+        println!("  Project prefix: {}", resolved_config.default_prefix);
 
         if let Some(assignee) = &resolved_config.default_assignee {
             println!("  Default assignee: {}", assignee);
@@ -64,6 +59,12 @@ pub fn handle_show(
         // Format priority to uppercase
         let priority_str = format!("{:?}", resolved_config.default_priority).to_uppercase();
         println!("  Default Priority: {}", priority_str);
+        
+        // Show default status if configured
+        if let Some(status) = &resolved_config.default_status {
+            let status_str = format!("{:?}", status).to_uppercase();
+            println!("  Default Status: {}", status_str);
+        }
         println!();
 
         // Issue Types, States, and Priorities
@@ -132,6 +133,11 @@ pub fn handle_show(
             println!("  Default assignee: {}", assignee);
         }
         println!("  Default Priority: {:?}", resolved_config.default_priority);
+        
+        // Show default status if configured
+        if let Some(status) = &resolved_config.default_status {
+            println!("  Default Status: {:?}", status);
+        }
     }
 
     Ok(())

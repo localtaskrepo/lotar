@@ -178,6 +178,12 @@ impl ConfigManager {
                     ConfigError::ParseError(format!("Invalid priority: {}. Valid values: Low, Medium, High, Critical", value))
                 })?;
             }
+            "default_status" => {
+                let status = value.parse::<TaskStatus>().map_err(|_| {
+                    ConfigError::ParseError(format!("Invalid status: {}. Valid values: Todo, InProgress, Done, Cancelled", value))
+                })?;
+                config.default_status = Some(status);
+            }
             _ => {
                 return Err(ConfigError::ParseError(format!("Unknown global config field: {}", field)));
             }
@@ -199,6 +205,12 @@ impl ConfigManager {
                     ConfigError::ParseError(format!("Invalid priority: {}. Valid values: Low, Medium, High, Critical", value))
                 })?;
                 config.default_priority = Some(priority);
+            }
+            "default_status" => {
+                let status = value.parse::<TaskStatus>().map_err(|_| {
+                    ConfigError::ParseError(format!("Invalid status: {}. Valid values: Todo, InProgress, Done, Cancelled", value))
+                })?;
+                config.default_status = Some(status);
             }
             "issue_states" => {
                 let states: Result<Vec<TaskStatus>, _> = value.split(',')
@@ -250,10 +262,10 @@ impl ConfigManager {
     /// Validate that a field name is valid for the given scope
     pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigError> {
         let valid_global_fields = vec![
-            "server_port", "default_prefix", "default_project", "default_assignee", "default_priority"
+            "server_port", "default_prefix", "default_project", "default_assignee", "default_priority", "default_status"
         ];
         let valid_project_fields = vec![
-            "project_name", "default_assignee", "default_priority",
+            "project_name", "default_assignee", "default_priority", "default_status",
             "issue_states", "issue_types", "issue_priorities", "categories", "tags", "custom_fields"
         ];
 
@@ -286,6 +298,11 @@ impl ConfigManager {
             "default_priority" => {
                 value.parse::<Priority>().map_err(|_| {
                     ConfigError::ParseError(format!("Invalid priority: {}. Valid values: Low, Medium, High, Critical", value))
+                })?;
+            }
+            "default_status" => {
+                value.parse::<TaskStatus>().map_err(|_| {
+                    ConfigError::ParseError(format!("Invalid status: {}. Valid values: Todo, InProgress, Done, Cancelled", value))
                 })?;
             }
             "default_prefix" | "default_project" => {
@@ -612,6 +629,9 @@ impl ConfigManager {
         if let Some(priority) = project_config.default_priority {
             resolved.default_priority = priority;
         }
+        if let Some(status) = project_config.default_status {
+            resolved.default_status = Some(status);
+        }
         if let Some(custom_fields) = project_config.custom_fields {
             resolved.custom_fields = custom_fields;
         }
@@ -632,6 +652,7 @@ impl ResolvedConfig {
             tags: global.tags,
             default_assignee: global.default_assignee,
             default_priority: global.default_priority,
+            default_status: global.default_status,
             custom_fields: global.custom_fields,
         }
     }

@@ -185,6 +185,7 @@ mod tests {
             tags: crate::config::types::StringConfigField::new_wildcard(),
             default_assignee: None,
             default_priority: Priority::Medium,
+            default_status: None,
             custom_fields: crate::config::types::StringConfigField::new_wildcard(),
         };
         

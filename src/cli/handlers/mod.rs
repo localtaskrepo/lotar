@@ -3,7 +3,7 @@ use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::output::{OutputRenderer, OutputFormat};
 use crate::storage::{Storage, task::Task};
-use crate::types::TaskType;
+use crate::types::{TaskType, TaskStatus};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json;
 
@@ -165,6 +165,16 @@ impl CommandHandler for AddHandler {
 
         // Create the task
         let mut task = Task::new(resolver.path.clone(), args.title, validated_priority);
+
+        // Set default status based on config (explicit default or first in issue_states)
+        let default_status = if let Some(explicit_default) = &config.default_status {
+            explicit_default.clone()
+        } else if !config.issue_states.values.is_empty() {
+            config.issue_states.values[0].clone()
+        } else {
+            TaskStatus::default() // Fallback to Todo
+        };
+        task.status = default_status;
 
         // Set validated properties
         task.task_type = validated_type;

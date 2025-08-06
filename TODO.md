@@ -1,10 +1,7 @@
 - inconsistent variable naming with snake and camel case mixed
 - Need to validate scaning for TODOs actually works and creates issues
-- Add ways to control output verbosity to allow more control as a tool
-    Add debug logging for better error tracing
 - MCP
 - Web
-- Index files is generated when there's no content (no mappings)
 - We need to add an author to issues ideally read from the current git user, otherwise fallback to environment value or .lotar config
 - Add github actions to run tests and link the results in the readme
 - we're using default_project instead of default_prefix in the global config.
@@ -15,7 +12,9 @@
 - Make sure new tasks automatically take the first state from the config as default start state (when there's not default_state defined).
 - Are all commands supporting the --tasks-dir and evironment variable settings? Do they all resolve parent project dirs?
 - arguments help and --help don't work everywhere (that will be confusing).
-- Tags are the only ones using an index. Not sure we need it since we do all other search operations without.
+- Comments feature (can we allow references to code?)
+- project templates need to be reviewed and updated for the latest features
+- show global info says we use file type yml, when that's the only type we support
 
 Other refactor jobs:
 - Error system

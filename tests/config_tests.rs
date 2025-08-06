@@ -373,9 +373,9 @@ mod config_operations {
             .stdout(predicate::str::contains(
                 "Configuration for project: ShowTest",
             ))
-            .stdout(predicate::str::contains("Server Settings:"))
-            .stdout(predicate::str::contains("Port: 8080"))
-            .stdout(predicate::str::contains("Project Settings:"));
+            .stdout(predicate::str::contains("Project Settings:"))
+            .stdout(predicate::str::contains("Project prefix:"))
+            .stdout(predicate::str::contains("Default Priority:"));
     }
 }
 
@@ -589,7 +589,7 @@ mod inheritance {
             .assert()
             .success();
 
-        // Show config should display both global and project settings
+        // Show config should display project settings (not server settings)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
@@ -597,7 +597,7 @@ mod inheritance {
             .arg("--project=InheritanceTest")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Port: 9000")) // From global
+            .stdout(predicate::str::contains("Project prefix: InheritanceTest"))
             .stdout(predicate::str::contains("Default Priority: High")); // Project-specific
     }
 }
