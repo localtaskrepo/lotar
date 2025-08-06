@@ -34,30 +34,45 @@ fn resolve_tasks_directory_with_override(
     )
 }
 
+/// Check if a string is a valid command name
+fn is_valid_command(command: &str) -> bool {
+    matches!(command, 
+        "add" | "list" | "status" | "priority" | "p" | "due-date" | "set" | 
+        "task" | "tasks" | "config" | "scan" | "serve" | "index"
+    )
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    // Handle help and version manually for enhanced output
-    // But skip if this is a subcommand help like "lotar help add"
-    if !(args.len() >= 3 && args[1] == "help") {
-        for arg in &args[1..] {
-            // Skip program name
-            if arg == "help" || arg == "--help" || arg == "-h" {
-                show_enhanced_help();
-                return;
-            }
-            if arg == "version" || arg == "--version" || arg == "-V" {
-                println!("lotar {}", env!("CARGO_PKG_VERSION"));
-                return;
-            }
+    // Handle version manually
+    for arg in &args[1..] {
+        if arg == "version" || arg == "--version" || arg == "-V" {
+            println!("lotar {}", env!("CARGO_PKG_VERSION"));
+            return;
         }
     }
 
-    // Handle subcommand help (e.g., "lotar help add" or "lotar add --help")
+    // Handle subcommand help (e.g., "lotar help add")
     if args.len() >= 3 && args[1] == "help" {
         let command = &args[2];
         show_command_help(command);
         return;
+    }
+
+    // Check for help flags and determine context
+    let has_help_flag = args[1..].iter().any(|arg| arg == "help" || arg == "--help" || arg == "-h");
+    
+    if has_help_flag {
+        // If we have a valid command as first argument and a help flag anywhere, show command help
+        if args.len() >= 2 && is_valid_command(&args[1]) && args[1] != "help" {
+            show_command_help(&args[1]);
+            return;
+        } else {
+            // Otherwise show global help
+            show_enhanced_help();
+            return;
+        }
     }
 
     // Parse with Clap
