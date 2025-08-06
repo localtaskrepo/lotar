@@ -2,7 +2,7 @@ mod common;
 
 use common::TestFixtures;
 use assert_cmd::Command;
-use std::fs;
+use predicates::prelude::*;
 
 /// Phase 1.3 - Index Command Implementation Testing
 /// Tests that the index command works correctly for tag operations,
@@ -41,22 +41,13 @@ fn test_index_rebuild_basic_functionality() {
         .success();
     
     let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-    assert!(output.contains("Rebuilding search index") || output.contains("rebuilt successfully"), 
-           "Index rebuild should indicate success: {}", output);
+    assert!(output.contains("simplified") || output.contains("directly on files"), 
+           "Index rebuild should indicate simplified architecture: {}", output);
     
-    // Verify index file was created
-    let index_file = temp_dir.join(".tasks").join("index.yml");
-    assert!(index_file.exists(), "Index file should be created at {:?}", index_file);
+    // Note: With simplified architecture, no index file is created
+    // All filtering is done directly on task files
     
-    // Check index file contents
-    let index_content = fs::read_to_string(&index_file)
-        .expect("Should be able to read index file");
-    
-    assert!(index_content.contains("tag2id:"), "Index should contain tag2id mapping");
-    assert!(index_content.contains("frontend") || index_content.contains("backend"), 
-           "Index should contain our tags");
-    
-    println!("✅ Index rebuild basic functionality working");
+    println!("✅ Index command test completed");
 }
 
 #[test]
@@ -107,10 +98,7 @@ fn test_index_updates_when_tags_modified() {
         .assert()
         .success();
     
-    // Read initial index
-    let index_file = temp_dir.join(".tasks").join("index.yml");
-    let initial_content = fs::read_to_string(&index_file)
-        .expect("Should be able to read index file");
+    // Read initial state - no index file with simplified architecture
     
     // Add another task with different tags
     let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -130,17 +118,8 @@ fn test_index_updates_when_tags_modified() {
         .assert()
         .success();
     
-    // Read updated index
-    let updated_content = fs::read_to_string(&index_file)
-        .expect("Should be able to read updated index file");
-    
-    // Verify index was updated
-    assert!(updated_content.contains("initial"), "Index should still contain initial tag");
-    assert!(updated_content.contains("updated") || updated_content.contains("new"), 
-           "Index should contain new tags");
-    assert_ne!(initial_content, updated_content, "Index content should have changed");
-    
-    println!("✅ Index updates correctly when tags are modified");
+    // With simplified architecture, no index file tracking changes
+    println!("✅ Index no longer tracks changes - simplified architecture");
 }
 
 #[test]
@@ -176,18 +155,10 @@ fn test_index_with_multiple_projects() {
         .success();
     
     let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-    assert!(output.contains("rebuilt successfully"), "Index rebuild should work across projects");
+    assert!(output.contains("simplified") || output.contains("rebuilt successfully"), "Index rebuild should work across projects");
     
-    // Check that index contains tags from multiple projects
-    let index_file = temp_dir.join(".tasks").join("index.yml");
-    let index_content = fs::read_to_string(&index_file)
-        .expect("Should be able to read index file");
-    
-    // Should contain tags from both projects
-    assert!(index_content.contains("ui") || index_content.contains("api"), 
-           "Index should contain tags from multiple projects: {}", index_content);
-    
-    println!("✅ Index works correctly with multiple projects");
+    // With simplified architecture, no index file is created
+    println!("✅ Index no longer needed for multiple projects - simplified architecture");
 }
 
 #[test]
@@ -280,15 +251,8 @@ fn test_index_performance_with_multiple_tasks() {
     assert!(duration.as_secs() < 5, "Index rebuild should complete quickly, took {:?}", duration);
     
     // Verify index file was created and contains expected tags
-    let index_file = temp_dir.join(".tasks").join("index.yml");
-    let index_content = fs::read_to_string(&index_file)
-        .expect("Should be able to read index file");
-    
-    // Should contain multiple tag groups
-    assert!(index_content.contains("batch"), "Index should contain batch tags");
-    assert!(index_content.contains("test"), "Index should contain test tags");
-    
-    println!("✅ Index performance test completed in {:?} for {} tasks", duration, task_count);
+    // With simplified architecture, no index file performance testing needed
+    println!("✅ Index no longer needed - performance is direct file access");
 }
 
 #[test]
@@ -305,38 +269,18 @@ fn test_index_file_handling_and_cleanup() {
         .assert()
         .success();
     
-    // Build index
+    // Test index rebuild command (now simplified)
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir)
         .arg("index")
         .arg("rebuild")
         .assert()
-        .success();
+        .success()
+        .stdout(predicate::str::contains("Index functionality has been simplified"));
     
+    // Verify no index file is created with simplified architecture
     let index_file = temp_dir.join(".tasks").join("index.yml");
-    assert!(index_file.exists(), "Index file should exist after rebuild");
+    assert!(!index_file.exists(), "No index file should exist with simplified architecture");
     
-    // Get file metadata
-    let metadata1 = fs::metadata(&index_file)
-        .expect("Should be able to get index file metadata");
-    
-    // Wait a moment and rebuild again
-    std::thread::sleep(std::time::Duration::from_millis(100));
-    
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("index")
-        .arg("rebuild")
-        .assert()
-        .success();
-    
-    // Check that file was updated
-    let metadata2 = fs::metadata(&index_file)
-        .expect("Should be able to get updated index file metadata");
-    
-    // File should have been modified (different modification time)
-    assert_ne!(metadata1.modified().unwrap(), metadata2.modified().unwrap(), 
-              "Index file should be updated on rebuild");
-    
-    println!("✅ Index file handling and update working correctly");
+    println!("✅ Index functionality simplified - no file handling needed");
 }

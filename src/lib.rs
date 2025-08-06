@@ -15,7 +15,7 @@ pub mod web_server; // Add utilities module
 pub mod workspace; // Add workspace resolution module
 
 pub use errors::{LoTaRError, LoTaRResult};
-pub use index::{TaskFilter, TaskIndex};
+pub use index::TaskFilter;
 pub use project::{get_project_name, get_project_path, get_effective_project_name};
 pub use scanner::Scanner;
 pub use storage::{Storage, Task};

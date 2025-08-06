@@ -437,15 +437,31 @@ impl CommandHandler for SearchHandler {
             // Convert to TaskDisplayInfo for rendering
             let display_tasks: Vec<crate::output::TaskDisplayInfo> = tasks
                 .into_iter()
-                .map(|(task_id, task)| crate::output::TaskDisplayInfo {
-                    id: task_id,
-                    title: task.title,
-                    status: task.status.to_string(),
-                    priority: task.priority.to_string(),
-                    task_type: task.task_type.to_string(),
-                    description: task.description,
-                    assignee: task.assignee,
-                    project: None, // Project info would need to come from context
+                .map(|(task_id, task)| {
+                    // Extract project from task ID (e.g., "LOTA-5" -> "LOTA")
+                    let project = if let Some(dash_pos) = task_id.find('-') {
+                        Some(task_id[..dash_pos].to_string())
+                    } else {
+                        None
+                    };
+                    
+                    crate::output::TaskDisplayInfo {
+                        id: task_id,
+                        title: task.title,
+                        status: task.status.to_string(),
+                        priority: task.priority.to_string(),
+                        task_type: task.task_type.to_string(),
+                        description: task.description,
+                        assignee: task.assignee,
+                        project,
+                        due_date: task.due_date,
+                        effort: task.effort,
+                        category: task.category,
+                        tags: task.tags,
+                        created: task.created,
+                        modified: task.modified,
+                        custom_fields: task.custom_fields,
+                    }
                 })
                 .collect();
 

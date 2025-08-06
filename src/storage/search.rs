@@ -1,4 +1,4 @@
-use crate::index::{TaskFilter, TaskIndex};
+use crate::index::TaskFilter;
 use crate::storage::task::Task;
 use std::fs;
 use std::path::Path;
@@ -8,15 +8,10 @@ pub struct StorageSearch;
 
 impl StorageSearch {
     /// Search for tasks based on filter criteria
-    pub fn search(root_path: &Path, index: &TaskIndex, filter: &TaskFilter) -> Vec<(String, Task)> {
+    pub fn search(root_path: &Path, filter: &TaskFilter) -> Vec<(String, Task)> {
         let mut results = Vec::new();
 
-        // If we have tag filters, use the index to get candidate task IDs
-        let tag_candidates = if !filter.tags.is_empty() {
-            index.find_by_filter(filter)
-        } else {
-            Vec::new()
-        };
+        // No longer use index for tag pre-filtering - do all filtering during file scan
 
         // If we have a specific project filter, search only that project
         if let Some(project) = &filter.project {
@@ -33,12 +28,6 @@ impl StorageSearch {
                             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                                 if let Ok(numeric_id) = stem.parse::<u64>() {
                                     let task_id = format!("{}-{}", project_folder, numeric_id);
-
-                                    // If we have tag filters, check if this task matches
-                                    if !filter.tags.is_empty() && !tag_candidates.contains(&task_id)
-                                    {
-                                        continue;
-                                    }
 
                                     // Load and filter the task
                                     if let Ok(content) = fs::read_to_string(&path) {
@@ -82,13 +71,6 @@ impl StorageSearch {
                                         if let Ok(numeric_id) = stem.parse::<u64>() {
                                             let task_id =
                                                 format!("{}-{}", project_folder, numeric_id);
-
-                                            // If we have tag filters, check if this task matches
-                                            if !filter.tags.is_empty()
-                                                && !tag_candidates.contains(&task_id)
-                                            {
-                                                continue;
-                                            }
 
                                             // Load and filter the task
                                             if let Ok(content) = fs::read_to_string(&task_path) {
@@ -160,7 +142,15 @@ impl StorageSearch {
             return false;
         }
 
-        // Tag filtering is handled at the index level before this method is called
+        // Check tag filters (OR logic - match any of the specified tags)
+        if !filter.tags.is_empty() {
+            let task_has_matching_tag = filter.tags.iter().any(|filter_tag| {
+                task.tags.iter().any(|task_tag| task_tag == filter_tag)
+            });
+            if !task_has_matching_tag {
+                return false;
+            }
+        }
 
         true
     }

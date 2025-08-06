@@ -1,5 +1,4 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
-use crate::index::TaskIndex;
 use crate::storage::task::Task;
 use crate::utils::generate_project_prefix;
 use std::fs;
@@ -12,7 +11,6 @@ impl StorageOperations {
     /// Add a new task to storage
     pub fn add(
         root_path: &Path,
-        index: &mut TaskIndex,
         task: &Task,
         project_prefix: &str,
         original_project_name: Option<&str>,
@@ -57,13 +55,7 @@ impl StorageOperations {
         fs::create_dir_all(file_path.parent().unwrap())?;
         fs::write(&file_path, file_string)?;
 
-        // Update index
-        let relative_path = file_path
-            .strip_prefix(root_path)
-            .unwrap_or(&file_path)
-            .to_string_lossy()
-            .to_string();
-        index.add_task_with_id(&formatted_id, &task_to_store, &relative_path);
+        // No longer need to update index - simplified architecture
 
         Ok(formatted_id)
     }
@@ -117,7 +109,6 @@ impl StorageOperations {
     /// Edit an existing task
     pub fn edit(
         root_path: &Path,
-        index: &mut TaskIndex,
         id: &str,
         new_task: &Task,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -128,7 +119,7 @@ impl StorageOperations {
         };
 
         // Get old task for index update
-        let old_task = Self::get(root_path, id, project_folder.clone());
+        let _old_task = Self::get(root_path, id, project_folder.clone());
 
         let project_path = root_path.join(&project_folder);
 
@@ -144,15 +135,7 @@ impl StorageOperations {
         let file_string = serde_yaml::to_string(&task_to_save)?;
         fs::write(&file_path, file_string)?;
 
-        // Update index using new method with explicit ID
-        if let Some(old) = old_task {
-            let relative_path = file_path
-                .strip_prefix(root_path)
-                .unwrap_or(&file_path)
-                .to_string_lossy()
-                .to_string();
-            index.update_task_with_id(id, &old, &task_to_save, &relative_path);
-        }
+        // No longer need to update index - simplified architecture
 
         Ok(())
     }
@@ -160,13 +143,9 @@ impl StorageOperations {
     /// Delete a task
     pub fn delete(
         root_path: &Path,
-        index: &mut TaskIndex,
         id: &str,
         project: String,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        // Get task for index update
-        let task = Self::get(root_path, id, project.clone());
-
         let project_path = root_path.join(&project);
 
         // Use filesystem-based file path resolution
@@ -177,10 +156,7 @@ impl StorageOperations {
 
         match fs::remove_file(file_path) {
             Ok(_) => {
-                // Update index using new method with explicit ID
-                if let Some(t) = task {
-                    index.remove_task_with_id(id, &t);
-                }
+                // No longer need to update index - simplified architecture
                 Ok(true)
             }
             Err(_) => Ok(false),

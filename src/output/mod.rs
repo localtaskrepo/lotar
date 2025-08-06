@@ -24,6 +24,13 @@ pub struct TaskDisplayInfo {
     pub description: Option<String>,
     pub assignee: Option<String>,
     pub project: Option<String>,
+    pub due_date: Option<String>,
+    pub effort: Option<String>,
+    pub category: Option<String>,
+    pub tags: Vec<String>,
+    pub created: String,
+    pub modified: String,
+    pub custom_fields: std::collections::HashMap<String, serde_yaml::Value>,
 }
 
 pub trait Outputable {

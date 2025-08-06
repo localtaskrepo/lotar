@@ -514,7 +514,8 @@ mod custom_tasks_directory {
             .stdout(predicate::str::contains("Created task:"));
 
         // Verify task files were created in custom directory
-        assert!(custom_tasks_dir.join("index.yml").exists());
+        // Note: index.yml no longer created in simplified architecture
+        assert!(custom_tasks_dir.exists());
 
         // Check that project directory was created
         let project_dirs: Vec<_> = fs::read_dir(&custom_tasks_dir)

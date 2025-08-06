@@ -8,7 +8,6 @@ use crate::scanner;
 use crate::api_server;
 use crate::web_server;
 use crate::routes;
-use crate::storage::Storage;
 use crate::project;
 use std::path::PathBuf;
 use std::fs;
@@ -592,19 +591,12 @@ impl CommandHandler for IndexHandler {
     type Args = IndexArgs;
     type Result = Result<(), String>;
     
-    fn execute(args: Self::Args, _project: Option<&str>, resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
+    fn execute(args: Self::Args, _project: Option<&str>, _resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
         match args.action {
             IndexAction::Rebuild => {
-                println!("🔄 Rebuilding search index from storage...");
-                let mut store = Storage::new(resolver.path.clone());
-
-                match store.rebuild_index() {
-                    Ok(_) => {
-                        println!("✅ Search index rebuilt successfully");
-                        Ok(())
-                    }
-                    Err(e) => Err(format!("Failed to rebuild index: {}", e)),
-                }
+                println!("🔄 Index functionality has been simplified - no rebuild needed");
+                println!("✅ All task filtering is now done directly on files");
+                Ok(())
             }
         }
     }
