@@ -110,6 +110,14 @@ impl TestFixtures {
             Priority::Medium,
         )
     }
+
+    /// Create a config file in the specified directory
+    #[allow(dead_code)]
+    pub fn create_config_in_dir(&self, dir: &std::path::Path, content: &str) {
+        let config_path = dir.join("config.yml");
+        std::fs::write(&config_path, content)
+            .expect("Failed to create config file");
+    }
 }
 
 /// Test utility functions

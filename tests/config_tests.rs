@@ -395,20 +395,18 @@ mod custom_tasks_directory {
         // Ensure custom directory doesn't exist initially
         assert!(!custom_tasks_dir.exists());
 
-        // Test that using --tasks-dir with non-existent directory gives error
+        // Test that using --tasks-dir with non-existent directory automatically creates it
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("--tasks-dir=custom-tasks")
             .arg("config")
             .arg("show")
             .assert()
-            .failure()
-            .stderr(predicate::str::contains(
-                "Specified tasks directory does not exist",
-            ));
+            .success()
+            .stdout(predicate::str::contains("Tasks directory: custom-tasks"));
 
-        // Create the custom directory
-        fs::create_dir_all(&custom_tasks_dir).unwrap();
+        // Verify the custom directory was created
+        assert!(custom_tasks_dir.exists());
 
         // Test config set command with custom directory
         let mut cmd = Command::cargo_bin("lotar").unwrap();

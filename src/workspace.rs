@@ -48,8 +48,10 @@ impl TasksDirectoryResolver {
         // 1. Command line flag takes highest priority
         if let Some(path) = explicit_path {
             let path_buf = PathBuf::from(path);
+            // Create directory if it doesn't exist (for --tasks-dir support)
             if !path_buf.exists() {
-                return Err(format!("Specified tasks directory does not exist: {}", path));
+                fs::create_dir_all(&path_buf)
+                    .map_err(|e| format!("Failed to create tasks directory {}: {}", path, e))?;
             }
             return Ok(TasksDirectoryResolver {
                 path: path_buf,
@@ -57,13 +59,29 @@ impl TasksDirectoryResolver {
             });
         }
 
-        // 2. Load home config to get tasks folder preference
+        // 2. Environment variable LOTAR_TASKS_DIR takes precedence
+        if let Ok(env_path) = env::var("LOTAR_TASKS_DIR") {
+            if !env_path.trim().is_empty() {
+                let path_buf = PathBuf::from(env_path.trim());
+                // Create directory if it doesn't exist
+                if !path_buf.exists() {
+                    fs::create_dir_all(&path_buf)
+                        .map_err(|e| format!("Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}", path_buf.display(), e))?;
+                }
+                return Ok(TasksDirectoryResolver {
+                    path: path_buf,
+                    source: TasksDirectorySource::CommandLineFlag, // Treat env var like CLI
+                });
+            }
+        }
+
+        // 3. Load home config to get tasks folder preference
         let home_tasks_folder = Self::get_home_config_tasks_folder(&home_config_override)?;
         
-        // 3. Determine the folder name to search for (home config takes precedence over parameter)
+        // 4. Determine the folder name to search for (home config takes precedence over parameter)
         let folder_name = Self::get_tasks_folder_name(home_tasks_folder.as_deref().or(global_config_tasks_folder));
 
-        // 4. Search up the directory tree
+        // 5. Search up the directory tree
         if let Some((found_path, parent_dir)) = Self::find_tasks_folder_in_parents(&folder_name)? {
             return Ok(TasksDirectoryResolver {
                 path: found_path.clone(),
@@ -75,7 +93,7 @@ impl TasksDirectoryResolver {
             });
         }
 
-        // 5. Default to current directory + folder name
+        // 6. Default to current directory + folder name
         let current_dir = env::current_dir()
             .map_err(|e| format!("Failed to get current directory: {}", e))?;
         let tasks_path = current_dir.join(&folder_name);
