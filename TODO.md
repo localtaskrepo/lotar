@@ -3,7 +3,8 @@
 - MCP
 - Web
 - We need to add an author to issues ideally read from the current git user, otherwise fallback to environment value or .lotar config
-- Add github actions to run tests and link the results in the readme
+- TODO: Replace parcel with vite
+- validation for view and rust code should be done only when respective source files are edited.
 - we're using default_project instead of default_prefix in the global config.
 - Tasks have relationships, so we should have commands to show them.
 - Feature: context with references to relevant files for the task. how does this work together with scanning for TODOs?

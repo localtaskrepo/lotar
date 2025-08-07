@@ -1,5 +1,5 @@
 //! Performance and experimental tests
-//! 
+//!
 //! This module consolidates all performance-related tests including:
 //! - CLI performance benchmarks
 //! - Large dataset handling
@@ -29,14 +29,14 @@ mod cli_performance {
         // Measure help command performance
         let start = Instant::now();
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("help")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("help").assert().success();
         let help_duration = start.elapsed();
 
         // Help should be very fast (< 1 second)
-        assert!(help_duration.as_secs() < 1, "Help command took too long: {:?}", help_duration);
+        assert!(
+            help_duration.as_secs() < 1,
+            "Help command took too long: {help_duration:?}"
+        );
 
         // Measure config show performance (read-only operation)
         let start = Instant::now();
@@ -49,7 +49,10 @@ mod cli_performance {
         let config_duration = start.elapsed();
 
         // Config show should be fast (< 2 seconds)
-        assert!(config_duration.as_secs() < 2, "Config show took too long: {:?}", config_duration);
+        assert!(
+            config_duration.as_secs() < 2,
+            "Config show took too long: {config_duration:?}"
+        );
     }
 
     #[test]
@@ -73,7 +76,7 @@ mod cli_performance {
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
-                .arg(&format!("Performance test task {}", i))
+                .arg(format!("Performance test task {i}"))
                 .arg("--project=PerfTest")
                 .assert()
                 .success();
@@ -81,7 +84,10 @@ mod cli_performance {
         let creation_duration = start.elapsed();
 
         // 10 task creations should complete reasonably quickly (< 10 seconds)
-        assert!(creation_duration.as_secs() < 10, "Task creation took too long: {:?}", creation_duration);
+        assert!(
+            creation_duration.as_secs() < 10,
+            "Task creation took too long: {creation_duration:?}"
+        );
 
         // Measure list performance
         let start = Instant::now();
@@ -95,7 +101,10 @@ mod cli_performance {
         let list_duration = start.elapsed();
 
         // List should be fast even with multiple tasks (< 2 seconds)
-        assert!(list_duration.as_secs() < 2, "List command took too long: {:?}", list_duration);
+        assert!(
+            list_duration.as_secs() < 2,
+            "List command took too long: {list_duration:?}"
+        );
     }
 
     #[test]
@@ -104,32 +113,45 @@ mod cli_performance {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a medium-sized project structure
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"perf-test\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"perf-test\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
-        
+
         // Create multiple source files
         for i in 0..25 {
-            let file_path = temp_dir.join("src").join(format!("module_{}.rs", i));
-            fs::write(&file_path, format!(
-                "// Module {}\npub fn function_{}() {{\n    println!(\"Function {}\");\n}}", 
-                i, i, i
-            )).unwrap();
+            let file_path = temp_dir.join("src").join(format!("module_{i}.rs"));
+            fs::write(
+                &file_path,
+                format!(
+                    "// Module {i}\npub fn function_{i}() {{\n    println!(\"Function {i}\");\n}}"
+                ),
+            )
+            .unwrap();
         }
 
         // Create tests directory with test files
         fs::create_dir_all(temp_dir.join("tests")).unwrap();
         for i in 0..10 {
-            let test_path = temp_dir.join("tests").join(format!("test_{}.rs", i));
-            fs::write(&test_path, format!(
-                "#[test]\nfn test_{}() {{\n    assert_eq!(2 + 2, 4);\n}}", i
-            )).unwrap();
+            let test_path = temp_dir.join("tests").join(format!("test_{i}.rs"));
+            fs::write(
+                &test_path,
+                format!("#[test]\nfn test_{i}() {{\n    assert_eq!(2 + 2, 4);\n}}"),
+            )
+            .unwrap();
         }
 
         // Create documentation files
         fs::create_dir_all(temp_dir.join("docs")).unwrap();
         for i in 0..5 {
-            let doc_path = temp_dir.join("docs").join(format!("doc_{}.md", i));
-            fs::write(&doc_path, format!("# Documentation {}\n\nThis is documentation file {}.", i, i)).unwrap();
+            let doc_path = temp_dir.join("docs").join(format!("doc_{i}.md"));
+            fs::write(
+                &doc_path,
+                format!("# Documentation {i}\n\nThis is documentation file {i}."),
+            )
+            .unwrap();
         }
 
         // Measure scan performance
@@ -143,7 +165,10 @@ mod cli_performance {
         let scan_duration = start.elapsed();
 
         // Scan should complete reasonably quickly even with many files (< 5 seconds)
-        assert!(scan_duration.as_secs() < 5, "Scan took too long: {:?}", scan_duration);
+        assert!(
+            scan_duration.as_secs() < 5,
+            "Scan took too long: {scan_duration:?}"
+        );
     }
 }
 
@@ -171,22 +196,22 @@ mod large_datasets {
         // Create many small tasks
         let task_count = 50;
         let start = Instant::now();
-        
+
         for i in 0..task_count {
             let mut cmd = Command::cargo_bin("lotar").unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
-                .arg(&format!("Task {}", i))
+                .arg(format!("Task {i}"))
                 .arg("--description")
-                .arg(&format!("Description for task number {}", i))
+                .arg(format!("Description for task number {i}"))
                 .arg("--project=LargeDataset")
                 .assert()
                 .success();
         }
-        
+
         let creation_duration = start.elapsed();
-        println!("Created {} tasks in {:?}", task_count, creation_duration);
+        println!("Created {task_count} tasks in {creation_duration:?}");
 
         // Measure list performance with many tasks
         let start = Instant::now();
@@ -198,11 +223,17 @@ mod large_datasets {
             .success();
         let list_duration = start.elapsed();
 
-        println!("Listed {} tasks in {:?}", task_count, list_duration);
+        println!("Listed {task_count} tasks in {list_duration:?}");
 
         // Performance should be reasonable (< 20 seconds for creation, < 3 seconds for listing)
-        assert!(creation_duration.as_secs() < 20, "Task creation took too long: {:?}", creation_duration);
-        assert!(list_duration.as_secs() < 3, "Task listing took too long: {:?}", list_duration);
+        assert!(
+            creation_duration.as_secs() < 20,
+            "Task creation took too long: {creation_duration:?}"
+        );
+        assert!(
+            list_duration.as_secs() < 3,
+            "Task listing took too long: {list_duration:?}"
+        );
     }
 
     #[test]
@@ -221,22 +252,23 @@ mod large_datasets {
 
         // Create tasks with complex descriptions and metadata
         let start = Instant::now();
-        
+
         for i in 0..20 {
             let long_description = format!(
-                "This is a very detailed description for task {}. \
+                "This is a very detailed description for task {i}. \
                 It contains multiple sentences and explains the task in great detail. \
                 The description includes technical requirements, acceptance criteria, \
                 and various implementation notes that span multiple lines. \
-                Task {} requires careful consideration of performance implications.",
-                i, i
+                Task {i} requires careful consideration of performance implications."
             );
 
             let mut cmd = Command::cargo_bin("lotar").unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
-                .arg(&format!("Complex Task {} with Long Title That Describes Everything", i))
+                .arg(format!(
+                    "Complex Task {i} with Long Title That Describes Everything"
+                ))
                 .arg("--description")
                 .arg(&long_description)
                 .arg("--priority=high")
@@ -244,7 +276,7 @@ mod large_datasets {
                 .assert()
                 .success();
         }
-        
+
         let creation_duration = start.elapsed();
 
         // Measure search performance with complex data
@@ -257,12 +289,18 @@ mod large_datasets {
             .success();
         let search_duration = start.elapsed();
 
-        println!("Complex task creation took: {:?}", creation_duration);
-        println!("Search took: {:?}", search_duration);
+        println!("Complex task creation took: {creation_duration:?}");
+        println!("Search took: {search_duration:?}");
 
         // Should handle complex data reasonably well
-        assert!(creation_duration.as_secs() < 15, "Complex task creation took too long: {:?}", creation_duration);
-        assert!(search_duration.as_secs() < 3, "Search took too long: {:?}", search_duration);
+        assert!(
+            creation_duration.as_secs() < 15,
+            "Complex task creation took too long: {creation_duration:?}"
+        );
+        assert!(
+            search_duration.as_secs() < 3,
+            "Search took too long: {search_duration:?}"
+        );
     }
 
     #[test]
@@ -272,17 +310,17 @@ mod large_datasets {
 
         // Create a large file (simulating a substantial codebase)
         let large_file_content = (0..1000)
-            .map(|i| format!("// Line {} of large file\nfn function_{}() {{\n    println!(\"Function {}\");\n}}\n", i, i, i))
+            .map(|i| format!("// Line {i} of large file\nfn function_{i}() {{\n    println!(\"Function {i}\");\n}}\n"))
             .collect::<Vec<_>>()
             .join("\n");
-        
+
         fs::write(temp_dir.join("large_file.rs"), &large_file_content).unwrap();
 
         // Create many smaller files
         fs::create_dir_all(temp_dir.join("src")).unwrap();
         for i in 0..100 {
-            let content = format!("// Small file {}\npub const VALUE_{}: i32 = {};", i, i, i);
-            fs::write(temp_dir.join("src").join(format!("small_{}.rs", i)), content).unwrap();
+            let content = format!("// Small file {i}\npub const VALUE_{i}: i32 = {i};");
+            fs::write(temp_dir.join("src").join(format!("small_{i}.rs")), content).unwrap();
         }
 
         // Measure scanning performance
@@ -295,10 +333,13 @@ mod large_datasets {
             .stdout(predicate::str::contains("Scanning"));
         let scan_duration = start.elapsed();
 
-        println!("Scanned large dataset in: {:?}", scan_duration);
+        println!("Scanned large dataset in: {scan_duration:?}");
 
         // Should handle large files and many small files (< 8 seconds)
-        assert!(scan_duration.as_secs() < 8, "Large file scanning took too long: {:?}", scan_duration);
+        assert!(
+            scan_duration.as_secs() < 8,
+            "Large file scanning took too long: {scan_duration:?}"
+        );
     }
 }
 
@@ -331,7 +372,7 @@ mod memory_optimization {
                 cmd.current_dir(temp_dir)
                     .arg("task")
                     .arg("add")
-                    .arg(&format!("Memory test task {}", task_id))
+                    .arg(format!("Memory test task {task_id}"))
                     .arg("--project=MemoryTest")
                     .assert()
                     .success();
@@ -372,7 +413,7 @@ mod memory_optimization {
 
         // Simulate rapid successive operations (like a user working quickly)
         let start = Instant::now();
-        
+
         // Add task
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -427,10 +468,13 @@ mod memory_optimization {
             .success();
 
         let total_duration = start.elapsed();
-        println!("Rapid operations completed in: {:?}", total_duration);
+        println!("Rapid operations completed in: {total_duration:?}");
 
         // All operations should complete quickly (< 10 seconds)
-        assert!(total_duration.as_secs() < 10, "Rapid operations took too long: {:?}", total_duration);
+        assert!(
+            total_duration.as_secs() < 10,
+            "Rapid operations took too long: {total_duration:?}"
+        );
     }
 }
 
@@ -486,7 +530,7 @@ mod experimental_features {
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
-                .arg(&format!("Stress test task {}", cycle))
+                .arg(format!("Stress test task {cycle}"))
                 .arg("--project=StressTest")
                 .assert()
                 .success();
@@ -504,7 +548,7 @@ mod experimental_features {
                 let mut cmd = Command::cargo_bin("lotar").unwrap();
                 cmd.current_dir(temp_dir)
                     .arg("status")
-                    .arg(&format!("STRE-{}", cycle))
+                    .arg(format!("STRE-{cycle}"))
                     .arg("done")
                     .assert()
                     .success();
@@ -565,15 +609,15 @@ mod experimental_features {
 
         // Valid operation after errors
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("help")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("help").assert().success();
 
         let error_recovery_duration = start.elapsed();
 
         // Error handling should be fast (< 5 seconds total)
-        assert!(error_recovery_duration.as_secs() < 5, "Error recovery took too long: {:?}", error_recovery_duration);
+        assert!(
+            error_recovery_duration.as_secs() < 5,
+            "Error recovery took too long: {error_recovery_duration:?}"
+        );
     }
 
     #[test]
@@ -587,7 +631,7 @@ mod experimental_features {
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
-            .arg(&format!("--project={}", long_project_name))
+            .arg(format!("--project={long_project_name}"))
             .assert()
             .success(); // Should handle long names gracefully
 
@@ -648,10 +692,7 @@ mod integration_performance {
 
         // Step 3: Scan project
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("scan")
-            .assert()
-            .success();
+        cmd.current_dir(temp_dir).arg("scan").assert().success();
 
         // Step 4: Add multiple tasks
         for i in 0..10 {
@@ -659,7 +700,7 @@ mod integration_performance {
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
-                .arg(&format!("Workflow task {}", i))
+                .arg(format!("Workflow task {i}"))
                 .arg("--project=FullWorkflow")
                 .assert()
                 .success();
@@ -670,7 +711,7 @@ mod integration_performance {
             let mut cmd = Command::cargo_bin("lotar").unwrap();
             cmd.current_dir(temp_dir)
                 .arg("status")
-                .arg(&format!("FULL-{}", i))
+                .arg(format!("FULL-{i}"))
                 .arg("in_progress")
                 .assert()
                 .success();
@@ -681,7 +722,7 @@ mod integration_performance {
             let mut cmd = Command::cargo_bin("lotar").unwrap();
             cmd.current_dir(temp_dir)
                 .arg("status")
-                .arg(&format!("FULL-{}", i))
+                .arg(format!("FULL-{i}"))
                 .arg("done")
                 .assert()
                 .success();
@@ -697,9 +738,12 @@ mod integration_performance {
             .stdout(predicate::str::contains("FULL"));
 
         let total_workflow_duration = start.elapsed();
-        println!("Full workflow completed in: {:?}", total_workflow_duration);
+        println!("Full workflow completed in: {total_workflow_duration:?}");
 
         // Complete workflow should finish in reasonable time (< 30 seconds)
-        assert!(total_workflow_duration.as_secs() < 30, "Full workflow took too long: {:?}", total_workflow_duration);
+        assert!(
+            total_workflow_duration.as_secs() < 30,
+            "Full workflow took too long: {total_workflow_duration:?}"
+        );
     }
 }

@@ -1,7 +1,7 @@
+use crate::config::manager::ConfigManager;
+use crate::config::validation::errors::{ValidationError, ValidationResult};
 use std::collections::HashSet;
 use std::path::Path;
-use crate::config::validation::errors::{ValidationError, ValidationResult};
-use crate::config::manager::ConfigManager;
 
 pub struct PrefixConflictDetector {
     existing_prefixes: HashSet<String>,
@@ -10,7 +10,7 @@ pub struct PrefixConflictDetector {
 impl PrefixConflictDetector {
     pub fn new(tasks_dir: &Path) -> Result<Self, String> {
         let mut existing_prefixes = HashSet::new();
-        
+
         // Scan existing project directories for prefixes
         if tasks_dir.exists() {
             let entries = std::fs::read_dir(tasks_dir)
@@ -19,15 +19,20 @@ impl PrefixConflictDetector {
             for entry in entries {
                 let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
                 let path = entry.path();
-                
+
                 if path.is_dir() {
                     if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
                         // Try to load config to get actual prefix
                         let config_path = path.join("config.yml");
                         if config_path.exists() {
-                            if let Ok(config_manager) = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir) {
-                                if let Ok(project_config) = config_manager.get_project_config(dir_name) {
-                                    existing_prefixes.insert(project_config.default_prefix.to_uppercase());
+                            if let Ok(config_manager) =
+                                ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
+                            {
+                                if let Ok(project_config) =
+                                    config_manager.get_project_config(dir_name)
+                                {
+                                    existing_prefixes
+                                        .insert(project_config.default_prefix.to_uppercase());
                                 }
                             }
                         } else {
@@ -48,30 +53,47 @@ impl PrefixConflictDetector {
 
         // Exact match check
         if self.existing_prefixes.contains(&new_prefix_upper) {
-            result.add_error(ValidationError::error(
-                Some("default_prefix".to_string()),
-                format!("Project prefix '{}' already exists", new_prefix)
-            ).with_fix("Choose a different prefix or use --force to override".to_string()));
+            result.add_error(
+                ValidationError::error(
+                    Some("default_prefix".to_string()),
+                    format!("Project prefix '{}' already exists", new_prefix),
+                )
+                .with_fix("Choose a different prefix or use --force to override".to_string()),
+            );
             return result;
         }
 
         // Substring conflict check
         for existing in &self.existing_prefixes {
             if existing.contains(&new_prefix_upper) || new_prefix_upper.contains(existing) {
-                result.add_error(ValidationError::warning(
-                    Some("default_prefix".to_string()),
-                    format!("Project prefix '{}' conflicts with existing prefix '{}'", new_prefix, existing)
-                ).with_fix(format!("Consider using a more distinct prefix to avoid confusion")));
+                result.add_error(
+                    ValidationError::warning(
+                        Some("default_prefix".to_string()),
+                        format!(
+                            "Project prefix '{}' conflicts with existing prefix '{}'",
+                            new_prefix, existing
+                        ),
+                    )
+                    .with_fix(
+                        "Consider using a more distinct prefix to avoid confusion".to_string(),
+                    ),
+                );
             }
         }
 
         // Similar prefix warning (edit distance)
         for existing in &self.existing_prefixes {
             if self.are_similar(&new_prefix_upper, existing) {
-                result.add_error(ValidationError::warning(
-                    Some("default_prefix".to_string()),
-                    format!("Project prefix '{}' is very similar to existing prefix '{}'", new_prefix, existing)
-                ).with_fix("Consider using a more distinct prefix".to_string()));
+                result.add_error(
+                    ValidationError::warning(
+                        Some("default_prefix".to_string()),
+                        format!(
+                            "Project prefix '{}' is very similar to existing prefix '{}'",
+                            new_prefix, existing
+                        ),
+                    )
+                    .with_fix("Consider using a more distinct prefix".to_string()),
+                );
             }
         }
 

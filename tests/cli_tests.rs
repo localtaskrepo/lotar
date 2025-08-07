@@ -1,5 +1,5 @@
 //! Comprehensive CLI command tests
-//! 
+//!
 //! This module consolidates all CLI-related tests including:
 //! - Basic commands (help, version, invalid commands)
 //! - Task management (add, list, edit, status)
@@ -9,9 +9,8 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
-use tempfile::TempDir;
 use std::fs;
-use serde_json;
+use tempfile::TempDir;
 
 mod common;
 use common::TestFixtures;
@@ -69,7 +68,7 @@ mod task_management {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "add", "Test Task"])
+            .args(["task", "add", "Test Task"])
             .assert()
             .success()
             .stdout(predicate::str::contains("Created task:"));
@@ -81,7 +80,7 @@ mod task_management {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "add"])
+            .args(["task", "add"])
             .assert()
             .failure();
     }
@@ -164,10 +163,11 @@ mod project_management {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&[
-                "task", "add",
+            .args([
+                "task",
+                "add",
                 "Project Test Task",
-                "--project=frontend-components"
+                "--project=frontend-components",
             ])
             .assert()
             .success()
@@ -181,10 +181,11 @@ mod project_management {
         // Create task with full project name
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&[
-                "task", "add",
+            .args([
+                "task",
+                "add",
                 "Smart Resolution Test",
-                "--project=FRONTEND-COMPONENTS"
+                "--project=FRONTEND-COMPONENTS",
             ])
             .assert()
             .success();
@@ -192,7 +193,7 @@ mod project_management {
         // List using prefix (should resolve to same project)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "list", "--project=FC"])
+            .args(["task", "list", "--project=FC"])
             .assert()
             .success()
             .stdout(predicate::str::contains("Smart Resolution Test"));
@@ -205,18 +206,14 @@ mod project_management {
         // Create task with uppercase project
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&[
-                "task", "add",
-                "Case Test Task",
-                "--project=FRONTEND"
-            ])
+            .args(["task", "add", "Case Test Task", "--project=FRONTEND"])
             .assert()
             .success();
 
         // List using lowercase
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "list", "--project=frontend"])
+            .args(["task", "list", "--project=frontend"])
             .assert()
             .success()
             .stdout(predicate::str::contains("Case Test Task"));
@@ -244,7 +241,10 @@ mod output_formatting {
             .arg("--format=json")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Created task:").or(predicate::str::contains("JSON Test Task")));
+            .stdout(
+                predicate::str::contains("Created task:")
+                    .or(predicate::str::contains("JSON Test Task")),
+            );
     }
 
     #[test]
@@ -253,11 +253,7 @@ mod output_formatting {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&[
-                "--verbose",
-                "task", "add",
-                "Verbose Test Task"
-            ])
+            .args(["--verbose", "task", "add", "Verbose Test Task"])
             .assert()
             .success();
     }
@@ -294,14 +290,14 @@ mod error_handling {
         // Create a task first
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "add", "Status Error Test"])
+            .args(["task", "add", "Status Error Test"])
             .assert()
             .success();
 
         // Try to set invalid status
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["status", "TEST-1", "invalid_status"])
+            .args(["status", "TEST-1", "invalid_status"])
             .assert()
             .failure();
     }
@@ -324,7 +320,7 @@ fn extract_task_id_from_output(output: &str) -> Option<String> {
             return Some(id.to_string());
         }
     }
-    
+
     // Fall back to text parsing for non-JSON output
     for line in output.lines() {
         if line.contains("Created task:") {
@@ -338,16 +334,20 @@ fn extract_task_id_from_output(output: &str) -> Option<String> {
 
 fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
     let mut cmd = Command::cargo_bin("lotar").unwrap();
-    let output = cmd.current_dir(temp_dir)
-        .args(&["--format=json", "list"])
+    let output = cmd
+        .current_dir(temp_dir)
+        .args(["--format=json", "list"])
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "Should be able to retrieve task list as JSON");
-    
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .expect("Should produce valid JSON");
-        
+    assert!(
+        output.status.success(),
+        "Should be able to retrieve task list as JSON"
+    );
+
+    let json: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("Should produce valid JSON");
+
     // Find the task with the matching ID in the tasks array
     if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
         for task in tasks {
@@ -358,8 +358,8 @@ fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
             }
         }
     }
-    
-    panic!("Could not find task with ID: {}", task_id);
+
+    panic!("Could not find task with ID: {task_id}");
 }
 
 // =============================================================================
@@ -376,21 +376,34 @@ mod dual_interface {
 
         // Test quick interface: lotar add
         let mut cmd1 = Command::cargo_bin("lotar").unwrap();
-        let output1 = cmd1.current_dir(&temp_dir)
-            .args(&["add", "Test task quick", "--priority=high", "--assignee=test@example.com"])
+        let output1 = cmd1
+            .current_dir(&temp_dir)
+            .args([
+                "add",
+                "Test task quick",
+                "--priority=high",
+                "--assignee=test@example.com",
+            ])
             .output()
             .unwrap();
 
         assert!(output1.status.success(), "Quick add should succeed");
         let stdout1 = String::from_utf8_lossy(&output1.stdout);
-        
+
         // Extract task ID from output (assuming it's in the format "Created task: TASK_ID")
         let task_id1 = extract_task_id_from_output(&stdout1);
 
         // Test full interface: lotar task add
         let mut cmd2 = Command::cargo_bin("lotar").unwrap();
-        let output2 = cmd2.current_dir(&temp_dir)
-            .args(&["task", "add", "Test task full", "--priority=high", "--assignee=test@example.com"])
+        let output2 = cmd2
+            .current_dir(&temp_dir)
+            .args([
+                "task",
+                "add",
+                "Test task full",
+                "--priority=high",
+                "--assignee=test@example.com",
+            ])
             .output()
             .unwrap();
 
@@ -399,8 +412,14 @@ mod dual_interface {
         let task_id2 = extract_task_id_from_output(&stdout2);
 
         // Verify both tasks were created
-        assert!(task_id1.is_some(), "Quick interface should create task with ID");
-        assert!(task_id2.is_some(), "Full interface should create task with ID");
+        assert!(
+            task_id1.is_some(),
+            "Quick interface should create task with ID"
+        );
+        assert!(
+            task_id2.is_some(),
+            "Full interface should create task with ID"
+        );
 
         // Get both tasks and compare their properties (excluding ID and creation time)
         let task1_json = get_task_as_json(&temp_dir, &task_id1.unwrap());
@@ -417,24 +436,31 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that parameters work the same way in both interfaces
-        let test_cases = vec![
+        let test_cases = [
             // (quick_args, full_args, description)
-            (vec!["add", "Simple task"], 
-             vec!["task", "add", "Simple task"], 
-             "Basic title setting"),
-            
-            (vec!["add", "Priority task", "--priority=medium"], 
-             vec!["task", "add", "Priority task", "--priority=medium"], 
-             "Priority setting"),
-             
-            (vec!["add", "Assigned task", "--assignee=user@example.com"], 
-             vec!["task", "add", "Assigned task", "--assignee=user@example.com"], 
-             "Assignee setting"),
+            (
+                vec!["add", "Simple task"],
+                vec!["task", "add", "Simple task"],
+                "Basic title setting",
+            ),
+            (
+                vec!["add", "Priority task", "--priority=medium"],
+                vec!["task", "add", "Priority task", "--priority=medium"],
+                "Priority setting",
+            ),
+            (
+                vec!["add", "Assigned task", "--assignee=user@example.com"],
+                vec![
+                    "task",
+                    "add",
+                    "Assigned task",
+                    "--assignee=user@example.com",
+                ],
+                "Assignee setting",
+            ),
         ];
 
-        for (i, (quick_args, full_args, description)) in test_cases.iter().enumerate() {
-            println!("Testing case {}: {}", i + 1, description);
-            
+        for (quick_args, full_args, _description) in test_cases.iter() {
             // Test quick interface
             let mut cmd1 = Command::cargo_bin("lotar").unwrap();
             cmd1.current_dir(&temp_dir)
@@ -442,7 +468,7 @@ mod dual_interface {
                 .assert()
                 .success();
 
-            // Test full interface  
+            // Test full interface
             let mut cmd2 = Command::cargo_bin("lotar").unwrap();
             cmd2.current_dir(&temp_dir)
                 .args(full_args)
@@ -456,11 +482,12 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that both interfaces produce consistent output formats
-        
+
         // Quick interface with JSON output
         let mut cmd1 = Command::cargo_bin("lotar").unwrap();
-        let output1 = cmd1.current_dir(&temp_dir)
-            .args(&["--format=json", "add", "Output test quick"])
+        let output1 = cmd1
+            .current_dir(&temp_dir)
+            .args(["--format=json", "add", "Output test quick"])
             .output()
             .unwrap();
 
@@ -470,8 +497,9 @@ mod dual_interface {
 
         // Full interface with JSON output
         let mut cmd2 = Command::cargo_bin("lotar").unwrap();
-        let output2 = cmd2.current_dir(&temp_dir)
-            .args(&["--format=json", "task", "add", "Output test full"])
+        let output2 = cmd2
+            .current_dir(&temp_dir)
+            .args(["--format=json", "task", "add", "Output test full"])
             .output()
             .unwrap();
 
@@ -480,47 +508,79 @@ mod dual_interface {
             .expect("Full interface should produce valid JSON");
 
         // Both should have the same JSON structure
-        assert!(json1.get("task").is_some(), "Quick interface JSON should include task object");
-        assert!(json2.get("task").is_some(), "Full interface JSON should include task object");
-        
+        assert!(
+            json1.get("task").is_some(),
+            "Quick interface JSON should include task object"
+        );
+        assert!(
+            json2.get("task").is_some(),
+            "Full interface JSON should include task object"
+        );
+
         // Check the task objects have the required fields
         if let Some(task1) = json1.get("task") {
-            assert!(task1.get("id").is_some(), "Quick interface task should have ID");
-            assert!(task1.get("title").is_some(), "Quick interface task should have title");
+            assert!(
+                task1.get("id").is_some(),
+                "Quick interface task should have ID"
+            );
+            assert!(
+                task1.get("title").is_some(),
+                "Quick interface task should have title"
+            );
         }
         if let Some(task2) = json2.get("task") {
-            assert!(task2.get("id").is_some(), "Full interface task should have ID");
-            assert!(task2.get("title").is_some(), "Full interface task should have title");
+            assert!(
+                task2.get("id").is_some(),
+                "Full interface task should have ID"
+            );
+            assert!(
+                task2.get("title").is_some(),
+                "Full interface task should have title"
+            );
         }
     }
 
-    #[test] 
+    #[test]
     fn test_add_enhanced_output_format() {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that enhanced add output shows all set properties
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let output = cmd.current_dir(&temp_dir)
-            .args(&["add", "Enhanced output test", "--priority=high", "--assignee=test@example.com"])
+        let output = cmd
+            .current_dir(&temp_dir)
+            .args([
+                "add",
+                "Enhanced output test",
+                "--priority=high",
+                "--assignee=test@example.com",
+            ])
             .output()
             .unwrap();
 
         assert!(output.status.success());
         let stdout = String::from_utf8_lossy(&output.stdout);
-        
+
         // Should show task ID
-        assert!(stdout.contains("Created task:") || stdout.contains("Task"), 
-                "Output should mention task creation");
-        
+        assert!(
+            stdout.contains("Created task:") || stdout.contains("Task"),
+            "Output should mention task creation"
+        );
+
         // Should show title
-        assert!(stdout.contains("Enhanced output test"), 
-                "Output should show the task title");
-        
-        // Should show set properties  
-        assert!(stdout.to_lowercase().contains("high") || stdout.to_lowercase().contains("priority"), 
-                "Output should show priority information");
-        assert!(stdout.contains("test@example.com") || stdout.to_lowercase().contains("assignee"), 
-                "Output should show assignee information");
+        assert!(
+            stdout.contains("Enhanced output test"),
+            "Output should show the task title"
+        );
+
+        // Should show set properties
+        assert!(
+            stdout.to_lowercase().contains("high") || stdout.to_lowercase().contains("priority"),
+            "Output should show priority information"
+        );
+        assert!(
+            stdout.contains("test@example.com") || stdout.to_lowercase().contains("assignee"),
+            "Output should show assignee information"
+        );
     }
 
     #[test]
@@ -528,38 +588,45 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test tasks
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "Task 1", "--priority=high", "--type=feature"])
+            .args(["add", "Task 1", "--priority=high", "--type=feature"])
             .assert()
             .success();
 
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "Task 2", "--priority=low", "--type=bug"])
+            .args(["add", "Task 2", "--priority=low", "--type=bug"])
             .assert()
             .success();
 
         // Test basic list commands
-        let quick_list = Command::cargo_bin("lotar").unwrap()
+        let quick_list = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["list"])
+            .args(["list"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        let full_list = Command::cargo_bin("lotar").unwrap()
+        let full_list = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["task", "list"])
+            .args(["task", "list"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        assert_eq!(quick_list, full_list, "Basic list commands should return identical output");
+        assert_eq!(
+            quick_list, full_list,
+            "Basic list commands should return identical output"
+        );
     }
 
     #[test]
@@ -567,43 +634,61 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test tasks with different properties
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "High Priority Feature", "--priority=high", "--type=feature"])
+            .args([
+                "add",
+                "High Priority Feature",
+                "--priority=high",
+                "--type=feature",
+            ])
             .assert()
             .success();
 
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "Low Priority Bug", "--priority=low", "--type=bug"])
+            .args(["add", "Low Priority Bug", "--priority=low", "--type=bug"])
             .assert()
             .success();
 
         // Test filtered lists
-        let quick_filtered = Command::cargo_bin("lotar").unwrap()
+        let quick_filtered = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["list", "--priority=high"])
+            .args(["list", "--priority=high"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        let full_filtered = Command::cargo_bin("lotar").unwrap()
+        let full_filtered = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["task", "list", "--priority=high"])
+            .args(["task", "list", "--priority=high"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        assert_eq!(quick_filtered, full_filtered, "Filtered list commands should return identical output");
+        assert_eq!(
+            quick_filtered, full_filtered,
+            "Filtered list commands should return identical output"
+        );
 
         // Verify the filter worked
         let stdout = String::from_utf8_lossy(&quick_filtered);
-        assert!(stdout.contains("High Priority Feature"), "Should contain high priority task");
-        assert!(!stdout.contains("Low Priority Bug"), "Should not contain low priority task");
+        assert!(
+            stdout.contains("High Priority Feature"),
+            "Should contain high priority task"
+        );
+        assert!(
+            !stdout.contains("Low Priority Bug"),
+            "Should not contain low priority task"
+        );
     }
 
     #[test]
@@ -611,38 +696,53 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test task
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "JSON Test Task", "--priority=medium"])
+            .args(["add", "JSON Test Task", "--priority=medium"])
             .assert()
             .success();
 
         // Test JSON output
-        let quick_json = Command::cargo_bin("lotar").unwrap()
+        let quick_json = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["list", "--format=json"])
+            .args(["list", "--format=json"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        let full_json = Command::cargo_bin("lotar").unwrap()
+        let full_json = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["task", "list", "--format=json"])
+            .args(["task", "list", "--format=json"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        assert_eq!(quick_json, full_json, "JSON list commands should return identical output");
+        assert_eq!(
+            quick_json, full_json,
+            "JSON list commands should return identical output"
+        );
 
         // Verify JSON structure
         let stdout = String::from_utf8_lossy(&quick_json);
-        assert!(stdout.contains("\"tasks\""), "JSON should contain tasks array");
-        assert!(stdout.contains("\"status\":\"success\""), "JSON should contain success status");
-        assert!(stdout.contains("JSON Test Task"), "JSON should contain the task");
+        assert!(
+            stdout.contains("\"tasks\""),
+            "JSON should contain tasks array"
+        );
+        assert!(
+            stdout.contains("\"status\":\"success\""),
+            "JSON should contain success status"
+        );
+        assert!(
+            stdout.contains("JSON Test Task"),
+            "JSON should contain the task"
+        );
     }
 
     #[test]
@@ -650,43 +750,50 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create tasks with different priorities
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "Low Priority Task", "--priority=low"])
+            .args(["add", "Low Priority Task", "--priority=low"])
             .assert()
             .success();
 
-        Command::cargo_bin("lotar").unwrap()
+        Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["add", "High Priority Task", "--priority=high"])
+            .args(["add", "High Priority Task", "--priority=high"])
             .assert()
             .success();
 
         // Test sorted lists
-        let quick_sorted = Command::cargo_bin("lotar").unwrap()
+        let quick_sorted = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["list", "--sort-by=priority"])
+            .args(["list", "--sort-by=priority"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        let full_sorted = Command::cargo_bin("lotar").unwrap()
+        let full_sorted = Command::cargo_bin("lotar")
+            .unwrap()
             .current_dir(&temp_dir)
-            .args(&["task", "list", "--sort-by=priority"])
+            .args(["task", "list", "--sort-by=priority"])
             .assert()
             .success()
             .get_output()
             .stdout
             .clone();
 
-        assert_eq!(quick_sorted, full_sorted, "Sorted list commands should return identical output");
+        assert_eq!(
+            quick_sorted, full_sorted,
+            "Sorted list commands should return identical output"
+        );
     }
 }
 
 // =============================================================================
-// File Structure and Config Creation Tests  
+// File Structure and Config Creation Tests
 // =============================================================================
 
 mod file_structure {
@@ -699,7 +806,7 @@ mod file_structure {
         // Create a task to trigger directory creation
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "add", "Directory Test"])
+            .args(["task", "add", "Directory Test"])
             .assert()
             .success();
 
@@ -714,10 +821,11 @@ mod file_structure {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&[
-                "task", "add",
+            .args([
+                "task",
+                "add",
                 "Project Directory Test",
-                "--project=test-project"
+                "--project=test-project",
             ])
             .assert()
             .success();
@@ -736,7 +844,10 @@ mod file_structure {
             })
             .collect();
 
-        assert!(!project_dirs.is_empty(), "At least one project directory should exist");
+        assert!(
+            !project_dirs.is_empty(),
+            "At least one project directory should exist"
+        );
     }
 
     #[test]
@@ -745,31 +856,30 @@ mod file_structure {
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "add", "File Creation Test"])
+            .args(["task", "add", "File Creation Test"])
             .assert()
             .success();
 
         // Check that task files were created
         let tasks_dir = temp_dir.path().join(".tasks");
-        
+
         // Look for project directories and task files
         let entries = fs::read_dir(&tasks_dir).unwrap();
         let mut found_task_file = false;
-        
+
         for entry in entries {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
                 // Check inside project directory for task files
                 let project_dir = entry.path();
                 if let Ok(project_entries) = fs::read_dir(project_dir) {
-                    for project_entry in project_entries {
-                        if let Ok(project_entry) = project_entry {
-                            let filename = project_entry.file_name();
-                            if filename.to_string_lossy().ends_with(".yml") &&
-                               filename.to_string_lossy() != "config.yml" {
-                                found_task_file = true;
-                                break;
-                            }
+                    for project_entry in project_entries.flatten() {
+                        let filename = project_entry.file_name();
+                        if filename.to_string_lossy().ends_with(".yml")
+                            && filename.to_string_lossy() != "config.yml"
+                        {
+                            found_task_file = true;
+                            break;
                         }
                     }
                 }
@@ -789,23 +899,38 @@ mod file_structure {
         // Test that write operations (like add) DO create global config
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["add", "Test global config creation"])
+            .args(["add", "Test global config creation"])
             .assert()
             .success();
 
         let tasks_dir = temp_dir.path().join(".tasks");
-        assert!(tasks_dir.exists(), "Write operations should create .tasks directory");
+        assert!(
+            tasks_dir.exists(),
+            "Write operations should create .tasks directory"
+        );
 
         // Check for global config.yml (should exist)
         let global_config = tasks_dir.join("config.yml");
-        assert!(global_config.exists(), "Global config.yml SHOULD be created by write operations");
+        assert!(
+            global_config.exists(),
+            "Global config.yml SHOULD be created by write operations"
+        );
 
         // Verify it's a valid global config with default settings
         let config_content = fs::read_to_string(&global_config).unwrap();
-        assert!(config_content.contains("server_port:"), "Global config should have server_port");
-        assert!(config_content.contains("issue_states:"), "Global config should have issue_states");
-        assert!(config_content.contains("default_project:") || config_content.contains("default_prefix:"), 
-                "Global config should have default_project setting");
+        assert!(
+            config_content.contains("server_port:"),
+            "Global config should have server_port"
+        );
+        assert!(
+            config_content.contains("issue_states:"),
+            "Global config should have issue_states"
+        );
+        assert!(
+            config_content.contains("default_project:")
+                || config_content.contains("default_prefix:"),
+            "Global config should have default_project setting"
+        );
     }
 
     #[test]
@@ -815,30 +940,39 @@ mod file_structure {
         // Test that read-only operations don't create .tasks directory
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["status", "TEST-001"])
+            .args(["status", "TEST-001"])
             .assert()
             .failure(); // Expected to fail since task doesn't exist
 
         let tasks_dir = temp_dir.path().join(".tasks");
-        assert!(!tasks_dir.exists(), "Read-only operations should not create any directories");
+        assert!(
+            !tasks_dir.exists(),
+            "Read-only operations should not create any directories"
+        );
 
         // Test other read-only operations
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["priority", "TEST-001"])
+            .args(["priority", "TEST-001"])
             .assert()
             .failure(); // Expected to fail since task doesn't exist
 
-        assert!(!tasks_dir.exists(), "Read-only property commands should not create directories");
+        assert!(
+            !tasks_dir.exists(),
+            "Read-only property commands should not create directories"
+        );
 
         // Test task subcommand read operations
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "priority", "TEST-001"])
+            .args(["task", "priority", "TEST-001"])
             .assert()
             .failure(); // Expected to fail since task doesn't exist
 
-        assert!(!tasks_dir.exists(), "Task subcommand read operations should not create directories");
+        assert!(
+            !tasks_dir.exists(),
+            "Task subcommand read operations should not create directories"
+        );
     }
 
     #[test]
@@ -848,21 +982,27 @@ mod file_structure {
         // Add a task (write operation)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["add", "Test config creation"])
+            .args(["add", "Test config creation"])
             .assert()
             .success();
 
         let tasks_dir = temp_dir.path().join(".tasks");
-        assert!(tasks_dir.exists(), "Write operations should create .tasks directory");
+        assert!(
+            tasks_dir.exists(),
+            "Write operations should create .tasks directory"
+        );
 
         // Check for global config.yml (should exist)
         let global_config = tasks_dir.join("config.yml");
-        assert!(global_config.exists(), "Global config.yml SHOULD be created by write operations");
+        assert!(
+            global_config.exists(),
+            "Global config.yml SHOULD be created by write operations"
+        );
 
         // Check for project-specific config (should exist in project directory)
         let entries = fs::read_dir(&tasks_dir).unwrap();
         let mut found_project_config = false;
-        
+
         for entry in entries {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_dir() {
@@ -874,7 +1014,10 @@ mod file_structure {
             }
         }
 
-        assert!(found_project_config, "Project-specific config.yml should also be created by add command");
+        assert!(
+            found_project_config,
+            "Project-specific config.yml should also be created by add command"
+        );
     }
 
     #[test]
@@ -882,17 +1025,20 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that both quick and full interfaces behave the same way
-        
+
         // First, test quick interface
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["add", "Quick interface test"])
+            .args(["add", "Quick interface test"])
             .assert()
             .success();
 
         let tasks_dir = temp_dir.path().join(".tasks");
         let global_config = tasks_dir.join("config.yml");
-        assert!(global_config.exists(), "Quick interface SHOULD create global config");
+        assert!(
+            global_config.exists(),
+            "Quick interface SHOULD create global config"
+        );
 
         // Clean up for next test
         fs::remove_dir_all(&tasks_dir).unwrap();
@@ -900,13 +1046,16 @@ mod file_structure {
         // Test full interface
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["task", "add", "Full interface test"])
+            .args(["task", "add", "Full interface test"])
             .assert()
             .success();
 
         let global_config = tasks_dir.join("config.yml");
-        assert!(global_config.exists(), "Full interface SHOULD create global config");
-        
+        assert!(
+            global_config.exists(),
+            "Full interface SHOULD create global config"
+        );
+
         // Both interfaces should behave identically regarding config creation
     }
 
@@ -917,7 +1066,7 @@ mod file_structure {
         // Test with explicit project - should set smart default_prefix
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["add", "Test smart prefix", "--project=myawesomeproject"])
+            .args(["add", "Test smart prefix", "--project=myawesomeproject"])
             .assert()
             .success();
 
@@ -925,10 +1074,17 @@ mod file_structure {
         assert!(global_config.exists(), "Global config should be created");
 
         let config_content = fs::read_to_string(&global_config).unwrap();
-        assert!(config_content.contains("default_project:"), "Global config should have default_project");
+        assert!(
+            config_content.contains("default_project:"),
+            "Global config should have default_project"
+        );
         // Should have some form of project prefix (exact value depends on generation logic)
-        assert!(config_content.contains("MYAW") || config_content.contains("MAP") || config_content.contains("MY"), 
-                "Global config should have a smart default_project derived from project name");
+        assert!(
+            config_content.contains("MYAW")
+                || config_content.contains("MAP")
+                || config_content.contains("MY"),
+            "Global config should have a smart default_project derived from project name"
+        );
     }
 
     #[test]
@@ -938,12 +1094,15 @@ mod file_structure {
         // First, create a task to establish .tasks directory and global config
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["add", "First task"])
+            .args(["add", "First task"])
             .assert()
             .success();
 
         let global_config = temp_dir.path().join(".tasks/config.yml");
-        assert!(global_config.exists(), "Global config should be created initially");
+        assert!(
+            global_config.exists(),
+            "Global config should be created initially"
+        );
 
         // Delete the global config
         fs::remove_file(&global_config).unwrap();
@@ -952,59 +1111,68 @@ mod file_structure {
         // Add another task - global config should be regenerated
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
-            .args(&["add", "Second task"])
+            .args(["add", "Second task"])
             .assert()
             .success();
 
-        assert!(global_config.exists(), "Global config should be regenerated when missing");
+        assert!(
+            global_config.exists(),
+            "Global config should be regenerated when missing"
+        );
     }
 
     #[test]
     fn test_project_name_in_config() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        
+
         // Create task using quick interface
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let output = cmd.current_dir(temp_dir)
+        let output = cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Test project name config")
             .output()
             .expect("Failed to execute command");
 
         assert!(output.status.success());
-        
+
         // Extract task ID from output
         let output_str = String::from_utf8(output.stdout).unwrap();
         let task_id = extract_task_id_from_output(&output_str)
             .expect("Could not extract task ID from output");
-        
+
         // Get the project prefix from task ID (e.g., "TTF-1" -> "TTF")
         let prefix = task_id.split('-').next().unwrap();
-        
+
         // Check that project config exists and has correct project name
         let project_config_path = temp_dir.join(".tasks").join(prefix).join("config.yml");
         assert!(project_config_path.exists(), "Project config should exist");
-        
+
         let config_content = fs::read_to_string(&project_config_path).unwrap();
-        
+
         // Should contain the actual project name, not the prefix
         // For temp directory, it will be detected as the directory name (starting with tmp)
         // So we just verify it's not the prefix (which would be uppercase)
-        assert!(config_content.contains("project_name:"), "Config should contain project_name field");
-        assert!(!config_content.contains(&format!("project_name: {}", prefix)), 
-                "Project config should NOT contain prefix '{}' as project name. Config content: {}", 
-                prefix, config_content);
+        assert!(
+            config_content.contains("project_name:"),
+            "Config should contain project_name field"
+        );
+        assert!(
+            !config_content.contains(&format!("project_name: {prefix}")),
+            "Project config should NOT contain prefix '{prefix}' as project name. Config content: {config_content}"
+        );
     }
 
     #[test]
     fn test_cli_interface_consistency() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
-        
+
         // Test with text output
         let mut quick_cmd = Command::cargo_bin("lotar").unwrap();
-        let quick_output = quick_cmd.current_dir(temp_dir)
+        let quick_output = quick_cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Test quick interface")
             .arg("--priority=high")
@@ -1012,7 +1180,8 @@ mod file_structure {
             .expect("Failed to execute quick add command");
 
         let mut full_cmd = Command::cargo_bin("lotar").unwrap();
-        let full_output = full_cmd.current_dir(temp_dir)
+        let full_output = full_cmd
+            .current_dir(temp_dir)
             .arg("task")
             .arg("add")
             .arg("Test full interface")
@@ -1022,10 +1191,10 @@ mod file_structure {
 
         assert!(quick_output.status.success());
         assert!(full_output.status.success());
-        
+
         let quick_str = String::from_utf8(quick_output.stdout).unwrap();
         let full_str = String::from_utf8(full_output.stdout).unwrap();
-        
+
         // Both should have similar structure (both show detailed task info)
         assert!(quick_str.contains("✅ Created task:"));
         assert!(full_str.contains("✅ Created task:"));
@@ -1033,10 +1202,11 @@ mod file_structure {
         assert!(full_str.contains("Title:"));
         assert!(quick_str.contains("Priority: HIGH"));
         assert!(full_str.contains("Priority: HIGH"));
-        
+
         // Test with JSON output
         let mut quick_json_cmd = Command::cargo_bin("lotar").unwrap();
-        let quick_json_output = quick_json_cmd.current_dir(temp_dir)
+        let quick_json_output = quick_json_cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Test quick JSON")
             .arg("--priority=low")
@@ -1045,7 +1215,8 @@ mod file_structure {
             .expect("Failed to execute quick add JSON command");
 
         let mut full_json_cmd = Command::cargo_bin("lotar").unwrap();
-        let full_json_output = full_json_cmd.current_dir(temp_dir)
+        let full_json_output = full_json_cmd
+            .current_dir(temp_dir)
             .arg("--format=json")
             .arg("task")
             .arg("add")
@@ -1056,22 +1227,34 @@ mod file_structure {
 
         assert!(quick_json_output.status.success());
         assert!(full_json_output.status.success());
-        
+
         let quick_json_str = String::from_utf8(quick_json_output.stdout).unwrap();
         let full_json_str = String::from_utf8(full_json_output.stdout).unwrap();
-        
+
         // Both should be valid JSON with same structure
         let quick_json: serde_json::Value = serde_json::from_str(&quick_json_str)
             .expect("Quick interface should produce valid JSON");
-        let full_json: serde_json::Value = serde_json::from_str(&full_json_str)
-            .expect("Full interface should produce valid JSON");
-        
+        let full_json: serde_json::Value =
+            serde_json::from_str(&full_json_str).expect("Full interface should produce valid JSON");
+
         // Both should have the same JSON structure
-        assert_eq!(quick_json.get("status"), Some(&serde_json::Value::String("success".to_string())));
-        assert_eq!(full_json.get("status"), Some(&serde_json::Value::String("success".to_string())));
+        assert_eq!(
+            quick_json.get("status"),
+            Some(&serde_json::Value::String("success".to_string()))
+        );
+        assert_eq!(
+            full_json.get("status"),
+            Some(&serde_json::Value::String("success".to_string()))
+        );
         assert!(quick_json.get("task").is_some());
         assert!(full_json.get("task").is_some());
-        assert!(quick_json.get("task").unwrap().get("priority") == Some(&serde_json::Value::String("LOW".to_string())));
-        assert!(full_json.get("task").unwrap().get("priority") == Some(&serde_json::Value::String("LOW".to_string())));
+        assert!(
+            quick_json.get("task").unwrap().get("priority")
+                == Some(&serde_json::Value::String("LOW".to_string()))
+        );
+        assert!(
+            full_json.get("task").unwrap().get("priority")
+                == Some(&serde_json::Value::String("LOW".to_string()))
+        );
     }
 }

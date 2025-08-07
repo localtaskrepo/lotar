@@ -1,5 +1,5 @@
 //! Tests for standardized property command pattern - status get/set functionality
-//! 
+//!
 //! This module tests the new standardized pattern where property commands
 //! can both get and set values:
 //! - `lotar status TASK_ID` → shows current status
@@ -65,7 +65,9 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status changed from TODO to IN_PROGRESS"));
+            .stdout(predicate::str::contains(
+                "status changed from TODO to IN_PROGRESS",
+            ));
     }
 
     #[test]
@@ -154,7 +156,9 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status changed from TODO to IN_PROGRESS"));
+            .stdout(predicate::str::contains(
+                "status changed from TODO to IN_PROGRESS",
+            ));
     }
 
     #[test]
@@ -227,7 +231,8 @@ mod status_command_pattern {
 
         // Create a task (will get auto-generated prefix)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let output = cmd.current_dir(temp_dir)
+        let output = cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Test task with prefix")
             .assert()
@@ -251,7 +256,7 @@ mod status_command_pattern {
             .arg(task_id)
             .assert()
             .success()
-            .stdout(predicate::str::contains(format!("{} status: TODO", task_id)));
+            .stdout(predicate::str::contains(format!("{task_id} status: TODO")));
     }
 
     #[test]

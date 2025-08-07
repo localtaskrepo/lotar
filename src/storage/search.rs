@@ -23,7 +23,7 @@ impl StorageSearch {
                 if let Ok(entries) = fs::read_dir(&project_path) {
                     for entry in entries.flatten() {
                         let path = entry.path();
-                        if path.is_file() && path.extension().map_or(false, |ext| ext == "yml") {
+                        if path.is_file() && path.extension().is_some_and(|ext| ext == "yml") {
                             // Extract task ID from filename
                             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                                 if let Ok(numeric_id) = stem.parse::<u64>() {
@@ -62,7 +62,7 @@ impl StorageSearch {
                             for project_entry in project_entries.flatten() {
                                 let task_path = project_entry.path();
                                 if task_path.is_file()
-                                    && task_path.extension().map_or(false, |ext| ext == "yml")
+                                    && task_path.extension().is_some_and(|ext| ext == "yml")
                                 {
                                     // Extract task ID from filename
                                     if let Some(stem) =
@@ -110,24 +110,18 @@ impl StorageSearch {
     /// Helper method to check if a task matches all filter criteria
     pub fn task_matches_filter(task: &Task, filter: &TaskFilter) -> bool {
         // Check status filter (OR logic - match any of the specified statuses)
-        if !filter.status.is_empty() {
-            if !filter.status.contains(&task.status) {
-                return false;
-            }
+        if !filter.status.is_empty() && !filter.status.contains(&task.status) {
+            return false;
         }
 
         // Check priority filter (OR logic - match any of the specified priorities)
-        if !filter.priority.is_empty() {
-            if !filter.priority.contains(&task.priority) {
-                return false;
-            }
+        if !filter.priority.is_empty() && !filter.priority.contains(&task.priority) {
+            return false;
         }
 
         // Check task type filter (OR logic - match any of the specified types)
-        if !filter.task_type.is_empty() {
-            if !filter.task_type.contains(&task.task_type) {
-                return false;
-            }
+        if !filter.task_type.is_empty() && !filter.task_type.contains(&task.task_type) {
+            return false;
         }
 
         // Check category filter
@@ -144,9 +138,10 @@ impl StorageSearch {
 
         // Check tag filters (OR logic - match any of the specified tags)
         if !filter.tags.is_empty() {
-            let task_has_matching_tag = filter.tags.iter().any(|filter_tag| {
-                task.tags.iter().any(|task_tag| task_tag == filter_tag)
-            });
+            let task_has_matching_tag = filter
+                .tags
+                .iter()
+                .any(|filter_tag| task.tags.iter().any(|task_tag| task_tag == filter_tag));
             if !task_has_matching_tag {
                 return false;
             }
@@ -163,11 +158,11 @@ impl StorageSearch {
                 || task
                     .subtitle
                     .as_ref()
-                    .map_or(false, |s| s.to_lowercase().contains(&query_lower))
+                    .is_some_and(|s| s.to_lowercase().contains(&query_lower))
                 || task
                     .description
                     .as_ref()
-                    .map_or(false, |s| s.to_lowercase().contains(&query_lower))
+                    .is_some_and(|s| s.to_lowercase().contains(&query_lower))
                 || task
                     .tags
                     .iter()

@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub enum TaskStatus {
+    #[default]
     Todo,
     InProgress,
     Verify,
@@ -15,12 +16,6 @@ pub enum TaskStatus {
 impl TaskStatus {
     pub fn is_default(&self) -> bool {
         matches!(self, TaskStatus::Todo)
-    }
-}
-
-impl Default for TaskStatus {
-    fn default() -> Self {
-        TaskStatus::Todo
     }
 }
 
@@ -103,8 +98,9 @@ impl TaskStatus {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub enum TaskType {
+    #[default]
     Feature,
     Bug,
     Epic,
@@ -115,12 +111,6 @@ pub enum TaskType {
 impl TaskType {
     pub fn is_default(&self) -> bool {
         matches!(self, TaskType::Feature)
-    }
-}
-
-impl Default for TaskType {
-    fn default() -> Self {
-        TaskType::Feature
     }
 }
 
@@ -243,9 +233,10 @@ pub struct TaskComment {
 // Type alias for custom fields - can hold any YAML-serializable value
 pub type CustomFields = HashMap<String, serde_yaml::Value>;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Copy)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Copy, Default)]
 pub enum Priority {
     Low,
+    #[default]
     Medium,
     High,
     Critical,
@@ -254,12 +245,6 @@ pub enum Priority {
 impl Priority {
     pub fn is_default(&self) -> bool {
         matches!(self, Priority::Medium)
-    }
-}
-
-impl Default for Priority {
-    fn default() -> Self {
-        Priority::Medium
     }
 }
 
@@ -337,5 +322,28 @@ impl Priority {
                 ""
             }
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_priority_serialization() {
+        let priority = Priority::High;
+
+        // Test Display implementation
+        assert_eq!(priority.to_string(), "HIGH");
+
+        // Test YAML serialization
+        let yaml = serde_yaml::to_string(&priority).unwrap();
+        eprintln!("Priority::High as YAML: {}", yaml.trim());
+        assert!(yaml.contains("High")); // Should be variant name
+
+        // Test JSON serialization
+        let json = serde_json::to_string(&priority).unwrap();
+        eprintln!("Priority::High as JSON: {}", json);
+        assert_eq!(json, "\"High\""); // Should be variant name
     }
 }

@@ -1,6 +1,6 @@
-use std::fs;
-use std::path::PathBuf;
 use crate::workspace::TasksDirectoryResolver;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Get the effective project name by checking global config first, then falling back to auto-detection
 pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
@@ -8,7 +8,8 @@ pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
     let global_config_path = resolver.path.join("config.yml");
     if global_config_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&global_config_path) {
-            if let Ok(config) = serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content) {
+            if let Ok(config) = serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
+            {
                 // If default_prefix is set (not empty), use it
                 if !config.default_prefix.is_empty() {
                     return config.default_prefix;
@@ -65,7 +66,7 @@ fn detect_from_project_files() -> Option<String> {
     None
 }
 
-fn read_cargo_toml_name(dir: &PathBuf) -> Option<String> {
+fn read_cargo_toml_name(dir: &Path) -> Option<String> {
     let cargo_toml_path = dir.join("Cargo.toml");
     if !cargo_toml_path.exists() {
         return None;
@@ -77,7 +78,8 @@ fn read_cargo_toml_name(dir: &PathBuf) -> Option<String> {
     let re = regex::Regex::new(r#"(?m)^name\s*=\s*"([^"]+)""#).ok()?;
     let captures = re.captures(&content)?;
 
-    captures.get(1)
+    captures
+        .get(1)
         .map(|m| m.as_str().to_string())
         .filter(|s| !s.is_empty())
 }
@@ -90,7 +92,6 @@ fn get_current_folder_name() -> Option<String> {
         .map(|s| s.to_string())
         .filter(|s| !s.is_empty() && s != "/" && s != ".")
 }
-
 
 pub fn get_project_path() -> Option<PathBuf> {
     Some(std::env::current_dir().unwrap())

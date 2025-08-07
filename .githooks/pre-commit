@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Git pre-commit hook for Rust project
+set -e
+
+# Set up PATH for Rust tools
+export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+
+echo "🔧 Running pre-commit checks..."
+
+# Check prerequisites
+if [ ! -f "Cargo.toml" ]; then
+    echo "❌ Not a Rust project"
+    exit 1
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "❌ cargo not found"
+    exit 1
+fi
+
+# Check for and clean up any stuck cargo processes
+echo "🧹 Checking for stuck cargo processes..."
+if pgrep -f "cargo.*clippy\|cargo.*check\|cargo.*build" >/dev/null 2>&1; then
+    echo "⚠️  Found stuck cargo processes, cleaning up..."
+    pkill -f "cargo.*clippy\|cargo.*check\|cargo.*build" >/dev/null 2>&1 || true
+    sleep 2
+fi
+
+# Function to check if files were modified
+files_modified() {
+    ! git diff --quiet --exit-code
+}
+
+# 1. Formatting
+echo "📝 Checking formatting..."
+if ! timeout 30 cargo fmt --all --check >/dev/null 2>&1; then
+    echo "⚠️  Fixing formatting..."
+    timeout 30 cargo fmt --all
+    if files_modified; then
+        git add -u
+        echo "✅ Formatting fixed and staged"
+    fi
+else
+    echo "✅ Formatting OK"
+fi
+
+# 2. Clippy check with auto-fixing
+echo "🔍 Checking and fixing clippy issues..."
+if ! timeout 30 cargo clippy --all-targets --all-features --quiet -- -D warnings >/dev/null 2>&1; then
+    echo "⚠️  Clippy issues found. Attempting auto-fix..."
+    
+    # Try to auto-fix clippy issues
+    if timeout 60 cargo clippy --fix --all-targets --all-features --allow-dirty --allow-staged >/dev/null 2>&1; then
+        echo "✅ Some clippy issues fixed automatically"
+        
+        if files_modified; then
+            # Stage the fixed files
+            git add -u
+            echo "� Fixed files have been staged for commit"
+        fi
+    fi
+    
+    # Check if there are still unfixable issues
+    if ! timeout 30 cargo clippy --all-targets --all-features --quiet -- -D warnings >/dev/null 2>&1; then
+        echo "❌ Clippy issues remain that require manual fixing"
+        echo "💡 Run: cargo clippy --all-targets --all-features"
+        exit 1
+    else
+        echo "✅ All clippy issues resolved"
+    fi
+else
+    echo "✅ Clippy OK"
+fi
+
+# 3. Build check
+echo "🔨 Checking build..."
+if timeout 60 cargo build --all-features --quiet >/dev/null 2>&1; then
+    echo "✅ Build OK"
+elif [ $? -eq 124 ]; then
+    echo "❌ Build timed out (may indicate compilation issues)"
+    exit 1
+else
+    echo "❌ Build failed"
+    exit 1
+fi
+
+# 4. Quick tests
+echo "🧪 Running tests..."
+if timeout 120 cargo test --lib --bins --quiet >/dev/null 2>&1; then
+    echo "✅ Tests OK"
+elif [ $? -eq 124 ]; then
+    echo "❌ Tests timed out"
+    exit 1
+else
+    echo "❌ Tests failed"
+    exit 1
+fi
+
+echo "🎉 All checks passed!"

@@ -1,3 +1,6 @@
+// Allow uninlined format args since it's mostly a style preference
+#![allow(clippy::uninlined_format_args)]
+
 mod api_server;
 mod cli;
 mod config;
@@ -36,9 +39,21 @@ fn resolve_tasks_directory_with_override(
 
 /// Check if a string is a valid command name
 fn is_valid_command(command: &str) -> bool {
-    matches!(command, 
-        "add" | "list" | "status" | "priority" | "p" | "due-date" | "set" | 
-        "task" | "tasks" | "config" | "scan" | "serve" | "index"
+    matches!(
+        command,
+        "add"
+            | "list"
+            | "status"
+            | "priority"
+            | "p"
+            | "due-date"
+            | "set"
+            | "task"
+            | "tasks"
+            | "config"
+            | "scan"
+            | "serve"
+            | "index"
     )
 }
 
@@ -61,8 +76,10 @@ fn main() {
     }
 
     // Check for help flags and determine context
-    let has_help_flag = args[1..].iter().any(|arg| arg == "help" || arg == "--help" || arg == "-h");
-    
+    let has_help_flag = args[1..]
+        .iter()
+        .any(|arg| arg == "help" || arg == "--help" || arg == "-h");
+
     if has_help_flag {
         // If we have a valid command as first argument and a help flag anywhere, show command help
         if args.len() >= 2 && is_valid_command(&args[1]) && args[1] != "help" {
@@ -102,7 +119,12 @@ fn main() {
             match AddHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(task_id) => {
                     // Use the shared output rendering function
-                    AddHandler::render_add_success(&task_id, cli.project.as_deref(), &resolver, &renderer);
+                    AddHandler::render_add_success(
+                        &task_id,
+                        cli.project.as_deref(),
+                        &resolver,
+                        &renderer,
+                    );
                     Ok(())
                 }
                 Err(e) => {
@@ -156,10 +178,7 @@ fn main() {
                 );
                 println!("{}", renderer.render_warning(&message));
             } else {
-                let message = format!(
-                    "Show {} due_date (placeholder implementation)",
-                    id
-                );
+                let message = format!("Show {} due_date (placeholder implementation)", id);
                 println!("{}", renderer.render_warning(&message));
             }
             Ok(())
@@ -238,7 +257,7 @@ fn show_enhanced_help() {
         }
         Err(_) => {
             // Fall back to clap's help
-            let _ = Cli::try_parse_from(&["lotar", "--help"]);
+            let _ = Cli::try_parse_from(["lotar", "--help"]);
         }
     }
 }

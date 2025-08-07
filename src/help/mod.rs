@@ -1,6 +1,6 @@
-use termimad::MadSkin;
-use include_dir::{include_dir, Dir, DirEntry};
 use crate::output::{OutputFormat, OutputRenderer};
+use include_dir::{Dir, DirEntry, include_dir};
+use termimad::MadSkin;
 
 static HELP_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/docs/help");
 
@@ -17,19 +17,19 @@ impl HelpSystem {
 
     pub fn show_command_help(&self, command: &str) -> Result<String, String> {
         let help_file = format!("{}.md", command);
-        
+
         if let Some(file) = self.find_help_file(&help_file) {
-            let content = file.contents_utf8()
+            let content = file
+                .contents_utf8()
                 .ok_or_else(|| format!("Help file '{}' is not valid UTF-8", help_file))?;
-            
+
             match self.renderer.format {
-                OutputFormat::Json => {
-                    Ok(serde_json::json!({
-                        "command": command,
-                        "help": content,
-                        "format": "markdown"
-                    }).to_string())
-                }
+                OutputFormat::Json => Ok(serde_json::json!({
+                    "command": command,
+                    "help": content,
+                    "format": "markdown"
+                })
+                .to_string()),
                 OutputFormat::Markdown => Ok(content.to_string()),
                 _ => {
                     // Render markdown to terminal using termimad
@@ -50,38 +50,41 @@ impl HelpSystem {
     #[allow(dead_code)]
     pub fn list_available_help(&self) -> Result<String, String> {
         let mut help_files = Vec::new();
-        
+
         self.collect_help_files(&HELP_DIR, &mut help_files);
-        
+
         if help_files.is_empty() {
             return Ok(self.renderer.render_warning("No help files found"));
         }
 
         match self.renderer.format {
-            OutputFormat::Json => {
-                Ok(serde_json::json!({
-                    "available_help": help_files
-                }).to_string())
-            }
+            OutputFormat::Json => Ok(serde_json::json!({
+                "available_help": help_files
+            })
+            .to_string()),
             OutputFormat::Table => {
-                use comfy_table::{Table, ContentArrangement};
+                use comfy_table::{ContentArrangement, Table};
                 let mut table = Table::new();
                 table.set_content_arrangement(ContentArrangement::Dynamic);
                 table.set_header(vec!["Command", "Description"]);
-                
+
                 for file in help_files {
                     let command = file.replace(".md", "");
-                    let description = self.extract_description(&file).unwrap_or_else(|| "No description available".to_string());
+                    let description = self
+                        .extract_description(&file)
+                        .unwrap_or_else(|| "No description available".to_string());
                     table.add_row(vec![command, description]);
                 }
-                
+
                 Ok(format!("Available Help Topics:\n\n{}", table))
             }
             _ => {
                 let mut output = String::from("Available Help Topics:\n\n");
                 for file in help_files {
                     let command = file.replace(".md", "");
-                    let description = self.extract_description(&file).unwrap_or_else(|| "No description available".to_string());
+                    let description = self
+                        .extract_description(&file)
+                        .unwrap_or_else(|| "No description available".to_string());
                     output.push_str(&format!("  {} - {}\n", command, description));
                 }
                 Ok(output)
@@ -94,6 +97,7 @@ impl HelpSystem {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::only_used_in_recursion)]
     fn collect_help_files(&self, dir: &Dir<'_>, files: &mut Vec<String>) {
         for entry in dir.entries() {
             match entry {

@@ -1,5 +1,5 @@
 //! Storage system tests
-//! 
+//!
 //! This module consolidates all storage-related tests including:
 //! - CRUD operations (Create, Read, Update, Delete)
 //! - Multi-project storage
@@ -45,7 +45,7 @@ mod crud_operations {
             .success()
             .stdout(predicate::str::contains("Created task:"));
 
-                // Verify task exists
+        // Verify task exists
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
@@ -270,7 +270,7 @@ mod multi_project {
             let mut cmd = Command::cargo_bin("lotar").unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
-                .arg(&format!("Gamma Task {}", i))
+                .arg(format!("Gamma Task {i}"))
                 .arg("--project=Gamma")
                 .assert()
                 .success();
@@ -278,7 +278,7 @@ mod multi_project {
             let mut cmd = Command::cargo_bin("lotar").unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
-                .arg(&format!("Delta Task {}", i))
+                .arg(format!("Delta Task {i}"))
                 .arg("--project=Delta")
                 .assert()
                 .success();

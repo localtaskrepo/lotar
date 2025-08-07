@@ -1,4 +1,4 @@
-/**
+/*
 GPT Instructions:
 Write a module in Rust called Scanner that implements the following features:
 * A function called scan() - returns a vector of Todo objects (you will need to define it)
@@ -6,7 +6,8 @@ Write a module in Rust called Scanner that implements the following features:
 * It should scan each file and look for TODOs (The search token should be configurable, but default to "TODO")
 * It should look for TODO token only in comments (not in strings)
 * To identify comments the module should have a mapping of file extensions to comment tokens
-* For example, for Rust the comment token is "//" and for C++ it is "//" or "/* */"
+* For example, for Rust the comment token is "//" and for C++ it is "//" or "/* */
+"
 * We should support all known comment styles for all programming languages we support, which could be more than 2
 * Implement as many comment styles as you can, for as many programming languages as you can
 * The constructor will be given a path to the directory to scan
@@ -132,19 +133,17 @@ impl Scanner {
 
     fn scan_directory(&self, dir_path: &PathBuf, references: &mut Vec<Reference>) {
         if let Ok(entries) = fs::read_dir(dir_path) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
+            for entry in entries.flatten() {
+                let path = entry.path();
 
-                    if path.is_dir() {
-                        // Recursive directory scanning
-                        self.scan_directory(&path, references);
-                    } else if let Some(extension) = path.extension() {
-                        if let Some(ext_str) = extension.to_str() {
-                            // Check for file extension match in our supported types
-                            if self.is_supported_file_type(ext_str) {
-                                self.scan_file(&path, references);
-                            }
+                if path.is_dir() {
+                    // Recursive directory scanning
+                    self.scan_directory(&path, references);
+                } else if let Some(extension) = path.extension() {
+                    if let Some(ext_str) = extension.to_str() {
+                        // Check for file extension match in our supported types
+                        if self.is_supported_file_type(ext_str) {
+                            self.scan_file(&path, references);
                         }
                     }
                 }

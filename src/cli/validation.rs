@@ -31,28 +31,26 @@ impl<'a> CliValidator<'a> {
         if self.config.categories.has_wildcard() {
             // Any category is allowed
             Ok(category.to_string())
+        } else if self
+            .config
+            .categories
+            .values
+            .contains(&category.to_string())
+        {
+            Ok(category.to_string())
         } else {
-            if self
-                .config
-                .categories
-                .values
-                .contains(&category.to_string())
-            {
-                Ok(category.to_string())
-            } else {
-                let suggestion = find_closest_match(category, &self.config.categories.values);
-                let suggestion_text = match suggestion {
-                    Some(s) => format!(" Did you mean '{}'?", s),
-                    None => String::new(),
-                };
+            let suggestion = find_closest_match(category, &self.config.categories.values);
+            let suggestion_text = match suggestion {
+                Some(s) => format!(" Did you mean '{}'?", s),
+                None => String::new(),
+            };
 
-                Err(format!(
-                    "Category '{}' is not allowed in this project. Valid categories: {}.{}",
-                    category,
-                    self.config.categories.values.join(", "),
-                    suggestion_text
-                ))
-            }
+            Err(format!(
+                "Category '{}' is not allowed in this project. Valid categories: {}.{}",
+                category,
+                self.config.categories.values.join(", "),
+                suggestion_text
+            ))
         }
     }
 
@@ -61,23 +59,21 @@ impl<'a> CliValidator<'a> {
         if self.config.tags.has_wildcard() {
             // Any tag is allowed
             Ok(tag.to_string())
+        } else if self.config.tags.values.contains(&tag.to_string()) {
+            Ok(tag.to_string())
         } else {
-            if self.config.tags.values.contains(&tag.to_string()) {
-                Ok(tag.to_string())
-            } else {
-                let suggestion = find_closest_match(tag, &self.config.tags.values);
-                let suggestion_text = match suggestion {
-                    Some(s) => format!(" Did you mean '{}'?", s),
-                    None => String::new(),
-                };
+            let suggestion = find_closest_match(tag, &self.config.tags.values);
+            let suggestion_text = match suggestion {
+                Some(s) => format!(" Did you mean '{}'?", s),
+                None => String::new(),
+            };
 
-                Err(format!(
-                    "Tag '{}' is not allowed in this project. Valid tags: {}.{}",
-                    tag,
-                    self.config.tags.values.join(", "),
-                    suggestion_text
-                ))
-            }
+            Err(format!(
+                "Tag '{}' is not allowed in this project. Valid tags: {}.{}",
+                tag,
+                self.config.tags.values.join(", "),
+                suggestion_text
+            ))
         }
     }
 
@@ -86,28 +82,26 @@ impl<'a> CliValidator<'a> {
         if self.config.custom_fields.has_wildcard() {
             // Any custom field is allowed
             Ok(field_name.to_string())
+        } else if self
+            .config
+            .custom_fields
+            .values
+            .contains(&field_name.to_string())
+        {
+            Ok(field_name.to_string())
         } else {
-            if self
-                .config
-                .custom_fields
-                .values
-                .contains(&field_name.to_string())
-            {
-                Ok(field_name.to_string())
-            } else {
-                let suggestion = find_closest_match(field_name, &self.config.custom_fields.values);
-                let suggestion_text = match suggestion {
-                    Some(s) => format!(" Did you mean '{}'?", s),
-                    None => String::new(),
-                };
+            let suggestion = find_closest_match(field_name, &self.config.custom_fields.values);
+            let suggestion_text = match suggestion {
+                Some(s) => format!(" Did you mean '{}'?", s),
+                None => String::new(),
+            };
 
-                Err(format!(
-                    "Custom field '{}' is not allowed in this project. Valid custom fields: {}.{}",
-                    field_name,
-                    self.config.custom_fields.values.join(", "),
-                    suggestion_text
-                ))
-            }
+            Err(format!(
+                "Custom field '{}' is not allowed in this project. Valid custom fields: {}.{}",
+                field_name,
+                self.config.custom_fields.values.join(", "),
+                suggestion_text
+            ))
         }
     }
 
@@ -133,9 +127,8 @@ impl<'a> CliValidator<'a> {
             return Ok(assignee.to_string());
         }
 
-        if assignee.starts_with('@') {
+        if let Some(username) = assignee.strip_prefix('@') {
             // Username format - validate it's a reasonable username
-            let username = &assignee[1..];
             if !username.is_empty()
                 && username
                     .chars()
@@ -240,6 +233,7 @@ fn edit_distance(s1: &str, s2: &str) -> usize {
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
     // Initialize first row and column
+    #[allow(clippy::needless_range_loop)]
     for i in 0..=len1 {
         matrix[i][0] = i;
     }

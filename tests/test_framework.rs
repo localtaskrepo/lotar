@@ -1,15 +1,14 @@
 /// Test organization and execution framework for CLI testing
-/// 
+///
 /// This module provides utilities for organizing and running tests in categories,
 /// generating reports, and managing test execution flow.
-
 use std::collections::HashMap;
 
 /// Test categories for organization
 #[derive(Debug, Clone, PartialEq)]
 pub enum TestCategory {
     Basic,
-    Validation, 
+    Validation,
     Configuration,
     Performance,
     Integration,
@@ -19,6 +18,12 @@ pub enum TestCategory {
 pub struct TestRunner {
     pub categories: Vec<TestCategory>,
     pub verbose: bool,
+}
+
+impl Default for TestRunner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestRunner {
@@ -45,23 +50,23 @@ impl TestRunner {
     /// Run all tests in configured categories
     pub fn run(self) -> TestResults {
         let mut results = TestResults::new();
-        
+
         for category in &self.categories {
             if self.verbose {
-                println!("Running tests for category: {:?}", category);
+                println!("Running tests for category: {category:?}");
             }
-            
+
             let category_result = self.run_category_tests(category);
-            results.add_category(&format!("{:?}", category), category_result);
+            results.add_category(&format!("{category:?}"), category_result);
         }
-        
+
         results
     }
 
     /// Run tests for a specific category
     fn run_category_tests(&self, category: &TestCategory) -> CategoryResult {
         let mut result = CategoryResult::new();
-        
+
         match category {
             TestCategory::Basic => {
                 result.add_test("basic_add_test", true, "Basic add functionality works");
@@ -81,10 +86,14 @@ impl TestRunner {
             }
             TestCategory::Integration => {
                 result.add_test("end_to_end_workflow", true, "End-to-end workflow works");
-                result.add_test("multi_project_workflow", true, "Multi-project workflow works");
+                result.add_test(
+                    "multi_project_workflow",
+                    true,
+                    "Multi-project workflow works",
+                );
             }
         }
-        
+
         result
     }
 }
@@ -92,6 +101,12 @@ impl TestRunner {
 /// Results for all test categories
 pub struct TestResults {
     pub categories: HashMap<String, CategoryResult>,
+}
+
+impl Default for TestResults {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TestResults {
@@ -109,31 +124,30 @@ impl TestResults {
 
     /// Calculate overall pass rate
     pub fn pass_rate(&self) -> f64 {
-        let total_tests: usize = self.categories.values()
-            .map(|cat| cat.tests.len())
-            .sum();
-            
+        let total_tests: usize = self.categories.values().map(|cat| cat.tests.len()).sum();
+
         if total_tests == 0 {
             return 1.0;
         }
-        
-        let passed_tests: usize = self.categories.values()
+
+        let passed_tests: usize = self
+            .categories
+            .values()
             .map(|cat| cat.tests.iter().filter(|test| test.passed).count())
             .sum();
-            
+
         passed_tests as f64 / total_tests as f64
     }
 
     /// Get total number of tests
     pub fn total_tests(&self) -> usize {
-        self.categories.values()
-            .map(|cat| cat.tests.len())
-            .sum()
+        self.categories.values().map(|cat| cat.tests.len()).sum()
     }
 
     /// Get number of passed tests
     pub fn passed_tests(&self) -> usize {
-        self.categories.values()
+        self.categories
+            .values()
             .map(|cat| cat.tests.iter().filter(|test| test.passed).count())
             .sum()
     }
@@ -144,12 +158,16 @@ pub struct CategoryResult {
     pub tests: Vec<TestResult>,
 }
 
+impl Default for CategoryResult {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CategoryResult {
     /// Create new category result
     pub fn new() -> Self {
-        Self {
-            tests: vec![],
-        }
+        Self { tests: vec![] }
     }
 
     /// Add a test result
@@ -166,7 +184,7 @@ impl CategoryResult {
         if self.tests.is_empty() {
             return 1.0;
         }
-        
+
         let passed = self.tests.iter().filter(|test| test.passed).count();
         passed as f64 / self.tests.len() as f64
     }
@@ -184,11 +202,11 @@ impl TestResult {
     pub fn name(&self) -> &str {
         &self.name
     }
-    
+
     pub fn passed(&self) -> bool {
         self.passed
     }
-    
+
     pub fn message(&self) -> &str {
         &self.message
     }
@@ -238,7 +256,7 @@ mod test_framework_tests {
         let runner = TestRunner::new()
             .with_categories(vec![TestCategory::Basic])
             .verbose();
-        
+
         assert_eq!(runner.categories.len(), 1);
         assert!(runner.verbose);
     }
@@ -246,13 +264,13 @@ mod test_framework_tests {
     #[test]
     fn test_results_calculation() {
         let mut results = TestResults::new();
-        
+
         let mut category = CategoryResult::new();
         category.add_test("test1", true, "Passed");
         category.add_test("test2", false, "Failed");
-        
+
         results.add_category("TestCategory", category);
-        
+
         assert_eq!(results.pass_rate(), 0.5);
     }
 }

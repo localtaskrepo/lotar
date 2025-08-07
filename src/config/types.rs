@@ -13,9 +13,9 @@ pub struct ConfigurableField<T> {
     pub values: Vec<T>,
 }
 
-impl<T> Serialize for ConfigurableField<T> 
-where 
-    T: Serialize
+impl<T> Serialize for ConfigurableField<T>
+where
+    T: Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

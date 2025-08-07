@@ -1,7 +1,7 @@
-use serde::{Serialize, Deserialize};
-use crate::types::{TaskStatus, Priority};
+use crate::types::{Priority, TaskStatus};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TaskFilter {
     pub status: Vec<TaskStatus>,
     pub priority: Vec<Priority>,
@@ -10,18 +10,4 @@ pub struct TaskFilter {
     pub category: Option<String>,
     pub tags: Vec<String>,
     pub text_query: Option<String>,
-}
-
-impl Default for TaskFilter {
-    fn default() -> Self {
-        Self {
-            status: vec![],
-            priority: vec![],
-            task_type: vec![],
-            project: None,
-            category: None,
-            tags: vec![],
-            text_query: None,
-        }
-    }
 }

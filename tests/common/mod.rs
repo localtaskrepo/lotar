@@ -44,27 +44,37 @@ impl TestFixtures {
     #[allow(dead_code)] // Used by output format consistency tests
     pub fn run_command(&self, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
         use assert_cmd::Command;
-        
+
         // Create a basic Cargo.toml if it doesn't exist for project detection
         let cargo_toml_path = self.temp_dir.path().join("Cargo.toml");
         if !cargo_toml_path.exists() {
-            std::fs::write(&cargo_toml_path, "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"")?;
-            
+            std::fs::write(
+                &cargo_toml_path,
+                "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"",
+            )?;
+
             // Create src directory and main.rs for a valid Rust project
             let src_dir = self.temp_dir.path().join("src");
             std::fs::create_dir_all(&src_dir)?;
-            std::fs::write(src_dir.join("main.rs"), "fn main() { println!(\"Hello, world!\"); }")?;
+            std::fs::write(
+                src_dir.join("main.rs"),
+                "fn main() { println!(\"Hello, world!\"); }",
+            )?;
         }
-        
+
         let output = Command::cargo_bin("lotar")?
             .args(args)
             .current_dir(self.temp_dir.path())
             .output()?;
-            
+
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
-            Err(format!("Command failed: {}", String::from_utf8_lossy(&output.stderr)).into())
+            Err(format!(
+                "Command failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )
+            .into())
         }
     }
 
@@ -115,8 +125,7 @@ impl TestFixtures {
     #[allow(dead_code)]
     pub fn create_config_in_dir(&self, dir: &std::path::Path, content: &str) {
         let config_path = dir.join("config.yml");
-        std::fs::write(&config_path, content)
-            .expect("Failed to create config file");
+        std::fs::write(&config_path, content).expect("Failed to create config file");
     }
 }
 
@@ -139,13 +148,12 @@ pub mod assertions {
         let task_files = std::fs::read_dir(tasks_root.join(project))
             .expect("Project directory should exist")
             .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path().extension().map_or(false, |ext| ext == "yml"))
+            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
             .collect::<Vec<_>>();
 
         assert!(
             !task_files.is_empty(),
-            "Should have at least one task file in project {}",
-            project
+            "Should have at least one task file in project {project}"
         );
     }
 
@@ -171,7 +179,7 @@ pub mod assertions {
                         .and_then(|name| name.to_str())
                         .unwrap_or("");
                     path.is_file()
-                        && path.extension().map_or(false, |ext| ext == "yml")
+                        && path.extension().is_some_and(|ext| ext == "yml")
                         && file_name != "config.yml" // Exclude config files from task count
                 })
                 .count() as u64
@@ -200,13 +208,11 @@ pub mod assertions {
 
         assert_eq!(
             actual_task_count, task_count,
-            "Task count mismatch for project {}",
-            project
+            "Task count mismatch for project {project}"
         );
         assert_eq!(
             actual_current_id, current_id,
-            "Current ID mismatch for project {}",
-            project
+            "Current ID mismatch for project {project}"
         );
     }
 }

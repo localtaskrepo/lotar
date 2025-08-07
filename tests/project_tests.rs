@@ -1,5 +1,5 @@
 //! Project management and detection tests
-//! 
+//!
 //! This module consolidates all project-related tests including:
 //! - Project structure detection and validation
 //! - Multi-project workspace handling
@@ -26,7 +26,11 @@ mod project_detection {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create Rust project structure
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"test-project\"\nversion = \"0.1.0\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"test-project\"\nversion = \"0.1.0\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
         fs::write(temp_dir.join("src/main.rs"), "fn main() {}").unwrap();
 
@@ -46,18 +50,30 @@ mod project_detection {
 
         // Create multiple project types
         // Rust project
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"rust-project\"\nversion = \"0.1.0\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"rust-project\"\nversion = \"0.1.0\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         // Node.js project
         let node_dir = temp_dir.join("node-project");
         fs::create_dir_all(&node_dir).unwrap();
-        fs::write(node_dir.join("package.json"), r#"{"name": "node-project", "version": "1.0.0"}"#).unwrap();
+        fs::write(
+            node_dir.join("package.json"),
+            r#"{"name": "node-project", "version": "1.0.0"}"#,
+        )
+        .unwrap();
 
         // Python project
         let python_dir = temp_dir.join("python-project");
         fs::create_dir_all(&python_dir).unwrap();
-        fs::write(python_dir.join("setup.py"), "from setuptools import setup\nsetup(name='python-project')").unwrap();
+        fs::write(
+            python_dir.join("setup.py"),
+            "from setuptools import setup\nsetup(name='python-project')",
+        )
+        .unwrap();
 
         // Test scan works with multiple project files
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -74,8 +90,12 @@ mod project_detection {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create multiple project types
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"rust-project\"").unwrap();
-        
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"rust-project\"",
+        )
+        .unwrap();
+
         let node_dir = temp_dir.join("node-app");
         fs::create_dir_all(&node_dir).unwrap();
         fs::write(node_dir.join("package.json"), r#"{"name": "node-app"}"#).unwrap();
@@ -111,7 +131,11 @@ mod structure_validation {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create incomplete Rust project (Cargo.toml without src/)
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"incomplete-rust\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"incomplete-rust\"",
+        )
+        .unwrap();
 
         // Scan should work regardless of project completeness
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -130,17 +154,29 @@ mod structure_validation {
         // Create nested project structure
         let workspace_dir = temp_dir.join("workspace");
         fs::create_dir_all(&workspace_dir).unwrap();
-        fs::write(workspace_dir.join("Cargo.toml"), "[workspace]\nmembers = [\"project1\", \"project2\"]").unwrap();
+        fs::write(
+            workspace_dir.join("Cargo.toml"),
+            "[workspace]\nmembers = [\"project1\", \"project2\"]",
+        )
+        .unwrap();
 
         // Create workspace members
         let project1_dir = workspace_dir.join("project1");
         fs::create_dir_all(&project1_dir).unwrap();
-        fs::write(project1_dir.join("Cargo.toml"), "[package]\nname = \"project1\"").unwrap();
+        fs::write(
+            project1_dir.join("Cargo.toml"),
+            "[package]\nname = \"project1\"",
+        )
+        .unwrap();
         fs::create_dir_all(project1_dir.join("src")).unwrap();
 
         let project2_dir = workspace_dir.join("project2");
         fs::create_dir_all(&project2_dir).unwrap();
-        fs::write(project2_dir.join("Cargo.toml"), "[package]\nname = \"project2\"").unwrap();
+        fs::write(
+            project2_dir.join("Cargo.toml"),
+            "[package]\nname = \"project2\"",
+        )
+        .unwrap();
         fs::create_dir_all(project2_dir.join("src")).unwrap();
 
         // Test that scan works with nested project structure
@@ -158,13 +194,21 @@ mod structure_validation {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a project with typical file structure issues
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"test-validation\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"test-validation\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
         fs::write(temp_dir.join("src/lib.rs"), "// Empty lib").unwrap();
 
         // Create some test files in non-standard locations
         fs::create_dir_all(temp_dir.join("random_tests")).unwrap();
-        fs::write(temp_dir.join("random_tests/test1.rs"), "#[test] fn test() {}").unwrap();
+        fs::write(
+            temp_dir.join("random_tests/test1.rs"),
+            "#[test] fn test() {}",
+        )
+        .unwrap();
 
         // Create some documentation
         fs::write(temp_dir.join("README.md"), "# Test Project").unwrap();
@@ -195,11 +239,19 @@ mod multi_project_workspace {
         // Create multiple projects
         let frontend_dir = temp_dir.join("frontend");
         fs::create_dir_all(&frontend_dir).unwrap();
-        fs::write(frontend_dir.join("package.json"), r#"{"name": "frontend-app"}"#).unwrap();
+        fs::write(
+            frontend_dir.join("package.json"),
+            r#"{"name": "frontend-app"}"#,
+        )
+        .unwrap();
 
         let backend_dir = temp_dir.join("backend");
         fs::create_dir_all(&backend_dir).unwrap();
-        fs::write(backend_dir.join("Cargo.toml"), "[package]\nname = \"backend-api\"").unwrap();
+        fs::write(
+            backend_dir.join("Cargo.toml"),
+            "[package]\nname = \"backend-api\"",
+        )
+        .unwrap();
         fs::create_dir_all(backend_dir.join("src")).unwrap();
 
         // Initialize configuration for multiple projects
@@ -264,11 +316,19 @@ mod multi_project_workspace {
         // Create project structure
         let project_a_dir = temp_dir.join("project-a");
         fs::create_dir_all(&project_a_dir).unwrap();
-        fs::write(project_a_dir.join("package.json"), r#"{"name": "project-a"}"#).unwrap();
+        fs::write(
+            project_a_dir.join("package.json"),
+            r#"{"name": "project-a"}"#,
+        )
+        .unwrap();
 
         let project_b_dir = temp_dir.join("project-b");
         fs::create_dir_all(&project_b_dir).unwrap();
-        fs::write(project_b_dir.join("Cargo.toml"), "[package]\nname = \"project-b\"").unwrap();
+        fs::write(
+            project_b_dir.join("Cargo.toml"),
+            "[package]\nname = \"project-b\"",
+        )
+        .unwrap();
         fs::create_dir_all(project_b_dir.join("src")).unwrap();
 
         // Initialize projects in their respective directories
@@ -340,7 +400,11 @@ mod smart_features {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a project structure
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"auto-detect-test\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"auto-detect-test\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         // Add a task without specifying project - should auto-detect
@@ -367,16 +431,28 @@ mod smart_features {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create multiple project types with complex names
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"backend-api-service\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"backend-api-service\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         let frontend_dir = temp_dir.join("frontend-web-app");
         fs::create_dir_all(&frontend_dir).unwrap();
-        fs::write(frontend_dir.join("package.json"), r#"{"name": "frontend-web-app"}"#).unwrap();
+        fs::write(
+            frontend_dir.join("package.json"),
+            r#"{"name": "frontend-web-app"}"#,
+        )
+        .unwrap();
 
         let mobile_dir = temp_dir.join("mobile-app");
         fs::create_dir_all(&mobile_dir).unwrap();
-        fs::write(mobile_dir.join("pubspec.yaml"), "name: mobile_app\nversion: 1.0.0").unwrap();
+        fs::write(
+            mobile_dir.join("pubspec.yaml"),
+            "name: mobile_app\nversion: 1.0.0",
+        )
+        .unwrap();
 
         // Test basic scanning (scan command doesn't support filtering)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -401,7 +477,11 @@ mod smart_features {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a project
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"status-test\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"status-test\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         // Initialize and add some tasks
@@ -415,7 +495,8 @@ mod smart_features {
 
         // Add tasks with different states
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let first_task_output = cmd.current_dir(temp_dir)
+        let first_task_output = cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Todo Task")
             .arg("--project=StatusTest")
@@ -426,7 +507,8 @@ mod smart_features {
             .clone();
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let second_task_output = cmd.current_dir(temp_dir)
+        let second_task_output = cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("In Progress Task")
             .arg("--project=StatusTest")
@@ -486,9 +568,17 @@ mod integration {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Step 1: Create a realistic project structure
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"workflow-test\"\nversion = \"0.1.0\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"workflow-test\"\nversion = \"0.1.0\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
-        fs::write(temp_dir.join("src/main.rs"), "fn main() { println!(\"Hello, world!\"); }").unwrap();
+        fs::write(
+            temp_dir.join("src/main.rs"),
+            "fn main() { println!(\"Hello, world!\"); }",
+        )
+        .unwrap();
         fs::write(temp_dir.join("README.md"), "# Workflow Test Project").unwrap();
 
         // Step 2: Initialize project configuration
@@ -511,7 +601,8 @@ mod integration {
 
         // Step 4: Add tasks for different workflow stages
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let first_task_output = cmd.current_dir(temp_dir)
+        let first_task_output = cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Setup CI/CD")
             .arg("--project=WorkflowTest")
@@ -575,7 +666,9 @@ mod integration {
             .arg("--project=WorkflowTest")
             .assert()
             .success()
-            .stdout(predicate::str::contains("in_progress").or(predicate::str::contains("IN_PROGRESS")));
+            .stdout(
+                predicate::str::contains("in_progress").or(predicate::str::contains("IN_PROGRESS")),
+            );
     }
 
     #[test]
@@ -586,11 +679,19 @@ mod integration {
         // Create two separate projects
         let project1_dir = temp_dir.join("isolated-project-1");
         fs::create_dir_all(&project1_dir).unwrap();
-        fs::write(project1_dir.join("package.json"), r#"{"name": "isolated-1"}"#).unwrap();
+        fs::write(
+            project1_dir.join("package.json"),
+            r#"{"name": "isolated-1"}"#,
+        )
+        .unwrap();
 
         let project2_dir = temp_dir.join("isolated-project-2");
         fs::create_dir_all(&project2_dir).unwrap();
-        fs::write(project2_dir.join("Cargo.toml"), "[package]\nname = \"isolated-2\"").unwrap();
+        fs::write(
+            project2_dir.join("Cargo.toml"),
+            "[package]\nname = \"isolated-2\"",
+        )
+        .unwrap();
         fs::create_dir_all(project2_dir.join("src")).unwrap();
 
         // Initialize both projects in their respective directories

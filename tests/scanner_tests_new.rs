@@ -1,5 +1,5 @@
 //! Scanner and indexing system tests
-//! 
+//!
 //! This module consolidates all scanner-related tests including:
 //! - File system scanning and indexing
 //! - Project discovery and analysis
@@ -26,9 +26,17 @@ mod basic_scanning {
 
         // Create a basic project structure with TODO comments
         fs::write(temp_dir.join("README.md"), "# Test Project").unwrap();
-        fs::write(temp_dir.join("main.py"), "# TODO: implement main logic\nprint('Hello World')").unwrap();
+        fs::write(
+            temp_dir.join("main.py"),
+            "# TODO: implement main logic\nprint('Hello World')",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
-        fs::write(temp_dir.join("src/lib.py"), "# TODO: add library code\n# Library code").unwrap();
+        fs::write(
+            temp_dir.join("src/lib.py"),
+            "# TODO: add library code\n# Library code",
+        )
+        .unwrap();
 
         // Test basic scan command
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -46,8 +54,16 @@ mod basic_scanning {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create mixed file types with TODO comments
-        fs::write(temp_dir.join("script.py"), "# TODO: Python script improvement").unwrap();
-        fs::write(temp_dir.join("script.js"), "// TODO: JavaScript enhancement").unwrap();
+        fs::write(
+            temp_dir.join("script.py"),
+            "# TODO: Python script improvement",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.join("script.js"),
+            "// TODO: JavaScript enhancement",
+        )
+        .unwrap();
         fs::write(temp_dir.join("style.css"), "/* CSS file */").unwrap();
         fs::write(temp_dir.join("data.json"), r#"{"key": "value"}"#).unwrap();
 
@@ -69,8 +85,16 @@ mod basic_scanning {
         fs::create_dir_all(temp_dir.join("level1/level2/level3")).unwrap();
         fs::write(temp_dir.join("root.rs"), "// TODO: Root level task").unwrap();
         fs::write(temp_dir.join("level1/level1.rs"), "// TODO: Level 1 task").unwrap();
-        fs::write(temp_dir.join("level1/level2/level2.rs"), "// TODO: Level 2 task").unwrap();
-        fs::write(temp_dir.join("level1/level2/level3/level3.rs"), "// TODO: Level 3 task").unwrap();
+        fs::write(
+            temp_dir.join("level1/level2/level2.rs"),
+            "// TODO: Level 2 task",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.join("level1/level2/level3/level3.rs"),
+            "// TODO: Level 3 task",
+        )
+        .unwrap();
 
         // Test recursive scan
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -87,7 +111,11 @@ mod basic_scanning {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create files without TODO comments
-        fs::write(temp_dir.join("clean.rs"), "fn main() { println!(\"Hello\"); }").unwrap();
+        fs::write(
+            temp_dir.join("clean.rs"),
+            "fn main() { println!(\"Hello\"); }",
+        )
+        .unwrap();
         fs::write(temp_dir.join("clean.py"), "print('Hello World')").unwrap();
 
         // Test scan with no TODOs
@@ -105,7 +133,11 @@ mod basic_scanning {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create file with TODO
-        fs::write(temp_dir.join("test.rs"), "// TODO: implement feature\nfn main() {}").unwrap();
+        fs::write(
+            temp_dir.join("test.rs"),
+            "// TODO: implement feature\nfn main() {}",
+        )
+        .unwrap();
 
         // Test scan with detailed output
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -132,9 +164,17 @@ mod project_discovery {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create Rust project structure
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"").unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.1.0\"",
+        )
+        .unwrap();
         fs::create_dir_all(temp_dir.join("src")).unwrap();
-        fs::write(temp_dir.join("src/main.rs"), "// TODO: implement main\nfn main() {}").unwrap();
+        fs::write(
+            temp_dir.join("src/main.rs"),
+            "// TODO: implement main\nfn main() {}",
+        )
+        .unwrap();
 
         // Test scan
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -152,7 +192,11 @@ mod project_discovery {
 
         // Create Python project structure
         fs::write(temp_dir.join("setup.py"), "from setuptools import setup").unwrap();
-        fs::write(temp_dir.join("main.py"), "# TODO: implement main\nprint('hello')").unwrap();
+        fs::write(
+            temp_dir.join("main.py"),
+            "# TODO: implement main\nprint('hello')",
+        )
+        .unwrap();
 
         // Test scan
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -169,8 +213,16 @@ mod project_discovery {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create JavaScript project structure
-        fs::write(temp_dir.join("package.json"), r#"{"name": "test", "version": "1.0.0"}"#).unwrap();
-        fs::write(temp_dir.join("index.js"), "// TODO: implement main\nconsole.log('hello');").unwrap();
+        fs::write(
+            temp_dir.join("package.json"),
+            r#"{"name": "test", "version": "1.0.0"}"#,
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.join("index.js"),
+            "// TODO: implement main\nconsole.log('hello');",
+        )
+        .unwrap();
 
         // Test scan
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -187,10 +239,18 @@ mod project_discovery {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create mixed project structure
-        fs::write(temp_dir.join("Cargo.toml"), "[package]\nname = \"test\"\nversion = \"0.1.0\"").unwrap();
-        fs::write(temp_dir.join("package.json"), r#"{"name": "test", "version": "1.0.0"}"#).unwrap();
+        fs::write(
+            temp_dir.join("Cargo.toml"),
+            "[package]\nname = \"test\"\nversion = \"0.1.0\"",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.join("package.json"),
+            r#"{"name": "test", "version": "1.0.0"}"#,
+        )
+        .unwrap();
         fs::write(temp_dir.join("setup.py"), "from setuptools import setup").unwrap();
-        
+
         fs::write(temp_dir.join("main.rs"), "// TODO: Rust TODO").unwrap();
         fs::write(temp_dir.join("main.js"), "// TODO: JavaScript TODO").unwrap();
         fs::write(temp_dir.join("main.py"), "# TODO: Python TODO").unwrap();
@@ -219,7 +279,7 @@ mod system_integration {
 
         // Create custom tasks directory
         fs::create_dir_all(temp_dir.join("custom-tasks")).unwrap();
-        
+
         // Create file with TODO
         fs::write(temp_dir.join("test.rs"), "// TODO: custom dir test").unwrap();
 
@@ -241,9 +301,17 @@ mod system_integration {
         // Create comprehensive test structure
         fs::create_dir_all(temp_dir.join("src")).unwrap();
         fs::create_dir_all(temp_dir.join("tests")).unwrap();
-        
-        fs::write(temp_dir.join("src/main.rs"), "// TODO: implement main logic").unwrap();
-        fs::write(temp_dir.join("src/lib.rs"), "// TODO: add library functionality").unwrap();
+
+        fs::write(
+            temp_dir.join("src/main.rs"),
+            "// TODO: implement main logic",
+        )
+        .unwrap();
+        fs::write(
+            temp_dir.join("src/lib.rs"),
+            "// TODO: add library functionality",
+        )
+        .unwrap();
         fs::write(temp_dir.join("tests/test.rs"), "// TODO: add more tests").unwrap();
 
         // Test verbose scan
@@ -262,7 +330,11 @@ mod system_integration {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create source files with TODOs
-        fs::write(temp_dir.join("main.rs"), "// TODO: integrate with task system").unwrap();
+        fs::write(
+            temp_dir.join("main.rs"),
+            "// TODO: integrate with task system",
+        )
+        .unwrap();
 
         // Test scan
         let mut cmd = Command::cargo_bin("lotar").unwrap();

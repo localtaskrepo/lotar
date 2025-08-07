@@ -1,11 +1,11 @@
+use crate::api_server;
+use include_dir::{Dir, include_dir};
+use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::path::Path;
-use include_dir::{include_dir, Dir};
-use crate::api_server;
 
 // Use the target/web folder to keep all build artifacts together
 const STATIC_FILES: Dir = include_dir!("target/web");
@@ -19,7 +19,7 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
         match stream {
             Ok(mut stream) => {
                 let mut buffer = [0; 512];
-                stream.read(&mut buffer).unwrap();
+                let _ = stream.read(&mut buffer).unwrap(); // Handle the read amount properly
                 let request = String::from_utf8_lossy(&buffer);
                 let request_line = request.lines().next().unwrap();
                 let request_parts: Vec<&str> = request_line.split(" ").collect();
@@ -29,10 +29,12 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                 if request_path.starts_with("/api") {
                     // Execute the appropriate rust code to handle the API request
                     let handler_response = api_server.handle_request(request_path);
-                    let response = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
-                                           handler_response.len(),
-                                           handler_response);
-                    stream.write(response.as_bytes()).unwrap();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                        handler_response.len(),
+                        handler_response
+                    );
+                    stream.write_all(response.as_bytes()).unwrap();
                     stream.flush().unwrap();
                 } else {
                     // Get the file path to serve based on the request path
@@ -57,16 +59,18 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                                 _ => "application/octet-stream",
                             };
 
-                            let response = format!("HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n{}",
-                                                   content_type,
-                                                   file_content.len(),
-                                                   file_content);
-                            stream.write(response.as_bytes()).unwrap();
+                            let response = format!(
+                                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n{}",
+                                content_type,
+                                file_content.len(),
+                                file_content
+                            );
+                            stream.write_all(response.as_bytes()).unwrap();
                             stream.flush().unwrap();
                         }
                         Err(_) => {
                             let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
-                            stream.write(response.as_bytes()).unwrap();
+                            stream.write_all(response.as_bytes()).unwrap();
                             stream.flush().unwrap();
                         }
                     }
@@ -75,7 +79,7 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
             Err(e) => {
                 let response = "HTTP/1.1 503 Service Unavailable\r\n\r\nService Unavailable.";
                 let mut stream = std::net::TcpStream::connect("127.0.0.1:8000").unwrap();
-                stream.write(response.as_bytes()).unwrap();
+                stream.write_all(response.as_bytes()).unwrap();
                 stream.flush().unwrap();
                 println!("Error: {}", e);
             }

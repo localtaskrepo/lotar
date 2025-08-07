@@ -1,9 +1,9 @@
-use serde::Serialize;
-use comfy_table::{Table, Cell, ContentArrangement};
-use console::style;
-use clap::ValueEnum;
 use crate::storage::Task;
-use crate::types::{TaskStatus, Priority, TaskType};
+use crate::types::{Priority, TaskStatus, TaskType};
+use clap::ValueEnum;
+use comfy_table::{Cell, ContentArrangement, Table};
+use console::style;
+use serde::Serialize;
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 pub enum OutputFormat {
@@ -100,12 +100,18 @@ impl Outputable for Task {
             self.assignee.as_deref().unwrap_or("-").to_string(),
             self.due_date.as_deref().unwrap_or("-").to_string(),
             self.effort.as_deref().unwrap_or("-").to_string(),
-            if self.tags.is_empty() { "-".to_string() } else { self.tags.join(", ") },
+            if self.tags.is_empty() {
+                "-".to_string()
+            } else {
+                self.tags.join(", ")
+            },
         ]
     }
 
     fn table_headers() -> Vec<&'static str> {
-        vec!["Title", "Status", "Priority", "Type", "Assignee", "Due Date", "Effort", "Tags"]
+        vec![
+            "Title", "Status", "Priority", "Type", "Assignee", "Due Date", "Effort", "Tags",
+        ]
     }
 }
 
@@ -121,12 +127,9 @@ pub struct TaskSummary {
 
 impl Outputable for TaskSummary {
     fn to_text(&self) -> String {
-        format!("[{}] {} - {} ({}, {})", 
-            self.id, 
-            self.title, 
-            self.status, 
-            self.priority, 
-            self.task_type
+        format!(
+            "[{}] {} - {} ({}, {})",
+            self.id, self.title, self.status, self.priority, self.task_type
         )
     }
 
@@ -166,7 +169,11 @@ impl OutputRenderer {
     }
 
     #[allow(dead_code)]
-    pub fn render_list<T: Outputable + Serialize>(&self, items: &[T], title: Option<&str>) -> String {
+    pub fn render_list<T: Outputable + Serialize>(
+        &self,
+        items: &[T],
+        title: Option<&str>,
+    ) -> String {
         match self.format {
             OutputFormat::Text => self.render_text_list(items, title),
             OutputFormat::Table => self.render_table_list(items, title),
@@ -177,36 +184,33 @@ impl OutputRenderer {
 
     pub fn render_success(&self, message: &str) -> String {
         match self.format {
-            OutputFormat::Json => {
-                serde_json::json!({
-                    "status": "success",
-                    "message": message
-                }).to_string()
-            }
+            OutputFormat::Json => serde_json::json!({
+                "status": "success",
+                "message": message
+            })
+            .to_string(),
             _ => format!("✅ {}", style(message).green()),
         }
     }
 
     pub fn render_error(&self, message: &str) -> String {
         match self.format {
-            OutputFormat::Json => {
-                serde_json::json!({
-                    "status": "error",
-                    "message": message
-                }).to_string()
-            }
+            OutputFormat::Json => serde_json::json!({
+                "status": "error",
+                "message": message
+            })
+            .to_string(),
             _ => format!("❌ {}", style(message).red()),
         }
     }
 
     pub fn render_warning(&self, message: &str) -> String {
         match self.format {
-            OutputFormat::Json => {
-                serde_json::json!({
-                    "status": "warning",
-                    "message": message
-                }).to_string()
-            }
+            OutputFormat::Json => serde_json::json!({
+                "status": "warning",
+                "message": message
+            })
+            .to_string(),
             _ => format!("⚠️  {}", style(message).yellow()),
         }
     }
@@ -220,7 +224,7 @@ impl OutputRenderer {
     #[allow(dead_code)]
     fn render_text_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
         let mut output = String::new();
-        
+
         if let Some(title) = title {
             output.push_str(&format!("{}\n\n", style(title).bold().underlined()));
         }
@@ -236,7 +240,7 @@ impl OutputRenderer {
                 }
             }
         }
-        
+
         output
     }
 
@@ -244,24 +248,21 @@ impl OutputRenderer {
     fn render_table_single<T: Outputable>(&self, item: &T) -> String {
         let mut table = Table::new();
         table.set_content_arrangement(ContentArrangement::Dynamic);
-        
+
         let headers = T::table_headers();
         let values = item.to_table_row();
-        
+
         for (header, value) in headers.iter().zip(values.iter()) {
-            table.add_row(vec![
-                Cell::new(header),
-                Cell::new(value),
-            ]);
+            table.add_row(vec![Cell::new(header), Cell::new(value)]);
         }
-        
+
         table.to_string()
     }
 
     #[allow(dead_code)]
     fn render_table_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
         let mut output = String::new();
-        
+
         if let Some(title) = title {
             output.push_str(&format!("{}\n\n", style(title).bold().underlined()));
         }
@@ -272,7 +273,7 @@ impl OutputRenderer {
 
         let mut table = Table::new();
         table.set_content_arrangement(ContentArrangement::Dynamic);
-        
+
         // Add headers
         let headers = T::table_headers();
         table.set_header(headers);
@@ -308,7 +309,7 @@ impl OutputRenderer {
     fn render_markdown_single<T: Outputable>(&self, item: &T) -> String {
         let headers = T::table_headers();
         let values = item.to_table_row();
-        
+
         let mut output = String::new();
         for (header, value) in headers.iter().zip(values.iter()) {
             output.push_str(&format!("**{}:** {}\n", header, value));
@@ -319,7 +320,7 @@ impl OutputRenderer {
     #[allow(dead_code)]
     fn render_markdown_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
         let mut output = String::new();
-        
+
         if let Some(title) = title {
             output.push_str(&format!("# {}\n\n", title));
         }
@@ -336,7 +337,7 @@ impl OutputRenderer {
             output.push_str(&format!("{} | ", header));
         }
         output.push('\n');
-        
+
         output.push_str("| ");
         for _ in &headers {
             output.push_str("--- | ");

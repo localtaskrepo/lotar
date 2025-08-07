@@ -1,5 +1,5 @@
 //! Configuration system tests
-//! 
+//!
 //! This module consolidates all configuration-related tests including:
 //! - Global and project configuration
 //! - Configuration templates and inheritance
@@ -41,10 +41,15 @@ mod global_config {
             .assert()
             .success()
             .stdout(predicate::str::contains("Configuration for project:"))
-            .stdout(predicate::str::contains("(none set - will auto-detect on first task creation)"));
+            .stdout(predicate::str::contains(
+                "(none set - will auto-detect on first task creation)",
+            ));
 
         // Verify no files were created by the read-only operation
-        assert!(!tasks_dir.exists(), "Config show should not create any directories");
+        assert!(
+            !tasks_dir.exists(),
+            "Config show should not create any directories"
+        );
 
         // Now test that write operations DO create config files when needed
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -57,7 +62,10 @@ mod global_config {
 
         // Now verify the config was created by the write operation
         let global_config_path = tasks_dir.join("config.yml");
-        assert!(global_config_path.exists(), "Task creation should create global config");
+        assert!(
+            global_config_path.exists(),
+            "Task creation should create global config"
+        );
 
         // Verify the config content doesn't contain null values
         let config_content = fs::read_to_string(&global_config_path).unwrap();
@@ -120,12 +128,8 @@ mod project_config {
             .stdout(predicate::str::contains(
                 "🚀 Initializing configuration with template 'default'",
             ))
-            .stdout(predicate::str::contains(
-                "✅ Configuration initialized at:",
-            ))
-            .stdout(predicate::str::contains(
-                ".tasks/MYVE/config.yml",
-            ));
+            .stdout(predicate::str::contains("✅ Configuration initialized at:"))
+            .stdout(predicate::str::contains(".tasks/MYVE/config.yml"));
 
         // Verify the project folder was created with the correct prefix
         let project_dir = temp_dir.join(".tasks").join("MYVE");
@@ -156,12 +160,8 @@ mod project_config {
             .arg("--project=TEST")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "✅ Configuration initialized at:",
-            ))
-            .stdout(predicate::str::contains(
-                ".tasks/TEST/config.yml",
-            ));
+            .stdout(predicate::str::contains("✅ Configuration initialized at:"))
+            .stdout(predicate::str::contains(".tasks/TEST/config.yml"));
 
         // Verify the project folder was created with the same name
         let project_dir = temp_dir.join(".tasks").join("TEST");
@@ -181,9 +181,7 @@ mod project_config {
             .arg("--project=my-awesome-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                ".tasks/MAP/config.yml",
-            ));
+            .stdout(predicate::str::contains(".tasks/MAP/config.yml"));
 
         let hyphen_dir = temp_dir.join(".tasks").join("MAP");
         assert!(hyphen_dir.exists());
@@ -196,9 +194,7 @@ mod project_config {
             .arg("--project=my_cool_project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                ".tasks/MCP/config.yml",
-            ));
+            .stdout(predicate::str::contains(".tasks/MCP/config.yml"));
 
         let underscore_dir = temp_dir.join(".tasks").join("MCP");
         assert!(underscore_dir.exists());
@@ -211,9 +207,7 @@ mod project_config {
             .arg("--project=ABC")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                ".tasks/ABC/config.yml",
-            ));
+            .stdout(predicate::str::contains(".tasks/ABC/config.yml"));
 
         let short_dir = temp_dir.join(".tasks").join("ABC");
         assert!(short_dir.exists());

@@ -3,7 +3,7 @@
 /// This module provides a consistent way to generate project prefixes
 /// across the entire application. The algorithm produces intuitive
 /// prefixes from project names.
-
+///
 /// Generate a project prefix from a project name with conflict detection
 ///
 /// This is the smart algorithm that:
@@ -20,7 +20,7 @@
 pub fn generate_project_prefix(project_name: &str) -> String {
     // Strip leading dots to avoid hidden directory issues
     let clean_name = project_name.trim_start_matches('.');
-    
+
     if clean_name.len() <= 4 {
         clean_name.to_uppercase()
     } else {
@@ -40,46 +40,52 @@ pub fn generate_project_prefix(project_name: &str) -> String {
 }
 
 /// Generate a unique project prefix from a project name, ensuring no conflicts
-/// 
+///
 /// This function checks for conflicts between:
 /// 1. Generated prefixes that match existing project names
 /// 2. Project names that match existing prefixes
 /// 3. Generated prefixes that match existing prefixes (with different project names)
 ///
 /// Returns an error if a conflict is detected that cannot be resolved.
-pub fn generate_unique_project_prefix(project_name: &str, tasks_dir: &std::path::PathBuf) -> Result<String, String> {
+pub fn generate_unique_project_prefix(
+    project_name: &str,
+    tasks_dir: &std::path::PathBuf,
+) -> Result<String, String> {
     let generated_prefix = generate_project_prefix(project_name);
-    
+
     // Check if tasks directory exists - if not, no conflicts possible
     if !tasks_dir.exists() {
         return Ok(generated_prefix);
     }
-    
+
     // Collect all existing projects for conflict checking
     let mut existing_projects = Vec::new();
     let mut existing_prefixes = Vec::new();
-    
+
     if let Ok(entries) = std::fs::read_dir(tasks_dir) {
         for entry in entries.flatten() {
-            if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+            if entry.file_type().is_ok_and(|ft| ft.is_dir()) {
                 let dir_name = entry.file_name().to_string_lossy().to_string();
-                
+
                 // Skip hidden directories
                 if dir_name.starts_with('.') {
                     continue;
                 }
-                
+
                 existing_prefixes.push(dir_name.clone());
-                
+
                 // Try to read project name from config
                 let config_path = entry.path().join("config.yml");
                 if config_path.exists() {
                     if let Ok(config_content) = std::fs::read_to_string(&config_path) {
                         // Simple YAML parsing to look for project_name field
                         for line in config_content.lines() {
-                            if let Some(existing_project_name) = line.strip_prefix("project_name: ") {
-                                let existing_project_name = existing_project_name.trim().trim_matches('"');
-                                existing_projects.push((existing_project_name.to_string(), dir_name.clone()));
+                            if let Some(existing_project_name) = line.strip_prefix("project_name: ")
+                            {
+                                let existing_project_name =
+                                    existing_project_name.trim().trim_matches('"');
+                                existing_projects
+                                    .push((existing_project_name.to_string(), dir_name.clone()));
                                 break;
                             }
                         }
@@ -88,17 +94,18 @@ pub fn generate_unique_project_prefix(project_name: &str, tasks_dir: &std::path:
             }
         }
     }
-    
+
     // Check for conflicts
-    
+
     // 1. Check if our project name matches an existing prefix
     if existing_prefixes.contains(&project_name.to_uppercase()) {
         return Err(format!(
             "Cannot create project '{}': A project with prefix '{}' already exists. Project names cannot match existing prefixes.",
-            project_name, project_name.to_uppercase()
+            project_name,
+            project_name.to_uppercase()
         ));
     }
-    
+
     // 2. Check if our generated prefix matches an existing project name
     for (existing_project_name, _) in &existing_projects {
         if generated_prefix.eq_ignore_ascii_case(existing_project_name) {
@@ -108,7 +115,7 @@ pub fn generate_unique_project_prefix(project_name: &str, tasks_dir: &std::path:
             ));
         }
     }
-    
+
     // 3. Check if our generated prefix matches an existing prefix for a different project
     if existing_prefixes.contains(&generated_prefix) {
         // Find which project uses this prefix
@@ -120,7 +127,7 @@ pub fn generate_unique_project_prefix(project_name: &str, tasks_dir: &std::path:
                 ));
             }
         }
-        
+
         // If we reach here, the prefix exists but we couldn't find the project name
         // This could happen if the config file is missing or malformed
         return Err(format!(
@@ -128,47 +135,54 @@ pub fn generate_unique_project_prefix(project_name: &str, tasks_dir: &std::path:
             project_name, generated_prefix
         ));
     }
-    
+
     // No conflicts detected
     Ok(generated_prefix)
 }
 
 /// Validate an explicit prefix provided by the user
-/// 
+///
 /// Checks for conflicts between:
 /// 1. Explicit prefix matching existing project names  
 /// 2. Explicit prefix matching existing prefixes (with different project names)
-pub fn validate_explicit_prefix(explicit_prefix: &str, project_name: &str, tasks_dir: &std::path::PathBuf) -> Result<(), String> {
+pub fn validate_explicit_prefix(
+    explicit_prefix: &str,
+    project_name: &str,
+    tasks_dir: &std::path::PathBuf,
+) -> Result<(), String> {
     // Check if tasks directory exists - if not, no conflicts possible
     if !tasks_dir.exists() {
         return Ok(());
     }
-    
+
     // Collect all existing projects for conflict checking
     let mut existing_projects = Vec::new();
     let mut existing_prefixes = Vec::new();
-    
+
     if let Ok(entries) = std::fs::read_dir(tasks_dir) {
         for entry in entries.flatten() {
-            if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+            if entry.file_type().is_ok_and(|ft| ft.is_dir()) {
                 let dir_name = entry.file_name().to_string_lossy().to_string();
-                
+
                 // Skip hidden directories
                 if dir_name.starts_with('.') {
                     continue;
                 }
-                
+
                 existing_prefixes.push(dir_name.clone());
-                
+
                 // Try to read project name from config
                 let config_path = entry.path().join("config.yml");
                 if config_path.exists() {
                     if let Ok(config_content) = std::fs::read_to_string(&config_path) {
                         // Simple YAML parsing to look for project_name field
                         for line in config_content.lines() {
-                            if let Some(existing_project_name) = line.strip_prefix("project_name: ") {
-                                let existing_project_name = existing_project_name.trim().trim_matches('"');
-                                existing_projects.push((existing_project_name.to_string(), dir_name.clone()));
+                            if let Some(existing_project_name) = line.strip_prefix("project_name: ")
+                            {
+                                let existing_project_name =
+                                    existing_project_name.trim().trim_matches('"');
+                                existing_projects
+                                    .push((existing_project_name.to_string(), dir_name.clone()));
                                 break;
                             }
                         }
@@ -177,9 +191,9 @@ pub fn validate_explicit_prefix(explicit_prefix: &str, project_name: &str, tasks
             }
         }
     }
-    
+
     // Check for conflicts
-    
+
     // 1. Check if our explicit prefix matches an existing project name (case insensitive)
     for (existing_project_name, _) in &existing_projects {
         if explicit_prefix.eq_ignore_ascii_case(existing_project_name) {
@@ -189,17 +203,19 @@ pub fn validate_explicit_prefix(explicit_prefix: &str, project_name: &str, tasks
             ));
         }
     }
-    
+
     // 2. Check if our explicit prefix matches an existing prefix for a different project (case insensitive)
     for (existing_project_name, existing_prefix) in &existing_projects {
-        if explicit_prefix.eq_ignore_ascii_case(existing_prefix) && project_name != existing_project_name {
+        if explicit_prefix.eq_ignore_ascii_case(existing_prefix)
+            && project_name != existing_project_name
+        {
             return Err(format!(
                 "Cannot use prefix '{}': This prefix is already used by project '{}'. Choose a different prefix.",
                 explicit_prefix, existing_project_name
             ));
         }
     }
-    
+
     // No conflicts detected
     Ok(())
 }
@@ -217,7 +233,7 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::PathBuf) -> Str
     // If not found as prefix, look through all project directories to find one with matching project_name
     if let Ok(entries) = std::fs::read_dir(tasks_dir) {
         for entry in entries.flatten() {
-            if entry.file_type().map_or(false, |ft| ft.is_dir()) {
+            if entry.file_type().is_ok_and(|ft| ft.is_dir()) {
                 let dir_name = entry.file_name().to_string_lossy().to_string();
 
                 // Skip hidden directories
@@ -257,7 +273,7 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::PathBuf) -> Str
 
     // Neither direct prefix nor full project name found
     // This could be a new project being created, so return the generated prefix
-    return generated_prefix;
+    generated_prefix
 }
 
 #[cfg(test)]
@@ -390,8 +406,14 @@ mod tests {
         std::fs::create_dir_all(&tasks_dir).unwrap();
 
         // Test with no existing projects
-        assert_eq!(generate_unique_project_prefix("frontend", &tasks_dir).unwrap(), "FRON");
-        assert_eq!(generate_unique_project_prefix("api-backend", &tasks_dir).unwrap(), "AB");
+        assert_eq!(
+            generate_unique_project_prefix("frontend", &tasks_dir).unwrap(),
+            "FRON"
+        );
+        assert_eq!(
+            generate_unique_project_prefix("api-backend", &tasks_dir).unwrap(),
+            "AB"
+        );
     }
 
     #[test]
@@ -407,15 +429,20 @@ mod tests {
         std::fs::create_dir_all(&existing_project_dir).unwrap();
         std::fs::write(
             existing_project_dir.join("config.yml"),
-            "project_name: backend\n"
-        ).unwrap();
+            "project_name: backend\n",
+        )
+        .unwrap();
 
         // Test conflict: project name matches existing prefix
         let result = generate_unique_project_prefix("BACK", &tasks_dir);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Project names cannot match existing prefixes"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Project names cannot match existing prefixes")
+        );
 
-        // Test conflict: generated prefix matches existing project name  
+        // Test conflict: generated prefix matches existing project name
         let result = generate_unique_project_prefix("backend", &tasks_dir);
         assert!(result.is_err());
         let error_msg = result.unwrap_err();
@@ -426,15 +453,19 @@ mod tests {
         let result = generate_unique_project_prefix("backend-api", &tasks_dir); // Would generate "BA" but "BACK" exists
         // This one should actually work since "BA" != "BACK"
         assert!(result.is_ok());
-        
+
         // Create a project that would actually conflict
         let result = generate_unique_project_prefix("back-end", &tasks_dir); // Would generate "BE" 
         assert!(result.is_ok()); // No conflict
 
         // Test a project that would generate "BACK" prefix (4-letter name)
-        let result = generate_unique_project_prefix("back", &tasks_dir); 
+        let result = generate_unique_project_prefix("back", &tasks_dir);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Project names cannot match existing prefixes"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Project names cannot match existing prefixes")
+        );
     }
 
     #[test]
@@ -450,18 +481,27 @@ mod tests {
         std::fs::create_dir_all(&existing_project_dir).unwrap();
         std::fs::write(
             existing_project_dir.join("config.yml"),
-            "project_name: frontend\n"
-        ).unwrap();
+            "project_name: frontend\n",
+        )
+        .unwrap();
 
         // Test conflict: explicit prefix matches existing project name
         let result = validate_explicit_prefix("frontend", "new-project", &tasks_dir);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("prefix conflicts with existing project name"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("prefix conflicts with existing project name")
+        );
 
         // Test conflict: explicit prefix matches existing prefix for different project
         let result = validate_explicit_prefix("FRON", "backend", &tasks_dir);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("prefix is already used by project"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("prefix is already used by project")
+        );
 
         // Test no conflict: explicit prefix is unique
         let result = validate_explicit_prefix("BACK", "backend", &tasks_dir);

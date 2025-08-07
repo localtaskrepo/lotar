@@ -1,6 +1,6 @@
 //! Tests for dual CLI interface consistency
-//! 
-//! This module tests that both quick commands (lotar add) and full subcommands 
+//!
+//! This module tests that both quick commands (lotar add) and full subcommands
 //! (lotar task add) work correctly and produce identical results.
 
 use assert_cmd::Command;
@@ -21,27 +21,25 @@ mod dual_interface_tests {
 
         // Test 1: Quick interface - lotar add
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let assert_result = cmd.current_dir(temp_dir)
+        let assert_result = cmd
+            .current_dir(temp_dir)
             .arg("add")
             .arg("Quick interface test task")
             .arg("--project=test-project")
             .assert()
             .success();
         let output = assert_result.get_output();
-        
+
         let quick_output = String::from_utf8_lossy(&output.stdout);
         assert!(quick_output.contains("Created task:"));
-        
+
         // Extract task ID from quick interface
-        let quick_task_id = quick_output
-            .split("Created task: ")
-            .nth(1)
-            .unwrap()
-            .trim();
+        let quick_task_id = quick_output.split("Created task: ").nth(1).unwrap().trim();
 
         // Test 2: Full subcommand interface - lotar task add
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let assert_result = cmd.current_dir(temp_dir)
+        let assert_result = cmd
+            .current_dir(temp_dir)
             .arg("task")
             .arg("add")
             .arg("Full subcommand test task")
@@ -49,21 +47,17 @@ mod dual_interface_tests {
             .assert()
             .success();
         let output = assert_result.get_output();
-        
+
         let full_output = String::from_utf8_lossy(&output.stdout);
         assert!(full_output.contains("Created task:"));
-        
+
         // Extract task ID from full interface
-        let full_task_id = full_output
-            .split("Created task: ")
-            .nth(1)
-            .unwrap()
-            .trim();
+        let full_task_id = full_output.split("Created task: ").nth(1).unwrap().trim();
 
         // Verify both tasks were created with consistent project prefix
         assert!(quick_task_id.starts_with("TP-"));
         assert!(full_task_id.starts_with("TP-"));
-        
+
         // Verify task IDs are sequential
         let quick_num: i32 = quick_task_id.replace("TP-", "").parse().unwrap();
         let full_num: i32 = full_task_id.replace("TP-", "").parse().unwrap();
@@ -147,29 +141,27 @@ mod dual_interface_tests {
 
         // Test quick list interface
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let assert_result = cmd.current_dir(temp_dir)
-            .arg("list")
-            .assert()
-            .success();
+        let assert_result = cmd.current_dir(temp_dir).arg("list").assert().success();
         let quick_output = assert_result.get_output();
-        
+
         let quick_list = String::from_utf8_lossy(&quick_output.stdout);
 
         // Test full subcommand list interface
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let assert_result = cmd.current_dir(temp_dir)
+        let assert_result = cmd
+            .current_dir(temp_dir)
             .arg("task")
             .arg("list")
             .assert()
             .success();
         let full_output = assert_result.get_output();
-        
+
         let full_list = String::from_utf8_lossy(&full_output.stdout);
 
         // Both should show the same task
         assert!(quick_list.contains("Test task for listing"));
         assert!(full_list.contains("Test task for listing"));
-        
+
         // Both should show task count
         assert!(quick_list.contains("Found 1 task"));
         assert!(full_list.contains("Found 1 task"));
@@ -193,33 +185,37 @@ mod dual_interface_tests {
 
         // Test quick list interface with JSON format
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let assert_result = cmd.current_dir(temp_dir)
+        let assert_result = cmd
+            .current_dir(temp_dir)
             .arg("list")
             .arg("--format=json")
             .assert()
             .success();
         let quick_output = assert_result.get_output();
-        
+
         let quick_json = String::from_utf8_lossy(&quick_output.stdout);
-        let quick_parsed: Value = serde_json::from_str(&quick_json).expect("Quick interface should produce valid JSON");
+        let quick_parsed: Value =
+            serde_json::from_str(&quick_json).expect("Quick interface should produce valid JSON");
 
         // Test full subcommand list interface with JSON format
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let assert_result = cmd.current_dir(temp_dir)
+        let assert_result = cmd
+            .current_dir(temp_dir)
             .arg("task")
             .arg("list")
             .arg("--format=json")
             .assert()
             .success();
         let full_output = assert_result.get_output();
-        
+
         let full_json = String::from_utf8_lossy(&full_output.stdout);
-        let full_parsed: Value = serde_json::from_str(&full_json).expect("Full interface should produce valid JSON");
+        let full_parsed: Value =
+            serde_json::from_str(&full_json).expect("Full interface should produce valid JSON");
 
         // Both should produce identical JSON structure
         assert_eq!(quick_parsed["tasks"].as_array().unwrap().len(), 1);
         assert_eq!(full_parsed["tasks"].as_array().unwrap().len(), 1);
-        
+
         // Task data should be identical
         let quick_task = &quick_parsed["tasks"][0];
         let full_task = &full_parsed["tasks"][0];
@@ -275,12 +271,13 @@ mod dual_interface_tests {
 
         // Test priority GET operation (if priority command is working)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        let priority_result = cmd.current_dir(temp_dir)
+        let priority_result = cmd
+            .current_dir(temp_dir)
             .arg("priority")
             .arg("1")
             .arg("--project=test-project")
             .assert();
-        
+
         // Priority command might have task resolution issues, so just check it doesn't panic
         // We'll test priority validation in a separate test focused on that
         let _ = priority_result;
@@ -297,8 +294,8 @@ mod dual_interface_tests {
             .arg("add")
             .arg("Case insensitive test")
             .arg("--project=test-project")
-            .arg("--type=BUG")  // Uppercase
-            .arg("--priority=high")  // Lowercase
+            .arg("--type=BUG") // Uppercase
+            .arg("--priority=high") // Lowercase
             .assert()
             .success()
             .stdout(predicate::str::contains("Created task:"));
@@ -317,10 +314,12 @@ mod dual_interface_tests {
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("2")
-            .arg("in_progress")  // Lowercase with underscore
+            .arg("in_progress") // Lowercase with underscore
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status changed from TODO to IN_PROGRESS"));
+            .stdout(predicate::str::contains(
+                "status changed from TODO to IN_PROGRESS",
+            ));
     }
 }

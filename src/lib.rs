@@ -1,3 +1,6 @@
+// Allow uninlined format args since it's mostly a style preference
+#![allow(clippy::uninlined_format_args)]
+
 pub mod api_server;
 pub mod cli; // Add the CLI module
 pub mod config; // Add the new config module
@@ -16,7 +19,7 @@ pub mod workspace; // Add workspace resolution module
 
 pub use errors::{LoTaRError, LoTaRResult};
 pub use index::TaskFilter;
-pub use project::{get_project_name, get_project_path, get_effective_project_name};
+pub use project::{get_effective_project_name, get_project_name, get_project_path};
 pub use scanner::Scanner;
 pub use storage::{Storage, Task};
 pub use types::TaskStatus; // Export error types

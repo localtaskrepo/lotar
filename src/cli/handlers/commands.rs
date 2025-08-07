@@ -1,17 +1,19 @@
-use crate::cli::{ConfigAction, ConfigShowArgs, ConfigValidateArgs, ScanArgs, ServeArgs, IndexArgs, IndexAction};
-use crate::cli::handlers::CommandHandler;
-use crate::output::OutputRenderer;
-use crate::workspace::TasksDirectoryResolver;
-use crate::config::ConfigManager;
-use crate::types::{Priority, TaskStatus};
-use crate::scanner;
 use crate::api_server;
-use crate::web_server;
-use crate::routes;
+use crate::cli::handlers::CommandHandler;
+use crate::cli::{
+    ConfigAction, ConfigShowArgs, ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs,
+};
+use crate::config::ConfigManager;
+use crate::output::OutputRenderer;
 use crate::project;
-use std::path::PathBuf;
-use std::fs;
+use crate::routes;
+use crate::scanner;
+use crate::types::{Priority, TaskStatus};
+use crate::web_server;
+use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
+use std::fs;
+use std::path::PathBuf;
 
 /// Handler for config commands
 pub struct ConfigHandler;
@@ -19,40 +21,41 @@ pub struct ConfigHandler;
 impl CommandHandler for ConfigHandler {
     type Args = ConfigAction;
     type Result = Result<(), String>;
-    
-    fn execute(args: Self::Args, _project: Option<&str>, resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
+
+    fn execute(
+        args: Self::Args,
+        _project: Option<&str>,
+        resolver: &TasksDirectoryResolver,
+        _renderer: &OutputRenderer,
+    ) -> Self::Result {
         match args {
             ConfigAction::Show(ConfigShowArgs { project }) => {
                 Self::handle_config_show(resolver, project)
             }
-            ConfigAction::Set(crate::cli::ConfigSetArgs { 
-                field, 
-                value, 
+            ConfigAction::Set(crate::cli::ConfigSetArgs {
+                field,
+                value,
                 dry_run,
                 force,
-                global 
-            }) => {
-                Self::handle_config_set(resolver, field, value, dry_run, force, global)
-            }
-            ConfigAction::Init(crate::cli::ConfigInitArgs { 
+                global,
+            }) => Self::handle_config_set(resolver, field, value, dry_run, force, global),
+            ConfigAction::Init(crate::cli::ConfigInitArgs {
                 template,
                 prefix,
                 project,
                 copy_from,
                 global,
                 dry_run,
-                force 
-            }) => {
-                Self::handle_config_init(resolver, template, prefix, project, copy_from, global, dry_run, force)
-            }
+                force,
+            }) => Self::handle_config_init(
+                resolver, template, prefix, project, copy_from, global, dry_run, force,
+            ),
             ConfigAction::Validate(ConfigValidateArgs {
                 project,
                 global,
                 fix,
                 errors_only,
-            }) => {
-                Self::handle_config_validate(resolver, project, global, fix, errors_only)
-            }
+            }) => Self::handle_config_validate(resolver, project, global, fix, errors_only),
             ConfigAction::Templates => {
                 println!("📚 Available Configuration Templates:");
                 println!("  • default - Basic task management setup");
@@ -60,7 +63,9 @@ impl CommandHandler for ConfigHandler {
                 println!("  • kanban - Kanban board style setup");
                 println!("  • simple - Minimal configuration");
                 println!();
-                println!("Use 'lotar config init --template=<name>' to initialize with a template.");
+                println!(
+                    "Use 'lotar config init --template=<name>' to initialize with a template."
+                );
                 Ok(())
             }
         }
@@ -69,19 +74,23 @@ impl CommandHandler for ConfigHandler {
 
 impl ConfigHandler {
     /// Handle config show command with optional project filter
-    fn handle_config_show(resolver: &TasksDirectoryResolver, project: Option<String>) -> Result<(), String> {
+    fn handle_config_show(
+        resolver: &TasksDirectoryResolver,
+        project: Option<String>,
+    ) -> Result<(), String> {
         let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
             .map_err(|e| format!("Failed to load config: {}", e))?;
 
         if let Some(project_name) = project {
             // Show project-specific config
             let project_prefix = crate::utils::resolve_project_input(&project_name, &resolver.path);
-            let project_config = config_manager.get_project_config(&project_prefix)
+            let project_config = config_manager
+                .get_project_config(&project_prefix)
                 .map_err(|e| format!("Failed to load project config: {}", e))?;
-                
+
             println!("Configuration for project: {}", project_name);
             println!();
-            
+
             // Project Settings section (no server settings for project config)
             println!("Project Settings:");
             println!("  Tasks directory: {}", resolver.path.display());
@@ -92,7 +101,7 @@ impl ConfigHandler {
                 println!("  Default assignee: {}", assignee);
             }
             println!("  Default Priority: {:?}", project_config.default_priority);
-            
+
             // Show default status if configured
             if let Some(status) = &project_config.default_status {
                 println!("  Default Status: {:?}", status);
@@ -102,11 +111,14 @@ impl ConfigHandler {
             // Issue Types, States, and Priorities
             println!("Issue States: {:?}", project_config.issue_states.values);
             println!("Issue Types: {:?}", project_config.issue_types.values);
-            println!("Issue Priorities: {:?}", project_config.issue_priorities.values);
+            println!(
+                "Issue Priorities: {:?}",
+                project_config.issue_priorities.values
+            );
         } else {
             // Show global config
             let resolved_config = config_manager.get_resolved_config();
-            
+
             println!("Global configuration (showing current effective settings):");
             println!();
             println!(
@@ -134,13 +146,13 @@ impl ConfigHandler {
                 println!("  Default assignee: {}", assignee);
             }
             println!("  Default Priority: {:?}", resolved_config.default_priority);
-            
+
             // Show default status if configured
             if let Some(status) = &resolved_config.default_status {
                 println!("  Default Status: {:?}", status);
             }
         }
-        
+
         Ok(())
     }
 
@@ -154,17 +166,20 @@ impl ConfigHandler {
         mut global: bool,
     ) -> Result<(), String> {
         // Auto-detect global-only fields
-        let global_only_fields = vec!["server_port", "default_prefix", "default_project"];
+        let global_only_fields = ["server_port", "default_prefix", "default_project"];
         if global_only_fields.contains(&field.as_str()) && !global {
             global = true;
             if !dry_run {
-                println!("ℹ️  Automatically treating '{}' as global configuration field", field);
+                println!(
+                    "ℹ️  Automatically treating '{}' as global configuration field",
+                    field
+                );
             }
         }
-        
+
         if dry_run {
             println!("🔍 DRY RUN: Would set {} = {}", field, value);
-            
+
             // Check for validation conflicts
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
             if !conflicts.is_empty() {
@@ -178,13 +193,13 @@ impl ConfigHandler {
                     return Ok(());
                 }
             }
-            
+
             println!("✅ Dry run completed. Use the same command without --dry-run to apply.");
             return Ok(());
         }
-        
+
         println!("🔧 Setting configuration: {} = {}", field, value);
-        
+
         // Check for validation conflicts unless forced
         if !force {
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
@@ -198,13 +213,13 @@ impl ConfigHandler {
                 return Err("Configuration change blocked due to validation conflicts".to_string());
             }
         }
-        
+
         // Validate field name and value
         ConfigManager::validate_field_name(&field, global)
             .map_err(|e| format!("Validation error: {}", e))?;
         ConfigManager::validate_field_value(&field, &value)
             .map_err(|e| format!("Validation error: {}", e))?;
-        
+
         // Determine project prefix if not global
         let project_prefix = if global {
             None
@@ -212,39 +227,50 @@ impl ConfigHandler {
             // For project-specific config, we need to determine the project
             // This could be explicitly provided or auto-detected from current context
             // For now, let's use the default project if available
-            let config_manager = ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path)
-                .map_err(|e| format!("Failed to load config: {}", e))?;
+            let config_manager =
+                ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path)
+                    .map_err(|e| format!("Failed to load config: {}", e))?;
             let default_prefix = config_manager.get_resolved_config().default_prefix.clone();
-            
+
             if !default_prefix.is_empty() {
                 Some(default_prefix)
             } else {
-                return Err("No default project set. Use --global flag or set a default project first.".to_string());
+                return Err(
+                    "No default project set. Use --global flag or set a default project first."
+                        .to_string(),
+                );
             }
         };
-        
+
         // Update the configuration
-        ConfigManager::update_config_field(&resolver.path, &field, &value, project_prefix.as_deref())
-            .map_err(|e| format!("Failed to update config: {}", e))?;
-        
+        ConfigManager::update_config_field(
+            &resolver.path,
+            &field,
+            &value,
+            project_prefix.as_deref(),
+        )
+        .map_err(|e| format!("Failed to update config: {}", e))?;
+
         // Show helpful information about project-specific config
         if project_prefix.is_some() {
             // Check if the value matches the global default and inform the user
             if Self::check_matches_global_default(&field, &value, &resolver.path) {
-                println!("ℹ️  Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field.");
+                println!(
+                    "ℹ️  Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field."
+                );
             }
         }
 
         println!("✅ Successfully updated {}", field);
         Ok(())
     }
-    
+
     /// Check if a field value matches the global default
     fn check_matches_global_default(field: &str, value: &str, tasks_dir: &std::path::Path) -> bool {
         // Load global config to compare
         if let Ok(config_manager) = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir) {
             let global_config = config_manager.get_resolved_config();
-            
+
             match field {
                 "default_priority" => {
                     if let Ok(priority) = value.parse::<Priority>() {
@@ -266,8 +292,9 @@ impl ConfigHandler {
         }
         false
     }
-    
+
     /// Handle config init command
+    #[allow(clippy::too_many_arguments)]
     fn handle_config_init(
         resolver: &TasksDirectoryResolver,
         template: String,
@@ -279,12 +306,17 @@ impl ConfigHandler {
         force: bool,
     ) -> Result<(), String> {
         if dry_run {
-            println!("🔍 DRY RUN: Would initialize config with template '{}'", template);
+            println!(
+                "🔍 DRY RUN: Would initialize config with template '{}'",
+                template
+            );
             if let Some(ref prefix) = prefix {
                 println!("  • Project prefix: {}", prefix);
                 // Validate explicit prefix
                 if let Some(ref project_name) = project {
-                    if let Err(conflict) = crate::utils::validate_explicit_prefix(prefix, project_name, &resolver.path) {
+                    if let Err(conflict) =
+                        crate::utils::validate_explicit_prefix(prefix, project_name, &resolver.path)
+                    {
                         println!("  ❌ Conflict detected: {}", conflict);
                         return Err(conflict);
                     }
@@ -300,7 +332,10 @@ impl ConfigHandler {
                             println!("  • Generated prefix: {} ✅", generated_prefix);
                         }
                         Err(conflict) => {
-                            println!("  • Generated prefix: {} ❌", crate::utils::generate_project_prefix(project));
+                            println!(
+                                "  • Generated prefix: {} ❌",
+                                crate::utils::generate_project_prefix(project)
+                            );
                             println!("  ❌ Conflict detected: {}", conflict);
                             return Err(conflict);
                         }
@@ -317,26 +352,38 @@ impl ConfigHandler {
                 let project_prefix = if let Some(ref prefix) = prefix {
                     prefix.clone()
                 } else {
-                    match crate::utils::generate_unique_project_prefix(project_name, &resolver.path) {
+                    match crate::utils::generate_unique_project_prefix(project_name, &resolver.path)
+                    {
                         Ok(prefix) => prefix,
                         Err(_) => crate::utils::generate_project_prefix(project_name), // For display purposes
                     }
                 };
-                println!("  • Target: Project configuration (.tasks/{}/config.yml)", project_prefix);
+                println!(
+                    "  • Target: Project configuration (.tasks/{}/config.yml)",
+                    project_prefix
+                );
             }
             println!("✅ Dry run completed. Use the same command without --dry-run to apply.");
             return Ok(());
         }
-        
+
         println!("🚀 Initializing configuration with template '{}'", template);
-        
+
         // Load template
         let template_config = Self::load_template(&template)?;
-        
+
         // Apply template with customizations
-        Self::apply_template_config(resolver, template_config, prefix, project, copy_from, global, force)
+        Self::apply_template_config(
+            resolver,
+            template_config,
+            prefix,
+            project,
+            copy_from,
+            global,
+            force,
+        )
     }
-    
+
     /// Check for validation conflicts when changing config
     fn check_validation_conflicts(
         _resolver: &TasksDirectoryResolver,
@@ -345,21 +392,24 @@ impl ConfigHandler {
         _global: bool,
     ) -> Result<Vec<String>, String> {
         let mut conflicts = Vec::new();
-        
+
         // TODO: Implement actual conflict detection
         // This would:
         // 1. Load existing tasks
         // 2. Check if any task values would become invalid with new config
         // 3. Return list of conflicting tasks/values
-        
+
         // For now, just simulate some example conflicts
         if field == "issue_states.values" && new_value.contains("In-Progress") {
-            conflicts.push("Task PROJ-1 has status 'InProgress' which doesn't match new 'In-Progress'".to_string());
+            conflicts.push(
+                "Task PROJ-1 has status 'InProgress' which doesn't match new 'In-Progress'"
+                    .to_string(),
+            );
         }
-        
+
         Ok(conflicts)
     }
-    
+
     /// Load a configuration template
     fn load_template(template_name: &str) -> Result<serde_yaml::Value, String> {
         // For now, return a basic template structure
@@ -371,11 +421,11 @@ impl ConfigHandler {
             "simple" => include_str!("../../config/templates/simple.yml"),
             _ => return Err(format!("Unknown template: {}", template_name)),
         };
-        
+
         serde_yaml::from_str(template_content)
             .map_err(|e| format!("Failed to parse template '{}': {}", template_name, e))
     }
-    
+
     /// Apply template configuration
     fn apply_template_config(
         resolver: &TasksDirectoryResolver,
@@ -387,19 +437,19 @@ impl ConfigHandler {
         force: bool,
     ) -> Result<(), String> {
         // Extract config from template
-        let template_map = template.as_mapping()
-            .ok_or("Invalid template format")?;
-        
-        let config_section = template_map.get(&serde_yaml::Value::String("config".to_string()))
+        let template_map = template.as_mapping().ok_or("Invalid template format")?;
+
+        let config_section = template_map
+            .get(serde_yaml::Value::String("config".to_string()))
             .ok_or("Template missing 'config' section")?;
-        
+
         let mut config = config_section.clone();
-        
+
         // Transform template format to config format by flattening "values" fields
         if let Some(config_map) = config.as_mapping_mut() {
             Self::flatten_template_values(config_map);
         }
-        
+
         // Apply customizations
         if let Some(config_map) = config.as_mapping_mut() {
             // Set project prefix if provided
@@ -409,7 +459,7 @@ impl ConfigHandler {
                     serde_yaml::Value::String(prefix.clone()),
                 );
             }
-            
+
             // Set project name if provided
             if let Some(ref project_name) = project {
                 config_map.insert(
@@ -417,13 +467,13 @@ impl ConfigHandler {
                     serde_yaml::Value::String(project_name.clone()),
                 );
             }
-            
+
             // Copy settings from another project if specified
             if let Some(source_project) = copy_from {
                 Self::merge_config_from_project(config_map, resolver, &source_project)?;
             }
         }
-        
+
         // Determine target path
         let config_path = if global {
             // Ensure tasks directory exists for global config
@@ -431,45 +481,50 @@ impl ConfigHandler {
                 .map_err(|e| format!("Failed to create tasks directory: {}", e))?;
             resolver.path.join("config.yml")
         } else {
-            let project_name = project.as_deref()
-                .or_else(|| {
-                    config.get("project_name")
-                        .and_then(|v| v.as_str())
-                })
+            let project_name = project
+                .as_deref()
+                .or_else(|| config.get("project_name").and_then(|v| v.as_str()))
                 .unwrap_or("DEFAULT");
-            
+
             // Generate prefix from project name with conflict detection
             let project_prefix = if let Some(explicit_prefix) = prefix {
                 // User provided explicit prefix, validate it doesn't conflict
-                crate::utils::validate_explicit_prefix(&explicit_prefix, project_name, &resolver.path)?;
+                crate::utils::validate_explicit_prefix(
+                    &explicit_prefix,
+                    project_name,
+                    &resolver.path,
+                )?;
                 explicit_prefix
             } else {
                 // Generate prefix with conflict detection
                 crate::utils::generate_unique_project_prefix(project_name, &resolver.path)?
             };
-            
+
             let project_dir = resolver.path.join(&project_prefix);
             fs::create_dir_all(&project_dir)
                 .map_err(|e| format!("Failed to create project directory: {}", e))?;
             project_dir.join("config.yml")
         };
-        
+
         // Check if config already exists
         if config_path.exists() && !force {
-            return Err(format!("Configuration already exists at {}. Use --force to overwrite.", config_path.display()));
+            return Err(format!(
+                "Configuration already exists at {}. Use --force to overwrite.",
+                config_path.display()
+            ));
         }
-        
+
         // Write configuration
         let config_yaml = serde_yaml::to_string(&config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        
+
         fs::write(&config_path, config_yaml)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
-        
+
         println!("✅ Configuration initialized at: {}", config_path.display());
         Ok(())
     }
-    
+
     /// Merge configuration from another project
     fn merge_config_from_project(
         target_config: &mut serde_yaml::Mapping,
@@ -477,17 +532,20 @@ impl ConfigHandler {
         source_project: &str,
     ) -> Result<(), String> {
         let source_config_path = resolver.path.join(source_project).join("config.yml");
-        
+
         if !source_config_path.exists() {
-            return Err(format!("Source project '{}' does not exist", source_project));
+            return Err(format!(
+                "Source project '{}' does not exist",
+                source_project
+            ));
         }
-        
+
         let source_content = fs::read_to_string(&source_config_path)
             .map_err(|e| format!("Failed to read source config: {}", e))?;
-        
+
         let source_config: serde_yaml::Value = serde_yaml::from_str(&source_content)
             .map_err(|e| format!("Failed to parse source config: {}", e))?;
-        
+
         if let Some(source_map) = source_config.as_mapping() {
             // Copy relevant fields (excluding project_name which should be unique)
             for (key, value) in source_map {
@@ -498,7 +556,7 @@ impl ConfigHandler {
                 }
             }
         }
-        
+
         println!("📋 Copied settings from project '{}'", source_project);
         Ok(())
     }
@@ -506,15 +564,21 @@ impl ConfigHandler {
     /// Flatten template "values" structure to direct arrays for config fields
     fn flatten_template_values(config_map: &mut serde_yaml::Mapping) {
         let fields_to_flatten = vec![
-            "issue_states", "issue_types", "issue_priorities", 
-            "categories", "tags", "custom_fields"
+            "issue_states",
+            "issue_types",
+            "issue_priorities",
+            "categories",
+            "tags",
+            "custom_fields",
         ];
-        
+
         for field_name in fields_to_flatten {
             let field_key = serde_yaml::Value::String(field_name.to_string());
             if let Some(field_value) = config_map.get_mut(&field_key) {
                 if let Some(field_map) = field_value.as_mapping() {
-                    if let Some(values) = field_map.get(&serde_yaml::Value::String("values".to_string())) {
+                    if let Some(values) =
+                        field_map.get(serde_yaml::Value::String("values".to_string()))
+                    {
                         // Replace the nested structure with just the values array
                         *field_value = values.clone();
                     }
@@ -536,10 +600,8 @@ impl ConfigHandler {
         let global_config_path = resolver.path.join("config.yml");
         let global_config = if global_config_path.exists() {
             match std::fs::read_to_string(&global_config_path) {
-                Ok(content) => {
-                    serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
-                        .map_err(|e| format!("Failed to parse global config: {}", e))?
-                }
+                Ok(content) => serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
+                    .map_err(|e| format!("Failed to parse global config: {}", e))?,
                 Err(e) => {
                     return Err(format!("Failed to read global config file: {}", e));
                 }
@@ -553,10 +615,10 @@ impl ConfigHandler {
         let mut has_errors = false;
 
         // Validate global config if requested or no specific scope given
-        if global || (!project.is_some() && !global) {
+        if global || project.is_none() {
             println!("🔍 Validating global configuration...");
             let result = validator.validate_global_config(&global_config);
-            
+
             if result.has_errors() || result.has_warnings() {
                 has_errors |= result.has_errors(); // Only actual errors affect exit code
                 all_results.push(("Global Config".to_string(), result));
@@ -567,31 +629,37 @@ impl ConfigHandler {
 
         // Validate project config if requested or available
         if let Some(project_name) = project {
-            println!("🔍 Validating project configuration for '{}'...", project_name);
-            
+            println!(
+                "🔍 Validating project configuration for '{}'...",
+                project_name
+            );
+
             // Load project config directly from file
-            let project_config_path = resolver.path
-                .join(&project_name)
-                .join("config.yml");
-                
+            let project_config_path = resolver.path.join(&project_name).join("config.yml");
+
             if project_config_path.exists() {
                 match std::fs::read_to_string(&project_config_path) {
                     Ok(config_content) => {
-                        match serde_yaml::from_str::<crate::config::types::ProjectConfig>(&config_content) {
+                        match serde_yaml::from_str::<crate::config::types::ProjectConfig>(
+                            &config_content,
+                        ) {
                             Ok(project_config) => {
                                 let result = validator.validate_project_config(&project_config);
-                                
+
                                 // For prefix conflicts, we need to determine the actual prefix used
                                 // This would typically come from the project directory name or config
                                 let prefix = &project_name; // Simple fallback
                                 let conflict_result = validator.check_prefix_conflicts(prefix);
-                                
+
                                 let mut combined_result = result;
                                 combined_result.merge(conflict_result);
-                                
+
                                 if combined_result.has_errors() || combined_result.has_warnings() {
                                     has_errors |= combined_result.has_errors(); // Only actual errors affect exit code
-                                    all_results.push((format!("Project Config ({})", project_name), combined_result));
+                                    all_results.push((
+                                        format!("Project Config ({})", project_name),
+                                        combined_result,
+                                    ));
                                 } else {
                                     println!("✅ Project configuration is valid");
                                 }
@@ -608,7 +676,10 @@ impl ConfigHandler {
                     }
                 }
             } else {
-                eprintln!("❌ Project config file not found: {}", project_config_path.display());
+                eprintln!(
+                    "❌ Project config file not found: {}",
+                    project_config_path.display()
+                );
                 has_errors = true;
             }
         }
@@ -616,7 +687,7 @@ impl ConfigHandler {
         // Display results
         for (scope, result) in all_results {
             println!("\n📋 {} Validation Results:", scope);
-            
+
             // Display errors
             for error in &result.errors {
                 if errors_only && error.severity != ValidationSeverity::Error {
@@ -624,13 +695,13 @@ impl ConfigHandler {
                 }
                 println!("{}", error);
             }
-            
+
             // Display warnings (unless errors_only is set)
             if !errors_only {
                 for warning in &result.warnings {
                     println!("{}", warning);
                 }
-                
+
                 // Display info messages
                 for info in &result.info {
                     println!("{}", info);
@@ -641,12 +712,12 @@ impl ConfigHandler {
         // Handle validation outcome
         if has_errors {
             println!("\n❌ Configuration validation failed with errors");
-            
+
             if fix {
                 println!("🔧 Auto-fix functionality not yet implemented");
                 println!("   Please review the suggestions above and make manual corrections");
             }
-            
+
             return Err("Configuration validation failed".to_string());
         } else {
             println!("\n✅ All configurations are valid!");
@@ -662,8 +733,13 @@ pub struct ScanHandler;
 impl CommandHandler for ScanHandler {
     type Args = ScanArgs;
     type Result = Result<(), String>;
-    
-    fn execute(args: Self::Args, _project: Option<&str>, _resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
+
+    fn execute(
+        args: Self::Args,
+        _project: Option<&str>,
+        _resolver: &TasksDirectoryResolver,
+        _renderer: &OutputRenderer,
+    ) -> Self::Result {
         let path = if let Some(scan_path) = args.path {
             PathBuf::from(scan_path)
         } else {
@@ -678,10 +754,10 @@ impl CommandHandler for ScanHandler {
         }
 
         println!("🔍 Scanning {} for TODO comments...", path.display());
-        
+
         let mut scanner = scanner::Scanner::new(path);
         let results = scanner.scan();
-        
+
         if results.is_empty() {
             println!("✅ No TODO comments found.");
         } else {
@@ -695,15 +771,16 @@ impl CommandHandler for ScanHandler {
                     }
                     println!();
                 } else {
-                    println!("  {}:{} - {}", 
-                        entry.file_path.display(), 
-                        entry.line_number, 
+                    println!(
+                        "  {}:{} - {}",
+                        entry.file_path.display(),
+                        entry.line_number,
                         entry.title.trim()
                     );
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -714,16 +791,21 @@ pub struct ServeHandler;
 impl CommandHandler for ServeHandler {
     type Args = ServeArgs;
     type Result = Result<(), String>;
-    
-    fn execute(args: Self::Args, _project: Option<&str>, _resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
+
+    fn execute(
+        args: Self::Args,
+        _project: Option<&str>,
+        _resolver: &TasksDirectoryResolver,
+        _renderer: &OutputRenderer,
+    ) -> Self::Result {
         let port = args.port.unwrap_or(8080);
         let host = args.host;
-        
+
         println!("🚀 Starting LoTaR web server...");
         println!("   Host: {}", host);
         println!("   Port: {}", port);
         println!("   URL: http://{}:{}", host, port);
-        
+
         if args.open {
             // Open browser automatically
             let url = format!("http://{}:{}", host, port);
@@ -732,13 +814,13 @@ impl CommandHandler for ServeHandler {
                 println!("   Please navigate to {} manually", url);
             }
         }
-        
+
         println!("Press Ctrl+C to stop the server");
-        
+
         let mut api_server = api_server::ApiServer::new();
         routes::initialize(&mut api_server);
         web_server::serve(&api_server, port);
-        
+
         Ok(())
     }
 }
@@ -749,8 +831,13 @@ pub struct IndexHandler;
 impl CommandHandler for IndexHandler {
     type Args = IndexArgs;
     type Result = Result<(), String>;
-    
-    fn execute(args: Self::Args, _project: Option<&str>, _resolver: &TasksDirectoryResolver, _renderer: &OutputRenderer) -> Self::Result {
+
+    fn execute(
+        args: Self::Args,
+        _project: Option<&str>,
+        _resolver: &TasksDirectoryResolver,
+        _renderer: &OutputRenderer,
+    ) -> Self::Result {
         match args.action {
             IndexAction::Rebuild => {
                 println!("🔄 Index functionality has been simplified - no rebuild needed");
@@ -770,7 +857,7 @@ fn open_browser(url: &str) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    
+
     #[cfg(target_os = "linux")]
     {
         std::process::Command::new("xdg-open")
@@ -778,7 +865,7 @@ fn open_browser(url: &str) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    
+
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("cmd")
@@ -786,6 +873,6 @@ fn open_browser(url: &str) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
-    
+
     Ok(())
 }

@@ -72,7 +72,7 @@ impl CommandHandler for StatusHandler {
         let mut storage = match Storage::try_open(resolver.path.clone()) {
             Some(storage) => storage,
             None => {
-                return Err(format!("No tasks found. Use 'lotar add' to create tasks first."));
+                return Err("No tasks found. Use 'lotar add' to create tasks first.".to_string());
             }
         };
         let task_result = storage.get(&full_task_id, resolved_project.clone());

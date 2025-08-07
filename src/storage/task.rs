@@ -1,8 +1,8 @@
+use crate::types::{CustomFields, Priority, TaskComment, TaskRelationships, TaskStatus, TaskType};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 use std::fmt;
-use crate::types::{TaskStatus, TaskType, Priority, TaskRelationships, TaskComment, CustomFields};
+use std::path::PathBuf;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Task {
@@ -75,7 +75,19 @@ impl Task {
 
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\ncategory: {:?}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
-               self.title, self.status, self.subtitle, self.description, self.priority, self.category, self.created, self.modified, self.due_date, self.tags)
+        write!(
+            f,
+            "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\ncategory: {:?}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
+            self.title,
+            self.status,
+            self.subtitle,
+            self.description,
+            self.priority,
+            self.category,
+            self.created,
+            self.modified,
+            self.due_date,
+            self.tags
+        )
     }
 }

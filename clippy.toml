@@ -1,0 +1,23 @@
+# Clippy configuration for Lotar
+# This customizes linting rules for our project
+
+# Complexity thresholds
+too-many-arguments-threshold = 7
+type-complexity-threshold = 250
+trivial-copy-size-limit = 128
+
+# Length limits
+max-suggested-slice-pattern-length = 3
+
+# Cognitive complexity
+cognitive-complexity-threshold = 30
+
+# Performance settings
+large-error-threshold = 200
+vec-box-size-threshold = 4096
+
+# Naming conventions - allow certain patterns common in CLI tools
+enum-variant-name-threshold = 3
+
+# Allow certain patterns that are common in our codebase
+# (We'll handle these through targeted allows in code where needed)

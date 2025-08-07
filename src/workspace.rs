@@ -1,6 +1,6 @@
-use std::path::{Path, PathBuf};
 use std::env;
 use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct TasksDirectoryResolver {
@@ -27,7 +27,7 @@ impl TasksDirectoryResolver {
     }
 
     /// Function to resolve with home directory override (primarily for testing)
-    /// 
+    ///
     /// This function allows tests to specify a custom home directory path for configuration
     /// loading, enabling isolated testing of home config functionality.
     #[allow(dead_code)] // Used in integration tests
@@ -36,7 +36,11 @@ impl TasksDirectoryResolver {
         global_config_tasks_folder: Option<&str>,
         home_config_override: Option<PathBuf>,
     ) -> Result<Self, String> {
-        Self::resolve_internal(explicit_path, global_config_tasks_folder, home_config_override)
+        Self::resolve_internal(
+            explicit_path,
+            global_config_tasks_folder,
+            home_config_override,
+        )
     }
 
     /// Internal resolve function with optional home config override for testing
@@ -65,8 +69,13 @@ impl TasksDirectoryResolver {
                 let path_buf = PathBuf::from(env_path.trim());
                 // Create directory if it doesn't exist
                 if !path_buf.exists() {
-                    fs::create_dir_all(&path_buf)
-                        .map_err(|e| format!("Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}", path_buf.display(), e))?;
+                    fs::create_dir_all(&path_buf).map_err(|e| {
+                        format!(
+                            "Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}",
+                            path_buf.display(),
+                            e
+                        )
+                    })?;
                 }
                 return Ok(TasksDirectoryResolver {
                     path: path_buf,
@@ -77,9 +86,11 @@ impl TasksDirectoryResolver {
 
         // 3. Load home config to get tasks folder preference
         let home_tasks_folder = Self::get_home_config_tasks_folder(&home_config_override)?;
-        
+
         // 4. Determine the folder name to search for (home config takes precedence over parameter)
-        let folder_name = Self::get_tasks_folder_name(home_tasks_folder.as_deref().or(global_config_tasks_folder));
+        let folder_name = Self::get_tasks_folder_name(
+            home_tasks_folder.as_deref().or(global_config_tasks_folder),
+        );
 
         // 5. Search up the directory tree
         if let Some((found_path, parent_dir)) = Self::find_tasks_folder_in_parents(&folder_name)? {
@@ -94,8 +105,8 @@ impl TasksDirectoryResolver {
         }
 
         // 6. Default to current directory + folder name
-        let current_dir = env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?;
+        let current_dir =
+            env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
         let tasks_path = current_dir.join(&folder_name);
 
         Ok(TasksDirectoryResolver {
@@ -125,7 +136,9 @@ impl TasksDirectoryResolver {
     }
 
     /// Get tasks folder preference from home configuration
-    pub fn get_home_config_tasks_folder(home_config_override: &Option<PathBuf>) -> Result<Option<String>, String> {
+    pub fn get_home_config_tasks_folder(
+        home_config_override: &Option<PathBuf>,
+    ) -> Result<Option<String>, String> {
         let home_config_path = match home_config_override {
             Some(override_path) => override_path.clone(),
             None => Self::get_default_home_config_path()?,
@@ -160,9 +173,8 @@ impl TasksDirectoryResolver {
     /// Get the default home configuration path (cross-platform)
     pub fn get_default_home_config_path() -> Result<PathBuf, String> {
         // Use dirs crate for cross-platform home directory support
-        let home_dir = dirs::home_dir()
-            .ok_or("Unable to determine home directory")?;
-        
+        let home_dir = dirs::home_dir().ok_or("Unable to determine home directory")?;
+
         // On Windows, we might want to use a different location
         #[cfg(windows)]
         {
@@ -171,15 +183,17 @@ impl TasksDirectoryResolver {
                 return Ok(config_dir.join("lotar").join("config.yml"));
             }
         }
-        
+
         // Default to ~/.lotar for Unix-like systems and fallback for Windows
         Ok(home_dir.join(".lotar"))
     }
 
     /// Search up the directory tree for a tasks folder
-    fn find_tasks_folder_in_parents(folder_name: &str) -> Result<Option<(PathBuf, PathBuf)>, String> {
-        let mut current_dir = env::current_dir()
-            .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    fn find_tasks_folder_in_parents(
+        folder_name: &str,
+    ) -> Result<Option<(PathBuf, PathBuf)>, String> {
+        let mut current_dir =
+            env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
 
         loop {
             let tasks_path = current_dir.join(folder_name);
@@ -226,16 +240,25 @@ mod tests {
         unsafe {
             env::set_var("LOTAR_TASKS_FOLDER", ".tickets");
         }
-        assert_eq!(TasksDirectoryResolver::get_tasks_folder_name(None), ".tickets");
+        assert_eq!(
+            TasksDirectoryResolver::get_tasks_folder_name(None),
+            ".tickets"
+        );
 
         // Test config fallback
         unsafe {
             env::remove_var("LOTAR_TASKS_FOLDER");
         }
-        assert_eq!(TasksDirectoryResolver::get_tasks_folder_name(Some(".issues")), ".issues");
+        assert_eq!(
+            TasksDirectoryResolver::get_tasks_folder_name(Some(".issues")),
+            ".issues"
+        );
 
         // Test default
-        assert_eq!(TasksDirectoryResolver::get_tasks_folder_name(None), ".tasks");
+        assert_eq!(
+            TasksDirectoryResolver::get_tasks_folder_name(None),
+            ".tasks"
+        );
     }
 
     #[test]
@@ -244,10 +267,8 @@ mod tests {
         let tasks_dir = temp_dir.path().join("custom_tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
 
-        let resolver = TasksDirectoryResolver::resolve(
-            Some(tasks_dir.to_str().unwrap()),
-            None,
-        ).unwrap();
+        let resolver =
+            TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None).unwrap();
 
         assert_eq!(resolver.path, tasks_dir);
         matches!(resolver.source, TasksDirectorySource::CommandLineFlag);

@@ -1,0 +1,13 @@
+# Rust formatting configuration for Lotar
+# Using only stable rustfmt features for consistent code style
+
+# Basic formatting
+edition = "2021"
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+
+# String and misc formatting
+newline_style = "Unix"
+remove_nested_parens = true
+use_small_heuristics = "Default"

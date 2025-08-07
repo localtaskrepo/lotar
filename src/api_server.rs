@@ -8,6 +8,12 @@ pub struct ApiServer {
     handlers: HashMap<String, ApiHandler>,
 }
 
+impl Default for ApiServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ApiServer {
     pub fn new() -> Self {
         Self {
@@ -19,9 +25,8 @@ impl ApiServer {
         // Normalize the path to remove trailing slashes and make it lowercase
         let normalized_path: String = path.trim_end_matches('/').to_lowercase();
 
-        self.handlers.insert(normalized_path.to_string(), ApiHandler {
-            callback,
-        });
+        self.handlers
+            .insert(normalized_path.to_string(), ApiHandler { callback });
     }
 
     pub fn handle_request(&self, request_path: &str) -> String {
@@ -29,7 +34,8 @@ impl ApiServer {
         let normalized_request_path = request_path.trim_end_matches('/').to_lowercase();
 
         // Find the best matching handler for the request path
-        let matching_handler = self.handlers
+        let matching_handler = self
+            .handlers
             .iter()
             .filter(|(path, _)| normalized_request_path.starts_with(path.as_str()))
             .max_by_key(|(path, _)| path.len());

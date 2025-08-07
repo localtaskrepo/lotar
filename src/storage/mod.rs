@@ -6,11 +6,11 @@
 // - search: Search and filtering functionality
 // - manager: High-level storage coordination and project management
 
-pub mod task;
+pub mod manager;
 pub mod operations;
 pub mod search;
-pub mod manager;
+pub mod task;
 
 // Re-export the main types for convenience
-pub use task::Task;
 pub use manager::Storage;
+pub use task::Task;

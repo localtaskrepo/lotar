@@ -1,5 +1,5 @@
-use crate::cli::handlers::status::{StatusArgs as StatusHandlerArgs, StatusHandler};
 use crate::cli::handlers::priority::{PriorityArgs, PriorityHandler};
+use crate::cli::handlers::status::{StatusArgs as StatusHandlerArgs, StatusHandler};
 use crate::cli::handlers::{AddHandler, CommandHandler};
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
@@ -49,9 +49,7 @@ impl CommandHandler for TaskHandler {
                     Err(e) => Err(e),
                 }
             }
-            TaskAction::List(args) => {
-                SearchHandler::execute(args, project, resolver, renderer)
-            }
+            TaskAction::List(args) => SearchHandler::execute(args, project, resolver, renderer),
             TaskAction::Edit(edit_args) => {
                 EditHandler::execute(edit_args, project, resolver, renderer)
             }
@@ -69,7 +67,7 @@ impl CommandHandler for TaskHandler {
                 PriorityHandler::execute(priority_args, project, resolver, renderer)
             }
             TaskAction::Assignee { id, assignee } => {
-                // Handle assignee command  
+                // Handle assignee command
                 if let Some(new_assignee) = assignee {
                     let message = format!(
                         "Set {} assignee = {} (placeholder implementation)",
@@ -77,10 +75,7 @@ impl CommandHandler for TaskHandler {
                     );
                     println!("{}", renderer.render_warning(&message));
                 } else {
-                    let message = format!(
-                        "Show {} assignee (placeholder implementation)",
-                        id
-                    );
+                    let message = format!("Show {} assignee (placeholder implementation)", id);
                     println!("{}", renderer.render_warning(&message));
                 }
                 Ok(())
@@ -94,10 +89,7 @@ impl CommandHandler for TaskHandler {
                     );
                     println!("{}", renderer.render_warning(&message));
                 } else {
-                    let message = format!(
-                        "Show {} due_date (placeholder implementation)",
-                        id
-                    );
+                    let message = format!("Show {} due_date (placeholder implementation)", id);
                     println!("{}", renderer.render_warning(&message));
                 }
                 Ok(())
@@ -335,17 +327,13 @@ impl CommandHandler for SearchHandler {
             } else {
                 assignee.clone()
             };
-            tasks.retain(|(_, task)| {
-                task.assignee
-                    .as_ref()
-                    .map_or(false, |a| a == &filter_assignee)
-            });
+            tasks.retain(|(_, task)| task.assignee.as_ref() == Some(&filter_assignee));
         }
 
         if args.mine {
             // TODO: Resolve current user and filter by that
             // For now, filter by @me placeholder
-            tasks.retain(|(_, task)| task.assignee.as_ref().map_or(false, |a| a == "@me"));
+            tasks.retain(|(_, task)| task.assignee.as_ref().is_some_and(|a| a == "@me"));
         }
 
         if args.high {
@@ -362,7 +350,7 @@ impl CommandHandler for SearchHandler {
         if let Some(sort_field) = args.sort_by {
             use crate::cli::SortField;
             use crate::types::{Priority, TaskStatus};
-            
+
             tasks.sort_by(|(_, task_a), (_, task_b)| {
                 let comparison = match sort_field {
                     SortField::Priority => {
@@ -374,7 +362,7 @@ impl CommandHandler for SearchHandler {
                             Priority::Low => 1,
                         };
                         priority_order(&task_a.priority).cmp(&priority_order(&task_b.priority))
-                    },
+                    }
                     SortField::Status => {
                         // Sort by status enum order
                         let status_order = |s: &TaskStatus| match s {
@@ -385,7 +373,7 @@ impl CommandHandler for SearchHandler {
                             TaskStatus::Done => 5,
                         };
                         status_order(&task_a.status).cmp(&status_order(&task_b.status))
-                    },
+                    }
                     SortField::DueDate => {
                         // Sort by due date (tasks without due date go last)
                         match (&task_a.due_date, &task_b.due_date) {
@@ -394,17 +382,17 @@ impl CommandHandler for SearchHandler {
                             (None, Some(_)) => std::cmp::Ordering::Greater,
                             (None, None) => std::cmp::Ordering::Equal,
                         }
-                    },
+                    }
                     SortField::Created => {
                         // Sort by creation timestamp
                         task_a.created.cmp(&task_b.created)
-                    },
+                    }
                     SortField::Modified => {
                         // Sort by modification timestamp
                         task_a.modified.cmp(&task_b.modified)
-                    },
+                    }
                 };
-                
+
                 // Apply reverse if requested
                 if args.reverse {
                     comparison.reverse()
@@ -439,12 +427,10 @@ impl CommandHandler for SearchHandler {
                 .into_iter()
                 .map(|(task_id, task)| {
                     // Extract project from task ID (e.g., "LOTA-5" -> "LOTA")
-                    let project = if let Some(dash_pos) = task_id.find('-') {
-                        Some(task_id[..dash_pos].to_string())
-                    } else {
-                        None
-                    };
-                    
+                    let project = task_id
+                        .find('-')
+                        .map(|dash_pos| task_id[..dash_pos].to_string());
+
                     crate::output::TaskDisplayInfo {
                         id: task_id,
                         title: task.title,

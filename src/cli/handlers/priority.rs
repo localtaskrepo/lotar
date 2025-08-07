@@ -1,9 +1,9 @@
+use crate::cli::handlers::CommandHandler;
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
+use crate::output::OutputRenderer;
 use crate::storage::Storage;
 use crate::workspace::TasksDirectoryResolver;
-use crate::cli::handlers::CommandHandler;
-use crate::output::OutputRenderer;
 
 /// Handler for priority change commands
 pub struct PriorityHandler;
@@ -11,23 +11,32 @@ pub struct PriorityHandler;
 impl CommandHandler for PriorityHandler {
     type Args = PriorityArgs;
     type Result = Result<(), String>;
-    
-    fn execute(args: Self::Args, project: Option<&str>, resolver: &TasksDirectoryResolver, renderer: &OutputRenderer) -> Self::Result {
+
+    fn execute(
+        args: Self::Args,
+        project: Option<&str>,
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) -> Self::Result {
         // Create project resolver
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
-        
+
         // Validate task ID format
-        project_resolver.validate_task_id_format(&args.task_id)
+        project_resolver
+            .validate_task_id_format(&args.task_id)
             .map_err(|e| format!("Invalid task ID: {}", e))?;
-        
+
         // Resolve project from task ID - function parameter takes precedence
         let effective_project = project.or(args.explicit_project.as_deref());
-        
+
         // Check for conflicts between full task ID and explicit project argument
         let final_effective_project = if let Some(explicit_proj) = effective_project {
-            if let Some(task_id_prefix) = project_resolver.extract_project_from_task_id(&args.task_id) {
-                let explicit_as_prefix = project_resolver.resolve_project_name_to_prefix(explicit_proj);
+            if let Some(task_id_prefix) =
+                project_resolver.extract_project_from_task_id(&args.task_id)
+            {
+                let explicit_as_prefix =
+                    project_resolver.resolve_project_name_to_prefix(explicit_proj);
                 if task_id_prefix != explicit_as_prefix {
                     println!("{}", renderer.render_warning(&format!(
                         "Warning: Task ID '{}' belongs to project '{}', but project '{}' was specified. Using task ID's project.",
@@ -44,27 +53,28 @@ impl CommandHandler for PriorityHandler {
         } else {
             effective_project
         };
-        
+
         // Get project configuration for validation
         let resolved_project = project_resolver.resolve_project("", final_effective_project)?;
-        
+
         // Now get the config after project resolution
         let config = project_resolver.get_config();
-        
+
         let project_config = if !resolved_project.is_empty() {
-            project_resolver.get_project_config(&resolved_project)
+            project_resolver
+                .get_project_config(&resolved_project)
                 .map_err(|e| format!("Failed to get project configuration: {}", e))?
         } else {
             config.clone()
         };
-        
+
         let project_validator = CliValidator::new(&project_config);
-        
+
         // Try to open existing storage first (for both read and write operations)
         let mut storage = match Storage::try_open(resolver.path.clone()) {
             Some(storage) => storage,
             None => {
-                return Err(format!("No tasks found. Use 'lotar add' to create tasks first."));
+                return Err("No tasks found. Use 'lotar add' to create tasks first.".to_string());
             }
         };
         let project_prefix = if let Some(project) = final_effective_project {
@@ -72,37 +82,42 @@ impl CommandHandler for PriorityHandler {
         } else {
             crate::project::get_effective_project_name(resolver)
         };
-        
+
         match args.new_priority {
             Some(new_priority) => {
                 // SET operation: Change task priority
                 let validated_priority = project_validator
                     .validate_priority(&new_priority)
                     .map_err(|e| format!("Priority validation failed: {}", e))?;
-                
+
                 // Load the task
                 let mut task = storage
                     .get(&args.task_id, project_prefix.clone())
                     .ok_or_else(|| format!("Task '{}' not found", args.task_id))?;
-                
+
                 let old_priority = task.priority;
-                
+
                 // Check if priority is actually changing
                 if old_priority == validated_priority {
-                    println!("{}", renderer.render_warning(&format!(
-                        "Task {} priority is already {}",
-                        args.task_id, validated_priority
-                    )));
+                    println!(
+                        "{}",
+                        renderer.render_warning(&format!(
+                            "Task {} priority is already {}",
+                            args.task_id, validated_priority
+                        ))
+                    );
                     return Ok(());
                 }
-                
+
                 // Update priority
                 task.priority = validated_priority;
                 storage.edit(&args.task_id, &task);
-                
-                println!("✅ Task {} priority changed from {} to {}", 
-                    args.task_id, old_priority, validated_priority);
-                
+
+                println!(
+                    "✅ Task {} priority changed from {} to {}",
+                    args.task_id, old_priority, validated_priority
+                );
+
                 Ok(())
             }
             None => {
@@ -110,7 +125,7 @@ impl CommandHandler for PriorityHandler {
                 let task = storage
                     .get(&args.task_id, project_prefix.clone())
                     .ok_or_else(|| format!("Task '{}' not found", args.task_id))?;
-                
+
                 println!("Task {} priority: {}", args.task_id, task.priority);
                 Ok(())
             }
@@ -127,7 +142,11 @@ pub struct PriorityArgs {
 }
 
 impl PriorityArgs {
-    pub fn new(task_id: String, new_priority: Option<String>, explicit_project: Option<String>) -> Self {
+    pub fn new(
+        task_id: String,
+        new_priority: Option<String>,
+        explicit_project: Option<String>,
+    ) -> Self {
         Self {
             task_id,
             new_priority,
