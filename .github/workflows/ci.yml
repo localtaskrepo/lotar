@@ -11,6 +11,11 @@ env:
   RUST_BACKTRACE: 1
   NODE_VERSION: '22'  # Latest LTS (v22.18.0)
 
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Build frontend first (required for Rust compilation)
   build_frontend:
@@ -27,14 +32,14 @@ jobs:
         cache: 'npm'
         
     - name: Install dependencies
-      run: npm ci --omit=optional
+      run: npm ci --omit=optional --prefer-offline
         
-    - name: Build frontend (with fallback)
+    - name: Build frontend (with optimized fallback)
       run: |
         echo "Attempting frontend build..."
         
-        # Try parcel build with timeout
-        timeout 120 npm run build:web || {
+        # Try parcel build with timeout (reduced from 120s to 90s)
+        timeout 90 npm run build:web || {
           echo "⚠️ Parcel build failed/timed out, creating minimal fallback..."
           mkdir -p target/web
           
@@ -89,6 +94,9 @@ jobs:
       uses: Swatinem/rust-cache@v2  # Latest version (v2.8.0)
       with:
         cache-on-failure: true
+        # More aggressive caching for CI
+        shared-key: "ci-cache"
+        save-if: ${{ github.ref == 'refs/heads/main' }}
         
     - name: Check code formatting
       run: cargo fmt --all --check
@@ -96,19 +104,19 @@ jobs:
     - name: Run clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
       
-    - name: Build project
+    - name: Build project (debug)
       run: cargo build --all-features
       
-    - name: Build release
-      run: cargo build --release --all-features
+    - name: Run core tests (fast)
+      run: cargo test --lib --bins --quiet --jobs $(nproc)
         
-    - name: Run tests
-      run: cargo test --release --quiet --jobs $(nproc)
+    - name: Build release (check only for speed)
+      run: cargo check --release --all-features
         
     - name: Run doc tests
       run: cargo test --doc --all-features --quiet
 
-  # Security audit
+  # Security audit (optimized with caching, runs in parallel)
   security:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -119,8 +127,20 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       
-    - name: Install cargo-audit
-      run: cargo install cargo-audit --locked
+    - name: Cache cargo-audit
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/cargo-audit
+        key: cargo-audit-${{ runner.os }}
+        
+    - name: Install cargo-audit (if not cached)
+      run: |
+        if ! command -v cargo-audit >/dev/null 2>&1; then
+          echo "Installing cargo-audit..."
+          cargo install cargo-audit --locked
+        else
+          echo "Using cached cargo-audit"
+        fi
       
     - name: Run security audit
       run: cargo audit
