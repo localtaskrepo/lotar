@@ -3,7 +3,7 @@
 > A git-integrated task management system that lives in your repository.
 
 [![Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)](docs/README.md)
-[![Tests](https://img.shields.io/badge/tests-225%20passing-brightgreen)](docs/README.md#testing--quality)
+[![Tests](https://github.com/localtaskrepo/lotar/actions/workflows/test.yml/badge.svg)](https://github.com/localtaskrepo/lotar/actions/workflows/test.yml)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 
 ## 🚀 Quick Start
@@ -14,23 +14,24 @@ git clone https://github.com/mallox/lotar
 cd lotar
 cargo build --release
 
-# Create your first task (auto-initializes project with defaults)
-lotar task add --title="Setup project" --project=myapp --priority=HIGH
+# Create your first task (automatically initializes with smart defaults)
+lotar add "Setup authentication system" --priority=high
 
-# List tasks (works with full names or auto-generated prefixes)
-lotar task list --project=myapp    # Full project name
-lotar task list --project=MY       # Auto-generated prefix
+# List all tasks (auto-detects the single project)
+lotar list
 
-# Search with intelligent project resolution
-lotar task search "auth" --project=authentication-service
-# Shows: [AUTH-001] Login system - AUTHENTICATION-SERVICE
+# Change task status 
+lotar status AUTH-001 in_progress
+
+# Add assignee to a task
+lotar assignee AUTH-001 john.doe@company.com
+
+# Different output formats
+lotar list --format=table
+lotar list --format=json
 
 # Start web interface
-lotar serve 8080
-
-# Customize your workflow (optional)
-lotar config init --template=agile  # Only needed for custom settings
-lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE
+lotar serve --port=8080
 ```
 
 ## ✨ What is LoTaR?
@@ -40,38 +41,70 @@ LoTaR is a **production-ready task management system** designed for developers w
 ### Key Benefits
 - 🔒 **Git-native**: Tasks are version-controlled with your code
 - 📝 **Human-readable**: YAML files you can edit manually
-- 🚀 **Fast**: Sub-100ms operations with smart indexing
+- 🚀 **Fast**: Sub-100ms operations with direct file operations
 - 🔍 **Integrated**: Scan source code for TODO comments
 - 🌐 **Complete**: CLI, web interface, and REST API
 - 🛡️ **Secure**: Project isolation and input validation
 - ⚡ **Zero-config**: Auto-initializes projects with sensible defaults
 - 🧠 **Smart**: Intelligent project resolution and auto-detection
 
+## � Multi-Project Workflows
+
+For teams managing multiple projects in one repository or across different directories:
+
+```bash
+# Explicit project specification
+lotar add "Setup API auth" --project=backend --priority=high
+lotar add "Design login UI" --project=frontend --priority=medium
+
+# List tasks by project (supports full names or auto-generated prefixes)
+lotar list --project=backend      # Full name
+lotar list --project=BACK         # Auto-generated prefix
+
+# Search across projects with context
+lotar list --search="auth" --project=backend
+# → [BACK-001] Setup API auth - BACKEND (Priority: HIGH)
+
+# Custom tasks directory for different environments
+export LOTAR_TASKS_DIR=/shared/project-tasks
+lotar add "Integration test" --project=testing
+# OR use command-line override
+lotar add "Deploy script" --tasks-dir=/ops/tasks --project=deployment
+
+# Advanced configuration per project
+lotar config init --template=agile --project=backend
+lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE --project=backend
+```
+> **[📖 Smart Project Management Guide](docs/smart-project-management.md)** - Detailed documentation on intelligent project resolution, auto-detection, and flexible naming
+
 ## 🎯 Core Features
 
 ### Task Management
 ```bash
 # Full CRUD operations with formatted IDs
-# Auto-initializes project configs with sensible defaults
-lotar task add --title="OAuth Implementation" --type=feature --priority=HIGH
-lotar task status PROJ-001 IN_PROGRESS
-lotar task search "authentication" --priority=HIGH
+lotar add "OAuth Implementation" --type=feature --priority=high
+lotar status PROJ-001 in_progress
+lotar assignee PROJ-001 john.doe@company.com
+lotar list --priority=high
 ```
 
-### 🧠 Smart Project Management
+### Environment Variables & Global Options
 ```bash
-# Use either full project names or prefixes - LoTaR figures it out
-lotar task add --title="Add routing" --project=frontend      # Full name
-lotar task add --title="Fix bug" --project=FRON             # Auto-generated prefix
+# Environment variable support (applies to all commands)
+export LOTAR_TASKS_DIR=/project/tasks
+export LOTAR_DEFAULT_ASSIGNEE=john.doe@company.com
+lotar add "Environment-configured task"  # Uses environment settings
 
-# Search shows full project context
-lotar task search "auth" 
-# → [AUTH-001] OAuth login - AUTHENTICATION-SERVICE (Priority: HIGH)
+# Global options work with ALL commands
+lotar add "Task" --tasks-dir=/custom/path
+lotar list --tasks-dir=/custom/path
+lotar config show --tasks-dir=/custom/path
 
-# Auto-detection sets intelligent defaults
-# First task in repo creates global config with smart defaults
+# Output format control
+lotar list --format=table     # Terminal table
+lotar list --format=json      # JSON for scripting  
+lotar list --format=markdown  # Markdown output
 ```
-> **[📖 Smart Project Management Guide](docs/smart-project-management.md)** - Detailed documentation on intelligent project resolution, auto-detection, and flexible naming
 
 ### Source Code Integration
 ```bash
@@ -90,8 +123,8 @@ lotar serve 8080
 LoTaR creates a `.tasks/` directory in your repository:
 
 ```
+```
 .tasks/
-├── index.yml                 # Global search index and project metadata
 ├── config.yml               # Global configuration
 ├── BACKEND/                 # Project folders
 │   ├── config.yml          # Project-specific configuration (optional)
@@ -99,6 +132,7 @@ LoTaR creates a `.tasks/` directory in your repository:
 │   └── 002.yml
 └── FRONTEND/
     └── 001.yml
+```
 ```
 
 Each task is stored as a readable YAML file with structured data:
@@ -113,65 +147,52 @@ created: "2025-07-30T10:00:00Z"
 
 ## ⚙️ Configuration
 
-LoTaR uses a flexible configuration system that supports both global and project-specific settings.
-
-### Zero-Configuration Setup
-
-**For most users, no configuration is needed!** LoTaR automatically initializes projects with sensible defaults when you create your first task:
+### Zero-Configuration Start
+For most users, **no configuration is needed**! LoTaR automatically initializes projects with sensible defaults:
 
 ```bash
-# This automatically creates default configuration for "myproject"
-lotar task add --title="First task" --project=myproject
-
-# Subsequent tasks reuse the existing configuration
-lotar task add --title="Second task" --project=myproject  # No auto-init message
+# This automatically creates default configuration
+lotar add "First task" --project=myproject
 ```
 
-The auto-initialization creates:
-- Global config (`.tasks/config.yml`) if it doesn't exist
-- Project-specific config (`.tasks/{PROJECT}/config.yml`) with default template
-- Proper project folder structure with consistent naming
-
-### Configuration Hierarchy
-
-1. **Built-in defaults** (lowest priority)
-2. **Global config** (`.tasks/config.yml`)
-3. **Home config** (`~/.lotar`) 
-4. **Project config** (`.tasks/{project}/config.yml`)
-5. **Environment variables** (highest priority)
-
 ### Configuration Commands
-
 ```bash
 # View current configuration
 lotar config show
 
-# Manual initialization (only needed for custom templates/settings)
+# Manual initialization (only for custom templates)
 lotar config init --template=agile --project=myapp
 
-# Set global configuration
+# Set global/project settings
 lotar config set server_port 9000
-lotar config set default_project myapp
-
-# Set project-specific configuration
 lotar config set issue_states TODO,WORKING,REVIEW,DONE --project=myapp
-lotar config set tags backend,frontend,* --project=myapp
 
-# List available templates
+# List available templates (simple, agile, kanban, default)
 lotar config templates
 ```
 
-> **Note**: The `config init` command is only needed when you want to use custom templates or settings. For basic usage, just start adding tasks and LoTaR will handle the setup automatically.
+### Configuration Hierarchy
+1. Built-in defaults
+2. Global config (`.tasks/config.yml`)
+3. Home config (`~/.lotar`) 
+4. Project config (`.tasks/{project}/config.yml`)
+5. Environment variables (`LOTAR_TASKS_DIR`, `LOTAR_DEFAULT_ASSIGNEE`)
+6. Command-line flags (highest priority)
+
+<details>
+<summary>📋 Complete Configuration Reference</summary>
+
+### Environment Variables
+- `LOTAR_TASKS_DIR`: Override tasks directory (absolute: `/project/tasks` or relative: `.issues`)
+- `LOTAR_DEFAULT_ASSIGNEE`: Set default assignee for all tasks
 
 ### Available Templates
-
 - **simple**: Minimal workflow (TODO/IN_PROGRESS/DONE)
 - **agile**: Full agile workflow with epics, sprints, and stories
 - **kanban**: Continuous flow with assignee requirements
 - **default**: Basic configuration using global defaults
 
 ### Configurable Fields
-
 **Global Settings:**
 - `server_port`: Web interface port (default: 8080)
 - `default_project`: Default project name
@@ -186,12 +207,22 @@ lotar config templates
 - `default_assignee`: Default task assignee
 - `default_priority`: Default priority level
 
+</details>
+
 ## 🧪 Production Ready
 
-- ✅ **225 tests passing** with comprehensive coverage
+- ✅ **Comprehensive test suite** with continuous integration
 - ✅ **Memory safe** with Rust's ownership system
 - ✅ **Performance optimized** for large task sets
 - ✅ **Security validated** with project isolation
+
+## 🤝 Use Cases
+
+- **Development Teams**: Track features, bugs, and technical debt alongside code
+- **Solo Developers**: Keep tasks organized without external dependencies
+- **Code Reviews**: See task context in git history and diffs
+- **Compliance**: Immutable audit trail of decisions and changes
+- **Documentation**: Requirements that evolve with your codebase
 
 ## 📖 Documentation
 
@@ -202,6 +233,30 @@ lotar config templates
 
 **Advanced:**
 - [🔮 Future Features](docs/mcp-integration-specification.md) - Planned AI agent integration
+
+## 📝 Example Workflow
+
+```bash
+# Start a new feature (auto-initializes with defaults)
+lotar add "Add user authentication" --type=feature --priority=high --project=auth
+
+# Scan for TODOs in your code
+lotar scan ./src
+
+# Update status as you progress
+lotar status AUTH-001 in_progress
+
+# Add related tasks (smart project resolution)
+lotar add "Add password reset" --project=auth
+lotar add "Add 2FA support" --project=authentication  # Full name also works
+
+# Filter and search
+lotar list --search="auth" --status=todo
+
+# Complete and track in git
+lotar status AUTH-001 done
+git add .tasks/ && git commit -m "Complete user authentication feature"
+```
 
 ## 🛠️ Installation
 
@@ -221,51 +276,9 @@ export PATH="$PATH:$(pwd)/target/release"
 
 ### Development
 ```bash
-# Run tests
-cargo test
-
-# Development build
-cargo build
-
-# Code quality
-cargo clippy
-cargo fmt
-```
-
-## 🤝 Use Cases
-
-- **Development Teams**: Track features, bugs, and technical debt alongside code
-- **Solo Developers**: Keep tasks organized without external dependencies
-- **Code Reviews**: See task context in git history and diffs
-- **Compliance**: Immutable audit trail of decisions and changes
-- **Documentation**: Requirements that evolve with your codebase
-
-## 📝 Example Workflow
-
-```bash
-# Start a new feature (auto-initializes with defaults)
-# Works with full project names or prefixes
-lotar task add --title="Add user authentication" --type=feature --priority=HIGH --project=authentication
-
-# Work on it (scan finds TODOs automatically)
-lotar scan ./src
-
-# Update status as you progress (smart project resolution)
-lotar task status AUTH-001 IN_PROGRESS
-
-# Add more tasks to the same project (multiple naming options)
-lotar task add --title="Add password reset" --project=auth          # Prefix
-lotar task add --title="Add 2FA support" --project=authentication   # Full name
-
-# Search shows full project context
-lotar task search "auth" --status=TODO
-# Found 2 matching tasks:
-#   [AUTH-002] Add password reset - AUTHENTICATION (Priority: MEDIUM, Status: TODO)  
-#   [AUTH-003] Add 2FA support - AUTHENTICATION (Priority: HIGH, Status: TODO)
-
-# Complete and track
-lotar task status AUTH-001 DONE
-git add .tasks/ && git commit -m "Complete user authentication feature"
+cargo test      # Run tests
+cargo build     # Development build
+cargo clippy    # Code quality
 ```
 
 ## 📄 License

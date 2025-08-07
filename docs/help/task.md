@@ -50,14 +50,14 @@ lotar task priority <TASK_ID> [NEW_PRIORITY]
 ```
 
 ### assignee
-Change or view task assignee.
+**⚠️ PLACEHOLDER** - Change or view task assignee.
 
 ```bash
 lotar task assignee <TASK_ID> [NEW_ASSIGNEE]
 ```
 
 ### due-date
-Change or view task due date.
+**⚠️ PLACEHOLDER** - Change or view task due date.
 
 ```bash
 lotar task due-date <TASK_ID> [NEW_DATE]

@@ -1,11 +1,11 @@
-use crate::types::{Priority, TaskStatus};
+use crate::types::{Priority, TaskStatus, TaskType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TaskFilter {
     pub status: Vec<TaskStatus>,
     pub priority: Vec<Priority>,
-    pub task_type: Vec<crate::types::TaskType>,
+    pub task_type: Vec<TaskType>,
     pub project: Option<String>,
     pub category: Option<String>,
     pub tags: Vec<String>,

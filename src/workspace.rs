@@ -67,7 +67,30 @@ impl TasksDirectoryResolver {
         if let Ok(env_path) = env::var("LOTAR_TASKS_DIR") {
             if !env_path.trim().is_empty() {
                 let path_buf = PathBuf::from(env_path.trim());
-                // Create directory if it doesn't exist
+
+                // Special handling for relative paths: check if it's a simple directory name
+                // that might exist in parent directories (like "./tasks" or "tasks")
+                if path_buf.is_relative() {
+                    // Extract the final directory name for simple cases
+                    if let Some(dir_name) = path_buf.file_name() {
+                        let dir_name_str = dir_name.to_string_lossy();
+
+                        // For simple directory names (not complex paths), search parents first
+                        // This covers cases like "tasks", ".tasks", "./tasks", "./.tasks"
+                        if !env_path.trim().contains('/') || env_path.trim().starts_with("./") {
+                            if let Some((found_path, parent_dir)) =
+                                Self::find_tasks_folder_in_parents(&dir_name_str)?
+                            {
+                                return Ok(TasksDirectoryResolver {
+                                    path: found_path,
+                                    source: TasksDirectorySource::FoundInParent(parent_dir),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // If no existing directory found in parents, create at the specified path
                 if !path_buf.exists() {
                     fs::create_dir_all(&path_buf).map_err(|e| {
                         format!(
@@ -117,21 +140,14 @@ impl TasksDirectoryResolver {
 
     /// Get the tasks folder name from environment, config, or default
     fn get_tasks_folder_name(global_config_tasks_folder: Option<&str>) -> String {
-        // 1. Environment variable
-        if let Ok(env_folder) = env::var("LOTAR_TASKS_FOLDER") {
-            if !env_folder.trim().is_empty() {
-                return env_folder;
-            }
-        }
-
-        // 2. Global config setting
+        // 1. Global config setting
         if let Some(config_folder) = global_config_tasks_folder {
             if !config_folder.trim().is_empty() {
                 return config_folder.to_string();
             }
         }
 
-        // 3. Default
+        // 2. Default
         ".tasks".to_string()
     }
 
@@ -236,19 +252,7 @@ mod tests {
 
     #[test]
     fn test_get_tasks_folder_name() {
-        // Test environment variable
-        unsafe {
-            env::set_var("LOTAR_TASKS_FOLDER", ".tickets");
-        }
-        assert_eq!(
-            TasksDirectoryResolver::get_tasks_folder_name(None),
-            ".tickets"
-        );
-
         // Test config fallback
-        unsafe {
-            env::remove_var("LOTAR_TASKS_FOLDER");
-        }
         assert_eq!(
             TasksDirectoryResolver::get_tasks_folder_name(Some(".issues")),
             ".issues"
@@ -272,5 +276,114 @@ mod tests {
 
         assert_eq!(resolver.path, tasks_dir);
         matches!(resolver.source, TasksDirectorySource::CommandLineFlag);
+    }
+
+    #[test]
+    fn test_relative_path_parent_search() {
+        // Create a test that doesn't rely on changing working directory
+        // This is more stable for parallel test execution
+
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a parent directory with .tasks
+        let parent_tasks_dir = temp_dir.path().join(".tasks");
+        fs::create_dir_all(&parent_tasks_dir).unwrap();
+
+        // Create a subdirectory
+        let sub_dir = temp_dir.path().join("subproject");
+        fs::create_dir_all(&sub_dir).unwrap();
+
+        // Test with explicit path resolution (simulating what happens when the environment
+        // variable is set but we're in a subdirectory)
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(&sub_dir).unwrap();
+
+        // Set environment variable to relative path
+        unsafe {
+            env::set_var("LOTAR_TASKS_DIR", ".tasks");
+        }
+
+        // This should find the parent .tasks directory
+        let result = TasksDirectoryResolver::resolve_internal(None, None, None);
+
+        // Cleanup first
+        env::set_current_dir(original_dir).unwrap();
+        unsafe {
+            env::remove_var("LOTAR_TASKS_DIR");
+        }
+
+        // Now check the result
+        let resolver = result.unwrap();
+        let expected_canonical = parent_tasks_dir.canonicalize().unwrap();
+        let actual_canonical = resolver.path.canonicalize().unwrap();
+
+        assert_eq!(actual_canonical, expected_canonical);
+        matches!(resolver.source, TasksDirectorySource::FoundInParent(_));
+    }
+
+    #[test]
+    fn test_relative_path_with_prefix() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a parent directory with .tasks
+        let parent_tasks_dir = temp_dir.path().join(".tasks");
+        fs::create_dir_all(&parent_tasks_dir).unwrap();
+
+        // Create a subdirectory
+        let sub_dir = temp_dir.path().join("subproject");
+        fs::create_dir_all(&sub_dir).unwrap();
+
+        // Change to subdirectory
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(&sub_dir).unwrap();
+
+        // Set environment variable to relative path with ./ prefix
+        unsafe {
+            env::set_var("LOTAR_TASKS_DIR", "./.tasks");
+        }
+
+        // Should find the parent .tasks directory instead of creating a new one
+        let resolver = TasksDirectoryResolver::resolve(None, None).unwrap();
+
+        // Canonicalize both paths for comparison
+        let expected_canonical = parent_tasks_dir.canonicalize().unwrap();
+        let actual_canonical = resolver.path.canonicalize().unwrap();
+
+        // Should find the parent .tasks directory
+        assert_eq!(actual_canonical, expected_canonical);
+        matches!(resolver.source, TasksDirectorySource::FoundInParent(_));
+
+        // Cleanup
+        env::set_current_dir(original_dir).unwrap();
+        unsafe {
+            env::remove_var("LOTAR_TASKS_DIR");
+        }
+    }
+
+    #[test]
+    fn test_complex_relative_path_no_search() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Change to temp directory
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(temp_dir.path()).unwrap();
+
+        // Set environment variable to complex relative path
+        unsafe {
+            env::set_var("LOTAR_TASKS_DIR", "../other/tasks");
+        }
+
+        // Should NOT search parents for complex paths, just use the path as-is
+        let resolver = TasksDirectoryResolver::resolve(None, None).unwrap();
+
+        // Should create the directory at the specified relative path
+        assert_eq!(resolver.path, PathBuf::from("../other/tasks"));
+        matches!(resolver.source, TasksDirectorySource::CommandLineFlag);
+
+        // Cleanup
+        env::set_current_dir(original_dir).unwrap();
+        unsafe {
+            env::remove_var("LOTAR_TASKS_DIR");
+        }
     }
 }

@@ -20,21 +20,32 @@ lotar serve --port=3000
 # Start with specific host binding
 lotar serve --host=0.0.0.0 --port=8080
 
-# Start with file watching enabled
-lotar serve --watch
+# Open browser automatically
+lotar serve --open
 
-# Start in development mode
-lotar serve --dev
+# Custom tasks directory
+lotar serve --tasks-dir=/custom/path --port=8080
+
+# Environment variable usage
+export LOTAR_TASKS_DIR=/project/tasks
+lotar serve  # Uses environment-configured directory
 ```
 
 ## Options
 
 - `--port <PORT>` - Port to bind server to (default: 8080)
 - `--host <HOST>` - Host address to bind to (default: localhost)
-- `--watch` - Enable automatic file watching and reload
-- `--dev` - Development mode with enhanced debugging
-- `--no-browser` - Don't automatically open browser
-- `--timeout <SECONDS>` - Server shutdown timeout
+- `--open` - Automatically open browser after starting server
+
+## Global Options
+
+- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose` - Enable verbose output
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+
+## Environment Variables
+
+- `LOTAR_TASKS_DIR` - Default tasks directory location
 
 ## Features
 

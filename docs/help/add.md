@@ -18,10 +18,17 @@ lotar add "Implement user authentication"
 lotar add "Add OAuth support" --type=feature --priority=high --assignee=john.doe
 
 # Bug with due date
-lotar add "Fix login crash" --bug --critical --due=tomorrow
+lotar add "Fix login crash" --type=bug --priority=critical --due=tomorrow
 
 # Epic with custom fields
-lotar add "User Management System" --epic --field=story_points=13 --field=sprint=2
+lotar add "User Management System" --type=epic --field=story_points=13 --field=sprint=2
+
+# Custom tasks directory
+lotar add "External task" --tasks-dir=/external/projects/tasks --project=external
+
+# Environment variable usage
+export LOTAR_TASKS_DIR=/project/tasks
+lotar add "Environment task" --project=myapp  # Uses environment directory
 ```
 
 ## Options
@@ -48,6 +55,16 @@ lotar add "User Management System" --epic --field=story_points=13 --field=sprint
 
 ### Custom Fields
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
+
+### Global Options
+- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose` - Enable verbose output
+- `--project <PROJECT>` - Target project (overrides auto-detection)
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+
+### Environment Variables
+- `LOTAR_TASKS_DIR` - Default tasks directory location  
+- `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for new tasks
 
 ## Output Formats
 

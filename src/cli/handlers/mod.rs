@@ -3,7 +3,7 @@ use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
 use crate::output::{OutputFormat, OutputRenderer};
-use crate::storage::{Storage, task::Task};
+use crate::storage::{manager::Storage, task::Task};
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json;
@@ -14,7 +14,7 @@ pub mod status;
 pub mod task;
 
 // Re-export handlers for easy access
-pub use commands::{ConfigHandler, IndexHandler, ScanHandler, ServeHandler};
+pub use commands::{ConfigHandler, ScanHandler, ServeHandler};
 pub use task::TaskHandler;
 
 /// Trait for command handlers

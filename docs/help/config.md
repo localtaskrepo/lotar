@@ -55,6 +55,9 @@ lotar config show
 # Show project-specific configuration
 lotar config show --project=backend
 
+# Show configuration with custom tasks directory
+lotar config show --tasks-dir=/custom/path
+
 # Initialize new project with agile template
 lotar config init --project=backend --template=agile
 
@@ -75,6 +78,10 @@ lotar config set default_priority HIGH --project=backend --dry-run
 
 # Set global configuration
 lotar config set server_port 9000 --global
+
+# Environment variable integration
+export LOTAR_TASKS_DIR=/custom/tasks
+lotar config show  # Shows environment-configured directory
 
 # List available templates
 lotar config templates
@@ -165,9 +172,21 @@ lotar config templates
 - `kanban` - Kanban board style
 - `simple` - Minimal configuration
 
+## Global Options
+
+- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose` - Enable verbose output
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+
+## Environment Variables
+
+- `LOTAR_TASKS_DIR` - Default tasks directory location
+- `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for all new tasks
+
 ## Notes
 
 - Global settings apply to all projects
 - Project settings override global defaults
 - Templates provide pre-configured workflows
 - Configuration is stored in YAML format
+- Environment variables are respected in configuration display and operations

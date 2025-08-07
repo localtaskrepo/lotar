@@ -4,8 +4,7 @@ use crate::cli::handlers::{AddHandler, CommandHandler};
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::cli::{TaskAction, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs};
-use crate::index::TaskFilter;
-use crate::storage::{Storage, task::Task};
+use crate::storage::{TaskFilter, manager::Storage, task::Task};
 use crate::workspace::TasksDirectoryResolver;
 
 /// Handler for all task subcommands

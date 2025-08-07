@@ -1,4 +1,4 @@
-use crate::storage::Task;
+use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
 use clap::ValueEnum;
 use comfy_table::{Cell, ContentArrangement, Table};

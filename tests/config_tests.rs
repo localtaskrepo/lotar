@@ -432,10 +432,10 @@ mod custom_tasks_directory {
         // Create the environment-specified directory
         fs::create_dir_all(&env_tasks_dir).unwrap();
 
-        // Test with LOTAR_TASKS_FOLDER environment variable
+        // Test with LOTAR_TASKS_DIR environment variable
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
-            .env("LOTAR_TASKS_FOLDER", "env-tasks")
+            .env("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap())
             .arg("config")
             .arg("set")
             .arg("default_project")

@@ -2,7 +2,7 @@ use crate::cli::handlers::CommandHandler;
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::output::OutputRenderer;
-use crate::storage::Storage;
+use crate::storage::manager::Storage;
 use crate::workspace::TasksDirectoryResolver;
 
 /// Handler for priority change commands

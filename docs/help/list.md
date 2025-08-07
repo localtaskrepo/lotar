@@ -25,6 +25,13 @@ lotar list --format=table
 
 # JSON for scripting
 lotar list --format=json
+
+# Custom tasks directory
+lotar list --tasks-dir=/custom/path --project=auth
+
+# Environment variable usage
+export LOTAR_TASKS_DIR=/project/tasks
+lotar list --project=auth  # Uses environment directory
 ```
 
 ## Filtering Options
@@ -57,6 +64,14 @@ lotar list --format=json
 ### Text Search
 - `--search <QUERY>` - Search in title and description
 - `--title-only` - Search only in task titles
+
+### Global Options
+- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose` - Enable verbose output
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+
+### Environment Variables
+- `LOTAR_TASKS_DIR` - Default tasks directory location
 
 ## Output Formats
 

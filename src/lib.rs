@@ -6,7 +6,6 @@ pub mod cli; // Add the CLI module
 pub mod config; // Add the new config module
 pub mod errors; // Add the new errors module
 pub mod help; // Add help system module
-pub mod index;
 pub mod output; // Add output formatting module
 pub mod project;
 pub mod routes;
@@ -18,9 +17,6 @@ pub mod web_server; // Add utilities module
 pub mod workspace; // Add workspace resolution module
 
 pub use errors::{LoTaRError, LoTaRResult};
-pub use index::TaskFilter;
-pub use project::{get_effective_project_name, get_project_name, get_project_path};
-pub use scanner::Scanner;
-pub use storage::{Storage, Task};
+pub use storage::{TaskFilter, manager::Storage, task::Task};
 pub use types::TaskStatus; // Export error types
 pub use workspace::TasksDirectoryResolver;

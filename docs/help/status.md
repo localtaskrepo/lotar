@@ -19,6 +19,13 @@ lotar status 123 verify --project=backend
 
 # JSON output for automation
 lotar status AUTH-001 done --format=json
+
+# Custom tasks directory
+lotar status AUTH-001 done --tasks-dir=/custom/path
+
+# Environment variable usage
+export LOTAR_TASKS_DIR=/project/tasks
+lotar status AUTH-001 in_progress  # Uses environment directory
 ```
 
 ## Status Values
@@ -56,6 +63,17 @@ lotar status 123 done --project=backend  # Explicit project context
 2. **Default project**: From global configuration
 3. **Task ID prefix**: Extracts project from AUTH-001 format
 4. **Explicit project**: Using `--project` flag
+
+## Global Options
+
+- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose` - Enable verbose output  
+- `--project <PROJECT>` - Specify project context (overrides auto-detection)
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+
+## Environment Variables
+
+- `LOTAR_TASKS_DIR` - Default tasks directory location
 
 ## Output Formats
 

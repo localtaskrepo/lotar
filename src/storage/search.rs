@@ -1,4 +1,4 @@
-use crate::index::TaskFilter;
+use crate::storage::TaskFilter;
 use crate::storage::task::Task;
 use std::fs;
 use std::path::Path;

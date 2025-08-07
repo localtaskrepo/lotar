@@ -1,5 +1,5 @@
 use crate::config::types::GlobalConfig;
-use crate::index::TaskFilter;
+use crate::storage::TaskFilter;
 use crate::storage::operations::StorageOperations;
 use crate::storage::search::StorageSearch;
 use crate::storage::task::Task;

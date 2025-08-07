@@ -397,6 +397,106 @@ mod environment_variable_consistency {
             }
         }
 
+        // === SCENARIO 3: LOTAR_TASKS_DIR with relative paths ===
+        {
+            let fixtures = TestFixtures::new();
+
+            // Set environment variable to relative path
+            unsafe {
+                env::set_var("LOTAR_TASKS_DIR", "./rel_tasks");
+            }
+
+            // Commands should use relative path from current directory
+            let output = fixtures.run_command(&["config", "show"]);
+            assert!(output.is_ok(), "Config show should work with relative path");
+            let output_str = output.unwrap();
+
+            // Check that the tasks directory line contains our resolved path
+            // (relative paths get resolved to absolute paths for display)
+            assert!(
+                output_str
+                    .lines()
+                    .any(|line| line.trim().starts_with("Tasks directory:")
+                        && line.contains("rel_tasks")),
+                "Config should show resolved path containing rel_tasks: {output_str}"
+            );
+
+            let output = fixtures.run_command(&["add", "rel-task", "--project=rel"]);
+            assert!(output.is_ok(), "Add should work with relative path");
+
+            // Verify task was created in relative directory from test working directory
+            let rel_tasks_dir = fixtures.temp_dir.path().join("rel_tasks");
+            assert!(
+                rel_tasks_dir.exists(),
+                "Relative tasks directory should be created at: {}",
+                rel_tasks_dir.display()
+            );
+
+            let task_files: Vec<_> = fs::read_dir(&rel_tasks_dir)
+                .unwrap_or_else(|_| panic!("Should be able to read rel_tasks directory"))
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with("REL")
+                })
+                .collect();
+            assert!(
+                !task_files.is_empty(),
+                "Task project directory should be created in relative path"
+            );
+
+            // Clean up this scenario
+            unsafe {
+                env::remove_var("LOTAR_TASKS_DIR");
+            }
+        }
+
+        // === SCENARIO 4: Command line flag should override relative environment variable ===
+        {
+            let fixtures = TestFixtures::new();
+            let cli_tasks_dir = fixtures.temp_dir.path().join("cli_tasks");
+            fs::create_dir_all(&cli_tasks_dir).unwrap();
+
+            // Set environment variable to relative path
+            unsafe {
+                env::set_var("LOTAR_TASKS_DIR", "./env_rel_tasks");
+            }
+
+            // Command line option should override environment variable
+            let output = fixtures.run_command(&[
+                "add",
+                "override-rel-task",
+                "--project=override",
+                "--tasks-dir",
+                cli_tasks_dir.to_str().unwrap(),
+            ]);
+            assert!(output.is_ok(), "Add with CLI override should succeed");
+
+            // Verify task is in CLI directory, not environment directory
+            let cli_files: Vec<_> = fs::read_dir(&cli_tasks_dir)
+                .unwrap()
+                .filter_map(|entry| entry.ok())
+                .filter(|entry| {
+                    entry.path().is_dir() && entry.file_name().to_string_lossy().starts_with("OVE")
+                })
+                .collect();
+            assert!(
+                !cli_files.is_empty(),
+                "Task should be in CLI-specified directory"
+            );
+
+            let env_rel_tasks_dir = fixtures.temp_dir.path().join("env_rel_tasks");
+            // Environment directory should not exist since CLI override was used
+            assert!(
+                !env_rel_tasks_dir.exists(),
+                "Environment relative directory should not be created when CLI override is used"
+            );
+
+            // Clean up this scenario
+            unsafe {
+                env::remove_var("LOTAR_TASKS_DIR");
+            }
+        }
+
         // Final cleanup
         unsafe {
             env::remove_var("LOTAR_TASKS_DIR");

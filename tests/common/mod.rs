@@ -1,5 +1,5 @@
-use lotar::storage::{Storage, Task};
 use lotar::types::Priority;
+use lotar::{Storage, Task};
 use std::fs;
 use std::fs::File;
 use std::io::Write;

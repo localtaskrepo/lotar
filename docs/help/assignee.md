@@ -1,33 +1,37 @@
 # lotar assignee
 
+**⚠️ PLACEHOLDER IMPLEMENTATION - Not fully functional yet**
+
 Change or view task assignee.
 
-## Usage
+## Current Status
+
+This command is currently a placeholder implementation that only displays a warning message. It does not actually modify task data.
+
+## Planned Usage
 
 ```bash
-# View current assignee
+# View current assignee (planned)
 lotar assignee <TASK_ID>
 
-# Change assignee
+# Change assignee (planned)  
 lotar assignee <TASK_ID> <NEW_ASSIGNEE>
 ```
 
-## Quick Examples
+## Workaround
 
+Use the full task interface for now:
 ```bash
-# View current assignee
-lotar assignee AUTH-001
+# Use the task edit interface instead
+lotar task edit <TASK_ID> --assignee=<NEW_ASSIGNEE>
+```
 
-# Assign to user
-lotar assignee AUTH-001 john.doe@example.com
+## Implementation Status
 
-# Assign using username
-lotar assignee AUTH-001 john.doe
-
-# With explicit project
-lotar assignee 123 jane.smith --project=backend
-
-# JSON output for automation
+- [ ] Command parsing ✅ (implemented)
+- [ ] Actual assignee modification ❌ (placeholder only)
+- [ ] Validation ❌ (not implemented)
+- [ ] Output formatting ❌ (placeholder only)
 lotar assignee AUTH-001 team@example.com --format=json
 ```
 

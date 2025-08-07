@@ -11,13 +11,13 @@ LoTaR automatically resolves between project names and prefixes, allowing you to
 You can use either the **full project name** or the **directory prefix** in any command:
 
 ```bash
-# These commands are equivalent:
-lotar task add --title="Fix bug" --project=FRONTEND    # Using full name
-lotar task add --title="Fix bug" --project=FRON        # Using prefix
+# Example: Project "AUTHENTICATION-SERVICE" can be referenced as:
+lotar add "Fix bug" --project=AUTHENTICATION-SERVICE  # Using full name
+lotar add "Fix bug" --project=AUTH                    # Using prefix
 
 # Search works with both formats:
-lotar task search "authentication" --project=AUTHENTICATION-SERVICE
-lotar task search "authentication" --project=AUTH
+lotar list --search="authentication" --project=AUTHENTICATION-SERVICE
+lotar list --search="authentication" --project=AUTH
 ```
 
 ### How It Works
@@ -134,7 +134,7 @@ lotar task add --title="Setup routing" --project=frontend
 Search results display full project names alongside task IDs for better readability:
 
 ```bash
-lotar task search "authentication"
+lotar list --search="authentication"
 
 # Output:
 Found 3 matching tasks:
@@ -149,7 +149,7 @@ LoTaR uses different output formats optimized for each command:
 
 **List Command** (clean, focused):
 ```bash
-lotar task list --project=frontend
+lotar list --project=frontend
 
 Tasks in project 'frontend':
   Setup routing (Priority: HIGH, Status: TODO)
@@ -157,9 +157,9 @@ Tasks in project 'frontend':
   Fix responsive layout (Priority: LOW, Status: DONE)
 ```
 
-**Search Command** (detailed, with context):
+**List with Search** (detailed, with context):
 ```bash
-lotar task search "routing"
+lotar list --search="routing"
 
 Found 2 matching tasks:
   [FRON-001] Setup routing - FRONTEND (Priority: HIGH, Status: TODO)

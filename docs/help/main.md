@@ -17,25 +17,41 @@ lotar status AUTH-001 done
 # List with different output formats
 lotar list --format=table
 lotar list --format=json
+
+# Use custom tasks directory
+lotar add "Custom task" --tasks-dir=/custom/path
+lotar list --tasks-dir=/custom/path
+
+# Environment variable support
+export LOTAR_TASKS_DIR=/project/tasks
+lotar add "Environment task"  # Uses environment-configured directory
 ```
 
 ## Global Options
 
+**Available on ALL commands:**
 - `--format <FORMAT>` - Output format: text, table, json, markdown (default: text)
 - `--verbose` - Enable verbose output
-- `--project <PROJECT>` - Specify project context
+- `--project <PROJECT>` - Specify project context (overrides auto-detection)
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides all auto-detection)
+
+## Environment Variables
+
+- `LOTAR_TASKS_DIR` - Override default tasks directory location
+- `LOTAR_DEFAULT_ASSIGNEE` - Set default assignee for all new tasks
 
 ## Commands
 
 - **add** - Create new tasks with validation
-- **list** - Display tasks with filtering
+- **list** - Display tasks with filtering and multiple output formats
 - **status** - Change task status with validation  
-- **set** - Update task properties
+- **priority** - Change task priority
+- **assignee** - Change task assignee ⚠️ PLACEHOLDER
+- **due-date** - Manage task due dates ⚠️ PLACEHOLDER
 - **task** - Full task management (legacy interface)
 - **config** - Comprehensive project configuration with templates, validation, and dry-run
 - **scan** - Find TODO comments in code
 - **serve** - Start web interface
-- **index** - Manage search indexes
 
 Use `lotar help <command>` for detailed command information.
 
@@ -88,6 +104,13 @@ LoTaR automatically detects project context:
 - Supports multiple projects in monorepos
 - Git integration for change tracking
 - Template-based configuration
+- Environment variable support for custom locations
+
+**Tasks Directory Resolution Order:**
+1. `--tasks-dir <PATH>` command line flag (highest priority)
+2. `LOTAR_TASKS_DIR` environment variable
+3. Parent directory search for existing `.tasks` folder
+4. Current directory `.tasks` folder (created if needed)
 
 ## Getting Help
 

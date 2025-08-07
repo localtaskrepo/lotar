@@ -21,10 +21,10 @@ cd lotar
 cargo build --release
 
 # Create your first task
-lotar task add --title="Setup project" --project=myapp --priority=HIGH
+lotar add "Setup project" --project=myapp --priority=HIGH
 
 # List tasks
-lotar task list --project=myapp
+lotar list --project=myapp
 
 # Start web interface
 lotar serve 8080
@@ -46,7 +46,7 @@ lotar scan ./src
 - **YAML Format**: Human-readable `.yml` files
 - **Project Isolation**: Each project gets its own directory
 - **Git-friendly**: All files are version-controllable
-- **Performance Indexing**: Global tag index for fast searches
+- **Direct File Operations**: Fast task filtering without indexing overhead
 
 ### Source Code Integration
 - **25+ Programming Languages** supported
@@ -63,17 +63,15 @@ lotar scan ./src
 
 ```bash
 # Task Management
-lotar task add --title="Title" --type=feature --priority=HIGH
-lotar task list --project=backend --status=IN_PROGRESS
-lotar task search "keyword" --priority=HIGH
-lotar task status PROJ-001 DONE
-lotar task edit PROJ-001 --assignee="user@example.com"
-lotar task delete PROJ-001
+lotar add "Title" --type=feature --priority=HIGH
+lotar list --project=backend --status=IN_PROGRESS
+lotar list --search="keyword" --priority=HIGH
+lotar status PROJ-001 DONE
+lotar assignee PROJ-001 user@example.com
 
 # System Commands
 lotar serve 8080          # Start web server
 lotar scan ./src          # Scan for TODOs
-lotar index rebuild       # Rebuild search index
 lotar config set key val  # Configuration
 ```
 
@@ -81,27 +79,27 @@ lotar config set key val  # Configuration
 
 ```
 .tasks/
-├── index.yml             # Global search index
+├── config.yml           # Global configuration
 ├── PROJECT-A/           # Project directory
-│   ├── metadata.yml     # Project metadata
+│   ├── config.yml       # Project-specific config (optional)
 │   ├── 1.yml           # Task files
 │   └── 2.yml
 └── PROJECT-B/
-    └── metadata.yml
+    ├── config.yml       # Project configuration
+    └── 1.yml
 ```
 
 ## Testing & Quality
 
-- **225 tests** across comprehensive test suites (100% passing)
-- **Handler Unit Tests**: 8 tests for CLI command handlers
-- **CLI Integration**: 13 tests for end-to-end workflows
-- **Experimental CLI**: 15 tests for real command execution
-- **Storage Systems**: 17 tests for CRUD operations and validation
-- **Configuration**: 19 tests for config management and templates
-- **Index System**: 8 tests for search performance
-- **Project Management**: 14 tests for smart project resolution
-- **Performance Tests**: 7 tests for operation timing
-- **Home Config**: 10 tests for user directory handling
+- **Comprehensive test suite** across all components (see [CI status](https://github.com/localtaskrepo/lotar/actions/workflows/test.yml))
+- **Handler Unit Tests**: CLI command handlers
+- **CLI Integration**: End-to-end workflows
+- **Experimental CLI**: Real command execution
+- **Storage Systems**: CRUD operations and validation
+- **Configuration**: Config management and templates
+- **Project Management**: Smart project resolution
+- **Performance Tests**: Operation timing
+- **Home Config**: User directory handling
 - **And many more**: Comprehensive coverage across all components
 
 **Quality Metrics:**

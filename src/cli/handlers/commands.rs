@@ -1,8 +1,6 @@
 use crate::api_server;
 use crate::cli::handlers::CommandHandler;
-use crate::cli::{
-    ConfigAction, ConfigShowArgs, ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs,
-};
+use crate::cli::{ConfigAction, ConfigShowArgs, ConfigValidateArgs, ScanArgs, ServeArgs};
 use crate::config::ConfigManager;
 use crate::output::OutputRenderer;
 use crate::project;
@@ -822,29 +820,6 @@ impl CommandHandler for ServeHandler {
         web_server::serve(&api_server, port);
 
         Ok(())
-    }
-}
-
-/// Handler for index commands
-pub struct IndexHandler;
-
-impl CommandHandler for IndexHandler {
-    type Args = IndexArgs;
-    type Result = Result<(), String>;
-
-    fn execute(
-        args: Self::Args,
-        _project: Option<&str>,
-        _resolver: &TasksDirectoryResolver,
-        _renderer: &OutputRenderer,
-    ) -> Self::Result {
-        match args.action {
-            IndexAction::Rebuild => {
-                println!("🔄 Index functionality has been simplified - no rebuild needed");
-                println!("✅ All task filtering is now done directly on files");
-                Ok(())
-            }
-        }
     }
 }
 

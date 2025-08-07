@@ -18,7 +18,7 @@ pub enum SortField {
 #[command(version, author)]
 pub struct Cli {
     /// Global project context (overrides auto-detection)
-    #[arg(short = 'p', long, global = true)]
+    #[arg(long, global = true)]
     pub project: Option<String>,
 
     /// Tasks directory path (overrides default)
@@ -70,22 +70,20 @@ pub enum Commands {
         priority: Option<String>,
     },
 
+    /// Change task assignee
+    Assignee {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// New assignee. If omitted, shows current assignee.
+        assignee: Option<String>,
+    },
+
     /// Change task due date
     DueDate {
         /// Task ID (with or without project prefix)
         id: String,
         /// New due date (YYYY-MM-DD or relative like 'tomorrow'). If omitted, shows current due date.
         due_date: Option<String>,
-    },
-
-    /// Set arbitrary task property
-    Set {
-        /// Task ID
-        id: String,
-        /// Property name
-        property: String,
-        /// Property value
-        value: String,
     },
 
     /// Full task management (existing functionality)
@@ -106,9 +104,6 @@ pub enum Commands {
 
     /// Start web server (existing)
     Serve(ServeArgs),
-
-    /// Index management (existing)
-    Index(IndexArgs),
 }
 
 #[derive(Args)]
@@ -393,7 +388,7 @@ pub struct TaskSearchArgs {
     pub reverse: bool,
 
     /// Limit results
-    #[arg(short = 'n', long, default_value = "20")]
+    #[arg(long, default_value = "20")]
     pub limit: usize,
 }
 

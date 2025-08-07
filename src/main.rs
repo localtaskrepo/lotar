@@ -5,7 +5,6 @@ mod api_server;
 mod cli;
 mod config;
 mod help;
-mod index;
 mod output;
 mod project;
 mod routes;
@@ -23,7 +22,7 @@ use workspace::TasksDirectoryResolver;
 use cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use cli::handlers::status::{StatusArgs, StatusHandler};
 use cli::handlers::{
-    AddHandler, CommandHandler, ConfigHandler, IndexHandler, ScanHandler, ServeHandler, TaskHandler,
+    AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, TaskHandler,
 };
 use cli::{Cli, Commands};
 
@@ -45,15 +44,12 @@ fn is_valid_command(command: &str) -> bool {
             | "list"
             | "status"
             | "priority"
-            | "p"
+            | "assignee"
             | "due-date"
-            | "set"
             | "task"
-            | "tasks"
             | "config"
             | "scan"
             | "serve"
-            | "index"
     )
 }
 
@@ -183,17 +179,18 @@ fn main() {
             }
             Ok(())
         }
-        Commands::Set {
-            id,
-            property,
-            value,
-        } => {
-            // TODO: Implement proper set handler
-            let message = format!(
-                "Set {} {} = {} (placeholder implementation)",
-                id, property, value
-            );
-            println!("{}", renderer.render_warning(&message));
+        Commands::Assignee { id, assignee } => {
+            // TODO: Create a dedicated AssigneeHandler similar to StatusHandler and PriorityHandler
+            if let Some(new_assignee) = assignee {
+                let message = format!(
+                    "Set {} assignee = {} (placeholder implementation)",
+                    id, new_assignee
+                );
+                println!("{}", renderer.render_warning(&message));
+            } else {
+                let message = format!("Show {} assignee (placeholder implementation)", id);
+                println!("{}", renderer.render_warning(&message));
+            }
             Ok(())
         }
         Commands::Task { action } => {
@@ -225,15 +222,6 @@ fn main() {
         }
         Commands::Serve(args) => {
             match ServeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => Ok(()),
-                Err(e) => {
-                    println!("{}", renderer.render_error(&e));
-                    Err(e)
-                }
-            }
-        }
-        Commands::Index(args) => {
-            match IndexHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => Ok(()),
                 Err(e) => {
                     println!("{}", renderer.render_error(&e));

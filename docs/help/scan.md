@@ -17,24 +17,39 @@ lotar scan
 # Scan specific directory
 lotar scan src/
 
-# Scan with custom patterns
-lotar scan --pattern="TODO|FIXME|HACK"
+# Detailed output with more information
+lotar scan --detailed
 
-# Scan and create tasks automatically
-lotar scan --create-tasks
+# Include specific file extensions
+lotar scan --include=rs,js,py
 
-# Scan specific file types
-lotar scan --extensions=rs,js,py
+# Exclude certain file extensions
+lotar scan --exclude=log,tmp
+
+# Custom tasks directory
+lotar scan --tasks-dir=/custom/path src/
+
+# Environment variable usage
+export LOTAR_TASKS_DIR=/project/tasks
+lotar scan src/  # Uses environment-configured directory
 ```
 
 ## Options
 
 - `<PATH>` - Directory or file to scan (default: current directory)
-- `--pattern <PATTERN>` - Custom regex pattern for comments to find
-- `--extensions <EXT1,EXT2>` - File extensions to scan
-- `--create-tasks` - Automatically create tasks from found comments
-- `--exclude <PATTERN>` - Exclude files/directories matching pattern
-- `--recursive` - Scan directories recursively (default: true)
+- `--include <EXT1,EXT2>` - Include specific file extensions
+- `--exclude <EXT1,EXT2>` - Exclude specific file extensions  
+- `--detailed` - Show detailed output with file paths and line numbers
+
+## Global Options
+
+- `--format <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose` - Enable verbose output
+- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+
+## Environment Variables
+
+- `LOTAR_TASKS_DIR` - Default tasks directory location
 
 ## Default Patterns
 
@@ -80,8 +95,8 @@ tests/integration.rs:56
 
 ## Notes
 
-- Scan results are not automatically saved as tasks
-- Use `--create-tasks` to convert comments to actual tasks
-- Patterns are case-insensitive
+- Scan results are displayed but not automatically saved as tasks
+- Patterns are built-in for common comment styles (TODO, FIXME, etc.)
 - Binary files are automatically skipped
 - Hidden files and directories are ignored by default
+- Scanning is recursive by default

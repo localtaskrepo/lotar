@@ -1,33 +1,37 @@
 # lotar due-date
 
+**⚠️ PLACEHOLDER IMPLEMENTATION - Not fully functional yet**
+
 Change or view task due date.
 
-## Usage
+## Current Status
+
+This command is currently a placeholder implementation that only displays a warning message. It does not actually modify task data.
+
+## Planned Usage
 
 ```bash
-# View current due date
+# View current due date (planned)
 lotar due-date <TASK_ID>
 
-# Change due date
+# Change due date (planned)
 lotar due-date <TASK_ID> <NEW_DATE>
 ```
 
-## Quick Examples
+## Workaround
 
+Use the full task interface for now:
 ```bash
-# View current due date
-lotar due-date AUTH-001
+# Use the task edit interface instead
+lotar task edit <TASK_ID> --due=<NEW_DATE>
+```
 
-# Set specific date
-lotar due-date AUTH-001 2025-12-31
+## Implementation Status
 
-# Use relative dates
-lotar due-date AUTH-001 tomorrow
-lotar due-date AUTH-001 "next friday"
-lotar due-date AUTH-001 "+1 week"
-
-# With explicit project
-lotar due-date 123 2025-08-15 --project=backend
+- [ ] Command parsing ✅ (implemented)
+- [ ] Actual due date modification ❌ (placeholder only)
+- [ ] Date validation ❌ (not implemented)  
+- [ ] Output formatting ❌ (placeholder only)
 
 # JSON output for automation
 lotar due-date AUTH-001 2025-09-01 --format=json

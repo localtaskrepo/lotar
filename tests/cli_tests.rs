@@ -141,9 +141,8 @@ mod task_management {
         // Update task status using correct syntax
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
-            .arg("set")
-            .arg("1")
             .arg("status")
+            .arg("1")
             .arg("in_progress")
             .assert()
             .success();
