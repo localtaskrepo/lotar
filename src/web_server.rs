@@ -1,4 +1,5 @@
 use crate::api_server;
+use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, include_dir};
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -16,11 +17,13 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Failed to bind to port {}: {}", port, e);
+            OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
+                .log_error(&format!("Failed to bind to port {}: {}", port, e));
             return;
         }
     };
-    println!("Listening on port {}", port);
+    OutputRenderer::new(OutputFormat::Text, LogLevel::Info)
+        .log_info(&format!("Listening on port {}", port));
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
@@ -54,7 +57,8 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                         Ok(mut file) => {
                             let mut file_content = String::new();
                             if let Err(e) = file.read_to_string(&mut file_content) {
-                                eprintln!("Failed to read file {}: {}", file_path, e);
+                                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                                    .log_warn(&format!("Failed to read file {}: {}", file_path, e));
                                 continue;
                             }
 
@@ -92,7 +96,8 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
             }
             Err(e) => {
                 // Log the error; avoid panicking on transient failures
-                eprintln!("Connection error: {}", e);
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                    .log_warn(&format!("Connection error: {}", e));
             }
         }
     }

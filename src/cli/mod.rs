@@ -1,4 +1,4 @@
-use crate::output::OutputFormat;
+use crate::output::{LogLevel, OutputFormat};
 use crate::types::{Priority, TaskType};
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -27,8 +27,12 @@ pub struct Cli {
     #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Text)]
     pub format: OutputFormat,
 
-    /// Verbose output
-    #[arg(short, long, global = true)]
+    /// Log level (controls diagnostic verbosity)
+    #[arg(long, global = true, value_enum, env = "LOTAR_LOG_LEVEL", default_value_t = LogLevel::Warn)]
+    pub log_level: LogLevel,
+
+    /// Backward-compat verbose flag (maps to Info level)
+    #[arg(long, global = true, hide = true)]
     pub verbose: bool,
 
     #[command(subcommand)]

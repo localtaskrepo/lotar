@@ -3,6 +3,7 @@ use crate::types::{Priority, TaskStatus, TaskType};
 use clap::ValueEnum;
 use console::style;
 use serde::Serialize;
+use std::io::{self, Write};
 
 mod json;
 mod markdown;
@@ -16,6 +17,33 @@ pub enum OutputFormat {
     Table,
     Json,
     Markdown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum LogLevel {
+    Off,
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl LogLevel {
+    fn allows(self, level: LogLevel) -> bool {
+        use LogLevel::*;
+        fn rank(l: LogLevel) -> u8 {
+            match l {
+                Off => 0,
+                Error => 1,
+                Warn => 2,
+                Info => 3,
+                Debug => 4,
+                Trace => 5,
+            }
+        }
+        rank(self) >= rank(level) && !matches!(self, Off)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -154,12 +182,19 @@ impl Outputable for TaskSummary {
 
 pub struct OutputRenderer {
     pub format: OutputFormat,
-    verbose: bool,
+    log_level: LogLevel,
+    // pretty_json controls pretty JSON printing; we derive it from log level (Debug+)
+    pretty_json: bool,
 }
 
 impl OutputRenderer {
-    pub fn new(format: OutputFormat, verbose: bool) -> Self {
-        Self { format, verbose }
+    pub fn new(format: OutputFormat, log_level: LogLevel) -> Self {
+        let pretty_json = matches!(log_level, LogLevel::Debug | LogLevel::Trace);
+        Self {
+            format,
+            log_level,
+            pretty_json,
+        }
     }
 
     // Small helpers to reduce duplication
@@ -223,13 +258,55 @@ impl OutputRenderer {
         }
     }
 
+    // Emitters: user-facing output, not gated by log level.
+    // Respect stream hygiene: info/success -> stdout (except JSON mode where info headers are unwanted),
+    // warnings/errors -> stderr.
+    pub fn emit_success(&self, message: &str) {
+        let out = self.render_success(message);
+        let _ = writeln!(io::stdout(), "{}", out);
+    }
+
+    pub fn emit_error(&self, message: &str) {
+        let out = self.render_error(message);
+        let _ = writeln!(io::stderr(), "{}", out);
+    }
+
+    pub fn emit_warning(&self, message: &str) {
+        let out = self.render_warning(message);
+        let _ = writeln!(io::stderr(), "{}", out);
+    }
+
+    pub fn emit_info(&self, message: &str) {
+        // Suppress info banners in JSON format to keep stdout pure JSON
+        if matches!(self.format, OutputFormat::Json) {
+            return;
+        }
+        let out = self.render_info(message);
+        let _ = writeln!(io::stdout(), "{}", out);
+    }
+
+    // Emit info even in JSON mode (used when a command would otherwise emit nothing)
+    pub fn emit_notice(&self, message: &str) {
+        let out = self.render_info(message);
+        let _ = writeln!(io::stdout(), "{}", out);
+    }
+
+    pub fn emit_raw_stdout(&self, message: &str) {
+        let _ = writeln!(io::stdout(), "{}", message);
+    }
+
+    pub fn emit_raw_stderr(&self, message: &str) {
+        let _ = writeln!(io::stderr(), "{}", message);
+    }
+
     // Private implementation methods
     fn render_text_single<T: Outputable>(&self, item: &T) -> String {
         text::render_text_single(item)
     }
 
     fn render_text_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
-        text::render_text_list(items, title, self.verbose)
+        // use pretty_json as a proxy for verbosity in text mode as well for now
+        text::render_text_list(items, title, self.pretty_json)
     }
 
     fn render_table_single<T: Outputable>(&self, item: &T) -> String {
@@ -241,11 +318,11 @@ impl OutputRenderer {
     }
 
     fn render_json_single<T: Serialize>(&self, item: &T) -> String {
-        json::render_json_single(item, self.verbose)
+        json::render_json_single(item, self.pretty_json)
     }
 
     fn render_json_list<T: Serialize>(&self, items: &[T]) -> String {
-        json::render_json_list(items, self.verbose)
+        json::render_json_list(items, self.pretty_json)
     }
 
     fn render_markdown_single<T: Outputable>(&self, item: &T) -> String {
@@ -258,3 +335,37 @@ impl OutputRenderer {
 }
 
 // ProgressIndicator removed as unused; reintroduce if interactive progress becomes necessary.
+
+// Thin logging helpers: gated by log level and routed to stderr to avoid corrupting stdout payloads.
+impl OutputRenderer {
+    pub fn log_error(&self, message: &str) {
+        if self.log_level.allows(LogLevel::Error) {
+            let _ = writeln!(io::stderr(), "{}", self.render_error(message));
+        }
+    }
+
+    pub fn log_warn(&self, message: &str) {
+        if self.log_level.allows(LogLevel::Warn) {
+            let _ = writeln!(io::stderr(), "{}", self.render_warning(message));
+        }
+    }
+
+    pub fn log_info(&self, message: &str) {
+        if self.log_level.allows(LogLevel::Info) {
+            // Always route to stderr to keep stdout pure in all formats
+            let _ = writeln!(io::stderr(), "{}", self.render_info(message));
+        }
+    }
+
+    pub fn log_debug(&self, message: &str) {
+        if self.log_level.allows(LogLevel::Debug) {
+            let _ = writeln!(io::stderr(), "🐞 {}", message);
+        }
+    }
+
+    pub fn log_trace(&self, message: &str) {
+        if self.log_level.allows(LogLevel::Trace) {
+            let _ = writeln!(io::stderr(), "🔎 {}", message);
+        }
+    }
+}

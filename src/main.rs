@@ -46,7 +46,10 @@ fn main() {
     // Handle version manually
     for arg in &args[1..] {
         if arg == "version" || arg == "--version" || arg == "-V" {
-            println!("lotar {}", env!("CARGO_PKG_VERSION"));
+            // version is user-facing
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_raw_stdout(&format!("lotar {}", env!("CARGO_PKG_VERSION")));
             return;
         }
     }
@@ -79,7 +82,9 @@ fn main() {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {
-            eprintln!("{}", e);
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_raw_stderr(&e.to_string());
             std::process::exit(1);
         }
     };
@@ -88,17 +93,25 @@ fn main() {
     let resolver = match resolve_tasks_directory_with_override(cli.tasks_dir.clone()) {
         Ok(resolver) => resolver,
         Err(error) => {
-            eprintln!("❌ Error resolving tasks directory: {}", error);
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_error(&format!("Error resolving tasks directory: {}", error));
             std::process::exit(1);
         }
     };
 
     // Create output renderer
-    let renderer = output::OutputRenderer::new(cli.format, cli.verbose);
+    let effective_level = if cli.verbose {
+        output::LogLevel::Info
+    } else {
+        cli.log_level
+    };
+    let renderer = output::OutputRenderer::new(cli.format, effective_level);
 
     // Execute the command
     let result = match cli.command {
         Commands::Add(args) => {
+            renderer.log_info("BEGIN ADD");
             match AddHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(task_id) => {
                     // Use the shared output rendering function
@@ -108,36 +121,49 @@ fn main() {
                         &resolver,
                         &renderer,
                     );
+                    renderer.log_info("END ADD status=ok");
                     Ok(())
                 }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END ADD status=err");
                     Err(e)
                 }
             }
         }
         Commands::List(args) => {
+            renderer.log_info("BEGIN LIST");
             let task_action = TaskAction::List(args);
             match TaskHandler::execute(task_action, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END LIST status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END LIST status=err");
                     Err(e)
                 }
             }
         }
         Commands::Status { id, status } => {
+            renderer.log_info("BEGIN STATUS");
             let status_args = StatusArgs::new(id, status, cli.project.clone());
             match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver, &renderer)
             {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END STATUS status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END STATUS status=err");
                     Err(e)
                 }
             }
         }
         Commands::Priority { id, priority } | Commands::PriorityShort { id, priority } => {
+            renderer.log_info("BEGIN PRIORITY");
             let priority_args = PriorityArgs::new(id, priority, cli.project.clone());
             match PriorityHandler::execute(
                 priority_args,
@@ -145,73 +171,101 @@ fn main() {
                 &resolver,
                 &renderer,
             ) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END PRIORITY status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END PRIORITY status=err");
                     Err(e)
                 }
             }
         }
         Commands::DueDate { id, due_date } => {
+            renderer.log_info("BEGIN DUEDATE");
             // TODO: Create a dedicated DueDateHandler similar to StatusHandler and PriorityHandler
             if let Some(new_due_date) = due_date {
                 let message = format!(
                     "Set {} due_date = {} (placeholder implementation)",
                     id, new_due_date
                 );
-                eprintln!("{}", renderer.render_warning(&message));
+                renderer.emit_warning(&message);
             } else {
                 let message = format!("Show {} due_date (placeholder implementation)", id);
-                eprintln!("{}", renderer.render_warning(&message));
+                renderer.emit_warning(&message);
             }
+            renderer.log_info("END DUEDATE status=ok");
             Ok(())
         }
         Commands::Assignee { id, assignee } => {
+            renderer.log_info("BEGIN ASSIGNEE");
             // TODO: Create a dedicated AssigneeHandler similar to StatusHandler and PriorityHandler
             if let Some(new_assignee) = assignee {
                 let message = format!(
                     "Set {} assignee = {} (placeholder implementation)",
                     id, new_assignee
                 );
-                println!("{}", renderer.render_warning(&message));
+                renderer.emit_warning(&message);
             } else {
                 let message = format!("Show {} assignee (placeholder implementation)", id);
-                println!("{}", renderer.render_warning(&message));
+                renderer.emit_warning(&message);
             }
+            renderer.log_info("END ASSIGNEE status=ok");
             Ok(())
         }
         Commands::Task { action } => {
+            renderer.log_info("BEGIN TASK");
             match TaskHandler::execute(action, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END TASK status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END TASK status=err");
                     Err(e)
                 }
             }
         }
         Commands::Config { action } => {
+            renderer.log_info("BEGIN CONFIG");
             match ConfigHandler::execute(action, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END CONFIG status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END CONFIG status=err");
                     Err(e)
                 }
             }
         }
         Commands::Scan(args) => {
+            renderer.log_info("BEGIN SCAN");
             match ScanHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END SCAN status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END SCAN status=err");
                     Err(e)
                 }
             }
         }
         Commands::Serve(args) => {
+            renderer.log_info("BEGIN SERVE");
             match ServeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
-                Ok(()) => Ok(()),
+                Ok(()) => {
+                    renderer.log_info("END SERVE status=ok");
+                    Ok(())
+                }
                 Err(e) => {
-                    eprintln!("{}", renderer.render_error(&e));
+                    renderer.emit_error(&e);
+                    renderer.log_info("END SERVE status=err");
                     Err(e)
                 }
             }
@@ -228,7 +282,9 @@ fn show_enhanced_help() {
     let help_system = help::HelpSystem::new(output::OutputFormat::Text, false);
     match help_system.show_global_help() {
         Ok(help_text) => {
-            println!("{}", help_text);
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_raw_stdout(&help_text);
         }
         Err(_) => {
             // Fall back to clap's help
@@ -242,18 +298,15 @@ fn show_command_help(command: &str) {
     let help_system = help::HelpSystem::new(output::OutputFormat::Text, false);
     match help_system.show_command_help(command) {
         Ok(help_text) => {
-            println!("{}", help_text);
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_raw_stdout(&help_text);
         }
         Err(e) => {
-            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, false);
-            eprintln!(
-                "{}",
-                renderer.render_error(&format!("Error showing help for '{}': {}", command, e))
-            );
-            eprintln!(
-                "{}",
-                renderer.render_info("Try 'lotar help' for available commands.")
-            );
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_error(&format!("Error showing help for '{}': {}", command, e));
+            renderer.emit_info("Try 'lotar help' for available commands.");
             std::process::exit(1);
         }
     }

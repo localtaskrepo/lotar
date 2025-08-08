@@ -19,14 +19,12 @@ impl CommandHandler for ScanHandler {
         _resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
+        renderer.log_info("scan: begin");
         let path = if let Some(scan_path) = args.path {
             PathBuf::from(scan_path)
         } else {
             project::get_project_path().unwrap_or_else(|| {
-                eprintln!(
-                    "{}",
-                    renderer.render_warning("No path specified. Using current directory.")
-                );
+                renderer.emit_warning("No path specified. Using current directory.");
                 PathBuf::from(".")
             })
         };
@@ -36,12 +34,10 @@ impl CommandHandler for ScanHandler {
         }
 
         if !matches!(renderer.format, crate::output::OutputFormat::Json) {
-            println!(
-                "{}",
-                renderer.render_info(&format!("Scanning {} for TODO comments...", path.display()))
-            );
+            renderer.emit_info(&format!("Scanning {} for TODO comments...", path.display()));
         }
 
+        renderer.log_debug(&format!("scan: scanning path={}", path.display()));
         let mut scanner = scanner::Scanner::new(path);
         let results = scanner.scan();
 
@@ -57,29 +53,30 @@ impl CommandHandler for ScanHandler {
                     })
                 })
                 .collect();
-            println!("{}", serde_json::to_string(&items).unwrap());
+            renderer.emit_raw_stdout(&serde_json::to_string(&items).unwrap());
         } else if results.is_empty() {
-            println!("{}", renderer.render_success("No TODO comments found."));
+            renderer.emit_success("No TODO comments found.");
         } else {
-            println!(
-                "{}",
-                renderer.render_info(&format!("Found {} TODO comment(s):", results.len()))
-            );
+            renderer.emit_info(&format!("Found {} TODO comment(s):", results.len()));
             for entry in results {
                 if args.detailed {
-                    println!("  📄 {}", entry.file_path.display());
-                    println!("    Line {}: {}", entry.line_number, entry.title.trim());
+                    renderer.emit_raw_stdout(&format!("  📄 {}", entry.file_path.display()));
+                    renderer.emit_raw_stdout(&format!(
+                        "    Line {}: {}",
+                        entry.line_number,
+                        entry.title.trim()
+                    ));
                     if !entry.annotation.is_empty() {
-                        println!("    Note: {}", entry.annotation);
+                        renderer.emit_raw_stdout(&format!("    Note: {}", entry.annotation));
                     }
-                    println!();
+                    renderer.emit_raw_stdout("");
                 } else {
-                    println!(
+                    renderer.emit_raw_stdout(&format!(
                         "  {}:{} - {}",
                         entry.file_path.display(),
                         entry.line_number,
                         entry.title.trim()
-                    );
+                    ));
                 }
             }
         }

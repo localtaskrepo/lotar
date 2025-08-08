@@ -2,7 +2,7 @@
 - MCP
 - Web
 - We need to add an author to issues ideally read from the current git user, otherwise fallback to environment value or .lotar config
-    - Actually there are two fields: reporter and assignee. Reporter is the one that is auto filled with the current user on creation
+  - Actually there are two fields: reporter and assignee. Reporter is the one that is auto filled with the current user on creation
 - TODO: Replace parcel with vite
 - we're using default_project instead of default_prefix in the global config.
 - Tasks have relationships, so we should have commands to show them.
@@ -13,6 +13,4 @@
 - Audit log in issue that tracks all changes made by which user
 - Due date commands don't work yet
 - Add shortcuts for arguments with -- (e.g. --project shoud have -p as well)
-
-Other refactor jobs:
-- Log system
+- Binary size optimizations

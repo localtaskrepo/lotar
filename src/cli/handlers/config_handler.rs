@@ -22,7 +22,7 @@ impl CommandHandler for ConfigHandler {
     ) -> Self::Result {
         match args {
             ConfigAction::Show(ConfigShowArgs { project }) => {
-                Self::handle_config_show(resolver, project)
+                Self::handle_config_show(resolver, renderer, project)
             }
             ConfigAction::Set(crate::cli::ConfigSetArgs {
                 field,
@@ -51,19 +51,13 @@ impl CommandHandler for ConfigHandler {
                 Self::handle_config_validate(resolver, renderer, project, global, fix, errors_only)
             }
             ConfigAction::Templates => {
-                println!(
-                    "{}",
-                    renderer.render_success("Available Configuration Templates:")
-                );
-                println!("  • default - Basic task management setup");
-                println!("  • agile - Agile/Scrum workflow configuration");
-                println!("  • kanban - Kanban board style setup");
-                println!("  • simple - Minimal configuration");
-                println!(
-                    "{}",
-                    renderer.render_info(
-                        "Use 'lotar config init --template=<n>' to initialize with a template."
-                    )
+                renderer.emit_success("Available Configuration Templates:");
+                renderer.emit_raw_stdout("  • default - Basic task management setup");
+                renderer.emit_raw_stdout("  • agile - Agile/Scrum workflow configuration");
+                renderer.emit_raw_stdout("  • kanban - Kanban board style setup");
+                renderer.emit_raw_stdout("  • simple - Minimal configuration");
+                renderer.emit_info(
+                    "Use 'lotar config init --template=<n>' to initialize with a template.",
                 );
                 Ok(())
             }
@@ -75,6 +69,7 @@ impl ConfigHandler {
     /// Handle config show command with optional project filter
     fn handle_config_show(
         resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
         project: Option<String>,
     ) -> Result<(), String> {
         let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
@@ -88,72 +83,70 @@ impl ConfigHandler {
                 .get_project_config(&project_prefix)
                 .map_err(|e| format!("Failed to load project config: {}", e))?;
 
-            println!(
-                "{}",
-                OutputRenderer::new(crate::output::OutputFormat::Text, false)
-                    .render_info(&format!("Configuration for project: {}", project_name))
-            );
+            renderer.emit_info(&format!("Configuration for project: {}", project_name));
 
             // Project Settings section (no server settings for project config)
-            println!(
-                "{}",
-                OutputRenderer::new(crate::output::OutputFormat::Text, false)
-                    .render_info("Project Settings:")
-            );
-            println!("  Tasks directory: {}", resolver.path.display());
-            println!("  Task file extension: yml");
-            println!("  Project prefix: {}", project_config.default_prefix);
+            renderer.emit_info("Project Settings:");
+            renderer.emit_raw_stdout(&format!("  Tasks directory: {}", resolver.path.display()));
+            renderer.emit_raw_stdout("  Task file extension: yml");
+            renderer.emit_raw_stdout(&format!(
+                "  Project prefix: {}",
+                project_config.default_prefix
+            ));
 
             if let Some(assignee) = &project_config.default_assignee {
-                println!("  Default assignee: {}", assignee);
+                renderer.emit_raw_stdout(&format!("  Default assignee: {}", assignee));
             }
-            println!("  Default Priority: {:?}", project_config.default_priority);
+            renderer.emit_raw_stdout(&format!(
+                "  Default Priority: {:?}",
+                project_config.default_priority
+            ));
 
             // Show default status if configured
             if let Some(status) = &project_config.default_status {
-                println!("  Default Status: {:?}", status);
+                renderer.emit_raw_stdout(&format!("  Default Status: {:?}", status));
             }
-            println!();
+            renderer.emit_raw_stdout("");
 
             // Issue Types, States, and Priorities
-            println!("Issue States: {:?}", project_config.issue_states.values);
-            println!("Issue Types: {:?}", project_config.issue_types.values);
-            println!(
+            renderer.emit_raw_stdout(&format!(
+                "Issue States: {:?}",
+                project_config.issue_states.values
+            ));
+            renderer.emit_raw_stdout(&format!(
+                "Issue Types: {:?}",
+                project_config.issue_types.values
+            ));
+            renderer.emit_raw_stdout(&format!(
                 "Issue Priorities: {:?}",
                 project_config.issue_priorities.values
-            );
+            ));
         } else {
             let resolved_config = config_manager.get_resolved_config();
-            println!(
-                "{}",
-                OutputRenderer::new(crate::output::OutputFormat::Text, false).render_info(
-                    &format!(
-                        "Configuration for project: {}",
-                        if resolved_config.default_prefix.is_empty() {
-                            "(none set - will auto-detect on first task creation)"
-                        } else {
-                            &resolved_config.default_prefix
-                        }
-                    )
-                )
-            );
-            println!(
-                "{}",
-                OutputRenderer::new(crate::output::OutputFormat::Text, false)
-                    .render_info("Project Settings:")
-            );
-            println!("  Tasks directory: {}", resolver.path.display());
-            println!("  Task file extension: yml");
-            println!("  Project prefix: {}", resolved_config.default_prefix);
-            println!("  Port: {}", resolved_config.server_port);
-            println!(
+            renderer.emit_info(&format!(
+                "Configuration for project: {}",
+                if resolved_config.default_prefix.is_empty() {
+                    "(none set - will auto-detect on first task creation)"
+                } else {
+                    &resolved_config.default_prefix
+                }
+            ));
+            renderer.emit_info("Project Settings:");
+            renderer.emit_raw_stdout(&format!("  Tasks directory: {}", resolver.path.display()));
+            renderer.emit_raw_stdout("  Task file extension: yml");
+            renderer.emit_raw_stdout(&format!(
+                "  Project prefix: {}",
+                resolved_config.default_prefix
+            ));
+            renderer.emit_raw_stdout(&format!("  Port: {}", resolved_config.server_port));
+            renderer.emit_raw_stdout(&format!(
                 "  Default Project: {}",
                 if resolved_config.default_prefix.is_empty() {
                     "(none set - will auto-detect on first task creation)"
                 } else {
                     &resolved_config.default_prefix
                 }
-            );
+            ));
         }
 
         Ok(())
@@ -173,75 +166,48 @@ impl ConfigHandler {
         if global_only_fields.contains(&field.as_str()) && !global {
             global = true;
             if !dry_run {
-                println!(
-                    "{}",
-                    renderer.render_info(&format!(
-                        "Automatically treating '{}' as global configuration field",
-                        field
-                    ))
-                );
+                renderer.emit_info(&format!(
+                    "Automatically treating '{}' as global configuration field",
+                    field
+                ));
             }
         }
 
         if dry_run {
-            println!(
-                "{}",
-                renderer.render_info(&format!("DRY RUN: Would set {} = {}", field, value))
-            );
+            renderer.emit_info(&format!("DRY RUN: Would set {} = {}", field, value));
 
             // Check for validation conflicts
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
             if !conflicts.is_empty() {
-                println!(
-                    "{}",
-                    renderer
-                        .render_warning("WARNING: This change would cause validation conflicts:")
-                );
+                renderer.emit_warning("WARNING: This change would cause validation conflicts:");
                 for conflict in conflicts {
-                    println!("  • {}", conflict);
+                    renderer.emit_raw_stdout(&format!("  • {}", conflict));
                 }
                 if !force {
-                    println!(
-                        "{}",
-                        renderer.render_info(
-                            "Use --force to apply anyway, or fix conflicting values first."
-                        )
-                    );
+                    renderer
+                        .emit_info("Use --force to apply anyway, or fix conflicting values first.");
                     return Ok(());
                 }
             }
 
-            println!(
-                "{}",
-                renderer.render_success(
-                    "Dry run completed. Use the same command without --dry-run to apply."
-                )
+            renderer.emit_success(
+                "Dry run completed. Use the same command without --dry-run to apply.",
             );
             return Ok(());
         }
 
-        println!(
-            "{}",
-            renderer.render_info(&format!("Setting configuration: {} = {}", field, value))
-        );
+        renderer.emit_info(&format!("Setting configuration: {} = {}", field, value));
 
         // Check for validation conflicts unless forced
         if !force {
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
             if !conflicts.is_empty() {
-                println!(
-                    "{}",
-                    renderer
-                        .render_warning("WARNING: This change would cause validation conflicts:")
-                );
+                renderer.emit_warning("WARNING: This change would cause validation conflicts:");
                 for conflict in conflicts {
-                    println!("  • {}", conflict);
+                    renderer.emit_raw_stdout(&format!("  • {}", conflict));
                 }
-                println!(
-                    "{}",
-                    renderer.render_info(
-                        "Use --dry-run to see what would change, or --force to apply anyway."
-                    )
+                renderer.emit_info(
+                    "Use --dry-run to see what would change, or --force to apply anyway.",
                 );
                 return Err("Configuration change blocked due to validation conflicts".to_string());
             }
@@ -288,18 +254,12 @@ impl ConfigHandler {
         if project_prefix.is_some() {
             // Check if the value matches the global default and inform the user
             if Self::check_matches_global_default(&field, &value, &resolver.path) {
-                println!(
-                    "{}",
-                    renderer.render_info(
-                        "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field."
-                    )
+                renderer.emit_info(
+                    "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field.",
                 );
             }
         }
-        println!(
-            "{}",
-            renderer.render_success(&format!("Successfully updated {}", field))
-        );
+        renderer.emit_success(&format!("Successfully updated {}", field));
         Ok(())
     }
 
@@ -345,50 +305,51 @@ impl ConfigHandler {
         force: bool,
     ) -> Result<(), String> {
         if dry_run {
-            println!(
-                "{}",
-                renderer.render_info(&format!(
-                    "DRY RUN: Would initialize config with template '{}'",
-                    template
-                ))
-            );
+            renderer.emit_info(&format!(
+                "DRY RUN: Would initialize config with template '{}'",
+                template
+            ));
             if let Some(ref prefix) = prefix {
-                println!("  • Project prefix: {}", prefix);
+                renderer.emit_raw_stdout(&format!("  • Project prefix: {}", prefix));
                 // Validate explicit prefix
                 if let Some(ref project_name) = project {
                     if let Err(conflict) =
                         crate::utils::validate_explicit_prefix(prefix, project_name, &resolver.path)
                     {
-                        println!("  ❌ Conflict detected: {}", conflict);
+                        renderer.emit_raw_stdout(&format!("  ❌ Conflict detected: {}", conflict));
                         return Err(conflict);
                     }
-                    println!("  ✅ Prefix '{}' is available", prefix);
+                    renderer.emit_raw_stdout(&format!("  ✅ Prefix '{}' is available", prefix));
                 }
             }
             if let Some(ref project) = project {
-                println!("  • Project name: {}", project);
+                renderer.emit_raw_stdout(&format!("  • Project name: {}", project));
                 // Show what prefix would be generated and check for conflicts
                 if prefix.is_none() {
                     match crate::utils::generate_unique_project_prefix(project, &resolver.path) {
                         Ok(generated_prefix) => {
-                            println!("  • Generated prefix: {} ✅", generated_prefix);
+                            renderer.emit_raw_stdout(&format!(
+                                "  • Generated prefix: {} ✅",
+                                generated_prefix
+                            ));
                         }
                         Err(conflict) => {
-                            println!(
+                            renderer.emit_raw_stdout(&format!(
                                 "  • Generated prefix: {} ❌",
                                 crate::utils::generate_project_prefix(project)
-                            );
-                            println!("  ❌ Conflict detected: {}", conflict);
+                            ));
+                            renderer
+                                .emit_raw_stdout(&format!("  ❌ Conflict detected: {}", conflict));
                             return Err(conflict);
                         }
                     }
                 }
             }
             if let Some(ref copy_from) = copy_from {
-                println!("  • Copy settings from: {}", copy_from);
+                renderer.emit_raw_stdout(&format!("  • Copy settings from: {}", copy_from));
             }
             if global {
-                println!("  • Target: Global configuration (.tasks/config.yml)");
+                renderer.emit_raw_stdout("  • Target: Global configuration (.tasks/config.yml)");
             } else {
                 let project_name = project.as_deref().unwrap_or("DEFAULT");
                 let project_prefix = if let Some(ref prefix) = prefix {
@@ -400,28 +361,22 @@ impl ConfigHandler {
                         Err(_) => crate::utils::generate_project_prefix(project_name), // For display purposes
                     }
                 };
-                println!(
+                renderer.emit_raw_stdout(&format!(
                     "  • Target: Project configuration (.tasks/{}/config.yml)",
                     project_prefix
-                );
+                ));
             }
-            println!(
-                "{}",
-                renderer.render_success(
-                    "Dry run completed. Use the same command without --dry-run to apply."
-                )
+            renderer.emit_success(
+                "Dry run completed. Use the same command without --dry-run to apply.",
             );
             return Ok(());
         }
 
         // Standardized info message for initialization
-        println!(
-            "{}",
-            renderer.render_info(&format!(
-                "Initializing configuration with template '{}'",
-                template
-            ))
-        );
+        renderer.emit_info(&format!(
+            "Initializing configuration with template '{}'",
+            template
+        ));
 
         // Load template
         let template_config = Self::load_template(&template)?;
@@ -527,7 +482,7 @@ impl ConfigHandler {
 
             // Copy settings from another project if specified
             if let Some(source_project) = copy_from {
-                Self::merge_config_from_project(config_map, resolver, &source_project)?;
+                Self::merge_config_from_project(config_map, resolver, renderer, &source_project)?;
             }
         }
 
@@ -578,13 +533,10 @@ impl ConfigHandler {
         fs::write(&config_path, config_yaml)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
 
-        println!(
-            "{}",
-            renderer.render_success(&format!(
-                "Configuration initialized at: {}",
-                config_path.display()
-            ))
-        );
+        renderer.emit_success(&format!(
+            "Configuration initialized at: {}",
+            config_path.display()
+        ));
         Ok(())
     }
 
@@ -592,6 +544,7 @@ impl ConfigHandler {
     fn merge_config_from_project(
         target_config: &mut serde_yaml::Mapping,
         resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
         source_project: &str,
     ) -> Result<(), String> {
         let source_config_path =
@@ -621,13 +574,10 @@ impl ConfigHandler {
             }
         }
 
-        println!(
-            "{}",
-            OutputRenderer::new(crate::output::OutputFormat::Text, false).render_info(&format!(
-                "Copied settings from project '{}'",
-                source_project
-            ))
-        );
+        renderer.emit_info(&format!(
+            "Copied settings from project '{}'",
+            source_project
+        ));
         Ok(())
     }
 
@@ -687,32 +637,23 @@ impl ConfigHandler {
 
         // Validate global config if requested or no specific scope given
         if global || project.is_none() {
-            println!(
-                "{}",
-                renderer.render_info("Validating global configuration")
-            );
+            renderer.emit_info("Validating global configuration");
             let result = validator.validate_global_config(&global_config);
 
             if result.has_errors() || result.has_warnings() {
                 has_errors |= result.has_errors(); // Only actual errors affect exit code
                 all_results.push(("Global Config".to_string(), result));
             } else {
-                println!(
-                    "{}",
-                    renderer.render_success("Global configuration is valid")
-                );
+                renderer.emit_success("Global configuration is valid");
             }
         }
 
         // Validate project config if requested or available
         if let Some(project_name) = project {
-            println!(
-                "{}",
-                renderer.render_info(&format!(
-                    "Validating project configuration for '{}'",
-                    project_name
-                ))
-            );
+            renderer.emit_info(&format!(
+                "Validating project configuration for '{}'",
+                project_name
+            ));
 
             // Load project config directly from file
             let project_config_path =
@@ -742,101 +683,70 @@ impl ConfigHandler {
                                         combined_result,
                                     ));
                                 } else {
-                                    println!(
-                                        "{}",
-                                        renderer.render_success("Project configuration is valid")
-                                    );
+                                    renderer.emit_success("Project configuration is valid");
                                 }
                             }
                             Err(e) => {
-                                eprintln!(
-                                    "{}",
-                                    renderer.render_error(&format!(
-                                        "Could not parse project config YAML: {}",
-                                        e
-                                    ))
-                                );
+                                renderer.emit_error(&format!(
+                                    "Could not parse project config YAML: {}",
+                                    e
+                                ));
                                 has_errors = true;
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!(
-                            "{}",
-                            renderer.render_error(&format!(
-                                "Could not read project config file: {}",
-                                e
-                            ))
-                        );
+                        renderer.emit_error(&format!("Could not read project config file: {}", e));
                         has_errors = true;
                     }
                 }
             } else {
-                eprintln!(
-                    "{}",
-                    renderer.render_error(&format!(
-                        "Project config file not found: {}",
-                        project_config_path.display()
-                    ))
-                );
+                renderer.emit_error(&format!(
+                    "Project config file not found: {}",
+                    project_config_path.display()
+                ));
                 has_errors = true;
             }
         }
 
         // Display results
         for (scope, result) in all_results {
-            println!(
-                "{}",
-                renderer.render_info(&format!("{} Validation Results:", scope))
-            );
+            renderer.emit_info(&format!("{} Validation Results:", scope));
 
             // Display errors
             for error in &result.errors {
                 if errors_only && error.severity != ValidationSeverity::Error {
                     continue;
                 }
-                println!("{}", error);
+                renderer.emit_raw_stdout(&format!("{}", error));
             }
 
             // Display warnings (unless errors_only is set)
             if !errors_only {
                 for warning in &result.warnings {
-                    println!("{}", warning);
+                    renderer.emit_raw_stdout(&format!("{}", warning));
                 }
 
                 // Display info messages
                 for info in &result.info {
-                    println!("{}", info);
+                    renderer.emit_raw_stdout(&format!("{}", info));
                 }
             }
         }
 
         // Handle validation outcome
         if has_errors {
-            println!(
-                "{}",
-                renderer.render_error("Configuration validation failed with errors")
-            );
+            renderer.emit_error("Configuration validation failed with errors");
 
             if fix {
-                println!(
-                    "{}",
-                    renderer.render_warning("Auto-fix functionality not yet implemented")
-                );
-                println!(
-                    "{}",
-                    renderer.render_info(
-                        "Please review the suggestions above and make manual corrections"
-                    )
-                );
+                renderer.emit_warning("Auto-fix functionality not yet implemented");
+                renderer
+                    .emit_info("Please review the suggestions above and make manual corrections");
             }
 
             return Err("Configuration validation failed".to_string());
         } else {
-            println!(
-                "{}",
-                renderer.render_success("All configurations are valid!")
-            );
+            renderer.emit_success("All configurations are valid!");
         }
 
         Ok(())

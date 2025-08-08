@@ -1,4 +1,5 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
+use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use crate::storage::task::Task;
 #[cfg(test)]
 use crate::utils::generate_project_prefix;
@@ -35,7 +36,8 @@ impl StorageOperations {
             if let Err(e) =
                 ConfigManager::save_project_config(root_path, project_prefix, &project_config)
             {
-                eprintln!("Warning: Failed to create project config: {}", e);
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                    .log_warn(&format!("Failed to create project config: {}", e));
                 // Continue execution - this is not a fatal error
             }
         }

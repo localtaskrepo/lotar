@@ -21,31 +21,26 @@ impl CommandHandler for ServeHandler {
     ) -> Self::Result {
         let port = args.port.unwrap_or(8080);
         let host = args.host;
+        renderer.log_info(&format!(
+            "serve: host={} port={} open={}",
+            host, port, args.open
+        ));
 
-        println!(
-            "{}",
-            renderer.render_success("Starting LoTaR web server...")
-        );
-        println!("   Host: {}", host);
-        println!("   Port: {}", port);
-        println!("   URL: http://{}:{}", host, port);
+        renderer.emit_success("Starting LoTaR web server...");
+        renderer.emit_raw_stdout(&format!("   Host: {}", host));
+        renderer.emit_raw_stdout(&format!("   Port: {}", port));
+        renderer.emit_raw_stdout(&format!("   URL: http://{}:{}", host, port));
 
         if args.open {
             // Open browser automatically
             let url = format!("http://{}:{}", host, port);
             if let Err(e) = open_browser(&url) {
-                eprintln!(
-                    "{}",
-                    renderer.render_warning(&format!("Failed to open browser: {}", e))
-                );
-                println!("   Please navigate to {} manually", url);
+                renderer.emit_warning(&format!("Failed to open browser: {}", e));
+                renderer.emit_raw_stdout(&format!("   Please navigate to {} manually", url));
             }
         }
 
-        eprintln!(
-            "{}",
-            renderer.render_warning("Press Ctrl+C to stop the server")
-        );
+        renderer.emit_warning("Press Ctrl+C to stop the server");
 
         let mut api_server = api_server::ApiServer::new();
         routes::initialize(&mut api_server);

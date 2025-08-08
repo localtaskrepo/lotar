@@ -18,6 +18,10 @@ impl CommandHandler for StatusHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
+        renderer.log_info(&format!(
+            "status: resolving project for task_id={} explicit_project={:?}",
+            args.task_id, project
+        ));
         // Create project resolver
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
@@ -38,10 +42,10 @@ impl CommandHandler for StatusHandler {
                 let explicit_as_prefix =
                     project_resolver.resolve_project_name_to_prefix(explicit_proj);
                 if task_id_prefix != explicit_as_prefix {
-                    eprintln!("{}", renderer.render_warning(&format!(
+                    renderer.emit_warning(&format!(
                         "Warning: Task ID '{}' belongs to project '{}', but project '{}' was specified. Using task ID's project.",
                         args.task_id, task_id_prefix, explicit_proj
-                    )));
+                    ));
                     // Use task ID's project instead of the conflicting explicit project
                     None
                 } else {
@@ -75,22 +79,26 @@ impl CommandHandler for StatusHandler {
                 return Err("No tasks found. Use 'lotar add' to create tasks first.".to_string());
             }
         };
+        renderer.log_debug(&format!(
+            "status: loading task full_id={} project={}",
+            full_task_id, resolved_project
+        ));
         let task_result = storage.get(&full_task_id, resolved_project.clone());
         let mut task = task_result.ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
 
         match args.new_status {
             // Get current status
             None => {
-                println!(
-                    "{}",
-                    renderer
-                        .render_success(&format!("Task {} status: {}", full_task_id, task.status))
-                );
+                renderer.emit_success(&format!("Task {} status: {}", full_task_id, task.status));
                 Ok(())
             }
             // Set new status
             Some(new_status) => {
                 // Validate the new status against project configuration
+                renderer.log_debug(&format!(
+                    "status: validating new_status candidate='{}'",
+                    new_status
+                ));
                 let validated_status = validator
                     .validate_status(&new_status)
                     .map_err(|e| format!("Status validation failed: {}", e))?;
@@ -99,33 +107,28 @@ impl CommandHandler for StatusHandler {
 
                 // Check if status is actually changing
                 if old_status == validated_status {
-                    eprintln!(
-                        "{}",
-                        renderer.render_warning(&format!(
-                            "Task {} already has status '{}'",
-                            full_task_id, validated_status
-                        ))
-                    );
-                    // Emit a small stdout info so --format=table/json/markdown flows have output
-                    println!(
-                        "{}",
-                        renderer.render_info(&format!("Task {} status unchanged", full_task_id))
-                    );
+                    renderer.log_info("status: no-op (old == new)");
+                    renderer.emit_warning(&format!(
+                        "Task {} already has status '{}'",
+                        full_task_id, validated_status
+                    ));
+                    // Emit a small stdout notice so --format=table/json/markdown flows have output
+                    // Notice prints in JSON mode too (info is suppressed there)
+                    renderer.emit_notice(&format!("Task {} status unchanged", full_task_id));
                     return Ok(());
                 }
 
                 task.status = validated_status.clone();
 
                 // Save the updated task
+                renderer.log_debug("status: persisting change to storage");
                 storage.edit(&full_task_id, &task);
 
-                println!(
-                    "{}",
-                    renderer.render_success(&format!(
-                        "Task {} status changed from {} to {}",
-                        full_task_id, old_status, validated_status
-                    ))
-                );
+                renderer.emit_success(&format!(
+                    "Task {} status changed from {} to {}",
+                    full_task_id, old_status, validated_status
+                ));
+                renderer.log_info("status: updated successfully");
 
                 Ok(())
             }
@@ -192,13 +195,13 @@ mod tests {
         let args = StatusArgs::new("123".to_string(), Some("Done".to_string()), None);
 
         let resolver = create_test_resolver();
-        let renderer = OutputRenderer::new(crate::output::OutputFormat::Text, false);
+        let renderer = OutputRenderer::new(
+            crate::output::OutputFormat::Text,
+            crate::output::LogLevel::Warn,
+        );
 
         // This would fail in a real test because we need actual config files and tasks
         // But it demonstrates the structure
-        match StatusHandler::execute(args, None, &resolver, &renderer) {
-            Ok(()) => println!("Success: Status changed"),
-            Err(e) => println!("Expected error in test: {}", e),
-        }
+        let _ = StatusHandler::execute(args, None, &resolver, &renderer);
     }
 }

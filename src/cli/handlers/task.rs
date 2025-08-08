@@ -72,10 +72,10 @@ impl CommandHandler for TaskHandler {
                         "Set {} assignee = {} (placeholder implementation)",
                         id, new_assignee
                     );
-                    eprintln!("{}", renderer.render_warning(&message));
+                    renderer.emit_warning(&message);
                 } else {
                     let message = format!("Show {} assignee (placeholder implementation)", id);
-                    eprintln!("{}", renderer.render_warning(&message));
+                    renderer.emit_warning(&message);
                 }
                 Ok(())
             }
@@ -86,10 +86,10 @@ impl CommandHandler for TaskHandler {
                         "Set {} due_date = {} (placeholder implementation)",
                         id, new_due_date
                     );
-                    eprintln!("{}", renderer.render_warning(&message));
+                    renderer.emit_warning(&message);
                 } else {
                     let message = format!("Show {} due_date (placeholder implementation)", id);
-                    eprintln!("{}", renderer.render_warning(&message));
+                    renderer.emit_warning(&message);
                 }
                 Ok(())
             }
@@ -113,6 +113,7 @@ impl CommandHandler for EditHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
+        renderer.log_info("edit: begin");
         let mut storage = Storage::new(resolver.path.clone());
 
         // Create project resolver and validator
@@ -214,12 +215,10 @@ impl CommandHandler for EditHandler {
         }
 
         // Save the updated task
+        renderer.log_debug("edit: persisting edits");
         storage.edit(&args.id, &task);
 
-        println!(
-            "{}",
-            renderer.render_success(&format!("Task '{}' updated successfully", args.id))
-        );
+        renderer.emit_success(&format!("Task '{}' updated successfully", args.id));
         Ok(())
     }
 }
@@ -237,6 +236,7 @@ impl CommandHandler for SearchHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
+        renderer.log_info("list: begin");
         let storage = Storage::new(resolver.path.clone());
 
         // Create project resolver and validator
@@ -316,6 +316,7 @@ impl CommandHandler for SearchHandler {
                 crate::utils::resolve_project_input(project, resolver.path.as_path());
             task_filter.project = Some(project_prefix);
         } // Execute search/list
+        renderer.log_debug("list: executing search");
         let task_tuples = storage.search(&task_filter);
         let mut tasks: Vec<(String, Task)> = task_tuples.into_iter().collect();
 
@@ -409,25 +410,24 @@ impl CommandHandler for SearchHandler {
         tasks.truncate(args.limit);
 
         if tasks.is_empty() {
+            renderer.log_info("list: no results");
             match renderer.format {
                 crate::output::OutputFormat::Json => {
-                    println!(
-                        "{}",
-                        serde_json::json!({
+                    renderer.emit_raw_stdout(
+                        &serde_json::json!({
                             "status": "success",
                             "message": "No tasks found",
                             "tasks": []
                         })
+                        .to_string(),
                     );
                 }
                 _ => {
-                    eprintln!(
-                        "{}",
-                        renderer.render_warning("No tasks found matching the search criteria.")
-                    );
+                    renderer.emit_warning("No tasks found matching the search criteria.");
                 }
             }
         } else {
+            renderer.log_info(&format!("list: {} result(s)", tasks.len()));
             // Convert to TaskDisplayInfo for rendering
             let display_tasks: Vec<crate::output::TaskDisplayInfo> = tasks
                 .into_iter()
@@ -459,28 +459,25 @@ impl CommandHandler for SearchHandler {
 
             match renderer.format {
                 crate::output::OutputFormat::Json => {
-                    println!(
-                        "{}",
-                        serde_json::json!({
+                    renderer.emit_raw_stdout(
+                        &serde_json::json!({
                             "status": "success",
                             "message": format!("Found {} task(s)", display_tasks.len()),
                             "tasks": display_tasks
                         })
+                        .to_string(),
                     );
                 }
                 _ => {
-                    println!(
-                        "{}",
-                        renderer.render_success(&format!("Found {} task(s):", display_tasks.len()))
-                    );
+                    renderer.emit_success(&format!("Found {} task(s):", display_tasks.len()));
                     for task in display_tasks {
-                        println!(
+                        renderer.emit_raw_stdout(&format!(
                             "  {} - {} [{}] ({})",
                             task.id, task.title, task.status, task.priority
-                        );
+                        ));
                         if let Some(description) = &task.description {
                             if !description.is_empty() {
-                                println!("    {}", description);
+                                renderer.emit_raw_stdout(&format!("    {}", description));
                             }
                         }
                     }
@@ -505,6 +502,7 @@ impl CommandHandler for DeleteHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
+        renderer.log_info("delete: begin");
         let mut storage = Storage::new(resolver.path.clone());
 
         // Resolve project prefix
@@ -530,16 +528,13 @@ impl CommandHandler for DeleteHandler {
 
             let mut input = String::new();
             if io::stdin().read_line(&mut input).is_err() {
-                println!(
-                    "{}",
-                    renderer.render_error("Failed to read input. Aborting.")
-                );
+                renderer.emit_error("Failed to read input. Aborting.");
                 return Ok(());
             }
             let input = input.trim().to_lowercase();
 
             if input != "y" && input != "yes" {
-                eprintln!("{}", renderer.render_warning("Deletion cancelled."));
+                renderer.emit_warning("Deletion cancelled.");
                 return Ok(());
             }
         }
@@ -547,10 +542,7 @@ impl CommandHandler for DeleteHandler {
         // Delete the task
         let deleted = storage.delete(&args.id, project_prefix);
         if deleted {
-            println!(
-                "{}",
-                renderer.render_success(&format!("Task '{}' deleted successfully", args.id))
-            );
+            renderer.emit_success(&format!("Task '{}' deleted successfully", args.id));
             Ok(())
         } else {
             Err(format!("Failed to delete task '{}'", args.id))

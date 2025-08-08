@@ -147,7 +147,7 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
         ConfigError::IoError(format!("Failed to write default global config: {}", e))
     })?;
 
-    println!(
+    eprintln!(
         "Created default global configuration at: {}",
         config_path.display()
     );

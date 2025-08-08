@@ -2,6 +2,7 @@ use crate::cli::AddArgs;
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
+use crate::output::LogLevel;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::storage::{manager::Storage, task::Task};
 use crate::types::{Priority, TaskStatus, TaskType};
@@ -45,8 +46,9 @@ impl CommandHandler for AddHandler {
         args: Self::Args,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
-        _renderer: &OutputRenderer,
+        renderer: &OutputRenderer,
     ) -> Self::Result {
+        renderer.log_info("add: begin validation and project resolution");
         // Create project resolver and validator
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
@@ -79,6 +81,7 @@ impl CommandHandler for AddHandler {
         };
 
         let validator = CliValidator::new(&config);
+        renderer.log_debug("add: arguments validated and normalized");
 
         // Process and validate arguments
         let validated_type = if args.bug {
@@ -170,6 +173,7 @@ impl CommandHandler for AddHandler {
 
         // Create the task
         let mut task = Task::new(resolver.path.clone(), args.title, validated_priority);
+        renderer.log_debug("add: task object constructed");
 
         // Set default status based on config (explicit default or first in issue_states)
         task.status = Self::get_default_status(&config);
@@ -232,7 +236,12 @@ impl CommandHandler for AddHandler {
             (prefix, None)
         };
 
+        renderer.log_info(&format!(
+            "add: writing task to storage project={} original={:?}",
+            project_for_storage, original_project_name
+        ));
         let task_id = storage.add(&task, &project_for_storage, original_project_name);
+        renderer.log_info(&format!("add: created id={}", task_id));
 
         Ok(task_id)
     }
@@ -276,26 +285,24 @@ impl AddHandler {
                                 "modified": task.modified
                             }
                         });
-                        println!("{}", response);
+                        renderer.emit_raw_stdout(&response.to_string());
                     }
                     _ => {
-                        println!(
-                            "{}",
-                            renderer.render_success(&format!("Created task: {}", task_id))
-                        );
-                        println!("  Title: {}", task.title);
-                        println!("  Status: {}", task.status);
-                        println!("  Priority: {}", task.priority);
-                        println!("  Type: {}", task.task_type);
+                        renderer.emit_success(&format!("Created task: {}", task_id));
+                        renderer.emit_raw_stdout(&format!("  Title: {}", task.title));
+                        renderer.emit_raw_stdout(&format!("  Status: {}", task.status));
+                        renderer.emit_raw_stdout(&format!("  Priority: {}", task.priority));
+                        renderer.emit_raw_stdout(&format!("  Type: {}", task.task_type));
                         if let Some(assignee) = &task.assignee {
-                            println!("  Assignee: {}", assignee);
+                            renderer.emit_raw_stdout(&format!("  Assignee: {}", assignee));
                         }
                         if let Some(due_date) = &task.due_date {
-                            println!("  Due date: {}", due_date);
+                            renderer.emit_raw_stdout(&format!("  Due date: {}", due_date));
                         }
                         if let Some(description) = &task.description {
                             if !description.is_empty() {
-                                println!("  Description: {}", description);
+                                renderer
+                                    .emit_raw_stdout(&format!("  Description: {}", description));
                             }
                         }
                     }
@@ -309,13 +316,10 @@ impl AddHandler {
                             "message": format!("Created task: {}", task_id),
                             "task_id": task_id
                         });
-                        println!("{}", response);
+                        renderer.emit_raw_stdout(&response.to_string());
                     }
                     _ => {
-                        println!(
-                            "{}",
-                            renderer.render_success(&format!("Created task: {}", task_id))
-                        );
+                        renderer.emit_success(&format!("Created task: {}", task_id));
                     }
                 }
             }
@@ -328,13 +332,10 @@ impl AddHandler {
                         "message": format!("Created task: {}", task_id),
                         "task_id": task_id
                     });
-                    println!("{}", response);
+                    renderer.emit_raw_stdout(&response.to_string());
                 }
                 _ => {
-                    println!(
-                        "{}",
-                        renderer.render_success(&format!("Created task: {}", task_id))
-                    );
+                    renderer.emit_success(&format!("Created task: {}", task_id));
                 }
             }
         }
@@ -369,10 +370,11 @@ impl AddHandler {
             if project_values.contains(explicit) {
                 return Ok(explicit.clone());
             } else {
-                eprintln!(
+                let msg = format!(
                     "Warning: Project default {} '{:?}' is not in configured {} list {:?}. Using smart fallback.",
                     field_name, explicit, field_name, project_values
                 );
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&msg);
             }
         }
 
@@ -380,10 +382,11 @@ impl AddHandler {
         if project_values.contains(global_default) {
             return Ok(global_default.clone());
         } else {
-            eprintln!(
+            let msg = format!(
                 "Warning: Global default {} '{:?}' is not in project {} list {:?}. Using first configured value.",
                 field_name, global_default, field_name, project_values
             );
+            OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&msg);
         }
 
         // 3. Use first in project values as final fallback
@@ -402,7 +405,8 @@ impl AddHandler {
         ) {
             Ok(priority) => priority,
             Err(e) => {
-                eprintln!("Error: {}", e);
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
+                    .log_error(&format!("Error: {}", e));
                 std::process::exit(1);
             }
         }
@@ -412,8 +416,8 @@ impl AddHandler {
     fn get_default_status(config: &ResolvedConfig) -> TaskStatus {
         // Error if project has no status values configured (user configuration error)
         if config.issue_states.values.is_empty() {
-            eprintln!(
-                "Error: Project configuration error: status list is empty. Please configure at least one status value."
+            OutputRenderer::new(OutputFormat::Text, LogLevel::Error).log_error(
+                "Project configuration error: status list is empty. Please configure at least one status value.",
             );
             std::process::exit(1);
         }
@@ -423,10 +427,11 @@ impl AddHandler {
             if config.issue_states.values.contains(explicit) {
                 return explicit.clone();
             } else {
-                eprintln!(
+                let msg = format!(
                     "Warning: Project default status '{:?}' is not in configured status list {:?}. Using smart fallback.",
                     explicit, config.issue_states.values
                 );
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&msg);
             }
         }
 
@@ -691,13 +696,13 @@ mod tests {
         };
 
         let resolver = create_test_resolver();
-        let renderer = OutputRenderer::new(crate::output::OutputFormat::Text, false);
+        let renderer = OutputRenderer::new(
+            crate::output::OutputFormat::Text,
+            crate::output::LogLevel::Warn,
+        );
 
         // This would fail in a real test because we need actual config files
         // But it demonstrates the structure
-        match AddHandler::execute(args, None, &resolver, &renderer) {
-            Ok(task_id) => println!("Created task: {}", task_id),
-            Err(e) => println!("Expected error in test: {}", e),
-        }
+        let _ = AddHandler::execute(args, None, &resolver, &renderer);
     }
 }

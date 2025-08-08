@@ -1,4 +1,4 @@
-use crate::output::{OutputFormat, OutputRenderer};
+use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, DirEntry, include_dir};
 use termimad::MadSkin;
 
@@ -9,9 +9,10 @@ pub struct HelpSystem {
 }
 
 impl HelpSystem {
-    pub fn new(format: OutputFormat, verbose: bool) -> Self {
+    pub fn new(format: OutputFormat, _verbose: bool) -> Self {
+        // Help rendering uses minimal logs; default Warn log level (no banners)
         Self {
-            renderer: OutputRenderer::new(format, verbose),
+            renderer: OutputRenderer::new(format, LogLevel::Warn),
         }
     }
 
