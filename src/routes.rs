@@ -5,7 +5,7 @@ pub fn initialize(api_server: &mut ApiServer) {
         "/api/test",
         Box::new(|path| {
             println!("Executing test handler for path: {}", path);
-            "{\"result\": \"OK\"}".to_string()
+            String::from("{\"result\": \"OK\"}")
         }),
     );
 }

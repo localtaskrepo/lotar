@@ -7,6 +7,7 @@
 // - manager: High-level storage coordination and project management
 // - filter: Task filtering utilities
 
+pub mod backend;
 pub mod filter;
 pub mod manager;
 pub mod operations;

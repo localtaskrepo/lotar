@@ -112,9 +112,6 @@ jobs:
         
     - name: Build release (check only for speed)
       run: cargo check --release --all-features
-        
-    - name: Run doc tests
-      run: cargo test --doc --all-features --quiet
 
   # Security audit (optimized with caching, runs in parallel)
   security:

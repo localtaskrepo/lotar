@@ -126,7 +126,7 @@ mod project_config {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "🚀 Initializing configuration with template 'default'",
+                "Initializing configuration with template 'default'",
             ))
             .stdout(predicate::str::contains("✅ Configuration initialized at:"))
             .stdout(predicate::str::contains(".tasks/MYVE/config.yml"));
@@ -276,7 +276,7 @@ mod templates {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "📚 Available Configuration Templates:",
+                "Available Configuration Templates:",
             ))
             .stdout(predicate::str::contains("default"))
             .stdout(predicate::str::contains("simple"))
@@ -615,7 +615,7 @@ mod error_handling {
             .arg("--project=ErrorTest")
             .assert()
             .failure()
-            .stdout(predicate::str::contains("❌ Unknown template: invalid"));
+            .stderr(predicate::str::contains("Unknown template: invalid"));
     }
 
     #[test]

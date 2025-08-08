@@ -15,9 +15,4 @@
 - Add shortcuts for arguments with -- (e.g. --project shoud have -p as well)
 
 Other refactor jobs:
-- Error system
 - Log system
-- Overall code quality \
-    - can functions be combined into utility functions
-    - Empty files
-    - Unnecessary folders

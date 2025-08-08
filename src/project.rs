@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 /// Get the effective project name by checking global config first, then falling back to auto-detection
 pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
     // Try to read from global config first
-    let global_config_path = resolver.path.join("config.yml");
+    let global_config_path = crate::utils::paths::global_config_path(&resolver.path);
     if global_config_path.exists() {
         if let Ok(content) = std::fs::read_to_string(&global_config_path) {
             if let Ok(config) = serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
@@ -94,5 +94,5 @@ fn get_current_folder_name() -> Option<String> {
 }
 
 pub fn get_project_path() -> Option<PathBuf> {
-    Some(std::env::current_dir().unwrap())
+    std::env::current_dir().ok()
 }

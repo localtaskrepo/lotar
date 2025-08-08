@@ -1,38 +1,7 @@
-/*
-GPT Instructions:
-Write a module in Rust called Scanner that implements the following features:
-* A function called scan() - returns a vector of Todo objects (you will need to define it)
-* This function should scan the current directory for files with source code
-* It should scan each file and look for TODOs (The search token should be configurable, but default to "TODO")
-* It should look for TODO token only in comments (not in strings)
-* To identify comments the module should have a mapping of file extensions to comment tokens
-* For example, for Rust the comment token is "//" and for C++ it is "//" or "/* */
-"
-* We should support all known comment styles for all programming languages we support, which could be more than 2
-* Implement as many comment styles as you can, for as many programming languages as you can
-* The constructor will be given a path to the directory to scan
-* The scan should be recursive, so it should scan all subdirectories as well
-* The scan should be case insensitive for the TODO token
-* Todo objects should be clonable, serializable/deserializable (in yaml), and printable
-* Favor a configuration object that has the different comment mappings for the different file types for the languages we're trying to search for
-* The TODO object should have the following fields:
-* - The file path
-* - The line number for the TODO
-* - The line number for code related to the TODO (if any)
-* - The line text after the TODO token as title (only the first sentence if it's a multi-sentence TODO)
-* - If it's a multi-sentence TODO, the line text after the first sentence as description
-* - A generated UUID for the TODO
-* We want to support a special TODO token: when the TODO token has "(<id>)" behind it that should be used as the UUID for the TODO. For example: "TODO (1234-5678-90ab-cdef) - This is a TODO" should have the UUID 1234-5678-90ab-cdef
-* Otherwise we just want to generate a new UUID for the TODO
-* We will need to keep track of existing TODOs as we don't want to create new ID's for existing TODOs
-* There should be two ways of doing this, for which we can use 2 different functions:
-* - Either by fuzzy matching the line number and the line text of a TODO with known TODOs
-* - Or by using the UUID in the TODO token. If the UUID is not found, we should create a new TODO and modify the source file to add the UUID to the TODO token using the format above
-* To be able to persist the information you will need to ask an external module called Store whether a TODO with a given ID already exists or not. For that you use the Store module which has 1 public function: bool, exists(todo: TODO) -> bool. Add a comment to this function that it implements both looking up by id first and if that doesn't work does fuzzy matching
-* Use a static configuration object to configure the search tokens for the different file types. Use Regex to simplify code where possible
-* Don't assume the comment mapping is passed to the scanner. The scanner should be able to figure out the right mapping on its own based on the file extensions associated with different programming languages. Be sure to implement a one to many relationship between a file and the comment that filetype supports. If you want to optimized you can also you use a many to many relationship if want to group multiple file extension types together. You may optimize even more with a regex.
-* Write concise, readable, and maintainable code, but skip any tests for now
-*/
+//! Source code scanner for TODO references in comment lines.
+//! - Recursively scans a directory for supported source files
+//! - Detects TODOs in comment lines across many languages
+//! - Extracts optional UUID and a title after the TODO token
 
 // Optimized file types configuration - removed duplicates and organized by comment style
 const FILE_TYPES: &[(&str, &str)] = &[
@@ -85,9 +54,10 @@ const FILE_TYPES: &[(&str, &str)] = &[
     ("tex", "%"),
 ];
 
+use rayon::prelude::*;
 use regex::Regex;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Reference {
@@ -110,80 +80,98 @@ pub struct Reference {
 pub struct Scanner {
     path: PathBuf,
     last_scan: Vec<Reference>,
+    todo_regex: Regex,
+    uuid_extract_regex: Regex,
+    simple_todo_regex: Regex,
 }
 
 impl Scanner {
     pub fn new(path: PathBuf) -> Self {
+        let todo_regex = Regex::new(r"[Tt][Oo][Dd][Oo]").unwrap();
+        let uuid_extract_regex =
+            Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*\(([^)]+)\)[ \t]*:?[ \t]*(.*)").unwrap();
+        let simple_todo_regex = Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*:?[ \t]*(.*)").unwrap();
+
         Self {
             path,
             last_scan: Vec::new(),
+            todo_regex,
+            uuid_extract_regex,
+            simple_todo_regex,
         }
     }
 
     pub fn scan(&mut self) -> Vec<Reference> {
-        let mut references = vec![];
+        // Collect candidate files first, then process in parallel
+        let files = self.collect_candidate_files(self.path.as_path());
 
-        // Recursively search through the directory for source code files
-        self.scan_directory(&self.path.clone(), &mut references);
+        let mut references: Vec<Reference> = files
+            .par_iter()
+            .flat_map(|path| self.scan_file_collect(path.as_path()))
+            .collect();
 
-        // Save the current scan results for later comparison
+        // Deterministic ordering by file then line
+        references.sort_by(|a, b| {
+            a.file_path
+                .cmp(&b.file_path)
+                .then(a.line_number.cmp(&b.line_number))
+        });
+
         self.last_scan = references.clone();
         references
     }
 
-    fn scan_directory(&self, dir_path: &PathBuf, references: &mut Vec<Reference>) {
-        if let Ok(entries) = fs::read_dir(dir_path) {
-            for entry in entries.flatten() {
-                let path = entry.path();
+    fn is_supported_ext(ext: &str) -> bool {
+        Self::get_comment_token(ext).is_some()
+    }
 
-                if path.is_dir() {
-                    // Recursive directory scanning
-                    self.scan_directory(&path, references);
-                } else if let Some(extension) = path.extension() {
-                    if let Some(ext_str) = extension.to_str() {
-                        // Check for file extension match in our supported types
-                        if self.is_supported_file_type(ext_str) {
-                            self.scan_file(&path, references);
+    fn collect_candidate_files(&self, dir_path: &Path) -> Vec<PathBuf> {
+        fn walk(dir_path: &Path, out: &mut Vec<PathBuf>) {
+            // Recurse into visible subdirectories using filesystem helper
+            for (_, subdir_path) in crate::utils::filesystem::list_visible_subdirs(dir_path) {
+                walk(subdir_path.as_path(), out);
+            }
+
+            // Collect supported files in current directory
+            if let Ok(entries) = fs::read_dir(dir_path) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                            if Scanner::is_supported_ext(&ext.to_ascii_lowercase()) {
+                                out.push(path);
+                            }
                         }
                     }
                 }
             }
         }
+
+        let mut files = Vec::new();
+        walk(dir_path, &mut files);
+        files
     }
 
-    fn is_supported_file_type(&self, extension: &str) -> bool {
-        // Check if this extension is supported
-        for (file_type, _) in FILE_TYPES {
-            if file_type == &extension {
-                return true;
-            }
-        }
-        false
+    fn get_comment_token(extension: &str) -> Option<&'static str> {
+        FILE_TYPES
+            .iter()
+            .find(|(file_type, _)| file_type == &extension)
+            .map(|(_, token)| *token)
     }
 
-    fn scan_file(&self, file_path: &PathBuf, references: &mut Vec<Reference>) {
+    fn scan_file(&self, file_path: &Path, references: &mut Vec<Reference>) {
         if let Ok(file_contents) = fs::read_to_string(file_path) {
             if let Some(extension) = file_path.extension() {
                 if let Some(ext_str) = extension.to_str() {
-                    // Find the correct comment pattern for this file type
-                    if let Some((_, start_comment)) = FILE_TYPES
-                        .iter()
-                        .find(|(file_type, _)| file_type == &ext_str)
-                    {
-                        let comment_regex = Regex::new(start_comment).unwrap();
-                        let todo_regex = Regex::new(r"[Tt][Oo][Dd][Oo]").unwrap();
-                        let uuid_extract_regex =
-                            Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*\(([^)]+)\)[ \t]*:?[ \t]*(.*)")
-                                .unwrap();
-                        let simple_todo_regex =
-                            Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*:?[ \t]*(.*)").unwrap();
-
+                    let ext_str = ext_str.to_ascii_lowercase();
+                    // Find the correct comment token for this file type
+                    if let Some(start_comment) = Self::get_comment_token(&ext_str) {
                         // Process each line to find TODOs in comments
                         for (line_number, line) in file_contents.lines().enumerate() {
                             // Check if line contains a comment and TODO (case insensitive)
-                            if comment_regex.is_match(line) && todo_regex.is_match(line) {
+                            if line.contains(start_comment) && self.todo_regex.is_match(line) {
                                 let (uuid, title) = if let Some(uuid_captures) =
-                                    uuid_extract_regex.captures(line)
+                                    self.uuid_extract_regex.captures(line)
                                 {
                                     // Extract UUID and title from UUID format
                                     let uuid = uuid_captures
@@ -194,7 +182,7 @@ impl Scanner {
                                         .map_or(String::new(), |m| m.as_str().trim().to_string());
                                     (uuid, title)
                                 } else if let Some(simple_captures) =
-                                    simple_todo_regex.captures(line)
+                                    self.simple_todo_regex.captures(line)
                                 {
                                     // Extract title from simple TODO format
                                     let title = simple_captures
@@ -202,8 +190,12 @@ impl Scanner {
                                         .map_or(String::new(), |m| m.as_str().trim().to_string());
                                     (String::new(), title)
                                 } else {
-                                    // Fallback: extract whatever comes after TODO
-                                    if let Some(todo_pos) = line.to_lowercase().find("todo") {
+                                    // Fallback: extract whatever comes after TODO without extra allocation
+                                    let lower = "todo";
+                                    if let Some(todo_pos) = line.find(lower) {
+                                        let after_todo = &line[todo_pos + 4..].trim();
+                                        (String::new(), after_todo.to_string())
+                                    } else if let Some(todo_pos) = line.find("TODO") {
                                         let after_todo = &line[todo_pos + 4..].trim();
                                         (String::new(), after_todo.to_string())
                                     } else {
@@ -212,7 +204,7 @@ impl Scanner {
                                 };
 
                                 let reference = Reference {
-                                    file_path: file_path.clone(),
+                                    file_path: file_path.to_path_buf(),
                                     line_number: line_number + 1, // 1-based line numbers
                                     title,
                                     uuid,
@@ -227,5 +219,11 @@ impl Scanner {
                 }
             }
         }
+    }
+
+    fn scan_file_collect(&self, file_path: &Path) -> Vec<Reference> {
+        let mut refs = Vec::new();
+        self.scan_file(file_path, &mut refs);
+        refs
     }
 }

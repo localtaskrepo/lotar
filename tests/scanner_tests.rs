@@ -44,8 +44,8 @@ mod basic_scanning {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("🔍 Scanning"))
-            .stdout(predicate::str::contains("📝 Found 2 TODO comment(s):"));
+            .stdout(predicate::str::contains("Scanning"))
+            .stdout(predicate::str::contains("Found 2 TODO comment(s):"));
     }
 
     #[test]
@@ -73,7 +73,7 @@ mod basic_scanning {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 2 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 2 TODO comment(s):"));
     }
 
     #[test]
@@ -102,7 +102,7 @@ mod basic_scanning {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 4 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 4 TODO comment(s):"));
     }
 
     #[test]
@@ -146,7 +146,7 @@ mod basic_scanning {
             .arg("--detailed")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 1 TODO comment(s):"))
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"))
             .stdout(predicate::str::contains("📄"));
     }
 }
@@ -182,7 +182,7 @@ mod project_discovery {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 1 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -204,7 +204,7 @@ mod project_discovery {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 1 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -230,7 +230,7 @@ mod project_discovery {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 1 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -261,7 +261,7 @@ mod project_discovery {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 3 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 3 TODO comment(s):"));
     }
 }
 
@@ -290,7 +290,7 @@ mod system_integration {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 1 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 
     #[test]
@@ -321,7 +321,7 @@ mod system_integration {
             .arg("--detailed")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 3 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 3 TODO comment(s):"));
     }
 
     #[test]
@@ -342,6 +342,6 @@ mod system_integration {
             .arg("scan")
             .assert()
             .success()
-            .stdout(predicate::str::contains("📝 Found 1 TODO comment(s):"));
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
     }
 }

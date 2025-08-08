@@ -30,7 +30,7 @@ impl HelpSystem {
                     "format": "markdown"
                 })
                 .to_string()),
-                OutputFormat::Markdown => Ok(content.to_string()),
+                OutputFormat::Markdown => Ok(content.to_owned()),
                 _ => {
                     // Render markdown to terminal using termimad
                     let skin = MadSkin::default();
@@ -72,7 +72,7 @@ impl HelpSystem {
                     let command = file.replace(".md", "");
                     let description = self
                         .extract_description(&file)
-                        .unwrap_or_else(|| "No description available".to_string());
+                        .unwrap_or_else(|| String::from("No description available"));
                     table.add_row(vec![command, description]);
                 }
 
@@ -84,7 +84,7 @@ impl HelpSystem {
                     let command = file.replace(".md", "");
                     let description = self
                         .extract_description(&file)
-                        .unwrap_or_else(|| "No description available".to_string());
+                        .unwrap_or_else(|| String::from("No description available"));
                     output.push_str(&format!("  {} - {}\n", command, description));
                 }
                 Ok(output)

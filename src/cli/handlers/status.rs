@@ -38,7 +38,7 @@ impl CommandHandler for StatusHandler {
                 let explicit_as_prefix =
                     project_resolver.resolve_project_name_to_prefix(explicit_proj);
                 if task_id_prefix != explicit_as_prefix {
-                    println!("{}", renderer.render_warning(&format!(
+                    eprintln!("{}", renderer.render_warning(&format!(
                         "Warning: Task ID '{}' belongs to project '{}', but project '{}' was specified. Using task ID's project.",
                         args.task_id, task_id_prefix, explicit_proj
                     )));
@@ -99,12 +99,17 @@ impl CommandHandler for StatusHandler {
 
                 // Check if status is actually changing
                 if old_status == validated_status {
-                    println!(
+                    eprintln!(
                         "{}",
                         renderer.render_warning(&format!(
                             "Task {} already has status '{}'",
                             full_task_id, validated_status
                         ))
+                    );
+                    // Emit a small stdout info so --format=table/json/markdown flows have output
+                    println!(
+                        "{}",
+                        renderer.render_info(&format!("Task {} status unchanged", full_task_id))
                     );
                     return Ok(());
                 }

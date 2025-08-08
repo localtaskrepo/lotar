@@ -55,7 +55,7 @@ default_status: Todo
     );
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("🔍 Validating global configuration"));
+    assert!(stdout.contains("Validating global configuration"));
     assert!(stdout.contains("✅ All configurations are valid"));
 }
 
@@ -94,7 +94,7 @@ default_status: Todo
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("📋 Global Config Validation Results"));
+    assert!(stdout.contains("Global Config Validation Results"));
     assert!(stdout.contains("⚠️"));
     assert!(stdout.contains("Port 80 may require elevated privileges"));
     assert!(stdout.contains("Consider using a port >= 1024"));
@@ -179,7 +179,7 @@ default_assignee: "user@example.com"
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("🔍 Validating project configuration for 'TEST'"));
+    assert!(stdout.contains("Validating project configuration for 'TEST'"));
     assert!(stdout.contains("✅ All configurations are valid"));
 }
 
@@ -227,8 +227,8 @@ server_port: 8080
 
     assert!(!output.status.success());
 
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("Failed to parse global config"));
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("Failed to parse global config"));
 }
 
 #[test]
@@ -248,7 +248,7 @@ fn test_config_validate_no_config_uses_defaults() {
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("🔍 Validating global configuration"));
+    assert!(stdout.contains("Validating global configuration"));
     assert!(stdout.contains("✅ All configurations are valid"));
 }
 
@@ -292,7 +292,7 @@ default_assignee: "user@example.com"
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("🔍 Validating global configuration"));
+    assert!(stdout.contains("Validating global configuration"));
     assert!(stdout.contains("✅ All configurations are valid"));
 }
 
@@ -326,5 +326,5 @@ project_name: "Existing Project"
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("🔍 Validating project configuration"));
+    assert!(stdout.contains("Validating project configuration"));
 }

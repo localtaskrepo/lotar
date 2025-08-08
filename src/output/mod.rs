@@ -1,9 +1,13 @@
 use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
 use clap::ValueEnum;
-use comfy_table::{Cell, ContentArrangement, Table};
 use console::style;
 use serde::Serialize;
+
+mod json;
+mod markdown;
+mod table;
+mod text;
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 pub enum OutputFormat {
@@ -97,11 +101,11 @@ impl Outputable for Task {
             self.status.to_string(),
             self.priority.to_string(),
             self.task_type.to_string(),
-            self.assignee.as_deref().unwrap_or("-").to_string(),
-            self.due_date.as_deref().unwrap_or("-").to_string(),
-            self.effort.as_deref().unwrap_or("-").to_string(),
+            self.assignee.as_deref().unwrap_or("-").to_owned(),
+            self.due_date.as_deref().unwrap_or("-").to_owned(),
+            self.effort.as_deref().unwrap_or("-").to_owned(),
             if self.tags.is_empty() {
-                "-".to_string()
+                String::from("-")
             } else {
                 self.tags.join(", ")
             },
@@ -158,7 +162,17 @@ impl OutputRenderer {
         Self { format, verbose }
     }
 
-    #[allow(dead_code)]
+    // Small helpers to reduce duplication
+    fn json_status_message(status: &str, message: &str) -> String {
+        serde_json::json!({
+            "status": status,
+            "message": message
+        })
+        .to_string()
+    }
+
+    // removed unused transitional helper to satisfy clippy dead_code
+
     pub fn render_single<T: Outputable + Serialize>(&self, item: &T) -> String {
         match self.format {
             OutputFormat::Text => self.render_text_single(item),
@@ -168,7 +182,6 @@ impl OutputRenderer {
         }
     }
 
-    #[allow(dead_code)]
     pub fn render_list<T: Outputable + Serialize>(
         &self,
         items: &[T],
@@ -184,218 +197,64 @@ impl OutputRenderer {
 
     pub fn render_success(&self, message: &str) -> String {
         match self.format {
-            OutputFormat::Json => serde_json::json!({
-                "status": "success",
-                "message": message
-            })
-            .to_string(),
+            OutputFormat::Json => Self::json_status_message("success", message),
             _ => format!("✅ {}", style(message).green()),
         }
     }
 
     pub fn render_error(&self, message: &str) -> String {
         match self.format {
-            OutputFormat::Json => serde_json::json!({
-                "status": "error",
-                "message": message
-            })
-            .to_string(),
+            OutputFormat::Json => Self::json_status_message("error", message),
             _ => format!("❌ {}", style(message).red()),
         }
     }
 
     pub fn render_warning(&self, message: &str) -> String {
         match self.format {
-            OutputFormat::Json => serde_json::json!({
-                "status": "warning",
-                "message": message
-            })
-            .to_string(),
+            OutputFormat::Json => Self::json_status_message("warning", message),
             _ => format!("⚠️  {}", style(message).yellow()),
         }
     }
 
+    pub fn render_info(&self, message: &str) -> String {
+        match self.format {
+            OutputFormat::Json => Self::json_status_message("info", message),
+            _ => format!("ℹ️  {}", message),
+        }
+    }
+
     // Private implementation methods
-    #[allow(dead_code)]
     fn render_text_single<T: Outputable>(&self, item: &T) -> String {
-        item.to_text()
+        text::render_text_single(item)
     }
 
-    #[allow(dead_code)]
     fn render_text_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
-        let mut output = String::new();
-
-        if let Some(title) = title {
-            output.push_str(&format!("{}\n\n", style(title).bold().underlined()));
-        }
-
-        if items.is_empty() {
-            output.push_str(&style("No items found.").dim().to_string());
-        } else {
-            for (index, item) in items.iter().enumerate() {
-                if self.verbose {
-                    output.push_str(&format!("{}. {}\n", index + 1, item.to_text()));
-                } else {
-                    output.push_str(&format!("{}\n", item.to_text()));
-                }
-            }
-        }
-
-        output
+        text::render_text_list(items, title, self.verbose)
     }
 
-    #[allow(dead_code)]
     fn render_table_single<T: Outputable>(&self, item: &T) -> String {
-        let mut table = Table::new();
-        table.set_content_arrangement(ContentArrangement::Dynamic);
-
-        let headers = T::table_headers();
-        let values = item.to_table_row();
-
-        for (header, value) in headers.iter().zip(values.iter()) {
-            table.add_row(vec![Cell::new(header), Cell::new(value)]);
-        }
-
-        table.to_string()
+        table::render_table_single(item)
     }
 
-    #[allow(dead_code)]
     fn render_table_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
-        let mut output = String::new();
-
-        if let Some(title) = title {
-            output.push_str(&format!("{}\n\n", style(title).bold().underlined()));
-        }
-
-        if items.is_empty() {
-            return format!("{}No items found.", output);
-        }
-
-        let mut table = Table::new();
-        table.set_content_arrangement(ContentArrangement::Dynamic);
-
-        // Add headers
-        let headers = T::table_headers();
-        table.set_header(headers);
-
-        // Add rows
-        for item in items {
-            table.add_row(item.to_table_row());
-        }
-
-        output.push_str(&table.to_string());
-        output
+        table::render_table_list(items, title)
     }
 
-    #[allow(dead_code)]
     fn render_json_single<T: Serialize>(&self, item: &T) -> String {
-        if self.verbose {
-            serde_json::to_string_pretty(item).unwrap_or_else(|_| "{}".to_string())
-        } else {
-            serde_json::to_string(item).unwrap_or_else(|_| "{}".to_string())
-        }
+        json::render_json_single(item, self.verbose)
     }
 
-    #[allow(dead_code)]
     fn render_json_list<T: Serialize>(&self, items: &[T]) -> String {
-        if self.verbose {
-            serde_json::to_string_pretty(items).unwrap_or_else(|_| "[]".to_string())
-        } else {
-            serde_json::to_string(items).unwrap_or_else(|_| "[]".to_string())
-        }
+        json::render_json_list(items, self.verbose)
     }
 
-    #[allow(dead_code)]
     fn render_markdown_single<T: Outputable>(&self, item: &T) -> String {
-        let headers = T::table_headers();
-        let values = item.to_table_row();
-
-        let mut output = String::new();
-        for (header, value) in headers.iter().zip(values.iter()) {
-            output.push_str(&format!("**{}:** {}\n", header, value));
-        }
-        output
+        markdown::render_markdown_single(item)
     }
 
-    #[allow(dead_code)]
     fn render_markdown_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
-        let mut output = String::new();
-
-        if let Some(title) = title {
-            output.push_str(&format!("# {}\n\n", title));
-        }
-
-        if items.is_empty() {
-            output.push_str("No items found.\n");
-            return output;
-        }
-
-        // Markdown table
-        let headers = T::table_headers();
-        output.push_str("| ");
-        for header in &headers {
-            output.push_str(&format!("{} | ", header));
-        }
-        output.push('\n');
-
-        output.push_str("| ");
-        for _ in &headers {
-            output.push_str("--- | ");
-        }
-        output.push('\n');
-
-        for item in items {
-            let values = item.to_table_row();
-            output.push_str("| ");
-            for value in values {
-                output.push_str(&format!("{} | ", value));
-            }
-            output.push('\n');
-        }
-
-        output
+        markdown::render_markdown_list(items, title)
     }
 }
 
-// Progress indicators for different formats
-#[allow(dead_code)]
-pub struct ProgressIndicator {
-    format: OutputFormat,
-}
-
-impl ProgressIndicator {
-    #[allow(dead_code)]
-    pub fn new(format: OutputFormat) -> Self {
-        Self { format }
-    }
-
-    #[allow(dead_code)]
-    pub fn start(&self, message: &str) {
-        match self.format {
-            OutputFormat::Json => {
-                // JSON mode is typically for scripts, so no progress indicators
-            }
-            _ => {
-                print!("🔄 {}...", message);
-                use std::io::Write;
-                std::io::stdout().flush().unwrap();
-            }
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn finish(&self, success: bool) {
-        match self.format {
-            OutputFormat::Json => {
-                // No output for JSON mode
-            }
-            _ => {
-                if success {
-                    println!(" ✅");
-                } else {
-                    println!(" ❌");
-                }
-            }
-        }
-    }
-}
+// ProgressIndicator removed as unused; reintroduce if interactive progress becomes necessary.

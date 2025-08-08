@@ -1,30 +1,17 @@
 // Allow uninlined format args since it's mostly a style preference
 #![allow(clippy::uninlined_format_args)]
 
-mod api_server;
-mod cli;
-mod config;
-mod help;
-mod output;
-mod project;
-mod routes;
-mod scanner;
-mod storage;
-mod types;
-mod utils;
-mod web_server;
-mod workspace;
-
 use clap::Parser;
 use std::env;
-use workspace::TasksDirectoryResolver;
 
-use cli::handlers::priority::{PriorityArgs, PriorityHandler};
-use cli::handlers::status::{StatusArgs, StatusHandler};
-use cli::handlers::{
+use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
+use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
+use lotar::cli::handlers::{
     AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, TaskHandler,
 };
-use cli::{Cli, Commands};
+use lotar::cli::{Cli, Commands, TaskAction};
+use lotar::workspace::TasksDirectoryResolver;
+use lotar::{help, output};
 
 /// Resolve the tasks directory based on config and command line arguments
 fn resolve_tasks_directory_with_override(
@@ -124,17 +111,17 @@ fn main() {
                     Ok(())
                 }
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
         }
         Commands::List(args) => {
-            let task_action = crate::cli::TaskAction::List(args);
+            let task_action = TaskAction::List(args);
             match TaskHandler::execute(task_action, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -145,7 +132,7 @@ fn main() {
             {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -160,7 +147,7 @@ fn main() {
             ) {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -172,10 +159,10 @@ fn main() {
                     "Set {} due_date = {} (placeholder implementation)",
                     id, new_due_date
                 );
-                println!("{}", renderer.render_warning(&message));
+                eprintln!("{}", renderer.render_warning(&message));
             } else {
                 let message = format!("Show {} due_date (placeholder implementation)", id);
-                println!("{}", renderer.render_warning(&message));
+                eprintln!("{}", renderer.render_warning(&message));
             }
             Ok(())
         }
@@ -197,7 +184,7 @@ fn main() {
             match TaskHandler::execute(action, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -206,7 +193,7 @@ fn main() {
             match ConfigHandler::execute(action, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -215,7 +202,7 @@ fn main() {
             match ScanHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -224,7 +211,7 @@ fn main() {
             match ServeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => Ok(()),
                 Err(e) => {
-                    println!("{}", renderer.render_error(&e));
+                    eprintln!("{}", renderer.render_error(&e));
                     Err(e)
                 }
             }
@@ -258,8 +245,15 @@ fn show_command_help(command: &str) {
             println!("{}", help_text);
         }
         Err(e) => {
-            eprintln!("❌ Error showing help for '{}': {}", command, e);
-            eprintln!("Try 'lotar help' for available commands.");
+            let renderer = output::OutputRenderer::new(output::OutputFormat::Text, false);
+            eprintln!(
+                "{}",
+                renderer.render_error(&format!("Error showing help for '{}': {}", command, e))
+            );
+            eprintln!(
+                "{}",
+                renderer.render_info("Try 'lotar help' for available commands.")
+            );
             std::process::exit(1);
         }
     }

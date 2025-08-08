@@ -111,7 +111,7 @@ mod dual_interface_tests {
             .arg("--priority=invalid")
             .assert()
             .failure()
-            .stdout(predicate::str::contains("Priority validation failed"));
+            .stderr(predicate::str::contains("Priority validation failed"));
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -122,7 +122,7 @@ mod dual_interface_tests {
             .arg("--priority=invalid")
             .assert()
             .failure()
-            .stdout(predicate::str::contains("Priority validation failed"));
+            .stderr(predicate::str::contains("Priority validation failed"));
     }
 
     #[test]

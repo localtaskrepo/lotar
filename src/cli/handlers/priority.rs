@@ -78,7 +78,7 @@ impl CommandHandler for PriorityHandler {
             }
         };
         let project_prefix = if let Some(project) = final_effective_project {
-            crate::utils::resolve_project_input(project, &resolver.path)
+            crate::utils::resolve_project_input(project, resolver.path.as_path())
         } else {
             crate::project::get_effective_project_name(resolver)
         };
@@ -114,8 +114,11 @@ impl CommandHandler for PriorityHandler {
                 storage.edit(&args.task_id, &task);
 
                 println!(
-                    "✅ Task {} priority changed from {} to {}",
-                    args.task_id, old_priority, validated_priority
+                    "{}",
+                    renderer.render_success(&format!(
+                        "Task {} priority changed from {} to {}",
+                        args.task_id, old_priority, task.priority
+                    ))
                 );
 
                 Ok(())
@@ -126,7 +129,13 @@ impl CommandHandler for PriorityHandler {
                     .get(&args.task_id, project_prefix.clone())
                     .ok_or_else(|| format!("Task '{}' not found", args.task_id))?;
 
-                println!("Task {} priority: {}", args.task_id, task.priority);
+                println!(
+                    "{}",
+                    renderer.render_success(&format!(
+                        "Task {} priority: {}",
+                        args.task_id, task.priority
+                    ))
+                );
                 Ok(())
             }
         }

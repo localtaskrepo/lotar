@@ -8,15 +8,19 @@
 //!
 //! The module is organized into:
 //! - `types`: Core configuration types and structures
-//! - `templates`: Template loading and management
-//! - `manager`: Main configuration management logic
-//! - `commands`: CLI command handlers for configuration operations
+//! - `manager`: Main configuration management coordination
+//! - `operations`: CRUD operations for configuration data
+//! - `persistence`: File I/O operations for configuration files
+//! - `resolution`: Configuration merging and resolution logic
 //! - `validation`: Configuration validation system
 
-pub mod commands;
 pub mod manager;
-pub mod templates;
+pub mod operations;
+pub mod persistence;
+pub mod resolution;
 pub mod types;
 pub mod validation;
 
+// Re-export main types for public API
 pub use manager::ConfigManager;
+pub use types::*;

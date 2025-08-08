@@ -72,10 +72,10 @@ impl CommandHandler for TaskHandler {
                         "Set {} assignee = {} (placeholder implementation)",
                         id, new_assignee
                     );
-                    println!("{}", renderer.render_warning(&message));
+                    eprintln!("{}", renderer.render_warning(&message));
                 } else {
                     let message = format!("Show {} assignee (placeholder implementation)", id);
-                    println!("{}", renderer.render_warning(&message));
+                    eprintln!("{}", renderer.render_warning(&message));
                 }
                 Ok(())
             }
@@ -86,10 +86,10 @@ impl CommandHandler for TaskHandler {
                         "Set {} due_date = {} (placeholder implementation)",
                         id, new_due_date
                     );
-                    println!("{}", renderer.render_warning(&message));
+                    eprintln!("{}", renderer.render_warning(&message));
                 } else {
                     let message = format!("Show {} due_date (placeholder implementation)", id);
-                    println!("{}", renderer.render_warning(&message));
+                    eprintln!("{}", renderer.render_warning(&message));
                 }
                 Ok(())
             }
@@ -111,7 +111,7 @@ impl CommandHandler for EditHandler {
         args: Self::Args,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
-        _renderer: &crate::output::OutputRenderer,
+        renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
         let mut storage = Storage::new(resolver.path.clone());
 
@@ -150,7 +150,7 @@ impl CommandHandler for EditHandler {
 
         // Resolve project prefix for loading
         let project_prefix = if let Some(project) = project {
-            crate::utils::resolve_project_input(project, &resolver.path)
+            crate::utils::resolve_project_input(project, resolver.path.as_path())
         } else {
             crate::project::get_effective_project_name(resolver)
         };
@@ -216,7 +216,10 @@ impl CommandHandler for EditHandler {
         // Save the updated task
         storage.edit(&args.id, &task);
 
-        println!("✅ Task '{}' updated successfully", args.id);
+        println!(
+            "{}",
+            renderer.render_success(&format!("Task '{}' updated successfully", args.id))
+        );
         Ok(())
     }
 }
@@ -309,7 +312,8 @@ impl CommandHandler for SearchHandler {
 
         if let Some(project) = project {
             // Resolve project name to prefix, just like in AddHandler
-            let project_prefix = crate::utils::resolve_project_input(project, &resolver.path);
+            let project_prefix =
+                crate::utils::resolve_project_input(project, resolver.path.as_path());
             task_filter.project = Some(project_prefix);
         } // Execute search/list
         let task_tuples = storage.search(&task_filter);
@@ -417,7 +421,10 @@ impl CommandHandler for SearchHandler {
                     );
                 }
                 _ => {
-                    println!("No tasks found matching the search criteria.");
+                    eprintln!(
+                        "{}",
+                        renderer.render_warning("No tasks found matching the search criteria.")
+                    );
                 }
             }
         } else {
@@ -462,7 +469,10 @@ impl CommandHandler for SearchHandler {
                     );
                 }
                 _ => {
-                    println!("Found {} task(s):", display_tasks.len());
+                    println!(
+                        "{}",
+                        renderer.render_success(&format!("Found {} task(s):", display_tasks.len()))
+                    );
                     for task in display_tasks {
                         println!(
                             "  {} - {} [{}] ({})",
@@ -493,13 +503,13 @@ impl CommandHandler for DeleteHandler {
         args: Self::Args,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
-        _renderer: &crate::output::OutputRenderer,
+        renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
         let mut storage = Storage::new(resolver.path.clone());
 
         // Resolve project prefix
         let project_prefix = if let Some(project) = project {
-            crate::utils::resolve_project_input(project, &resolver.path)
+            crate::utils::resolve_project_input(project, resolver.path.as_path())
         } else {
             crate::project::get_effective_project_name(resolver)
         };
@@ -516,14 +526,20 @@ impl CommandHandler for DeleteHandler {
                 args.id
             );
             use std::io::{self, Write};
-            io::stdout().flush().unwrap();
+            let _ = io::stdout().flush();
 
             let mut input = String::new();
-            io::stdin().read_line(&mut input).unwrap();
+            if io::stdin().read_line(&mut input).is_err() {
+                println!(
+                    "{}",
+                    renderer.render_error("Failed to read input. Aborting.")
+                );
+                return Ok(());
+            }
             let input = input.trim().to_lowercase();
 
             if input != "y" && input != "yes" {
-                println!("Deletion cancelled.");
+                eprintln!("{}", renderer.render_warning("Deletion cancelled."));
                 return Ok(());
             }
         }
@@ -531,7 +547,10 @@ impl CommandHandler for DeleteHandler {
         // Delete the task
         let deleted = storage.delete(&args.id, project_prefix);
         if deleted {
-            println!("✅ Task '{}' deleted successfully", args.id);
+            println!(
+                "{}",
+                renderer.render_success(&format!("Task '{}' deleted successfully", args.id))
+            );
             Ok(())
         } else {
             Err(format!("Failed to delete task '{}'", args.id))

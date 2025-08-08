@@ -1,5 +1,6 @@
 use crate::storage::TaskFilter;
 use crate::storage::task::Task;
+use rayon::prelude::*;
 use std::fs;
 use std::path::Path;
 
@@ -9,7 +10,7 @@ pub struct StorageSearch;
 impl StorageSearch {
     /// Search for tasks based on filter criteria
     pub fn search(root_path: &Path, filter: &TaskFilter) -> Vec<(String, Task)> {
-        let mut results = Vec::new();
+        let mut results: Vec<(String, Task)> = Vec::new();
 
         // No longer use index for tag pre-filtering - do all filtering during file scan
 
@@ -20,78 +21,54 @@ impl StorageSearch {
 
             for project_folder in project_folders {
                 let project_path = root_path.join(&project_folder);
-                if let Ok(entries) = fs::read_dir(&project_path) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.is_file() && path.extension().is_some_and(|ext| ext == "yml") {
-                            // Extract task ID from filename
-                            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                                if let Ok(numeric_id) = stem.parse::<u64>() {
-                                    let task_id = format!("{}-{}", project_folder, numeric_id);
+                let files = crate::utils::filesystem::list_files_with_ext(&project_path, "yml");
 
-                                    // Load and filter the task
-                                    if let Ok(content) = fs::read_to_string(&path) {
-                                        if let Ok(task) = serde_yaml::from_str::<Task>(&content) {
-                                            if Self::task_matches_filter(&task, filter) {
-                                                results.push((task_id, task));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                let mut partial: Vec<(String, Task)> = files
+                    .par_iter()
+                    .filter_map(|path| {
+                        let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
+                        let task_id = format!("{}-{}", project_folder, numeric_id);
+                        let content = fs::read_to_string(path).ok()?;
+                        let task: Task = serde_yaml::from_str(&content).ok()?;
+                        if Self::task_matches_filter(&task, filter) {
+                            Some((task_id, task))
+                        } else {
+                            None
                         }
-                    }
-                }
+                    })
+                    .collect();
+
+                results.append(&mut partial);
             }
         } else {
             // Search across all projects
-            if let Ok(entries) = fs::read_dir(root_path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_dir()
-                        && !path
-                            .file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .starts_with('.')
-                    {
-                        let project_folder =
-                            path.file_name().unwrap().to_string_lossy().to_string();
+            let all_files: Vec<(String, std::path::PathBuf)> =
+                crate::utils::filesystem::list_visible_subdirs(root_path)
+                    .into_iter()
+                    .flat_map(|(project_folder, dir_path)| {
+                        crate::utils::filesystem::list_files_with_ext(&dir_path, "yml")
+                            .into_iter()
+                            .map(move |p| (project_folder.clone(), p))
+                    })
+                    .collect();
 
-                        if let Ok(project_entries) = fs::read_dir(&path) {
-                            for project_entry in project_entries.flatten() {
-                                let task_path = project_entry.path();
-                                if task_path.is_file()
-                                    && task_path.extension().is_some_and(|ext| ext == "yml")
-                                {
-                                    // Extract task ID from filename
-                                    if let Some(stem) =
-                                        task_path.file_stem().and_then(|s| s.to_str())
-                                    {
-                                        if let Ok(numeric_id) = stem.parse::<u64>() {
-                                            let task_id =
-                                                format!("{}-{}", project_folder, numeric_id);
-
-                                            // Load and filter the task
-                                            if let Ok(content) = fs::read_to_string(&task_path) {
-                                                if let Ok(task) =
-                                                    serde_yaml::from_str::<Task>(&content)
-                                                {
-                                                    if Self::task_matches_filter(&task, filter) {
-                                                        results.push((task_id, task));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            results = all_files
+                .par_iter()
+                .filter_map(|(project_folder, task_path)| {
+                    let numeric_id = crate::utils::filesystem::file_numeric_stem(task_path)?;
+                    let task_id = format!("{}-{}", project_folder, numeric_id);
+                    let content = fs::read_to_string(task_path).ok()?;
+                    let task: Task = serde_yaml::from_str(&content).ok()?;
+                    if Self::task_matches_filter(&task, filter) {
+                        Some((task_id, task))
+                    } else {
+                        None
                     }
-                }
-            }
+                })
+                .collect();
         }
-
+        // Deterministic order
+        results.sort_by(|a, b| a.0.cmp(&b.0));
         results
     }
 

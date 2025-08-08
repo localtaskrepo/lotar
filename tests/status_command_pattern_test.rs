@@ -182,7 +182,7 @@ mod status_command_pattern {
             .arg("todo")
             .assert()
             .success()
-            .stdout(predicate::str::contains("already has status 'TODO'"));
+            .stderr(predicate::str::contains("already has status 'TODO'"));
     }
 
     #[test]
@@ -206,7 +206,7 @@ mod status_command_pattern {
             .arg("invalid_status")
             .assert()
             .failure()
-            .stdout(predicate::str::contains("Status validation failed"));
+            .stderr(predicate::str::contains("Status validation failed"));
     }
 
     #[test]
@@ -221,7 +221,7 @@ mod status_command_pattern {
             .arg("999")
             .assert()
             .failure()
-            .stdout(predicate::str::contains("not found"));
+            .stderr(predicate::str::contains("not found"));
     }
 
     #[test]

@@ -24,9 +24,8 @@ impl ApiServer {
     pub fn register_handler(&mut self, path: &str, callback: Box<dyn Fn(String) -> String>) {
         // Normalize the path to remove trailing slashes and make it lowercase
         let normalized_path: String = path.trim_end_matches('/').to_lowercase();
-
         self.handlers
-            .insert(normalized_path.to_string(), ApiHandler { callback });
+            .insert(normalized_path, ApiHandler { callback });
     }
 
     pub fn handle_request(&self, request_path: &str) -> String {
@@ -42,7 +41,7 @@ impl ApiServer {
 
         match matching_handler {
             Some((_, handler)) => (handler.callback)(request_path.to_string()),
-            None => "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.".to_string(),
+            None => String::from("HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found."),
         }
     }
 }

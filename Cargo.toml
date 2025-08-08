@@ -22,6 +22,7 @@ clap = { version = "4.5", features = ["derive", "env", "suggestions", "std"], de
 termimad = { version = "0.30", default-features = false }
 comfy-table = { version = "7.1", default-features = false }
 console = { version = "0.15", default-features = false }
+rayon = { version = "1.10", default-features = false }
 
 # Production release profile optimized for minimal binary size
 [profile.release]

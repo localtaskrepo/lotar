@@ -1,5 +1,6 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
 use crate::storage::task::Task;
+#[cfg(test)]
 use crate::utils::generate_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,9 +16,8 @@ impl StorageOperations {
         project_prefix: &str,
         original_project_name: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        // Use the provided project prefix
-        let project_folder = project_prefix.to_string();
-        let project_path = root_path.join(&project_folder);
+        // Resolve target project path
+        let project_path = root_path.join(project_prefix);
 
         // Use original project name for config initialization, fall back to prefix
         let config_project_name = original_project_name.unwrap_or(project_prefix);
@@ -26,7 +26,7 @@ impl StorageOperations {
         fs::create_dir_all(&project_path)?;
 
         // Create project config.yml if it doesn't exist and we have a project name
-        let config_file_path = project_path.join("config.yml");
+        let config_file_path = crate::utils::paths::project_config_path(root_path, project_prefix);
         if !config_file_path.exists() && original_project_name.is_some() {
             // Create a basic project config with the project name
             let project_config = ProjectConfig::new(config_project_name.to_string());
@@ -44,15 +44,16 @@ impl StorageOperations {
         let next_numeric_id = Self::get_current_id(&project_path) + 1;
 
         // Create the formatted ID for external use
-        let formatted_id = format!("{}-{}", project_folder, next_numeric_id);
-
-        // Create a mutable copy of the task (no project field to set)
-        let task_to_store = task.clone();
+        let formatted_id = format!("{}-{}", project_prefix, next_numeric_id);
 
         // Get file path using the numeric ID
-        let file_path = Self::get_file_path(&project_folder, next_numeric_id, root_path);
-        let file_string = serde_yaml::to_string(&task_to_store)?;
-        fs::create_dir_all(file_path.parent().unwrap())?;
+        let file_path = Self::get_file_path(project_prefix, next_numeric_id, root_path);
+        let file_string = serde_yaml::to_string(task)?;
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent)?;
+        } else {
+            return Err("Invalid target file path".into());
+        }
         fs::write(&file_path, file_string)?;
 
         // No longer need to update index - simplified architecture
@@ -61,14 +62,14 @@ impl StorageOperations {
     }
 
     /// Get a task by ID
-    pub fn get(root_path: &Path, id: &str, project: String) -> Option<Task> {
+    pub fn get(root_path: &Path, id: &str, project: &str) -> Option<Task> {
         // Extract project folder from the task ID if provided
         if let Some(folder_from_id) = Self::get_project_for_task(id) {
             // SECURITY: Enforce project isolation - verify the project folder from ID matches the provided project
-            let project_name = if project.trim().is_empty() {
-                "default".to_string()
+            let project_name: &str = if project.trim().is_empty() {
+                "default"
             } else {
-                project.clone()
+                project
             };
 
             // If the project folder extracted from ID doesn't match the provided project, deny access
@@ -88,13 +89,13 @@ impl StorageOperations {
         }
 
         // Fallback: try the provided project name (for backward compatibility)
-        let project_name = if project.trim().is_empty() {
-            "default".to_string()
+        let project_name: &str = if project.trim().is_empty() {
+            "default"
         } else {
             project
         };
 
-        let project_path = root_path.join(&project_name);
+        let project_path = root_path.join(project_name);
         if let Some(file_path) = Self::get_file_path_for_id(&project_path, id) {
             if let Ok(file_string) = fs::read_to_string(&file_path) {
                 if let Ok(task) = serde_yaml::from_str::<Task>(&file_string) {
@@ -118,8 +119,8 @@ impl StorageOperations {
             None => return Err("Invalid task ID format".into()),
         };
 
-        // Get old task for index update
-        let _old_task = Self::get(root_path, id, project_folder.clone());
+        // Get old task for potential future use (kept for compatibility)
+        let _old_task = Self::get(root_path, id, &project_folder);
 
         let project_path = root_path.join(&project_folder);
 
@@ -129,10 +130,8 @@ impl StorageOperations {
             None => return Err("Task file not found".into()),
         };
 
-        // Save the task (no project field to update)
-        let task_to_save = new_task.clone();
-
-        let file_string = serde_yaml::to_string(&task_to_save)?;
+        // Save the task
+        let file_string = serde_yaml::to_string(new_task)?;
         fs::write(&file_path, file_string)?;
 
         // No longer need to update index - simplified architecture
@@ -144,9 +143,9 @@ impl StorageOperations {
     pub fn delete(
         root_path: &Path,
         id: &str,
-        project: String,
+        project: &str,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        let project_path = root_path.join(&project);
+        let project_path = root_path.join(project);
 
         // Use filesystem-based file path resolution
         let file_path = match Self::get_file_path_for_id(&project_path, id) {
@@ -188,23 +187,15 @@ impl StorageOperations {
 
     /// Get the current highest task ID by scanning the project directory
     pub fn get_current_id(project_path: &Path) -> u64 {
-        if let Ok(entries) = fs::read_dir(project_path) {
-            entries
-                .filter_map(|entry| entry.ok())
-                .filter_map(|entry| {
-                    let file_name = entry.file_name();
-                    let name_str = file_name.to_string_lossy();
-                    if name_str.ends_with(".yml") {
-                        name_str.strip_suffix(".yml")?.parse::<u64>().ok()
-                    } else {
-                        None
-                    }
-                })
-                .max()
-                .unwrap_or(0)
-        } else {
-            0
-        }
+        crate::utils::filesystem::list_files_with_ext(project_path, "yml")
+            .into_iter()
+            .filter_map(|p| {
+                p.file_stem()
+                    .and_then(|s| s.to_str())
+                    .and_then(|s| s.parse::<u64>().ok())
+            })
+            .max()
+            .unwrap_or(0)
     }
 
     /// Get the actual project folder name for a given task ID
@@ -214,7 +205,7 @@ impl StorageOperations {
     }
 
     /// Get or create a project prefix, ensuring it's unique and consistent
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn get_or_create_project_prefix(
         root_path: &Path,
         project_name: &str,
@@ -232,7 +223,7 @@ impl StorageOperations {
         let prefix_path = root_path.join(&expected_prefix);
         if prefix_path.exists() && prefix_path.is_dir() {
             // Verify this is for the same project by checking config
-            let config_path = prefix_path.join("config.yml");
+            let config_path = crate::utils::paths::project_config_path(root_path, &expected_prefix);
             if config_path.exists() {
                 if let Ok(content) = fs::read_to_string(&config_path) {
                     if let Ok(config) =
@@ -254,7 +245,7 @@ impl StorageOperations {
     }
 
     /// Generate a unique folder name (prefix) for a project
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn generate_unique_folder_prefix(
         root_path: &Path,
         project_name: &str,

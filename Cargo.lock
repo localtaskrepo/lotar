@@ -810,6 +810,7 @@ dependencies = [
  "mockall",
  "predicates",
  "proptest",
+ "rayon",
  "regex",
  "serde",
  "serde_json",

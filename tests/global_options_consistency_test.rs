@@ -1,16 +1,20 @@
 use std::env;
 use std::fs;
+use std::sync::{LazyLock, Mutex};
 
 mod common;
 use crate::common::TestFixtures;
+
+// Global mutex to ensure environment variable tests don't run in parallel
+static ENV_TEST_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 /// Tests for Phase 3.1.2: Global Options Consistency
 ///
 /// This test module ensures that global options like --tasks-dir, environment variables,
 /// and parent directory resolution work consistently across all commands.
 ///
-/// **Important:** These tests modify environment variables and should be run sequentially
-/// to avoid conflicts. Use: `cargo test --test global_options_consistency_test -- --test-threads=1`
+/// **Thread Safety:** Tests that modify global state (environment variables, current directory)
+/// are protected by a mutex to ensure safe parallel execution while keeping individual tests small.
 ///
 #[cfg(test)]
 mod tasks_dir_consistency {
@@ -78,6 +82,9 @@ mod tasks_dir_consistency {
 
     #[test]
     fn test_tasks_dir_overrides_default_detection() {
+        // Use mutex to ensure this test doesn't run in parallel (changes working directory)
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         let fixtures = TestFixtures::new();
 
         // Create a default tasks directory
@@ -129,6 +136,9 @@ mod tasks_dir_consistency {
 
     #[test]
     fn test_tasks_dir_with_relative_paths() {
+        // Use mutex to ensure this test doesn't run in parallel (changes working directory)
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         let fixtures = TestFixtures::new();
         let tasks_subdir = fixtures.temp_dir.path().join("project").join("tasks");
         fs::create_dir_all(&tasks_subdir).unwrap();
@@ -170,6 +180,9 @@ mod environment_variable_consistency {
     /// Combined test for environment variable scenarios to avoid parallel execution conflicts
     #[test]
     fn test_environment_variable_scenarios_combined() {
+        // Use mutex to ensure this test doesn't run in parallel with other env var tests
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         // Clean up any leftover environment variables from other tests
         unsafe {
             env::remove_var("LOTAR_TASKS_DIR");
@@ -600,6 +613,9 @@ mod global_options_integration {
 
     #[test]
     fn test_complex_scenario_with_all_global_options() {
+        // Use mutex to ensure this test doesn't run in parallel with other env var tests
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         let fixtures = TestFixtures::new();
 
         // Set up complex directory structure

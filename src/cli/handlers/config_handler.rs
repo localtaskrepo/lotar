@@ -1,17 +1,11 @@
-use crate::api_server;
 use crate::cli::handlers::CommandHandler;
-use crate::cli::{ConfigAction, ConfigShowArgs, ConfigValidateArgs, ScanArgs, ServeArgs};
+use crate::cli::{ConfigAction, ConfigShowArgs, ConfigValidateArgs};
 use crate::config::ConfigManager;
 use crate::output::OutputRenderer;
-use crate::project;
-use crate::routes;
-use crate::scanner;
 use crate::types::{Priority, TaskStatus};
-use crate::web_server;
 use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
 use std::fs;
-use std::path::PathBuf;
 
 /// Handler for config commands
 pub struct ConfigHandler;
@@ -24,7 +18,7 @@ impl CommandHandler for ConfigHandler {
         args: Self::Args,
         _project: Option<&str>,
         resolver: &TasksDirectoryResolver,
-        _renderer: &OutputRenderer,
+        renderer: &OutputRenderer,
     ) -> Self::Result {
         match args {
             ConfigAction::Show(ConfigShowArgs { project }) => {
@@ -36,7 +30,7 @@ impl CommandHandler for ConfigHandler {
                 dry_run,
                 force,
                 global,
-            }) => Self::handle_config_set(resolver, field, value, dry_run, force, global),
+            }) => Self::handle_config_set(resolver, renderer, field, value, dry_run, force, global),
             ConfigAction::Init(crate::cli::ConfigInitArgs {
                 template,
                 prefix,
@@ -46,23 +40,30 @@ impl CommandHandler for ConfigHandler {
                 dry_run,
                 force,
             }) => Self::handle_config_init(
-                resolver, template, prefix, project, copy_from, global, dry_run, force,
+                resolver, renderer, template, prefix, project, copy_from, global, dry_run, force,
             ),
             ConfigAction::Validate(ConfigValidateArgs {
                 project,
                 global,
                 fix,
                 errors_only,
-            }) => Self::handle_config_validate(resolver, project, global, fix, errors_only),
+            }) => {
+                Self::handle_config_validate(resolver, renderer, project, global, fix, errors_only)
+            }
             ConfigAction::Templates => {
-                println!("📚 Available Configuration Templates:");
+                println!(
+                    "{}",
+                    renderer.render_success("Available Configuration Templates:")
+                );
                 println!("  • default - Basic task management setup");
                 println!("  • agile - Agile/Scrum workflow configuration");
                 println!("  • kanban - Kanban board style setup");
                 println!("  • simple - Minimal configuration");
-                println!();
                 println!(
-                    "Use 'lotar config init --template=<name>' to initialize with a template."
+                    "{}",
+                    renderer.render_info(
+                        "Use 'lotar config init --template=<n>' to initialize with a template."
+                    )
                 );
                 Ok(())
             }
@@ -81,16 +82,24 @@ impl ConfigHandler {
 
         if let Some(project_name) = project {
             // Show project-specific config
-            let project_prefix = crate::utils::resolve_project_input(&project_name, &resolver.path);
+            let project_prefix =
+                crate::utils::resolve_project_input(&project_name, resolver.path.as_path());
             let project_config = config_manager
                 .get_project_config(&project_prefix)
                 .map_err(|e| format!("Failed to load project config: {}", e))?;
 
-            println!("Configuration for project: {}", project_name);
-            println!();
+            println!(
+                "{}",
+                OutputRenderer::new(crate::output::OutputFormat::Text, false)
+                    .render_info(&format!("Configuration for project: {}", project_name))
+            );
 
             // Project Settings section (no server settings for project config)
-            println!("Project Settings:");
+            println!(
+                "{}",
+                OutputRenderer::new(crate::output::OutputFormat::Text, false)
+                    .render_info("Project Settings:")
+            );
             println!("  Tasks directory: {}", resolver.path.display());
             println!("  Task file extension: yml");
             println!("  Project prefix: {}", project_config.default_prefix);
@@ -114,49 +123,45 @@ impl ConfigHandler {
                 project_config.issue_priorities.values
             );
         } else {
-            // Show global config
             let resolved_config = config_manager.get_resolved_config();
-
-            println!("Global configuration (showing current effective settings):");
-            println!();
             println!(
-                "Configuration for project: {}",
+                "{}",
+                OutputRenderer::new(crate::output::OutputFormat::Text, false).render_info(
+                    &format!(
+                        "Configuration for project: {}",
+                        if resolved_config.default_prefix.is_empty() {
+                            "(none set - will auto-detect on first task creation)"
+                        } else {
+                            &resolved_config.default_prefix
+                        }
+                    )
+                )
+            );
+            println!(
+                "{}",
+                OutputRenderer::new(crate::output::OutputFormat::Text, false)
+                    .render_info("Project Settings:")
+            );
+            println!("  Tasks directory: {}", resolver.path.display());
+            println!("  Task file extension: yml");
+            println!("  Project prefix: {}", resolved_config.default_prefix);
+            println!("  Port: {}", resolved_config.server_port);
+            println!(
+                "  Default Project: {}",
                 if resolved_config.default_prefix.is_empty() {
                     "(none set - will auto-detect on first task creation)"
                 } else {
                     &resolved_config.default_prefix
                 }
             );
-            println!();
-
-            // Server Settings section
-            println!("Server Settings:");
-            println!("  Port: {}", resolved_config.server_port);
-            println!();
-
-            // Project Settings section
-            println!("Project Settings:");
-            println!("  Tasks directory: {}", resolver.path.display());
-            println!("  Task file extension: yml");
-            println!("  Default Project: {}", resolved_config.default_prefix);
-
-            if let Some(assignee) = &resolved_config.default_assignee {
-                println!("  Default assignee: {}", assignee);
-            }
-            println!("  Default Priority: {:?}", resolved_config.default_priority);
-
-            // Show default status if configured
-            if let Some(status) = &resolved_config.default_status {
-                println!("  Default Status: {:?}", status);
-            }
         }
 
         Ok(())
     }
 
-    /// Handle config set command
     fn handle_config_set(
         resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
         field: String,
         value: String,
         dry_run: bool,
@@ -169,45 +174,75 @@ impl ConfigHandler {
             global = true;
             if !dry_run {
                 println!(
-                    "ℹ️  Automatically treating '{}' as global configuration field",
-                    field
+                    "{}",
+                    renderer.render_info(&format!(
+                        "Automatically treating '{}' as global configuration field",
+                        field
+                    ))
                 );
             }
         }
 
         if dry_run {
-            println!("🔍 DRY RUN: Would set {} = {}", field, value);
+            println!(
+                "{}",
+                renderer.render_info(&format!("DRY RUN: Would set {} = {}", field, value))
+            );
 
             // Check for validation conflicts
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
             if !conflicts.is_empty() {
-                println!("⚠️  WARNING: This change would cause validation conflicts:");
+                println!(
+                    "{}",
+                    renderer
+                        .render_warning("WARNING: This change would cause validation conflicts:")
+                );
                 for conflict in conflicts {
                     println!("  • {}", conflict);
                 }
                 if !force {
-                    println!();
-                    println!("Use --force to apply anyway, or fix conflicting values first.");
+                    println!(
+                        "{}",
+                        renderer.render_info(
+                            "Use --force to apply anyway, or fix conflicting values first."
+                        )
+                    );
                     return Ok(());
                 }
             }
 
-            println!("✅ Dry run completed. Use the same command without --dry-run to apply.");
+            println!(
+                "{}",
+                renderer.render_success(
+                    "Dry run completed. Use the same command without --dry-run to apply."
+                )
+            );
             return Ok(());
         }
 
-        println!("🔧 Setting configuration: {} = {}", field, value);
+        println!(
+            "{}",
+            renderer.render_info(&format!("Setting configuration: {} = {}", field, value))
+        );
 
         // Check for validation conflicts unless forced
         if !force {
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
             if !conflicts.is_empty() {
-                println!("⚠️  WARNING: This change would cause validation conflicts:");
+                println!(
+                    "{}",
+                    renderer
+                        .render_warning("WARNING: This change would cause validation conflicts:")
+                );
                 for conflict in conflicts {
                     println!("  • {}", conflict);
                 }
-                println!();
-                println!("Use --dry-run to see what would change, or --force to apply anyway.");
+                println!(
+                    "{}",
+                    renderer.render_info(
+                        "Use --dry-run to see what would change, or --force to apply anyway."
+                    )
+                );
                 return Err("Configuration change blocked due to validation conflicts".to_string());
             }
         }
@@ -254,12 +289,17 @@ impl ConfigHandler {
             // Check if the value matches the global default and inform the user
             if Self::check_matches_global_default(&field, &value, &resolver.path) {
                 println!(
-                    "ℹ️  Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field."
+                    "{}",
+                    renderer.render_info(
+                        "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field."
+                    )
                 );
             }
         }
-
-        println!("✅ Successfully updated {}", field);
+        println!(
+            "{}",
+            renderer.render_success(&format!("Successfully updated {}", field))
+        );
         Ok(())
     }
 
@@ -295,6 +335,7 @@ impl ConfigHandler {
     #[allow(clippy::too_many_arguments)]
     fn handle_config_init(
         resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
         template: String,
         prefix: Option<String>,
         project: Option<String>,
@@ -305,8 +346,11 @@ impl ConfigHandler {
     ) -> Result<(), String> {
         if dry_run {
             println!(
-                "🔍 DRY RUN: Would initialize config with template '{}'",
-                template
+                "{}",
+                renderer.render_info(&format!(
+                    "DRY RUN: Would initialize config with template '{}'",
+                    template
+                ))
             );
             if let Some(ref prefix) = prefix {
                 println!("  • Project prefix: {}", prefix);
@@ -361,11 +405,23 @@ impl ConfigHandler {
                     project_prefix
                 );
             }
-            println!("✅ Dry run completed. Use the same command without --dry-run to apply.");
+            println!(
+                "{}",
+                renderer.render_success(
+                    "Dry run completed. Use the same command without --dry-run to apply."
+                )
+            );
             return Ok(());
         }
 
-        println!("🚀 Initializing configuration with template '{}'", template);
+        // Standardized info message for initialization
+        println!(
+            "{}",
+            renderer.render_info(&format!(
+                "Initializing configuration with template '{}'",
+                template
+            ))
+        );
 
         // Load template
         let template_config = Self::load_template(&template)?;
@@ -373,6 +429,7 @@ impl ConfigHandler {
         // Apply template with customizations
         Self::apply_template_config(
             resolver,
+            renderer,
             template_config,
             prefix,
             project,
@@ -425,8 +482,10 @@ impl ConfigHandler {
     }
 
     /// Apply template configuration
+    #[allow(clippy::too_many_arguments)]
     fn apply_template_config(
         resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
         template: serde_yaml::Value,
         prefix: Option<String>,
         project: Option<String>,
@@ -477,7 +536,7 @@ impl ConfigHandler {
             // Ensure tasks directory exists for global config
             fs::create_dir_all(&resolver.path)
                 .map_err(|e| format!("Failed to create tasks directory: {}", e))?;
-            resolver.path.join("config.yml")
+            crate::utils::paths::global_config_path(&resolver.path)
         } else {
             let project_name = project
                 .as_deref()
@@ -498,10 +557,10 @@ impl ConfigHandler {
                 crate::utils::generate_unique_project_prefix(project_name, &resolver.path)?
             };
 
-            let project_dir = resolver.path.join(&project_prefix);
+            let project_dir = crate::utils::paths::project_dir(&resolver.path, &project_prefix);
             fs::create_dir_all(&project_dir)
                 .map_err(|e| format!("Failed to create project directory: {}", e))?;
-            project_dir.join("config.yml")
+            crate::utils::paths::project_config_path(&resolver.path, &project_prefix)
         };
 
         // Check if config already exists
@@ -519,7 +578,13 @@ impl ConfigHandler {
         fs::write(&config_path, config_yaml)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
 
-        println!("✅ Configuration initialized at: {}", config_path.display());
+        println!(
+            "{}",
+            renderer.render_success(&format!(
+                "Configuration initialized at: {}",
+                config_path.display()
+            ))
+        );
         Ok(())
     }
 
@@ -529,7 +594,8 @@ impl ConfigHandler {
         resolver: &TasksDirectoryResolver,
         source_project: &str,
     ) -> Result<(), String> {
-        let source_config_path = resolver.path.join(source_project).join("config.yml");
+        let source_config_path =
+            crate::utils::paths::project_config_path(&resolver.path, source_project);
 
         if !source_config_path.exists() {
             return Err(format!(
@@ -555,7 +621,13 @@ impl ConfigHandler {
             }
         }
 
-        println!("📋 Copied settings from project '{}'", source_project);
+        println!(
+            "{}",
+            OutputRenderer::new(crate::output::OutputFormat::Text, false).render_info(&format!(
+                "Copied settings from project '{}'",
+                source_project
+            ))
+        );
         Ok(())
     }
 
@@ -587,6 +659,7 @@ impl ConfigHandler {
 
     fn handle_config_validate(
         resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
         project: Option<String>,
         global: bool,
         fix: bool,
@@ -595,7 +668,7 @@ impl ConfigHandler {
         use crate::config::validation::{ConfigValidator, ValidationSeverity};
 
         // Load global config from tasks directory
-        let global_config_path = resolver.path.join("config.yml");
+        let global_config_path = crate::utils::paths::global_config_path(&resolver.path);
         let global_config = if global_config_path.exists() {
             match std::fs::read_to_string(&global_config_path) {
                 Ok(content) => serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
@@ -614,26 +687,36 @@ impl ConfigHandler {
 
         // Validate global config if requested or no specific scope given
         if global || project.is_none() {
-            println!("🔍 Validating global configuration...");
+            println!(
+                "{}",
+                renderer.render_info("Validating global configuration")
+            );
             let result = validator.validate_global_config(&global_config);
 
             if result.has_errors() || result.has_warnings() {
                 has_errors |= result.has_errors(); // Only actual errors affect exit code
                 all_results.push(("Global Config".to_string(), result));
             } else {
-                println!("✅ Global configuration is valid");
+                println!(
+                    "{}",
+                    renderer.render_success("Global configuration is valid")
+                );
             }
         }
 
         // Validate project config if requested or available
         if let Some(project_name) = project {
             println!(
-                "🔍 Validating project configuration for '{}'...",
-                project_name
+                "{}",
+                renderer.render_info(&format!(
+                    "Validating project configuration for '{}'",
+                    project_name
+                ))
             );
 
             // Load project config directly from file
-            let project_config_path = resolver.path.join(&project_name).join("config.yml");
+            let project_config_path =
+                crate::utils::paths::project_config_path(&resolver.path, &project_name);
 
             if project_config_path.exists() {
                 match std::fs::read_to_string(&project_config_path) {
@@ -659,24 +742,42 @@ impl ConfigHandler {
                                         combined_result,
                                     ));
                                 } else {
-                                    println!("✅ Project configuration is valid");
+                                    println!(
+                                        "{}",
+                                        renderer.render_success("Project configuration is valid")
+                                    );
                                 }
                             }
                             Err(e) => {
-                                eprintln!("❌ Could not parse project config YAML: {}", e);
+                                eprintln!(
+                                    "{}",
+                                    renderer.render_error(&format!(
+                                        "Could not parse project config YAML: {}",
+                                        e
+                                    ))
+                                );
                                 has_errors = true;
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!("❌ Could not read project config file: {}", e);
+                        eprintln!(
+                            "{}",
+                            renderer.render_error(&format!(
+                                "Could not read project config file: {}",
+                                e
+                            ))
+                        );
                         has_errors = true;
                     }
                 }
             } else {
                 eprintln!(
-                    "❌ Project config file not found: {}",
-                    project_config_path.display()
+                    "{}",
+                    renderer.render_error(&format!(
+                        "Project config file not found: {}",
+                        project_config_path.display()
+                    ))
                 );
                 has_errors = true;
             }
@@ -684,7 +785,10 @@ impl ConfigHandler {
 
         // Display results
         for (scope, result) in all_results {
-            println!("\n📋 {} Validation Results:", scope);
+            println!(
+                "{}",
+                renderer.render_info(&format!("{} Validation Results:", scope))
+            );
 
             // Display errors
             for error in &result.errors {
@@ -709,145 +813,32 @@ impl ConfigHandler {
 
         // Handle validation outcome
         if has_errors {
-            println!("\n❌ Configuration validation failed with errors");
+            println!(
+                "{}",
+                renderer.render_error("Configuration validation failed with errors")
+            );
 
             if fix {
-                println!("🔧 Auto-fix functionality not yet implemented");
-                println!("   Please review the suggestions above and make manual corrections");
+                println!(
+                    "{}",
+                    renderer.render_warning("Auto-fix functionality not yet implemented")
+                );
+                println!(
+                    "{}",
+                    renderer.render_info(
+                        "Please review the suggestions above and make manual corrections"
+                    )
+                );
             }
 
             return Err("Configuration validation failed".to_string());
         } else {
-            println!("\n✅ All configurations are valid!");
+            println!(
+                "{}",
+                renderer.render_success("All configurations are valid!")
+            );
         }
 
         Ok(())
     }
-}
-
-/// Handler for scan command
-pub struct ScanHandler;
-
-impl CommandHandler for ScanHandler {
-    type Args = ScanArgs;
-    type Result = Result<(), String>;
-
-    fn execute(
-        args: Self::Args,
-        _project: Option<&str>,
-        _resolver: &TasksDirectoryResolver,
-        _renderer: &OutputRenderer,
-    ) -> Self::Result {
-        let path = if let Some(scan_path) = args.path {
-            PathBuf::from(scan_path)
-        } else {
-            project::get_project_path().unwrap_or_else(|| {
-                println!("No path specified. Using current directory.");
-                PathBuf::from(".")
-            })
-        };
-
-        if !path.exists() {
-            return Err(format!("Path '{}' does not exist", path.display()));
-        }
-
-        println!("🔍 Scanning {} for TODO comments...", path.display());
-
-        let mut scanner = scanner::Scanner::new(path);
-        let results = scanner.scan();
-
-        if results.is_empty() {
-            println!("✅ No TODO comments found.");
-        } else {
-            println!("📝 Found {} TODO comment(s):", results.len());
-            for entry in results {
-                if args.detailed {
-                    println!("  📄 {}", entry.file_path.display());
-                    println!("    Line {}: {}", entry.line_number, entry.title.trim());
-                    if !entry.annotation.is_empty() {
-                        println!("    Note: {}", entry.annotation);
-                    }
-                    println!();
-                } else {
-                    println!(
-                        "  {}:{} - {}",
-                        entry.file_path.display(),
-                        entry.line_number,
-                        entry.title.trim()
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// Handler for serve command
-pub struct ServeHandler;
-
-impl CommandHandler for ServeHandler {
-    type Args = ServeArgs;
-    type Result = Result<(), String>;
-
-    fn execute(
-        args: Self::Args,
-        _project: Option<&str>,
-        _resolver: &TasksDirectoryResolver,
-        _renderer: &OutputRenderer,
-    ) -> Self::Result {
-        let port = args.port.unwrap_or(8080);
-        let host = args.host;
-
-        println!("🚀 Starting LoTaR web server...");
-        println!("   Host: {}", host);
-        println!("   Port: {}", port);
-        println!("   URL: http://{}:{}", host, port);
-
-        if args.open {
-            // Open browser automatically
-            let url = format!("http://{}:{}", host, port);
-            if let Err(e) = open_browser(&url) {
-                println!("⚠️  Failed to open browser: {}", e);
-                println!("   Please navigate to {} manually", url);
-            }
-        }
-
-        println!("Press Ctrl+C to stop the server");
-
-        let mut api_server = api_server::ApiServer::new();
-        routes::initialize(&mut api_server);
-        web_server::serve(&api_server, port);
-
-        Ok(())
-    }
-}
-
-/// Helper function to open browser (cross-platform)
-fn open_browser(url: &str) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(url)
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(&["/c", "start", url])
-            .spawn()
-            .map_err(|e| e.to_string())?;
-    }
-
-    Ok(())
 }

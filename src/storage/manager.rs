@@ -1,39 +1,46 @@
 use crate::config::types::GlobalConfig;
 use crate::storage::TaskFilter;
-use crate::storage::operations::StorageOperations;
+use crate::storage::backend::{FsBackend, StorageBackend};
 use crate::storage::search::StorageSearch;
 use crate::storage::task::Task;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Main storage manager that orchestrates all storage operations
 pub struct Storage {
     pub root_path: PathBuf,
+    backend: Box<dyn StorageBackend>,
 }
 
 impl Storage {
+    /// Create storage with default filesystem backend
     pub fn new(root_path: PathBuf) -> Self {
-        fs::create_dir_all(&root_path).unwrap();
+        let backend: Box<dyn StorageBackend> = Box::new(FsBackend);
+        Self::new_with_backend(root_path, backend)
+    }
+
+    /// Create storage with an explicit backend implementation
+    pub fn new_with_backend(root_path: PathBuf, backend: Box<dyn StorageBackend>) -> Self {
+        let _ = fs::create_dir_all(&root_path);
 
         // Ensure global config exists
         Self::ensure_global_config_exists(&root_path, None);
-
-        Self { root_path }
+        Self { root_path, backend }
     }
 
     /// Create Storage with intelligent global config creation
     pub fn new_with_context(root_path: PathBuf, project_context: Option<&str>) -> Self {
-        fs::create_dir_all(&root_path).unwrap();
+        let backend: Box<dyn StorageBackend> = Box::new(FsBackend);
+        let _ = fs::create_dir_all(&root_path);
 
         // Ensure global config exists with smart default_prefix detection
         Self::ensure_global_config_exists(&root_path, project_context);
-
-        Self { root_path }
+        Self { root_path, backend }
     }
 
     /// Ensure global config exists, creating it intelligently if missing
-    fn ensure_global_config_exists(root_path: &PathBuf, project_context: Option<&str>) {
-        let global_config_path = root_path.join("config.yml");
+    fn ensure_global_config_exists(root_path: &Path, project_context: Option<&str>) {
+        let global_config_path = crate::utils::paths::global_config_path(root_path);
 
         if global_config_path.exists() {
             return; // Already exists, nothing to do
@@ -56,7 +63,7 @@ impl Storage {
 
     /// Determine the best default_prefix for global config
     fn determine_smart_default_prefix(
-        root_path: &PathBuf,
+        root_path: &Path,
         project_context: Option<&str>,
     ) -> Option<String> {
         // 1. Use explicit project context if provided
@@ -78,16 +85,11 @@ impl Storage {
         }
 
         // 3. Check if any existing projects exist and use one as default
-        if let Ok(entries) = fs::read_dir(root_path) {
-            for entry in entries.flatten() {
-                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                    let dir_name = entry.file_name().to_string_lossy().to_string();
-                    // Skip special directories
-                    if dir_name != "." && dir_name != ".." && !dir_name.starts_with('.') {
-                        return Some(dir_name);
-                    }
-                }
-            }
+        if let Some((dir_name, _path)) = crate::utils::filesystem::list_visible_subdirs(root_path)
+            .into_iter()
+            .next()
+        {
+            return Some(dir_name);
         }
 
         // 4. Fall back to empty (no default project)
@@ -101,7 +103,10 @@ impl Storage {
             return None;
         }
 
-        Some(Self { root_path })
+        Some(Self {
+            root_path,
+            backend: Box::new(FsBackend),
+        })
     }
 
     pub fn add(
@@ -110,22 +115,27 @@ impl Storage {
         project_prefix: &str,
         original_project_name: Option<&str>,
     ) -> String {
-        match StorageOperations::add(&self.root_path, task, project_prefix, original_project_name) {
+        match self
+            .backend
+            .add(&self.root_path, task, project_prefix, original_project_name)
+        {
             Ok(formatted_id) => formatted_id,
             Err(_) => "ERROR".to_string(), // TODO: Better error handling
         }
     }
 
     pub fn get(&self, id: &str, project: String) -> Option<Task> {
-        StorageOperations::get(&self.root_path, id, project)
+        self.backend.get(&self.root_path, id, &project)
     }
 
     pub fn edit(&mut self, id: &str, new_task: &Task) {
-        let _ = StorageOperations::edit(&self.root_path, id, new_task);
+        let _ = self.backend.edit(&self.root_path, id, new_task);
     }
 
     pub fn delete(&mut self, id: &str, project: String) -> bool {
-        StorageOperations::delete(&self.root_path, id, project).unwrap_or_default()
+        self.backend
+            .delete(&self.root_path, id, &project)
+            .unwrap_or_default()
     }
 
     pub fn search(&self, filter: &TaskFilter) -> Vec<(String, Task)> {

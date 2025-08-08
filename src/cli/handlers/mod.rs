@@ -8,13 +8,17 @@ use crate::types::{Priority, TaskStatus, TaskType};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json;
 
-pub mod commands;
+pub mod config_handler;
 pub mod priority;
+pub mod scan_handler;
+pub mod serve_handler;
 pub mod status;
 pub mod task;
 
 // Re-export handlers for easy access
-pub use commands::{ConfigHandler, ScanHandler, ServeHandler};
+pub use config_handler::ConfigHandler;
+pub use scan_handler::ScanHandler;
+pub use serve_handler::ServeHandler;
 pub use task::TaskHandler;
 
 /// Trait for command handlers
@@ -211,7 +215,8 @@ impl CommandHandler for AddHandler {
 
         let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
             // If we have an explicit project from command line, resolve it to its prefix
-            let prefix = crate::utils::resolve_project_input(explicit_project, &resolver.path);
+            let prefix =
+                crate::utils::resolve_project_input(explicit_project, resolver.path.as_path());
             (prefix, Some(explicit_project))
         } else if let Some(ref detected) = detected_name {
             // Auto-detected project name - generate prefix but use original name for config

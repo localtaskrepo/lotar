@@ -79,7 +79,7 @@ impl ProjectResolver {
     /// Resolve a project name (which could be a full name) to its prefix
     pub fn resolve_project_name_to_prefix(&self, project_name: &str) -> String {
         // Use the existing utility function that handles project name -> prefix mapping
-        crate::utils::resolve_project_input(project_name, &self.tasks_dir)
+        crate::utils::resolve_project_input(project_name, self.tasks_dir.as_path())
     }
 
     /// Validate project name format
@@ -117,11 +117,15 @@ impl ProjectResolver {
 
     /// Extract project prefix from task ID (e.g., "AUTH-123" -> "AUTH")
     pub fn extract_project_from_task_id(&self, task_id: &str) -> Option<String> {
-        // Look for pattern: LETTERS-NUMBERS (e.g., AUTH-123, TI-456, MOBILE-789)
+        // Look for pattern: PREFIX-NUMBER (e.g., AUTH-123, TI-456, MOBILE-789)
         if let Some(dash_pos) = task_id.find('-') {
             let prefix = &task_id[..dash_pos];
-            // Verify it's all uppercase letters (project prefixes should be consistent)
-            if prefix.chars().all(|c| c.is_ascii_uppercase()) && !prefix.is_empty() {
+            // Verify it's all uppercase alphanumeric (letters or digits)
+            if !prefix.is_empty()
+                && prefix
+                    .chars()
+                    .all(|c| c.is_ascii_digit() || (c.is_ascii_uppercase()))
+            {
                 return Some(prefix.to_string());
             }
         }

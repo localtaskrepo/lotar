@@ -13,34 +13,21 @@ impl PrefixConflictDetector {
 
         // Scan existing project directories for prefixes
         if tasks_dir.exists() {
-            let entries = std::fs::read_dir(tasks_dir)
-                .map_err(|e| format!("Failed to read tasks directory: {}", e))?;
-
-            for entry in entries {
-                let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
-                let path = entry.path();
-
-                if path.is_dir() {
-                    if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                        // Try to load config to get actual prefix
-                        let config_path = path.join("config.yml");
-                        if config_path.exists() {
-                            if let Ok(config_manager) =
-                                ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-                            {
-                                if let Ok(project_config) =
-                                    config_manager.get_project_config(dir_name)
-                                {
-                                    existing_prefixes
-                                        .insert(project_config.default_prefix.to_uppercase());
-                                }
-                            }
-                        } else {
-                            // Fallback to directory name as prefix
-                            existing_prefixes.insert(dir_name.to_uppercase());
+            for (dir_name, _path) in crate::utils::filesystem::list_visible_subdirs(tasks_dir) {
+                // Try to load config to get actual prefix
+                let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
+                if config_path.exists() {
+                    if let Ok(config_manager) =
+                        ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
+                    {
+                        if let Ok(project_config) = config_manager.get_project_config(&dir_name) {
+                            existing_prefixes.insert(project_config.default_prefix.to_uppercase());
+                            continue;
                         }
                     }
                 }
+                // Fallback to directory name as prefix
+                existing_prefixes.insert(dir_name.to_uppercase());
             }
         }
 

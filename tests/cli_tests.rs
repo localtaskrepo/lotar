@@ -279,7 +279,7 @@ mod error_handling {
             .arg("--title=Should not work")
             .assert()
             .failure()
-            .stdout(predicate::str::contains("not found").or(predicate::str::contains("error")));
+            .stderr(predicate::str::contains("not found").or(predicate::str::contains("error")));
     }
 
     #[test]

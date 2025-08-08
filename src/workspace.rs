@@ -2,6 +2,12 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+use std::sync::{LazyLock, Mutex};
+
+#[cfg(test)]
+static ENV_TEST_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
 #[derive(Debug, Clone)]
 pub struct TasksDirectoryResolver {
     pub path: PathBuf,
@@ -30,7 +36,7 @@ impl TasksDirectoryResolver {
     ///
     /// This function allows tests to specify a custom home directory path for configuration
     /// loading, enabling isolated testing of home config functionality.
-    #[allow(dead_code)] // Used in integration tests
+    #[cfg(test)] // Used in integration tests
     pub fn resolve_with_home_override(
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
@@ -143,12 +149,12 @@ impl TasksDirectoryResolver {
         // 1. Global config setting
         if let Some(config_folder) = global_config_tasks_folder {
             if !config_folder.trim().is_empty() {
-                return config_folder.to_string();
+                return config_folder.to_owned();
             }
         }
 
         // 2. Default
-        ".tasks".to_string()
+        String::from(".tasks")
     }
 
     /// Get tasks folder preference from home configuration
@@ -280,6 +286,9 @@ mod tests {
 
     #[test]
     fn test_relative_path_parent_search() {
+        // Use a lock to ensure this test doesn't run in parallel with other env var tests
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         // Create a test that doesn't rely on changing working directory
         // This is more stable for parallel test execution
 
@@ -323,6 +332,9 @@ mod tests {
 
     #[test]
     fn test_relative_path_with_prefix() {
+        // Use a lock to ensure this test doesn't run in parallel with other env var tests
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         let temp_dir = TempDir::new().unwrap();
 
         // Create a parent directory with .tasks
@@ -362,6 +374,9 @@ mod tests {
 
     #[test]
     fn test_complex_relative_path_no_search() {
+        // Use a lock to ensure this test doesn't run in parallel with other env var tests
+        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+
         let temp_dir = TempDir::new().unwrap();
 
         // Change to temp directory

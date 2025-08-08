@@ -587,7 +587,7 @@ mod experimental_features {
             .arg("--project=NonExistentProject")
             .assert()
             .success()
-            .stdout(predicate::str::contains("No tasks found"));
+            .stderr(predicate::str::contains("No tasks found"));
 
         // Invalid task ID with status command
         let mut cmd = Command::cargo_bin("lotar").unwrap();
