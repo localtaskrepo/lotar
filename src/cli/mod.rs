@@ -24,11 +24,11 @@ pub struct Cli {
     pub tasks_dir: Option<String>,
 
     /// Output format
-    #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Text)]
+    #[arg(long, global = true, value_parser = crate::output::parse_output_format, default_value = "text")]
     pub format: OutputFormat,
 
     /// Log level (controls diagnostic verbosity)
-    #[arg(long, global = true, value_enum, env = "LOTAR_LOG_LEVEL", default_value_t = LogLevel::Warn)]
+    #[arg(long, global = true, value_enum, default_value_t = LogLevel::Warn)]
     pub log_level: LogLevel,
 
     /// Backward-compat verbose flag (maps to Info level)

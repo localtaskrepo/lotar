@@ -2,11 +2,11 @@
 mod mcp_server_tests {
     use super::*;
     // Minimal per-variable lock for this test to avoid env races
-    use once_cell::sync::Lazy;
     use std::collections::HashMap;
+    use std::sync::LazyLock;
     use std::sync::{Mutex, MutexGuard};
-    static ENV_LOCKS: Lazy<Mutex<HashMap<&'static str, &'static Mutex<()>>>> =
-        Lazy::new(|| Mutex::new(HashMap::new()));
+    static ENV_LOCKS: LazyLock<Mutex<HashMap<&'static str, &'static Mutex<()>>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
     fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
         let mtx: &'static Mutex<()> = {
             let mut map = ENV_LOCKS.lock().unwrap();

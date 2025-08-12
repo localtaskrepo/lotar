@@ -54,6 +54,7 @@ const FILE_TYPES: &[(&str, &str)] = &[
     ("tex", "%"),
 ];
 
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use regex::Regex;
 use std::fs;
@@ -105,8 +106,15 @@ impl Scanner {
         // Collect candidate files first, then process in parallel
         let files = self.collect_candidate_files(self.path.as_path());
 
+        #[cfg(feature = "parallel")]
         let mut references: Vec<Reference> = files
             .par_iter()
+            .flat_map(|path| self.scan_file_collect(path.as_path()))
+            .collect();
+
+        #[cfg(not(feature = "parallel"))]
+        let mut references: Vec<Reference> = files
+            .iter()
             .flat_map(|path| self.scan_file_collect(path.as_path()))
             .collect();
 

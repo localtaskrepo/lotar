@@ -1,5 +1,6 @@
 use crate::storage::TaskFilter;
 use crate::storage::task::Task;
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::fs;
 use std::path::Path;
@@ -23,8 +24,25 @@ impl StorageSearch {
                 let project_path = root_path.join(&project_folder);
                 let files = crate::utils::filesystem::list_files_with_ext(&project_path, "yml");
 
+                #[cfg(feature = "parallel")]
                 let mut partial: Vec<(String, Task)> = files
                     .par_iter()
+                    .filter_map(|path| {
+                        let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
+                        let task_id = format!("{}-{}", project_folder, numeric_id);
+                        let content = fs::read_to_string(path).ok()?;
+                        let task: Task = serde_yaml::from_str(&content).ok()?;
+                        if Self::task_matches_filter(&task, filter) {
+                            Some((task_id, task))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                #[cfg(not(feature = "parallel"))]
+                let mut partial: Vec<(String, Task)> = files
+                    .iter()
                     .filter_map(|path| {
                         let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
                         let task_id = format!("{}-{}", project_folder, numeric_id);
@@ -52,20 +70,40 @@ impl StorageSearch {
                     })
                     .collect();
 
-            results = all_files
-                .par_iter()
-                .filter_map(|(project_folder, task_path)| {
-                    let numeric_id = crate::utils::filesystem::file_numeric_stem(task_path)?;
-                    let task_id = format!("{}-{}", project_folder, numeric_id);
-                    let content = fs::read_to_string(task_path).ok()?;
-                    let task: Task = serde_yaml::from_str(&content).ok()?;
-                    if Self::task_matches_filter(&task, filter) {
-                        Some((task_id, task))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            #[cfg(feature = "parallel")]
+            {
+                results = all_files
+                    .par_iter()
+                    .filter_map(|(project_folder, task_path)| {
+                        let numeric_id = crate::utils::filesystem::file_numeric_stem(task_path)?;
+                        let task_id = format!("{}-{}", project_folder, numeric_id);
+                        let content = fs::read_to_string(task_path).ok()?;
+                        let task: Task = serde_yaml::from_str(&content).ok()?;
+                        if Self::task_matches_filter(&task, filter) {
+                            Some((task_id, task))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+            }
+            #[cfg(not(feature = "parallel"))]
+            {
+                results = all_files
+                    .iter()
+                    .filter_map(|(project_folder, task_path)| {
+                        let numeric_id = crate::utils::filesystem::file_numeric_stem(task_path)?;
+                        let task_id = format!("{}-{}", project_folder, numeric_id);
+                        let content = fs::read_to_string(task_path).ok()?;
+                        let task: Task = serde_yaml::from_str(&content).ok()?;
+                        if Self::task_matches_filter(&task, filter) {
+                            Some((task_id, task))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+            }
         }
         // Deterministic order
         results.sort_by(|a, b| a.0.cmp(&b.0));

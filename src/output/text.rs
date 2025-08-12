@@ -1,5 +1,3 @@
-use console::style;
-
 use super::Outputable;
 
 pub fn render_text_single<T: Outputable>(item: &T) -> String {
@@ -10,11 +8,11 @@ pub fn render_text_list<T: Outputable>(items: &[T], title: Option<&str>, verbose
     let mut output = String::new();
 
     if let Some(title) = title {
-        output.push_str(&format!("{}\n\n", style(title).bold().underlined()));
+        output.push_str(&format!("{}\n\n", title));
     }
 
     if items.is_empty() {
-        output.push_str(&style("No items found.").dim().to_string());
+        output.push_str("No items found.");
     } else {
         for (index, item) in items.iter().enumerate() {
             if verbose {

@@ -337,8 +337,42 @@ fn parse_path_and_query(path_full: &str) -> (String, HashMap<String, String>) {
 }
 
 fn url_decode(s: &str) -> String {
-    let bytes: Vec<u8> = percent_encoding::percent_decode_str(s).collect();
-    String::from_utf8_lossy(&bytes).into_owned()
+    // Minimal percent-decoder for application/x-www-form-urlencoded-like strings
+    let mut out = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'+' => {
+                out.push(' ');
+                i += 1;
+            }
+            b'%' if i + 2 < bytes.len() => {
+                let hi = bytes[i + 1];
+                let lo = bytes[i + 2];
+                let hex = |c: u8| -> Option<u8> {
+                    match c {
+                        b'0'..=b'9' => Some(c - b'0'),
+                        b'a'..=b'f' => Some(10 + c - b'a'),
+                        b'A'..=b'F' => Some(10 + c - b'A'),
+                        _ => None,
+                    }
+                };
+                if let (Some(h), Some(l)) = (hex(hi), hex(lo)) {
+                    out.push((h << 4 | l) as char);
+                    i += 3;
+                } else {
+                    out.push('%');
+                    i += 1;
+                }
+            }
+            c => {
+                out.push(c as char);
+                i += 1;
+            }
+        }
+    }
+    out
 }
 
 fn add_files_to_executable() -> HashMap<String, &'static [u8]> {

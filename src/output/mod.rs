@@ -1,22 +1,31 @@
 use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
 use clap::ValueEnum;
-use console::style;
 use serde::Serialize;
 use std::io::{self, Write};
 
 mod json;
-mod markdown;
-mod table;
 mod text;
 
 #[derive(Debug, Clone, ValueEnum, Default)]
 pub enum OutputFormat {
     #[default]
     Text,
-    Table,
     Json,
-    Markdown,
+}
+
+// Custom parser for clap to provide clearer error messages for invalid format values
+pub fn parse_output_format(s: &str) -> Result<OutputFormat, String> {
+    match s.to_ascii_lowercase().as_str() {
+        "text" => Ok(OutputFormat::Text),
+        // Backward-compatible aliases; render as plain text
+        "table" | "markdown" | "md" => Ok(OutputFormat::Text),
+        "json" => Ok(OutputFormat::Json),
+        other => Err(format!(
+            "invalid format: '{}' . Supported formats: text, json",
+            other
+        )),
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -83,37 +92,26 @@ impl Outputable for Task {
         };
 
         let priority_str = self.priority.to_string();
-        let priority_color = match self.priority {
-            Priority::Critical => style(&priority_str).red().bright(),
-            Priority::High => style(&priority_str).red(),
-            Priority::Medium => style(&priority_str).yellow(),
-            Priority::Low => style(&priority_str).green(),
-        };
+        let priority_color = priority_str;
 
         let type_str = self.task_type.to_string();
-        let type_styled = match self.task_type {
-            TaskType::Bug => style(&type_str).red(),
-            TaskType::Feature => style(&type_str).blue(),
-            TaskType::Epic => style(&type_str).magenta(),
-            TaskType::Spike => style(&type_str).cyan(),
-            TaskType::Chore => style(&type_str).dim(),
-        };
+        let type_styled = type_str;
 
         let mut output = format!(
             "{} {} [{}] - {} ({})",
             status_emoji,
-            style(&self.title).bold(),
+            self.title.clone(),
             type_styled,
             priority_color,
-            style(&self.status.to_string()).cyan()
+            self.status
         );
 
         if let Some(assignee) = &self.assignee {
-            output.push_str(&format!(" - 👤 {}", style(assignee).dim()));
+            output.push_str(&format!(" - 👤 {}", assignee));
         }
 
         if let Some(due_date) = &self.due_date {
-            output.push_str(&format!(" - 📅 {}", style(due_date).dim()));
+            output.push_str(&format!(" - 📅 {}", due_date));
         }
 
         if !self.tags.is_empty() {
@@ -211,9 +209,7 @@ impl OutputRenderer {
     pub fn render_single<T: Outputable + Serialize>(&self, item: &T) -> String {
         match self.format {
             OutputFormat::Text => self.render_text_single(item),
-            OutputFormat::Table => self.render_table_single(item),
             OutputFormat::Json => self.render_json_single(item),
-            OutputFormat::Markdown => self.render_markdown_single(item),
         }
     }
 
@@ -224,30 +220,28 @@ impl OutputRenderer {
     ) -> String {
         match self.format {
             OutputFormat::Text => self.render_text_list(items, title),
-            OutputFormat::Table => self.render_table_list(items, title),
             OutputFormat::Json => self.render_json_list(items),
-            OutputFormat::Markdown => self.render_markdown_list(items, title),
         }
     }
 
     pub fn render_success(&self, message: &str) -> String {
         match self.format {
             OutputFormat::Json => Self::json_status_message("success", message),
-            _ => format!("✅ {}", style(message).green()),
+            _ => format!("✅ {}", message),
         }
     }
 
     pub fn render_error(&self, message: &str) -> String {
         match self.format {
             OutputFormat::Json => Self::json_status_message("error", message),
-            _ => format!("❌ {}", style(message).red()),
+            _ => format!("❌ {}", message),
         }
     }
 
     pub fn render_warning(&self, message: &str) -> String {
         match self.format {
             OutputFormat::Json => Self::json_status_message("warning", message),
-            _ => format!("⚠️  {}", style(message).yellow()),
+            _ => format!("⚠️  {}", message),
         }
     }
 
@@ -309,14 +303,6 @@ impl OutputRenderer {
         text::render_text_list(items, title, self.pretty_json)
     }
 
-    fn render_table_single<T: Outputable>(&self, item: &T) -> String {
-        table::render_table_single(item)
-    }
-
-    fn render_table_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
-        table::render_table_list(items, title)
-    }
-
     fn render_json_single<T: Serialize>(&self, item: &T) -> String {
         json::render_json_single(item, self.pretty_json)
     }
@@ -325,13 +311,7 @@ impl OutputRenderer {
         json::render_json_list(items, self.pretty_json)
     }
 
-    fn render_markdown_single<T: Outputable>(&self, item: &T) -> String {
-        markdown::render_markdown_single(item)
-    }
-
-    fn render_markdown_list<T: Outputable>(&self, items: &[T], title: Option<&str>) -> String {
-        markdown::render_markdown_list(items, title)
-    }
+    // Markdown/Table output removed
 }
 
 // ProgressIndicator removed as unused; reintroduce if interactive progress becomes necessary.
@@ -369,3 +349,5 @@ impl OutputRenderer {
         }
     }
 }
+
+// Styling removed to keep output plain and test-friendly
