@@ -106,6 +106,9 @@ pub enum Commands {
 
     /// Start web server (existing)
     Serve(ServeArgs),
+
+    /// Start MCP JSON-RPC server over stdio
+    Mcp,
 }
 
 // AddArgs moved to args_task

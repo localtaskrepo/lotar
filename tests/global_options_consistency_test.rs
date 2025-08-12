@@ -1,12 +1,12 @@
 use std::env;
 use std::fs;
-use std::sync::{LazyLock, Mutex};
 
 mod common;
 use crate::common::TestFixtures;
+use crate::common::env_mutex::lock_var;
 
 // Global mutex to ensure environment variable tests don't run in parallel
-static ENV_TEST_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+// Use shared ENV_MUTEX from tests/common/env_mutex.rs for any env mutations
 
 /// Tests for Phase 3.1.2: Global Options Consistency
 ///
@@ -83,7 +83,8 @@ mod tasks_dir_consistency {
     #[test]
     fn test_tasks_dir_overrides_default_detection() {
         // Use mutex to ensure this test doesn't run in parallel (changes working directory)
-        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+        // Lock current directory changes and LOTAR_TASKS_DIR separately
+        let _cwd_guard = lock_var("CWD");
 
         let fixtures = TestFixtures::new();
 
@@ -137,7 +138,7 @@ mod tasks_dir_consistency {
     #[test]
     fn test_tasks_dir_with_relative_paths() {
         // Use mutex to ensure this test doesn't run in parallel (changes working directory)
-        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+        let _cwd_guard = lock_var("CWD");
 
         let fixtures = TestFixtures::new();
         let tasks_subdir = fixtures.temp_dir.path().join("project").join("tasks");
@@ -181,7 +182,7 @@ mod environment_variable_consistency {
     #[test]
     fn test_environment_variable_scenarios_combined() {
         // Use mutex to ensure this test doesn't run in parallel with other env var tests
-        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+        let _env_guard = lock_var("LOTAR_TASKS_DIR");
 
         // Clean up any leftover environment variables from other tests
         unsafe {
@@ -613,8 +614,9 @@ mod global_options_integration {
 
     #[test]
     fn test_complex_scenario_with_all_global_options() {
-        // Use mutex to ensure this test doesn't run in parallel with other env var tests
-        let _guard = ENV_TEST_MUTEX.lock().unwrap();
+        // Use per-var locks to avoid cross-test interference
+        let _tasks_guard = lock_var("LOTAR_TASKS_DIR");
+        let _assignee_guard = lock_var("LOTAR_DEFAULT_ASSIGNEE");
 
         let fixtures = TestFixtures::new();
 

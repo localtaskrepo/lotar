@@ -6,6 +6,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+// Re-export shared environment mutex for tests that mutate global env vars
+pub mod env_mutex;
+
 /// Test utilities for LoTaR testing
 pub struct TestFixtures {
     pub temp_dir: TempDir,
@@ -13,6 +16,7 @@ pub struct TestFixtures {
 }
 
 impl TestFixtures {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let tasks_root = temp_dir.path().join(".tasks");

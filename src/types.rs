@@ -3,7 +3,11 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
+#[cfg(feature = "schema")]
+use schemars::JsonSchema;
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub enum TaskStatus {
     #[default]
     Todo,
@@ -99,6 +103,7 @@ impl TaskStatus {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub enum TaskType {
     #[default]
     Feature,
@@ -194,6 +199,7 @@ impl TaskType {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskRelationships {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub depends_on: Vec<String>,
@@ -224,6 +230,7 @@ impl TaskRelationships {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskComment {
     pub author: String,
     pub date: String,
@@ -231,9 +238,30 @@ pub struct TaskComment {
 }
 
 // Type alias for custom fields - can hold any YAML-serializable value
+// For schema generation, use serde_json::Value which has a JsonSchema implementation
+#[cfg(not(feature = "schema"))]
 pub type CustomFields = HashMap<String, serde_yaml::Value>;
+#[cfg(feature = "schema")]
+pub type CustomFields = HashMap<String, serde_json::Value>;
+
+// Value type alias and helpers for constructing custom field values in a feature-aware way
+#[cfg(not(feature = "schema"))]
+pub type CustomFieldValue = serde_yaml::Value;
+#[cfg(feature = "schema")]
+pub type CustomFieldValue = serde_json::Value;
+
+#[cfg(not(feature = "schema"))]
+pub fn custom_value_string<S: Into<String>>(s: S) -> serde_yaml::Value {
+    serde_yaml::Value::String(s.into())
+}
+
+#[cfg(feature = "schema")]
+pub fn custom_value_string<S: Into<String>>(s: S) -> serde_json::Value {
+    serde_json::Value::String(s.into())
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Copy, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub enum Priority {
     Low,
     #[default]
@@ -325,25 +353,4 @@ impl Priority {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_priority_serialization() {
-        let priority = Priority::High;
-
-        // Test Display implementation
-        assert_eq!(priority.to_string(), "HIGH");
-
-        // Test YAML serialization
-        let yaml = serde_yaml::to_string(&priority).unwrap();
-        eprintln!("Priority::High as YAML: {}", yaml.trim());
-        assert!(yaml.contains("High")); // Should be variant name
-
-        // Test JSON serialization
-        let json = serde_json::to_string(&priority).unwrap();
-        eprintln!("Priority::High as JSON: {}", json);
-        assert_eq!(json, "\"High\""); // Should be variant name
-    }
-}
+// inline tests moved to tests/types_priority_unit_test.rs

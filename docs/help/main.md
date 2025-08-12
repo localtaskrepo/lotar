@@ -52,6 +52,7 @@ lotar add "Environment task"  # Uses environment-configured directory
 - **config** - Comprehensive project configuration with templates, validation, and dry-run
 - **scan** - Find TODO comments in code
 - **serve** - Start web interface
+- **mcp** - Run JSON-RPC server (tools for tasks/projects/config)
 
 Use `lotar help <command>` for detailed command information.
 

@@ -62,7 +62,7 @@ pub struct TaskDisplayInfo {
     pub tags: Vec<String>,
     pub created: String,
     pub modified: String,
-    pub custom_fields: std::collections::HashMap<String, serde_yaml::Value>,
+    pub custom_fields: crate::types::CustomFields,
 }
 
 pub trait Outputable {

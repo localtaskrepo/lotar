@@ -160,9 +160,10 @@ pub struct GlobalConfig {
     pub custom_fields: StringConfigField,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ResolvedConfig {
     pub server_port: u16,
+    #[serde(rename = "default_project")]
     pub default_prefix: String,
     pub issue_states: ConfigurableField<TaskStatus>,
     pub issue_types: ConfigurableField<TaskType>,

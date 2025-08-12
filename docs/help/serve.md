@@ -57,41 +57,54 @@ lotar serve  # Uses environment-configured directory
 - **Statistics** - Task completion and project metrics
 
 ### API Endpoints
-- `GET /api/tasks` - List all tasks
-- `POST /api/tasks` - Create new task
-- `GET /api/tasks/{id}` - Get specific task
-- `PUT /api/tasks/{id}` - Update task
-- `DELETE /api/tasks/{id}` - Delete task
-- `GET /api/projects` - List projects
-- `GET /api/stats` - Get statistics
+- `POST /api/tasks/add` - Create new task (body: TaskCreate)
+- `GET /api/tasks/list` - List tasks
+	- Query params:
+		- `project` (prefix)
+		- `status` (CSV; validated against config)
+		- `priority` (CSV; validated against config)
+		- `type` (CSV; validated against config)
+		- `tags` (CSV)
+		- `category`
+		- `q` (free-text search)
+	- Notes: Invalid values for `status`, `priority`, or `type` return HTTP 400
+- `GET /api/tasks/get?id=...` - Get task by id (returns HTTP 404 if not found)
+- `POST /api/tasks/update` - Update task (body: { id, patch })
+- `POST /api/tasks/delete` - Delete task (body: { id })
+- `GET /api/projects/list` - List projects
+- `GET /api/projects/stats?project=PREFIX` - Project stats
 
 ### Real-time Updates
-- WebSocket support for live updates
-- Automatic refresh when files change (with `--watch`)
-- Cross-browser synchronization
+- Server-Sent Events (SSE)
+	- `GET /api/events` — stream of events: `task_created`, `task_updated`, `task_deleted`, `config_updated`
+	- Alias: `GET /api/tasks/stream`
+	- Optional query params:
+		- `debounce_ms` — debounce window in ms (default 100; env fallback `LOTAR_SSE_DEBOUNCE_MS`)
+		- `kinds` — CSV list of event kinds to include
+		- `project` — project prefix filter
+	- Behavior & reliability:
+		- Sends `retry: 1000` on connect to advise client reconnection delay
+		- Emits `:heartbeat` comments periodically when idle to keep connections alive
 
 ## Access URLs
 
 Once started, the server provides:
 - **Web Interface**: `http://localhost:8080`
-- **API Documentation**: `http://localhost:8080/api/docs`
-- **Health Check**: `http://localhost:8080/health`
+- **API Base**: `http://localhost:8080/api`
 
-## File Watching
+## File Watching (planned)
 
-When `--watch` is enabled:
-- Monitors task files for changes
-- Automatically reloads data when files are modified
-- Broadcasts updates to connected clients
-- Detects new projects and tasks
+- Filesystem watcher integration will broadcast updates to connected clients
+- Debounce defaults to ~100ms; configuration TBD (env + CLI)
 
-## Development Mode
+## Development Notes
 
-With `--dev` flag:
-- Enhanced error messages
-- Request/response logging
-- Auto-reload on code changes
-- Development-friendly CORS settings
+- CORS is permissive by default for local development
+- Preflight: `OPTIONS /api/*` returns `204 No Content` with headers:
+	- `Access-Control-Allow-Origin: *`
+	- `Access-Control-Allow-Methods: GET,POST,OPTIONS`
+	- `Access-Control-Allow-Headers: Content-Type`
+- Static files are served from `target/web`
 
 ## Notes
 

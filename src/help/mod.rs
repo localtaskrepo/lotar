@@ -138,21 +138,4 @@ impl HelpSystem {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_help_system_creation() {
-        let help = HelpSystem::new(OutputFormat::Text, false);
-        assert!(matches!(help.renderer.format, OutputFormat::Text));
-    }
-
-    #[test]
-    fn test_list_available_help() {
-        let help = HelpSystem::new(OutputFormat::Text, false);
-        // This will work once we create the help files
-        let result = help.list_available_help();
-        assert!(result.is_ok());
-    }
-}
+// inline tests moved to tests/help_module_unit_test.rs

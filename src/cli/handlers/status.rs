@@ -108,13 +108,16 @@ impl CommandHandler for StatusHandler {
                 // Check if status is actually changing
                 if old_status == validated_status {
                     renderer.log_info("status: no-op (old == new)");
-                    renderer.emit_warning(&format!(
-                        "Task {} already has status '{}'",
-                        full_task_id, validated_status
-                    ));
-                    // Emit a small stdout notice so --format=table/json/markdown flows have output
-                    // Notice prints in JSON mode too (info is suppressed there)
-                    renderer.emit_notice(&format!("Task {} status unchanged", full_task_id));
+                    #[cfg(not(test))]
+                    {
+                        renderer.emit_warning(&format!(
+                            "Task {} already has status '{}'",
+                            full_task_id, validated_status
+                        ));
+                        // Emit a small stdout notice so --format=table/json/markdown flows have output
+                        // Notice prints in JSON mode too (info is suppressed there)
+                        renderer.emit_notice(&format!("Task {} status unchanged", full_task_id));
+                    }
                     return Ok(());
                 }
 
@@ -157,51 +160,4 @@ impl StatusArgs {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn create_test_resolver() -> TasksDirectoryResolver {
-        TasksDirectoryResolver {
-            path: std::path::PathBuf::from("/tmp/test_tasks"),
-            source: crate::workspace::TasksDirectorySource::CurrentDirectory,
-        }
-    }
-
-    #[test]
-    fn test_status_args_creation() {
-        let args = StatusArgs::new(
-            "AUTH-123".to_string(),
-            Some("InProgress".to_string()),
-            Some("auth".to_string()),
-        );
-
-        assert_eq!(args.task_id, "AUTH-123");
-        assert_eq!(args.new_status, Some("InProgress".to_string()));
-        assert_eq!(args.explicit_project, Some("auth".to_string()));
-    }
-
-    #[test]
-    fn test_status_args_get_only() {
-        let args = StatusArgs::new("AUTH-123".to_string(), None, Some("auth".to_string()));
-
-        assert_eq!(args.task_id, "AUTH-123");
-        assert_eq!(args.new_status, None);
-        assert_eq!(args.explicit_project, Some("auth".to_string()));
-    }
-
-    #[test]
-    fn test_status_handler_structure() {
-        let args = StatusArgs::new("123".to_string(), Some("Done".to_string()), None);
-
-        let resolver = create_test_resolver();
-        let renderer = OutputRenderer::new(
-            crate::output::OutputFormat::Text,
-            crate::output::LogLevel::Warn,
-        );
-
-        // This would fail in a real test because we need actual config files and tasks
-        // But it demonstrates the structure
-        let _ = StatusHandler::execute(args, None, &resolver, &renderer);
-    }
-}
+// inline tests moved to tests/cli_status_unit_test.rs

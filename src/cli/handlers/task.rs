@@ -189,8 +189,10 @@ impl CommandHandler for EditHandler {
         if let Some(due) = args.due {
             // TODO: Parse and validate due date
             // For now, just store as string in custom fields
-            task.custom_fields
-                .insert("due_date".to_string(), serde_yaml::Value::String(due));
+            task.custom_fields.insert(
+                "due_date".to_string(),
+                crate::types::custom_value_string(due),
+            );
         }
 
         if let Some(description) = args.description {
@@ -211,7 +213,7 @@ impl CommandHandler for EditHandler {
         // Set custom fields
         for (key, value) in args.fields {
             task.custom_fields
-                .insert(key, serde_yaml::Value::String(value));
+                .insert(key, crate::types::custom_value_string(value));
         }
 
         // Save the updated task

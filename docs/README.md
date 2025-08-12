@@ -57,7 +57,11 @@ lotar scan ./src
 ### Web Interface & API
 - **Built-in Web Server** with embedded React frontend
 - **REST API** for all task operations
+    - Multi-value filters for list: `status`, `priority`, `type`, `tags`
+    - Proper 404 for unknown resources
+    - CORS preflight support for `/api/*`
 - **Configurable ports** (default 8080)
+ - **SSE**: realtime events with `retry` hint and periodic heartbeats
 
 ## Command Reference
 

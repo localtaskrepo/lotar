@@ -163,8 +163,8 @@ mod dual_interface_tests {
         assert!(full_list.contains("Test task for listing"));
 
         // Both should show task count
-        assert!(quick_list.contains("Found 1 task"));
-        assert!(full_list.contains("Found 1 task"));
+        assert!(quick_list.contains("Found 1 task(s)"));
+        assert!(full_list.contains("Found 1 task(s)"));
     }
 
     #[test]

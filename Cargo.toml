@@ -23,6 +23,8 @@ termimad = { version = "0.30", default-features = false }
 comfy-table = { version = "7.1", default-features = false }
 console = { version = "0.15", default-features = false }
 rayon = { version = "1.10", default-features = false }
+percent-encoding = { version = "2.3", default-features = false, features = ["alloc"] }
+once_cell = "1.19"
 
 # Production release profile optimized for minimal binary size
 [profile.release]
@@ -51,3 +53,11 @@ mockall = "0.13"
 criterion = "0.7"
 proptest = "1.5"
 tempfile = "3.10"
+
+[features]
+default = []
+schema = ["schemars"]
+
+[dependencies.schemars]
+version = "0.8"
+optional = true

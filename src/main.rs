@@ -270,6 +270,10 @@ fn main() {
                 }
             }
         }
+        Commands::Mcp => {
+            lotar::mcp::server::run_stdio_server();
+            Ok(())
+        }
     };
 
     if let Err(_error) = result {

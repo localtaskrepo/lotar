@@ -1,6 +1,7 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
+mod common;
 
 /// Focused test suite for smart defaults functionality
 /// Smart Defaults Test: Phase 3.1.1 completion validation
@@ -275,6 +276,28 @@ mod combined_scenarios {
         env.assert_task_priority("both-explicit", "HIGH");
         env.assert_task_status("both-explicit", "VERIFY");
     }
+
+    #[test]
+    fn test_global_default_status_invalid_but_project_list_valid_fallback() {
+        let env = TestEnvironment::new();
+
+        env.init_project("precedence");
+        // Configure project states without the global default (valid enum names only)
+        env.set_config("precedence", "issue_states", "TODO,IN_PROGRESS,DONE");
+
+        // Set global default_status to value not present in project list
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(env.path())
+            .args(["config", "set", "default_status", "BLOCKED", "--global"])
+            .assert()
+            .success();
+
+        // Create task and ensure it falls back to first project state
+        env.create_task("precedence", "Test precedence fallback");
+        // Should fall back to first project state (TODO)
+        env.assert_task_status("precedence", "TODO");
+    }
 }
 
 mod edge_cases {
@@ -338,5 +361,124 @@ mod edge_cases {
         // Should have 3 tasks all with CRITICAL priority and VERIFY status
         assert_eq!(stdout.matches("(CRITICAL)").count(), 3);
         assert_eq!(stdout.matches("[VERIFY]").count(), 3);
+    }
+}
+
+// Merged from default_status_assignment_test.rs
+mod default_status_tests {
+    use super::*;
+    use common::TestFixtures;
+
+    #[test]
+    fn test_new_task_uses_first_configured_status() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("config")
+            .arg("init")
+            .arg("--project=custom-status")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("issue_states")
+            .arg("IN_PROGRESS,TODO,DONE")
+            .arg("--project=custom-status")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("add")
+            .arg("Test default status")
+            .arg("--project=custom-status")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("status")
+            .arg("1")
+            .arg("--project=custom-status")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("status: IN_PROGRESS"));
+    }
+
+    #[test]
+    fn test_explicit_default_status_config() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("config")
+            .arg("init")
+            .arg("--project=explicit-default")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("issue_states")
+            .arg("TODO,IN_PROGRESS,DONE")
+            .arg("--project=explicit-default")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("default_status")
+            .arg("DONE")
+            .arg("--project=explicit-default")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("add")
+            .arg("Test explicit default")
+            .arg("--project=explicit-default")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("status")
+            .arg("1")
+            .arg("--project=explicit-default")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("status: DONE"));
+    }
+
+    #[test]
+    fn test_fallback_to_todo_when_no_config() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("add")
+            .arg("Test fallback default")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("status")
+            .arg("1")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("status: TODO"));
     }
 }

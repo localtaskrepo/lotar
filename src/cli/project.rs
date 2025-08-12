@@ -190,133 +190,22 @@ impl ProjectResolver {
     }
 }
 
-#[cfg(test)]
-mod tests {
+/// Public test support for constructing a ProjectResolver in integration tests
+#[doc(hidden)]
+pub mod test_support {
     use super::*;
+    use crate::config::types::ResolvedConfig;
 
-    fn create_test_resolver() -> ProjectResolver {
-        use crate::config::types::*;
-        use crate::types::{Priority, TaskStatus, TaskType};
-
-        // Create a test config manager with a mock ResolvedConfig
-        let config = ResolvedConfig {
-            server_port: 8080,
-            default_prefix: "TEST".to_string(),
-            issue_states: ConfigurableField {
-                values: vec![TaskStatus::Todo, TaskStatus::Done],
-            },
-            issue_types: ConfigurableField {
-                values: vec![TaskType::Feature, TaskType::Bug],
-            },
-            issue_priorities: ConfigurableField {
-                values: vec![Priority::Low, Priority::High],
-            },
-            categories: crate::config::types::StringConfigField::new_wildcard(),
-            tags: crate::config::types::StringConfigField::new_wildcard(),
-            default_assignee: None,
-            default_priority: Priority::Medium,
-            default_status: None,
-            custom_fields: crate::config::types::StringConfigField::new_wildcard(),
-        };
-
-        // Create a ConfigManager with the test config
-        let config_manager = ConfigManager::from_resolved_config(config);
-
+    /// Create a ProjectResolver from a provided ResolvedConfig and tasks_dir
+    pub fn resolver_from_config(
+        config: ResolvedConfig,
+        tasks_dir: std::path::PathBuf,
+    ) -> ProjectResolver {
+        // Build a ConfigManager via public test support
+        let config_manager = crate::config::manager::test_support::from_resolved_config(config);
         ProjectResolver {
             config_manager,
-            tasks_dir: std::path::PathBuf::from("/tmp"),
+            tasks_dir,
         }
-    }
-
-    #[test]
-    fn test_extract_project_from_task_id() {
-        let resolver = create_test_resolver();
-
-        assert_eq!(
-            resolver.extract_project_from_task_id("AUTH-123"),
-            Some("AUTH".to_string())
-        );
-        assert_eq!(
-            resolver.extract_project_from_task_id("TI-456"),
-            Some("TI".to_string())
-        );
-        assert_eq!(
-            resolver.extract_project_from_task_id("MOBILE-789"),
-            Some("MOBILE".to_string())
-        );
-
-        // Invalid formats
-        assert_eq!(resolver.extract_project_from_task_id("123"), None);
-        assert_eq!(resolver.extract_project_from_task_id("auth-123"), None); // lowercase
-        assert_eq!(resolver.extract_project_from_task_id("AUTH123"), None); // no dash
-        assert_eq!(resolver.extract_project_from_task_id("-123"), None); // empty prefix
-    }
-
-    #[test]
-    fn test_resolve_project() {
-        let mut resolver = create_test_resolver();
-
-        // Case 1: Explicit project matches task ID prefix (direct match)
-        assert_eq!(
-            resolver.resolve_project("AUTH-123", Some("AUTH")).unwrap(),
-            "AUTH"
-        );
-
-        // Case 2: Explicit project matches task ID prefix (case insensitive)
-        assert_eq!(
-            resolver.resolve_project("AUTH-123", Some("auth")).unwrap(),
-            "AUTH"
-        );
-
-        // Case 3: Explicit project CONFLICTS with task ID prefix - should ERROR
-        let result = resolver.resolve_project("AUTH-123", Some("FRONTEND"));
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Project mismatch"));
-
-        // Case 4: Only explicit project provided (no task ID prefix)
-        assert_eq!(
-            resolver.resolve_project("123", Some("MOBILE")).unwrap(),
-            "MOBI"
-        );
-
-        // Case 5: Only task ID prefix provided (no explicit project)
-        assert_eq!(resolver.resolve_project("AUTH-123", None).unwrap(), "AUTH");
-
-        // Case 6: Neither provided - fall back to default
-        assert_eq!(resolver.resolve_project("123", None).unwrap(), "TEST");
-        assert_eq!(resolver.resolve_project("", None).unwrap(), "TEST");
-
-        // Case 7: Invalid explicit project format should error
-        let result = resolver.resolve_project("123", Some("INVALID!"));
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid project name"));
-    }
-
-    #[test]
-    fn test_resolve_project_original_behavior() {
-        let mut resolver = create_test_resolver();
-
-        // Test edge cases from original implementation
-        assert_eq!(resolver.resolve_project("no-prefix", None).unwrap(), "TEST"); // No uppercase prefix gets default
-    }
-
-    #[test]
-    fn test_get_full_task_id() {
-        let mut resolver = create_test_resolver();
-
-        // Already has prefix
-        assert_eq!(
-            resolver.get_full_task_id("AUTH-123", None).unwrap(),
-            "AUTH-123"
-        );
-
-        // Numeric ID, use default project
-        assert_eq!(resolver.get_full_task_id("123", None).unwrap(), "TEST-123");
-
-        // Numeric ID with explicit project
-        assert_eq!(
-            resolver.get_full_task_id("123", Some("MOBILE")).unwrap(),
-            "MOBI-123"
-        );
     }
 }

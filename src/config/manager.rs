@@ -182,3 +182,13 @@ impl ConfigManager {
         Ok(ResolvedConfig::from_global(config))
     }
 }
+
+/// Public test support to construct a ConfigManager from a ResolvedConfig in integration tests
+#[doc(hidden)]
+pub mod test_support {
+    use super::*;
+
+    pub fn from_resolved_config(resolved_config: ResolvedConfig) -> ConfigManager {
+        ConfigManager { resolved_config }
+    }
+}

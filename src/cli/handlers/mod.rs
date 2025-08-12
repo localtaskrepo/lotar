@@ -194,9 +194,11 @@ impl CommandHandler for AddHandler {
                 .validate_custom_field(&key, &value)
                 .map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
 
-            // Store as custom fields using serde_yaml::Value
-            task.custom_fields
-                .insert(validated_key, serde_yaml::Value::String(validated_value));
+            // Store as custom fields using feature-aware value constructor
+            task.custom_fields.insert(
+                validated_key,
+                crate::types::custom_value_string(validated_value),
+            );
         }
 
         // Save the task
@@ -370,11 +372,13 @@ impl AddHandler {
             if project_values.contains(explicit) {
                 return Ok(explicit.clone());
             } else {
-                let msg = format!(
-                    "Warning: Project default {} '{:?}' is not in configured {} list {:?}. Using smart fallback.",
-                    field_name, explicit, field_name, project_values
-                );
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&msg);
+                #[cfg(not(test))]
+                {
+                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&format!(
+                        "Warning: Project default {} '{:?}' is not in configured {} list {:?}. Using smart fallback.",
+                        field_name, explicit, field_name, project_values
+                    ));
+                }
             }
         }
 
@@ -382,11 +386,13 @@ impl AddHandler {
         if project_values.contains(global_default) {
             return Ok(global_default.clone());
         } else {
-            let msg = format!(
-                "Warning: Global default {} '{:?}' is not in project {} list {:?}. Using first configured value.",
-                field_name, global_default, field_name, project_values
-            );
-            OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&msg);
+            #[cfg(not(test))]
+            {
+                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&format!(
+                    "Warning: Global default {} '{:?}' is not in project {} list {:?}. Using first configured value.",
+                    field_name, global_default, field_name, project_values
+                ));
+            }
         }
 
         // 3. Use first in project values as final fallback
@@ -427,11 +433,13 @@ impl AddHandler {
             if config.issue_states.values.contains(explicit) {
                 return explicit.clone();
             } else {
-                let msg = format!(
-                    "Warning: Project default status '{:?}' is not in configured status list {:?}. Using smart fallback.",
-                    explicit, config.issue_states.values
-                );
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&msg);
+                #[cfg(not(test))]
+                {
+                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&format!(
+                        "Warning: Project default status '{:?}' is not in configured status list {:?}. Using smart fallback.",
+                        explicit, config.issue_states.values
+                    ));
+                }
             }
         }
 
@@ -443,266 +451,28 @@ impl AddHandler {
     }
 }
 
-#[cfg(test)]
-mod tests {
+pub mod test_support {
     use super::*;
-    use crate::config::types::{ConfigurableField, ResolvedConfig, StringConfigField};
-    use crate::types::{Priority, TaskStatus, TaskType};
+    use crate::config::types::ResolvedConfig;
+    use crate::types::{Priority, TaskStatus};
 
-    // Helper function to create a test resolver
-    fn create_test_resolver() -> TasksDirectoryResolver {
-        TasksDirectoryResolver {
-            path: std::path::PathBuf::from("/tmp/test_tasks"),
-            source: crate::workspace::TasksDirectorySource::CurrentDirectory,
-        }
+    /// Expose smart default for String for integration tests
+    pub fn smart_default_string(
+        project_explicit: Option<&String>,
+        global_default: &String,
+        project_values: &[String],
+        field_name: &str,
+    ) -> Result<String, String> {
+        AddHandler::get_smart_default(project_explicit, global_default, project_values, field_name)
     }
 
-    // Helper function to create a test ResolvedConfig with custom values
-    fn create_test_config(
-        priorities: Vec<Priority>,
-        default_priority: Priority,
-        statuses: Vec<TaskStatus>,
-        default_status: Option<TaskStatus>,
-    ) -> ResolvedConfig {
-        ResolvedConfig {
-            server_port: 8080,
-            default_prefix: "TEST".to_string(),
-            issue_states: ConfigurableField { values: statuses },
-            issue_types: ConfigurableField {
-                values: vec![TaskType::Feature, TaskType::Bug],
-            },
-            issue_priorities: ConfigurableField { values: priorities },
-            categories: StringConfigField {
-                values: vec!["*".to_string()],
-            },
-            tags: StringConfigField {
-                values: vec!["*".to_string()],
-            },
-            default_assignee: None,
-            default_priority,
-            default_status,
-            custom_fields: StringConfigField {
-                values: vec!["*".to_string()],
-            },
-        }
+    /// Expose default priority selection for integration tests
+    pub fn default_priority(config: &ResolvedConfig) -> Priority {
+        AddHandler::get_default_priority(config)
     }
 
-    #[test]
-    fn test_get_smart_default_basic_functionality() {
-        // Test with basic string values to verify the generic function
-        let project_values = vec!["Alpha".to_string(), "Beta".to_string(), "Gamma".to_string()];
-        let global_default = "Beta".to_string();
-
-        // Case 1: Project explicit default that exists in project values
-        let project_explicit = Some("Gamma".to_string());
-        let result = AddHandler::get_smart_default(
-            project_explicit.as_ref(),
-            &global_default,
-            &project_values,
-            "test_field",
-        );
-        assert_eq!(result.unwrap(), "Gamma");
-
-        // Case 2: No project explicit, global default exists in project values
-        let result =
-            AddHandler::get_smart_default(None, &global_default, &project_values, "test_field");
-        assert_eq!(result.unwrap(), "Beta");
-
-        // Case 3: Global default not in project values, use first
-        let global_not_in_project = "Delta".to_string();
-        let result = AddHandler::get_smart_default(
-            None,
-            &global_not_in_project,
-            &project_values,
-            "test_field",
-        );
-        assert_eq!(result.unwrap(), "Alpha");
-
-        // Case 4: Project explicit not in project values, fallback to global
-        let invalid_explicit = Some("Zeta".to_string());
-        let result = AddHandler::get_smart_default(
-            invalid_explicit.as_ref(),
-            &global_default,
-            &project_values,
-            "test_field",
-        );
-        assert_eq!(result.unwrap(), "Beta");
-
-        // Case 5: Empty project values should error
-        let empty_values: Vec<String> = vec![];
-        let result =
-            AddHandler::get_smart_default(None, &global_default, &empty_values, "test_field");
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("configuration error"));
-    }
-
-    #[test]
-    fn test_get_default_priority_scenarios() {
-        // Case 1: Global default priority exists in project priorities
-        let config = create_test_config(
-            vec![Priority::Low, Priority::Medium, Priority::High],
-            Priority::Medium,
-            vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
-            None,
-        );
-        let result = AddHandler::get_default_priority(&config);
-        assert_eq!(result, Priority::Medium);
-
-        // Case 2: Global default priority not in project priorities, use first
-        let config = create_test_config(
-            vec![Priority::Critical, Priority::High],
-            Priority::Medium, // Not in project list
-            vec![TaskStatus::Todo, TaskStatus::InProgress],
-            None,
-        );
-        let result = AddHandler::get_default_priority(&config);
-        assert_eq!(result, Priority::Critical);
-
-        // Case 3: Global default is Low, project has [High, Medium, Low], should use Low
-        let config = create_test_config(
-            vec![Priority::High, Priority::Medium, Priority::Low],
-            Priority::Low,
-            vec![TaskStatus::Todo],
-            None,
-        );
-        let result = AddHandler::get_default_priority(&config);
-        assert_eq!(result, Priority::Low);
-    }
-
-    #[test]
-    fn test_get_default_status_scenarios() {
-        // Case 1: Project explicit default status exists in project statuses
-        let config = create_test_config(
-            vec![Priority::Medium],
-            Priority::Medium,
-            vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
-            Some(TaskStatus::InProgress),
-        );
-        let result = AddHandler::get_default_status(&config);
-        assert_eq!(result, TaskStatus::InProgress);
-
-        // Case 2: No project explicit default, global default exists in project
-        let config = create_test_config(
-            vec![Priority::Medium],
-            Priority::Medium,
-            vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
-            None, // No explicit default
-        );
-        let result = AddHandler::get_default_status(&config);
-        assert_eq!(result, TaskStatus::Todo); // First in project values
-
-        // Case 3: Project explicit default not in project values, fallback to first
-        let config = create_test_config(
-            vec![Priority::Medium],
-            Priority::Medium,
-            vec![TaskStatus::InProgress, TaskStatus::Done],
-            Some(TaskStatus::Todo), // Not in project list
-        );
-        let result = AddHandler::get_default_status(&config);
-        assert_eq!(result, TaskStatus::InProgress); // First in project values
-
-        // Case 4: Different status combinations
-        let config = create_test_config(
-            vec![Priority::Medium],
-            Priority::Medium,
-            vec![TaskStatus::Verify, TaskStatus::Blocked],
-            Some(TaskStatus::Verify),
-        );
-        let result = AddHandler::get_default_status(&config);
-        assert_eq!(result, TaskStatus::Verify);
-    }
-
-    #[test]
-    fn test_priority_validation_integration() {
-        // Test that the new logic integrates correctly with the task creation flow
-        let priorities = vec![Priority::Critical, Priority::High, Priority::Medium];
-        let config = create_test_config(
-            priorities.clone(),
-            Priority::Low, // Global default not in project list
-            vec![TaskStatus::Todo, TaskStatus::Done],
-            Some(TaskStatus::Todo),
-        );
-
-        // When no priority is specified, should get first from project list (Critical)
-        let result = AddHandler::get_default_priority(&config);
-        assert_eq!(result, Priority::Critical);
-    }
-
-    #[test]
-    fn test_status_validation_integration() {
-        // Test status scenarios that should occur in real usage
-        let statuses = vec![
-            TaskStatus::Blocked,
-            TaskStatus::InProgress,
-            TaskStatus::Verify,
-            TaskStatus::Done,
-        ];
-
-        // Case 1: Explicit default is valid
-        let config = create_test_config(
-            vec![Priority::Medium],
-            Priority::Medium,
-            statuses.clone(),
-            Some(TaskStatus::Verify),
-        );
-        let result = AddHandler::get_default_status(&config);
-        assert_eq!(result, TaskStatus::Verify);
-
-        // Case 2: No explicit default, use first
-        let config = create_test_config(
-            vec![Priority::Medium],
-            Priority::Medium,
-            statuses.clone(),
-            None,
-        );
-        let result = AddHandler::get_default_status(&config);
-        assert_eq!(result, TaskStatus::Blocked);
-    }
-
-    #[test]
-    fn test_edge_cases() {
-        // Test with single value lists
-        let config = create_test_config(
-            vec![Priority::Critical],
-            Priority::Medium, // Not in list
-            vec![TaskStatus::Todo],
-            None,
-        );
-
-        let priority_result = AddHandler::get_default_priority(&config);
-        assert_eq!(priority_result, Priority::Critical);
-
-        let status_result = AddHandler::get_default_status(&config);
-        assert_eq!(status_result, TaskStatus::Todo);
-    }
-
-    #[test]
-    fn test_add_handler_basic() {
-        let args = AddArgs {
-            title: "Test Task".to_string(),
-            task_type: None,
-            priority: None,
-            assignee: None,
-            effort: None,
-            due: None,
-            description: None,
-            category: None,
-            tags: vec![],
-            fields: vec![],
-            bug: false,
-            epic: false,
-            critical: false,
-            high: false,
-        };
-
-        let resolver = create_test_resolver();
-        let renderer = OutputRenderer::new(
-            crate::output::OutputFormat::Text,
-            crate::output::LogLevel::Warn,
-        );
-
-        // This would fail in a real test because we need actual config files
-        // But it demonstrates the structure
-        let _ = AddHandler::execute(args, None, &resolver, &renderer);
+    /// Expose default status selection for integration tests
+    pub fn default_status(config: &ResolvedConfig) -> TaskStatus {
+        AddHandler::get_default_status(config)
     }
 }

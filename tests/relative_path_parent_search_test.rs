@@ -1,4 +1,7 @@
 use assert_cmd::Command;
+use lotar::help::HelpSystem;
+use lotar::output::OutputFormat;
+use lotar::workspace::TasksDirectoryResolver;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
@@ -90,4 +93,22 @@ fn test_complex_relative_path_no_parent_search() {
         complex_path_dir.exists(),
         "Should create directory at complex relative path"
     );
+}
+
+// Merged from misc_smoke_unit_test.rs
+#[test]
+fn help_system_smoke() {
+    let help = HelpSystem::new(OutputFormat::Text, false);
+    let _ = help;
+    let result = help.list_available_help();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn explicit_path_resolution_creates_dir_and_resolves() {
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let tasks_dir = temp_dir.path().join("custom_tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let resolver = TasksDirectoryResolver::resolve(tasks_dir.to_str(), None).unwrap();
+    assert_eq!(resolver.path, tasks_dir);
 }

@@ -300,6 +300,85 @@ mod error_handling {
             .assert()
             .failure();
     }
+
+    #[test]
+    fn test_status_project_mismatch_reports_error() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a task under default project (TEST)
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(["task", "add", "Mismatch Test Task", "--project=FOO"])
+            .assert()
+            .success();
+
+        // Try to set status with wrong explicit project -> should succeed but warn
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(["status", "FOO-1", "done", "--project=BAR"]) // BAR doesn't match FOO
+            .assert()
+            .success()
+            .stderr(
+                predicate::str::contains("Project mismatch")
+                    .or(predicate::str::contains("Using task ID's project")),
+            );
+    }
+
+    #[test]
+    fn test_edit_preserves_unspecified_fields() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Add with multiple fields set
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args([
+                "task",
+                "add",
+                "Original",
+                "--assignee=dev@example.com",
+                "--priority=high",
+                "--type=feature",
+            ])
+            .assert()
+            .success();
+
+        // Discover created task id via list json
+        let list_out = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(&temp_dir)
+            .args(["--format=json", "list"])
+            .output()
+            .unwrap();
+        assert!(list_out.status.success());
+        let list_json: serde_json::Value = serde_json::from_slice(&list_out.stdout).unwrap();
+        let task_id = list_json["tasks"][0]["id"].as_str().unwrap().to_string();
+
+        // Edit only title
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(&temp_dir)
+            .args(["task", "edit", &task_id, "--title=Renamed"])
+            .assert()
+            .success();
+
+        // List JSON and verify assignee/priority/type preserved
+        let task = super::get_task_as_json(&temp_dir, &task_id);
+        assert_eq!(task["title"].as_str(), Some("Renamed"));
+        assert_eq!(task["assignee"].as_str(), Some("dev@example.com"));
+        assert!(
+            task["priority"]
+                .as_str()
+                .unwrap_or("")
+                .to_uppercase()
+                .contains("HIGH")
+        );
+        assert!(
+            task["task_type"]
+                .as_str()
+                .unwrap_or("")
+                .to_lowercase()
+                .contains("feature")
+        );
+    }
 }
 
 // =============================================================================
