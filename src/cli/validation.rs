@@ -123,7 +123,7 @@ impl<'a> CliValidator<'a> {
     pub fn validate_assignee(&self, assignee: &str) -> Result<String, String> {
         // Handle special cases
         if assignee == "@me" {
-            // Will be resolved to actual user later
+            // Allow @me alias; will be resolved at use sites
             return Ok(assignee.to_string());
         }
 

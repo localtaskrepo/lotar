@@ -299,46 +299,7 @@ fn main() {
         Commands::Whoami { explain } => {
             renderer.log_info("BEGIN WHOAMI");
             // Try to resolve using the same algorithm as services
-            let me = {
-                // Config default_reporter
-                if let Ok(cfg) =
-                    lotar::config::resolution::load_and_merge_configs(Some(&resolver.path))
-                {
-                    cfg.default_reporter.filter(|s| !s.trim().is_empty())
-                } else {
-                    None
-                }
-            }
-            .or_else(|| {
-                if let Ok(cwd) = std::env::current_dir() {
-                    let p = cwd.join(".git").join("config");
-                    if p.exists() {
-                        if let Ok(c) = std::fs::read_to_string(p) {
-                            for l in c.lines() {
-                                let l = l.trim();
-                                if l.starts_with("name = ") {
-                                    let name = l.trim_start_matches("name = ").trim();
-                                    if !name.is_empty() {
-                                        return Some(name.to_string());
-                                    }
-                                }
-                            }
-                            for l in c.lines() {
-                                let l = l.trim();
-                                if l.starts_with("email = ") {
-                                    let email = l.trim_start_matches("email = ").trim();
-                                    if !email.is_empty() {
-                                        return Some(email.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                None
-            })
-            .or_else(|| std::env::var("USER").ok())
-            .or_else(|| std::env::var("USERNAME").ok());
+            let me = lotar::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
 
             if let Some(user) = me {
                 if matches!(renderer.format, output::OutputFormat::Json) {

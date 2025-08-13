@@ -207,6 +207,8 @@ fn test_project_config_validation_valid() {
         default_priority: Some(Priority::Medium),
         default_status: Some(TaskStatus::Todo),
         custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -231,6 +233,8 @@ fn test_project_config_validation_empty_project_name() {
         default_priority: None,
         default_status: None,
         custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -262,6 +266,8 @@ fn test_project_config_validation_long_project_name() {
         default_priority: None,
         default_status: None,
         custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -296,6 +302,8 @@ fn test_project_config_validation_invalid_defaults() {
         default_priority: Some(Priority::Medium), // Medium not in priorities list
         default_status: Some(TaskStatus::Done),   // Done not in states list
         custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -331,6 +339,8 @@ fn test_project_config_validation_invalid_email_format() {
         default_priority: None,
         default_status: None,
         custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
     };
 
     let result = validator.validate_project_config(&config);

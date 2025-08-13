@@ -58,6 +58,8 @@ lotar add "Environment task"  # Uses environment-configured directory
 
 Use `lotar help <command>` for detailed command information.
 
+See also: [Resolution & Precedence](./precedence.md) for value sources and identity resolution.
+
 ## Output Formats
 
 ### Text (Default)

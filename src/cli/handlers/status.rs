@@ -140,43 +140,18 @@ impl CommandHandler for StatusHandler {
 
                 // Prepare preview message if dry-run
                 if args.dry_run {
+                    // First-change semantics: only if moving away from project default
+                    let cfg = project_resolver.get_config();
+                    let project_default_status = cfg
+                        .default_status
+                        .clone()
+                        .unwrap_or_else(|| cfg.issue_states.values[0].clone());
                     let would_assign = task.assignee.is_none()
-                        && project_resolver.get_config().auto_assign_on_status;
+                        && project_resolver.get_config().auto_assign_on_status
+                        && task.status == project_default_status
+                        && task.status != validated_status;
                     let resolved_assignee = if would_assign {
-                        {
-                            let cfg = project_resolver.get_config();
-                            cfg.default_reporter.clone()
-                        }
-                        .or_else(|| {
-                            if let Ok(cwd) = std::env::current_dir() {
-                                let p = cwd.join(".git").join("config");
-                                if p.exists() {
-                                    if let Ok(c) = std::fs::read_to_string(p) {
-                                        for l in c.lines() {
-                                            let l = l.trim();
-                                            if l.starts_with("name = ") {
-                                                let name = l.trim_start_matches("name = ").trim();
-                                                if !name.is_empty() {
-                                                    return Some(name.to_string());
-                                                }
-                                            }
-                                        }
-                                        for l in c.lines() {
-                                            let l = l.trim();
-                                            if l.starts_with("email = ") {
-                                                let email = l.trim_start_matches("email = ").trim();
-                                                if !email.is_empty() {
-                                                    return Some(email.to_string());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            None
-                        })
-                        .or_else(|| std::env::var("USER").ok())
-                        .or_else(|| std::env::var("USERNAME").ok())
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
                     } else {
                         None
                     };
@@ -218,54 +193,17 @@ impl CommandHandler for StatusHandler {
                 task.status = validated_status.clone();
                 // Auto-assign assignee if none is set (configurable)
                 if task.assignee.is_none() && project_resolver.get_config().auto_assign_on_status {
-                    // Delegate to same resolution used by services by peeking config then git then system
-                    let me = {
-                        // Config default reporter
-                        let cfg = project_resolver.get_config();
-                        cfg.default_reporter.clone()
-                    }
-                    .or_else(|| {
-                        if let Ok(cwd) = std::env::current_dir() {
-                            let p = cwd.join(".git").join("config");
-                            if p.exists() {
-                                if let Ok(c) = std::fs::read_to_string(p) {
-                                    for l in c.lines() {
-                                        let l = l.trim();
-                                        if l.starts_with("name = ") {
-                                            let name = l.trim_start_matches("name = ").trim();
-                                            if !name.is_empty() {
-                                                return Some(name.to_string());
-                                            }
-                                        }
-                                    }
-                                    for l in c.lines() {
-                                        let l = l.trim();
-                                        if l.starts_with("email = ") {
-                                            let email = l.trim_start_matches("email = ").trim();
-                                            if !email.is_empty() {
-                                                return Some(email.to_string());
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                    let cfg = project_resolver.get_config();
+                    let project_default_status = cfg
+                        .default_status
+                        .clone()
+                        .unwrap_or_else(|| cfg.issue_states.values[0].clone());
+                    if old_status == project_default_status && old_status != validated_status {
+                        if let Some(me) = crate::utils::identity::resolve_current_user(Some(
+                            resolver.path.as_path(),
+                        )) {
+                            task.assignee = Some(me);
                         }
-                        None
-                    })
-                    .or_else(|| {
-                        std::env::var("USER")
-                            .ok()
-                            .filter(|s| !s.trim().is_empty())
-                            .map(|s| s.trim().to_string())
-                    })
-                    .or_else(|| {
-                        std::env::var("USERNAME")
-                            .ok()
-                            .filter(|s| !s.trim().is_empty())
-                            .map(|s| s.trim().to_string())
-                    });
-                    if let Some(me) = me {
-                        task.assignee = Some(me);
                     }
                 }
 

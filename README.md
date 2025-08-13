@@ -228,6 +228,8 @@ lotar config templates
 
 **Getting Started:**
 - [📚 Complete Documentation](docs/README.md) - Features, commands, and usage
+- [📇 Help Index](docs/help/index.md) - Central links to command help and references
+- [⚖️ Resolution & Precedence](docs/help/precedence.md) - Config/identity/path source order
 - [🧠 Smart Project Management](docs/smart-project-management.md) - Intelligent project resolution and auto-detection
 - [🏗️ Architecture & Technical Reference](docs/architecture-decisions.md) - System design and file formats
 

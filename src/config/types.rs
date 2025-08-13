@@ -114,6 +114,10 @@ pub struct ProjectConfig {
     pub default_status: Option<TaskStatus>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub custom_fields: Option<StringConfigField>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_set_reporter: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_assign_on_status: Option<bool>,
 }
 
 impl ProjectConfig {
@@ -130,6 +134,8 @@ impl ProjectConfig {
             default_priority: None,
             default_status: None,
             custom_fields: None,
+            auto_set_reporter: None,
+            auto_assign_on_status: None,
         }
     }
 }

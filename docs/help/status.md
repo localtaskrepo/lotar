@@ -145,10 +145,13 @@ transitions:
 ### Auto-Assign on Status Change
 - If `auto_assign_on_status: true` and the task has no assignee, LoTaR auto-assigns the current user.
 - The current user is resolved in order: `default_reporter` from config → git user.name/email → system username.
+ - If you pass `--assignee=@me` via CLI (where supported) or patch `assignee: "@me"` over REST/MCP, `@me` resolves using the same identity rules.
+ - REST note: the `/api/tasks/update` endpoint ignores the `status` field; status transitions are driven via CLI, but the same first-change auto-assign semantics apply in services when status is changed through supported channels.
 
 ### Planning and diagnostics
 - `--dry-run` previews changes without saving.
 - `--explain` shows how the new status was validated and how the assignee would be resolved.
+ - See also: [Resolution & Precedence](./precedence.md).
 
 ## Error Handling
 

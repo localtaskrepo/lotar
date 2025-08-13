@@ -21,6 +21,10 @@ pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(),
     fs::write(&config_path, config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;
 
+    // Invalidate cache for this tasks_dir
+    crate::config::resolution::invalidate_config_cache_for(Some(tasks_dir));
+    crate::utils::identity::invalidate_identity_cache(Some(tasks_dir));
+
     Ok(())
 }
 
@@ -43,6 +47,10 @@ pub fn save_project_config(
 
     fs::write(&config_path, config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
+
+    // Invalidate cache for this tasks_dir
+    crate::config::resolution::invalidate_config_cache_for(Some(tasks_dir));
+    crate::utils::identity::invalidate_identity_cache(Some(tasks_dir));
 
     Ok(())
 }

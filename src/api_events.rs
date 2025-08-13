@@ -29,32 +29,46 @@ pub fn emit(event: ApiEvent) {
     *subs = alive;
 }
 
-pub fn emit_task_created(task: &crate::api_types::TaskDTO) {
-    let payload = serde_json::to_value(task).unwrap_or(JsonValue::Null);
+pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
+    let mut payload = serde_json::to_value(task).unwrap_or(JsonValue::Null);
+    if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
+        map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
+    }
     emit(ApiEvent {
         kind: "task_created".into(),
         data: payload,
     });
 }
 
-pub fn emit_task_updated(task: &crate::api_types::TaskDTO) {
-    let payload = serde_json::to_value(task).unwrap_or(JsonValue::Null);
+pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
+    let mut payload = serde_json::to_value(task).unwrap_or(JsonValue::Null);
+    if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
+        map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
+    }
     emit(ApiEvent {
         kind: "task_updated".into(),
         data: payload,
     });
 }
 
-pub fn emit_task_deleted(id: &str) {
+pub fn emit_task_deleted(id: &str, triggered_by: Option<&str>) {
+    let mut payload = serde_json::json!({"id": id});
+    if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
+        map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
+    }
     emit(ApiEvent {
         kind: "task_deleted".into(),
-        data: serde_json::json!({"id": id}),
+        data: payload,
     });
 }
 
-pub fn emit_config_updated() {
+pub fn emit_config_updated(triggered_by: Option<&str>) {
+    let mut payload = serde_json::json!({});
+    if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
+        map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
+    }
     emit(ApiEvent {
         kind: "config_updated".into(),
-        data: serde_json::json!({}),
+        data: payload,
     });
 }

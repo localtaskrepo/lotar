@@ -1,8 +1,48 @@
 use crate::config::types::*;
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, RwLock};
+
+// Simple in-process cache for resolved configuration keyed by tasks root path.
+// This reduces repeated disk IO for common read paths. Invalidate on writes.
+static CONFIG_CACHE: OnceLock<RwLock<HashMap<String, ResolvedConfig>>> = OnceLock::new();
+
+fn config_cache() -> &'static RwLock<HashMap<String, ResolvedConfig>> {
+    CONFIG_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn cache_key_for(tasks_dir: Option<&Path>) -> String {
+    // Normalize to an absolute tasks-root path string for cache key
+    let root: PathBuf = match tasks_dir {
+        Some(p) => p.to_path_buf(),
+        None => crate::utils::paths::tasks_root_from(Path::new(".")),
+    };
+    let root_str = root
+        .canonicalize()
+        .unwrap_or(root)
+        .to_string_lossy()
+        .to_string();
+    // Include relevant env overrides in the cache key so runtime env changes create a new entry
+    let env_port = std::env::var("LOTAR_PORT").unwrap_or_default();
+    let env_proj = std::env::var("LOTAR_PROJECT").unwrap_or_default();
+    let env_def_assignee = std::env::var("LOTAR_DEFAULT_ASSIGNEE").unwrap_or_default();
+    let env_def_reporter = std::env::var("LOTAR_DEFAULT_REPORTER").unwrap_or_default();
+    format!(
+        "{}|PORT={}|PROJ={}|DEF_ASG={}|DEF_REP={}",
+        root_str, env_port, env_proj, env_def_assignee, env_def_reporter
+    )
+}
 
 /// Load and merge all configurations with proper priority order
 pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig, ConfigError> {
+    // Fast path: return from cache if available
+    let key = cache_key_for(tasks_dir);
+    if let Ok(guard) = config_cache().read() {
+        if let Some(cached) = guard.get(&key) {
+            return Ok(cached.clone());
+        }
+    }
+
     // Start with built-in defaults
     let mut config = GlobalConfig::default();
 
@@ -28,7 +68,11 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
     // 1. Environment variables (highest priority)
     crate::config::persistence::apply_env_overrides(&mut config);
 
-    Ok(ResolvedConfig::from_global(config))
+    let resolved = ResolvedConfig::from_global(config);
+    if let Ok(mut guard) = config_cache().write() {
+        guard.insert(key, resolved.clone());
+    }
+    Ok(resolved)
 }
 
 /// Improved merging that only overrides non-default values
@@ -178,6 +222,12 @@ pub fn get_project_config(
     if let Some(reporter) = project_config.default_reporter {
         resolved.default_reporter = Some(reporter);
     }
+    if let Some(auto) = project_config.auto_set_reporter {
+        resolved.auto_set_reporter = auto;
+    }
+    if let Some(auto) = project_config.auto_assign_on_status {
+        resolved.auto_assign_on_status = auto;
+    }
     if let Some(priority) = project_config.default_priority {
         resolved.default_priority = priority;
     }
@@ -203,6 +253,14 @@ pub fn get_project_config(
     // tasks-dir scoped config). For now, prefer the rebuilt values to ensure
     // strict precedence as requested.
     Ok(resolved)
+}
+
+/// Invalidate the cached resolved configuration for a specific tasks_dir
+pub fn invalidate_config_cache_for(tasks_dir: Option<&Path>) {
+    let key = cache_key_for(tasks_dir);
+    if let Ok(mut guard) = config_cache().write() {
+        guard.remove(&key);
+    }
 }
 
 impl ResolvedConfig {

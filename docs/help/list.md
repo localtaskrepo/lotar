@@ -51,8 +51,9 @@ lotar list --project=auth  # Uses environment directory
 - `--features` - Show only feature tasks
 
 ### Assignment & Due Dates
-- `--assignee <ASSIGNEE>` - Tasks assigned to specific person
+- `--assignee <ASSIGNEE>` - Tasks assigned to specific person (accepts @me)
 - `--unassigned` - Tasks with no assignee
+ - Tip: Use `--assignee=@me` or `--mine` to filter to your tasks. Your identity resolves from config default_reporter → git user → system username.
 - `--due-soon` - Tasks due within 7 days
 - `--overdue` - Tasks past their due date
 

@@ -1,5 +1,5 @@
 {
-  "name": "localtaskrepo",
+  "name": "@localtaskrepo/lotar",
   "version": "0.1.0",
   "description": "A task and project management tool that runs locally and can be synced via repo",
   "scripts": {

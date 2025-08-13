@@ -1,0 +1,215 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag matches Cargo.toml version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION=$(grep -E '^version\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*version\s*=\s*"([^"]+)".*/\1/')
+          echo "Tag: $TAG | Cargo.toml: $CARGO_VERSION"
+          if [ "$TAG" != "$CARGO_VERSION" ]; then
+            echo "Error: tag ($TAG) does not match Cargo.toml version ($CARGO_VERSION)." >&2
+            exit 1
+          fi
+
+      - name: Create or update release (no assets yet)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-release:
+    name: Build and Release
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: macos
+            rust_target: aarch64-apple-darwin
+            artifact: macos-arm64
+            bin: lotar
+          - os: macos-latest
+            target: macos
+            rust_target: x86_64-apple-darwin
+            artifact: macos-x64
+            bin: lotar
+          - os: ubuntu-latest
+            target: linux
+            rust_target: x86_64-unknown-linux-gnu
+            artifact: linux-x64
+            bin: lotar
+          - os: ubuntu-latest
+            target: linux-musl
+            rust_target: x86_64-unknown-linux-musl
+            artifact: linux-musl-x64
+            bin: lotar
+          - os: windows-latest
+            target: windows
+            rust_target: x86_64-pc-windows-msvc
+            artifact: windows-x64
+            bin: lotar.exe
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+      - name: Setup Node (for web build)
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            **/package-lock.json
+
+      - name: Install musl toolchain (linux-musl)
+        if: matrix.target == 'linux-musl'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          rustup target add x86_64-unknown-linux-musl
+
+      - name: Install Rust target
+        shell: bash
+        run: |
+          rustup target add "${{ matrix.rust_target }}"
+
+      - name: Build Web UI
+        shell: bash
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+            npm run build:web
+          fi
+
+      - name: Build (release)
+        shell: bash
+        run: |
+          cargo build --release --locked --target "${{ matrix.rust_target }}"
+
+      - name: Strip binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN_PATH="target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
+          if command -v strip >/dev/null 2>&1; then
+            strip "$BIN_PATH" || true
+          fi
+
+      - name: Package artifact (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NAME="lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
+          BIN_PATH="target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
+          cp "$BIN_PATH" "dist/${{ matrix.bin }}"
+          tar -czf "$NAME.tar.gz" -C dist "${{ matrix.bin }}"
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "$NAME.tar.gz" > "$NAME.sha256"
+          elif command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$NAME.tar.gz" > "$NAME.sha256"
+          else
+            echo "WARN: no checksum tool; creating empty checksum file" >&2
+            : > "$NAME.sha256"
+          fi
+
+      - name: Package artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -Path dist -ItemType Directory -Force | Out-Null
+          $name = "lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
+          $binPath = "target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
+          Copy-Item $binPath "dist/${{ matrix.bin }}"
+          Compress-Archive -Path "dist/${{ matrix.bin }}" -DestinationPath "$name.zip"
+          $hash = (Get-FileHash -Path "$name.zip" -Algorithm SHA256).Hash
+          "$hash  $name.zip" | Out-File -FilePath "$name.sha256" -Encoding ascii
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign artifact (non-Windows)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          set -euo pipefail
+          NAME="lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
+          cosign sign-blob --yes \
+            --output-signature "$NAME.tar.gz.sig" \
+            --output-certificate "$NAME.tar.gz.pem" \
+            "$NAME.tar.gz"
+
+      - name: Sign artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          $name = "lotar-${{ github.ref_name }}-${{ matrix.artifact }}"
+          cosign sign-blob --yes --output-signature "$name.zip.sig" --output-certificate "$name.zip.pem" "$name.zip"
+
+      - name: Create GitHub Release (append assets, tar.gz)
+        if: matrix.os != 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz.pem
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.tar.gz.sig
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release (append assets, zip)
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip.pem
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.zip.sig
+            lotar-${{ github.ref_name }}-${{ matrix.artifact }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

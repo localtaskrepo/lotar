@@ -12,6 +12,7 @@
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
+        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto_set_reporter is enabled in config, reporter is set automatically when not provided.",
         "parameters": [
           {
             "name": "project",
@@ -25,7 +26,17 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TaskCreate" }
+              "schema": { "$ref": "#/components/schemas/TaskCreate" },
+              "examples": {
+                "withMeAlias": {
+                  "summary": "Create with @me",
+                  "value": {"title":"New task","project":"TEST","assignee":"@me"}
+                },
+                "basic": {
+                  "summary": "Basic create",
+                  "value": {"title":"Implement search","priority":"High","task_type":"feature"}
+                }
+              }
             }
           }
         },
@@ -34,7 +45,34 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/EnvelopeTask" }
+                "schema": { "$ref": "#/components/schemas/EnvelopeTask" },
+                "examples": {
+                  "created": {
+                    "summary": "Created response",
+                    "value": {
+                      "data": {
+                        "id": "TEST-1",
+                        "title": "Implement search",
+                        "status": "TODO",
+                        "priority": "HIGH",
+                        "task_type": "feature",
+                        "reporter": "alice",
+                        "assignee": "bob",
+                        "created": "2025-08-13T10:00:00Z",
+                        "modified": "2025-08-13T10:00:00Z",
+                        "due_date": null,
+                        "effort": null,
+                        "subtitle": null,
+                        "description": null,
+                        "category": null,
+                        "tags": [],
+                        "relationships": {"depends_on":[],"blocks":[],"related":[],"children":[],"fixes":[]},
+                        "comments": [],
+                        "custom_fields": {}
+                      }
+                    }
+                  }
+                }
               }
             }
           },
@@ -51,6 +89,7 @@
           { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "CSV of statuses (TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE)" },
           { "name": "priority", "in": "query", "schema": { "type": "string" }, "description": "CSV of priorities (LOW, MEDIUM, HIGH, CRITICAL)" },
           { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "CSV of types (feature, bug, epic, spike, chore)" },
+          { "name": "assignee", "in": "query", "schema": { "type": "string" }, "description": "Assignee filter; supports @me to resolve the current user" },
           { "name": "tags", "in": "query", "schema": { "type": "string" }, "description": "CSV of tags" },
           { "name": "category", "in": "query", "schema": { "type": "string" } },
           { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Free-text search" }
@@ -74,6 +113,17 @@
                     }
                   },
                   "required": ["data", "meta"]
+                },
+                "examples": {
+                  "list": {
+                    "summary": "List response",
+                    "value": {
+                      "data": [
+                        {"id":"TEST-1","title":"Implement search","status":"TODO","priority":"HIGH","task_type":"feature","reporter":"alice","assignee":null,"created":"2025-08-13T10:00:00Z","modified":"2025-08-13T10:00:00Z","due_date":null,"effort":null,"subtitle":null,"description":null,"category":null,"tags":[],"relationships":{"depends_on":[],"blocks":[],"related":[],"children":[],"fixes":[]},"comments":[],"custom_fields":{}}
+                      ],
+                      "meta": {"count": 1}
+                    }
+                  }
                 }
               }
             }
@@ -101,6 +151,7 @@
     "/api/tasks/update": {
       "post": {
         "summary": "Update a task by id",
+        "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto_assign_on_status) applies when status transitions via supported channels.",
         "requestBody": {
           "required": true,
           "content": {
@@ -109,12 +160,22 @@
                 "allOf": [
                   { "$ref": "#/components/schemas/TaskUpdateRequest" }
                 ]
+              },
+              "examples": {
+                "updateMeAlias": {
+                  "summary": "Update reporter with @me",
+                  "value": {"id":"TEST-1","reporter":"@me"}
+                },
+                "editFields": {
+                  "summary": "Update description and tags",
+                  "value": {"id":"TEST-1","description":"Details","tags":["api","docs"]}
+                }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeTask" } } } },
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeTask" }, "examples": {"updated": {"summary":"Updated response","value":{"data": {"id":"TEST-1","title":"Implement search","status":"IN_PROGRESS","priority":"HIGH","task_type":"feature","reporter":"erin","assignee":"erin","created":"2025-08-13T10:00:00Z","modified":"2025-08-13T10:10:00Z","due_date":null,"effort":null,"subtitle":null,"description":"Details","category":null,"tags":["api","docs"],"relationships":{"depends_on":[],"blocks":[],"related":[],"children":[],"fixes":[]},"comments":[],"custom_fields":{}}}} } } } },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "500": { "$ref": "#/components/responses/InternalError" }
         }
@@ -164,7 +225,7 @@
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeConfig" } } }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeConfig" }, "examples": {"show": {"summary":"Resolved config","value": {"data": {"default_project": "TEST", "issue_states": ["TODO","IN_PROGRESS","DONE"], "auto_set_reporter": true, "auto_assign_on_status": true}}}} } }
           },
           "500": { "$ref": "#/components/responses/InternalError" }
         }
@@ -227,8 +288,8 @@
           "status": { "$ref": "#/components/schemas/TaskStatus" },
           "priority": { "$ref": "#/components/schemas/Priority" },
           "task_type": { "$ref": "#/components/schemas/TaskType" },
-          "reporter": { "type": "string", "nullable": true },
-          "assignee": { "type": "string", "nullable": true },
+          "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
+          "assignee": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
           "created": { "type": "string" },
           "modified": { "type": "string" },
           "due_date": { "type": "string", "nullable": true },
@@ -250,8 +311,8 @@
           "project": { "type": "string", "nullable": true },
           "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
           "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
-          "reporter": { "type": "string", "nullable": true },
-          "assignee": { "type": "string", "nullable": true },
+          "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
+          "assignee": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
           "due_date": { "type": "string", "nullable": true },
           "effort": { "type": "string", "nullable": true },
           "description": { "type": "string", "nullable": true },
@@ -268,8 +329,8 @@
           "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true },
           "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
           "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
-          "reporter": { "type": "string", "nullable": true },
-          "assignee": { "type": "string", "nullable": true },
+          "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
+          "assignee": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
           "due_date": { "type": "string", "nullable": true },
           "effort": { "type": "string", "nullable": true },
           "description": { "type": "string", "nullable": true },

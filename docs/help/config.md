@@ -116,6 +116,7 @@ When resolving configuration, LoTaR uses this order (highest wins):
 Notes:
 - Project config overrides global, but home/env can override both.
 - CLI flags are applied by each command and always win for that invocation.
+ - Identity resolution uses the merged configuration from this precedence chain.
 
 ### Automatic Prefix Generation
 Projects automatically get prefixes generated from their names:
@@ -168,6 +169,10 @@ lotar config templates
 - `default_priority` - Default task priority
 - `default_status` - Default task status
 - `custom_fields` - Custom field definitions
+- `auto_set_reporter` - If true, set reporter automatically on create/update when missing
+- `auto_assign_on_status` - If true, auto-assign assignee on first meaningful status change
+    - First-change is defined as: when a task moves away from the default_status (or the first state if default unset) and the task currently has no assignee.
+    - The assignee chosen is the resolved current user (see Identity Resolution below).
 
 ### Global
 - `server_port` - Web server port
@@ -182,6 +187,8 @@ lotar config templates
 - `default_priority` - Default task priority for all projects
 - `default_status` - Default task status for all projects
 - `custom_fields` - Default custom fields for all projects
+- `auto_set_reporter` - If true, set reporter automatically on create/update when missing
+- `auto_assign_on_status` - If true, auto-assign assignee on first meaningful status change
 
 ## Templates
 
@@ -208,6 +215,15 @@ Notes:
 - Auto reporter and auto-assign behavior is controlled by configuration: set `default_reporter`, `auto_set_reporter`, and `auto_assign_on_status` in config files. The above environment variables can provide defaults, but do not toggle automation flags.
 - Diagnostic/testing variables (not for general use): `LOTAR_TEST_SILENT=1` silences warnings in tests; `LOTAR_VERBOSE=1` enables extra setup logs.
 
+## Identity Resolution and @me
+
+- Anywhere a person field is accepted (reporter, assignee, default_reporter), the special value `@me` is allowed.
+- `@me` resolves to the current user using this order:
+    1) Merged config `default_reporter` (following the precedence above)
+    2) git config at repo root: user.name or user.email
+    3) System environment: $USER or $USERNAME
+- This resolution is used consistently by CLI, REST, and MCP.
+
 ## Notes
 
 - Global settings apply to all projects
@@ -215,3 +231,4 @@ Notes:
 - Templates provide pre-configured workflows
 - Configuration is stored in YAML format
 - Environment variables are respected in configuration display and operations
+ - See also: [Resolution & Precedence](./precedence.md) for source order and identity rules.

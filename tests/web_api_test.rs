@@ -194,6 +194,63 @@ fn http_get_bytes(port: u16, path: &str) -> (u16, HashMap<String, String>, Vec<u
     (0, HashMap::new(), Vec::new())
 }
 
+#[test]
+fn rest_create_and_update_supports_me_alias() {
+    let _env = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+        std::env::set_var("LOTAR_TEST_SILENT", "1");
+    }
+
+    // Configure identity for deterministic @me
+    std::fs::write(
+        lotar::utils::paths::global_config_path(&tasks_dir),
+        "default_project: REST\nissue_states: [Todo, InProgress, Done]\nissue_types: [Feature, Bug, Chore]\nissue_priorities: [Low, Medium, High]\ndefault_reporter: erin\n",
+    )
+    .unwrap();
+
+    let port = find_free_port();
+    start_server_on(port);
+
+    // Create task with @me as assignee
+    let create_body = json!({
+        "title": "REST @me",
+        "project": "REST",
+        "assignee": "@me"
+    });
+    let (status, body) = http_post_json(
+        port,
+        "/api/tasks/add?project=REST",
+        &create_body.to_string(),
+    );
+    assert_eq!(status, 201, "create should succeed");
+    let env: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let data = env.get("data").cloned().unwrap_or(json!({}));
+    let id = data.get("id").and_then(|v| v.as_str()).unwrap().to_string();
+    assert_eq!(data.get("assignee").and_then(|v| v.as_str()), Some("erin"));
+
+    // Update via REST with @me for reporter
+    let patch = json!({
+        "id": id,
+        "reporter": "@me"
+    });
+    let (status, body) = http_post_json(port, "/api/tasks/update", &patch.to_string());
+    assert_eq!(status, 200, "update should succeed");
+    let env: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let data = env.get("data").cloned().unwrap_or(json!({}));
+    assert_eq!(data.get("reporter").and_then(|v| v.as_str()), Some("erin"));
+
+    stop_server_on(port);
+
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+        std::env::remove_var("LOTAR_TEST_SILENT");
+    }
+}
+
 fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream.set_read_timeout(Some(net_timeout())).unwrap();
@@ -558,6 +615,84 @@ fn sse_debounce_emits_all_events() {
 
     unsafe {
         std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+    stop_server_on(port);
+}
+
+#[test]
+fn sse_includes_triggered_by_identity() {
+    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Speed up IO handling in server during tests and enable ready event
+    unsafe {
+        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
+        std::env::set_var("LOTAR_SSE_READY", "1");
+    }
+
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    // Provide default_reporter in config so identity is deterministic
+    std::fs::write(tasks_dir.join("config.yml"), b"default_reporter: alice\n").unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+    }
+
+    let port = find_free_port();
+    start_server_on(port);
+
+    let (mut sse, mut leftover) = open_sse(
+        port,
+        "debounce_ms=10&kinds=task_created&project=TEST&ready=1",
+    );
+    // Drain until the ready event
+    let events = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+    if events.is_empty() {
+        // read any leftover and continue
+        leftover = Vec::new();
+    } else {
+        leftover = Vec::new();
+    }
+
+    // Send two creates to reduce chance of missing the first due to a race
+    let (st1, _b1) = http_post_json(
+        port,
+        "/api/tasks/add?project=TEST",
+        r#"{"title":"SSE actor"}"#,
+    );
+    assert_eq!(st1, 201, "first add should succeed");
+    let (st2, _b2) = http_post_json(
+        port,
+        "/api/tasks/add?project=TEST",
+        r#"{"title":"SSE actor 2"}"#,
+    );
+    assert_eq!(st2, 201, "second add should succeed");
+
+    let events = read_sse_events(&mut sse, 3, Duration::from_millis(3000), leftover);
+    assert!(!events.is_empty(), "expected at least one created event");
+    // Find the first event for TEST-* and validate triggered_by
+    let mut found = false;
+    for (_kind, data) in events {
+        let json: serde_json::Value = match serde_json::from_str(&data) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
+            if id.starts_with("TEST-") {
+                assert_eq!(
+                    json.get("triggered_by").and_then(|v| v.as_str()),
+                    Some("alice")
+                );
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "did not find a TEST-* task_created event");
+
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+        std::env::remove_var("LOTAR_TEST_FAST_IO");
+        std::env::remove_var("LOTAR_SSE_READY");
     }
     stop_server_on(port);
 }

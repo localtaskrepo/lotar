@@ -20,6 +20,8 @@ Create a new task with detailed options.
 ```bash
 lotar task add --title="Task title" [OPTIONS]
 ```
+Notes:
+- You can filter by current user with --assignee=@me or --mine.
 
 ### list
 List tasks with advanced filtering options.
@@ -27,6 +29,8 @@ List tasks with advanced filtering options.
 ```bash
 lotar task list [OPTIONS]
 ```
+Notes:
+- When providing --assignee=@me, it resolves to your identity from config/git/system.
 
 ### edit
 Edit an existing task.

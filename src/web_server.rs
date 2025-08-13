@@ -135,6 +135,18 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                     initial.push_str("retry: 1000\n\n");
                     let _ = stream.write_all(initial.as_bytes());
                     let _ = stream.flush();
+                    // Optional: emit an immediate readiness event for clients/tests to sync on
+                    // Minimized in production: requires LOTAR_SSE_READY=1 to be set.
+                    let allow_ready = std::env::var("LOTAR_SSE_READY").ok().as_deref() == Some("1");
+                    if allow_ready
+                        && query
+                            .get("ready")
+                            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+                            .unwrap_or(false)
+                    {
+                        let _ = stream.write_all(b"event: ready\ndata: {}\n\n");
+                        let _ = stream.flush();
+                    }
                     // Spawn a thread to forward events to this client with debounce and filtering
                     let mut stream_clone = stream.try_clone().unwrap();
                     std::thread::spawn(move || {

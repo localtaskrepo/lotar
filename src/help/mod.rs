@@ -1,7 +1,17 @@
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, DirEntry, include_dir};
+use regex::Regex;
+use std::sync::LazyLock;
 
 static HELP_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/docs/help");
+const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+// Default to version-pinned docs on GitHub (e.g., v0.3.0); override with LOTAR_DOCS_BASE_URL
+static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| {
+    format!(
+        "https://github.com/localtaskrepo/lotar/blob/v{}/",
+        env!("CARGO_PKG_VERSION")
+    )
+});
 
 pub struct HelpSystem {
     renderer: OutputRenderer,
@@ -30,7 +40,12 @@ impl HelpSystem {
                     "format": "markdown"
                 })
                 .to_string()),
-                _ => Ok(content.to_owned()),
+                _ => {
+                    // Render Markdown with terminal hyperlinks (OSC 8) by default.
+                    // Links remain readable text if the terminal doesn't support OSC 8.
+                    let base_dir = format!("{}/docs/help", ROOT_DIR);
+                    Ok(self.render_with_hyperlinks(content, &base_dir))
+                }
             }
         } else {
             Err(format!("No help available for command '{}'", command))
@@ -113,6 +128,109 @@ impl HelpSystem {
             }
         }
         None
+    }
+
+    fn render_with_hyperlinks(&self, markdown: &str, base_dir: &str) -> String {
+        // Convert Markdown links [text](target) into OSC 8 clickable hyperlinks.
+        // Preserve original link text and do not change JSON output.
+        let re = Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").ok();
+        if re.is_none() {
+            return markdown.to_string();
+        }
+        let re = re.unwrap();
+        let mut out = String::with_capacity(markdown.len() + 64);
+        let mut last = 0usize;
+        for caps in re.captures_iter(markdown) {
+            if let (Some(m), Some(text), Some(target)) = (
+                caps.get(0),
+                caps.get(1).map(|m| m.as_str()),
+                caps.get(2).map(|m| m.as_str()),
+            ) {
+                // Push preceding text
+                out.push_str(&markdown[last..m.start()]);
+                // Skip OSC-8 for in-page anchors (e.g., #section)
+                if target.starts_with('#') {
+                    out.push_str(text);
+                    last = m.end();
+                    continue;
+                }
+
+                let url = self.resolve_link_target(target, base_dir);
+                // OSC 8: ESC ] 8 ;; URL ST, text, ESC ] 8 ;; ST
+                out.push_str("\x1b]8;;");
+                out.push_str(&url);
+                out.push_str("\x1b\\");
+                out.push_str(text);
+                out.push_str("\x1b]8;;\x1b\\");
+                last = m.end();
+            }
+        }
+        out.push_str(&markdown[last..]);
+        out
+    }
+
+    fn resolve_link_target(&self, target: &str, base_dir: &str) -> String {
+        use std::path::{Path, PathBuf};
+
+        // If target is an absolute URL or file, return as-is.
+        if target.starts_with("http://")
+            || target.starts_with("https://")
+            || target.starts_with("file://")
+            || target.starts_with("mailto:")
+        {
+            return target.to_string();
+        }
+
+        // Determine the base URL for docs (env override or default to GitHub).
+        let base_url = std::env::var("LOTAR_DOCS_BASE_URL")
+            .ok()
+            .unwrap_or_else(|| DEFAULT_DOCS_BASE_URL.clone());
+        let base_url = if base_url.ends_with('/') {
+            base_url
+        } else {
+            format!("{}/", base_url)
+        };
+
+        // Compute a repo-relative path for the target.
+        // Strategy:
+        //  - If target starts with "./" or "../", resolve relative to base_dir
+        //  - Else if it's an absolute filesystem path, keep it as file://
+        //  - Else try base_dir/target first; if it doesn't exist, fall back to ROOT_DIR/target
+        //  - If resolution fails, use the raw target as repo-relative
+
+        // Absolute filesystem path: keep as local file URL (useful in dev)
+        if target.starts_with('/') {
+            let abs = PathBuf::from(target);
+            let abs = abs.canonicalize().unwrap_or(abs);
+            return format!("file://{}", abs.to_string_lossy());
+        }
+
+        let candidate_paths: [PathBuf; 2] = [
+            Path::new(base_dir).join(target),
+            Path::new(ROOT_DIR).join(target),
+        ];
+
+        // Pick the first existing candidate; else use the first as best-effort
+        let chosen = candidate_paths
+            .iter()
+            .find(|p| p.exists())
+            .cloned()
+            .unwrap_or_else(|| candidate_paths[0].clone());
+
+        // Try to compute repo-relative by stripping ROOT_DIR
+        let repo_rel = chosen
+            .strip_prefix(ROOT_DIR)
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|_| PathBuf::from(target));
+
+        // Normalize path separators to '/'
+        let repo_rel = repo_rel
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/");
+
+        format!("{}{}", base_url, repo_rel)
     }
 }
 

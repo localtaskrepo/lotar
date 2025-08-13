@@ -57,19 +57,20 @@ lotar serve  # Uses environment-configured directory
 - **Statistics** - Task completion and project metrics
 
 ### API Endpoints
-- `POST /api/tasks/add` - Create new task (body: TaskCreate)
+- `POST /api/tasks/add` - Create new task (body: TaskCreate; supports `@me` for people fields; auto-set reporter if enabled)
 - `GET /api/tasks/list` - List tasks
 	- Query params:
 		- `project` (prefix)
 		- `status` (CSV; validated against config)
 		- `priority` (CSV; validated against config)
 		- `type` (CSV; validated against config)
+		- `assignee` (supports `@me` to filter to current user)
 		- `tags` (CSV)
 		- `category`
 		- `q` (free-text search)
 	- Notes: Invalid values for `status`, `priority`, or `type` return HTTP 400
 - `GET /api/tasks/get?id=...` - Get task by id (returns HTTP 404 if not found)
-- `POST /api/tasks/update` - Update task (body: { id, patch })
+- `POST /api/tasks/update` - Update task (body: TaskUpdateRequest: flat fields with `id` + optional properties; supports `@me` for reporter/assignee)
 - `POST /api/tasks/delete` - Delete task (body: { id })
 - `GET /api/projects/list` - List projects
 - `GET /api/projects/stats?project=PREFIX` - Project stats

@@ -3,6 +3,7 @@
 // Domain submodules
 pub mod config;
 pub mod filesystem;
+pub mod identity;
 pub mod paths;
 pub mod project;
 

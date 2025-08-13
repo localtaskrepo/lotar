@@ -721,7 +721,9 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 .params
                 .get("assignee")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+                .and_then(|s| {
+                    crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()))
+                });
             let due_date = req
                 .params
                 .get("due_date")
@@ -786,7 +788,9 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     .params
                     .get("reporter")
                     .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
+                    .and_then(|s| {
+                        crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()))
+                    }),
                 assignee,
                 due_date,
                 effort,
@@ -1021,10 +1025,12 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 }
             }
             if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
-                patch.reporter = Some(s.to_string());
+                patch.reporter =
+                    crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()));
             }
             if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
-                patch.assignee = Some(s.to_string());
+                patch.assignee =
+                    crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()));
             }
             if let Some(s) = patch_val.get("due_date").and_then(|v| v.as_str()) {
                 patch.due_date = Some(s.to_string());

@@ -179,7 +179,10 @@ impl CommandHandler for AddHandler {
 
         // Set validated properties
         task.task_type = validated_type;
-        task.assignee = validated_assignee;
+        // Resolve @me if present so previews and persisted task show actual identity
+        task.assignee = validated_assignee.and_then(|a| {
+            crate::utils::identity::resolve_me_alias(&a, Some(resolver.path.as_path()))
+        });
         task.due_date = validated_due_date;
         task.effort = validated_effort;
         task.description = args.description;

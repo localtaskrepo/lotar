@@ -153,6 +153,15 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
         ConfigError::IoError(format!("Failed to write default global config: {}", e))
     })?;
 
+    // Invalidate cache for this tasks_dir after creation
+    if let Some(dir) = tasks_dir {
+        crate::config::resolution::invalidate_config_cache_for(Some(dir));
+        crate::utils::identity::invalidate_identity_cache(Some(dir));
+    } else {
+        crate::config::resolution::invalidate_config_cache_for(None);
+        crate::utils::identity::invalidate_identity_cache(None);
+    }
+
     // Be quiet by default during tests; only log when explicitly verbose
     let quiet = std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1";
     let verbose = std::env::var("LOTAR_VERBOSE").unwrap_or_default() == "1";

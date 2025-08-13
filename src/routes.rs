@@ -61,7 +61,11 @@ pub fn initialize(api_server: &mut ApiServer) {
             },
         };
         match TaskService::create(&mut storage, req_create) {
-            Ok(task) => { crate::api_events::emit_task_created(&task); ok_json(201, json!({"data": task})) },
+            Ok(task) => {
+                let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_created(&task, actor.as_deref());
+                ok_json(201, json!({"data": task}))
+            },
             Err(e) => internal(json!({"error": {"code":"INTERNAL", "message": e.to_string()}})),
         }
     });
@@ -191,7 +195,11 @@ pub fn initialize(api_server: &mut ApiServer) {
             },
         };
         match TaskService::update(&mut storage, &edit.id, patch) {
-            Ok(task) => { crate::api_events::emit_task_updated(&task); ok_json(200, json!({"data": task})) },
+            Ok(task) => {
+                let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&task, actor.as_deref());
+                ok_json(200, json!({"data": task}))
+            },
             Err(e) => bad_request(e.to_string()),
         }
     });
@@ -215,7 +223,8 @@ pub fn initialize(api_server: &mut ApiServer) {
         )
         .unwrap_or(false);
         if deleted {
-            crate::api_events::emit_task_deleted(&del.id);
+            let actor = crate::utils::identity::resolve_current_user(None);
+            crate::api_events::emit_task_deleted(&del.id, actor.as_deref());
         }
         ok_json(200, json!({"data": {"deleted": deleted}}))
     });
@@ -256,7 +265,9 @@ pub fn initialize(api_server: &mut ApiServer) {
         let project = body.get("project").and_then(|v| v.as_str());
         match ConfigService::set(&resolver, &map, global, project) {
             Ok(_) => {
-                crate::api_events::emit_config_updated();
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_config_updated(actor.as_deref());
                 ok_json(200, json!({"data": {"updated": true}}))
             }
             Err(e) => bad_request(e.to_string()),

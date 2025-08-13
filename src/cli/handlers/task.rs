@@ -359,19 +359,27 @@ impl CommandHandler for SearchHandler {
 
         // Filter by assignee
         if let Some(ref assignee) = args.assignee {
-            let filter_assignee = if assignee == "@me" {
-                // TODO: Resolve @me to actual user
-                "@me".to_string()
+            let me = if assignee == "@me" {
+                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
             } else {
-                assignee.clone()
+                Some(assignee.clone())
             };
-            tasks.retain(|(_, task)| task.assignee.as_ref() == Some(&filter_assignee));
+            if let Some(target) = me {
+                tasks.retain(|(_, task)| task.assignee.as_ref() == Some(&target));
+            } else {
+                // If we can't resolve @me, filter to none to produce empty result deterministically
+                tasks.clear();
+            }
         }
 
         if args.mine {
-            // TODO: Resolve current user and filter by that
-            // For now, filter by @me placeholder
-            tasks.retain(|(_, task)| task.assignee.as_ref().is_some_and(|a| a == "@me"));
+            if let Some(me) =
+                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
+            {
+                tasks.retain(|(_, task)| task.assignee.as_ref() == Some(&me));
+            } else {
+                tasks.clear();
+            }
         }
 
         if args.high {

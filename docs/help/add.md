@@ -36,7 +36,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ### Core Properties
 - `--type <TYPE>` - Task type: feature, bug, epic, spike, chore
 - `--priority <PRIORITY>` - Priority: low, medium, high, critical
-- `--assignee <ASSIGNEE>` - Task assignee (email or @username)
+- `--assignee <ASSIGNEE>` - Task assignee (email or @username). Supports `@me` to resolve to your identity.
 
 ### Scheduling
 - `--due <DATE>` - Due date (YYYY-MM-DD or relative like 'tomorrow')
@@ -73,6 +73,11 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 
 Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto_set_reporter: true` in your config. The environment variable can provide a default reporter value.
 
+Notes:
+- `@me` resolution order: config.default_reporter (merged with precedence) → git user.name/email → $USER/$USERNAME.
+- When `--assignee=@me` is provided, it is resolved at the CLI layer so previews and persisted values match.
+ - See also: [Resolution & Precedence](./precedence.md).
+
 ## Output Formats
 
 Control output with global `--format` option:
@@ -89,13 +94,6 @@ lotar add "New task" --format=json
 # JSON dry-run preview
 lotar add "Preview task" --dry-run --format=json
 # {"status":"preview","action":"create","project":"AUTH","title":"Preview task","priority":"MEDIUM","status_value":"TODO"}
-
-# Table format
-lotar add "New task" --format=table
-# | Property | Value    |
-# |----------|----------|
-# | Task ID  | AUTH-001 |
-# | Status   | Created  |
 ```
 
 ## Validation
