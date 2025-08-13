@@ -76,18 +76,87 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.default_priority != defaults.default_priority {
         base.default_priority = override_config.default_priority;
     }
+    if override_config.default_status != defaults.default_status {
+        base.default_status = override_config.default_status;
+    }
+    if override_config.custom_fields.values != defaults.custom_fields.values {
+        base.custom_fields = override_config.custom_fields;
+    }
+}
+
+/// Overlay fields from a GlobalConfig onto a ResolvedConfig using the same
+/// non-default override semantics as merge_global_config. This is used when
+/// applying higher-priority scopes (home, env) after project-specific values.
+pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_config: GlobalConfig) {
+    let defaults = GlobalConfig::default();
+
+    if override_config.server_port != defaults.server_port {
+        resolved.server_port = override_config.server_port;
+    }
+    if override_config.default_prefix != defaults.default_prefix {
+        resolved.default_prefix = override_config.default_prefix;
+    }
+
+    if override_config.issue_states.values != defaults.issue_states.values {
+        resolved.issue_states = override_config.issue_states;
+    }
+    if override_config.issue_types.values != defaults.issue_types.values {
+        resolved.issue_types = override_config.issue_types;
+    }
+    if override_config.issue_priorities.values != defaults.issue_priorities.values {
+        resolved.issue_priorities = override_config.issue_priorities;
+    }
+    if override_config.categories.values != defaults.categories.values {
+        resolved.categories = override_config.categories;
+    }
+    if override_config.tags.values != defaults.tags.values {
+        resolved.tags = override_config.tags;
+    }
+
+    if override_config.default_assignee.is_some() {
+        resolved.default_assignee = override_config.default_assignee;
+    }
+    if override_config.default_reporter.is_some() {
+        resolved.default_reporter = override_config.default_reporter;
+    }
+    if override_config.auto_set_reporter != defaults.auto_set_reporter {
+        resolved.auto_set_reporter = override_config.auto_set_reporter;
+    }
+    if override_config.auto_assign_on_status != defaults.auto_assign_on_status {
+        resolved.auto_assign_on_status = override_config.auto_assign_on_status;
+    }
+    if override_config.default_priority != defaults.default_priority {
+        resolved.default_priority = override_config.default_priority;
+    }
+    if override_config.default_status != defaults.default_status {
+        resolved.default_status = override_config.default_status;
+    }
+    if override_config.custom_fields.values != defaults.custom_fields.values {
+        resolved.custom_fields = override_config.custom_fields;
+    }
 }
 
 /// Get project-specific configuration by merging with global config
 pub fn get_project_config(
-    resolved_config: &ResolvedConfig,
+    _resolved_config: &ResolvedConfig,
     project_name: &str,
+    tasks_dir: &std::path::Path,
 ) -> Result<ResolvedConfig, ConfigError> {
-    // Load project-specific config and merge with global
-    let project_config = crate::config::persistence::load_project_config(project_name)?;
-    let mut resolved = resolved_config.clone();
+    // Desired precedence: CLI > env > home > project > global > defaults
+    // We don't re-handle CLI here (handled by command handlers). Implement the
+    // remainder by building a fresh chain to ensure home/env can override project.
 
-    // Apply project-specific overrides
+    // 1) Start from defaults -> global
+    let mut base_global = GlobalConfig::default();
+    if let Ok(global_config) = crate::config::persistence::load_global_config(Some(tasks_dir)) {
+        merge_global_config(&mut base_global, global_config);
+    }
+    // Convert to resolved baseline
+    let mut resolved = ResolvedConfig::from_global(base_global.clone());
+
+    // 2) Overlay project-specific config
+    let project_config =
+        crate::config::persistence::load_project_config_from_dir(project_name, tasks_dir)?;
     if let Some(states) = project_config.issue_states {
         resolved.issue_states = states;
     }
@@ -109,7 +178,6 @@ pub fn get_project_config(
     if let Some(reporter) = project_config.default_reporter {
         resolved.default_reporter = Some(reporter);
     }
-    // Note: project-level toggles for automation not currently supported in ProjectConfig; could be added later
     if let Some(priority) = project_config.default_priority {
         resolved.default_priority = priority;
     }
@@ -120,6 +188,20 @@ pub fn get_project_config(
         resolved.custom_fields = custom_fields;
     }
 
+    // 3) Overlay home config (higher priority than project)
+    if let Ok(home_config) = crate::config::persistence::load_home_config() {
+        overlay_global_into_resolved(&mut resolved, home_config);
+    }
+
+    // 4) Overlay environment variables (highest of config sources)
+    let mut env_cfg = GlobalConfig::default();
+    crate::config::persistence::apply_env_overrides(&mut env_cfg);
+    overlay_global_into_resolved(&mut resolved, env_cfg);
+
+    // Preserve any already-resolved fields from the provided resolved_config that
+    // are not impacted by project/home/env precedence (e.g., server_port from
+    // tasks-dir scoped config). For now, prefer the rebuilt values to ensure
+    // strict precedence as requested.
     Ok(resolved)
 }
 

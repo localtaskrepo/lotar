@@ -1,22 +1,31 @@
 use crate::config::types::*;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct ConfigManager {
     resolved_config: ResolvedConfig,
+    tasks_dir: PathBuf,
 }
 
 impl ConfigManager {
     #[allow(dead_code)]
     pub fn new() -> Result<Self, ConfigError> {
         let resolved_config = crate::config::resolution::load_and_merge_configs(None)?;
-        Ok(Self { resolved_config })
+        let default_root = crate::utils::paths::tasks_root_from(Path::new("."));
+        Ok(Self {
+            resolved_config,
+            tasks_dir: default_root,
+        })
     }
 
     /// Create a ConfigManager from an existing ResolvedConfig (for testing)
     #[cfg(test)]
     pub fn from_resolved_config(resolved_config: ResolvedConfig) -> Self {
-        Self { resolved_config }
+        let default_root = crate::utils::paths::tasks_root_from(Path::new("."));
+        Self {
+            resolved_config,
+            tasks_dir: default_root,
+        }
     }
 
     /// Get a reference to the resolved configuration
@@ -33,14 +42,20 @@ impl ConfigManager {
     pub fn new_manager_with_tasks_dir_ensure_config(tasks_dir: &Path) -> Result<Self, ConfigError> {
         let resolved_config =
             Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, true)?;
-        Ok(Self { resolved_config })
+        Ok(Self {
+            resolved_config,
+            tasks_dir: tasks_dir.to_path_buf(),
+        })
     }
 
     /// Create a ConfigManager instance for read-only operations (does not create config files)
     pub fn new_manager_with_tasks_dir_readonly(tasks_dir: &Path) -> Result<Self, ConfigError> {
         let resolved_config =
             Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, false)?;
-        Ok(Self { resolved_config })
+        Ok(Self {
+            resolved_config,
+            tasks_dir: tasks_dir.to_path_buf(),
+        })
     }
 
     /// Ensure default_prefix is set in global config, auto-detecting if necessary
@@ -94,7 +109,11 @@ impl ConfigManager {
 
     /// Get project-specific configuration by merging with global config
     pub fn get_project_config(&self, project_name: &str) -> Result<ResolvedConfig, ConfigError> {
-        crate::config::resolution::get_project_config(&self.resolved_config, project_name)
+        crate::config::resolution::get_project_config(
+            &self.resolved_config,
+            project_name,
+            &self.tasks_dir,
+        )
     }
 
     /// Delegate to operations module
@@ -189,6 +208,10 @@ pub mod test_support {
     use super::*;
 
     pub fn from_resolved_config(resolved_config: ResolvedConfig) -> ConfigManager {
-        ConfigManager { resolved_config }
+        let default_root = crate::utils::paths::tasks_root_from(Path::new("."));
+        ConfigManager {
+            resolved_config,
+            tasks_dir: default_root,
+        }
     }
 }

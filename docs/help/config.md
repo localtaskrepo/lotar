@@ -104,6 +104,19 @@ lotar config validate --project=my-project --fix
 
 ## Advanced Features
 
+### Configuration Precedence
+When resolving configuration, LoTaR uses this order (highest wins):
+1. Command-line flags (per command)
+2. Environment variables
+3. Home config (~/.lotar)
+4. Project config (.tasks/<PROJECT>/config.yml)
+5. Global config (.tasks/config.yml)
+6. Built-in defaults
+
+Notes:
+- Project config overrides global, but home/env can override both.
+- CLI flags are applied by each command and always win for that invocation.
+
 ### Automatic Prefix Generation
 Projects automatically get prefixes generated from their names:
 - Short names (≤4 chars): Use as-is (`test` → `TEST`)
@@ -185,12 +198,15 @@ lotar config templates
 
 ## Environment Variables
 
-- `LOTAR_TASKS_DIR` - Default tasks directory location
+- `LOTAR_TASKS_DIR` - Default tasks directory location (overrides discovery)
+- `LOTAR_PORT` - Web server port override
+- `LOTAR_PROJECT` - Default project name; mapped to a prefix and applied as `default_project`
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for all new tasks
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity used for auto reporter/assign
 
 Notes:
 - Auto reporter and auto-assign behavior is controlled by configuration: set `default_reporter`, `auto_set_reporter`, and `auto_assign_on_status` in config files. The above environment variables can provide defaults, but do not toggle automation flags.
+- Diagnostic/testing variables (not for general use): `LOTAR_TEST_SILENT=1` silences warnings in tests; `LOTAR_VERBOSE=1` enables extra setup logs.
 
 ## Notes
 

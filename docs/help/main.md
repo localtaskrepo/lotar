@@ -115,6 +115,8 @@ LoTaR automatically detects project context:
 3. Parent directory search for existing `.tasks` folder
 4. Current directory `.tasks` folder (created if needed)
 
+Configuration precedence (for config values): CLI > env > home > project > global > defaults
+
 ## Getting Help
 
 - `lotar help` - Show this overview

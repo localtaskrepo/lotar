@@ -12,7 +12,7 @@ lotar whoami [--explain]
 ## Details
 
 Resolution order:
-1. `default_reporter` from merged configuration (project/home/global)
+1. `default_reporter` from merged configuration, resolved with precedence: CLI > env > home > project > global > defaults
 2. `git` configuration from .git/config (user.name, then user.email)
 3. System username (USER/USERNAME)
 
