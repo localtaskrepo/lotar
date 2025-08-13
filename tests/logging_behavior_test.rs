@@ -1,4 +1,4 @@
-use assert_cmd::Command;
+use crate::common::cargo_bin_silent;
 use predicates::prelude::*;
 
 mod common;
@@ -17,7 +17,7 @@ fn add_command_emits_info_logs() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let assert = cmd
         .current_dir(temp_dir)
         .arg("add")
@@ -53,8 +53,7 @@ fn list_command_emits_info_logs() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Seed a task
-    Command::cargo_bin("lotar")
-        .unwrap()
+    cargo_bin_silent()
         .current_dir(temp_dir)
         .arg("add")
         .arg("List logging task")
@@ -63,7 +62,7 @@ fn list_command_emits_info_logs() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let assert = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -92,7 +91,7 @@ fn config_templates_emits_stdout_and_logs() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("templates")
@@ -114,7 +113,7 @@ fn config_show_with_tasks_dir_emits_expected_output_and_logs() {
     let custom_tasks = temp_dir.join("custom_tasks");
     std::fs::create_dir_all(&custom_tasks).unwrap();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("show")
@@ -137,8 +136,7 @@ fn status_command_logs_and_json_notice_on_noop() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task
-    let add = Command::cargo_bin("lotar")
-        .unwrap()
+    let add = cargo_bin_silent()
         .current_dir(temp_dir)
         .arg("add")
         .arg("Status logging task")
@@ -150,8 +148,7 @@ fn status_command_logs_and_json_notice_on_noop() {
     let task_id = extract_task_id(&stdout).expect("should extract task id");
 
     // Set to a new status first to ensure known state
-    Command::cargo_bin("lotar")
-        .unwrap()
+    cargo_bin_silent()
         .current_dir(temp_dir)
         .args([
             "status",
@@ -164,7 +161,7 @@ fn status_command_logs_and_json_notice_on_noop() {
         .success();
 
     // Repeat with JSON format to trigger no-op path and JSON notice
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let assert = cmd
         .current_dir(temp_dir)
         .args([
@@ -209,7 +206,7 @@ fn scan_command_emits_debug_logs() {
     )
     .unwrap();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let assert = cmd
         .current_dir(temp_dir)
         .args([
@@ -239,8 +236,7 @@ fn priority_command_emits_info_logs() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task to modify
-    let add = Command::cargo_bin("lotar")
-        .unwrap()
+    let add = cargo_bin_silent()
         .current_dir(temp_dir)
         .arg("add")
         .arg("Priority logging task")
@@ -251,7 +247,7 @@ fn priority_command_emits_info_logs() {
     let stdout = String::from_utf8_lossy(&add.get_output().stdout).to_string();
     let task_id = extract_task_id(&stdout).expect("should extract task id");
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let assert = cmd
         .current_dir(temp_dir)
         .args([

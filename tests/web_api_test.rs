@@ -9,6 +9,19 @@ use std::time::{Duration, Instant};
 mod common;
 use crate::common::env_mutex::lock_var;
 
+// Test-time acceleration helpers
+fn fast_net() -> bool {
+    std::env::var("LOTAR_TEST_FAST_NET").ok().as_deref() == Some("1")
+}
+
+fn net_timeout() -> std::time::Duration {
+    if fast_net() {
+        std::time::Duration::from_millis(500)
+    } else {
+        std::time::Duration::from_millis(1500)
+    }
+}
+
 fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> HttpRequest {
     let mut q = HashMap::new();
     for (k, v) in query {
@@ -33,15 +46,36 @@ fn find_free_port() -> u16 {
 
 fn start_server_on(port: u16) {
     thread::spawn(move || {
+        // Enable fast IO/heartbeat paths inside the server during tests
+        unsafe {
+            std::env::set_var("LOTAR_TEST_FAST_IO", "1");
+        }
         let mut api = ApiServer::new();
         routes::initialize(&mut api);
         lotar::web_server::serve(&api, port);
     });
+    // Also enable faster client-side network timeouts for this process
+    unsafe {
+        std::env::set_var("LOTAR_TEST_FAST_NET", "1");
+    }
     std::thread::sleep(Duration::from_millis(50));
+}
+
+fn stop_server_on(port: u16) {
+    if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(250)));
+        let req = "GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
+        let _ = stream.write_all(req.as_bytes());
+        let _ = stream.flush();
+        let mut tmp = [0u8; 256];
+        let _ = stream.read(&mut tmp);
+    }
+    std::thread::sleep(Duration::from_millis(20));
 }
 
 fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream.set_read_timeout(Some(net_timeout())).unwrap();
     let req = format!(
         "POST {} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
         path_and_query,
@@ -50,28 +84,119 @@ fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>)
     );
     stream.write_all(req.as_bytes()).unwrap();
     stream.flush().unwrap();
-    let mut buf = Vec::new();
-    stream.read_to_end(&mut buf).unwrap();
-    let resp = String::from_utf8_lossy(&buf);
-    let status = resp
-        .lines()
-        .next()
-        .and_then(|l| l.split_whitespace().nth(1))
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(0);
-    let body_start = buf
-        .windows(4)
-        .position(|w| w == b"\r\n\r\n")
-        .map(|i| i + 4)
-        .unwrap_or(buf.len());
-    (status, buf[body_start..].to_vec())
+
+    // Read headers first
+    let mut header_buf = Vec::new();
+    let mut tmp = [0u8; 1024];
+    loop {
+        let n = stream.read(&mut tmp).unwrap();
+        if n == 0 {
+            break;
+        }
+        header_buf.extend_from_slice(&tmp[..n]);
+        if let Some(pos) = header_buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            // Split headers and leftover body bytes
+            let body_leftover = header_buf.split_off(pos + 4);
+            let headers_text = String::from_utf8_lossy(&header_buf);
+            let status = headers_text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|s| s.parse::<u16>().ok())
+                .unwrap_or(0);
+            let content_length = headers_text
+                .lines()
+                .find_map(|l| l.split_once(":").map(|(k, v)| (k.trim(), v.trim())))
+                .and_then(|_| {
+                    headers_text
+                        .lines()
+                        .filter_map(|l| l.split_once(":").map(|(k, v)| (k.trim(), v.trim())))
+                        .find(|(k, _)| k.eq_ignore_ascii_case("Content-Length"))
+                        .and_then(|(_, v)| v.parse::<usize>().ok())
+                })
+                .unwrap_or(0);
+
+            // Read exact remaining bytes for body
+            let mut body_bytes = body_leftover;
+            while body_bytes.len() < content_length {
+                let n = stream.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                body_bytes.extend_from_slice(&tmp[..n]);
+            }
+            body_bytes.truncate(content_length);
+            return (status, body_bytes);
+        }
+        if header_buf.len() > 64 * 1024 {
+            break; // safety cap
+        }
+    }
+    (0, Vec::new())
+}
+
+fn http_get_bytes(port: u16, path: &str) -> (u16, HashMap<String, String>, Vec<u8>) {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream.set_read_timeout(Some(net_timeout())).unwrap();
+    let req = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+    stream.write_all(req.as_bytes()).unwrap();
+    stream.flush().unwrap();
+
+    // Read headers first
+    let mut header_buf = Vec::new();
+    let mut tmp = [0u8; 1024];
+    loop {
+        let n = stream.read(&mut tmp).unwrap_or(0);
+        if n == 0 {
+            break;
+        }
+        header_buf.extend_from_slice(&tmp[..n]);
+        if let Some(pos) = header_buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            let mut headers = HashMap::new();
+            let body_leftover = header_buf.split_off(pos + 4);
+            let headers_text = String::from_utf8_lossy(&header_buf);
+            // Parse status
+            let status = headers_text
+                .lines()
+                .next()
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|s| s.parse::<u16>().ok())
+                .unwrap_or(0);
+            // Collect headers map
+            for line in headers_text.lines().skip(1) {
+                if line.trim().is_empty() {
+                    break;
+                }
+                if let Some((k, v)) = line.split_once(":") {
+                    headers.insert(k.trim().to_string(), v.trim().to_string());
+                }
+            }
+            let content_length = headers
+                .get("Content-Length")
+                .and_then(|v| v.parse::<usize>().ok())
+                .unwrap_or(0);
+            // Read exact remaining bytes for body
+            let mut body_bytes = body_leftover;
+            while body_bytes.len() < content_length {
+                let n = stream.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                body_bytes.extend_from_slice(&tmp[..n]);
+            }
+            body_bytes.truncate(content_length);
+            return (status, headers, body_bytes);
+        }
+        if header_buf.len() > 64 * 1024 {
+            break;
+        }
+    }
+    (0, HashMap::new(), Vec::new())
 }
 
 fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    stream
-        .set_read_timeout(Some(Duration::from_millis(1500)))
-        .unwrap();
+    stream.set_read_timeout(Some(net_timeout())).unwrap();
     let suffix = if query.is_empty() {
         String::new()
     } else {
@@ -149,12 +274,29 @@ fn read_sse_events(
 
 fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    let to = if fast_net() {
+        Duration::from_millis(400)
+    } else {
+        Duration::from_millis(1000)
+    };
+    stream.set_read_timeout(Some(to)).unwrap();
     let req = format!("OPTIONS {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
     stream.write_all(req.as_bytes()).unwrap();
     stream.flush().unwrap();
-    let mut buf = Vec::new();
-    stream.read_to_end(&mut buf).unwrap();
-    let resp = String::from_utf8_lossy(&buf);
+    // Read only headers; OPTIONS has no body
+    let mut header_buf = Vec::new();
+    let mut tmp = [0u8; 1024];
+    loop {
+        let n = stream.read(&mut tmp).unwrap_or(0);
+        if n == 0 {
+            break;
+        }
+        header_buf.extend_from_slice(&tmp[..n]);
+        if header_buf.windows(4).any(|w| w == b"\r\n\r\n") {
+            break;
+        }
+    }
+    let resp = String::from_utf8_lossy(&header_buf);
     let mut lines = resp.lines();
     let status = lines
         .next()
@@ -177,6 +319,10 @@ fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
 fn api_add_list_get_delete_roundtrip() {
     // Serialize environment mutations across tests
     let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Speed up IO handling in server during tests
+    unsafe {
+        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
+    }
     // Isolate tasks dir via env var
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
@@ -310,6 +456,7 @@ fn api_options_preflight_returns_204_and_cors_headers() {
         .cloned()
         .unwrap_or_default();
     assert!(allow_headers.to_ascii_lowercase().contains("content-type"));
+    stop_server_on(port);
 }
 
 #[test]
@@ -328,30 +475,24 @@ fn sse_initial_retry_hint_is_sent() {
         text.contains("retry: 1000"),
         "leftover did not contain retry hint: {text}"
     );
+    stop_server_on(port);
 }
 
 #[test]
 fn openapi_spec_served() {
     let port = find_free_port();
     start_server_on(port);
-    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
-    let req = "GET /api/openapi.json HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
-    stream.write_all(req.as_bytes()).unwrap();
-    stream.flush().unwrap();
-    let mut buf = Vec::new();
-    stream.read_to_end(&mut buf).unwrap();
-    let resp = String::from_utf8_lossy(&buf);
-    let status = resp
-        .lines()
-        .next()
-        .and_then(|l| l.split_whitespace().nth(1))
-        .and_then(|s| s.parse::<u16>().ok())
-        .unwrap_or(0);
+    let (status, headers, body) = http_get_bytes(port, "/api/openapi.json");
     assert_eq!(status, 200);
-    assert!(resp.contains("\r\nContent-Type: application/json\r\n"));
+    assert_eq!(
+        headers.get("Content-Type").map(|s| s.as_str()),
+        Some("application/json")
+    );
+    let resp_body = String::from_utf8_lossy(&body);
     // Check that a couple of known paths are present
-    assert!(resp.contains("\"/api/tasks/add\""));
-    assert!(resp.contains("\"/api/events\""));
+    assert!(resp_body.contains("\"/api/tasks/add\""));
+    assert!(resp_body.contains("\"/api/events\""));
+    stop_server_on(port);
 }
 
 // Merged from sse_events_test.rs
@@ -388,6 +529,7 @@ fn sse_events_with_kinds_and_project_filter() {
     unsafe {
         std::env::remove_var("LOTAR_TASKS_DIR");
     }
+    stop_server_on(port);
 }
 
 #[test]
@@ -417,6 +559,7 @@ fn sse_debounce_emits_all_events() {
     unsafe {
         std::env::remove_var("LOTAR_TASKS_DIR");
     }
+    stop_server_on(port);
 }
 
 #[test]
@@ -532,4 +675,5 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
     unsafe {
         std::env::remove_var("LOTAR_TASKS_DIR");
     }
+    stop_server_on(port);
 }

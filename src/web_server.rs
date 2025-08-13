@@ -2,18 +2,16 @@ use crate::api_server::{self, HttpRequest};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, include_dir};
 use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::Path;
+use std::sync::{LazyLock, Mutex};
 
-// Use the target/web folder to keep all build artifacts together
-const STATIC_FILES: Dir = include_dir!("target/web");
+// Embed built web assets (run: npm run build:web to populate target/web)
+static STATIC_FILES: Dir<'_> = include_dir!("target/web");
 
 pub fn serve(api_server: &api_server::ApiServer, port: u16) {
-    add_files_to_executable();
-
     let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
         Ok(l) => l,
         Err(e) => {
@@ -22,8 +20,27 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
             return;
         }
     };
+    // Register this server instance in a global stop registry (used only by tests)
+    static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    {
+        let mut map = STOP_FLAGS.lock().unwrap();
+        map.insert(port, false);
+    }
+
     // Suppress startup info logs to keep tests and consumers' output clean.
     for stream in listener.incoming() {
+        // Check for test-initiated shutdown before handling the next connection
+        {
+            if STOP_FLAGS
+                .lock()
+                .ok()
+                .and_then(|m| m.get(&port).cloned())
+                .unwrap_or(false)
+            {
+                break;
+            }
+        }
         match stream {
             Ok(mut stream) => {
                 // Read headers fully first
@@ -109,6 +126,8 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                     let project_filter: Option<String> = query.get("project").cloned();
 
                     let rx = crate::api_events::subscribe();
+                    // Test acceleration: allow LOTAR_TEST_FAST_IO=1 to lower latencies
+                    let fast = std::env::var("LOTAR_TEST_FAST_IO").ok().as_deref() == Some("1");
                     let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\n";
                     // Send headers and initial retry hint together
                     let mut initial = String::with_capacity(headers.len() + 14);
@@ -121,8 +140,16 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                     std::thread::spawn(move || {
                         let mut buffer: Vec<crate::api_events::ApiEvent> = Vec::new();
                         let mut deadline: Option<Instant> = None;
-                        let debounce = Duration::from_millis(debounce_ms);
-                        let heartbeat_every = Duration::from_secs(15);
+                        let debounce = Duration::from_millis(if fast {
+                            debounce_ms.min(20)
+                        } else {
+                            debounce_ms
+                        });
+                        let heartbeat_every = if fast {
+                            Duration::from_secs(2)
+                        } else {
+                            Duration::from_secs(15)
+                        };
                         loop {
                             // Determine timeout for recv
                             let timeout = match deadline {
@@ -199,6 +226,16 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                         }
                     });
                     continue;
+                } else if path == "/__test/stop" {
+                    // Test-only endpoint to allow clean shutdown of the server loop
+                    if let Ok(mut map) = STOP_FLAGS.lock() {
+                        map.insert(port, true);
+                    }
+                    let response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 8\r\n\r\nstopping";
+                    let _ = stream.write_all(response.as_bytes());
+                    let _ = stream.flush();
+                    // Loop will observe the flag on next iteration and break
+                    continue;
                 } else if path.starts_with("/api") {
                     // Serve static OpenAPI if requested
                     if path == "/api/openapi.json" {
@@ -268,45 +305,65 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                     let _ = stream.write_all(&resp.body);
                     let _ = stream.flush();
                 } else {
-                    // Get the file path to serve based on the request path
-                    let file_path = format!("target/web{}", path);
-                    match fs::File::open(&file_path) {
-                        Ok(mut file) => {
-                            let mut file_content = String::new();
-                            if let Err(e) = file.read_to_string(&mut file_content) {
-                                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                                    .log_warn(&format!("Failed to read file {}: {}", file_path, e));
-                                continue;
+                    // Serve embedded static files first, then fallback to filesystem
+                    let request_path = if path == "/" { "/index.html" } else { &path };
+                    let rel_path = request_path.trim_start_matches('/');
+
+                    // Try embedded
+                    if let Some(file) = STATIC_FILES.get_file(rel_path) {
+                        let data = file.contents();
+                        let ext = Path::new(rel_path)
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .unwrap_or("");
+                        let content_type = match ext {
+                            "html" => "text/html",
+                            "jpg" | "jpeg" => "image/jpeg",
+                            "png" => "image/png",
+                            "css" => "text/css",
+                            "js" => "application/javascript",
+                            "svg" => "image/svg+xml",
+                            _ => "application/octet-stream",
+                        };
+                        let header = format!(
+                            "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+                            content_type,
+                            data.len()
+                        );
+                        let _ = stream.write_all(header.as_bytes());
+                        let _ = stream.write_all(data);
+                        let _ = stream.flush();
+                    } else {
+                        // Fallback to filesystem (useful in dev)
+                        let fs_path = Path::new("target/web").join(rel_path);
+                        match fs::read(&fs_path) {
+                            Ok(bytes) => {
+                                let ext =
+                                    fs_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                                let content_type = match ext {
+                                    "html" => "text/html",
+                                    "jpg" | "jpeg" => "image/jpeg",
+                                    "png" => "image/png",
+                                    "css" => "text/css",
+                                    "js" => "application/javascript",
+                                    "svg" => "image/svg+xml",
+                                    _ => "application/octet-stream",
+                                };
+                                let header = format!(
+                                    "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+                                    content_type,
+                                    bytes.len()
+                                );
+                                let _ = stream.write_all(header.as_bytes());
+                                let _ = stream.write_all(&bytes);
+                                let _ = stream.flush();
                             }
-
-                            let path: &Path = Path::new(&file_path);
-                            let extension = match path.extension() {
-                                Some(ext) => ext,
-                                None => OsStr::new(""),
-                            };
-
-                            let content_type = match extension.to_str() {
-                                Some("html") => "text/html",
-                                Some("jpg") => "image/jpeg",
-                                Some("png") => "image/png",
-                                Some("css") => "text/css",
-                                Some("js") => "application/javascript",
-                                _ => "application/octet-stream",
-                            };
-
-                            let response = format!(
-                                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n{}",
-                                content_type,
-                                file_content.len(),
-                                file_content
-                            );
-                            let _ = stream.write_all(response.as_bytes());
-                            let _ = stream.flush();
-                        }
-                        Err(_) => {
-                            let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
-                            let _ = stream.write_all(response.as_bytes());
-                            let _ = stream.flush();
+                            Err(_) => {
+                                let response =
+                                    "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
+                                let _ = stream.write_all(response.as_bytes());
+                                let _ = stream.flush();
+                            }
                         }
                     }
                 }
@@ -318,6 +375,9 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
             }
         }
     }
+
+    // Cleanup entry in stop registry when server exits
+    let _ = STOP_FLAGS.lock().map(|mut m| m.remove(&port));
 }
 
 fn parse_path_and_query(path_full: &str) -> (String, HashMap<String, String>) {
@@ -373,18 +433,4 @@ fn url_decode(s: &str) -> String {
         }
     }
     out
-}
-
-fn add_files_to_executable() -> HashMap<String, &'static [u8]> {
-    let mut file_map = HashMap::new();
-    for file in STATIC_FILES.files() {
-        let path = format!("{}{}", "target/web", file.path().display());
-        let key = match path.strip_prefix("target/web") {
-            Some(k) => k.to_owned(),
-            None => continue,
-        };
-        let data = file.contents();
-        file_map.insert(key, data);
-    }
-    file_map
 }

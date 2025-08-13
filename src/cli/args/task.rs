@@ -137,6 +137,16 @@ pub struct AddArgs {
     #[arg(long)]
     #[serde(default)]
     pub high: bool,
+
+    /// Preview without writing
+    #[arg(long)]
+    #[serde(default)]
+    pub dry_run: bool,
+
+    /// Explain defaults and choices
+    #[arg(long)]
+    #[serde(default)]
+    pub explain: bool,
 }
 
 #[derive(Subcommand)]
@@ -268,6 +278,11 @@ pub struct TaskEditArgs {
     #[arg(long = "field", value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
+
+    /// Preview changes without saving
+    #[arg(long)]
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 #[derive(Args, Deserialize, Debug)]
@@ -350,4 +365,9 @@ pub struct TaskDeleteArgs {
     #[arg(long)]
     #[serde(default)]
     pub force: bool,
+
+    /// Preview deletion without removing the file
+    #[arg(long)]
+    #[serde(default)]
+    pub dry_run: bool,
 }

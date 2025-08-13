@@ -1,3 +1,4 @@
+use assert_cmd::Command;
 use lotar::types::Priority;
 use lotar::{Storage, Task};
 use std::fs;
@@ -67,6 +68,7 @@ impl TestFixtures {
         }
 
         let output = Command::cargo_bin("lotar")?
+            .env("LOTAR_TEST_SILENT", "1")
             .args(args)
             .current_dir(self.temp_dir.path())
             .output()?;
@@ -140,6 +142,15 @@ pub mod utils {
     pub fn get_project_for_task(task_id: &str) -> Option<String> {
         task_id.split('-').next().map(|s| s.to_string())
     }
+}
+
+/// Command helpers shared across CLI tests
+#[allow(dead_code)]
+pub fn cargo_bin_silent() -> Command {
+    // Spawn lotar with LOTAR_TEST_SILENT=1 to suppress non-essential warnings in tests
+    let mut cmd = Command::cargo_bin("lotar").expect("binary 'lotar' not found");
+    cmd.env("LOTAR_TEST_SILENT", "1");
+    cmd
 }
 
 /// Assertion helpers for testing

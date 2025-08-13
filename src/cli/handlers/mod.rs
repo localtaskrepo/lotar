@@ -2,8 +2,7 @@ use crate::cli::AddArgs;
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
-use crate::output::LogLevel;
-use crate::output::{OutputFormat, OutputRenderer};
+use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use crate::storage::{manager::Storage, task::Task};
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::workspace::TasksDirectoryResolver;
@@ -238,6 +237,51 @@ impl CommandHandler for AddHandler {
             (prefix, None)
         };
 
+        if args.dry_run {
+            // Preview without saving
+            match renderer.format {
+                OutputFormat::Json => {
+                    let mut obj = serde_json::json!({
+                        "status": "preview",
+                        "action": "create",
+                        "project": project_for_storage,
+                        "title": task.title,
+                        "priority": task.priority.to_string(),
+                        "status_value": task.status.to_string(),
+                    });
+                    if let Some(a) = &task.assignee {
+                        obj["assignee"] = serde_json::Value::String(a.clone());
+                    }
+                    if let Some(d) = &task.due_date {
+                        obj["due_date"] = serde_json::Value::String(d.clone());
+                    }
+                    if let Some(e) = &task.effort {
+                        obj["effort"] = serde_json::Value::String(e.clone());
+                    }
+                    if let Some(c) = &task.category {
+                        obj["category"] = serde_json::Value::String(c.clone());
+                    }
+                    if !task.tags.is_empty() {
+                        obj["tags"] = serde_json::json!(task.tags);
+                    }
+                    if args.explain {
+                        obj["explain"] = serde_json::Value::String("default status and priority via smart defaults; reporter/assignee per config/defaults".to_string());
+                    }
+                    renderer.emit_raw_stdout(&obj.to_string());
+                }
+                _ => {
+                    renderer.emit_info(&format!(
+                        "DRY RUN: Would create task in project {} with title '{}' and priority {}",
+                        project_for_storage, task.title, task.priority
+                    ));
+                    if args.explain {
+                        renderer.emit_info("Explanation: default status and priority chosen via smart defaults; reporter/assignee per config/defaults.");
+                    }
+                }
+            }
+            return Ok(format!("{}-PREVIEW", project_for_storage));
+        }
+
         renderer.log_info(&format!(
             "add: writing task to storage project={} original={:?}",
             project_for_storage, original_project_name
@@ -250,6 +294,18 @@ impl CommandHandler for AddHandler {
 }
 
 impl AddHandler {
+    // Internal helper: create a warn logger that auto-silences during tests or when LOTAR_TEST_SILENT=1
+    fn warn_logger() -> OutputRenderer {
+        let test_silent = cfg!(test)
+            || std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1"
+            || std::env::var("RUST_TEST_THREADS").is_ok();
+        let level = if test_silent {
+            LogLevel::Off
+        } else {
+            LogLevel::Warn
+        };
+        OutputRenderer::new(OutputFormat::Text, level)
+    }
     /// Render the output for a successfully created task
     pub fn render_add_success(
         task_id: &str,
@@ -280,6 +336,7 @@ impl AddHandler {
                                 "status": task.status.to_string(),
                                 "priority": task.priority.to_string(),
                                 "task_type": task.task_type.to_string(),
+                                "reporter": task.reporter,
                                 "assignee": task.assignee,
                                 "due_date": task.due_date,
                                 "description": task.description,
@@ -295,6 +352,9 @@ impl AddHandler {
                         renderer.emit_raw_stdout(&format!("  Status: {}", task.status));
                         renderer.emit_raw_stdout(&format!("  Priority: {}", task.priority));
                         renderer.emit_raw_stdout(&format!("  Type: {}", task.task_type));
+                        if let Some(reporter) = &task.reporter {
+                            renderer.emit_raw_stdout(&format!("  Reporter: {}", reporter));
+                        }
                         if let Some(assignee) = &task.assignee {
                             renderer.emit_raw_stdout(&format!("  Assignee: {}", assignee));
                         }
@@ -372,13 +432,11 @@ impl AddHandler {
             if project_values.contains(explicit) {
                 return Ok(explicit.clone());
             } else {
-                #[cfg(not(test))]
-                {
-                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&format!(
-                        "Warning: Project default {} '{:?}' is not in configured {} list {:?}. Using smart fallback.",
-                        field_name, explicit, field_name, project_values
-                    ));
-                }
+                // Emit warning unless silenced for tests
+                Self::warn_logger().log_warn(&format!(
+                    "Warning: Project default {} '{:?}' is not in configured {} list {:?}. Using smart fallback.",
+                    field_name, explicit, field_name, project_values
+                ));
             }
         }
 
@@ -386,13 +444,11 @@ impl AddHandler {
         if project_values.contains(global_default) {
             return Ok(global_default.clone());
         } else {
-            #[cfg(not(test))]
-            {
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&format!(
-                    "Warning: Global default {} '{:?}' is not in project {} list {:?}. Using first configured value.",
-                    field_name, global_default, field_name, project_values
-                ));
-            }
+            // Emit warning unless silenced for tests
+            Self::warn_logger().log_warn(&format!(
+                "Warning: Global default {} '{:?}' is not in project {} list {:?}. Using first configured value.",
+                field_name, global_default, field_name, project_values
+            ));
         }
 
         // 3. Use first in project values as final fallback
@@ -433,13 +489,11 @@ impl AddHandler {
             if config.issue_states.values.contains(explicit) {
                 return explicit.clone();
             } else {
-                #[cfg(not(test))]
-                {
-                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(&format!(
-                        "Warning: Project default status '{:?}' is not in configured status list {:?}. Using smart fallback.",
-                        explicit, config.issue_states.values
-                    ));
-                }
+                // Emit warning unless silenced for tests
+                Self::warn_logger().log_warn(&format!(
+                    "Warning: Project default status '{:?}' is not in configured status list {:?}. Using smart fallback.",
+                    explicit, config.issue_states.values
+                ));
             }
         }
 

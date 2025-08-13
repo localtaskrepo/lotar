@@ -2,6 +2,7 @@
 
 mod common;
 
+use crate::common::cargo_bin_silent;
 use assert_cmd::Command;
 use common::TestFixtures;
 use std::fs;
@@ -15,7 +16,7 @@ fn test_config_init_dry_run_mode() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -43,7 +44,7 @@ fn test_config_init_dry_run_mode() {
     }
 
     // Test dry-run with template option
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -67,7 +68,7 @@ fn test_config_set_dry_run_mode() {
     let temp_dir = fixtures.temp_dir.path();
 
     // First create a proper config to test dry-run modifications on
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("init")
@@ -75,7 +76,7 @@ fn test_config_set_dry_run_mode() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")

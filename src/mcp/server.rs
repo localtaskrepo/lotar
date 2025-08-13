@@ -782,6 +782,11 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 project,
                 priority,
                 task_type,
+                reporter: req
+                    .params
+                    .get("reporter")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
                 assignee,
                 due_date,
                 effort,
@@ -1014,6 +1019,9 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                         );
                     }
                 }
+            }
+            if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
+                patch.reporter = Some(s.to_string());
             }
             if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
                 patch.assignee = Some(s.to_string());

@@ -39,6 +39,7 @@ lotar add "Environment task"  # Uses environment-configured directory
 
 - `LOTAR_TASKS_DIR` - Override default tasks directory location
 - `LOTAR_DEFAULT_ASSIGNEE` - Set default assignee for all new tasks
+- `LOTAR_DEFAULT_REPORTER` - Set default reporter identity used when auto-setting
 
 ## Commands
 
@@ -53,6 +54,7 @@ lotar add "Environment task"  # Uses environment-configured directory
 - **scan** - Find TODO comments in code
 - **serve** - Start web interface
 - **mcp** - Run JSON-RPC server (tools for tasks/projects/config)
+- **whoami** - Show resolved current user identity (with --explain)
 
 Use `lotar help <command>` for detailed command information.
 

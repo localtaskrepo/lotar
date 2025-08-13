@@ -5,7 +5,7 @@ Change task status with validation and different output formats.
 ## Usage
 
 ```bash
-lotar status <TASK_ID> <NEW_STATUS>
+lotar status <TASK_ID> [<NEW_STATUS>] [--dry-run] [--explain]
 ```
 
 ## Quick Examples
@@ -26,6 +26,9 @@ lotar status AUTH-001 done --tasks-dir=/custom/path
 # Environment variable usage
 export LOTAR_TASKS_DIR=/project/tasks
 lotar status AUTH-001 in_progress  # Uses environment directory
+
+# Preview without writing and explain resolution
+lotar status AUTH-001 done --dry-run --explain
 ```
 
 ## Status Values
@@ -87,11 +90,25 @@ Human-readable confirmation:
 Machine-readable for scripts:
 ```json
 {
+  "status": "success",
+  "message": "Task AUTH-001 status changed from TODO to IN_PROGRESS",
   "task_id": "AUTH-001",
-  "old_status": "TODO", 
+  "old_status": "TODO",
   "new_status": "IN_PROGRESS",
-  "timestamp": "2025-08-01T10:30:00Z",
-  "status": "success"
+  "assignee": "john.doe" // optional
+}
+```
+
+Dry-run preview in JSON:
+```json
+{
+  "status": "preview",
+  "action": "status_change",
+  "task_id": "AUTH-001",
+  "old_status": "TODO",
+  "new_status": "IN_PROGRESS",
+  "would_set_assignee": "john.doe", // optional
+  "explain": "status validated against project config; auto-assign uses default_reporter→git user.name/email→system username."
 }
 ```
 
@@ -124,6 +141,14 @@ transitions:
   IN_PROGRESS: [VERIFY, BLOCKED, TODO]  
   VERIFY: [DONE, IN_PROGRESS]
 ```
+
+### Auto-Assign on Status Change
+- If `auto_assign_on_status: true` and the task has no assignee, LoTaR auto-assigns the current user.
+- The current user is resolved in order: `default_reporter` from config → git user.name/email → system username.
+
+### Planning and diagnostics
+- `--dry-run` previews changes without saving.
+- `--explain` shows how the new status was validated and how the assignee would be resolved.
 
 ## Error Handling
 

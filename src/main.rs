@@ -37,11 +37,22 @@ fn is_valid_command(command: &str) -> bool {
             | "config"
             | "scan"
             | "serve"
+            | "whoami"
     )
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    // No arguments: print usage/help to stderr and exit with failure (tests expect "Usage")
+    if args.len() == 1 {
+        let renderer =
+            output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+        renderer.emit_raw_stderr(
+            "Usage: lotar <COMMAND> [ARGS]\nTry 'lotar help' for available commands.",
+        );
+        std::process::exit(1);
+    }
 
     // Handle version manually
     for arg in &args[1..] {
@@ -115,12 +126,16 @@ fn main() {
             match AddHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(task_id) => {
                     // Use the shared output rendering function
-                    AddHandler::render_add_success(
-                        &task_id,
-                        cli.project.as_deref(),
-                        &resolver,
-                        &renderer,
-                    );
+                    if task_id.ends_with("-PREVIEW") {
+                        // Dry run preview already printed
+                    } else {
+                        AddHandler::render_add_success(
+                            &task_id,
+                            cli.project.as_deref(),
+                            &resolver,
+                            &renderer,
+                        );
+                    }
                     renderer.log_info("END ADD status=ok");
                     Ok(())
                 }
@@ -146,9 +161,16 @@ fn main() {
                 }
             }
         }
-        Commands::Status { id, status } => {
+        Commands::Status {
+            id,
+            status,
+            dry_run,
+            explain,
+        } => {
             renderer.log_info("BEGIN STATUS");
-            let status_args = StatusArgs::new(id, status, cli.project.clone());
+            let mut status_args = StatusArgs::new(id, status, cli.project.clone());
+            status_args.dry_run = dry_run;
+            status_args.explain = explain;
             match StatusHandler::execute(status_args, cli.project.as_deref(), &resolver, &renderer)
             {
                 Ok(()) => {
@@ -273,6 +295,67 @@ fn main() {
         Commands::Mcp => {
             lotar::mcp::server::run_stdio_server();
             Ok(())
+        }
+        Commands::Whoami { explain } => {
+            renderer.log_info("BEGIN WHOAMI");
+            // Try to resolve using the same algorithm as services
+            let me = {
+                // Config default_reporter
+                if let Ok(cfg) =
+                    lotar::config::resolution::load_and_merge_configs(Some(&resolver.path))
+                {
+                    cfg.default_reporter.filter(|s| !s.trim().is_empty())
+                } else {
+                    None
+                }
+            }
+            .or_else(|| {
+                if let Ok(cwd) = std::env::current_dir() {
+                    let p = cwd.join(".git").join("config");
+                    if p.exists() {
+                        if let Ok(c) = std::fs::read_to_string(p) {
+                            for l in c.lines() {
+                                let l = l.trim();
+                                if l.starts_with("name = ") {
+                                    let name = l.trim_start_matches("name = ").trim();
+                                    if !name.is_empty() {
+                                        return Some(name.to_string());
+                                    }
+                                }
+                            }
+                            for l in c.lines() {
+                                let l = l.trim();
+                                if l.starts_with("email = ") {
+                                    let email = l.trim_start_matches("email = ").trim();
+                                    if !email.is_empty() {
+                                        return Some(email.to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                None
+            })
+            .or_else(|| std::env::var("USER").ok())
+            .or_else(|| std::env::var("USERNAME").ok());
+
+            if let Some(user) = me {
+                if matches!(renderer.format, output::OutputFormat::Json) {
+                    renderer.emit_raw_stdout(&serde_json::json!({"user": user}).to_string());
+                } else {
+                    renderer.emit_success(&user.to_string());
+                }
+                if explain {
+                    renderer.emit_info("Resolution order: config.default_reporter → git user.name/email → system USER/USERNAME");
+                }
+                renderer.log_info("END WHOAMI status=ok");
+                Ok(())
+            } else {
+                renderer.emit_error("Could not resolve current user");
+                renderer.log_info("END WHOAMI status=err");
+                Err("no-identity".to_string())
+            }
         }
     };
 

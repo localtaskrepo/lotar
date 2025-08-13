@@ -2,6 +2,7 @@
 
 mod common;
 
+use crate::common::cargo_bin_silent;
 use assert_cmd::Command;
 use common::TestFixtures;
 use std::time::Duration;
@@ -15,7 +16,7 @@ fn test_serve_command_basic_functionality() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a test task first to have some data to serve
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Test task for web server")
@@ -24,7 +25,7 @@ fn test_serve_command_basic_functionality() {
         .success();
 
     // Test serve command help
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -37,7 +38,7 @@ fn test_serve_command_basic_functionality() {
     }
 
     // Test serve command with default options (background mode for testing)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -54,7 +55,7 @@ fn test_serve_command_port_options() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test custom port option
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -66,7 +67,7 @@ fn test_serve_command_port_options() {
     let _custom_port_works = result.try_success().is_ok();
 
     // Test alternative port option
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -79,7 +80,7 @@ fn test_serve_command_port_options() {
     let _alt_port_works = result.try_success().is_ok();
 
     // Test invalid port option
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -96,7 +97,7 @@ fn test_serve_command_host_options() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test localhost host
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -107,7 +108,7 @@ fn test_serve_command_host_options() {
     if let Ok(_) = result.try_success() {}
 
     // Test bind to all interfaces
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -118,7 +119,7 @@ fn test_serve_command_host_options() {
     if let Ok(_) = result.try_success() {}
 
     // Test custom IP
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -135,7 +136,7 @@ fn test_serve_command_combined_options() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test port and host together
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -147,7 +148,7 @@ fn test_serve_command_combined_options() {
     if let Ok(_) = result.try_success() {}
 
     // Test with verbose output
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")

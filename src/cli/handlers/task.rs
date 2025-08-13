@@ -37,6 +37,8 @@ impl CommandHandler for TaskHandler {
                     epic: false,
                     critical: false,
                     high: false,
+                    dry_run: false,
+                    explain: false,
                 };
 
                 match AddHandler::execute(cli_add_args, project, resolver, renderer) {
@@ -214,6 +216,36 @@ impl CommandHandler for EditHandler {
         for (key, value) in args.fields {
             task.custom_fields
                 .insert(key, crate::types::custom_value_string(value));
+        }
+
+        if args.dry_run {
+            match renderer.format {
+                crate::output::OutputFormat::Json => {
+                    let obj = serde_json::json!({
+                        "status": "preview",
+                        "action": "edit",
+                        "task_id": args.id,
+                        "task_type": task.task_type.to_string(),
+                        "priority": task.priority.to_string(),
+                        "assignee": task.assignee,
+                        "due_date": task.due_date,
+                        "tags": task.tags,
+                    });
+                    renderer.emit_raw_stdout(&obj.to_string());
+                }
+                _ => {
+                    renderer.emit_info(&format!(
+                        "DRY RUN: Would update '{}' with: type={:?}, priority={}, assignee={:?}, due={:?}, tags={}",
+                        args.id,
+                        task.task_type,
+                        task.priority,
+                        task.assignee,
+                        task.due_date,
+                        if task.tags.is_empty() { "-".to_string() } else { task.tags.join(",") }
+                    ));
+                }
+            }
+            return Ok(());
         }
 
         // Save the updated task
@@ -519,8 +551,8 @@ impl CommandHandler for DeleteHandler {
             return Err(format!("Task '{}' not found", args.id));
         }
 
-        // Confirm deletion if not forced
-        if !args.force {
+        // Confirm deletion if not forced (skip prompt in dry-run)
+        if !args.force && !args.dry_run {
             print!(
                 "Are you sure you want to delete task '{}'? (y/N): ",
                 args.id
@@ -539,6 +571,27 @@ impl CommandHandler for DeleteHandler {
                 renderer.emit_warning("Deletion cancelled.");
                 return Ok(());
             }
+        }
+
+        if args.dry_run {
+            match renderer.format {
+                crate::output::OutputFormat::Json => {
+                    let obj = serde_json::json!({
+                        "status": "preview",
+                        "action": "delete",
+                        "task_id": args.id,
+                        "project": project_prefix,
+                    });
+                    renderer.emit_raw_stdout(&obj.to_string());
+                }
+                _ => {
+                    renderer.emit_info(&format!(
+                        "DRY RUN: Would delete task '{}' from project {}",
+                        args.id, project_prefix
+                    ));
+                }
+            }
+            return Ok(());
         }
 
         // Delete the task

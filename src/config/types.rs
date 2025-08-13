@@ -107,6 +107,8 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_assignee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_priority: Option<Priority>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_status: Option<TaskStatus>,
@@ -124,6 +126,7 @@ impl ProjectConfig {
             categories: None,
             tags: None,
             default_assignee: None,
+            default_reporter: None,
             default_priority: None,
             default_status: None,
             custom_fields: None,
@@ -152,6 +155,12 @@ pub struct GlobalConfig {
 
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_assignee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_reporter: Option<String>,
+    #[serde(default = "default_true")]
+    pub auto_set_reporter: bool,
+    #[serde(default = "default_true")]
+    pub auto_assign_on_status: bool,
     #[serde(default = "default_priority")]
     pub default_priority: Priority,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -171,6 +180,9 @@ pub struct ResolvedConfig {
     pub categories: StringConfigField,
     pub tags: StringConfigField,
     pub default_assignee: Option<String>,
+    pub default_reporter: Option<String>,
+    pub auto_set_reporter: bool,
+    pub auto_assign_on_status: bool,
     pub default_priority: Priority,
     pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
@@ -249,11 +261,18 @@ impl Default for GlobalConfig {
             categories: default_categories(),
             tags: default_tags(),
             default_assignee: None,
+            default_reporter: None,
+            auto_set_reporter: true,
+            auto_assign_on_status: true,
             default_priority: default_priority(),
             default_status: None,
             custom_fields: default_custom_fields(),
         }
     }
+}
+
+fn default_true() -> bool {
+    true
 }
 
 // Constants that are actually used would go here if needed

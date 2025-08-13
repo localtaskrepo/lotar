@@ -2,6 +2,76 @@ use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::{manager::Storage, task::Task};
 use crate::utils;
+use std::path::Path;
+
+/// Resolve current user for reporter/assignee detection.
+/// Order: config.default_reporter -> git config user.name/email -> system username
+fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
+    // Config default_reporter (global/project merged)
+    if let Some(root) = tasks_root {
+        if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(Some(root)) {
+            if let Some(rep) = cfg.default_reporter.and_then(|s| {
+                let t = s.trim().to_string();
+                if t.is_empty() { None } else { Some(t) }
+            }) {
+                return Some(rep);
+            }
+        }
+    } else if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(None) {
+        if let Some(rep) = cfg.default_reporter.and_then(|s| {
+            let t = s.trim().to_string();
+            if t.is_empty() { None } else { Some(t) }
+        }) {
+            return Some(rep);
+        }
+    }
+
+    // Try git config user.name then user.email (best-effort, no git dependency in build)
+    // We do a very light probe by reading .git/config if available.
+    if let Ok(cwd) = std::env::current_dir() {
+        let git_config = cwd.join(".git").join("config");
+        if git_config.exists() {
+            if let Ok(contents) = std::fs::read_to_string(&git_config) {
+                // Find user.name first
+                for line in contents.lines() {
+                    let line = line.trim();
+                    if line.starts_with("name = ") {
+                        let name = line.trim_start_matches("name = ").trim();
+                        if !name.is_empty() {
+                            return Some(name.to_string());
+                        }
+                    }
+                }
+                // Then user.email
+                for line in contents.lines() {
+                    let line = line.trim();
+                    if line.starts_with("email = ") {
+                        let email = line.trim_start_matches("email = ").trim();
+                        if !email.is_empty() {
+                            return Some(email.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // System username via whoami envs
+    if let Ok(user) = std::env::var("USER") {
+        let t = user.trim();
+        if !t.is_empty() {
+            return Some(t.to_string());
+        }
+    }
+    if let Ok(user) = std::env::var("USERNAME") {
+        let t = user.trim();
+        if !t.is_empty() {
+            return Some(t.to_string());
+        }
+    }
+
+    None
+}
 
 pub struct TaskService;
 
@@ -27,6 +97,29 @@ impl TaskService {
         if let Some(tt) = req.task_type {
             t.task_type = tt;
         }
+        // reporter: explicit or auto-detect (configurable)
+        let config = crate::config::resolution::load_and_merge_configs(Some(&storage.root_path));
+        let auto = config.as_ref().map(|c| c.auto_set_reporter).unwrap_or(true);
+        t.reporter = if let Some(rep) = req.reporter {
+            Some(rep)
+        } else if auto {
+            // Prefer configured default_reporter, then fall back
+            if let Ok(cfg) = &config {
+                if let Some(rep) = cfg
+                    .default_reporter
+                    .clone()
+                    .filter(|s| !s.trim().is_empty())
+                {
+                    Some(rep)
+                } else {
+                    resolve_current_user(Some(&storage.root_path))
+                }
+            } else {
+                resolve_current_user(Some(&storage.root_path))
+            }
+        } else {
+            None
+        };
         t.assignee = req.assignee;
         t.due_date = req.due_date;
         t.effort = req.effort;
@@ -63,12 +156,24 @@ impl TaskService {
         }
         if let Some(v) = patch.status {
             t.status = v;
+            // Auto-assign on state change if assignee is empty
+            let auto = crate::config::resolution::load_and_merge_configs(Some(&storage.root_path))
+                .map(|c| c.auto_assign_on_status)
+                .unwrap_or(true);
+            if auto && t.assignee.as_ref().is_none() {
+                if let Some(me) = resolve_current_user(Some(&storage.root_path)) {
+                    t.assignee = Some(me);
+                }
+            }
         }
         if let Some(v) = patch.priority {
             t.priority = v;
         }
         if let Some(v) = patch.task_type {
             t.task_type = v;
+        }
+        if let Some(v) = patch.reporter {
+            t.reporter = Some(v);
         }
         if let Some(v) = patch.assignee {
             t.assignee = Some(v);
@@ -129,6 +234,7 @@ impl TaskService {
             status: task.status,
             priority: task.priority,
             task_type: task.task_type,
+            reporter: task.reporter,
             assignee: task.assignee,
             created: task.created,
             modified: task.modified,

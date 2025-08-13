@@ -1,6 +1,5 @@
 mod common;
-
-use assert_cmd::Command;
+use crate::common::cargo_bin_silent;
 use common::TestFixtures;
 
 /// Phase 1.2 - Output Format Consistency Testing
@@ -13,7 +12,7 @@ fn test_list_command_format_support() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create test tasks
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Format test task 1")
@@ -25,7 +24,7 @@ fn test_list_command_format_support() {
     let formats = ["text", "table", "json", "markdown"];
 
     for format in &formats {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = cargo_bin_silent();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -69,7 +68,7 @@ fn test_add_command_format_support() {
 
     for (i, format) in formats.iter().enumerate() {
         let task_title = format!("Add format test {}", i + 1);
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = cargo_bin_silent();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -105,7 +104,7 @@ fn test_status_command_format_support() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a test task first
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Status format test task")
@@ -116,7 +115,7 @@ fn test_status_command_format_support() {
     let formats = ["text", "table", "json", "markdown"];
 
     for format in &formats {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = cargo_bin_silent();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("status")
@@ -153,7 +152,7 @@ fn test_config_show_format_support() {
     let formats = ["text", "table", "json", "markdown"];
 
     for format in &formats {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = cargo_bin_silent();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("config")
@@ -184,7 +183,7 @@ fn test_format_option_error_handling() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test invalid format option
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -208,7 +207,7 @@ fn test_json_format_structure_consistency() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create test data
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("JSON consistency test")
@@ -218,7 +217,7 @@ fn test_json_format_structure_consistency() {
         .success();
 
     // Test that JSON output from list command has consistent structure
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = cargo_bin_silent();
     let assert_result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -265,9 +264,7 @@ fn main() {
     let formats = ["text", "table", "json", "markdown"];
 
     for format in &formats {
-        println!("Testing scan --format={format}");
-
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = cargo_bin_silent();
         let result = cmd
             .current_dir(temp_dir)
             .arg("scan")

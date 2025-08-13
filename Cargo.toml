@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 
 [[bin]]
@@ -40,13 +40,10 @@ debug-assertions = true
 overflow-checks = true
 
 [dev-dependencies]
-tokio-test = "0.4"
 assert_cmd = "2.0"
 predicates = "3.1"
-mockall = "0.13"
-criterion = "0.7"
-proptest = "1.5"
 tempfile = "3.10"
+ ctor = "0.2"
 once_cell = "1.19"
 
 [features]

@@ -325,6 +325,11 @@ impl OutputRenderer {
     }
 
     pub fn log_warn(&self, message: &str) {
+        // Auto-silence warnings only when explicitly requested by LOTAR_TEST_SILENT=1
+        let test_silent = std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1";
+        if test_silent {
+            return;
+        }
         if self.log_level.allows(LogLevel::Warn) {
             let _ = writeln!(io::stderr(), "{}", self.render_warning(message));
         }

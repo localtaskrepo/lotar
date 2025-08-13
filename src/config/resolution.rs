@@ -64,6 +64,15 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.default_assignee.is_some() {
         base.default_assignee = override_config.default_assignee;
     }
+    if override_config.default_reporter.is_some() {
+        base.default_reporter = override_config.default_reporter;
+    }
+    if override_config.auto_set_reporter != defaults.auto_set_reporter {
+        base.auto_set_reporter = override_config.auto_set_reporter;
+    }
+    if override_config.auto_assign_on_status != defaults.auto_assign_on_status {
+        base.auto_assign_on_status = override_config.auto_assign_on_status;
+    }
     if override_config.default_priority != defaults.default_priority {
         base.default_priority = override_config.default_priority;
     }
@@ -97,6 +106,10 @@ pub fn get_project_config(
     if let Some(assignee) = project_config.default_assignee {
         resolved.default_assignee = Some(assignee);
     }
+    if let Some(reporter) = project_config.default_reporter {
+        resolved.default_reporter = Some(reporter);
+    }
+    // Note: project-level toggles for automation not currently supported in ProjectConfig; could be added later
     if let Some(priority) = project_config.default_priority {
         resolved.default_priority = priority;
     }
@@ -121,6 +134,9 @@ impl ResolvedConfig {
             categories: global.categories,
             tags: global.tags,
             default_assignee: global.default_assignee,
+            default_reporter: global.default_reporter,
+            auto_set_reporter: global.auto_set_reporter,
+            auto_assign_on_status: global.auto_assign_on_status,
             default_priority: global.default_priority,
             default_status: global.default_status,
             custom_fields: global.custom_fields,

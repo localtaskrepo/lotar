@@ -19,6 +19,10 @@ pub struct ConfigShowArgs {
     /// Show project-specific configuration
     #[arg(long)]
     pub project: Option<String>,
+
+    /// Explain where each value comes from (env, home, global, project, default)
+    #[arg(long)]
+    pub explain: bool,
 }
 
 #[derive(Args)]

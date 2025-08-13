@@ -14,8 +14,11 @@ lotar config <ACTION> [OPTIONS]
 Display current configuration.
 
 ```bash
-lotar config show [--project=PROJECT]
+lotar config show [--project=PROJECT] [--explain]
 ```
+Options:
+- `--explain` — Annotate where values come from (env, home, global, project, default).
+ - When `--format=json` is used, an additional structured explanation object is emitted with a `sources` map per key.
 
 ### init
 Initialize project configuration from template with advanced options.
@@ -148,6 +151,7 @@ lotar config templates
 - `categories` - Available categories
 - `tags` - Available tags
 - `default_assignee` - Default task assignee
+- `default_reporter` - Default task reporter (also used for auto-assign resolution)
 - `default_priority` - Default task priority
 - `default_status` - Default task status
 - `custom_fields` - Custom field definitions
@@ -161,6 +165,7 @@ lotar config templates
 - `categories` - Default categories for all projects
 - `tags` - Default tags for all projects
 - `default_assignee` - Default task assignee for all projects
+- `default_reporter` - Default task reporter for all projects (also used for auto-assign resolution)
 - `default_priority` - Default task priority for all projects
 - `default_status` - Default task status for all projects
 - `custom_fields` - Default custom fields for all projects
@@ -182,6 +187,10 @@ lotar config templates
 
 - `LOTAR_TASKS_DIR` - Default tasks directory location
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for all new tasks
+- `LOTAR_DEFAULT_REPORTER` - Default reporter identity used for auto reporter/assign
+
+Notes:
+- Auto reporter and auto-assign behavior is controlled by configuration: set `default_reporter`, `auto_set_reporter`, and `auto_assign_on_status` in config files. The above environment variables can provide defaults, but do not toggle automation flags.
 
 ## Notes
 

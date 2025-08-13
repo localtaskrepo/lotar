@@ -13,6 +13,8 @@ pub struct TaskDTO {
     pub priority: crate::types::Priority,
     pub task_type: crate::types::TaskType,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub assignee: Option<String>,
     pub created: String,
     pub modified: String,
@@ -53,6 +55,7 @@ pub struct TaskCreate {
     pub project: Option<String>,
     pub priority: Option<crate::types::Priority>,
     pub task_type: Option<crate::types::TaskType>,
+    pub reporter: Option<String>,
     pub assignee: Option<String>,
     pub due_date: Option<String>,
     pub effort: Option<String>,
@@ -69,6 +72,7 @@ pub struct TaskUpdate {
     pub status: Option<crate::types::TaskStatus>,
     pub priority: Option<crate::types::Priority>,
     pub task_type: Option<crate::types::TaskType>,
+    pub reporter: Option<String>,
     pub assignee: Option<String>,
     pub due_date: Option<String>,
     pub effort: Option<String>,

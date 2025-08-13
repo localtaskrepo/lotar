@@ -32,7 +32,9 @@ lotar task list [OPTIONS]
 Edit an existing task.
 
 ```bash
-lotar task edit <TASK_ID> [OPTIONS]
+lotar task edit <TASK_ID> [OPTIONS] [--dry-run]
+# JSON preview: lotar task edit PROJ-1 --priority=high --dry-run --format=json
+# {"status":"preview","action":"edit","task_id":"PROJ-1","priority":"HIGH", ...}
 ```
 
 ### status
@@ -67,7 +69,9 @@ lotar task due-date <TASK_ID> [NEW_DATE]
 Delete a task.
 
 ```bash
-lotar task delete <TASK_ID>
+lotar task delete <TASK_ID> [--dry-run] [--force]
+# JSON preview: lotar task delete PROJ-1 --dry-run --format=json
+# {"status":"preview","action":"delete","task_id":"PROJ-1","project":"PROJ"}
 ```
 
 ## Examples

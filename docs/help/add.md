@@ -53,6 +53,10 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 - `--critical` - Shorthand for --priority=critical
 - `--high` - Shorthand for --priority=high
 
+### Planning and diagnostics
+- `--dry-run` - Preview the task that would be created without writing
+- `--explain` - Show how defaults (status/priority/reporter) were chosen
+
 ### Custom Fields
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
 
@@ -65,6 +69,9 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ### Environment Variables
 - `LOTAR_TASKS_DIR` - Default tasks directory location  
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for new tasks
+- `LOTAR_DEFAULT_REPORTER` - Default reporter identity when not provided
+
+Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto_set_reporter: true` in your config. The environment variable can provide a default reporter value.
 
 ## Output Formats
 
@@ -77,7 +84,11 @@ lotar add "New task"
 
 # JSON for scripting
 lotar add "New task" --format=json
-# {"task_id": "AUTH-001", "status": "created"}
+# {"status":"success","message":"Created task: AUTH-001","task":{"id":"AUTH-001", ...}}
+
+# JSON dry-run preview
+lotar add "Preview task" --dry-run --format=json
+# {"status":"preview","action":"create","project":"AUTH","title":"Preview task","priority":"MEDIUM","status_value":"TODO"}
 
 # Table format
 lotar add "New task" --format=table

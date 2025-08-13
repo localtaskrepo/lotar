@@ -89,7 +89,24 @@ impl CommandHandler for StatusHandler {
         match args.new_status {
             // Get current status
             None => {
-                renderer.emit_success(&format!("Task {} status: {}", full_task_id, task.status));
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        renderer.emit_raw_stdout(
+                            &serde_json::json!({
+                                "status": "success",
+                                "task_id": full_task_id,
+                                "status_value": task.status.to_string()
+                            })
+                            .to_string(),
+                        );
+                    }
+                    _ => {
+                        renderer.emit_success(&format!(
+                            "Task {} status: {}",
+                            full_task_id, task.status
+                        ));
+                    }
+                }
                 Ok(())
             }
             // Set new status
@@ -121,16 +138,162 @@ impl CommandHandler for StatusHandler {
                     return Ok(());
                 }
 
+                // Prepare preview message if dry-run
+                if args.dry_run {
+                    let would_assign = task.assignee.is_none()
+                        && project_resolver.get_config().auto_assign_on_status;
+                    let resolved_assignee = if would_assign {
+                        {
+                            let cfg = project_resolver.get_config();
+                            cfg.default_reporter.clone()
+                        }
+                        .or_else(|| {
+                            if let Ok(cwd) = std::env::current_dir() {
+                                let p = cwd.join(".git").join("config");
+                                if p.exists() {
+                                    if let Ok(c) = std::fs::read_to_string(p) {
+                                        for l in c.lines() {
+                                            let l = l.trim();
+                                            if l.starts_with("name = ") {
+                                                let name = l.trim_start_matches("name = ").trim();
+                                                if !name.is_empty() {
+                                                    return Some(name.to_string());
+                                                }
+                                            }
+                                        }
+                                        for l in c.lines() {
+                                            let l = l.trim();
+                                            if l.starts_with("email = ") {
+                                                let email = l.trim_start_matches("email = ").trim();
+                                                if !email.is_empty() {
+                                                    return Some(email.to_string());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            None
+                        })
+                        .or_else(|| std::env::var("USER").ok())
+                        .or_else(|| std::env::var("USERNAME").ok())
+                    } else {
+                        None
+                    };
+
+                    match renderer.format {
+                        crate::output::OutputFormat::Json => {
+                            let mut obj = serde_json::json!({
+                                "status": "preview",
+                                "action": "status_change",
+                                "task_id": full_task_id,
+                                "old_status": old_status,
+                                "new_status": validated_status,
+                            });
+                            if let Some(me) = resolved_assignee.clone() {
+                                obj["would_set_assignee"] = serde_json::Value::String(me);
+                            }
+                            if args.explain {
+                                obj["explain"] = serde_json::Value::String("status validated against project config; auto-assign uses default_reporter→git user.name/email→system username.".to_string());
+                            }
+                            renderer.emit_raw_stdout(&obj.to_string());
+                        }
+                        _ => {
+                            let mut preview = format!(
+                                "DRY RUN: Would change {} status from {} to {}",
+                                full_task_id, old_status, validated_status
+                            );
+                            if let Some(me) = resolved_assignee {
+                                preview.push_str(&format!("; would set assignee = {}", me));
+                            }
+                            renderer.emit_info(&preview);
+                            if args.explain {
+                                renderer.emit_info("Explanation: status validated against project config; auto-assign uses default_reporter→git user.name/email→system username.");
+                            }
+                        }
+                    }
+                    return Ok(());
+                }
+
                 task.status = validated_status.clone();
+                // Auto-assign assignee if none is set (configurable)
+                if task.assignee.is_none() && project_resolver.get_config().auto_assign_on_status {
+                    // Delegate to same resolution used by services by peeking config then git then system
+                    let me = {
+                        // Config default reporter
+                        let cfg = project_resolver.get_config();
+                        cfg.default_reporter.clone()
+                    }
+                    .or_else(|| {
+                        if let Ok(cwd) = std::env::current_dir() {
+                            let p = cwd.join(".git").join("config");
+                            if p.exists() {
+                                if let Ok(c) = std::fs::read_to_string(p) {
+                                    for l in c.lines() {
+                                        let l = l.trim();
+                                        if l.starts_with("name = ") {
+                                            let name = l.trim_start_matches("name = ").trim();
+                                            if !name.is_empty() {
+                                                return Some(name.to_string());
+                                            }
+                                        }
+                                    }
+                                    for l in c.lines() {
+                                        let l = l.trim();
+                                        if l.starts_with("email = ") {
+                                            let email = l.trim_start_matches("email = ").trim();
+                                            if !email.is_empty() {
+                                                return Some(email.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .or_else(|| {
+                        std::env::var("USER")
+                            .ok()
+                            .filter(|s| !s.trim().is_empty())
+                            .map(|s| s.trim().to_string())
+                    })
+                    .or_else(|| {
+                        std::env::var("USERNAME")
+                            .ok()
+                            .filter(|s| !s.trim().is_empty())
+                            .map(|s| s.trim().to_string())
+                    });
+                    if let Some(me) = me {
+                        task.assignee = Some(me);
+                    }
+                }
 
                 // Save the updated task
                 renderer.log_debug("status: persisting change to storage");
                 storage.edit(&full_task_id, &task);
 
-                renderer.emit_success(&format!(
-                    "Task {} status changed from {} to {}",
-                    full_task_id, old_status, validated_status
-                ));
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        let mut obj = serde_json::json!({
+                            "status": "success",
+                            "message": format!("Task {} status changed from {} to {}", full_task_id, old_status, validated_status),
+                            "task_id": full_task_id,
+                            "old_status": old_status,
+                            "new_status": validated_status,
+                        });
+                        if let Some(assignee) = &task.assignee {
+                            obj["assignee"] = serde_json::Value::String(assignee.clone());
+                        }
+                        renderer.emit_raw_stdout(&obj.to_string());
+                    }
+                    _ => {
+                        renderer.emit_success(&format!(
+                            "Task {} status changed from {} to {}",
+                            full_task_id, old_status, validated_status
+                        ));
+                    }
+                }
                 renderer.log_info("status: updated successfully");
 
                 Ok(())
@@ -144,6 +307,8 @@ pub struct StatusArgs {
     pub task_id: String,
     pub new_status: Option<String>, // None = get status, Some = set status
     pub explicit_project: Option<String>,
+    pub dry_run: bool,
+    pub explain: bool,
 }
 
 impl StatusArgs {
@@ -156,6 +321,8 @@ impl StatusArgs {
             task_id,
             new_status,
             explicit_project,
+            dry_run: false,
+            explain: false,
         }
     }
 }

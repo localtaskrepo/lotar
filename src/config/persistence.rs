@@ -106,6 +106,12 @@ pub fn apply_env_overrides(config: &mut GlobalConfig) {
     if let Ok(assignee) = env::var("LOTAR_DEFAULT_ASSIGNEE") {
         config.default_assignee = Some(assignee);
     }
+
+    if let Ok(reporter) = env::var("LOTAR_DEFAULT_REPORTER") {
+        config.default_reporter = Some(reporter);
+    }
+
+    // Note: auto_set_reporter and auto_assign_on_status are not overridden by env vars
 }
 
 /// Create default global configuration file
@@ -147,10 +153,20 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
         ConfigError::IoError(format!("Failed to write default global config: {}", e))
     })?;
 
-    eprintln!(
-        "Created default global configuration at: {}",
-        config_path.display()
-    );
+    // Be quiet by default during tests; only log when explicitly verbose
+    let quiet = std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1";
+    let verbose = std::env::var("LOTAR_VERBOSE").unwrap_or_default() == "1";
+    if !quiet && verbose {
+        // Use standard renderer path to ensure logs go to stderr
+        let renderer = crate::output::OutputRenderer::new(
+            crate::output::OutputFormat::Text,
+            crate::output::LogLevel::Warn,
+        );
+        renderer.log_warn(&format!(
+            "Created default global configuration at: {}",
+            config_path.display()
+        ));
+    }
     Ok(())
 }
 

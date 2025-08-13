@@ -53,6 +53,12 @@ pub enum Commands {
         id: String,
         /// New status (must be valid for project). If omitted, shows current status.
         status: Option<String>,
+        /// Preview the change without saving
+        #[arg(long)]
+        dry_run: bool,
+        /// Explain what values are chosen and why
+        #[arg(long)]
+        explain: bool,
     },
 
     /// Change task priority (validates against project config)
@@ -109,6 +115,13 @@ pub enum Commands {
 
     /// Start MCP JSON-RPC server over stdio
     Mcp,
+
+    /// Show the resolved current user identity used for reporter/assignee
+    Whoami {
+        /// Explain resolution chain and sources
+        #[arg(long)]
+        explain: bool,
+    },
 }
 
 // AddArgs moved to args_task

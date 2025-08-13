@@ -3,6 +3,7 @@ use lotar::config::validation::errors::{ValidationError, ValidationResult};
 use lotar::config::validation::{ConfigValidator, ValidationSeverity};
 use lotar::types::{Priority, TaskStatus, TaskType};
 use tempfile::TempDir;
+// No CLI invocations here; keep this module self-contained
 
 #[test]
 fn test_global_config_validation_valid() {
@@ -24,6 +25,9 @@ fn test_global_config_validation_valid() {
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
         default_assignee: None,
+        default_reporter: None,
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
         default_priority: Priority::Medium,
         default_status: Some(TaskStatus::Todo),
         custom_fields: StringConfigField::new_wildcard(),
@@ -54,6 +58,9 @@ fn test_global_config_validation_privileged_port_warning() {
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
         default_assignee: None,
+        default_reporter: None,
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
         default_priority: Priority::Medium,
         default_status: Some(TaskStatus::Todo),
         custom_fields: StringConfigField::new_wildcard(),
@@ -101,6 +108,9 @@ fn test_global_config_validation_empty_lists_error() {
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
         default_assignee: None,
+        default_reporter: None,
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
         default_priority: Priority::Medium,
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
@@ -150,6 +160,9 @@ fn test_global_config_validation_invalid_defaults() {
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
         default_assignee: None,
+        default_reporter: None,
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
         default_priority: Priority::Medium, // This should cause an error
         default_status: Some(TaskStatus::Done), // This should cause an error (Done not in states)
         custom_fields: StringConfigField::new_wildcard(),
@@ -190,6 +203,7 @@ fn test_project_config_validation_valid() {
         categories: None,
         tags: None,
         default_assignee: Some("user@example.com".to_string()),
+        default_reporter: None,
         default_priority: Some(Priority::Medium),
         default_status: Some(TaskStatus::Todo),
         custom_fields: None,
@@ -213,6 +227,7 @@ fn test_project_config_validation_empty_project_name() {
         categories: None,
         tags: None,
         default_assignee: None,
+        default_reporter: None,
         default_priority: None,
         default_status: None,
         custom_fields: None,
@@ -243,6 +258,7 @@ fn test_project_config_validation_long_project_name() {
         categories: None,
         tags: None,
         default_assignee: None,
+        default_reporter: None,
         default_priority: None,
         default_status: None,
         custom_fields: None,
@@ -276,6 +292,7 @@ fn test_project_config_validation_invalid_defaults() {
         categories: None,
         tags: None,
         default_assignee: None,
+        default_reporter: None,
         default_priority: Some(Priority::Medium), // Medium not in priorities list
         default_status: Some(TaskStatus::Done),   // Done not in states list
         custom_fields: None,
@@ -310,6 +327,7 @@ fn test_project_config_validation_invalid_email_format() {
         categories: None,
         tags: None,
         default_assignee: Some("invalid-email".to_string()), // Invalid email format
+        default_reporter: None,
         default_priority: None,
         default_status: None,
         custom_fields: None,

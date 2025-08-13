@@ -16,6 +16,8 @@ pub struct Task {
     #[serde(skip_serializing_if = "TaskType::is_default", default)]
     pub task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub assignee: Option<String>,
     pub created: String,
     pub modified: String,
@@ -56,6 +58,7 @@ impl Task {
             status: TaskStatus::default(),
             priority,
             task_type: TaskType::default(),
+            reporter: None,
             assignee: None,
             created: now.clone(),
             modified: now,
