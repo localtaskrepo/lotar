@@ -38,6 +38,8 @@ fn make_resolver() -> ProjectResolver {
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        auto_identity: true,
+        auto_identity_git: true,
     };
     resolver_from_config(cfg, std::path::PathBuf::from("/tmp"))
 }

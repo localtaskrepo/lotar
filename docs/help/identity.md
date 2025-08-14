@@ -6,10 +6,20 @@ Central reference for identity resolution and people fields.
 
 Used wherever a person is needed (assignee, reporter, default_reporter):
 1) Merged config default_reporter (precedence: CLI > env > home > project > global > defaults)
-2) git user (user.name or user.email at repo root)
-3) System user ($USER or $USERNAME)
+2) Project manifest author (package.json author, Cargo.toml authors, or .csproj Authors)
+3) git user (user.name or user.email at repo root) — gated by `auto.identity_git`
+4) System user ($USER or $USERNAME)
+
+Automation toggles:
+- `auto.identity` (default: true) — if false, only `default_reporter` is considered; git/system are ignored.
+- `auto.identity_git` (default: true) — if false, skips reading git user.*; falls back from config to system.
+
+Use `lotar whoami --explain` to see the chosen source, confidence, and toggle states.
 
 The special value `@me` resolves to the current user via the order above across CLI, REST, and MCP.
+Notes:
+- Project manifest detection is best-effort and reads only local files in your repo root (no external tools). For package.json it supports both string and object forms of `author`, and falls back to the first `contributors` entry.
+- For Cargo.toml we parse the first `authors` entry. For .csproj we read the `<Authors>` element.
 
 ## Reporter vs Assignee
 - reporter: who created or owns reporting responsibility; can be auto-set if missing when `auto_set_reporter: true`.

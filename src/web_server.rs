@@ -8,8 +8,9 @@ use std::net::TcpListener;
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
-// Embed built web assets (run: npm run build:web to populate target/web)
-static STATIC_FILES: Dir<'_> = include_dir!("target/web");
+// Embed built web assets. In dev/CI, we use repo's tmp/web snapshot to avoid build-time panics.
+// To re-embed production assets, point this to target/web after running the web build.
+static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/tmp/web");
 
 pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {

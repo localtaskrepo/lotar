@@ -21,10 +21,11 @@ Notes:
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. It resolves to the current user using this order:
 1) Merged config default_reporter (using the precedence above)
-2) git config (user.name or user.email) at the repository root
-3) System user from $USER/$USERNAME
+2) Project manifest author (package.json author, Cargo.toml authors, .csproj Authors) if present
+3) git config (user.name or user.email) at the repository root
+4) System user from $USER/$USERNAME
 
-Applied consistently by CLI, REST, and MCP.
+Applied consistently by CLI, REST, and MCP. Automation toggles `auto.identity` and `auto.identity_git` can gate steps in this order.
 
 ## Tasks directory resolution
 

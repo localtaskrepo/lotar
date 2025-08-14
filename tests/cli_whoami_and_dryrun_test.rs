@@ -12,10 +12,10 @@ use lotar::utils::paths;
 
 fn write_minimal_config(tasks_dir: &std::path::Path, extra: &str) {
     // Provide minimal, valid lists so CLI validation passes where needed
-    let base = r#"default_project: TEST
-issue_states: [Todo, InProgress, Done]
-issue_types: [Feature, Bug, Chore]
-issue_priorities: [Low, Medium, High]
+    let base = r#"default.project: TEST
+issue.states: [Todo, InProgress, Done]
+issue.types: [Feature, Bug, Chore]
+issue.priorities: [Low, Medium, High]
 "#;
     let mut content = String::from(base);
     if !extra.is_empty() {
@@ -36,7 +36,7 @@ fn whoami_uses_config_default_reporter() {
     std::fs::create_dir_all(&tasks_dir).unwrap();
 
     // Configure a deterministic reporter identity
-    write_minimal_config(&tasks_dir, "default_reporter: alice@example.com\n");
+    write_minimal_config(&tasks_dir, "default.reporter: alice@example.com\n");
 
     unsafe {
         std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
@@ -55,6 +55,72 @@ fn whoami_uses_config_default_reporter() {
 }
 
 #[test]
+fn whoami_explain_text_includes_source_and_confidence() {
+    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+
+    let temp = TempDir::new().unwrap();
+    let tasks_dir = temp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+
+    // Deterministic reporter identity
+    write_minimal_config(&tasks_dir, "default.reporter: carol\n");
+
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+    }
+
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp.path())
+        .args(["whoami", "--explain"]) // text mode
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("carol"))
+        .stdout(predicate::str::contains("source:"))
+        .stdout(predicate::str::contains("confidence:"));
+
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+}
+
+#[test]
+fn whoami_json_compact_and_explain_fields() {
+    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+
+    let temp = TempDir::new().unwrap();
+    let tasks_dir = temp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+
+    write_minimal_config(&tasks_dir, "default.reporter: dave\n");
+
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+    }
+
+    // Compact JSON (no extra fields)
+    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    cmd.current_dir(temp.path())
+        .args(["whoami", "--format=json"]) // json mode
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("{\"user\":\"dave\"}"));
+
+    // Explain JSON includes source/confidence/details
+    let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+    cmd2.current_dir(temp.path())
+        .args(["whoami", "--format=json", "--explain"]) // json + explain
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"user\":"))
+        .stdout(predicate::str::contains("\"source\":"))
+        .stdout(predicate::str::contains("\"confidence\":"));
+
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+}
+
+#[test]
 fn status_dry_run_explain_previews_and_does_not_write() {
     let _env_tasks = lock_var("LOTAR_TASKS_DIR");
 
@@ -63,7 +129,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
     std::fs::create_dir_all(&tasks_dir).unwrap();
 
     // Default reporter used for auto-assign preview
-    write_minimal_config(&tasks_dir, "default_reporter: bob\n");
+    write_minimal_config(&tasks_dir, "default.reporter: bob\n");
 
     unsafe {
         std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());

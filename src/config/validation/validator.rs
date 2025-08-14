@@ -31,6 +31,11 @@ impl ConfigValidator {
         // Validate field formats
         self.validate_field_formats(config, &mut result);
 
+        // Validate scan.ticket_patterns (if present)
+        if let Some(patterns) = &config.scan_ticket_patterns {
+            self.validate_ticket_patterns(patterns, &mut result);
+        }
+
         result
     }
 
@@ -125,6 +130,11 @@ impl ConfigValidator {
                         .to_string(),
                 ),
             );
+        }
+
+        // Validate scan.ticket_patterns (if present)
+        if let Some(patterns) = &config.scan_ticket_patterns {
+            self.validate_ticket_patterns(patterns, &mut result);
         }
 
         result
@@ -282,6 +292,56 @@ impl ConfigValidator {
                     )
                     .with_fix("Use email format (user@domain.com) or @username format".to_string()),
                 );
+            }
+        }
+    }
+
+    fn validate_ticket_patterns(&self, patterns: &[String], result: &mut ValidationResult) {
+        // Errors for invalid regex, warnings for overlapping/ambiguous patterns
+        let mut compiled: Vec<(String, regex::Regex)> = Vec::new();
+        for (i, p) in patterns.iter().enumerate() {
+            match regex::Regex::new(p) {
+                Ok(r) => compiled.push((p.clone(), r)),
+                Err(e) => result.add_error(
+                    ValidationError::error(
+                        Some(format!("scan.ticket_patterns[{}]", i)),
+                        format!("Invalid regex: {}", e),
+                    )
+                    .with_fix("Ensure the pattern is a valid Rust regex".to_string()),
+                ),
+            }
+        }
+
+        // Check for ambiguous overlaps by testing representative samples
+        // Heuristic: if two patterns can both match the same simple key formats, warn
+        let samples = vec![
+            "DEMO-123",
+            "ABC_99",
+            "[ticket=DEMO-1]",
+            "feat/PROJ-42",
+            "#123",
+        ];
+        for s in samples {
+            let matches: Vec<&str> = compiled
+                .iter()
+                .filter(|(_, re)| re.is_match(s))
+                .map(|(p, _)| p.as_str())
+                .collect();
+            if matches.len() > 1 {
+                result.add_error(
+                    ValidationError::warning(
+                        Some("scan.ticket_patterns".to_string()),
+                        format!(
+                            "Multiple patterns match sample '{}': {}",
+                            s,
+                            matches.join(", ")
+                        ),
+                    )
+                    .with_fix(
+                        "Consider making patterns mutually exclusive or ordering them".to_string(),
+                    ),
+                );
+                break; // one warning is enough to indicate ambiguity
             }
         }
     }

@@ -994,20 +994,19 @@ mod file_structure {
             "Global config.yml SHOULD be created by write operations"
         );
 
-        // Verify it's a valid global config with default settings
+        // Verify it's a valid global config with default settings (canonical nested YAML)
         let config_content = fs::read_to_string(&global_config).unwrap();
         assert!(
-            config_content.contains("server_port:"),
-            "Global config should have server_port"
+            config_content.contains("server:") && config_content.contains("port:"),
+            "Global config should have server.port"
         );
         assert!(
-            config_content.contains("issue_states:"),
-            "Global config should have issue_states"
+            config_content.contains("issue:") && config_content.contains("states:"),
+            "Global config should have issue.states"
         );
         assert!(
-            config_content.contains("default_project:")
-                || config_content.contains("default_prefix:"),
-            "Global config should have default_project setting"
+            config_content.contains("default:") && config_content.contains("project:"),
+            "Global config should have default.project setting"
         );
     }
 
@@ -1153,8 +1152,8 @@ mod file_structure {
 
         let config_content = fs::read_to_string(&global_config).unwrap();
         assert!(
-            config_content.contains("default_project:"),
-            "Global config should have default_project"
+            config_content.contains("default:") && config_content.contains("project:"),
+            "Global config should have default.project"
         );
         // Should have some form of project prefix (exact value depends on generation logic)
         assert!(
@@ -1233,12 +1232,13 @@ mod file_structure {
         // For temp directory, it will be detected as the directory name (starting with tmp)
         // So we just verify it's not the prefix (which would be uppercase)
         assert!(
-            config_content.contains("project_name:"),
-            "Config should contain project_name field"
+            config_content.contains("project:\n  id:") || config_content.contains("project.id:"),
+            "Config should contain canonical project.id field"
         );
         assert!(
-            !config_content.contains(&format!("project_name: {prefix}")),
-            "Project config should NOT contain prefix '{prefix}' as project name. Config content: {config_content}"
+            !config_content.contains(&format!("project.id: {prefix}"))
+                && !config_content.contains(&format!("id: {prefix}")),
+            "Project config should NOT contain prefix '{prefix}' as project id. Config content: {config_content}"
         );
     }
 

@@ -55,10 +55,9 @@ impl Storage {
             global_config.default_prefix = smart_prefix;
         }
 
-        // Write the global config
-        if let Ok(config_yaml) = serde_yaml::to_string(&global_config) {
-            let _ = fs::write(&global_config_path, config_yaml);
-        }
+        // Write the global config in canonical nested format
+        let config_yaml = crate::config::normalization::to_canonical_global_yaml(&global_config);
+        let _ = fs::write(&global_config_path, config_yaml);
     }
 
     /// Determine the best default_prefix for global config

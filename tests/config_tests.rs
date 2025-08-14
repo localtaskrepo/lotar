@@ -70,7 +70,9 @@ mod global_config {
         // Verify the config content doesn't contain null values
         let config_content = fs::read_to_string(&global_config_path).unwrap();
         assert!(!config_content.contains("null"));
-        assert!(config_content.contains("server_port: 8080"));
+        // Canonical nested YAML output
+        assert!(config_content.contains("server:"));
+        assert!(config_content.contains("port: 8080"));
     }
 
     #[test]
@@ -92,7 +94,8 @@ mod global_config {
         // Verify global config was updated
         let global_config_path = temp_dir.join(".tasks").join("config.yml");
         let global_config_content = fs::read_to_string(&global_config_path).unwrap();
-        assert!(global_config_content.contains("server_port: 9000"));
+        assert!(global_config_content.contains("server:"));
+        assert!(global_config_content.contains("port: 9000"));
 
         // Test config show displays the updated value
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -141,7 +144,9 @@ mod project_config {
 
         let config_content = fs::read_to_string(&project_config_path).unwrap();
         assert!(!config_content.contains("null"));
-        assert!(config_content.contains("project_name: MyVeryLongProjectName"));
+        // Canonical nested project id
+        assert!(config_content.contains("project:"));
+        assert!(config_content.contains("id: MyVeryLongProjectName"));
         // Template-based configs contain all template fields, not just project name
         let lines: Vec<&str> = config_content.lines().collect();
         assert!(lines.len() > 1); // Should contain multiple lines from template
@@ -239,8 +244,10 @@ mod templates {
 
         let config_path = temp_dir.join(".tasks").join("SIMP").join("config.yml");
         let config_content = fs::read_to_string(&config_path).unwrap();
-        assert!(config_content.contains("project_name: SimpleProject"));
-        assert!(config_content.contains("issue_states:"));
+        assert!(config_content.contains("project:"));
+        assert!(config_content.contains("id: SimpleProject"));
+        assert!(config_content.contains("issue:"));
+        assert!(config_content.contains("states:"));
         assert!(config_content.contains("Todo"));
         assert!(config_content.contains("InProgress"));
         assert!(config_content.contains("Done"));
@@ -258,8 +265,10 @@ mod templates {
 
         let agile_config_path = temp_dir.join(".tasks").join("AGIL").join("config.yml");
         let agile_config_content = fs::read_to_string(&agile_config_path).unwrap();
-        assert!(agile_config_content.contains("project_name: AgileProject"));
-        assert!(agile_config_content.contains("issue_types:"));
+        assert!(agile_config_content.contains("project:"));
+        assert!(agile_config_content.contains("id: AgileProject"));
+        assert!(agile_config_content.contains("issue:"));
+        assert!(agile_config_content.contains("types:"));
         assert!(agile_config_content.contains("Epic"));
     }
 
@@ -306,6 +315,16 @@ mod config_operations {
             .assert()
             .success();
 
+        // Ensure default project is set for project-scoped operations
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("default_project")
+            .arg("SetTestProject")
+            .assert()
+            .success();
+
         // Set issue states
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -337,8 +356,10 @@ mod config_operations {
         // Verify the project config was updated
         let config_path = temp_dir.join(".tasks").join("SETT").join("config.yml");
         let config_content = fs::read_to_string(&config_path).unwrap();
-        assert!(config_content.contains("default_priority: High"));
-        assert!(config_content.contains("issue_states:"));
+        assert!(config_content.contains("default:"));
+        assert!(config_content.contains("priority: High"));
+        assert!(config_content.contains("issue:"));
+        assert!(config_content.contains("states:"));
     }
 
     #[test]
@@ -420,7 +441,8 @@ mod custom_tasks_directory {
 
         // Verify the config contains our setting
         let config_content = fs::read_to_string(&custom_config_path).unwrap();
-        assert!(config_content.contains("server_port: 9001"));
+        assert!(config_content.contains("server:"));
+        assert!(config_content.contains("port: 9001"));
     }
 
     #[test]
@@ -452,7 +474,9 @@ mod custom_tasks_directory {
 
         // Verify the config contains our setting
         let config_content = fs::read_to_string(&env_config_path).unwrap();
-        assert!(config_content.contains("default_project: env-project"));
+        assert!(config_content.contains("default:"));
+        // default_project is normalized to a prefix in canonical config; env-project -> EP
+        assert!(config_content.contains("project: EP"));
     }
 
     #[test]
@@ -466,7 +490,7 @@ mod custom_tasks_directory {
 
         // Create a config file in the parent tasks directory
         let parent_config_path = parent_tasks_dir.join("config.yml");
-        fs::write(&parent_config_path, "server_port: 7777\ntask_file_extension: yml\ndefault_project: parent-project\ntasks_folder: .tasks\n").unwrap();
+        fs::write(&parent_config_path, "server.port: 7777\n# task_file_extension and tasks_folder are legacy/no-op in current model\ndefault.project: parent-project\n").unwrap();
 
         // Create a subdirectory
         let sub_dir = temp_dir.join("subdir");
@@ -589,7 +613,8 @@ mod inheritance {
             .arg("--project=InheritanceTest")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Project prefix: InheritanceTest"))
+            // With canonicalization, a provided project name is displayed as its prefix
+            .stdout(predicate::str::contains("Project prefix: INHE"))
             .stdout(predicate::str::contains("Default Priority: High")); // Project-specific
     }
 }

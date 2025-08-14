@@ -120,6 +120,8 @@ pub struct ProjectConfig {
     pub auto_assign_on_status: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_signal_words: Option<Vec<String>>, // case-insensitive signal words for scanner
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub scan_ticket_patterns: Option<Vec<String>>, // regex patterns to detect ticket keys
 }
 
 impl ProjectConfig {
@@ -139,6 +141,7 @@ impl ProjectConfig {
             auto_set_reporter: None,
             auto_assign_on_status: None,
             scan_signal_words: None,
+            scan_ticket_patterns: None,
         }
     }
 }
@@ -178,6 +181,14 @@ pub struct GlobalConfig {
     pub custom_fields: StringConfigField,
     #[serde(default = "default_scan_signal_words")]
     pub scan_signal_words: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub scan_ticket_patterns: Option<Vec<String>>,
+
+    // Automation toggles
+    #[serde(default = "default_true")]
+    pub auto_identity: bool,
+    #[serde(default = "default_true")]
+    pub auto_identity_git: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -198,6 +209,10 @@ pub struct ResolvedConfig {
     pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
     pub scan_signal_words: Vec<String>,
+
+    // Automation toggles (effective)
+    pub auto_identity: bool,
+    pub auto_identity_git: bool,
 }
 
 #[derive(Debug)]
@@ -290,12 +305,24 @@ impl Default for GlobalConfig {
             default_status: None,
             custom_fields: default_custom_fields(),
             scan_signal_words: default_scan_signal_words(),
+            scan_ticket_patterns: None,
+            auto_identity: true,
+            auto_identity_git: true,
         }
     }
 }
 
 fn default_true() -> bool {
     true
+}
+
+// Helper accessors for optional fields used by normalization without exposing internals
+pub fn maybe_scan_ticket_patterns(cfg: &GlobalConfig) -> Option<&Vec<String>> {
+    cfg.scan_ticket_patterns.as_ref()
+}
+
+pub fn maybe_project_scan_ticket_patterns(cfg: &ProjectConfig) -> Option<&Vec<String>> {
+    cfg.scan_ticket_patterns.as_ref()
 }
 
 // Constants that are actually used would go here if needed

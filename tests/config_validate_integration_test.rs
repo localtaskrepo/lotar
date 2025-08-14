@@ -22,21 +22,21 @@ fn test_config_validate_global_valid() {
     fs::write(
         tasks_dir.join("config.yml"),
         r#"
-server_port: 8080
-default_project: "TEST"
-issue_states:
-  - Todo
-  - InProgress  
-  - Done
-issue_types:
-  - Feature
-  - Bug
-issue_priorities:
-  - Low
-  - Medium
-  - High
-default_priority: Medium
-default_status: Todo
+server.port: 8080
+default.project: "TEST"
+issue.states:
+    - Todo
+    - InProgress  
+    - Done
+issue.types:
+    - Feature
+    - Bug
+issue.priorities:
+    - Low
+    - Medium
+    - High
+default.priority: Medium
+default.status: Todo
 "#,
     )
     .unwrap();
@@ -69,17 +69,17 @@ fn test_config_validate_global_with_warnings() {
     fs::write(
         tasks_dir.join("config.yml"),
         r#"
-server_port: 80
-default_project: "TEST"
-issue_states:
-  - Todo
-  - Done
-issue_types:
-  - Feature
-issue_priorities:
-  - Medium
-default_priority: Medium
-default_status: Todo
+server.port: 80
+default.project: "TEST"
+issue.states:
+    - Todo
+    - Done
+issue.types:
+    - Feature
+issue.priorities:
+    - Medium
+default.priority: Medium
+default.status: Todo
 "#,
     )
     .unwrap();
@@ -111,14 +111,14 @@ fn test_config_validate_global_errors_only() {
     fs::write(
         tasks_dir.join("config.yml"),
         r#"
-server_port: 80
-issue_states:
-  - Todo
-issue_types:
-  - Feature
-issue_priorities:
-  - Medium
-default_priority: Medium
+server.port: 80
+issue.states:
+    - Todo
+issue.types:
+    - Feature
+issue.priorities:
+    - Medium
+default.priority: Medium
 "#,
     )
     .unwrap();
@@ -150,21 +150,21 @@ fn test_config_validate_project_valid() {
     fs::write(
         project_dir.join("config.yml"),
         r#"
-project_name: "Test Project"
-issue_states:
-  - Todo
-  - InProgress
-  - Done
-issue_types:
-  - Feature
-  - Bug
-issue_priorities:
-  - Low
-  - Medium
-  - High
-default_priority: Medium
-default_status: Todo
-default_assignee: "user@example.com"
+project.id: "Test Project"
+issue.states:
+    - Todo
+    - InProgress
+    - Done
+issue.types:
+    - Feature
+    - Bug
+issue.priorities:
+    - Low
+    - Medium
+    - High
+default.priority: Medium
+default.status: Todo
+default.assignee: "user@example.com"
 "#,
     )
     .unwrap();
@@ -264,11 +264,11 @@ fn test_config_validate_both_global_and_project() {
     fs::write(
         tasks_dir.join("config.yml"),
         r#"
-server_port: 8080
-issue_states: [Todo, Done]
-issue_types: [Feature]
-issue_priorities: [Medium]
-default_priority: Medium
+server.port: 8080
+issue.states: [Todo, Done]
+issue.types: [Feature]
+issue.priorities: [Medium]
+default.priority: Medium
 "#,
     )
     .unwrap();
@@ -276,8 +276,8 @@ default_priority: Medium
     fs::write(
         project_dir.join("config.yml"),
         r#"
-project_name: "Test Project"
-default_assignee: "user@example.com"
+project.id: "Test Project"
+default.assignee: "user@example.com"
 "#,
     )
     .unwrap();
@@ -310,7 +310,7 @@ fn test_config_validate_prefix_conflicts() {
     fs::write(
         project_dir.join("config.yml"),
         r#"
-project_name: "Existing Project"
+project.id: "Existing Project"
 "#,
     )
     .unwrap();

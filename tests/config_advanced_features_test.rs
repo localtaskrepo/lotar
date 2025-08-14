@@ -176,13 +176,19 @@ fn test_config_copy_from_functionality() {
         .assert()
         .success();
 
-    // Modify source config
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
-    cmd.current_dir(&source_dir)
-        .arg("config")
-        .arg("set")
-        .arg("project_name")
-        .arg("source-project")
+    // Set default project to a valid prefix so project-scoped set works
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(&source_dir)
+        .args(["config", "set", "default_project", "DEMO", "--global"])
+        .assert()
+        .success();
+
+    // Now project-scoped set should create DEMO project config and succeed
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(&source_dir)
+        .args(["config", "set", "project_name", "source-project"])
         .assert()
         .success();
 
@@ -257,6 +263,14 @@ fn test_config_validation_and_conflicts() {
     let _unknown_field_result = result.try_success().is_ok();
 
     // Test project name vs prefix conflict detection
+    // Ensure default project is set so project-scoped set works
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "default_project", "DEMO", "--global"])
+        .assert()
+        .success();
+
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
@@ -296,7 +310,14 @@ fn test_config_global_vs_project_precedence() {
         .assert()
         .success();
 
-    // Set project-specific value
+    // Set project-specific value - first set default project to a valid prefix
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "default_project", "DEMO", "--global"])
+        .assert()
+        .success();
+
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")

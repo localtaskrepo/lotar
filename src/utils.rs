@@ -4,6 +4,8 @@
 pub mod config;
 pub mod filesystem;
 pub mod identity;
+pub mod identity_detectors;
+// (git helpers are exposed at crate::utils_git)
 pub mod paths;
 pub mod project;
 

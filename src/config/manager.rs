@@ -92,10 +92,9 @@ impl ConfigManager {
             // Update the default_prefix
             global_config.default_prefix = detected_prefix.clone();
 
-            // Save updated config
-            let updated_yaml = serde_yaml::to_string(&global_config).map_err(|e| {
-                ConfigError::ParseError(format!("Failed to serialize updated config: {}", e))
-            })?;
+            // Save updated config using canonical writer
+            let updated_yaml =
+                crate::config::normalization::to_canonical_global_yaml(&global_config);
             fs::write(&config_path, updated_yaml).map_err(|e| {
                 ConfigError::IoError(format!("Failed to write updated global config: {}", e))
             })?;

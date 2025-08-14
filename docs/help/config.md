@@ -49,6 +49,16 @@ Validate configuration files for errors and warnings.
 lotar config validate [--project=PROJECT] [--global] [--fix] [--errors-only]
 ```
 
+### normalize
+Rewrite config files into the canonical nested YAML form (supports dotted keys on input).
+
+```bash
+lotar config normalize [--global] [--project=PREFIX] [--write]
+```
+Options:
+- Without --write, prints the normalized form (dry-run) and does not modify files.
+- When no scope is provided, normalizes the global config and all project configs.
+
 ## Examples
 
 ```bash
@@ -80,7 +90,7 @@ lotar config init --project=backend --template=simple --force
 lotar config set default_priority HIGH --project=backend --dry-run
 
 # Set global configuration
-lotar config set server_port 9000 --global
+lotar config set server.port 9000 --global
 
 # Environment variable integration
 export LOTAR_TASKS_DIR=/custom/tasks
@@ -100,6 +110,12 @@ lotar config validate --global --errors-only
 
 # Validate and attempt auto-fixes
 lotar config validate --project=my-project --fix
+
+# Preview canonical nested config for all files (no writes)
+lotar config normalize
+
+# Normalize a single project and write back
+lotar config normalize --project=DEMO --write
 ```
 
 ## Advanced Features
@@ -117,6 +133,12 @@ Notes:
 - Project config overrides global, but home/env can override both.
 - CLI flags are applied by each command and always win for that invocation.
  - Identity resolution uses the merged configuration from this precedence chain.
+
+### Canonical YAML shape
+LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to a nested structure with these groups: server, default, issue, taxonomy, custom, scan, auto. Use `lotar config normalize` to rewrite files into this canonical form.
+
+Notes:
+- Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`).
 
 ### Automatic Prefix Generation
 Projects automatically get prefixes generated from their names:
@@ -158,7 +180,7 @@ lotar config templates
 ## Configuration Keys
 
 ### Project-Level
-- `project_name` - Project name/identifier
+- `project.id` - Project identifier
 - `issue_states` - Available task statuses
 - `issue_types` - Available task types  
 - `issue_priorities` - Available priorities
@@ -175,8 +197,8 @@ lotar config templates
     - The assignee chosen is the resolved current user (see Identity Resolution below).
 
 ### Global
-- `server_port` - Web server port
-- `default_project` - Default project prefix
+- `server.port` - Web server port
+- `default.project` - Default project prefix
 - `issue_states` - Default task statuses for all projects
 - `issue_types` - Default task types for all projects
 - `issue_priorities` - Default priorities for all projects
@@ -189,6 +211,8 @@ lotar config templates
 - `custom_fields` - Default custom fields for all projects
 - `auto_set_reporter` - If true, set reporter automatically on create/update when missing
 - `auto_assign_on_status` - If true, auto-assign assignee on first meaningful status change
+- `auto.identity` - Enable smart identity detection beyond configured default (default: true)
+- `auto.identity_git` - Enable git-based identity detection (default: true)
 
 ## Templates
 
@@ -207,7 +231,7 @@ lotar config templates
 
 - `LOTAR_TASKS_DIR` - Default tasks directory location (overrides discovery)
 - `LOTAR_PORT` - Web server port override
-- `LOTAR_PROJECT` - Default project name; mapped to a prefix and applied as `default_project`
+- `LOTAR_PROJECT` - Default project name; mapped to a prefix and applied as `default.project`
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for all new tasks
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity used for auto reporter/assign
 

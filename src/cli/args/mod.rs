@@ -7,7 +7,10 @@ pub mod task;
 
 // Re-exports for ergonomic imports from crate::cli::args
 pub use common::parse_key_value;
-pub use config::{ConfigAction, ConfigInitArgs, ConfigSetArgs, ConfigShowArgs, ConfigValidateArgs};
+pub use config::{
+    ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
+    ConfigValidateArgs,
+};
 pub use index::{IndexAction, IndexArgs};
 pub use scan::ScanArgs;
 pub use serve::ServeArgs;

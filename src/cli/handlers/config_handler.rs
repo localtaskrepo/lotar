@@ -1,5 +1,5 @@
 use crate::cli::handlers::CommandHandler;
-use crate::cli::{ConfigAction, ConfigShowArgs, ConfigValidateArgs};
+use crate::cli::{ConfigAction, ConfigNormalizeArgs, ConfigShowArgs, ConfigValidateArgs};
 use crate::config::ConfigManager;
 use crate::output::OutputRenderer;
 use crate::types::{Priority, TaskStatus};
@@ -61,11 +61,95 @@ impl CommandHandler for ConfigHandler {
                 );
                 Ok(())
             }
+            ConfigAction::Normalize(ConfigNormalizeArgs {
+                global,
+                project,
+                write,
+            }) => Self::handle_config_normalize(resolver, renderer, global, project, write),
         }
     }
 }
 
 impl ConfigHandler {
+    fn handle_config_normalize(
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+        global: bool,
+        project: Option<String>,
+        write: bool,
+    ) -> Result<(), String> {
+        use crate::utils::paths;
+        use std::path::PathBuf;
+
+        let mut targets: Vec<(String, PathBuf)> = Vec::new();
+
+        if global || project.is_none() {
+            let path = paths::global_config_path(&resolver.path);
+            if path.exists() {
+                targets.push(("global".to_string(), path));
+            }
+        }
+
+        if let Some(proj) = project {
+            let path = paths::project_config_path(&resolver.path, &proj);
+            if !path.exists() {
+                return Err(format!("Project config not found: {}", path.display()));
+            }
+            targets.push((format!("project:{}", proj), path));
+        } else if !global {
+            // If neither --global nor --project specified, normalize all project configs
+            for (prefix, dir) in crate::utils::filesystem::list_visible_subdirs(&resolver.path) {
+                let cfg = dir.join("config.yml");
+                if cfg.exists() {
+                    targets.push((format!("project:{}", prefix), cfg));
+                }
+            }
+        }
+
+        if targets.is_empty() {
+            renderer.emit_info("No configuration files found to normalize");
+            return Ok(());
+        }
+
+        let mut changed = 0usize;
+        for (label, path) in targets {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+
+            // Attempt normalization via round-trip through our tolerant parsers,
+            // then emit in canonical nested style.
+            let canonical = if label == "global" {
+                let parsed = crate::config::normalization::parse_global_from_yaml_str(&content)
+                    .map_err(|e| e.to_string())?;
+                crate::config::normalization::to_canonical_global_yaml(&parsed)
+            } else {
+                // label is project:<prefix>
+                let proj = label.split_once(':').map(|(_, p)| p).unwrap_or("");
+                let parsed =
+                    crate::config::normalization::parse_project_from_yaml_str(proj, &content)
+                        .map_err(|e| e.to_string())?;
+                crate::config::normalization::to_canonical_project_yaml(&parsed)
+            };
+
+            if write {
+                std::fs::write(&path, canonical.as_bytes())
+                    .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+                renderer.emit_success(&format!("Normalized {} -> {}", label, path.display()));
+                changed += 1;
+            } else {
+                renderer.emit_info(&format!("Would normalize {} -> {}", label, path.display()));
+                renderer.emit_raw_stdout(&canonical);
+            }
+        }
+
+        if write {
+            renderer.emit_success(&format!(
+                "Normalization complete ({} file(s) updated)",
+                changed
+            ));
+        }
+        Ok(())
+    }
     /// Handle config show command with optional project filter
     fn handle_config_show(
         resolver: &TasksDirectoryResolver,
@@ -859,11 +943,35 @@ impl ConfigHandler {
             ));
         }
 
-        // Write configuration
-        let config_yaml = serde_yaml::to_string(&config)
+        // Write configuration using canonical nested format
+        let tmp_yaml = serde_yaml::to_string(&config)
             .map_err(|e| format!("Failed to serialize config: {}", e))?;
+        let canonical = if config_path.parent() == Some(&resolver.path) {
+            // Global config
+            let parsed = crate::config::normalization::parse_global_from_yaml_str(&tmp_yaml)
+                .map_err(|e| format!("Failed to parse config for canonicalization: {}", e))?;
+            crate::config::normalization::to_canonical_global_yaml(&parsed)
+        } else {
+            // Project config; derive prefix from parent dir name
+            let prefix = config_path
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|s| s.to_str())
+                .unwrap_or("");
+            // Use the human-readable project name for project.id if provided
+            let project_id = project
+                .as_deref()
+                .or_else(|| config.get("project_name").and_then(|v| v.as_str()))
+                .unwrap_or(prefix);
+            let parsed =
+                crate::config::normalization::parse_project_from_yaml_str(project_id, &tmp_yaml)
+                    .map_err(|e| {
+                        format!("Failed to parse project config for canonicalization: {}", e)
+                    })?;
+            crate::config::normalization::to_canonical_project_yaml(&parsed)
+        };
 
-        fs::write(&config_path, config_yaml)
+        fs::write(&config_path, canonical)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
 
         renderer.emit_success(&format!(
@@ -938,6 +1046,30 @@ impl ConfigHandler {
                 }
             }
         }
+
+        // Rename flat keys to dotted keys expected by canonical parser
+        // Collect changes to avoid mutating while iterating
+        let mut renames: Vec<(serde_yaml::Value, serde_yaml::Value)> = Vec::new();
+        for key in [
+            ("issue_states", "issue.states"),
+            ("issue_types", "issue.types"),
+            ("issue_priorities", "issue.priorities"),
+            ("categories", "taxonomy.categories"),
+            ("tags", "taxonomy.tags"),
+            ("custom_fields", "custom.fields"),
+        ] {
+            let from = serde_yaml::Value::String(key.0.to_string());
+            if let Some(val) = config_map.get(&from).cloned() {
+                let to = serde_yaml::Value::String(key.1.to_string());
+                renames.push((from, to.clone()));
+                // Preserve value under new key
+                config_map.insert(to.clone(), val);
+            }
+        }
+        // Remove old flat keys
+        for (from, _) in renames {
+            config_map.remove(&from);
+        }
     }
 
     fn handle_config_validate(
@@ -950,11 +1082,11 @@ impl ConfigHandler {
     ) -> Result<(), String> {
         use crate::config::validation::{ConfigValidator, ValidationSeverity};
 
-        // Load global config from tasks directory
+        // Load global config from tasks directory (normalization-aware)
         let global_config_path = crate::utils::paths::global_config_path(&resolver.path);
         let global_config = if global_config_path.exists() {
             match std::fs::read_to_string(&global_config_path) {
-                Ok(content) => serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
+                Ok(content) => crate::config::normalization::parse_global_from_yaml_str(&content)
                     .map_err(|e| format!("Failed to parse global config: {}", e))?,
                 Err(e) => {
                     return Err(format!("Failed to read global config file: {}", e));
@@ -995,7 +1127,8 @@ impl ConfigHandler {
             if project_config_path.exists() {
                 match std::fs::read_to_string(&project_config_path) {
                     Ok(config_content) => {
-                        match serde_yaml::from_str::<crate::config::types::ProjectConfig>(
+                        match crate::config::normalization::parse_project_from_yaml_str(
+                            &project_name,
                             &config_content,
                         ) {
                             Ok(project_config) => {

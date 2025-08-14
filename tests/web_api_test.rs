@@ -208,7 +208,7 @@ fn rest_create_and_update_supports_me_alias() {
     // Configure identity for deterministic @me
     std::fs::write(
         lotar::utils::paths::global_config_path(&tasks_dir),
-        "default_project: REST\nissue_states: [Todo, InProgress, Done]\nissue_types: [Feature, Bug, Chore]\nissue_priorities: [Low, Medium, High]\ndefault_reporter: erin\n",
+        "default.project: REST\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\ndefault.reporter: erin\n",
     )
     .unwrap();
 
@@ -631,8 +631,8 @@ fn sse_includes_triggered_by_identity() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    // Provide default_reporter in config so identity is deterministic
-    std::fs::write(tasks_dir.join("config.yml"), b"default_reporter: alice\n").unwrap();
+    // Provide default.reporter in config so identity is deterministic (canonical key)
+    std::fs::write(tasks_dir.join("config.yml"), b"default.reporter: alice\n").unwrap();
     unsafe {
         std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
     }

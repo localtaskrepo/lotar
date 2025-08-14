@@ -14,9 +14,8 @@ pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(),
         })?;
     }
 
-    let config_yaml = serde_yaml::to_string(config).map_err(|e| {
-        ConfigError::ParseError(format!("Failed to serialize global config: {}", e))
-    })?;
+    // Serialize in canonical nested format
+    let config_yaml = crate::config::normalization::to_canonical_global_yaml(config);
 
     fs::write(&config_path, config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;
@@ -41,9 +40,8 @@ pub fn save_project_config(
     fs::create_dir_all(&project_dir)
         .map_err(|e| ConfigError::IoError(format!("Failed to create project directory: {}", e)))?;
 
-    let config_yaml = serde_yaml::to_string(config).map_err(|e| {
-        ConfigError::ParseError(format!("Failed to serialize project config: {}", e))
-    })?;
+    // Serialize in canonical nested format
+    let config_yaml = crate::config::normalization::to_canonical_project_yaml(config);
 
     fs::write(&config_path, config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
@@ -94,7 +92,8 @@ fn apply_field_to_global_config(
                 .map_err(|_| ConfigError::ParseError(format!("Invalid port number: {}", value)))?;
         }
         "default_prefix" | "default_project" => {
-            config.default_prefix = value.to_string();
+            // Normalize to storage prefix, accepting either full project name or prefix
+            config.default_prefix = crate::utils::generate_project_prefix(value);
         }
         "default_assignee" => {
             config.default_assignee = if value.is_empty() {

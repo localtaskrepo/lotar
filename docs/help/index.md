@@ -5,6 +5,7 @@ Centralized documentation topics for quick navigation.
 - Getting Started: [Main Overview](./main.md)
 - Precedence & Resolution: [Configuration, Identity, and Paths](./precedence.md)
 - Configuration: [Config Command](./config.md)
+	- Tip: Use `lotar config normalize` to rewrite configs into canonical nested YAML
 - Tasks: [Add](./add.md) · [List](./list.md) · [Status](./status.md) · [Priority](./priority.md) · [Assignee](./assignee.md) · [Due Date](./due-date.md)
 - MCP: [MCP Server](./mcp.md)
 - Serve/API: [Serve](./serve.md)

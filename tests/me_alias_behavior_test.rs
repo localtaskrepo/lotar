@@ -8,10 +8,10 @@ use lotar::utils::paths;
 
 fn write_minimal_config(tasks_dir: &std::path::Path, extra: &str) {
     // Provide minimal, valid lists so CLI validation passes where needed
-    let base = r#"default_project: TEST
-issue_states: [Todo, InProgress, Done]
-issue_types: [Feature, Bug, Chore]
-issue_priorities: [Low, Medium, High]
+    let base = r#"default.project: TEST
+issue.states: [Todo, InProgress, Done]
+issue.types: [Feature, Bug, Chore]
+issue.priorities: [Low, Medium, High]
 "#;
     let mut content = String::from(base);
     if !extra.is_empty() {
@@ -32,7 +32,7 @@ fn add_with_assignee_me_resolves_identity() {
     std::fs::create_dir_all(&tasks_dir).unwrap();
 
     // Configure a deterministic reporter identity
-    write_minimal_config(&tasks_dir, "default_reporter: alice@example.com\n");
+    write_minimal_config(&tasks_dir, "default.reporter: alice@example.com\n");
 
     unsafe {
         std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());

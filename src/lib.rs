@@ -17,6 +17,7 @@ pub mod services;
 pub mod storage; // Updated to use storage module
 pub mod types;
 pub mod utils;
+pub mod utils_git;
 pub mod web_server; // Add utilities module
 pub mod workspace; // Add workspace resolution module
 

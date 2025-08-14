@@ -298,17 +298,61 @@ fn main() {
         }
         Commands::Whoami { explain } => {
             renderer.log_info("BEGIN WHOAMI");
-            // Try to resolve using the same algorithm as services
-            let me = lotar::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-
-            if let Some(user) = me {
+            // Try to resolve using detector framework (with explain)
+            let det =
+                lotar::utils::identity::resolve_current_user_explain(Some(resolver.path.as_path()));
+            if let Some(info) = det {
                 if matches!(renderer.format, output::OutputFormat::Json) {
-                    renderer.emit_raw_stdout(&serde_json::json!({"user": user}).to_string());
+                    if explain {
+                        // Augment with toggle states
+                        let cfg = lotar::config::resolution::load_and_merge_configs(Some(
+                            resolver.path.as_path(),
+                        ))
+                        .ok();
+                        renderer.emit_raw_stdout(
+                            &serde_json::json!({
+                                "user": info.user,
+                                "source": info.source.to_string(),
+                                "confidence": info.confidence,
+                                "details": info.details,
+                                "auto_identity": cfg.as_ref().map(|c| c.auto_identity),
+                                "auto_identity_git": cfg.as_ref().map(|c| c.auto_identity_git)
+                            })
+                            .to_string(),
+                        );
+                    } else {
+                        renderer.emit_raw_stdout(
+                            &serde_json::json!({
+                                "user": info.user
+                            })
+                            .to_string(),
+                        );
+                    }
                 } else {
-                    renderer.emit_success(&user.to_string());
-                }
-                if explain {
-                    renderer.emit_info("Resolution order: config.default_reporter → git user.name/email → system USER/USERNAME");
+                    renderer.emit_success(&info.user);
+                    if explain {
+                        let mut msg =
+                            format!("source: {}, confidence: {}", info.source, info.confidence);
+                        if let Some(d) = info.details {
+                            msg.push_str(&format!(", details: {}", d));
+                        }
+                        renderer.emit_info(&msg);
+                        let cfg = lotar::config::resolution::load_and_merge_configs(Some(
+                            resolver.path.as_path(),
+                        ))
+                        .ok();
+                        if let Some(cfg) = cfg {
+                            if !cfg.auto_identity {
+                                renderer.emit_info(
+                                    "Auto identity disabled; using configured default only",
+                                );
+                            } else if !cfg.auto_identity_git {
+                                renderer.emit_info("Git identity auto-detection disabled");
+                            } else {
+                                renderer.emit_info("Resolution order: config.default_reporter → git user.name/email → system USER/USERNAME");
+                            }
+                        }
+                    }
                 }
                 renderer.log_info("END WHOAMI status=ok");
                 Ok(())

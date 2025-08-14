@@ -129,6 +129,12 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
+    if override_config.auto_identity != defaults.auto_identity {
+        base.auto_identity = override_config.auto_identity;
+    }
+    if override_config.auto_identity_git != defaults.auto_identity_git {
+        base.auto_identity_git = override_config.auto_identity_git;
+    }
 }
 
 /// Overlay fields from a GlobalConfig onto a ResolvedConfig using the same
@@ -183,6 +189,12 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
+    }
+    if override_config.auto_identity != defaults.auto_identity {
+        resolved.auto_identity = override_config.auto_identity;
+    }
+    if override_config.auto_identity_git != defaults.auto_identity_git {
+        resolved.auto_identity_git = override_config.auto_identity_git;
     }
 }
 
@@ -246,6 +258,7 @@ pub fn get_project_config(
     if let Some(scan_words) = project_config.scan_signal_words {
         resolved.scan_signal_words = scan_words;
     }
+    // Smart toggles are currently only global/home/env scoped; project-level toggles could be added later
 
     // 3) Overlay home config (higher priority than project)
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
@@ -290,6 +303,8 @@ impl ResolvedConfig {
             default_status: global.default_status,
             custom_fields: global.custom_fields,
             scan_signal_words: global.scan_signal_words,
+            auto_identity: global.auto_identity,
+            auto_identity_git: global.auto_identity_git,
         }
     }
 }

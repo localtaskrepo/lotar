@@ -43,6 +43,8 @@ fn make_cfg(
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        auto_identity: true,
+        auto_identity_git: true,
     }
 }
 

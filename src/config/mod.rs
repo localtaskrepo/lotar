@@ -15,6 +15,7 @@
 //! - `validation`: Configuration validation system
 
 pub mod manager;
+pub mod normalization;
 pub mod operations;
 pub mod persistence;
 pub mod resolution;

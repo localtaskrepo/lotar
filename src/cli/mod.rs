@@ -5,9 +5,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 // CLI argument modules consolidated under cli/args
 pub mod args;
 pub use args::{
-    AddArgs, ConfigAction, ConfigInitArgs, ConfigSetArgs, ConfigShowArgs, ConfigValidateArgs,
-    IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, TaskAction, TaskAddArgs,
-    TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    AddArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
+    ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, TaskAction,
+    TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
 };
 
 #[derive(Parser)]

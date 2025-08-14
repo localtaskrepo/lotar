@@ -16,7 +16,7 @@ fn test_relative_path_finds_parent_directory() {
 
     // Create config in parent .tasks directory
     let parent_config = parent_tasks_dir.join("config.yml");
-    fs::write(&parent_config, "default_project: parent-project\n").unwrap();
+    fs::write(&parent_config, "default.project: parent-project\n").unwrap();
 
     // Create a subdirectory
     let sub_dir = temp_dir.path().join("subproject");

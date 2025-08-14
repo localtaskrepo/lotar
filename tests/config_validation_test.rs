@@ -38,6 +38,9 @@ fn test_global_config_validation_valid() {
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        scan_ticket_patterns: None,
+        auto_identity: true,
+        auto_identity_git: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -78,6 +81,9 @@ fn test_global_config_validation_privileged_port_warning() {
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        scan_ticket_patterns: None,
+        auto_identity: true,
+        auto_identity_git: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -135,6 +141,9 @@ fn test_global_config_validation_empty_lists_error() {
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        scan_ticket_patterns: None,
+        auto_identity: true,
+        auto_identity_git: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -194,6 +203,9 @@ fn test_global_config_validation_invalid_defaults() {
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        scan_ticket_patterns: None,
+        auto_identity: true,
+        auto_identity_git: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -238,6 +250,7 @@ fn test_project_config_validation_valid() {
         auto_set_reporter: None,
         auto_assign_on_status: None,
         scan_signal_words: None,
+        scan_ticket_patterns: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -265,6 +278,7 @@ fn test_project_config_validation_empty_project_name() {
         auto_set_reporter: None,
         auto_assign_on_status: None,
         scan_signal_words: None,
+        scan_ticket_patterns: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -299,6 +313,7 @@ fn test_project_config_validation_long_project_name() {
         auto_set_reporter: None,
         auto_assign_on_status: None,
         scan_signal_words: None,
+        scan_ticket_patterns: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -336,6 +351,7 @@ fn test_project_config_validation_invalid_defaults() {
         auto_set_reporter: None,
         auto_assign_on_status: None,
         scan_signal_words: None,
+        scan_ticket_patterns: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -374,6 +390,7 @@ fn test_project_config_validation_invalid_email_format() {
         auto_set_reporter: None,
         auto_assign_on_status: None,
         scan_signal_words: None,
+        scan_ticket_patterns: None,
     };
 
     let result = validator.validate_project_config(&config);

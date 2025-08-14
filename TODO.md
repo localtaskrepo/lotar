@@ -11,7 +11,6 @@ Features:
 - VSCode Plugin
 - IntelliJ Plugin
 - Show source code snippets (e.g. around TODOs) in web ui and cli
-- Config values should be nested like scan (issue_, default_, auto_). Yaml is flexible enough that both . and nested notation can be used.
 
 Bugs:
 - project templates need to be reviewed and updated for the latest features
@@ -19,6 +18,7 @@ Bugs:
 Chores:
 - Replace parcel with vite
 - Check if we're Windows compatible
+- Test release workflow
 
 ---
 
@@ -27,40 +27,42 @@ Chores:
 Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 
 ## Phase 1 — Detection foundation
-- [ ] Detector trait and registry (Signals with value, confidence, provenance)
-- [ ] Git detector: repo root, current branch, remotes, user.name/email (repo-local > global)
-- [ ] Project-config detector: package.json, Cargo.toml, pyproject.toml, go.mod, .csproj (project name/authors)
-- [ ] System detector: OS username/hostname (fallback only)
-- [ ] Merge policy: CLI > env > config (home > project > global) > Git > system (deterministic)
-- [ ] Configured defaults override auto-detected values when enabled; smart detectors only apply if the corresponding feature toggle is on
-- [ ] whoami --explain shows sources and confidence per field
-- [ ] Caching and invalidation: keyed by repo+env; invalidate on config writes, branch change, .git/config mtime
-- [ ] Feature toggles: every smart feature is disable-able and has a default value used when disabled (env/CLI override supported)
- - [ ] Config schema normalization: support dotted and nested YAML, canonicalize to a single internal form
- - [ ] Validation: scan.ticket_patterns must be valid/non-ambiguous; clear errors/warnings
- - [ ] whoami --explain indicates when smart features are disabled and defaults are used
+- [x] Detector trait and registry (Signals with value, confidence, provenance)
+- [x] Git detector: repo root, current branch, remotes, user.name/email (repo-local > global)
+	- Implemented: user.name/user.email + branch + remotes; repo root discovery (details exposed via explain)
+- [x] Project-config detector: package.json, Cargo.toml, .csproj (authors)
+- [x] System detector: OS username/hostname (fallback only)
+- [x] Merge policy (identity): config.default_reporter → project manifest author → git user.name/email → system env
+- [x] Configurable defaults override auto-detected values via feature toggles
+- [x] whoami --explain shows sources and confidence per field (with toggle states and git details)
+- [x] Caching and invalidation: added explain cache keyed by tasks root + env + git mtimes; invalidate function provided
+- [x] Feature toggles: `auto.identity`, `auto.identity_git` added and enforced by detectors
+ - [x] Config schema normalization: accept dotted and nested YAML, canonicalize to a single nested form
+	 - Added `lotar config normalize` to rewrite files into the canonical nested form
+ - [x] Validation: scan.ticket_patterns must be valid/non-ambiguous; clear errors/warnings
+	- [x] whoami --explain indicates when smart features are disabled and defaults are used
 
-## Phase 3 — Ownership and auto-assign
+## Phase 2 — Ownership and auto-assign
 - [ ] CODEOWNERS parser and path matcher (supports wildcards, directory rules)
 - [ ] Auto-assign on first non-initial status: CODEOWNERS owner > Git identity > system (config-gated)
 - [ ] Option to disable CODEOWNERS auto-assign; when off, use configured defaults and ignore detector results
 - [ ] Tests: precedence, multiple owners, no matches
 - [ ] Docs: using CODEOWNERS for ownership and auto-assign
 
-## Phase 4 — Project context and monorepos
+## Phase 3 — Project context and monorepos
 - [ ] Monorepo discovery: cargo workspaces, npm/yarn/pnpm workspaces, go workspaces
 - [ ] Derive project id/name: prefer package/project names; fallback to repo name
 - [ ] Derive labels/tags from paths (e.g., packages/foo => label: foo)
 - [ ] Tests: nested workspaces, worktrees, submodules
 
-## Phase 5 — Branch/PR awareness
+## Phase 4 — Branch/PR awareness
 - [ ] Branch conventions: feat/fix/chore => default task type/status/priority
 - [ ] Config-aware mapping: statuses, types, and priorities are configurable; mapping only applies when branch tokens match configured values or a project-defined alias table
 - [ ] Link tasks from branch/commit messages (e.g., LOTAR-123, #123)
 - [ ] PR detection (opt-in with token): link open PR, import title/assignees/reviewers
 - [ ] Flags/docs to opt-in/out per project
 
-## Phase 2 — Source scan (MVP)
+## Phase 5 — Source scan (MVP)
 - [ ] Rich TODO syntax (link-friendly):
 	- Prefer stable ticket references and explicit metadata without relying on titles
 	- Examples:

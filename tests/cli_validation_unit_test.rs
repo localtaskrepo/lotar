@@ -31,6 +31,8 @@ fn cfg() -> ResolvedConfig {
             "BUG".to_string(),
             "NOTE".to_string(),
         ],
+        auto_identity: true,
+        auto_identity_git: true,
     }
 }
 

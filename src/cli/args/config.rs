@@ -12,6 +12,8 @@ pub enum ConfigAction {
     Templates,
     /// Validate configuration files
     Validate(ConfigValidateArgs),
+    /// Normalize config files to the canonical nested YAML form
+    Normalize(ConfigNormalizeArgs),
 }
 
 #[derive(Args)]
@@ -94,4 +96,19 @@ pub struct ConfigValidateArgs {
     /// Only show errors, not warnings
     #[arg(long)]
     pub errors_only: bool,
+}
+
+#[derive(Args)]
+pub struct ConfigNormalizeArgs {
+    /// Normalize global configuration only
+    #[arg(long)]
+    pub global: bool,
+
+    /// Normalize a specific project configuration (by prefix)
+    #[arg(long)]
+    pub project: Option<String>,
+
+    /// Actually write the normalized file(s) to disk (otherwise dry-run)
+    #[arg(long)]
+    pub write: bool,
 }

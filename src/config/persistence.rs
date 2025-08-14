@@ -71,8 +71,12 @@ pub fn load_project_config_from_dir(
     let content = fs::read_to_string(&path)
         .map_err(|e| ConfigError::IoError(format!("Failed to read project config: {}", e)))?;
 
-    serde_yaml::from_str(&content)
-        .map_err(|e| ConfigError::ParseError(format!("Failed to parse project config: {}", e)))
+    // Prefer normalization-aware parse so dotted/nested canonical YAML is supported everywhere
+    match crate::config::normalization::parse_project_from_yaml_str(project_name, &content) {
+        Ok(cfg) => Ok(cfg),
+        Err(_e) => serde_yaml::from_str::<ProjectConfig>(&content)
+            .map_err(|e| ConfigError::ParseError(format!("Failed to parse project config: {}", e))),
+    }
 }
 
 /// Load configuration from a specific file path
@@ -86,8 +90,12 @@ fn load_config_file(path: &Path) -> Result<GlobalConfig, ConfigError> {
     let content = fs::read_to_string(path)
         .map_err(|e| ConfigError::IoError(format!("Failed to read config: {}", e)))?;
 
-    serde_yaml::from_str(&content)
-        .map_err(|e| ConfigError::ParseError(format!("Failed to parse config: {}", e)))
+    // Prefer normalization-aware parse so dotted/nested canonical YAML is supported everywhere
+    match crate::config::normalization::parse_global_from_yaml_str(&content) {
+        Ok(cfg) => Ok(cfg),
+        Err(_e) => serde_yaml::from_str::<GlobalConfig>(&content)
+            .map_err(|e| ConfigError::ParseError(format!("Failed to parse config: {}", e))),
+    }
 }
 
 /// Apply environment variable overrides to configuration
@@ -145,9 +153,8 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
         // It will be set when the first project is created
     }
 
-    let config_yaml = serde_yaml::to_string(&default_config).map_err(|e| {
-        ConfigError::ParseError(format!("Failed to serialize default config: {}", e))
-    })?;
+    // Write in canonical nested format
+    let config_yaml = crate::config::normalization::to_canonical_global_yaml(&default_config);
 
     fs::write(&config_path, config_yaml).map_err(|e| {
         ConfigError::IoError(format!("Failed to write default global config: {}", e))

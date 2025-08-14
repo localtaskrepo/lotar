@@ -20,7 +20,7 @@ fn reporter_is_auto_set_from_config_on_create() {
     // Write global config with default_reporter
     std::fs::write(
         paths::global_config_path(&tasks_dir),
-        "default_project: TEST\nissue_states: [Todo, InProgress, Done]\nissue_types: [Feature, Bug, Chore]\nissue_priorities: [Low, Medium, High]\ndefault_reporter: alice@example.com\n",
+        "default.project: TEST\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\ndefault.reporter: alice@example.com\n",
     ).unwrap();
 
     let mut storage = Storage::new(tasks_dir.clone());
@@ -59,7 +59,7 @@ fn reporter_respects_disable_flag() {
     // Write config disabling auto reporter
     std::fs::write(
         paths::global_config_path(&tasks_dir),
-        "default_project: TEST\nauto_set_reporter: false\n",
+        "default.project: TEST\nauto.set_reporter: false\n",
     )
     .unwrap();
 
@@ -136,7 +136,7 @@ fn assignee_auto_set_on_status_change_when_empty() {
     // Configure default_reporter=bob to be used for auto-assign
     std::fs::write(
         paths::global_config_path(&tasks_dir),
-        "default_project: TEST\nissue_states: [Todo, InProgress, Done]\nissue_types: [Feature, Bug, Chore]\nissue_priorities: [Low, Medium, High]\ndefault_reporter: bob\n",
+        "default.project: TEST\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\ndefault.reporter: bob\n",
     ).unwrap();
 
     // Sanity check: merged config should see default_reporter=bob
@@ -191,7 +191,7 @@ fn assignee_auto_set_respects_disable_flag() {
     }
     std::fs::write(
         paths::global_config_path(&tasks_dir),
-        "default_project: TEST\nauto_assign_on_status: false\n",
+        "default.project: TEST\nauto.assign_on_status: false\n",
     )
     .unwrap();
 
@@ -229,6 +229,107 @@ fn assignee_auto_set_respects_disable_flag() {
     );
 
     unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+}
+
+// Merged from assignee_preservation_test.rs
+#[test]
+fn first_change_does_not_overwrite_existing_assignee() {
+    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+    }
+
+    // Configure default_reporter so auto-assign would choose it if eligible
+    std::fs::write(
+        paths::global_config_path(&tasks_dir),
+        "default.project: AAA\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\ndefault.reporter: ryan\n",
+    )
+    .unwrap();
+
+    let mut storage = Storage::new(tasks_dir.clone());
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Preset assignee".into(),
+            project: Some("AAA".into()),
+            priority: None,
+            task_type: None,
+            reporter: None,
+            assignee: Some("sam".into()),
+            due_date: None,
+            effort: None,
+            description: None,
+            category: None,
+            tags: vec![],
+            custom_fields: None,
+        },
+    )
+    .unwrap();
+
+    // Change status away from default; assignee should remain "sam"
+    let mut storage = Storage::new(tasks_dir.clone());
+    let updated = TaskService::update(
+        &mut storage,
+        &created.id,
+        TaskUpdate {
+            status: Some(TaskStatus::InProgress),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        updated.assignee.as_deref(),
+        Some("sam"),
+        "existing assignee must be preserved on first change"
+    );
+
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+}
+
+// Merged from env_reporter_override_test.rs
+#[test]
+fn env_default_reporter_is_respected() {
+    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    let _env_rep = lock_var("LOTAR_DEFAULT_REPORTER");
+
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+        std::env::set_var("LOTAR_DEFAULT_REPORTER", "env-reporter@example.com");
+    }
+
+    let mut storage = Storage::new(tasks_dir);
+    let req = TaskCreate {
+        title: "Env reporter".to_string(),
+        project: Some("TEST".to_string()),
+        priority: None,
+        task_type: None,
+        reporter: None,
+        assignee: None,
+        due_date: None,
+        effort: None,
+        description: None,
+        category: None,
+        tags: vec![],
+        custom_fields: None,
+    };
+    let created = TaskService::create(&mut storage, req).expect("create");
+    assert_eq!(
+        created.reporter.as_deref(),
+        Some("env-reporter@example.com")
+    );
+
+    unsafe {
+        std::env::remove_var("LOTAR_DEFAULT_REPORTER");
         std::env::remove_var("LOTAR_TASKS_DIR");
     }
 }

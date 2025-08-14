@@ -106,9 +106,9 @@ tests/integration.rs:56
 
 You can configure which signal words are recognized. Keys:
 
-- Global (tasks scope): `scan_signal_words` in `.tasks/config.yml`
-- Project: `scan_signal_words` in `.tasks/<PROJECT>/config.yml`
-- Home (user scope): `scan_signal_words` in `~/.lotar`
+- Global (tasks scope): `scan.signal_words` in `.tasks/config.yml`
+- Project: `scan.signal_words` in `.tasks/<PROJECT>/config.yml`
+- Home (user scope): `scan.signal_words` in `~/.lotar`
 
 Precedence (highest wins): CLI > env > home > project > global > defaults. In practice for this key, project overrides global; home/env can override both.
 
@@ -116,7 +116,8 @@ Examples:
 
 ```
 # ~/.lotar (home config)
-scan_signal_words:
+scan:
+  signal_words:
   - TODO
   - FIXME
   - DEBT
@@ -125,10 +126,13 @@ scan_signal_words:
 
 ```
 # .tasks/MYPROJ/config.yml (project)
-scan_signal_words:
+scan:
+  signal_words:
   - TODO
   - BUG
   - PERF
+
+You can also add regex-based ticket key detection under `scan.ticket_patterns`.
 ```
 
 See also: [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md).
