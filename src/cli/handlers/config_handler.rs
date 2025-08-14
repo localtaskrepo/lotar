@@ -1054,8 +1054,8 @@ impl ConfigHandler {
             ("issue_states", "issue.states"),
             ("issue_types", "issue.types"),
             ("issue_priorities", "issue.priorities"),
-            ("categories", "taxonomy.categories"),
-            ("tags", "taxonomy.tags"),
+            ("categories", "issue.categories"),
+            ("tags", "issue.tags"),
             ("custom_fields", "custom.fields"),
         ] {
             let from = serde_yaml::Value::String(key.0.to_string());

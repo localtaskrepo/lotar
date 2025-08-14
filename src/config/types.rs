@@ -109,6 +109,10 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_reporter: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_priority: Option<Priority>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_status: Option<TaskStatus>,
@@ -135,6 +139,8 @@ impl ProjectConfig {
             tags: None,
             default_assignee: None,
             default_reporter: None,
+            default_category: None,
+            default_tags: None,
             default_priority: None,
             default_status: None,
             custom_fields: None,
@@ -169,6 +175,10 @@ pub struct GlobalConfig {
     pub default_assignee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_reporter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default_category: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_tags: Vec<String>,
     #[serde(default = "default_true")]
     pub auto_set_reporter: bool,
     #[serde(default = "default_true")]
@@ -203,6 +213,8 @@ pub struct ResolvedConfig {
     pub tags: StringConfigField,
     pub default_assignee: Option<String>,
     pub default_reporter: Option<String>,
+    pub default_category: Option<String>,
+    pub default_tags: Vec<String>,
     pub auto_set_reporter: bool,
     pub auto_assign_on_status: bool,
     pub default_priority: Priority,
@@ -299,6 +311,8 @@ impl Default for GlobalConfig {
             tags: default_tags(),
             default_assignee: None,
             default_reporter: None,
+            default_category: None,
+            default_tags: Vec::new(),
             auto_set_reporter: true,
             auto_assign_on_status: true,
             default_priority: default_priority(),

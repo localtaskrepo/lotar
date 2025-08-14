@@ -43,7 +43,11 @@ Available statuses depend on your project configuration. Common defaults:
 
 Check your project's valid statuses:
 ```bash
-lotar config get issue_states
+# Human-readable
+lotar config show --project=backend
+
+# JSON + jq
+lotar config show --project=backend --format=json | jq -r '.data.issue.states[]'
 ```
 
 ## Task ID Resolution
@@ -143,7 +147,7 @@ transitions:
 ```
 
 ### Auto-Assign on Status Change
-- If `auto_assign_on_status: true` and the task has no assignee, LoTaR auto-assigns the current user.
+- If `auto.assign_on_status: true` and the task has no assignee, LoTaR auto-assigns the current user.
 - The current user is resolved in order: `default_reporter` from config → git user.name/email → system username.
  - If you pass `--assignee=@me` via CLI (where supported) or patch `assignee: "@me"` over REST/MCP, `@me` resolves using the same identity rules.
  - REST note: the `/api/tasks/update` endpoint ignores the `status` field; status transitions are driven via CLI, but the same first-change auto-assign semantics apply in services when status is changed through supported channels.
@@ -213,7 +217,7 @@ NEW_STATUS="done"
 lotar status $TASK_ID $NEW_STATUS --format=json > /tmp/change.json
 
 # Extract and sync to external system
-EXTERNAL_ID=$(lotar config get custom_fields.jira_id --task=$TASK_ID)
+EXTERNAL_ID=$(lotar config show --project=AUTH --format=json | jq -r '.data.custom.fields.jira_id')
 curl -X PUT "https://api.jira.com/issue/$EXTERNAL_ID" \
      -d '{"fields": {"status": "Done"}}'
 ```

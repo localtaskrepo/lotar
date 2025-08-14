@@ -12,7 +12,7 @@
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto_set_reporter is enabled in config, reporter is set automatically when not provided.",
+  "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto.set_reporter is enabled in config, reporter is set automatically when not provided.",
         "parameters": [
           {
             "name": "project",
@@ -151,7 +151,7 @@
     "/api/tasks/update": {
       "post": {
         "summary": "Update a task by id",
-        "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto_assign_on_status) applies when status transitions via supported channels.",
+  "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto.assign_on_status) applies when status transitions via supported channels.",
         "requestBody": {
           "required": true,
           "content": {
@@ -225,7 +225,7 @@
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeConfig" }, "examples": {"show": {"summary":"Resolved config","value": {"data": {"default_project": "TEST", "issue_states": ["TODO","IN_PROGRESS","DONE"], "auto_set_reporter": true, "auto_assign_on_status": true}}}} } }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeConfig" }, "examples": {"show": {"summary":"Resolved config","value": {"data": {"default": {"project": "TEST"}, "issue": {"states": ["TODO","IN_PROGRESS","DONE"]}, "auto": {"set_reporter": true, "assign_on_status": true}}}}} } }
           },
           "500": { "$ref": "#/components/responses/InternalError" }
         }

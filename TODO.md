@@ -12,13 +12,11 @@ Features:
 - IntelliJ Plugin
 - Show source code snippets (e.g. around TODOs) in web ui and cli
 
-Bugs:
-- project templates need to be reviewed and updated for the latest features
-
 Chores:
 - Replace parcel with vite
 - Check if we're Windows compatible
 - Test release workflow
+- There are a lot of _ variables. We should check if they are all needed
 
 ---
 

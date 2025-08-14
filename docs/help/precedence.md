@@ -15,7 +15,7 @@ When resolving configuration values, this order applies (highest wins):
 Notes:
 - The same chain applies across CLI, REST, and MCP.
 - Project config overrides global, but home/env can override both; CLI flags always win.
-- Automation toggles (auto_set_reporter, auto_assign_on_status) default to true when unspecified and follow the same precedence.
+- Automation toggles (auto.set_reporter, auto.assign_on_status) default to true when unspecified and follow the same precedence.
 
 ## Identity resolution and @me
 
@@ -47,8 +47,8 @@ Project context is determined based on:
 
 ## Automation semantics
 
-- auto_set_reporter: When true, reporter is auto-populated on create/update when missing (uses identity resolution above).
-- auto_assign_on_status: When true, the first time a task moves away from the default/first status and has no assignee, assignee is set to the resolved current user. Explicit assignee values are never overwritten.
+- auto.set_reporter: When true, reporter is auto-populated on create/update when missing (uses identity resolution above).
+- auto.assign_on_status: When true, the first time a task moves away from the default/first status and has no assignee, assignee is set to the resolved current user. Explicit assignee values are never overwritten.
 
 Both settings honor the configuration precedence chain.
 

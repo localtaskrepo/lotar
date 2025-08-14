@@ -7,20 +7,15 @@ description: "Minimal workflow with three states and basic issue types"
 config:
   project_name: "{{project_name}}"
   issue_states:
-    values:
-      - Todo
-      - InProgress
-      - Done
+    - Todo
+    - InProgress
+    - Done
   issue_types:
-    values:
-      - Feature
-      - Bug
-      - Chore
+    - Feature
+    - Bug
+    - Chore
   categories:
-    values:
-      - frontend
-      - backend
-      - docs
+    - frontend
+    - backend
+    - docs
   tags:
-    values:
-      - "*"

@@ -119,6 +119,28 @@ fn apply_field_to_global_config(
             })?;
             config.default_status = Some(status);
         }
+        "categories" | "tags" | "custom_fields" => {
+            let values: Vec<String> = value.split(',').map(|s| s.trim().to_string()).collect();
+            let field_config = StringConfigField { values };
+
+            match field {
+                "categories" => config.categories = field_config,
+                "tags" => config.tags = field_config,
+                "custom_fields" => config.custom_fields = field_config,
+                _ => unreachable!(),
+            }
+        }
+        "default_category" => {
+            config.default_category = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        "default_tags" => {
+            let tags: Vec<String> = value.split(',').map(|s| s.trim().to_string()).collect();
+            config.default_tags = tags;
+        }
         _ => {
             return Err(ConfigError::ParseError(format!(
                 "Unknown global config field: {}",
@@ -163,6 +185,17 @@ fn apply_field_to_project_config(
                 ))
             })?;
             config.default_status = Some(status);
+        }
+        "default_category" => {
+            config.default_category = if value.is_empty() {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        "default_tags" => {
+            let values: Vec<String> = value.split(',').map(|s| s.trim().to_string()).collect();
+            config.default_tags = Some(values);
         }
         "issue_states" => {
             let states: Result<Vec<TaskStatus>, _> =
@@ -214,12 +247,19 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "default_prefix",
         "default_project",
         "default_assignee",
+        "default_category",
+        "default_tags",
         "default_priority",
         "default_status",
+        "categories",
+        "tags",
+        "custom_fields",
     ];
     let valid_project_fields = vec![
         "project_name",
         "default_assignee",
+        "default_category",
+        "default_tags",
         "default_priority",
         "default_status",
         "issue_states",
@@ -300,6 +340,25 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                     "{} cannot be longer than 100 characters",
                     field
                 )));
+            }
+        }
+        "default_category" => {
+            if value.len() > 100 {
+                return Err(ConfigError::ParseError(
+                    "default_category cannot be longer than 100 characters".to_string(),
+                ));
+            }
+        }
+        "default_tags" | "categories" | "tags" | "custom_fields" => {
+            // Basic validation: allow comma-separated values, each up to 50 chars
+            for part in value.split(',') {
+                let p = part.trim();
+                if p.len() > 50 {
+                    return Err(ConfigError::ParseError(format!(
+                        "Value '{}' is too long (max 50 chars)",
+                        p
+                    )));
+                }
             }
         }
         _ => {} // Other fields don't need specific validation

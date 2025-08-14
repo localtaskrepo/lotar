@@ -71,7 +71,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for new tasks
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity when not provided
 
-Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto_set_reporter: true` in your config. The environment variable can provide a default reporter value.
+Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto.set_reporter: true` (default). The environment variable can provide a default reporter value.
 
 Notes:
 - `@me` resolution order: config.default_reporter (merged with precedence) → git user.name/email → $USER/$USERNAME.
@@ -109,8 +109,8 @@ All task properties are validated against project configuration:
 
 Configure validation rules with:
 ```bash
-lotar config set issue_types feature,bug,chore
-lotar config set issue_priorities low,medium,high,critical
+lotar config set issue.types feature,bug,chore
+lotar config set issue.priorities low,medium,high,critical
 ```
 
 ## Project Resolution

@@ -6,17 +6,19 @@ All configuration keys by scope with types and notes. Canonical YAML uses nested
 CLI > env > home > project > global > defaults. See [Resolution & Precedence](./precedence.md).
 
 ## Canonical keys (nested)
-- server.port: number (default 8080)
-- default.project: string (default project prefix)
+- server.port: number (default 8080; ignored in project-level config)
+- default.project: string (default project prefix; ignored in project-level config)
 - default.assignee: string
 - default.reporter: string
 - default.priority: enum Priority
 - default.status: enum TaskStatus
+- default.category: string
+- default.tags: string[]
 - issue.states: string[] (e.g., [Todo, InProgress, Done])
 - issue.types: string[] (feature, bug, epic, spike, chore)
 - issue.priorities: string[] (Low, Medium, High, Critical)
-- taxonomy.categories: string[]
-- taxonomy.tags: string[]
+- issue.categories: string[]
+- issue.tags: string[]
 - custom.fields: string[]
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
@@ -51,6 +53,9 @@ auto:
 	identity: true
 	identity_git: true
 	assign_on_status: true
+default:
+	category: Engineering
+	tags: [oncall, sev]
 ```
 
 ## Validation

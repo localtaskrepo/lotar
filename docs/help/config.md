@@ -86,11 +86,19 @@ lotar config init --project=frontend --copy-from=backend --template=agile
 # Force overwrite existing configuration
 lotar config init --project=backend --template=simple --force
 
-# Set configuration with validation preview
-lotar config set default_priority HIGH --project=backend --dry-run
+# Set configuration with validation preview (use dotted canonical keys)
+lotar config set default.priority HIGH --project=backend --dry-run
 
-# Set global configuration
+# Set global configuration (server port)
 lotar config set server.port 9000 --global
+
+# Set a project's default category and tags
+lotar config set default.category Engineering --project=backend
+lotar config set default.tags '["oncall","sev"]' --project=backend
+
+# Set global categories and tags for all projects (arrays)
+lotar config set issue.categories '["Engineering","QA","Ops"]' --global
+lotar config set issue.tags '["frontend","backend","urgent"]' --global
 
 # Environment variable integration
 export LOTAR_TASKS_DIR=/custom/tasks
@@ -135,10 +143,11 @@ Notes:
  - Identity resolution uses the merged configuration from this precedence chain.
 
 ### Canonical YAML shape
-LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to a nested structure with these groups: server, default, issue, taxonomy, custom, scan, auto. Use `lotar config normalize` to rewrite files into this canonical form.
+LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to a nested structure with these groups: server, default, issue, custom, scan, auto. Use `lotar config normalize` to rewrite files into this canonical form.
 
 Notes:
-- Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`).
+- Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`).
+- Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility, but canonicalization writes them under `issue.categories` and `issue.tags`.
 
 ### Automatic Prefix Generation
 Projects automatically get prefixes generated from their names:
@@ -165,52 +174,50 @@ Copy settings between projects while preserving unique identifiers:
 ```bash
 lotar config init --project=new-service --copy-from=existing-service
 ```
-lotar config init --project=backend --template=agile
 
-# Set default assignee for project
-lotar config set default_assignee john.doe@company.com --project=backend
-
-# Set global server port
-lotar config set server_port 8080
-
-# List available templates
-lotar config templates
 ```
 
 ## Configuration Keys
 
 ### Project-Level
 - `project.id` - Project identifier
-- `issue_states` - Available task statuses
-- `issue_types` - Available task types  
-- `issue_priorities` - Available priorities
-- `categories` - Available categories
-- `tags` - Available tags
-- `default_assignee` - Default task assignee
-- `default_reporter` - Default task reporter (also used for auto-assign resolution)
-- `default_priority` - Default task priority
-- `default_status` - Default task status
-- `custom_fields` - Custom field definitions
-- `auto_set_reporter` - If true, set reporter automatically on create/update when missing
-- `auto_assign_on_status` - If true, auto-assign assignee on first meaningful status change
-    - First-change is defined as: when a task moves away from the default_status (or the first state if default unset) and the task currently has no assignee.
+- `issue.states` - Available task statuses
+- `issue.types` - Available task types  
+- `issue.priorities` - Available priorities
+- `issue.categories` - Available categories
+- `issue.tags` - Available tags
+- `default.assignee` - Default task assignee
+- `default.reporter` - Default task reporter (also used for auto-assign resolution)
+- `default.category` - Default category for new tasks (if none provided)
+- `default.tags` - Default tags for new tasks (applied when no tags provided)
+- `default.priority` - Default task priority
+- `default.status` - Default task status
+- `custom.fields` - Custom field definitions
+    
+Automation (defaults inherited from global):
+- `auto.set_reporter` - If true, set reporter automatically on create/update when missing
+- `auto.assign_on_status` - If true, auto-assign assignee on first meaningful status change
+    - First-change is defined as: when a task moves away from the default.status (or the first state if default unset) and the task currently has no assignee.
     - The assignee chosen is the resolved current user (see Identity Resolution below).
 
 ### Global
 - `server.port` - Web server port
 - `default.project` - Default project prefix
-- `issue_states` - Default task statuses for all projects
-- `issue_types` - Default task types for all projects
-- `issue_priorities` - Default priorities for all projects
-- `categories` - Default categories for all projects
-- `tags` - Default tags for all projects
-- `default_assignee` - Default task assignee for all projects
-- `default_reporter` - Default task reporter for all projects (also used for auto-assign resolution)
-- `default_priority` - Default task priority for all projects
-- `default_status` - Default task status for all projects
-- `custom_fields` - Default custom fields for all projects
-- `auto_set_reporter` - If true, set reporter automatically on create/update when missing
-- `auto_assign_on_status` - If true, auto-assign assignee on first meaningful status change
+- `issue.states` - Default task statuses for all projects
+- `issue.types` - Default task types for all projects
+- `issue.priorities` - Default priorities for all projects
+- `issue.categories` - Default categories for all projects
+- `issue.tags` - Default tags for all projects
+- `default.assignee` - Default task assignee for all projects
+- `default.reporter` - Default task reporter for all projects (also used for auto-assign resolution)
+- `default.category` - Global default category for new tasks
+- `default.tags` - Global default tags for new tasks
+- `default.priority` - Default task priority for all projects
+- `default.status` - Default task status for all projects
+- `custom.fields` - Default custom fields for all projects
+Automation:
+- `auto.set_reporter` - Enable auto reporter when missing (default: true)
+- `auto.assign_on_status` - Enable first-change auto-assign (default: true)
 - `auto.identity` - Enable smart identity detection beyond configured default (default: true)
 - `auto.identity_git` - Enable git-based identity detection (default: true)
 
@@ -236,7 +243,7 @@ lotar config templates
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity used for auto reporter/assign
 
 Notes:
-- Auto reporter and auto-assign behavior is controlled by configuration: set `default_reporter`, `auto_set_reporter`, and `auto_assign_on_status` in config files. The above environment variables can provide defaults, but do not toggle automation flags.
+- Auto reporter and auto-assign behavior are controlled by configuration: set `default_reporter` and (optionally) override `auto.set_reporter` or `auto.assign_on_status` in YAML. The above environment variables can provide defaults, but do not toggle automation flags.
 - Diagnostic/testing variables (not for general use): `LOTAR_TEST_SILENT=1` silences warnings in tests; `LOTAR_VERBOSE=1` enables extra setup logs.
 
 ## Identity Resolution and @me

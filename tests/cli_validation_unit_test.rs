@@ -19,6 +19,8 @@ fn cfg() -> ResolvedConfig {
         tags: StringConfigField::new_wildcard(),
         default_assignee: None,
         default_reporter: None,
+        default_category: None,
+        default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
         default_priority: Priority::Medium,

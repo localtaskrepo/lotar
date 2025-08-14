@@ -136,6 +136,7 @@ impl CommandHandler for AddHandler {
                     .map_err(|e| format!("Due date validation failed: {}", e))?,
             )
         } else {
+            // No default due date
             None
         };
 
@@ -150,7 +151,7 @@ impl CommandHandler for AddHandler {
             None
         };
 
-        // Validate category if provided
+        // Validate category if provided; otherwise use default.category if configured
         let validated_category = if let Some(ref category) = args.category {
             Some(
                 validator
@@ -158,12 +159,24 @@ impl CommandHandler for AddHandler {
                     .map_err(|e| format!("Category validation failed: {}", e))?,
             )
         } else {
-            None
+            match &config.default_category {
+                Some(default_cat) => Some(
+                    validator
+                        .validate_category(default_cat)
+                        .map_err(|e| format!("Category validation failed: {}", e))?,
+                ),
+                None => None,
+            }
         };
 
         // Validate tags
         let mut validated_tags = Vec::new();
-        for tag in &args.tags {
+        let base_tags = if args.tags.is_empty() {
+            config.default_tags.clone()
+        } else {
+            vec![]
+        };
+        for tag in args.tags.iter().chain(base_tags.iter()) {
             let validated_tag = validator
                 .validate_tag(tag)
                 .map_err(|e| format!("Tag validation failed for '{}': {}", tag, e))?;

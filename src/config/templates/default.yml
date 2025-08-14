@@ -5,7 +5,7 @@ name: "Default"
 description: "Basic project configuration using global defaults"
 config:
   project_name: "{{project_name}}"
-  custom_fields:
-    - epic
-    - sprint
-    - story_points
+  tags:
+    - "*"
+  categories:
+    - "*"
