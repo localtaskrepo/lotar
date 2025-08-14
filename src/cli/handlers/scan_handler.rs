@@ -20,29 +20,80 @@ impl CommandHandler for ScanHandler {
         renderer: &OutputRenderer,
     ) -> Self::Result {
         renderer.log_info("scan: begin");
-        let path = if let Some(scan_path) = args.path {
-            PathBuf::from(scan_path)
+        let default_root = project::get_project_path().unwrap_or_else(|| PathBuf::from("."));
+        let roots: Vec<PathBuf> = if args.paths.is_empty() {
+            vec![default_root]
         } else {
-            project::get_project_path().unwrap_or_else(|| {
-                renderer.emit_warning("No path specified. Using current directory.");
-                PathBuf::from(".")
-            })
+            args.paths.iter().map(PathBuf::from).collect()
         };
 
-        if !path.exists() {
-            return Err(format!("Path '{}' does not exist", path.display()));
+        // Validate all roots exist
+        for root in &roots {
+            if !root.exists() {
+                return Err(format!("Path '{}' does not exist", root.display()));
+            }
         }
 
         if !matches!(renderer.format, crate::output::OutputFormat::Json) {
-            renderer.emit_info(&format!("Scanning {} for TODO comments...", path.display()));
+            if roots.len() == 1 {
+                renderer.emit_info(&format!(
+                    "Scanning {} for TODO comments...",
+                    roots[0].display()
+                ));
+            } else {
+                let joined = roots
+                    .iter()
+                    .map(|r| r.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                renderer.emit_info(&format!("Scanning multiple paths: {}", joined));
+            }
         }
 
-        renderer.log_debug(&format!("scan: scanning path={}", path.display()));
-        let mut scanner = scanner::Scanner::new(path);
-        let results = scanner.scan();
+        // Load config (global or project-specific) to obtain scan signal words
+        let cfg_words: Vec<String> = {
+            let mgr = crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
+                _resolver.path.as_path(),
+            )
+            .ok();
+            if let Some(mgr) = mgr {
+                if let Some(project_name) = _project {
+                    if let Ok(resolved) = mgr.get_project_config(project_name) {
+                        resolved.scan_signal_words
+                    } else {
+                        mgr.get_resolved_config().scan_signal_words.clone()
+                    }
+                } else {
+                    mgr.get_resolved_config().scan_signal_words.clone()
+                }
+            } else {
+                // Fallback: use scanner defaults by returning empty to skip override
+                Vec::new()
+            }
+        };
+
+        let mut all_results = Vec::new();
+        for root in roots {
+            renderer.log_debug(&format!("scan: scanning path={}", root.display()));
+            let mut scanner = scanner::Scanner::new(root)
+                .with_include_ext(&args.include)
+                .with_exclude_ext(&args.exclude);
+            if !cfg_words.is_empty() {
+                scanner = scanner.with_signal_words(&cfg_words);
+            }
+            let mut results = scanner.scan();
+            all_results.append(&mut results);
+        }
+
+        // Ensure deterministic ordering across roots
+        all_results.sort_by(|a, b| {
+            a.file_path
+                .cmp(&b.file_path)
+                .then(a.line_number.cmp(&b.line_number))
+        });
 
         if matches!(renderer.format, crate::output::OutputFormat::Json) {
-            let items: Vec<serde_json::Value> = results
+            let items: Vec<serde_json::Value> = all_results
                 .iter()
                 .map(|entry| {
                     serde_json::json!({
@@ -54,11 +105,11 @@ impl CommandHandler for ScanHandler {
                 })
                 .collect();
             renderer.emit_raw_stdout(&serde_json::to_string(&items).unwrap());
-        } else if results.is_empty() {
+        } else if all_results.is_empty() {
             renderer.emit_success("No TODO comments found.");
         } else {
-            renderer.emit_info(&format!("Found {} TODO comment(s):", results.len()));
-            for entry in results {
+            renderer.emit_info(&format!("Found {} TODO comment(s):", all_results.len()));
+            for entry in all_results {
                 if args.detailed {
                     renderer.emit_raw_stdout(&format!("  📄 {}", entry.file_path.display()));
                     renderer.emit_raw_stdout(&format!(

@@ -32,7 +32,7 @@ lotar add "Environment task"  # Uses environment-configured directory
 **Available on ALL commands:**
 - `--format <FORMAT>` - Output format: text, table, json, markdown (default: text)
 - `--verbose` - Enable verbose output
-- `--project <PROJECT>` - Specify project context (overrides auto-detection)
+- `--project <PROJECT>`, `-p <PROJECT>` - Specify project context (overrides auto-detection)
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides all auto-detection)
 
 ## Environment Variables

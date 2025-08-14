@@ -15,19 +15,19 @@ lotar list [OPTIONS]
 lotar list
 
 # Specific project
-lotar list --project=auth
+lotar list -p auth
 
 # Filter by status
-lotar list --status=todo --status=in_progress
+lotar list -s todo -s in_progress
 
 # Table output
-lotar list --format=table
+lotar list -f table
 
 # JSON for scripting
-lotar list --format=json
+lotar list -f json
 
 # Custom tasks directory
-lotar list --tasks-dir=/custom/path --project=auth
+lotar list --tasks-dir=/custom/path -p auth
 
 # Environment variable usage
 export LOTAR_TASKS_DIR=/project/tasks
@@ -37,38 +37,38 @@ lotar list --project=auth  # Uses environment directory
 ## Filtering Options
 
 ### Status Filtering
-- `--status <STATUS>` - Filter by task status (can be used multiple times)
+- `--status, -s <STATUS>` - Filter by task status (can be used multiple times)
 - Valid statuses depend on project configuration
 
 ### Priority Filtering  
-- `--priority <PRIORITY>` - Filter by priority level
-- `--high-priority` - Show only HIGH and CRITICAL tasks
-- `--low-priority` - Show only LOW and MEDIUM tasks
+- `--priority, -P <PRIORITY>` - Filter by priority level
+- `--high, -H` - Show only HIGH priority tasks
+- `--critical, -C` - Show only CRITICAL priority tasks
 
 ### Type Filtering
-- `--type <TYPE>` - Filter by task type
+- `--type, -t <TYPE>` - Filter by task type
 - `--bugs` - Show only bug tasks
 - `--features` - Show only feature tasks
 
 ### Assignment & Due Dates
-- `--assignee <ASSIGNEE>` - Tasks assigned to specific person (accepts @me)
+- `--assignee, -a <ASSIGNEE>` - Tasks assigned to specific person (accepts @me)
 - `--unassigned` - Tasks with no assignee
- - Tip: Use `--assignee=@me` or `--mine` to filter to your tasks. Your identity resolves from config default_reporter → git user → system username.
+ - Tip: Use `--assignee=@me` or `--mine, -m` to filter to your tasks. Your identity resolves from config default_reporter → git user → system username.
 - `--due-soon` - Tasks due within 7 days
 - `--overdue` - Tasks past their due date
 
 ### Project & Organization
-- `--project <PROJECT>` - Specific project (overrides auto-detection)
-- `--category <CATEGORY>` - Tasks in specific category
-- `--tag <TAG>` - Tasks with specific tag (can be used multiple times)
+- `--project, -p <PROJECT>` - Specific project (overrides auto-detection)
+- `--category, -c <CATEGORY>` - Tasks in specific category
+- `--tag, -i <TAG>` - Tasks with specific tag (can be used multiple times)
 
 ### Text Search
 - `--search <QUERY>` - Search in title and description
 - `--title-only` - Search only in task titles
 
 ### Global Options
-- `--format <FORMAT>` - Output format: text, table, json, markdown
-- `--verbose` - Enable verbose output
+- `--format, -f <FORMAT>` - Output format: text, table, json, markdown
+- `--verbose, -v` - Enable verbose output
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
 
 ### Environment Variables
@@ -122,8 +122,9 @@ Documentation-friendly tables:
 ## Sorting & Grouping
 
 ### Sorting Options
-- `--sort-by <FIELD>` - Sort by: priority, due_date, created, modified, status
-- `--reverse` - Reverse sort order
+- `--sort-by, -S <FIELD>` - Sort by: priority, due_date, created, modified, status
+- `--reverse, -R` - Reverse sort order
+- `--limit, -L <N>` - Limit results (default: 20)
 
 ### Grouping
 - `--group-by <FIELD>` - Group by: status, priority, assignee, type
@@ -134,13 +135,13 @@ Documentation-friendly tables:
 ### Multiple Criteria
 ```bash
 # High priority bugs assigned to john
-lotar list --type=bug --priority=high --assignee=john.doe
+lotar list -t bug -P high -a john.doe
 
 # Tasks due this week in auth project  
-lotar list --project=auth --due-soon
+lotar list -p auth --due-soon
 
 # All open tasks (not done)
-lotar list --status=todo --status=in_progress --status=blocked
+lotar list -s todo -s in_progress -s blocked
 ```
 
 ### Complex Queries

@@ -24,6 +24,13 @@ fn cfg() -> ResolvedConfig {
         default_priority: Priority::Medium,
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
+        scan_signal_words: vec![
+            "TODO".to_string(),
+            "FIXME".to_string(),
+            "HACK".to_string(),
+            "BUG".to_string(),
+            "NOTE".to_string(),
+        ],
     }
 }
 

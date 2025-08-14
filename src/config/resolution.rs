@@ -126,6 +126,9 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.custom_fields.values != defaults.custom_fields.values {
         base.custom_fields = override_config.custom_fields;
     }
+    if override_config.scan_signal_words != defaults.scan_signal_words {
+        base.scan_signal_words = override_config.scan_signal_words;
+    }
 }
 
 /// Overlay fields from a GlobalConfig onto a ResolvedConfig using the same
@@ -177,6 +180,9 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.custom_fields.values != defaults.custom_fields.values {
         resolved.custom_fields = override_config.custom_fields;
+    }
+    if override_config.scan_signal_words != defaults.scan_signal_words {
+        resolved.scan_signal_words = override_config.scan_signal_words;
     }
 }
 
@@ -237,6 +243,9 @@ pub fn get_project_config(
     if let Some(custom_fields) = project_config.custom_fields {
         resolved.custom_fields = custom_fields;
     }
+    if let Some(scan_words) = project_config.scan_signal_words {
+        resolved.scan_signal_words = scan_words;
+    }
 
     // 3) Overlay home config (higher priority than project)
     if let Ok(home_config) = crate::config::persistence::load_home_config() {
@@ -280,6 +289,7 @@ impl ResolvedConfig {
             default_priority: global.default_priority,
             default_status: global.default_status,
             custom_fields: global.custom_fields,
+            scan_signal_words: global.scan_signal_words,
         }
     }
 }

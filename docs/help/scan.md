@@ -1,11 +1,11 @@
 # lotar scan
 
-Scan source code files for TODO, FIXME, and other comment-based tasks.
+Scan source code files for comment lines containing TODO. This is an early stub intended to evolve into the full scanner.
 
 ## Usage
 
 ```bash
-lotar scan [PATH] [OPTIONS]
+lotar scan [PATH ...] [OPTIONS]
 ```
 
 ## Examples
@@ -14,17 +14,17 @@ lotar scan [PATH] [OPTIONS]
 # Scan current directory
 lotar scan
 
-# Scan specific directory
-lotar scan src/
+# Scan a specific directory (recursively)
+lotar scan src
 
 # Detailed output with more information
 lotar scan --detailed
 
 # Include specific file extensions
-lotar scan --include=rs,js,py
+lotar scan src app --include rs --include js --include py
 
 # Exclude certain file extensions
-lotar scan --exclude=log,tmp
+lotar scan src app --exclude log --exclude tmp
 
 # Custom tasks directory
 lotar scan --tasks-dir=/custom/path src/
@@ -36,9 +36,9 @@ lotar scan src/  # Uses environment-configured directory
 
 ## Options
 
-- `<PATH>` - Directory or file to scan (default: current directory)
-- `--include <EXT1,EXT2>` - Include specific file extensions
-- `--exclude <EXT1,EXT2>` - Exclude specific file extensions  
+- `<PATH>` - One or more paths (files or directories) to scan (default: current project or '.')
+- `--include <EXT>` - Include specific file extensions (repeated flag). When provided, only these extensions are scanned
+- `--exclude <EXT>` - Exclude specific file extensions (repeated flag). Exclusions take precedence over includes  
 - `--detailed` - Show detailed output with file paths and line numbers
 
 ## Global Options
@@ -51,14 +51,14 @@ lotar scan src/  # Uses environment-configured directory
 
 - `LOTAR_TASKS_DIR` - Default tasks directory location
 
-## Default Patterns
+## Current Patterns
 
-The scanner looks for these comment patterns:
-- `TODO:` or `TODO -` 
-- `FIXME:` or `FIXME -`
-- `HACK:` or `HACK -`
-- `BUG:` or `BUG -`
-- `NOTE:` or `NOTE -`
+By default the scanner detects common signal words (case-insensitive) in single-line comments:
+- TODO, FIXME, HACK, BUG, NOTE
+
+Supported shapes:
+- `WORD: <text>`
+- `WORD (<id>): <text>`  (captures the optional id into the internal result)
 
 ## Supported File Types
 
@@ -70,13 +70,11 @@ The scanner looks for these comment patterns:
 - Shell scripts (`.sh`, `.bash`)
 - And many more...
 
-## Output Formats
+## Output
 
-Use global `--format` option for different output formats:
-- `text` - Human-readable text (default)
-- `json` - Machine-readable JSON
-- `table` - Formatted table
-- `markdown` - Markdown format
+Use the global `--format` option:
+- `json` - Machine-readable JSON: an array of objects with fields `file`, `line`, `title`, `annotation`
+- other formats - Human-readable lines; table/markdown are not yet specialized for scan and fall back to plain text
 
 ## Example Output
 
@@ -93,10 +91,44 @@ tests/integration.rs:56
   HACK: Temporary workaround for API rate limiting
 ```
 
-## Notes
+## Notes & limitations (stub)
 
-- Scan results are displayed but not automatically saved as tasks
-- Patterns are built-in for common comment styles (TODO, FIXME, etc.)
-- Binary files are automatically skipped
-- Hidden files and directories are ignored by default
-- Scanning is recursive by default
+- Results are displayed only; nothing is written or modified
+// removed: now multiple common signal words are supported by default
+- Hidden files/dirs are skipped by default; ignore files are supported:
+  - `.lotarignore`: project-specific ignore rules at the scan root (if present)
+  - fallback `.gitignore`: used when `.lotarignore` is absent; global and git exclude files are honored
+- Single-line comment tokens only; block comments not yet parsed
+  
+- Recursive by default
+
+## Configuration
+
+You can configure which signal words are recognized. Keys:
+
+- Global (tasks scope): `scan_signal_words` in `.tasks/config.yml`
+- Project: `scan_signal_words` in `.tasks/<PROJECT>/config.yml`
+- Home (user scope): `scan_signal_words` in `~/.lotar`
+
+Precedence (highest wins): CLI > env > home > project > global > defaults. In practice for this key, project overrides global; home/env can override both.
+
+Examples:
+
+```
+# ~/.lotar (home config)
+scan_signal_words:
+  - TODO
+  - FIXME
+  - DEBT
+  - IDEA
+```
+
+```
+# .tasks/MYPROJ/config.yml (project)
+scan_signal_words:
+  - TODO
+  - BUG
+  - PERF
+```
+
+See also: [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md).

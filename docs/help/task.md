@@ -19,6 +19,7 @@ Create a new task with detailed options.
 
 ```bash
 lotar task add --title="Task title" [OPTIONS]
+# Short flags: -t type, -P priority, -a assignee, -d due, -i tag, -E effort, -D description, -c category, -F field
 ```
 Notes:
 - You can filter by current user with --assignee=@me or --mine.
@@ -28,6 +29,7 @@ List tasks with advanced filtering options.
 
 ```bash
 lotar task list [OPTIONS]
+# Short flags: -a assignee, -m mine, -s status, -P priority, -t type, -i tag, -c category, -H high, -C critical, -S sort-by, -R reverse, -L limit
 ```
 Notes:
 - When providing --assignee=@me, it resolves to your identity from config/git/system.
@@ -37,6 +39,7 @@ Edit an existing task.
 
 ```bash
 lotar task edit <TASK_ID> [OPTIONS] [--dry-run]
+# Short flags: -T title, -t type, -P priority, -a assignee, -E effort, -d due, -D description, -c category, -i tag, -F field, -n dry-run
 # JSON preview: lotar task edit PROJ-1 --priority=high --dry-run --format=json
 # {"status":"preview","action":"edit","task_id":"PROJ-1","priority":"HIGH", ...}
 ```

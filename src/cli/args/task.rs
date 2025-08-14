@@ -79,42 +79,42 @@ pub struct AddArgs {
     pub title: String,
 
     /// Task type
-    #[arg(long = "type")]
+    #[arg(long = "type", short = 't')]
     #[serde(alias = "type")]
     pub task_type: Option<String>,
 
     /// Priority level
-    #[arg(long)]
+    #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
     /// Assignee (email or @username)
-    #[arg(long, alias = "assign")]
+    #[arg(long, short = 'a', alias = "assign")]
     pub assignee: Option<String>,
 
     /// Effort estimate (e.g., 2d, 5h, 1w)
-    #[arg(long)]
+    #[arg(long, short = 'E')]
     pub effort: Option<String>,
 
     /// Due date (YYYY-MM-DD or relative like 'tomorrow')
-    #[arg(long)]
+    #[arg(long, short = 'd')]
     #[serde(alias = "due_date")]
     pub due: Option<String>,
 
     /// Task description
-    #[arg(long, alias = "desc")]
+    #[arg(long, short = 'D', alias = "desc")]
     pub description: Option<String>,
 
     /// Category
-    #[arg(long, alias = "cat")]
+    #[arg(long, short = 'c', alias = "cat")]
     pub category: Option<String>,
 
     /// Tags (can be used multiple times)
-    #[arg(long = "tag")]
+    #[arg(long = "tag", short = 'i')]
     #[serde(default)]
     pub tags: Vec<String>,
 
     /// Arbitrary properties (format: key=value)
-    #[arg(long = "field", value_parser = parse_key_value)]
+    #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
 
@@ -139,12 +139,12 @@ pub struct AddArgs {
     pub high: bool,
 
     /// Preview without writing
-    #[arg(long)]
+    #[arg(long, short = 'n')]
     #[serde(default)]
     pub dry_run: bool,
 
     /// Explain defaults and choices
-    #[arg(long)]
+    #[arg(long, short = 'e')]
     #[serde(default)]
     pub explain: bool,
 }
@@ -190,42 +190,42 @@ pub struct TaskAddArgs {
     pub title: String,
 
     /// Task type
-    #[arg(long = "type")]
+    #[arg(long = "type", short = 't')]
     #[serde(alias = "type")]
     pub task_type: Option<String>,
 
     /// Priority level
-    #[arg(long)]
+    #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
     /// Assignee (email or @username)
-    #[arg(long, alias = "assign")]
+    #[arg(long, short = 'a', alias = "assign")]
     pub assignee: Option<String>,
 
     /// Effort estimate (e.g., 2d, 5h, 1w)
-    #[arg(long)]
+    #[arg(long, short = 'E')]
     pub effort: Option<String>,
 
     /// Due date (YYYY-MM-DD or relative like 'tomorrow')
-    #[arg(long)]
+    #[arg(long, short = 'd')]
     #[serde(alias = "due_date")]
     pub due: Option<String>,
 
     /// Task description
-    #[arg(long, alias = "desc")]
+    #[arg(long, short = 'D', alias = "desc")]
     pub description: Option<String>,
 
     /// Category
-    #[arg(long, alias = "cat")]
+    #[arg(long, short = 'c', alias = "cat")]
     pub category: Option<String>,
 
     /// Tags (can be used multiple times)
-    #[arg(long = "tag")]
+    #[arg(long = "tag", short = 'i')]
     #[serde(default)]
     pub tags: Vec<String>,
 
     /// Custom fields
-    #[arg(long = "field", value_parser = parse_key_value)]
+    #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
 }
@@ -236,51 +236,51 @@ pub struct TaskEditArgs {
     pub id: String,
 
     /// New title
-    #[arg(long)]
+    #[arg(long, short = 'T')]
     pub title: Option<String>,
 
     /// New type
-    #[arg(long = "type")]
+    #[arg(long = "type", short = 't')]
     #[serde(alias = "type")]
     pub task_type: Option<String>,
 
     /// New priority
-    #[arg(long)]
+    #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
     /// New assignee
-    #[arg(long)]
+    #[arg(long, short = 'a')]
     pub assignee: Option<String>,
 
     /// New effort estimate
-    #[arg(long)]
+    #[arg(long, short = 'E')]
     pub effort: Option<String>,
 
     /// New due date
-    #[arg(long)]
+    #[arg(long, short = 'd')]
     #[serde(alias = "due_date")]
     pub due: Option<String>,
 
     /// New description
-    #[arg(long)]
+    #[arg(long, short = 'D')]
     pub description: Option<String>,
 
     /// New category
-    #[arg(long)]
+    #[arg(long, short = 'c')]
     pub category: Option<String>,
 
     /// Add tags (can be used multiple times)
-    #[arg(long = "tag")]
+    #[arg(long = "tag", short = 'i')]
     #[serde(default, alias = "tags")]
     pub tags: Vec<String>,
 
     /// Set custom fields
-    #[arg(long = "field", value_parser = parse_key_value)]
+    #[arg(long = "field", short = 'F', value_parser = parse_key_value)]
     #[serde(default, deserialize_with = "deserialize_kv_pairs")]
     pub fields: Vec<(String, String)>,
 
     /// Preview changes without saving
-    #[arg(long)]
+    #[arg(long, short = 'n')]
     #[serde(default)]
     pub dry_run: bool,
 }
@@ -300,59 +300,59 @@ pub struct TaskSearchArgs {
     pub query: Option<String>,
 
     /// Filter by assignee (@me for current user)
-    #[arg(long)]
+    #[arg(long, short = 'a')]
     pub assignee: Option<String>,
 
     /// Show only my tasks
-    #[arg(long)]
+    #[arg(long, short = 'm')]
     #[serde(default)]
     pub mine: bool,
 
     /// Filter by status (can be used multiple times)
-    #[arg(long)]
+    #[arg(long, short = 's')]
     #[serde(default)]
     pub status: Vec<String>,
 
     /// Filter by priority (can be used multiple times)
-    #[arg(long)]
+    #[arg(long, short = 'P')]
     #[serde(default)]
     pub priority: Vec<String>,
 
     /// Filter by type (can be used multiple times)
-    #[arg(long = "type")]
+    #[arg(long = "type", short = 't')]
     #[serde(default, alias = "type")]
     pub task_type: Vec<String>,
 
     /// Filter by tag (can be used multiple times)
-    #[arg(long)]
+    #[arg(long, short = 'i')]
     #[serde(default, alias = "tags")]
     pub tag: Vec<String>,
 
     /// Filter by category
-    #[arg(long)]
+    #[arg(long, short = 'c')]
     pub category: Option<String>,
 
     /// Show only high priority tasks
-    #[arg(long)]
+    #[arg(long, short = 'H')]
     #[serde(default)]
     pub high: bool,
 
     /// Show only critical priority tasks
-    #[arg(long)]
+    #[arg(long, short = 'C')]
     #[serde(default)]
     pub critical: bool,
 
     /// Sort tasks by field (priority, due-date, created, modified, status)
-    #[arg(long)]
+    #[arg(long, short = 'S')]
     pub sort_by: Option<SortField>,
 
     /// Reverse sort order
-    #[arg(long)]
+    #[arg(long, short = 'R')]
     #[serde(default)]
     pub reverse: bool,
 
     /// Limit results
-    #[arg(long, default_value = "20")]
+    #[arg(long, short = 'L', default_value = "20")]
     pub limit: usize,
 }
 

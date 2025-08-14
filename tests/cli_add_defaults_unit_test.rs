@@ -36,6 +36,13 @@ fn make_cfg(
         custom_fields: StringConfigField {
             values: vec!["*".to_string()],
         },
+        scan_signal_words: vec![
+            "TODO".to_string(),
+            "FIXME".to_string(),
+            "HACK".to_string(),
+            "BUG".to_string(),
+            "NOTE".to_string(),
+        ],
     }
 }
 

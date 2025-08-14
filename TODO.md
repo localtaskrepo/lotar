@@ -1,27 +1,23 @@
 Features:
 - Due Date
-- Assignee, Reporter
-- Source Code Scanning
 - Task relationship queries and graphs
-- Task contexts (attachments?)
 - Comments
 - Audit Log
-- Set custom properties from environment variable (e.g. tests = .lotar -> myid@company.com)
-- Shell completion
+- Shell completion with install command
 - Git Hooks for scanner (once implemented)
 - Project members property (for auto fill in web interface)
 - Allow env override for all config values that are in all other chains
 - Publish to docker hub, homebrew, npm?, ...
 - VSCode Plugin
 - IntelliJ Plugin
-- Show source code snippets (e.g. around TODOs) in web ui
+- Show source code snippets (e.g. around TODOs) in web ui and cli
+- Config values should be nested like scan (issue_, default_, auto_). Yaml is flexible enough that both . and nested notation can be used.
 
 Bugs:
 - project templates need to be reviewed and updated for the latest features
 
 Chores:
-- TODO: Replace parcel with vite
-- Add shortcuts for arguments with -- (e.g. --project shoud have -p as well)
+- Replace parcel with vite
 - Check if we're Windows compatible
 
 ---
@@ -40,28 +36,31 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 - [ ] whoami --explain shows sources and confidence per field
 - [ ] Caching and invalidation: keyed by repo+env; invalidate on config writes, branch change, .git/config mtime
 - [ ] Feature toggles: every smart feature is disable-able and has a default value used when disabled (env/CLI override supported)
+ - [ ] Config schema normalization: support dotted and nested YAML, canonicalize to a single internal form
+ - [ ] Validation: scan.ticket_patterns must be valid/non-ambiguous; clear errors/warnings
+ - [ ] whoami --explain indicates when smart features are disabled and defaults are used
 
-## Phase 2 — Ownership and auto-assign
+## Phase 3 — Ownership and auto-assign
 - [ ] CODEOWNERS parser and path matcher (supports wildcards, directory rules)
 - [ ] Auto-assign on first non-initial status: CODEOWNERS owner > Git identity > system (config-gated)
 - [ ] Option to disable CODEOWNERS auto-assign; when off, use configured defaults and ignore detector results
 - [ ] Tests: precedence, multiple owners, no matches
 - [ ] Docs: using CODEOWNERS for ownership and auto-assign
 
-## Phase 3 — Project context and monorepos
+## Phase 4 — Project context and monorepos
 - [ ] Monorepo discovery: cargo workspaces, npm/yarn/pnpm workspaces, go workspaces
 - [ ] Derive project id/name: prefer package/project names; fallback to repo name
 - [ ] Derive labels/tags from paths (e.g., packages/foo => label: foo)
 - [ ] Tests: nested workspaces, worktrees, submodules
 
-## Phase 4 — Branch/PR awareness
+## Phase 5 — Branch/PR awareness
 - [ ] Branch conventions: feat/fix/chore => default task type/status/priority
 - [ ] Config-aware mapping: statuses, types, and priorities are configurable; mapping only applies when branch tokens match configured values or a project-defined alias table
 - [ ] Link tasks from branch/commit messages (e.g., LOTAR-123, #123)
 - [ ] PR detection (opt-in with token): link open PR, import title/assignees/reviewers
 - [ ] Flags/docs to opt-in/out per project
 
-## Phase 5 — Source scan enrichment
+## Phase 2 — Source scan (MVP)
 - [ ] Rich TODO syntax (link-friendly):
 	- Prefer stable ticket references and explicit metadata without relying on titles
 	- Examples:
@@ -73,12 +72,87 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 		- Title is free text and non-authoritative for linking
 - [ ] Git blame to suggest reporter/owner when absent
 - [ ] Scanner honors .gitignore; performance improvements on large repos
-- [ ] Persistent bi-directional links between TODOs and tasks/tickets:
-		- Store stable ticket keys (e.g., DEMO-123) in task metadata and maintain file+line anchors
-		- Resilient anchors: compute content/AST hunks to keep links valid across refactors where possible
+- [ ] Persistent bi-directional links between TODOs and tasks/tickets (minimal schema, human-readable):
+		- Ticket files store a compact list of references; source carries the ticket key; no central index
 		- Optional: when VCS-host integration is enabled, post a backlink (permalink to code location) to the ticket; otherwise provide a CLI to copy/share the permalink
 - [ ] CLI: show-related (list files/snippets for a task/ticket), show-snippet (render code context around a TODO)
 - [ ] Tests with sample polyglot repos
+
+#### Current stub status (as of Aug 2025)
+- [x] Recursive scan of supported single-line comment styles for TODO (case-insensitive)
+- [x] Outputs JSON when `--format json` is used: [{ file, line, title, annotation }]
+- [x] Text output with optional `--detailed` summary
+- [x] `--include/--exclude` flags wired to file collector
+- [x] Recognize FIXME/HACK/BUG/NOTE (default signal words)
+- [x] Respects .lotarignore with fallback to .gitignore
+- [ ] Block/multiline comment parsing (planned)
+- [ ] Mutation (in-place key insertion) and dry-run diffs (planned)
+- [ ] Movement/relocation resilience and re-anchoring (planned)
+
+### Minimal ticket schema (simplified; typed references)
+
+```yaml
+ticket: DEMO-123
+title: Improve retry logic
+status: InProgress
+references:
+	# Built-in: code references (human-readable, no extra index)
+	- code: packages/api/src/retry.ts#L118
+	# optional symbol hint form
+	- code: packages/api/src/retry.ts::fetchWithRetry#L118
+	# Future: other reference types (not enforced yet)
+	# - figma: https://www.figma.com/file/...
+	# - jira: DEMO-999
+```
+
+Notes:
+- Path and symbol are alternatives; include symbol only when helpful. Line is an advisory hint.
+- The ticket id (DEMO-123) is the authoritative key; no separate pattern/last_seen fields.
+- Audit trail will be added later as its own feature.
+
+### Scan behavior specification
+- [ ] Detection
+	- [ ] Find TODOs and configurable signal words in comments (language-aware comment parsing)
+	- [ ] Optional: treat known ticket types (e.g., DEMO-123 patterns) as signal words when enabled
+	- [ ] Broad language support via a comment-format catalog (C/CPP/C#, Java, JS/TS, Python, Go, Rust, Ruby, Shell, Markdown, HTML, YAML/TOML/JSON comments)
+- [ ] Configuration
+	- [ ] `scan.signal_words: string[]` (default: ["TODO","FIXME"]) and per-project overrides
+	- [ ] `scan.ticket_patterns: [string|regex]` templates/regex to detect keys (e.g., `<PREFIX>-<ID>`, `[ticket=<ID>]`, `$<PREFIX>-<ID>`) 
+	- [ ] `scan.enable_ticket_words: bool` (default: false) to also trigger on ticket keys
+	- [ ] `scan.apply_in_place: bool` (default: true) controls auto-modification of source; `--dry-run` prints proposed edits only
+	- [ ] `scan.on_todo_deleted.enabled: bool` (default: true) and `scan.on_todo_deleted.status: string` to set ticket status when a linked TODO disappears
+	- [ ] Validation: if configured status is not in project statuses, emit warning and skip automation
+	- [x] Include/exclude globs (respect .gitignore by default, if .lotarignore exists use that instead)
+	Note: current stub detects only TODO and does not yet honor these configuration values.
+- [ ] Mutation
+	- [ ] When a TODO without a ticket key is found:
+		- If a signal word (issue type) is matched on the line, insert ` (KEY)` immediately after the matched token (default rule); idempotent
+		- Otherwise, append a compact key marker (default: `[ticket=KEY]`) at a sensible spot at end-of-token; idempotent
+		- `--dry-run` lists locations and diffs
+	- [ ] Preserve formatting and comment style; avoid reflowing code
+
+#### Ticket signal words and formatting
+- [ ] Recognize issue-type signal words and inject the ticket key (simplified default)
+	- Supported patterns (configurable, case-insensitive): `@Type`, `Type`, with optional nearby punctuation like `:`, `-`, wrappers like `<Type>`
+	- Type must map to a configured project type (via alias table); otherwise warn and skip
+	- Default insertion (idempotent): replace the matched span M with `M (KEY)`
+		- Examples:
+			- `// @Bug myTitle` → `// @Bug (DEMO-123) myTitle`
+			- `// Feature: myTitle` → `// Feature (DEMO-123): myTitle`
+			- `# Chore - tidy` → `# Chore (DEMO-123) - tidy`
+			- `/* <BUG> foo */` → `/* <BUG (DEMO-123)> foo */`
+	- Configurable placement (advanced): allow a template, e.g. `scan.insertion.template = "{matched} ({key})"` (default)
+		- Other examples: `{matched} ({key}):`, `{matched} ({key}) -`, `<{matched} ({key})>`
+	- Multi-line description (optional): treat contiguous same-style comment lines below as description; do not inject keys there; stop on blank/non-comment/indent change
+	- Ticket key format is matched from `scan.ticket_patterns`; defaults include `<PREFIX>-<ID>` and `[ticket=ID]`
+	- Ensure stable edits: avoid duplicate `(KEY)` insertions on the same line
+- [ ] Deletion automation
+	- [ ] When a previously linked TODO is deleted, automatically set ticket status per config; warn on invalid status; if unset, do nothing
+- [ ] Movement/relocation resilience (git-first, no index)
+ 	- [ ] Primary set = git-modified and renamed files (git status/diff); optional --full to scan all; path args to limit scope
+ 	- [ ] Re-anchoring order (fast → robust): same-file exact key match → nearby window around previous line → optional symbol scope → git hunk/rename remap → bounded grep within modified set
+ 	- [ ] Candidate tickets for a changed file are found by grepping ticket files for that file path in references (code: entries); update/remove anchors accordingly
+ 	- [ ] No global scan-state or per-TODO index; rely on git timestamps and rename detection for incremental scans
 
 ## Phase 6 — Release follow-ups (optional)
 - [ ] Include README and LICENSE in archives
@@ -89,3 +163,32 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 ## Acceptance gates per phase
 - [ ] Build passes (lint/tests), new tests cover behavior and edge cases
 - [ ] Docs/help updated; --explain outputs verified
+ - [ ] Scan MVP: idempotence tests green; dry-run JSON shape has golden tests; performance bounded by git-modified set and guardrails
+
+## Backlog — Later additions
+
+Scan (post-MVP):
+- [ ] Honor `.lotarignore` with fallback to `.gitignore`
+- [ ] Wire `--include/--exclude` filtering in file collector
+- [ ] Support additional signal words (FIXME, HACK, BUG, NOTE) via configurable `scan.signal_words`
+- [ ] In-place mutation for key insertion + `--dry-run` unified diffs
+- [ ] Movement/relocation re-anchoring and rename/hunk remap
+- [ ] Block/multiline comment parsing and basic AST anchors where feasible
+- [ ] CLI: `show-related`, `show-snippet` for tickets
+
+Ticket files & references:
+- [ ] Additional typed references (e.g., `figma:`, `jira:`)
+- [ ] Optional audit trail (append-only) separate from references
+- [ ] VCS-host backlinking (opt-in), permalink helpers
+
+Ownership & context:
+- [ ] CODEOWNERS auto-assign (Phase 3)
+- [ ] Monorepo/workspace discovery and labels (Phase 4)
+- [ ] Branch/PR awareness and mappings (Phase 5)
+
+Release & distribution:
+- [ ] Post-upload verify job, universal macOS binary, package managers (Phase 6)
+
+Docs & UX:
+- [ ] Dedicated docs for scan behavior, references schema, and ignore rules
+- [ ] Examples/playground repo for polyglot scan tests

@@ -118,6 +118,8 @@ pub struct ProjectConfig {
     pub auto_set_reporter: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_assign_on_status: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub scan_signal_words: Option<Vec<String>>, // case-insensitive signal words for scanner
 }
 
 impl ProjectConfig {
@@ -136,6 +138,7 @@ impl ProjectConfig {
             custom_fields: None,
             auto_set_reporter: None,
             auto_assign_on_status: None,
+            scan_signal_words: None,
         }
     }
 }
@@ -173,6 +176,8 @@ pub struct GlobalConfig {
     pub default_status: Option<TaskStatus>,
     #[serde(default = "default_custom_fields")]
     pub custom_fields: StringConfigField,
+    #[serde(default = "default_scan_signal_words")]
+    pub scan_signal_words: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -192,6 +197,7 @@ pub struct ResolvedConfig {
     pub default_priority: Priority,
     pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
+    pub scan_signal_words: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -256,6 +262,16 @@ fn default_custom_fields() -> StringConfigField {
     StringConfigField::new_wildcard()
 }
 
+fn default_scan_signal_words() -> Vec<String> {
+    vec![
+        "TODO".to_string(),
+        "FIXME".to_string(),
+        "HACK".to_string(),
+        "BUG".to_string(),
+        "NOTE".to_string(),
+    ]
+}
+
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
@@ -273,6 +289,7 @@ impl Default for GlobalConfig {
             default_priority: default_priority(),
             default_status: None,
             custom_fields: default_custom_fields(),
+            scan_signal_words: default_scan_signal_words(),
         }
     }
 }

@@ -31,6 +31,13 @@ fn test_global_config_validation_valid() {
         default_priority: Priority::Medium,
         default_status: Some(TaskStatus::Todo),
         custom_fields: StringConfigField::new_wildcard(),
+        scan_signal_words: vec![
+            "TODO".to_string(),
+            "FIXME".to_string(),
+            "HACK".to_string(),
+            "BUG".to_string(),
+            "NOTE".to_string(),
+        ],
     };
 
     let result = validator.validate_global_config(&config);
@@ -64,6 +71,13 @@ fn test_global_config_validation_privileged_port_warning() {
         default_priority: Priority::Medium,
         default_status: Some(TaskStatus::Todo),
         custom_fields: StringConfigField::new_wildcard(),
+        scan_signal_words: vec![
+            "TODO".to_string(),
+            "FIXME".to_string(),
+            "HACK".to_string(),
+            "BUG".to_string(),
+            "NOTE".to_string(),
+        ],
     };
 
     let result = validator.validate_global_config(&config);
@@ -114,6 +128,13 @@ fn test_global_config_validation_empty_lists_error() {
         default_priority: Priority::Medium,
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
+        scan_signal_words: vec![
+            "TODO".to_string(),
+            "FIXME".to_string(),
+            "HACK".to_string(),
+            "BUG".to_string(),
+            "NOTE".to_string(),
+        ],
     };
 
     let result = validator.validate_global_config(&config);
@@ -166,6 +187,13 @@ fn test_global_config_validation_invalid_defaults() {
         default_priority: Priority::Medium, // This should cause an error
         default_status: Some(TaskStatus::Done), // This should cause an error (Done not in states)
         custom_fields: StringConfigField::new_wildcard(),
+        scan_signal_words: vec![
+            "TODO".to_string(),
+            "FIXME".to_string(),
+            "HACK".to_string(),
+            "BUG".to_string(),
+            "NOTE".to_string(),
+        ],
     };
 
     let result = validator.validate_global_config(&config);
@@ -209,6 +237,7 @@ fn test_project_config_validation_valid() {
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
+        scan_signal_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -235,6 +264,7 @@ fn test_project_config_validation_empty_project_name() {
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
+        scan_signal_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -268,6 +298,7 @@ fn test_project_config_validation_long_project_name() {
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
+        scan_signal_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -304,6 +335,7 @@ fn test_project_config_validation_invalid_defaults() {
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
+        scan_signal_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -341,6 +373,7 @@ fn test_project_config_validation_invalid_email_format() {
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
+        scan_signal_words: None,
     };
 
     let result = validator.validate_project_config(&config);

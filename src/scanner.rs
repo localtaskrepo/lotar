@@ -54,6 +54,7 @@ const FILE_TYPES: &[(&str, &str)] = &[
     ("tex", "%"),
 ];
 
+use ignore::WalkBuilder;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use regex::Regex;
@@ -81,25 +82,83 @@ pub struct Reference {
 pub struct Scanner {
     path: PathBuf,
     last_scan: Vec<Reference>,
-    todo_regex: Regex,
+    signal_regex: Regex,
     uuid_extract_regex: Regex,
-    simple_todo_regex: Regex,
+    simple_extract_regex: Regex,
+    include_ext: Option<Vec<String>>, // lowercase extensions without dot
+    exclude_ext: Option<Vec<String>>, // lowercase extensions without dot
+    signal_words: Vec<String>,        // lowercase tokens like todo, fixme
 }
 
 impl Scanner {
     pub fn new(path: PathBuf) -> Self {
-        let todo_regex = Regex::new(r"[Tt][Oo][Dd][Oo]").unwrap();
-        let uuid_extract_regex =
-            Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*\(([^)]+)\)[ \t]*:?[ \t]*(.*)").unwrap();
-        let simple_todo_regex = Regex::new(r"[Tt][Oo][Dd][Oo][ \t]*:?[ \t]*(.*)").unwrap();
+        // Default signal words (case-insensitive)
+        let default_words = vec![
+            "todo".to_string(),
+            "fixme".to_string(),
+            "hack".to_string(),
+            "bug".to_string(),
+            "note".to_string(),
+        ];
+        let (signal_regex, uuid_extract_regex, simple_extract_regex) =
+            Self::build_signal_regexes(&default_words);
 
         Self {
             path,
             last_scan: Vec::new(),
-            todo_regex,
+            signal_regex,
             uuid_extract_regex,
-            simple_todo_regex,
+            simple_extract_regex,
+            include_ext: None,
+            exclude_ext: None,
+            signal_words: default_words,
         }
+    }
+
+    fn build_signal_regexes(words: &[String]) -> (Regex, Regex, Regex) {
+        // Join words as alternation, escaping handled by assuming simple alphanumerics
+        let joined = words
+            .iter()
+            .map(|w| regex::escape(w))
+            .collect::<Vec<_>>()
+            .join("|");
+        // Signal present anywhere in line (word boundary), case-insensitive
+        let signal_re = Regex::new(&format!(r"(?i)\b(?:{})\b", joined)).unwrap();
+        // With id in parens: WORD (<id>): <text>
+        let uuid_re = Regex::new(&format!(
+            r"(?i)\b(?:{})[ \t]*\(([^)]+)\)[ \t]*:?\s*(.*)",
+            joined
+        ))
+        .unwrap();
+        // Simple form: WORD: <text> (or just WORD <text>)
+        let simple_re = Regex::new(&format!(r"(?i)\b(?:{})[ \t]*:?\s*(.*)", joined)).unwrap();
+        (signal_re, uuid_re, simple_re)
+    }
+
+    pub fn with_include_ext(mut self, exts: &[String]) -> Self {
+        if !exts.is_empty() {
+            self.include_ext = Some(exts.iter().map(|e| e.to_ascii_lowercase()).collect());
+        }
+        self
+    }
+
+    pub fn with_exclude_ext(mut self, exts: &[String]) -> Self {
+        if !exts.is_empty() {
+            self.exclude_ext = Some(exts.iter().map(|e| e.to_ascii_lowercase()).collect());
+        }
+        self
+    }
+
+    pub fn with_signal_words(mut self, words: &[String]) -> Self {
+        if !words.is_empty() {
+            self.signal_words = words.iter().map(|w| w.to_ascii_lowercase()).collect();
+            let (signal_regex, uuid_extract_regex, simple_extract_regex) =
+                Self::build_signal_regexes(&self.signal_words);
+            self.signal_regex = signal_regex;
+            self.uuid_extract_regex = uuid_extract_regex;
+            self.simple_extract_regex = simple_extract_regex;
+        }
+        self
     }
 
     pub fn scan(&mut self) -> Vec<Reference> {
@@ -134,29 +193,57 @@ impl Scanner {
     }
 
     fn collect_candidate_files(&self, dir_path: &Path) -> Vec<PathBuf> {
-        fn walk(dir_path: &Path, out: &mut Vec<PathBuf>) {
-            // Recurse into visible subdirectories using filesystem helper
-            for (_, subdir_path) in crate::utils::filesystem::list_visible_subdirs(dir_path) {
-                walk(subdir_path.as_path(), out);
-            }
+        let mut files = Vec::new();
 
-            // Collect supported files in current directory
-            if let Ok(entries) = fs::read_dir(dir_path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.is_file() {
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            if Scanner::is_supported_ext(&ext.to_ascii_lowercase()) {
-                                out.push(path);
-                            }
+        // Build walker that respects .lotarignore or falls back to .gitignore
+        let mut builder = WalkBuilder::new(dir_path);
+        builder.hidden(true); // skip hidden by default
+
+        let lotarignore = dir_path.join(".lotarignore");
+        if lotarignore.exists() {
+            // Use .lotarignore rules only (no gitignore fallback)
+            builder.ignore(false);
+            builder.git_ignore(false);
+            builder.git_global(false);
+            builder.git_exclude(false);
+            builder.add_ignore(lotarignore);
+        } else {
+            // Fallback to git ignore files
+            builder.ignore(true);
+            builder.git_ignore(true);
+            builder.git_global(true);
+            builder.git_exclude(true);
+            // Also explicitly add root .gitignore so it works even without a .git repo
+            let gitignore = dir_path.join(".gitignore");
+            if gitignore.exists() {
+                builder.add_ignore(gitignore);
+            }
+        }
+
+        let walker = builder.build();
+        for entry in walker.flatten() {
+            if entry.file_type().is_some_and(|t| t.is_file()) {
+                let path = entry.path().to_path_buf();
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    let ext_lc = ext.to_ascii_lowercase();
+                    if !Self::is_supported_ext(&ext_lc) {
+                        continue;
+                    }
+                    if let Some(ref excludes) = self.exclude_ext {
+                        if excludes.iter().any(|e| e == &ext_lc) {
+                            continue;
                         }
                     }
+                    if let Some(ref includes) = self.include_ext {
+                        if !includes.iter().any(|e| e == &ext_lc) {
+                            continue;
+                        }
+                    }
+                    files.push(path);
                 }
             }
         }
 
-        let mut files = Vec::new();
-        walk(dir_path, &mut files);
         files
     }
 
@@ -176,39 +263,24 @@ impl Scanner {
                     if let Some(start_comment) = Self::get_comment_token(&ext_str) {
                         // Process each line to find TODOs in comments
                         for (line_number, line) in file_contents.lines().enumerate() {
-                            // Check if line contains a comment and TODO (case insensitive)
-                            if line.contains(start_comment) && self.todo_regex.is_match(line) {
-                                let (uuid, title) = if let Some(uuid_captures) =
+                            // Check if line contains a comment and any configured signal word
+                            if line.contains(start_comment) && self.signal_regex.is_match(line) {
+                                let (uuid, title) = if let Some(c) =
                                     self.uuid_extract_regex.captures(line)
                                 {
-                                    // Extract UUID and title from UUID format
-                                    let uuid = uuid_captures
-                                        .get(1)
-                                        .map_or(String::new(), |m| m.as_str().to_string());
-                                    let title = uuid_captures
+                                    let uuid =
+                                        c.get(1).map_or(String::new(), |m| m.as_str().to_string());
+                                    let title = c
                                         .get(2)
                                         .map_or(String::new(), |m| m.as_str().trim().to_string());
                                     (uuid, title)
-                                } else if let Some(simple_captures) =
-                                    self.simple_todo_regex.captures(line)
-                                {
-                                    // Extract title from simple TODO format
-                                    let title = simple_captures
+                                } else if let Some(c) = self.simple_extract_regex.captures(line) {
+                                    let title = c
                                         .get(1)
                                         .map_or(String::new(), |m| m.as_str().trim().to_string());
                                     (String::new(), title)
                                 } else {
-                                    // Fallback: extract whatever comes after TODO without extra allocation
-                                    let lower = "todo";
-                                    if let Some(todo_pos) = line.find(lower) {
-                                        let after_todo = &line[todo_pos + 4..].trim();
-                                        (String::new(), after_todo.to_string())
-                                    } else if let Some(todo_pos) = line.find("TODO") {
-                                        let after_todo = &line[todo_pos + 4..].trim();
-                                        (String::new(), after_todo.to_string())
-                                    } else {
-                                        (String::new(), String::new())
-                                    }
+                                    (String::new(), String::new())
                                 };
 
                                 let reference = Reference {

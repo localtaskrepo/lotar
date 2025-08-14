@@ -15,10 +15,10 @@ lotar add "Task title" [OPTIONS]
 lotar add "Implement user authentication"
 
 # Feature with details
-lotar add "Add OAuth support" --type=feature --priority=high --assignee=john.doe
+lotar add "Add OAuth support" --type=feature -P high --assignee=john.doe
 
 # Bug with due date
-lotar add "Fix login crash" --type=bug --priority=critical --due=tomorrow
+lotar add "Fix login crash" --type=bug -P critical --due=tomorrow
 
 # Epic with custom fields
 lotar add "User Management System" --type=epic --field=story_points=13 --field=sprint=2
@@ -35,17 +35,17 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 
 ### Core Properties
 - `--type <TYPE>` - Task type: feature, bug, epic, spike, chore
-- `--priority <PRIORITY>` - Priority: low, medium, high, critical
+- `--priority <PRIORITY>`, `-P <PRIORITY>` - Priority: low, medium, high, critical
 - `--assignee <ASSIGNEE>` - Task assignee (email or @username). Supports `@me` to resolve to your identity.
 
 ### Scheduling
 - `--due <DATE>` - Due date (YYYY-MM-DD or relative like 'tomorrow')
-- `--effort <ESTIMATE>` - Effort estimate (e.g., 2d, 5h, 1w)
+- `--effort <ESTIMATE>`, `-E <ESTIMATE>` - Effort estimate (e.g., 2d, 5h, 1w)
 
 ### Organization  
-- `--category <CATEGORY>` - Project category
-- `--tag <TAG>` - Tags (can be used multiple times)
-- `--description <TEXT>` - Detailed description
+- `--category <CATEGORY>`, `-c <CATEGORY>` - Project category
+- `--tag <TAG>`, `-i <TAG>` - Tags (can be used multiple times)
+- `--description <TEXT>`, `-D <TEXT>` - Detailed description
 
 ### Shortcuts
 - `--bug` - Shorthand for --type=bug
@@ -63,7 +63,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ### Global Options
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
-- `--project <PROJECT>` - Target project (overrides auto-detection)
+- `--project <PROJECT>`, `-p <PROJECT>` - Target project (overrides auto-detection)
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
 
 ### Environment Variables

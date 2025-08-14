@@ -16,7 +16,7 @@ pub use args::{
 #[command(version, author)]
 pub struct Cli {
     /// Global project context (overrides auto-detection)
-    #[arg(long, global = true)]
+    #[arg(long, short = 'p', global = true)]
     pub project: Option<String>,
 
     /// Tasks directory path (overrides default)
@@ -24,15 +24,15 @@ pub struct Cli {
     pub tasks_dir: Option<String>,
 
     /// Output format
-    #[arg(long, global = true, value_parser = crate::output::parse_output_format, default_value = "text")]
+    #[arg(long, short = 'f', global = true, value_parser = crate::output::parse_output_format, default_value = "text")]
     pub format: OutputFormat,
 
     /// Log level (controls diagnostic verbosity)
-    #[arg(long, global = true, value_enum, default_value_t = LogLevel::Warn)]
+    #[arg(long, short = 'l', global = true, value_enum, default_value_t = LogLevel::Warn)]
     pub log_level: LogLevel,
 
     /// Backward-compat verbose flag (maps to Info level)
-    #[arg(long, global = true, hide = true)]
+    #[arg(long, short = 'v', global = true, hide = true)]
     pub verbose: bool,
 
     #[command(subcommand)]
@@ -54,10 +54,10 @@ pub enum Commands {
         /// New status (must be valid for project). If omitted, shows current status.
         status: Option<String>,
         /// Preview the change without saving
-        #[arg(long)]
+        #[arg(long, short = 'n')]
         dry_run: bool,
         /// Explain what values are chosen and why
-        #[arg(long)]
+        #[arg(long, short = 'e')]
         explain: bool,
     },
 
