@@ -45,6 +45,12 @@ fn test_global_config_validation_valid() {
         auto_identity_git: true,
         auto_codeowners_assign: true,
         auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        branch_type_aliases: std::collections::HashMap::new(),
+        branch_status_aliases: std::collections::HashMap::new(),
+        branch_priority_aliases: std::collections::HashMap::new(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -92,6 +98,12 @@ fn test_global_config_validation_privileged_port_warning() {
         auto_identity_git: true,
         auto_codeowners_assign: true,
         auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        branch_type_aliases: std::collections::HashMap::new(),
+        branch_status_aliases: std::collections::HashMap::new(),
+        branch_priority_aliases: std::collections::HashMap::new(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -156,6 +168,12 @@ fn test_global_config_validation_empty_lists_error() {
         auto_identity_git: true,
         auto_codeowners_assign: true,
         auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        branch_type_aliases: std::collections::HashMap::new(),
+        branch_status_aliases: std::collections::HashMap::new(),
+        branch_priority_aliases: std::collections::HashMap::new(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -222,6 +240,12 @@ fn test_global_config_validation_invalid_defaults() {
         auto_identity_git: true,
         auto_codeowners_assign: true,
         auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        branch_type_aliases: std::collections::HashMap::new(),
+        branch_status_aliases: std::collections::HashMap::new(),
+        branch_priority_aliases: std::collections::HashMap::new(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -269,6 +293,9 @@ fn test_project_config_validation_valid() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -299,6 +326,9 @@ fn test_project_config_validation_empty_project_name() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -336,6 +366,9 @@ fn test_project_config_validation_long_project_name() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -376,6 +409,9 @@ fn test_project_config_validation_invalid_defaults() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -417,6 +453,9 @@ fn test_project_config_validation_invalid_email_format() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
     };
 
     let result = validator.validate_project_config(&config);

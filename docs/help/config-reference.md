@@ -26,6 +26,9 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - auto.identity_git: boolean (default true)
 - auto.set_reporter: boolean (default true)
 - auto.assign_on_status: boolean (default true)
+- auto.codeowners_assign: boolean (default true)
+- auto.tags_from_path: boolean (default true)
+- auto.branch_infer_type: boolean (default true)
 
 ## Home and Project keys
 Same shape as global; project values override global for that project. Use `project.id` for the project identifier.

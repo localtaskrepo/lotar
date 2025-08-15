@@ -196,6 +196,42 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     if let Some(v) = get_path(&data, &["auto", "tags_from_path"]).and_then(cast::<bool>) {
         cfg.auto_tags_from_path = v;
     }
+    if let Some(v) = get_path(&data, &["auto", "branch_infer_type"]).and_then(cast::<bool>) {
+        cfg.auto_branch_infer_type = v;
+    }
+    if let Some(v) = get_path(&data, &["auto", "branch_infer_status"]).and_then(cast::<bool>) {
+        cfg.auto_branch_infer_status = v;
+    }
+    if let Some(v) = get_path(&data, &["auto", "branch_infer_priority"]).and_then(cast::<bool>) {
+        cfg.auto_branch_infer_priority = v;
+    }
+
+    // branch.* alias maps (global)
+    if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
+        if let Ok(mut map) =
+            serde_yaml::from_value::<std::collections::HashMap<String, crate::types::TaskType>>(v)
+        {
+            // normalize keys to lowercase
+            let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
+            cfg.branch_type_aliases = map2;
+        }
+    }
+    if let Some(v) = get_path(&data, &["branch", "status_aliases"]).cloned() {
+        if let Ok(mut map) =
+            serde_yaml::from_value::<std::collections::HashMap<String, crate::types::TaskStatus>>(v)
+        {
+            let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
+            cfg.branch_status_aliases = map2;
+        }
+    }
+    if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned() {
+        if let Ok(mut map) =
+            serde_yaml::from_value::<std::collections::HashMap<String, crate::types::Priority>>(v)
+        {
+            let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
+            cfg.branch_priority_aliases = map2;
+        }
+    }
 
     Ok(cfg)
 }
@@ -278,6 +314,17 @@ pub fn parse_project_from_yaml_str(
     // scan.ticket_patterns
     if let Some(v) = get_path(&data, &["scan", "ticket_patterns"]).cloned() {
         cfg.scan_ticket_patterns = serde_yaml::from_value(v).ok();
+    }
+
+    // branch alias maps (project)
+    if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
+        cfg.branch_type_aliases = serde_yaml::from_value(v).ok();
+    }
+    if let Some(v) = get_path(&data, &["branch", "status_aliases"]).cloned() {
+        cfg.branch_status_aliases = serde_yaml::from_value(v).ok();
+    }
+    if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned() {
+        cfg.branch_priority_aliases = serde_yaml::from_value(v).ok();
     }
 
     Ok(cfg)
@@ -405,7 +452,46 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
         Y::String("tags_from_path".into()),
         Y::Bool(cfg.auto_tags_from_path),
     );
+    auto.insert(
+        Y::String("branch_infer_type".into()),
+        Y::Bool(cfg.auto_branch_infer_type),
+    );
+    auto.insert(
+        Y::String("branch_infer_status".into()),
+        Y::Bool(cfg.auto_branch_infer_status),
+    );
+    auto.insert(
+        Y::String("branch_infer_priority".into()),
+        Y::Bool(cfg.auto_branch_infer_priority),
+    );
     root.insert(Y::String("auto".into()), Y::Mapping(auto));
+
+    // branch alias maps (canonical)
+    if !cfg.branch_type_aliases.is_empty()
+        || !cfg.branch_status_aliases.is_empty()
+        || !cfg.branch_priority_aliases.is_empty()
+    {
+        let mut branch = serde_yaml::Mapping::new();
+        if !cfg.branch_type_aliases.is_empty() {
+            branch.insert(
+                Y::String("type_aliases".into()),
+                serde_yaml::to_value(&cfg.branch_type_aliases).unwrap_or(Y::Null),
+            );
+        }
+        if !cfg.branch_status_aliases.is_empty() {
+            branch.insert(
+                Y::String("status_aliases".into()),
+                serde_yaml::to_value(&cfg.branch_status_aliases).unwrap_or(Y::Null),
+            );
+        }
+        if !cfg.branch_priority_aliases.is_empty() {
+            branch.insert(
+                Y::String("priority_aliases".into()),
+                serde_yaml::to_value(&cfg.branch_priority_aliases).unwrap_or(Y::Null),
+            );
+        }
+        root.insert(Y::String("branch".into()), Y::Mapping(branch));
+    }
 
     serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())
 }
@@ -533,6 +619,51 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
     if !scan.is_empty() {
         root.insert(Y::String("scan".into()), Y::Mapping(scan));
+    }
+
+    // branch alias maps in project canonical YAML
+    let has_branch = cfg
+        .branch_type_aliases
+        .as_ref()
+        .map(|m| !m.is_empty())
+        .unwrap_or(false)
+        || cfg
+            .branch_status_aliases
+            .as_ref()
+            .map(|m| !m.is_empty())
+            .unwrap_or(false)
+        || cfg
+            .branch_priority_aliases
+            .as_ref()
+            .map(|m| !m.is_empty())
+            .unwrap_or(false);
+    if has_branch {
+        let mut branch = serde_yaml::Mapping::new();
+        if let Some(m) = &cfg.branch_type_aliases {
+            if !m.is_empty() {
+                branch.insert(
+                    Y::String("type_aliases".into()),
+                    serde_yaml::to_value(m).unwrap_or(Y::Null),
+                );
+            }
+        }
+        if let Some(m) = &cfg.branch_status_aliases {
+            if !m.is_empty() {
+                branch.insert(
+                    Y::String("status_aliases".into()),
+                    serde_yaml::to_value(m).unwrap_or(Y::Null),
+                );
+            }
+        }
+        if let Some(m) = &cfg.branch_priority_aliases {
+            if !m.is_empty() {
+                branch.insert(
+                    Y::String("priority_aliases".into()),
+                    serde_yaml::to_value(m).unwrap_or(Y::Null),
+                );
+            }
+        }
+        root.insert(Y::String("branch".into()), Y::Mapping(branch));
     }
 
     serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())

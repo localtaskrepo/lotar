@@ -129,6 +129,15 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.auto_tags_from_path != defaults.auto_tags_from_path {
         base.auto_tags_from_path = override_config.auto_tags_from_path;
     }
+    if override_config.auto_branch_infer_type != defaults.auto_branch_infer_type {
+        base.auto_branch_infer_type = override_config.auto_branch_infer_type;
+    }
+    if override_config.auto_branch_infer_status != defaults.auto_branch_infer_status {
+        base.auto_branch_infer_status = override_config.auto_branch_infer_status;
+    }
+    if override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
+        base.auto_branch_infer_priority = override_config.auto_branch_infer_priority;
+    }
     if override_config.default_priority != defaults.default_priority {
         base.default_priority = override_config.default_priority;
     }
@@ -140,6 +149,15 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
+    }
+    if !override_config.branch_type_aliases.is_empty() {
+        base.branch_type_aliases = override_config.branch_type_aliases;
+    }
+    if !override_config.branch_status_aliases.is_empty() {
+        base.branch_status_aliases = override_config.branch_status_aliases;
+    }
+    if !override_config.branch_priority_aliases.is_empty() {
+        base.branch_priority_aliases = override_config.branch_priority_aliases;
     }
     if override_config.auto_identity != defaults.auto_identity {
         base.auto_identity = override_config.auto_identity;
@@ -202,6 +220,15 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if override_config.auto_tags_from_path != defaults.auto_tags_from_path {
         resolved.auto_tags_from_path = override_config.auto_tags_from_path;
     }
+    if override_config.auto_branch_infer_type != defaults.auto_branch_infer_type {
+        resolved.auto_branch_infer_type = override_config.auto_branch_infer_type;
+    }
+    if override_config.auto_branch_infer_status != defaults.auto_branch_infer_status {
+        resolved.auto_branch_infer_status = override_config.auto_branch_infer_status;
+    }
+    if override_config.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
+        resolved.auto_branch_infer_priority = override_config.auto_branch_infer_priority;
+    }
     if override_config.default_priority != defaults.default_priority {
         resolved.default_priority = override_config.default_priority;
     }
@@ -213,6 +240,15 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
+    }
+    if !override_config.branch_type_aliases.is_empty() {
+        resolved.branch_type_aliases = override_config.branch_type_aliases;
+    }
+    if !override_config.branch_status_aliases.is_empty() {
+        resolved.branch_status_aliases = override_config.branch_status_aliases;
+    }
+    if !override_config.branch_priority_aliases.is_empty() {
+        resolved.branch_priority_aliases = override_config.branch_priority_aliases;
     }
     if override_config.auto_identity != defaults.auto_identity {
         resolved.auto_identity = override_config.auto_identity;
@@ -282,6 +318,26 @@ pub fn get_project_config(
     if let Some(scan_words) = project_config.scan_signal_words {
         resolved.scan_signal_words = scan_words;
     }
+    // Overlay project-level branch alias maps (if provided)
+    if let Some(m) = project_config.branch_type_aliases {
+        if !m.is_empty() {
+            // normalize keys to lowercase at use-time to be safe
+            resolved.branch_type_aliases =
+                m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
+        }
+    }
+    if let Some(m) = project_config.branch_status_aliases {
+        if !m.is_empty() {
+            resolved.branch_status_aliases =
+                m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
+        }
+    }
+    if let Some(m) = project_config.branch_priority_aliases {
+        if !m.is_empty() {
+            resolved.branch_priority_aliases =
+                m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
+        }
+    }
     // Smart toggles are currently only global/home/env scoped; project-level toggles could be added later
 
     // 3) Overlay home config (higher priority than project)
@@ -327,12 +383,18 @@ impl ResolvedConfig {
             auto_assign_on_status: global.auto_assign_on_status,
             auto_codeowners_assign: global.auto_codeowners_assign,
             auto_tags_from_path: global.auto_tags_from_path,
+            auto_branch_infer_type: global.auto_branch_infer_type,
+            auto_branch_infer_status: global.auto_branch_infer_status,
+            auto_branch_infer_priority: global.auto_branch_infer_priority,
             default_priority: global.default_priority,
             default_status: global.default_status,
             custom_fields: global.custom_fields,
             scan_signal_words: global.scan_signal_words,
             auto_identity: global.auto_identity,
             auto_identity_git: global.auto_identity_git,
+            branch_type_aliases: global.branch_type_aliases,
+            branch_status_aliases: global.branch_status_aliases,
+            branch_priority_aliases: global.branch_priority_aliases,
         }
     }
 }

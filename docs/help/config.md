@@ -146,8 +146,9 @@ Notes:
 LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to a nested structure with these groups: server, default, issue, custom, scan, auto. Use `lotar config normalize` to rewrite files into this canonical form.
 
 Notes:
-- Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`).
+- Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).
 - Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility, but canonicalization writes them under `issue.categories` and `issue.tags`.
+- Branch alias maps live under a top-level `branch` section and are merged with project-level overrides.
 
 ### Automatic Prefix Generation
 Projects automatically get prefixes generated from their names:
@@ -222,6 +223,40 @@ Automation:
 - `auto.identity_git` - Enable git-based identity detection (default: true)
  - `auto.codeowners_assign` - Prefer CODEOWNERS owner on first status change when task has no assignee (default: true)
  - `auto.tags_from_path` - Derive a tag from monorepo paths like packages/<name> when no tags provided and no defaults exist (default: true)
+ - `auto.branch_infer_type` - Infer task type from branch name prefixes like feat/, fix/, chore/ (default: true)
+ - `auto.branch_infer_status` - Infer status from `branch.status_aliases` using the first branch token (default: false)
+ - `auto.branch_infer_priority` - Infer priority from `branch.priority_aliases` using the first branch token (default: false)
+
+Branch alias maps (global- and project-level):
+- `branch.type_aliases` - Map branch tokens to task types. Example: `{ feat: Feature, fix: Bug }`
+- `branch.status_aliases` - Map branch tokens to statuses. Example: `{ wip: InProgress }`
+- `branch.priority_aliases` - Map branch tokens to priorities. Example: `{ hotfix: Critical }`
+
+Notes:
+- Keys are matched case-insensitively (normalized to lowercase during parse/merge).
+- Project-level maps override/add to global maps. On conflict, project wins.
+- Aliases must map to values present in the project's `issue.*` lists; invalid entries are ignored at use time.
+
+Canonical YAML example:
+
+```yaml
+issue:
+    states: [Todo, InProgress, Done]
+    types: [Feature, Bug, Chore]
+    priorities: [Low, Medium, High, Critical]
+auto:
+    branch_infer_type: true
+    branch_infer_status: true
+    branch_infer_priority: true
+branch:
+    type_aliases:
+        feat: Feature
+        fix: Bug
+    status_aliases:
+        wip: InProgress
+    priority_aliases:
+        hotfix: Critical
+```
 
 ## Templates
 

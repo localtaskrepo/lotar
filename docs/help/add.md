@@ -56,7 +56,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ### Planning and diagnostics
 - `--dry-run` - Preview the task that would be created without writing
 - `--explain` - Show how defaults (status/priority/reporter) were chosen
-	- Includes project detection source and whether a path-derived tag was added
+	- Includes project detection source, whether a path-derived tag was added, and any branch-based inference (type/status/priority) with alias hits
 
 ### Custom Fields
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
@@ -152,6 +152,36 @@ lotar add "Style header"                   # does NOT add tag (fails validation)
 Configuration toggle:
 - Set `auto.tags_from_path: false` in `.tasks/config.yml` (global) or in a project config to disable this behavior entirely.
 	- Default is `true`.
+
+### Branch-aware defaults (Phase 4)
+
+When no `--type`/shortcuts are provided, LoTaR will try to infer a task type from the current git branch name:
+
+- `feat/*` or `feature/*` → type = Feature
+- `fix/*`, `bugfix/*`, `hotfix/*` → type = Bug
+- `chore/*`, `docs/*`, `refactor/*`, `test/*`, `perf/*` → type = Chore
+
+Notes:
+- In addition to conventional prefixes, LoTaR also matches configured type names against the branch prefix: if your config lists a type like `Research`, a branch like `research-123` or `research/123` (case-insensitive; supports `-`, `_`, `/`) will infer that type when allowed by your config.
+- If the inferred type isn’t allowed by your config’s `issue.types`, it’s ignored and the default type resolved from your configuration (following precedence) is used.
+- Inference only runs inside a git repository with a readable HEAD; otherwise default behavior applies.
+
+Configuration toggle:
+- Set `auto.branch_infer_type: false` to disable branch-based type inference.
+	- Default is `true`.
+
+Status and priority can also be inferred using branch alias maps when enabled. LoTaR inspects the first segment of the branch (before the first `/`) and looks it up in configured alias maps:
+
+- `branch.status_aliases`: Maps a token to a status from `issue.states` (e.g., `wip: InProgress`)
+- `branch.priority_aliases`: Maps a token to a priority from `issue.priorities` (e.g., `hotfix: Critical`)
+
+Behavior and toggles:
+- Set `auto.branch_infer_status: true` to enable status inference from `branch.status_aliases`.
+- Set `auto.branch_infer_priority: true` to enable priority inference from `branch.priority_aliases`.
+- Project-level alias maps override/extend global ones; keys are matched case-insensitively (normalized to lowercase).
+- Inference only applies when the inferred value is valid per your config; otherwise the normal defaults apply.
+
+See `lotar config help` for how to configure alias maps.
 
 ## Examples by Use Case
 

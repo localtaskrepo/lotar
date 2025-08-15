@@ -1,5 +1,6 @@
 use crate::types::{Priority, TaskStatus, TaskType};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectTemplate {
@@ -126,6 +127,14 @@ pub struct ProjectConfig {
     pub scan_signal_words: Option<Vec<String>>, // case-insensitive signal words for scanner
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_ticket_patterns: Option<Vec<String>>, // regex patterns to detect ticket keys
+
+    // Optional per-project branch alias maps
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub branch_type_aliases: Option<HashMap<String, TaskType>>, // token -> TaskType
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub branch_status_aliases: Option<HashMap<String, TaskStatus>>, // token -> TaskStatus
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub branch_priority_aliases: Option<HashMap<String, Priority>>, // token -> Priority
 }
 
 impl ProjectConfig {
@@ -148,6 +157,9 @@ impl ProjectConfig {
             auto_assign_on_status: None,
             scan_signal_words: None,
             scan_ticket_patterns: None,
+            branch_type_aliases: None,
+            branch_status_aliases: None,
+            branch_priority_aliases: None,
         }
     }
 }
@@ -187,6 +199,12 @@ pub struct GlobalConfig {
     pub auto_codeowners_assign: bool,
     #[serde(default = "default_true")]
     pub auto_tags_from_path: bool,
+    #[serde(default = "default_true")]
+    pub auto_branch_infer_type: bool,
+    #[serde(default = "default_true")]
+    pub auto_branch_infer_status: bool,
+    #[serde(default = "default_true")]
+    pub auto_branch_infer_priority: bool,
     #[serde(default = "default_priority")]
     pub default_priority: Priority,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -197,6 +215,14 @@ pub struct GlobalConfig {
     pub scan_signal_words: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_ticket_patterns: Option<Vec<String>>,
+
+    // Branch alias maps (global-level)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub branch_type_aliases: HashMap<String, TaskType>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub branch_status_aliases: HashMap<String, TaskStatus>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub branch_priority_aliases: HashMap<String, Priority>,
 
     // Automation toggles
     #[serde(default = "default_true")]
@@ -231,6 +257,14 @@ pub struct ResolvedConfig {
     pub auto_identity: bool,
     pub auto_identity_git: bool,
     pub auto_tags_from_path: bool,
+    pub auto_branch_infer_type: bool,
+    pub auto_branch_infer_status: bool,
+    pub auto_branch_infer_priority: bool,
+
+    // Effective alias maps
+    pub branch_type_aliases: HashMap<String, TaskType>,
+    pub branch_status_aliases: HashMap<String, TaskStatus>,
+    pub branch_priority_aliases: HashMap<String, Priority>,
 }
 
 #[derive(Debug)]
@@ -323,11 +357,17 @@ impl Default for GlobalConfig {
             auto_assign_on_status: true,
             auto_codeowners_assign: true,
             auto_tags_from_path: true,
+            auto_branch_infer_type: true,
+            auto_branch_infer_status: true,
+            auto_branch_infer_priority: true,
             default_priority: default_priority(),
             default_status: None,
             custom_fields: default_custom_fields(),
             scan_signal_words: default_scan_signal_words(),
             scan_ticket_patterns: None,
+            branch_type_aliases: HashMap::new(),
+            branch_status_aliases: HashMap::new(),
+            branch_priority_aliases: HashMap::new(),
             auto_identity: true,
             auto_identity_git: true,
         }

@@ -17,6 +17,7 @@ Chores:
 - Check if we're Windows compatible
 - Test release workflow
 - There are a lot of _ variables. We should check if they are all needed
+- Check if any of the auto features can be applied to MCP and web endpoints (or they already are)
 
 ---
 
@@ -58,11 +59,9 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 - [x] Docs/help: updated behavior and precedence; added monorepo-aware auto-tag notes
 
 ## Phase 4 — Branch/PR awareness
-- [ ] Branch conventions: feat/fix/chore => default task type/status/priority
-- [ ] Config-aware mapping: statuses, types, and priorities are configurable; mapping only applies when branch tokens match configured values or a project-defined alias table
-- [ ] Link tasks from branch/commit messages (e.g., LOTAR-123, #123)
-- [ ] PR detection (opt-in with token): link open PR, import title/assignees/reviewers
-- [ ] Flags/docs to opt-in/out per project
+- [x] Branch conventions: infer default task type from branch (feat/feature → Feature; fix/bugfix/hotfix → Bug; chore/docs/refactor/test/perf → Chore), gated by `auto.branch_infer_type`
+- [~] Config-aware mapping and aliases: type inference respects configured types with graceful fallback; status/priority inference and alias table pending
+cra- [x] Flags/docs to opt-in/out via config (`auto.branch_infer_type`), with tests and help docs
 
 ## Phase 5 — Source scan (MVP)
 - [ ] Rich TODO syntax (link-friendly):
@@ -186,8 +185,7 @@ Ticket files & references:
 - [ ] VCS-host backlinking (opt-in), permalink helpers
 
 Ownership & context:
-- [ ] Monorepo/workspace discovery and labels (Phase 4)
-- [ ] Branch/PR awareness and mappings (Phase 5)
+- [ ] Advanced branch/PR features: status/priority inference; branch/commit/PR linking; alias tables and per-project overrides
 
 Release & distribution:
 - [ ] Post-upload verify job, universal macOS binary, package managers (Phase 6)

@@ -44,6 +44,12 @@ fn make_resolver() -> ProjectResolver {
         auto_identity: true,
         auto_identity_git: true,
         auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        branch_type_aliases: std::collections::HashMap::new(),
+        branch_status_aliases: std::collections::HashMap::new(),
+        branch_priority_aliases: std::collections::HashMap::new(),
     };
     resolver_from_config(cfg, std::path::PathBuf::from("/tmp"))
 }
