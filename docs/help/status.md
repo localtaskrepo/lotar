@@ -147,8 +147,10 @@ transitions:
 ```
 
 ### Auto-Assign on Status Change
-- If `auto.assign_on_status: true` and the task has no assignee, LoTaR auto-assigns the current user.
-- The current user is resolved in order: `default_reporter` from config → git user.name/email → system username.
+- If `auto.assign_on_status: true` and the task has no assignee, LoTaR auto-assigns an owner on the first change away from the default status.
+- Assignment order:
+  1) If `auto.codeowners_assign: true` and a CODEOWNERS file exists in the repo, a default owner defined there (e.g., a `* @owner` catch‑all) is used when present.
+  2) Fallback to the resolved current user: `default_reporter` from config → git user.name/email → system username.
  - If you pass `--assignee=@me` via CLI (where supported) or patch `assignee: "@me"` over REST/MCP, `@me` resolves using the same identity rules.
  - REST note: the `/api/tasks/update` endpoint ignores the `status` field; status transitions are driven via CLI, but the same first-change auto-assign semantics apply in services when status is changed through supported channels.
 

@@ -183,6 +183,8 @@ pub struct GlobalConfig {
     pub auto_set_reporter: bool,
     #[serde(default = "default_true")]
     pub auto_assign_on_status: bool,
+    #[serde(default = "default_true")]
+    pub auto_codeowners_assign: bool,
     #[serde(default = "default_priority")]
     pub default_priority: Priority,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -217,6 +219,7 @@ pub struct ResolvedConfig {
     pub default_tags: Vec<String>,
     pub auto_set_reporter: bool,
     pub auto_assign_on_status: bool,
+    pub auto_codeowners_assign: bool,
     pub default_priority: Priority,
     pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
@@ -315,6 +318,7 @@ impl Default for GlobalConfig {
             default_tags: Vec::new(),
             auto_set_reporter: true,
             auto_assign_on_status: true,
+            auto_codeowners_assign: true,
             default_priority: default_priority(),
             default_status: None,
             custom_fields: default_custom_fields(),

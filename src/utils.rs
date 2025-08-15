@@ -1,6 +1,7 @@
 // Thin utils module root that organizes domain utilities and re-exports
 
 // Domain submodules
+pub mod codeowners;
 pub mod config;
 pub mod filesystem;
 pub mod identity;

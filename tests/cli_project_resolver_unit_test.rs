@@ -30,6 +30,7 @@ fn make_resolver() -> ProjectResolver {
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
+        auto_codeowners_assign: true,
         default_priority: Priority::Medium,
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),

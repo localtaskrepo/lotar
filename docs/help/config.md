@@ -198,7 +198,7 @@ Automation (defaults inherited from global):
 - `auto.set_reporter` - If true, set reporter automatically on create/update when missing
 - `auto.assign_on_status` - If true, auto-assign assignee on first meaningful status change
     - First-change is defined as: when a task moves away from the default.status (or the first state if default unset) and the task currently has no assignee.
-    - The assignee chosen is the resolved current user (see Identity Resolution below).
+    - The assignee chosen is, in order: CODEOWNERS default owner (when available and `auto.codeowners_assign` is true) → resolved current user (see Identity Resolution below).
 
 ### Global
 - `server.port` - Web server port
@@ -220,6 +220,7 @@ Automation:
 - `auto.assign_on_status` - Enable first-change auto-assign (default: true)
 - `auto.identity` - Enable smart identity detection beyond configured default (default: true)
 - `auto.identity_git` - Enable git-based identity detection (default: true)
+ - `auto.codeowners_assign` - Prefer CODEOWNERS owner on first status change when task has no assignee (default: true)
 
 ## Templates
 

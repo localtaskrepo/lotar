@@ -199,10 +199,33 @@ impl CommandHandler for StatusHandler {
                         .clone()
                         .unwrap_or_else(|| cfg.issue_states.values[0].clone());
                     if old_status == project_default_status && old_status != validated_status {
-                        if let Some(me) = crate::utils::identity::resolve_current_user(Some(
-                            resolver.path.as_path(),
-                        )) {
-                            task.assignee = Some(me);
+                        // Try CODEOWNERS first (if enabled), then fall back to identity
+                        let mut assigned = false;
+                        if cfg.auto_codeowners_assign {
+                            let owner_from_codeowners = (|| {
+                                let repo_root =
+                                    crate::utils::codeowners::repo_root_from_tasks_root(
+                                        &resolver.path,
+                                    )?;
+                                let codeowners =
+                                    crate::utils::codeowners::CodeOwners::load_from_repo(
+                                        &repo_root,
+                                    )?;
+                                codeowners.default_owner()
+                            })();
+
+                            if let Some(owner) = owner_from_codeowners {
+                                task.assignee = Some(owner);
+                                assigned = true;
+                            }
+                        }
+
+                        if !assigned {
+                            if let Some(me) = crate::utils::identity::resolve_current_user(Some(
+                                resolver.path.as_path(),
+                            )) {
+                                task.assignee = Some(me);
+                            }
                         }
                     }
                 }

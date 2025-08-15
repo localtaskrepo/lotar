@@ -41,11 +41,11 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 	- [x] whoami --explain indicates when smart features are disabled and defaults are used
 
 ## Phase 2 — Ownership and auto-assign
-- [ ] CODEOWNERS parser and path matcher (supports wildcards, directory rules)
-- [ ] Auto-assign on first non-initial status: CODEOWNERS owner > Git identity > system (config-gated)
-- [ ] Option to disable CODEOWNERS auto-assign; when off, use configured defaults and ignore detector results
-- [ ] Tests: precedence, multiple owners, no matches
-- [ ] Docs: using CODEOWNERS for ownership and auto-assign
+- [x] CODEOWNERS parser and path matcher (supports wildcards, directory rules)
+- [x] Auto-assign on first non-initial status: CODEOWNERS owner > Git identity > system (config-gated)
+- [x] Option to disable CODEOWNERS auto-assign; when off, use configured defaults and ignore detector results
+- [~] Tests: precedence covered; add cases for multiple owners and no matches
+- [x] Docs: using CODEOWNERS for ownership and auto-assign
 
 ## Phase 3 — Project context and monorepos
 - [ ] Monorepo discovery: cargo workspaces, npm/yarn/pnpm workspaces, go workspaces
@@ -182,7 +182,6 @@ Ticket files & references:
 - [ ] VCS-host backlinking (opt-in), permalink helpers
 
 Ownership & context:
-- [ ] CODEOWNERS auto-assign (Phase 3)
 - [ ] Monorepo/workspace discovery and labels (Phase 4)
 - [ ] Branch/PR awareness and mappings (Phase 5)
 

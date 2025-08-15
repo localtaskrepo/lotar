@@ -33,6 +33,7 @@ fn make_cfg(
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
+        auto_codeowners_assign: true,
         default_priority,
         default_status,
         custom_fields: StringConfigField {
