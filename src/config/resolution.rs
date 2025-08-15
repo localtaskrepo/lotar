@@ -126,6 +126,9 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.auto_codeowners_assign != defaults.auto_codeowners_assign {
         base.auto_codeowners_assign = override_config.auto_codeowners_assign;
     }
+    if override_config.auto_tags_from_path != defaults.auto_tags_from_path {
+        base.auto_tags_from_path = override_config.auto_tags_from_path;
+    }
     if override_config.default_priority != defaults.default_priority {
         base.default_priority = override_config.default_priority;
     }
@@ -195,6 +198,9 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.auto_codeowners_assign != defaults.auto_codeowners_assign {
         resolved.auto_codeowners_assign = override_config.auto_codeowners_assign;
+    }
+    if override_config.auto_tags_from_path != defaults.auto_tags_from_path {
+        resolved.auto_tags_from_path = override_config.auto_tags_from_path;
     }
     if override_config.default_priority != defaults.default_priority {
         resolved.default_priority = override_config.default_priority;
@@ -320,6 +326,7 @@ impl ResolvedConfig {
             auto_set_reporter: global.auto_set_reporter,
             auto_assign_on_status: global.auto_assign_on_status,
             auto_codeowners_assign: global.auto_codeowners_assign,
+            auto_tags_from_path: global.auto_tags_from_path,
             default_priority: global.default_priority,
             default_status: global.default_status,
             custom_fields: global.custom_fields,

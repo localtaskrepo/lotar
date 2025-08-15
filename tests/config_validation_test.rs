@@ -44,6 +44,7 @@ fn test_global_config_validation_valid() {
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
+        auto_tags_from_path: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -90,6 +91,7 @@ fn test_global_config_validation_privileged_port_warning() {
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
+        auto_tags_from_path: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -153,6 +155,7 @@ fn test_global_config_validation_empty_lists_error() {
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
+        auto_tags_from_path: true,
     };
 
     let result = validator.validate_global_config(&config);
@@ -218,6 +221,7 @@ fn test_global_config_validation_invalid_defaults() {
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
+        auto_tags_from_path: true,
     };
 
     let result = validator.validate_global_config(&config);

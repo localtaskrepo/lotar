@@ -36,6 +36,7 @@ fn cfg() -> ResolvedConfig {
         ],
         auto_identity: true,
         auto_identity_git: true,
+        auto_tags_from_path: true,
     }
 }
 

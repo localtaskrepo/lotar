@@ -193,6 +193,9 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     if let Some(v) = get_path(&data, &["auto", "codeowners_assign"]).and_then(cast::<bool>) {
         cfg.auto_codeowners_assign = v;
     }
+    if let Some(v) = get_path(&data, &["auto", "tags_from_path"]).and_then(cast::<bool>) {
+        cfg.auto_tags_from_path = v;
+    }
 
     Ok(cfg)
 }
@@ -397,6 +400,10 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     auto.insert(
         Y::String("codeowners_assign".into()),
         Y::Bool(cfg.auto_codeowners_assign),
+    );
+    auto.insert(
+        Y::String("tags_from_path".into()),
+        Y::Bool(cfg.auto_tags_from_path),
     );
     root.insert(Y::String("auto".into()), Y::Mapping(auto));
 

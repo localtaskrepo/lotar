@@ -9,6 +9,7 @@ pub mod identity_detectors;
 // (git helpers are exposed at crate::utils_git)
 pub mod paths;
 pub mod project;
+pub mod workspace_labels;
 
 // Backwards-compatible re-exports for widely used project helpers
 pub use project::{

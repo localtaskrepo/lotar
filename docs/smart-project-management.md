@@ -168,6 +168,32 @@ Found 2 matching tasks:
 
 ## 🛠️ Advanced Usage Examples
 
+## 🧩 Monorepo Awareness (Phase 3)
+
+LoTaR detects project names and context in monorepos with sensible heuristics:
+
+### Project Name Detection Order
+
+1. `LOTAR_PROJECT` environment variable
+2. Nearest project manifest up to repo root:
+   - `package.json` → `name` (scope stripped)
+   - `Cargo.toml` → `[package].name`
+   - `go.mod` → module's last segment
+3. Git repository name (directory at repo root)
+4. Current directory name
+
+Note: The search stops at the repository root; both `.git` directories and `.git` files (worktrees/submodules) are supported.
+
+### Path-Derived Tags
+
+When adding tasks without tags and with no `default.tags`, a single tag may be derived from common monorepo directories:
+
+- Recognized: `packages/<name>`, `apps/<name>`, `libs/<name>`, `services/<name>`, `examples/<name>`
+- Hidden names are ignored
+- Only applied if the tag passes configured validation
+
+This keeps tasks organized by package/app automatically without extra typing.
+
 ### Cross-Project Workflows
 
 ```bash

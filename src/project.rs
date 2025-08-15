@@ -38,31 +38,57 @@ pub fn detect_project_name() -> Option<String> {
         }
     }
 
-    // 2. Try to detect from project files
+    // 2. Try to detect from project files (nearest manifest upwards)
     if let Some(name) = detect_from_project_files() {
         return Some(name);
     }
 
-    // 3. Use current folder name
+    // 3. Use git repo name when available
+    if let Some(repo_root) = crate::utils_git::find_repo_root(&std::env::current_dir().ok()?) {
+        if let Some(repo_name) = repo_root.file_name().and_then(|s| s.to_str()) {
+            return Some(repo_name.to_string());
+        }
+    }
+
+    // 4. Use current folder name
     if let Some(name) = get_current_folder_name() {
         return Some(name);
     }
 
-    // 5. Final fallback
+    // Final fallback
     Some("default".to_string())
 }
 
 fn detect_from_project_files() -> Option<String> {
-    let current_dir = std::env::current_dir().ok()?;
+    let mut dir = std::env::current_dir().ok()?;
+    // Walk up to repo root (if known) or filesystem root
+    let repo_root = crate::utils_git::find_repo_root(&dir);
+    loop {
+        // Prefer package.json name
+        if let Some(name) = read_package_json_name(&dir) {
+            return Some(name);
+        }
+        // Then Cargo.toml package name
+        if let Some(name) = read_cargo_toml_name(&dir) {
+            return Some(name);
+        }
+        // Then go.mod module name (last path segment)
+        if let Some(name) = read_go_mod_name(&dir) {
+            return Some(name);
+        }
 
-    // Check Cargo.toml (most relevant for this Rust project)
-    if let Some(name) = read_cargo_toml_name(&current_dir) {
-        return Some(name);
+        // Stop at repo root if found
+        if let Some(ref root) = repo_root {
+            if &dir == root {
+                break;
+            }
+        }
+        // Move up
+        match dir.parent() {
+            Some(parent) => dir = parent.to_path_buf(),
+            None => break,
+        }
     }
-
-    // Could add other TOML-based project files if needed
-    // pyproject.toml, etc. but keeping it simple for now
-
     None
 }
 
@@ -73,15 +99,51 @@ fn read_cargo_toml_name(dir: &Path) -> Option<String> {
     }
 
     let content = fs::read_to_string(&cargo_toml_path).ok()?;
-
-    // Simple regex-based parsing for the name field
-    let re = regex::Regex::new(r#"(?m)^name\s*=\s*"([^"]+)""#).ok()?;
+    // Only treat as a package file if it has a [package] section
+    if !content.contains("[package]") {
+        return None;
+    }
+    // Simple regex-based parsing for the name field within Cargo.toml
+    let re = regex::Regex::new(r#"(?m)^\s*name\s*=\s*"([^"]+)""#).ok()?;
     let captures = re.captures(&content)?;
-
     captures
         .get(1)
         .map(|m| m.as_str().to_string())
         .filter(|s| !s.is_empty())
+}
+
+fn read_package_json_name(dir: &Path) -> Option<String> {
+    let pj = dir.join("package.json");
+    if !pj.exists() {
+        return None;
+    }
+    let content = fs::read_to_string(&pj).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let name = v.get("name")?.as_str()?.trim();
+    if name.is_empty() {
+        return None;
+    }
+    // Strip scope if present (e.g., @scope/name -> name)
+    let cleaned = name.rsplit('/').next().unwrap_or(name).to_string();
+    Some(cleaned)
+}
+
+fn read_go_mod_name(dir: &Path) -> Option<String> {
+    let gm = dir.join("go.mod");
+    if !gm.exists() {
+        return None;
+    }
+    let content = fs::read_to_string(&gm).ok()?;
+    for line in content.lines() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix("module ") {
+            let last = rest.trim().trim_end_matches('/').rsplit('/').next()?;
+            if !last.is_empty() {
+                return Some(last.to_string());
+            }
+        }
+    }
+    None
 }
 
 fn get_current_folder_name() -> Option<String> {

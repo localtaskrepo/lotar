@@ -221,6 +221,7 @@ Automation:
 - `auto.identity` - Enable smart identity detection beyond configured default (default: true)
 - `auto.identity_git` - Enable git-based identity detection (default: true)
  - `auto.codeowners_assign` - Prefer CODEOWNERS owner on first status change when task has no assignee (default: true)
+ - `auto.tags_from_path` - Derive a tag from monorepo paths like packages/<name> when no tags provided and no defaults exist (default: true)
 
 ## Templates
 

@@ -56,6 +56,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ### Planning and diagnostics
 - `--dry-run` - Preview the task that would be created without writing
 - `--explain` - Show how defaults (status/priority/reporter) were chosen
+	- Includes project detection source and whether a path-derived tag was added
 
 ### Custom Fields
 - `--field <KEY>=<VALUE>` - Arbitrary properties (can be used multiple times)
@@ -120,7 +121,37 @@ Tasks are created in the appropriate project:
 1. **Explicit project**: `--project=myproject` or `-p myproject`
 2. **Task ID prefix**: If title starts with "PROJ-", uses PROJ project  
 3. **Default project**: From global config `default_project`
-4. **Auto-detection**: Based on current directory
+4. **Auto-detection**:
+	 - `LOTAR_PROJECT` environment variable (if set)
+	 - Nearest project manifest walking up to the repo root:
+		 - `package.json` name (scope stripped, e.g. `@scope/api` -> `api`)
+		 - `Cargo.toml` `[package].name`
+		 - `go.mod` module last path segment
+	 - Git repo name (folder name at repo root)
+	 - Current directory name
+
+Auto-detection walks upward but stops at the repository root (supports `.git` directory or file for worktrees/submodules).
+
+### Auto Tags from Monorepo Paths
+
+When you don't pass any `--tag` and your config has no `default.tags`, LoTaR will try to derive a single tag from common monorepo structures:
+
+- Recognized folders: `packages/<name>`, `apps/<name>`, `libs/<name>`, `services/<name>`, `examples/<name>`
+- Hidden names are ignored (e.g. `.hidden`)
+- The derived tag is validated against your configured `tags` list; if invalid, it's skipped
+
+Examples:
+```bash
+# In repo/packages/api
+lotar add "Implement endpoint"             # auto-adds --tag=api if allowed
+
+# In repo/apps/web, with no configured 'web' tag
+lotar add "Style header"                   # does NOT add tag (fails validation)
+```
+
+Configuration toggle:
+- Set `auto.tags_from_path: false` in `.tasks/config.yml` (global) or in a project config to disable this behavior entirely.
+	- Default is `true`.
 
 ## Examples by Use Case
 

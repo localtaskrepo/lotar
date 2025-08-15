@@ -185,6 +185,8 @@ pub struct GlobalConfig {
     pub auto_assign_on_status: bool,
     #[serde(default = "default_true")]
     pub auto_codeowners_assign: bool,
+    #[serde(default = "default_true")]
+    pub auto_tags_from_path: bool,
     #[serde(default = "default_priority")]
     pub default_priority: Priority,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -228,6 +230,7 @@ pub struct ResolvedConfig {
     // Automation toggles (effective)
     pub auto_identity: bool,
     pub auto_identity_git: bool,
+    pub auto_tags_from_path: bool,
 }
 
 #[derive(Debug)]
@@ -319,6 +322,7 @@ impl Default for GlobalConfig {
             auto_set_reporter: true,
             auto_assign_on_status: true,
             auto_codeowners_assign: true,
+            auto_tags_from_path: true,
             default_priority: default_priority(),
             default_status: None,
             custom_fields: default_custom_fields(),

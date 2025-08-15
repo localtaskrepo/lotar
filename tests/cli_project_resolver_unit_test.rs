@@ -43,6 +43,7 @@ fn make_resolver() -> ProjectResolver {
         ],
         auto_identity: true,
         auto_identity_git: true,
+        auto_tags_from_path: true,
     };
     resolver_from_config(cfg, std::path::PathBuf::from("/tmp"))
 }

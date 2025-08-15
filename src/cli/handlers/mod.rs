@@ -171,11 +171,17 @@ impl CommandHandler for AddHandler {
 
         // Validate tags
         let mut validated_tags = Vec::new();
-        let base_tags = if args.tags.is_empty() {
+        let mut base_tags = if args.tags.is_empty() {
             config.default_tags.clone()
         } else {
             vec![]
         };
+        // If still empty, try deriving a path label for monorepos (packages/foo -> foo)
+        if args.tags.is_empty() && base_tags.is_empty() && config.auto_tags_from_path {
+            if let Some(label) = crate::utils::workspace_labels::derive_label_from_cwd() {
+                base_tags.push(label);
+            }
+        }
         for tag in args.tags.iter().chain(base_tags.iter()) {
             let validated_tag = validator
                 .validate_tag(tag)

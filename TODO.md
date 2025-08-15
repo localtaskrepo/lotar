@@ -48,10 +48,14 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 - [x] Docs: using CODEOWNERS for ownership and auto-assign
 
 ## Phase 3 — Project context and monorepos
-- [ ] Monorepo discovery: cargo workspaces, npm/yarn/pnpm workspaces, go workspaces
-- [ ] Derive project id/name: prefer package/project names; fallback to repo name
-- [ ] Derive labels/tags from paths (e.g., packages/foo => label: foo)
-- [ ] Tests: nested workspaces, worktrees, submodules
+- [x] Monorepo discovery: cargo workspaces, npm/yarn/pnpm workspaces, go workspaces
+	- Implemented upward detection: nearest package.json name (scope stripped), Cargo [package] name, go.mod module last segment; fallback to repo name then cwd; stops at repo root (supports .git dir/file)
+- [x] Derive project id/name: prefer manifest names; fallback to repo name or project root directory name
+	- Covered by the detection above; prefix generation unchanged
+- [x] Derive labels/tags from paths (e.g., packages/foo => label: foo)
+	- Heuristic: packages/<name>, apps/<name>, libs/<name>, services/<name>, examples/<name>; hidden names ignored; no generic leaf-dir fallback
+- [x] Tests: nested workspaces, worktrees (/.git file), submodule-like structures
+- [x] Docs/help: updated behavior and precedence; added monorepo-aware auto-tag notes
 
 ## Phase 4 — Branch/PR awareness
 - [ ] Branch conventions: feat/fix/chore => default task type/status/priority

@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Find the git repo root by walking up from start until a .git directory is found.
+/// Find the git repo root by walking up from start until a .git directory or file is found.
 pub fn find_repo_root(start: &Path) -> Option<PathBuf> {
     let mut cur = start;
     loop {
         let candidate = cur.join(".git");
-        if candidate.is_dir() {
+        if candidate.is_dir() || candidate.is_file() {
             return Some(cur.to_path_buf());
         }
         match cur.parent() {
