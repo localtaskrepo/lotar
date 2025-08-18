@@ -10,12 +10,14 @@ use std::sync::{LazyLock, Mutex};
 
 static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web");
 
-pub fn serve(api_server: &api_server::ApiServer, port: u16) {
-    let listener = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16) {
+    // Resolve and bind to the provided host, defaulting to 127.0.0.1
+    let addr = format!("{}:{}", host, port);
+    let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
             OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
-                .log_error(&format!("Failed to bind to port {}: {}", port, e));
+                .log_error(&format!("Failed to bind to {}: {}", addr, e));
             return;
         }
     };
@@ -23,8 +25,11 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
     {
-        let mut map = STOP_FLAGS.lock().unwrap();
-        map.insert(port, false);
+        if let Ok(mut map) = STOP_FLAGS.lock() {
+            map.insert(port, false);
+        } else {
+            // If we cannot lock, continue serving without stop registry support
+        }
     }
 
     // Suppress startup info logs to keep tests and consumers' output clean.
@@ -147,7 +152,9 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                         let _ = stream.flush();
                     }
                     // Spawn a thread to forward events to this client with debounce and filtering
-                    let mut stream_clone = stream.try_clone().unwrap();
+                    let Ok(mut stream_clone) = stream.try_clone() else {
+                        continue;
+                    };
                     std::thread::spawn(move || {
                         let mut buffer: Vec<crate::api_events::ApiEvent> = Vec::new();
                         let mut deadline: Option<Instant> = None;
@@ -237,7 +244,7 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
                         }
                     });
                     continue;
-                } else if path == "/__test/stop" {
+                } else if path == "/__test/stop" || path == "/shutdown" {
                     // Test-only endpoint to allow clean shutdown of the server loop
                     if let Ok(mut map) = STOP_FLAGS.lock() {
                         map.insert(port, true);
@@ -389,6 +396,11 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
 
     // Cleanup entry in stop registry when server exits
     let _ = STOP_FLAGS.lock().map(|mut m| m.remove(&port));
+}
+
+// Backward-compat shim
+pub fn serve(api_server: &api_server::ApiServer, port: u16) {
+    serve_with_host(api_server, "127.0.0.1", port)
 }
 
 fn parse_path_and_query(path_full: &str) -> (String, HashMap<String, String>) {

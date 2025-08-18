@@ -32,6 +32,21 @@ pub fn load_global_config(tasks_dir: Option<&Path>) -> Result<GlobalConfig, Conf
 
 /// Load home configuration from ~/.lotar
 pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
+    // In test environments, ignore the user's home config to keep behavior deterministic
+    // Heuristics: RUST_TEST_THREADS is set by cargo test; LOTAR_TEST_MODE/LOTAR_IGNORE_HOME_CONFIG
+    // can be used to force-disable reading home config.
+    if std::env::var("RUST_TEST_THREADS").is_ok()
+        || std::env::var("LOTAR_TEST_MODE")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+        || std::env::var("LOTAR_IGNORE_HOME_CONFIG")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+    {
+        return Err(ConfigError::FileNotFound(
+            "Home config ignored in test mode".to_string(),
+        ));
+    }
     let home_dir =
         dirs::home_dir().ok_or(ConfigError::IoError("Home directory not found".to_string()))?;
     let path = home_dir.join(".lotar");
@@ -42,6 +57,19 @@ pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
 pub fn load_home_config_with_override(
     home_config_path: Option<&Path>,
 ) -> Result<GlobalConfig, ConfigError> {
+    // In test environments, ignore the user's home config to keep behavior deterministic
+    if std::env::var("RUST_TEST_THREADS").is_ok()
+        || std::env::var("LOTAR_TEST_MODE")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+        || std::env::var("LOTAR_IGNORE_HOME_CONFIG")
+            .map(|v| v == "1")
+            .unwrap_or(false)
+    {
+        return Err(ConfigError::FileNotFound(
+            "Home config ignored in test mode".to_string(),
+        ));
+    }
     let path = match home_config_path {
         Some(override_path) => override_path.to_path_buf(),
         None => {

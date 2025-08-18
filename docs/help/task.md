@@ -76,10 +76,13 @@ lotar task due-date <TASK_ID> [NEW_DATE]
 Delete a task.
 
 ```bash
-lotar task delete <TASK_ID> [--dry-run] [--force]
+lotar task delete <TASK_ID> [--dry-run] [--force | --yes | -y]
 # JSON preview: lotar task delete PROJ-1 --dry-run --format=json
 # {"status":"preview","action":"delete","task_id":"PROJ-1","project":"PROJ"}
 ```
+
+Notes:
+- `--yes` and `-y` are aliases for `--force` and skip the confirmation prompt.
 
 ## Examples
 

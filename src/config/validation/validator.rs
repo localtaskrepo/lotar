@@ -147,13 +147,14 @@ impl ConfigValidator {
         // This validates the final resolved configuration for consistency
         // Similar validations as global config but for the resolved state
 
-        if !config.issue_states.values.is_empty() && config.default_status.is_some() {
-            let default_status = config.default_status.as_ref().unwrap();
-            if !config.issue_states.values.contains(default_status) {
-                result.add_error(ValidationError::error(
-                    Some("default_status".to_string()),
-                    "Resolved default status not found in resolved issue states".to_string(),
-                ));
+        if !config.issue_states.values.is_empty() {
+            if let Some(default_status) = config.default_status.as_ref() {
+                if !config.issue_states.values.contains(default_status) {
+                    result.add_error(ValidationError::error(
+                        Some("default_status".to_string()),
+                        "Resolved default status not found in resolved issue states".to_string(),
+                    ));
+                }
             }
         }
 

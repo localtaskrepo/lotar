@@ -31,32 +31,10 @@ impl CommandHandler for StatusHandler {
             .validate_task_id_format(&args.task_id)
             .map_err(|e| format!("Invalid task ID: {}", e))?;
 
-        // Resolve project from task ID - function parameter takes precedence
-        let effective_project = project.or(args.explicit_project.as_deref());
-
-        // Check for conflicts between full task ID and explicit project argument
-        let final_effective_project = if let Some(explicit_proj) = effective_project {
-            if let Some(task_id_prefix) =
-                project_resolver.extract_project_from_task_id(&args.task_id)
-            {
-                let explicit_as_prefix =
-                    project_resolver.resolve_project_name_to_prefix(explicit_proj);
-                if task_id_prefix != explicit_as_prefix {
-                    renderer.emit_warning(&format!(
-                        "Warning: Task ID '{}' belongs to project '{}', but project '{}' was specified. Using task ID's project.",
-                        args.task_id, task_id_prefix, explicit_proj
-                    ));
-                    // Use task ID's project instead of the conflicting explicit project
-                    None
-                } else {
-                    effective_project
-                }
-            } else {
-                effective_project
-            }
-        } else {
-            effective_project
-        };
+        // Resolve project strictly: if task_id has a prefix and an explicit project is provided,
+        // enforce that they match, otherwise error. Always pass through the explicit project so
+        // ProjectResolver can validate consistency.
+        let final_effective_project = project.or(args.explicit_project.as_deref());
 
         let resolved_project = project_resolver
             .resolve_project(&args.task_id, final_effective_project)

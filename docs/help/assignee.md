@@ -1,87 +1,87 @@
 # lotar assignee
 
-**⚠️ PLACEHOLDER IMPLEMENTATION - Not fully functional yet**
+Change or view a task's assignee with validation and project-aware ID resolution.
 
-Change or view task assignee.
-
-## Current Status
-
-This command is currently a placeholder implementation that only displays a warning message. It does not actually modify task data.
-
-## Planned Usage
+## Usage
 
 ```bash
-# View current assignee (planned)
+# View current assignee
 lotar assignee <TASK_ID>
 
-# Change assignee (planned)  
+# Change assignee
 lotar assignee <TASK_ID> <NEW_ASSIGNEE>
 ```
 
-## Workaround
+## Examples
 
-Use the full task interface for now:
 ```bash
-# Use the task edit interface instead
-lotar task edit <TASK_ID> --assignee=<NEW_ASSIGNEE>
+# Get current assignee
+lotar assignee AUTH-001
+
+# Set to yourself (resolved via identity detection)
+lotar assignee 42 @me
+
+# Set using @username with explicit project for numeric IDs
+lotar assignee 42 @john_doe --project=AUTH
+
+# JSON output for automation
+lotar assignee AUTH-001 jane@example.com --format=json
 ```
 
-## Implementation Status
+## Accepted assignee formats
 
-- [ ] Command parsing ✅ (implemented)
-- [ ] Actual assignee modification ❌ (placeholder only)
-- [ ] Validation ❌ (not implemented)
-- [ ] Output formatting ❌ (placeholder only)
-lotar assignee AUTH-001 team@example.com --format=json
+- Email: john.doe@example.com
+- Username: @john_doe (letters, numbers, underscore, dash)
+- Special: @me (resolved to your detected identity)
+
+Use `lotar whoami --explain` to see how identity is resolved for @me.
+
+## Task ID resolution
+
+- Full IDs like AUTH-123 are used as-is
+- Numeric IDs like 123 use the default project; override with `--project`
+- If both the ID prefix and `--project` are given, they must refer to the same project
+
+## JSON output shapes
+
+- Get current assignee (`lotar assignee <ID> --format=json`):
+```json
+{
+  "status": "success",
+  "task_id": "AUTH-001",
+  "assignee": "john.doe@example.com"
+}
+```
+When no assignee is set: `"assignee": null`.
+
+- Set new assignee (`lotar assignee <ID> <ASSIGNEE> --format=json`):
+```json
+{
+  "status": "success",
+  "message": "Task AUTH-001 assignee updated",
+  "task_id": "AUTH-001",
+  "old_assignee": "john.doe@example.com",
+  "new_assignee": "jane@example.com"
+}
 ```
 
-## Assignee Format
+## Notes
 
-Assignees can be specified in various formats:
-- Email addresses: `john.doe@example.com`
-- Usernames: `john.doe`
-- Display names: `John Doe`
-- Team aliases: `@frontend-team`
+- Validation rejects invalid usernames and emails.
+- @me is resolved to a concrete identity when saving.
+- Works across multi-project workspaces; resolution is project-aware.
 
-## Project Integration
+## Alternative interface
 
-- Works with any project structure
-- Auto-detects project from task ID prefix
-- Falls back to global configuration if no project context
-- Supports custom assignee validation rules (project-specific)
-
-## Alternative Interface
-
-This command is also available through the full task interface:
+This is also available under the task umbrella:
 
 ```bash
 lotar task assignee <TASK_ID> [NEW_ASSIGNEE]
-# or using the alias
-lotar tasks assignee <TASK_ID> [NEW_ASSIGNEE]
 ```
 
-Both interfaces provide identical functionality.
+## See also
 
-## Output Formats
-
-Assignee changes support all output formats:
-- `text` (default): Human-readable with colors and emojis
-- `json`: Machine-readable for scripts and automation  
-- `table`: Clean tabular format
-- `markdown`: Documentation-friendly format
-
-## Error Handling
-
-Common errors and solutions:
-
-- **Task not found**: Verify task ID and project context
-- **Permission denied**: Check file permissions in tasks directory
-- **Invalid project**: Verify project exists and is properly configured
-
-## See Also
-
-- `lotar status` - Change task status
-- `lotar priority` - Change task priority
-- `lotar due-date` - Change task due date
-- `lotar task assignee` - Full task interface
-- `lotar config` - View and modify project configuration
+- `lotar whoami` – Show resolved identity
+- `lotar status` – Change task status
+- `lotar priority` – Change task priority
+- `lotar due-date` – Change task due date

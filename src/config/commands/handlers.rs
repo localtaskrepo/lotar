@@ -147,14 +147,20 @@ pub fn handle_show(
 #[allow(dead_code)]
 pub fn handle_show_config(tasks_dir: &Path, args: &[String]) {
     // Parse project name if provided
-    let (original_project_name, resolved_prefix) =
-        if args.len() > 3 && args[3].starts_with("--project=") {
-            let input = args[3].strip_prefix("--project=").unwrap();
-            let resolved = crate::utils::resolve_project_input(input, tasks_dir);
-            (Some(input.to_string()), Some(resolved))
-        } else {
-            (None, None)
-        };
+    let (original_project_name, resolved_prefix) = if args.len() > 3 && args[3].starts_with("--project=") {
+        match args[3].strip_prefix("--project=") {
+            Some(input) if !input.is_empty() => {
+                let resolved = crate::utils::resolve_project_input(input, tasks_dir);
+                (Some(input.to_string()), Some(resolved))
+            }
+            _ => {
+                eprintln!("Invalid --project argument; expected --project=<name>");
+                std::process::exit(2);
+            }
+        }
+    } else {
+        (None, None)
+    };
 
     if let Err(e) = handle_show(
         GlobalConfig::default(),

@@ -1,5 +1,6 @@
 use crate::config::types::ResolvedConfig;
 use crate::types::{Priority, TaskStatus, TaskType};
+use chrono::Datelike;
 
 /// Configuration-aware validation for CLI inputs
 pub struct CliValidator<'a> {
@@ -156,26 +157,37 @@ impl<'a> CliValidator<'a> {
 
     /// Parse and validate due date (supports relative dates)
     pub fn parse_due_date(&self, due_date: &str) -> Result<String, String> {
-        match due_date.to_lowercase().as_str() {
+        let s = due_date.trim().to_lowercase();
+        match s.as_str() {
             "today" => {
-                let today = chrono::Local::now().date_naive();
-                Ok(today.format("%Y-%m-%d").to_string())
+                let d = chrono::Local::now().date_naive();
+                Ok(d.format("%Y-%m-%d").to_string())
             }
             "tomorrow" => {
-                let tomorrow = chrono::Local::now().date_naive() + chrono::Duration::days(1);
-                Ok(tomorrow.format("%Y-%m-%d").to_string())
+                let d = chrono::Local::now().date_naive() + chrono::Duration::days(1);
+                Ok(d.format("%Y-%m-%d").to_string())
             }
             "next week" | "nextweek" => {
-                let next_week = chrono::Local::now().date_naive() + chrono::Duration::weeks(1);
-                Ok(next_week.format("%Y-%m-%d").to_string())
+                let d = chrono::Local::now().date_naive() + chrono::Duration::weeks(1);
+                Ok(d.format("%Y-%m-%d").to_string())
             }
             _ => {
+                // next monday/friday, etc.
+                if let Some(next_day) = parse_next_weekday(&s) {
+                    return Ok(next_day.format("%Y-%m-%d").to_string());
+                }
+                // +Nd, +Nw short offsets
+                if let Some(offset) = parse_simple_offset(&s) {
+                    let d = chrono::Local::now().date_naive() + offset;
+                    return Ok(d.format("%Y-%m-%d").to_string());
+                }
+
                 // Try to parse as YYYY-MM-DD
-                if let Ok(parsed) = chrono::NaiveDate::parse_from_str(due_date, "%Y-%m-%d") {
+                if let Ok(parsed) = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
                     Ok(parsed.format("%Y-%m-%d").to_string())
                 } else {
                     Err(format!(
-                        "Invalid date format: '{}'. Use YYYY-MM-DD or relative terms like 'today', 'tomorrow', 'next week'",
+                        "Invalid date format: '{}'. Use YYYY-MM-DD or relative terms like 'today', 'tomorrow', 'next week', 'next monday', '+3d', '+2w'",
                         due_date
                     ))
                 }
@@ -200,6 +212,69 @@ impl<'a> CliValidator<'a> {
             Err("Invalid effort format. Use number followed by h (hours), d (days), or w (weeks). Example: 2h, 1.5d, 1w".to_string())
         }
     }
+}
+
+/// Parse phrases like "next monday" into a NaiveDate relative to today.
+fn parse_next_weekday(s: &str) -> Option<chrono::NaiveDate> {
+    let trimmed = s.trim();
+    let rest = trimmed.strip_prefix("next ")?;
+    let wd = parse_weekday_name(rest.trim())?;
+    let today = chrono::Local::now().date_naive();
+    let today_num = today.weekday().num_days_from_monday() as i64;
+    let target_num = wd.num_days_from_monday() as i64;
+    let diff = (target_num - today_num).rem_euclid(7);
+    let days_ahead = if diff == 0 { 7 } else { diff };
+    Some(today + chrono::Duration::days(days_ahead))
+}
+
+fn parse_weekday_name(name: &str) -> Option<chrono::Weekday> {
+    let n = name.to_lowercase();
+    match n.as_str() {
+        "mon" | "monday" => Some(chrono::Weekday::Mon),
+        "tue" | "tues" | "tuesday" => Some(chrono::Weekday::Tue),
+        "wed" | "weds" | "wednesday" => Some(chrono::Weekday::Wed),
+        "thu" | "thur" | "thurs" | "thursday" => Some(chrono::Weekday::Thu),
+        "fri" | "friday" => Some(chrono::Weekday::Fri),
+        "sat" | "saturday" => Some(chrono::Weekday::Sat),
+        "sun" | "sunday" => Some(chrono::Weekday::Sun),
+        _ => None,
+    }
+}
+
+/// Parse "+Nd" or "+Nw" (and variants like "+1 day", "+2 weeks") into a Duration.
+fn parse_simple_offset(s: &str) -> Option<chrono::Duration> {
+    let t = s.trim_start();
+    if !t.starts_with('+') {
+        return None;
+    }
+    let rest = &t[1..];
+    // Try compact form: +10d, +2w
+    if let Some(unit) = rest.chars().last() {
+        if unit == 'd' || unit == 'w' {
+            let num_part = &rest[..rest.len() - 1];
+            if let Ok(n) = num_part.parse::<i64>() {
+                return Some(if unit == 'd' {
+                    chrono::Duration::days(n)
+                } else {
+                    chrono::Duration::weeks(n)
+                });
+            }
+        }
+    }
+    // Try spaced form: +10 day(s), +2 week(s)
+    let parts: Vec<&str> = rest.split_whitespace().collect();
+    if parts.len() == 2 {
+        if let Ok(n) = parts[0].parse::<i64>() {
+            let unit = parts[1].to_lowercase();
+            if unit.starts_with("day") {
+                return Some(chrono::Duration::days(n));
+            }
+            if unit.starts_with("week") {
+                return Some(chrono::Duration::weeks(n));
+            }
+        }
+    }
+    None
 }
 
 /// Find the closest match for a string in a list (simple edit distance)

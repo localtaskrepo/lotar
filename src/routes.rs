@@ -30,7 +30,12 @@ pub fn initialize(api_server: &mut ApiServer) {
         // Convert to TaskCreate DTO
         let req_create = crate::api_types::TaskCreate {
             title: add.title,
-            project: req.query.get("project").cloned(),
+            // Accept project from JSON body, fallback to query for backward-compat
+            project: body
+                .get("project")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| req.query.get("project").cloned()),
             priority: match add.priority {
                 Some(ref p) => match crate::types::Priority::parse_with_config(p, cfg) {
                     Ok(v) => Some(v),
@@ -204,6 +209,57 @@ pub fn initialize(api_server: &mut ApiServer) {
         }
     });
 
+    // POST /api/tasks/status { id, status }
+    api_server.register_handler("POST", "/api/tasks/status", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let id = match body.get("id").and_then(|v| v.as_str()) {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => return bad_request("Missing id".into()),
+        };
+        let new_status = match body.get("status").and_then(|v| v.as_str()) {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => return bad_request("Missing status".into()),
+        };
+        // Load config for validation
+        let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
+            Ok(m) => m,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
+        };
+        let cfg = cfg_mgr.get_resolved_config();
+        // Validate status
+        let parsed = match crate::types::TaskStatus::parse_with_config(&new_status, cfg) {
+            Ok(s) => s,
+            Err(msg) => return bad_request(msg),
+        };
+        let patch = crate::api_types::TaskUpdate {
+            title: None,
+            status: Some(parsed),
+            priority: None,
+            task_type: None,
+            reporter: None,
+            assignee: None,
+            due_date: None,
+            effort: None,
+            description: None,
+            category: None,
+            tags: None,
+            custom_fields: None,
+        };
+        match TaskService::update(&mut storage, &id, patch) {
+            Ok(task) => {
+                let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&task, actor.as_deref());
+                ok_json(200, json!({"data": task}))
+            }
+            Err(e) => bad_request(e.to_string()),
+        }
+    });
+
     // POST /api/tasks/delete
     api_server.register_handler("POST", "/api/tasks/delete", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
@@ -302,7 +358,14 @@ pub fn initialize(api_server: &mut ApiServer) {
 }
 
 fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
-    let body = serde_json::to_vec(&v).unwrap();
+    let body = match serde_json::to_vec(&v) {
+        Ok(b) => b,
+        Err(e) => format!(
+            "{{\"error\":{{\"code\":\"SERIALIZE\",\"message\":\"{}\"}}}}",
+            e
+        )
+        .into_bytes(),
+    };
     HttpResponse {
         status,
         headers: vec![("Content-Type".into(), "application/json".into())],
@@ -311,8 +374,10 @@ fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
 }
 
 fn bad_request(msg: String) -> HttpResponse {
-    let body = serde_json::to_vec(&json!({"error": {"code": "INVALID_ARGUMENT", "message": msg}}))
-        .unwrap();
+    let val = json!({"error": {"code": "INVALID_ARGUMENT", "message": msg}});
+    let body = serde_json::to_vec(&val).unwrap_or_else(|_| {
+        b"{\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"Bad request\"}}".to_vec()
+    });
     HttpResponse {
         status: 400,
         headers: vec![("Content-Type".into(), "application/json".into())],
@@ -321,7 +386,9 @@ fn bad_request(msg: String) -> HttpResponse {
 }
 
 fn internal(v: serde_json::Value) -> HttpResponse {
-    let body = serde_json::to_vec(&v).unwrap();
+    let body = serde_json::to_vec(&v).unwrap_or_else(|_| {
+        b"{\"error\":{\"code\":\"INTERNAL\",\"message\":\"Internal error\"}}".to_vec()
+    });
     HttpResponse {
         status: 500,
         headers: vec![("Content-Type".into(), "application/json".into())],
@@ -330,8 +397,10 @@ fn internal(v: serde_json::Value) -> HttpResponse {
 }
 
 fn not_found(msg: String) -> HttpResponse {
-    let body =
-        serde_json::to_vec(&json!({"error": {"code": "NOT_FOUND", "message": msg}})).unwrap();
+    let val = json!({"error": {"code": "NOT_FOUND", "message": msg}});
+    let body = serde_json::to_vec(&val).unwrap_or_else(|_| {
+        b"{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Not found\"}}".to_vec()
+    });
     HttpResponse {
         status: 404,
         headers: vec![("Content-Type".into(), "application/json".into())],

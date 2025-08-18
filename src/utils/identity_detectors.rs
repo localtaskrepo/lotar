@@ -267,7 +267,7 @@ impl ProjectManifestDetector {
                 if start.is_none() {
                     start = Some(i + 1);
                 } else {
-                    let st = start.unwrap();
+                    let Some(st) = start else { break };
                     return Some(s[st..i].to_string());
                 }
             }

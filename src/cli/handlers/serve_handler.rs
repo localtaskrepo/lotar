@@ -44,7 +44,8 @@ impl CommandHandler for ServeHandler {
 
         let mut api_server = api_server::ApiServer::new();
         routes::initialize(&mut api_server);
-        web_server::serve(&api_server, port);
+        // Bind to provided host; API and UI served together
+        web_server::serve_with_host(&api_server, &host, port);
 
         Ok(())
     }

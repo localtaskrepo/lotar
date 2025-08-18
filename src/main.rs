@@ -4,6 +4,8 @@
 use clap::Parser;
 use std::env;
 
+use lotar::cli::handlers::assignee::{AssigneeArgs, AssigneeHandler};
+use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
@@ -206,35 +208,39 @@ fn main() {
         }
         Commands::DueDate { id, due_date } => {
             renderer.log_info("BEGIN DUEDATE");
-            // TODO: Create a dedicated DueDateHandler similar to StatusHandler and PriorityHandler
-            if let Some(new_due_date) = due_date {
-                let message = format!(
-                    "Set {} due_date = {} (placeholder implementation)",
-                    id, new_due_date
-                );
-                renderer.emit_warning(&message);
-            } else {
-                let message = format!("Show {} due_date (placeholder implementation)", id);
-                renderer.emit_warning(&message);
+            let args = DueDateArgs {
+                task_id: id,
+                new_due_date: due_date,
+            };
+            match DueDateHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END DUEDATE status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END DUEDATE status=err");
+                    Err(e)
+                }
             }
-            renderer.log_info("END DUEDATE status=ok");
-            Ok(())
         }
         Commands::Assignee { id, assignee } => {
             renderer.log_info("BEGIN ASSIGNEE");
-            // TODO: Create a dedicated AssigneeHandler similar to StatusHandler and PriorityHandler
-            if let Some(new_assignee) = assignee {
-                let message = format!(
-                    "Set {} assignee = {} (placeholder implementation)",
-                    id, new_assignee
-                );
-                renderer.emit_warning(&message);
-            } else {
-                let message = format!("Show {} assignee (placeholder implementation)", id);
-                renderer.emit_warning(&message);
+            let args = AssigneeArgs {
+                task_id: id,
+                new_assignee: assignee,
+            };
+            match AssigneeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END ASSIGNEE status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END ASSIGNEE status=err");
+                    Err(e)
+                }
             }
-            renderer.log_info("END ASSIGNEE status=ok");
-            Ok(())
         }
         Commands::Task { action } => {
             renderer.log_info("BEGIN TASK");

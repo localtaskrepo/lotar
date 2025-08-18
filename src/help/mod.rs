@@ -133,11 +133,10 @@ impl HelpSystem {
     fn render_with_hyperlinks(&self, markdown: &str, base_dir: &str) -> String {
         // Convert Markdown links [text](target) into OSC 8 clickable hyperlinks.
         // Preserve original link text and do not change JSON output.
-        let re = Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").ok();
-        if re.is_none() {
-            return markdown.to_string();
-        }
-        let re = re.unwrap();
+        let re = match Regex::new(r"\[([^\]]+)\]\(([^)]+)\)") {
+            Ok(r) => r,
+            Err(_) => return markdown.to_string(),
+        };
         let mut out = String::with_capacity(markdown.len() + 64);
         let mut last = 0usize;
         for caps in re.captures_iter(markdown) {

@@ -157,8 +157,12 @@ impl ConfigHandler {
         project: Option<String>,
         explain: bool,
     ) -> Result<(), String> {
-        let config_manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
-            .map_err(|e| format!("Failed to load config: {}", e))?;
+        // Git-like behavior: adopt the parent tasks root if found (read-only is fine to inherit)
+        let effective_read_root = resolver.path.clone();
+
+        let config_manager =
+            ConfigManager::new_manager_with_tasks_dir_readonly(&effective_read_root)
+                .map_err(|e| format!("Failed to load config: {}", e))?;
 
         // Small helpers to determine provenance for selected fields
         fn env_source_for_key(
@@ -332,7 +336,10 @@ impl ConfigHandler {
 
             // Project Settings section (no server settings for project config)
             renderer.emit_info("Project Settings:");
-            renderer.emit_raw_stdout(&format!("  Tasks directory: {}", resolver.path.display()));
+            renderer.emit_raw_stdout(&format!(
+                "  Tasks directory: {}",
+                effective_read_root.display()
+            ));
             renderer.emit_raw_stdout("  Task file extension: yml");
             renderer.emit_raw_stdout(&format!(
                 "  Project prefix: {}",
@@ -399,11 +406,12 @@ impl ConfigHandler {
                     // Determine per-field source using project config file presence
                     let project_cfg_raw = crate::config::persistence::load_project_config_from_dir(
                         &project_prefix,
-                        &resolver.path,
+                        &effective_read_root,
                     )
                     .ok();
                     let global_cfg =
-                        crate::config::persistence::load_global_config(Some(&resolver.path)).ok();
+                        crate::config::persistence::load_global_config(Some(&effective_read_root))
+                            .ok();
                     let home_cfg = crate::config::persistence::load_home_config().ok();
 
                     let src = |key: &str| -> &'static str {
@@ -464,7 +472,10 @@ impl ConfigHandler {
                 }
             ));
             renderer.emit_info("Project Settings:");
-            renderer.emit_raw_stdout(&format!("  Tasks directory: {}", resolver.path.display()));
+            renderer.emit_raw_stdout(&format!(
+                "  Tasks directory: {}",
+                effective_read_root.display()
+            ));
             renderer.emit_raw_stdout("  Task file extension: yml");
             renderer.emit_raw_stdout(&format!(
                 "  Project prefix: {}",
@@ -483,7 +494,7 @@ impl ConfigHandler {
             if explain {
                 renderer.emit_info("Value sources:");
                 let global_cfg =
-                    crate::config::persistence::load_global_config(Some(&resolver.path)).ok();
+                    crate::config::persistence::load_global_config(Some(&effective_read_root)).ok();
                 let home_cfg = crate::config::persistence::load_home_config().ok();
 
                 let sp =

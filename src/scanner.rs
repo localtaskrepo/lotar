@@ -123,15 +123,32 @@ impl Scanner {
             .collect::<Vec<_>>()
             .join("|");
         // Signal present anywhere in line (word boundary), case-insensitive
-        let signal_re = Regex::new(&format!(r"(?i)\b(?:{})\b", joined)).unwrap();
+        let signal_re = match Regex::new(&format!(r"(?i)\b(?:{})\b", joined)) {
+            Ok(r) => r,
+            Err(_) => match Regex::new(r"(?i)\b(?:todo|fixme|hack|bug|note)\b") {
+                Ok(r) => r,
+                Err(_) => Regex::new(r"todo").unwrap(), // extremely unlikely; minimal fallback
+            },
+        };
         // With id in parens: WORD (<id>): <text>
         let uuid_re = Regex::new(&format!(
             r"(?i)\b(?:{})[ \t]*\(([^)]+)\)[ \t]*:?\s*(.*)",
             joined
         ))
-        .unwrap();
+        .unwrap_or_else(|_| {
+            Regex::new(r"(?i)\b(?:todo|fixme|hack|bug|note)[ \t]*\(([^)]+)\)[ \t]*:?\s*(.*)")
+                .unwrap_or_else(|_| {
+                    Regex::new(r"\(([^)]+)\)\s*(.*)").expect("regex compile fallback")
+                })
+        });
         // Simple form: WORD: <text> (or just WORD <text>)
-        let simple_re = Regex::new(&format!(r"(?i)\b(?:{})[ \t]*:?\s*(.*)", joined)).unwrap();
+        let simple_re = match Regex::new(&format!(r"(?i)\b(?:{})[ \t]*:?\s*(.*)", joined)) {
+            Ok(r) => r,
+            Err(_) => match Regex::new(r"(?i)\b(?:todo|fixme|hack|bug|note)[ \t]*:?\s*(.*)") {
+                Ok(r) => r,
+                Err(_) => Regex::new(r"\s*(.*)").expect("regex compile fallback"),
+            },
+        };
         (signal_re, uuid_re, simple_re)
     }
 

@@ -13,24 +13,29 @@ static SUBSCRIBERS: LazyLock<Mutex<Vec<mpsc::Sender<ApiEvent>>>> =
 
 pub fn subscribe() -> mpsc::Receiver<ApiEvent> {
     let (tx, rx) = mpsc::channel::<ApiEvent>();
-    let mut subs = SUBSCRIBERS.lock().unwrap();
-    subs.push(tx);
+    if let Ok(mut subs) = SUBSCRIBERS.lock() {
+        subs.push(tx);
+    } // else: if poisoned, drop silently; receiver will see no events
     rx
 }
 
 pub fn emit(event: ApiEvent) {
-    let mut subs = SUBSCRIBERS.lock().unwrap();
-    let mut alive = Vec::with_capacity(subs.len());
-    for s in subs.drain(..) {
-        if s.send(event.clone()).is_ok() {
-            alive.push(s);
+    if let Ok(mut subs) = SUBSCRIBERS.lock() {
+        let mut alive = Vec::with_capacity(subs.len());
+        for s in subs.drain(..) {
+            if s.send(event.clone()).is_ok() {
+                alive.push(s);
+            }
         }
+        *subs = alive;
     }
-    *subs = alive;
 }
 
 pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
-    let mut payload = serde_json::to_value(task).unwrap_or(JsonValue::Null);
+    let mut payload = match serde_json::to_value(task) {
+        Ok(v) => v,
+        Err(_) => JsonValue::Null,
+    };
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }
@@ -41,7 +46,10 @@ pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<
 }
 
 pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
-    let mut payload = serde_json::to_value(task).unwrap_or(JsonValue::Null);
+    let mut payload = match serde_json::to_value(task) {
+        Ok(v) => v,
+        Err(_) => JsonValue::Null,
+    };
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));
     }

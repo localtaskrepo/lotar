@@ -1,6 +1,10 @@
 use crate::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use crate::cli::handlers::status::{StatusArgs as StatusHandlerArgs, StatusHandler};
 use crate::cli::handlers::{AddHandler, CommandHandler};
+use crate::cli::handlers::{
+    assignee::{AssigneeArgs, AssigneeHandler},
+    duedate::{DueDateArgs, DueDateHandler},
+};
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::cli::{TaskAction, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs};
@@ -68,32 +72,18 @@ impl CommandHandler for TaskHandler {
                 PriorityHandler::execute(priority_args, project, resolver, renderer)
             }
             TaskAction::Assignee { id, assignee } => {
-                // Handle assignee command
-                if let Some(new_assignee) = assignee {
-                    let message = format!(
-                        "Set {} assignee = {} (placeholder implementation)",
-                        id, new_assignee
-                    );
-                    renderer.emit_warning(&message);
-                } else {
-                    let message = format!("Show {} assignee (placeholder implementation)", id);
-                    renderer.emit_warning(&message);
-                }
-                Ok(())
+                let args = AssigneeArgs {
+                    task_id: id,
+                    new_assignee: assignee,
+                };
+                AssigneeHandler::execute(args, project, resolver, renderer)
             }
             TaskAction::DueDate { id, due_date } => {
-                // Handle due date command
-                if let Some(new_due_date) = due_date {
-                    let message = format!(
-                        "Set {} due_date = {} (placeholder implementation)",
-                        id, new_due_date
-                    );
-                    renderer.emit_warning(&message);
-                } else {
-                    let message = format!("Show {} due_date (placeholder implementation)", id);
-                    renderer.emit_warning(&message);
-                }
-                Ok(())
+                let args = DueDateArgs {
+                    task_id: id,
+                    new_due_date: due_date,
+                };
+                DueDateHandler::execute(args, project, resolver, renderer)
             }
             TaskAction::Delete(delete_args) => {
                 DeleteHandler::execute(delete_args, project, resolver, renderer)
@@ -116,6 +106,7 @@ impl CommandHandler for EditHandler {
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
         renderer.log_info("edit: begin");
+        // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
         let mut storage = Storage::new(resolver.path.clone());
 
         // Create project resolver and validator
@@ -189,12 +180,16 @@ impl CommandHandler for EditHandler {
         }
 
         if let Some(due) = args.due {
-            // TODO: Parse and validate due date
-            // For now, just store as string in custom fields
-            task.custom_fields.insert(
-                "due_date".to_string(),
-                crate::types::custom_value_string(due),
-            );
+            let cfg = match &effective_project {
+                Some(project_name) => project_resolver
+                    .get_project_config(project_name)
+                    .map_err(|e| format!("Failed to get project configuration: {}", e))?,
+                None => project_resolver.get_config().clone(),
+            };
+            let v = CliValidator::new(&cfg)
+                .parse_due_date(&due)
+                .map_err(|e| format!("Due date validation failed: {}", e))?;
+            task.due_date = Some(v);
         }
 
         if let Some(description) = args.description {
@@ -395,31 +390,12 @@ impl CommandHandler for SearchHandler {
         // Apply sorting if requested
         if let Some(sort_field) = args.sort_by {
             use crate::cli::SortField;
-            use crate::types::{Priority, TaskStatus};
+            // Priority and TaskStatus implement Ord; use cmp on enums directly
 
             tasks.sort_by(|(_, task_a), (_, task_b)| {
                 let comparison = match sort_field {
-                    SortField::Priority => {
-                        // Sort by priority enum order (Critical > High > Medium > Low)
-                        let priority_order = |p: &Priority| match p {
-                            Priority::Critical => 4,
-                            Priority::High => 3,
-                            Priority::Medium => 2,
-                            Priority::Low => 1,
-                        };
-                        priority_order(&task_a.priority).cmp(&priority_order(&task_b.priority))
-                    }
-                    SortField::Status => {
-                        // Sort by status enum order
-                        let status_order = |s: &TaskStatus| match s {
-                            TaskStatus::Todo => 1,
-                            TaskStatus::InProgress => 2,
-                            TaskStatus::Verify => 3,
-                            TaskStatus::Blocked => 4,
-                            TaskStatus::Done => 5,
-                        };
-                        status_order(&task_a.status).cmp(&status_order(&task_b.status))
-                    }
+                    SortField::Priority => task_a.priority.cmp(&task_b.priority),
+                    SortField::Status => task_a.status.cmp(&task_b.status),
                     SortField::DueDate => {
                         // Sort by due date (tasks without due date go last)
                         match (&task_a.due_date, &task_b.due_date) {
@@ -545,7 +521,20 @@ impl CommandHandler for DeleteHandler {
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
         renderer.log_info("delete: begin");
+        // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
         let mut storage = Storage::new(resolver.path.clone());
+
+        // Create project resolver to handle numeric IDs and project resolution
+        let mut project_resolver = ProjectResolver::new(resolver)
+            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+
+        // Validate ID format and determine full task id (adds prefix if numeric-only)
+        project_resolver
+            .validate_task_id_format(&args.id)
+            .map_err(|e| format!("Invalid task ID: {}", e))?;
+        let full_task_id = project_resolver
+            .get_full_task_id(&args.id, project)
+            .map_err(|e| format!("Could not determine full task ID: {}", e))?;
 
         // Resolve project prefix
         let project_prefix = if let Some(project) = project {
@@ -555,7 +544,7 @@ impl CommandHandler for DeleteHandler {
         };
 
         // Check if task exists
-        if storage.get(&args.id, project_prefix.clone()).is_none() {
+        if storage.get(&full_task_id, project_prefix.clone()).is_none() {
             return Err(format!("Task '{}' not found", args.id));
         }
 
@@ -603,9 +592,21 @@ impl CommandHandler for DeleteHandler {
         }
 
         // Delete the task
-        let deleted = storage.delete(&args.id, project_prefix);
+        let deleted = storage.delete(&full_task_id, project_prefix);
         if deleted {
-            renderer.emit_success(&format!("Task '{}' deleted successfully", args.id));
+            match renderer.format {
+                crate::output::OutputFormat::Json => {
+                    let obj = serde_json::json!({
+                        "status": "success",
+                        "message": format!("Task '{}' deleted", args.id),
+                        "task_id": args.id
+                    });
+                    renderer.emit_raw_stdout(&obj.to_string());
+                }
+                _ => {
+                    renderer.emit_success(&format!("Task '{}' deleted successfully", args.id));
+                }
+            }
             Ok(())
         } else {
             Err(format!("Failed to delete task '{}'", args.id))

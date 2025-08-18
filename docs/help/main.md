@@ -47,8 +47,8 @@ lotar add "Environment task"  # Uses environment-configured directory
 - **list** - Display tasks with filtering and multiple output formats
 - **status** - Change task status with validation  
 - **priority** - Change task priority
-- **assignee** - Change task assignee ⚠️ PLACEHOLDER
-- **due-date** - Manage task due dates ⚠️ PLACEHOLDER
+- **assignee** - Change task assignee
+- **due-date** - Manage task due dates
 - **task** - Full task management (legacy interface)
 - **config** - Comprehensive project configuration with templates, validation, and dry-run
 - **scan** - Find TODO comments in code

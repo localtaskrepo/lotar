@@ -52,8 +52,13 @@ where
                                 "Object must contain exactly one key for pair",
                             ));
                         }
-                        let (k, v) = o.into_iter().next().unwrap();
-                        out.push((k, v.as_str().unwrap_or(&v.to_string()).to_string()));
+                        if let Some((k, v)) = o.into_iter().next() {
+                            out.push((k, v.as_str().unwrap_or(&v.to_string()).to_string()));
+                        } else {
+                            return Err(DeError::custom(
+                                "Object must contain exactly one key for pair",
+                            ));
+                        }
                     }
                     other => {
                         return Err(DeError::custom(format!(
@@ -362,7 +367,7 @@ pub struct TaskDeleteArgs {
     pub id: String,
 
     /// Confirm deletion without prompt
-    #[arg(long)]
+    #[arg(long, short = 'y', alias = "yes")]
     #[serde(default)]
     pub force: bool,
 

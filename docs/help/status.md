@@ -107,8 +107,6 @@ Dry-run preview in JSON:
 ```json
 {
   "status": "preview",
-  "action": "status_change",
-  "task_id": "AUTH-001",
   "old_status": "TODO",
   "new_status": "IN_PROGRESS",
   "would_set_assignee": "john.doe", // optional
@@ -121,16 +119,12 @@ Structured update information:
 ```
 | Property    | Value       |
 |-------------|-------------|
-| Task ID     | AUTH-001    |
-| Old Status  | TODO        |
 | New Status  | IN_PROGRESS |
 | Changed By  | john.doe    |
 | Timestamp   | 10:30 AM    |
 ```
 
 ## Validation
-
-Status changes are validated against project configuration:
 
 ### Status Validation
 - New status must be in project's `issue_states` list
@@ -220,6 +214,9 @@ lotar status $TASK_ID $NEW_STATUS --format=json > /tmp/change.json
 
 # Extract and sync to external system
 EXTERNAL_ID=$(lotar config show --project=AUTH --format=json | jq -r '.data.custom.fields.jira_id')
+## Notes
+
+- If the task ID includes a project prefix (e.g., FOO-123) and you also pass --project, they must refer to the same project; otherwise the command errors with a Project mismatch message.
 curl -X PUT "https://api.jira.com/issue/$EXTERNAL_ID" \
      -d '{"fields": {"status": "Done"}}'
 ```

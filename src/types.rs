@@ -21,6 +21,32 @@ impl TaskStatus {
     pub fn is_default(&self) -> bool {
         matches!(self, TaskStatus::Todo)
     }
+
+    /// A stable rank used for sorting. Lower comes first.
+    #[inline]
+    pub fn sort_rank(&self) -> u8 {
+        match self {
+            TaskStatus::Todo => 1,
+            TaskStatus::InProgress => 2,
+            TaskStatus::Verify => 3,
+            TaskStatus::Blocked => 4,
+            TaskStatus::Done => 5,
+        }
+    }
+}
+
+impl Eq for TaskStatus {}
+
+impl PartialOrd for TaskStatus {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TaskStatus {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.sort_rank().cmp(&other.sort_rank())
+    }
 }
 
 impl fmt::Display for TaskStatus {
@@ -273,6 +299,31 @@ pub enum Priority {
 impl Priority {
     pub fn is_default(&self) -> bool {
         matches!(self, Priority::Medium)
+    }
+
+    /// A stable rank used for sorting. Lower comes first.
+    #[inline]
+    pub fn sort_rank(&self) -> u8 {
+        match self {
+            Priority::Low => 1,
+            Priority::Medium => 2,
+            Priority::High => 3,
+            Priority::Critical => 4,
+        }
+    }
+}
+
+impl Eq for Priority {}
+
+impl PartialOrd for Priority {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Priority {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.sort_rank().cmp(&other.sort_rank())
     }
 }
 

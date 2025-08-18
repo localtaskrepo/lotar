@@ -19,9 +19,11 @@ impl ConfigService {
                     prefix, e
                 ))
             })?;
-            Ok(serde_json::to_value(project_cfg).unwrap())
+            serde_json::to_value(project_cfg)
+                .map_err(|e| LoTaRError::SerializationError(e.to_string()))
         } else {
-            Ok(serde_json::to_value(mgr.get_resolved_config()).unwrap())
+            serde_json::to_value(mgr.get_resolved_config())
+                .map_err(|e| LoTaRError::SerializationError(e.to_string()))
         }
     }
 

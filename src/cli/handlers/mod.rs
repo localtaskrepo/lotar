@@ -8,7 +8,9 @@ use crate::types::{Priority, TaskStatus, TaskType};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json;
 
+pub mod assignee;
 pub mod config_handler;
+pub mod duedate;
 pub mod priority;
 pub mod scan_handler;
 pub mod serve_handler;
@@ -402,13 +404,16 @@ impl CommandHandler for AddHandler {
         }
 
         // Save the task
+        // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
+        let write_root = resolver.path.clone();
+
         let mut storage = if let Some(project_name) = effective_project.as_deref() {
             // Use project context for smart global config creation
-            Storage::new_with_context(resolver.path.clone(), Some(project_name))
+            Storage::new_with_context(write_root, Some(project_name))
         } else {
             // Try to auto-detect project context for smart global config
             let context = crate::project::detect_project_name();
-            Storage::new_with_context(resolver.path.clone(), context.as_deref())
+            Storage::new_with_context(write_root, context.as_deref())
         };
 
         // Use resolved project prefix, not the raw project name
@@ -516,7 +521,10 @@ impl AddHandler {
         renderer: &OutputRenderer,
     ) {
         // Fetch the created task to show details (read-only operation)
-        if let Some(storage) = Storage::try_open(resolver.path.clone()) {
+        // Use the same root selection as write path: prefer local .tasks if resolver adopted a parent
+        let read_root = resolver.path.clone();
+
+        if let Some(storage) = Storage::try_open(read_root) {
             let project_name = cli_project.map(|s| s.to_string()).unwrap_or_else(|| {
                 // Extract project from task ID (e.g., "TTF-1" -> "TTF")
                 if let Some(dash_pos) = task_id.find('-') {

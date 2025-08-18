@@ -27,36 +27,18 @@ impl CommandHandler for PriorityHandler {
             .validate_task_id_format(&args.task_id)
             .map_err(|e| format!("Invalid task ID: {}", e))?;
 
-        // Resolve project from task ID - function parameter takes precedence
-        let effective_project = project.or(args.explicit_project.as_deref());
-
-        // Check for conflicts between task ID and explicit project
-        let final_effective_project = if let Some(explicit_proj) = effective_project {
-            if let Some(task_id_prefix) =
-                project_resolver.extract_project_from_task_id(&args.task_id)
-            {
-                let explicit_as_prefix =
-                    project_resolver.resolve_project_name_to_prefix(explicit_proj);
-                if task_id_prefix != explicit_as_prefix {
-                    renderer.emit_warning(&format!(
-                        "Warning: Task ID '{}' belongs to project '{}', but project '{}' was specified. Using task ID's project.",
-                        args.task_id, task_id_prefix, explicit_proj
-                    ));
-                    None
-                } else {
-                    effective_project
-                }
-            } else {
-                effective_project
-            }
-        } else {
-            effective_project
-        };
+        // Resolve project strictly: always honor explicit project if provided and validate
+        // against any prefix in the task_id. This will error on mismatches.
+        let final_effective_project = project.or(args.explicit_project.as_deref());
 
         // Load project configuration for validation
         let resolved_project = project_resolver
             .resolve_project("", final_effective_project)
             .map_err(|e| format!("Could not resolve project: {}", e))?;
+        // Determine full task id (handles numeric IDs by prefixing with project)
+        let full_task_id = project_resolver
+            .get_full_task_id(&args.task_id, final_effective_project)
+            .map_err(|e| format!("Could not determine full task ID: {}", e))?;
         let config = project_resolver.get_config();
         let project_config = if !resolved_project.is_empty() {
             project_resolver
@@ -86,37 +68,79 @@ impl CommandHandler for PriorityHandler {
                     .map_err(|e| format!("Priority validation failed: {}", e))?;
 
                 let mut task = storage
-                    .get(&args.task_id, project_prefix.clone())
-                    .ok_or_else(|| format!("Task '{}' not found", args.task_id))?;
+                    .get(&full_task_id, project_prefix.clone())
+                    .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
 
                 let old_priority = task.priority;
                 if old_priority == validated_priority {
-                    renderer.emit_warning(&format!(
-                        "Task {} priority is already {}",
-                        args.task_id, validated_priority
-                    ));
+                    match renderer.format {
+                        crate::output::OutputFormat::Json => {
+                            let obj = serde_json::json!({
+                                "status": "success",
+                                "message": format!("Task {} priority unchanged", full_task_id),
+                                "task_id": full_task_id,
+                                "priority": validated_priority.to_string()
+                            });
+                            renderer.emit_raw_stdout(&obj.to_string());
+                        }
+                        _ => {
+                            renderer.emit_warning(&format!(
+                                "Task {} priority is already {}",
+                                full_task_id, validated_priority
+                            ));
+                        }
+                    }
                     return Ok(());
                 }
 
                 task.priority = validated_priority;
-                storage.edit(&args.task_id, &task);
+                storage.edit(&full_task_id, &task);
 
-                renderer.emit_success(&format!(
-                    "Task {} priority changed from {} to {}",
-                    args.task_id, old_priority, task.priority
-                ));
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        let obj = serde_json::json!({
+                            "status": "success",
+                            "message": format!(
+                                "Task {} priority changed from {} to {}",
+                                full_task_id, old_priority, task.priority
+                            ),
+                            "task_id": full_task_id,
+                            "old_priority": old_priority.to_string(),
+                            "new_priority": task.priority.to_string()
+                        });
+                        renderer.emit_raw_stdout(&obj.to_string());
+                    }
+                    _ => {
+                        renderer.emit_success(&format!(
+                            "Task {} priority changed from {} to {}",
+                            full_task_id, old_priority, task.priority
+                        ));
+                    }
+                }
                 Ok(())
             }
             None => {
                 // GET operation
                 let task = storage
-                    .get(&args.task_id, project_prefix.clone())
-                    .ok_or_else(|| format!("Task '{}' not found", args.task_id))?;
+                    .get(&full_task_id, project_prefix.clone())
+                    .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
 
-                renderer.emit_success(&format!(
-                    "Task {} priority: {}",
-                    args.task_id, task.priority
-                ));
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        let obj = serde_json::json!({
+                            "status": "success",
+                            "task_id": full_task_id,
+                            "priority": task.priority.to_string()
+                        });
+                        renderer.emit_raw_stdout(&obj.to_string());
+                    }
+                    _ => {
+                        renderer.emit_success(&format!(
+                            "Task {} priority: {}",
+                            full_task_id, task.priority
+                        ));
+                    }
+                }
                 Ok(())
             }
         }

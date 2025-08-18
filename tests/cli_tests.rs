@@ -302,7 +302,7 @@ mod error_handling {
     }
 
     #[test]
-    fn test_status_project_mismatch_reports_error() {
+    fn test_status_project_mismatch_errors_when_id_has_prefix() {
         let temp_dir = TempDir::new().unwrap();
 
         // Create a task under default project (TEST)
@@ -312,16 +312,13 @@ mod error_handling {
             .assert()
             .success();
 
-        // Try to set status with wrong explicit project -> should succeed but warn
+        // Try to set status with wrong explicit project -> should error due to mismatch
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(&temp_dir)
             .args(["status", "FOO-1", "done", "--project=BAR"]) // BAR doesn't match FOO
             .assert()
-            .success()
-            .stderr(
-                predicate::str::contains("Project mismatch")
-                    .or(predicate::str::contains("Using task ID's project")),
-            );
+            .failure()
+            .stderr(predicate::str::contains("Project mismatch"));
     }
 
     #[test]

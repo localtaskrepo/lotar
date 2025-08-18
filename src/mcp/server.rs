@@ -367,7 +367,9 @@ pub fn run_stdio_server() {
                         "Parse error",
                         Some(json!({"details": format!("body read failed: {}", e)})),
                     );
-                    let _ = writeln!(stdout, "{}", serde_json::to_string(&resp).unwrap());
+                    if let Ok(s) = serde_json::to_string(&resp) {
+                        let _ = writeln!(stdout, "{}", s);
+                    }
                     let _ = stdout.flush();
                     continue;
                 }
@@ -380,7 +382,9 @@ pub fn run_stdio_server() {
                             "Parse error",
                             Some(json!({"details": format!("utf8 error: {}", e)})),
                         );
-                        let _ = writeln!(stdout, "{}", serde_json::to_string(&resp).unwrap());
+                        if let Ok(s) = serde_json::to_string(&resp) {
+                            let _ = writeln!(stdout, "{}", s);
+                        }
                         let _ = stdout.flush();
                         continue;
                     }
@@ -396,7 +400,13 @@ pub fn run_stdio_server() {
                     ),
                 };
                 // Respond using the same framing style (Content-Length)
-                let payload = serde_json::to_string(&response).unwrap();
+                let payload = match serde_json::to_string(&response) {
+                    Ok(s) => s,
+                    Err(e) => format!(
+                        "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":-32603,\"message\":\"Serialization error: {}\"}},\"id\":null}}",
+                        e
+                    ),
+                };
                 let _ = write!(
                     stdout,
                     "Content-Length: {}\r\n\r\n{}",
@@ -413,7 +423,9 @@ pub fn run_stdio_server() {
                     "Parse error",
                     Some(json!({"details": "missing Content-Length"})),
                 );
-                let _ = writeln!(stdout, "{}", serde_json::to_string(&resp).unwrap());
+                if let Ok(s) = serde_json::to_string(&resp) {
+                    let _ = writeln!(stdout, "{}", s);
+                }
                 let _ = stdout.flush();
                 continue;
             }
@@ -430,7 +442,9 @@ pub fn run_stdio_server() {
                 Some(json!({"details": e.to_string()})),
             ),
         };
-        let _ = writeln!(stdout, "{}", serde_json::to_string(&response).unwrap());
+        if let Ok(s) = serde_json::to_string(&response) {
+            let _ = writeln!(stdout, "{}", s);
+        }
         let _ = stdout.flush();
     }
 }
@@ -1296,5 +1310,9 @@ pub fn handle_json_line(line: &str) -> String {
             Some(json!({"details": e.to_string()})),
         ),
     };
-    serde_json::to_string(&response).unwrap()
+    serde_json::to_string(&response).unwrap_or_else(|_| {
+        // Fall back to a minimal, valid JSON-RPC error line
+        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"}}"
+            .to_string()
+    })
 }

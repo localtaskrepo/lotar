@@ -31,7 +31,7 @@ lotar list --format=table
 lotar list --format=json
 
 # Start web interface
-lotar serve --port=8080
+lotar serve --host=0.0.0.0 --port=8080 --open
 ```
 
 ## ✨ What is LoTaR?
@@ -115,7 +115,7 @@ lotar scan ./src
 ### Web Interface
 ```bash
 # Built-in web server with React frontend
-lotar serve 8080
+lotar serve --host 127.0.0.1 --port 8080
 ```
 
 ## 📁 How It Works

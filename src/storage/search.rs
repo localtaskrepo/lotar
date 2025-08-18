@@ -3,7 +3,7 @@ use crate::storage::task::Task;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Search and filtering functionality for task storage
 pub struct StorageSearch;
@@ -18,45 +18,64 @@ impl StorageSearch {
         // If we have a specific project filter, search only that project
         if let Some(project) = &filter.project {
             // Try to find the project folder (could be the project name itself or a mapped prefix)
-            let project_folders = Self::get_project_folders_for_name(root_path, project);
+            let mut candidate_roots: Vec<PathBuf> = vec![root_path.to_path_buf()];
 
-            for project_folder in project_folders {
-                let project_path = root_path.join(&project_folder);
-                let files = crate::utils::filesystem::list_files_with_ext(&project_path, "yml");
+            // Fallback: when running from a workspace parent without a local .tasks, also
+            // scan immediate child directories for their own .tasks roots (monorepo layout).
+            if let Some(parent) = root_path.parent() {
+                for entry in crate::utils::filesystem::list_visible_subdirs(parent) {
+                    let (_, dir_path) = entry;
+                    let child_tasks = dir_path.join(".tasks");
+                    if child_tasks.exists() && child_tasks.is_dir() {
+                        candidate_roots.push(child_tasks);
+                    }
+                }
+            }
 
-                #[cfg(feature = "parallel")]
-                let mut partial: Vec<(String, Task)> = files
-                    .par_iter()
-                    .filter_map(|path| {
-                        let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
-                        let task_id = format!("{}-{}", project_folder, numeric_id);
-                        let content = fs::read_to_string(path).ok()?;
-                        let task: Task = serde_yaml::from_str(&content).ok()?;
-                        if Self::task_matches_filter(&task, filter) {
-                            Some((task_id, task))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+            // Deduplicate candidate roots
+            candidate_roots.sort();
+            candidate_roots.dedup();
 
-                #[cfg(not(feature = "parallel"))]
-                let mut partial: Vec<(String, Task)> = files
-                    .iter()
-                    .filter_map(|path| {
-                        let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
-                        let task_id = format!("{}-{}", project_folder, numeric_id);
-                        let content = fs::read_to_string(path).ok()?;
-                        let task: Task = serde_yaml::from_str(&content).ok()?;
-                        if Self::task_matches_filter(&task, filter) {
-                            Some((task_id, task))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+            for candidate_root in candidate_roots.into_iter() {
+                let project_folders = Self::get_project_folders_for_name(&candidate_root, project);
+                for project_folder in project_folders {
+                    let project_path = candidate_root.join(&project_folder);
+                    let files = crate::utils::filesystem::list_files_with_ext(&project_path, "yml");
 
-                results.append(&mut partial);
+                    #[cfg(feature = "parallel")]
+                    let mut partial: Vec<(String, Task)> = files
+                        .par_iter()
+                        .filter_map(|path| {
+                            let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
+                            let task_id = format!("{}-{}", project_folder, numeric_id);
+                            let content = fs::read_to_string(path).ok()?;
+                            let task: Task = serde_yaml::from_str(&content).ok()?;
+                            if Self::task_matches_filter(&task, filter) {
+                                Some((task_id, task))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    #[cfg(not(feature = "parallel"))]
+                    let mut partial: Vec<(String, Task)> = files
+                        .iter()
+                        .filter_map(|path| {
+                            let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
+                            let task_id = format!("{}-{}", project_folder, numeric_id);
+                            let content = fs::read_to_string(path).ok()?;
+                            let task: Task = serde_yaml::from_str(&content).ok()?;
+                            if Self::task_matches_filter(&task, filter) {
+                                Some((task_id, task))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+
+                    results.append(&mut partial);
+                }
             }
         } else {
             // Search across all projects

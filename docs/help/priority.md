@@ -12,6 +12,10 @@ lotar priority <TASK_ID>
 lotar priority <TASK_ID> <NEW_PRIORITY>
 ```
 
+## Notes
+
+- If the task ID includes a project prefix (e.g., FOO-123) and you also pass --project, they must refer to the same project; otherwise the command errors with a Project mismatch message.
+
 ## Quick Examples
 
 ```bash

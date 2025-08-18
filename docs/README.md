@@ -63,6 +63,13 @@ lotar scan ./src
 - **Configurable ports** (default 8080)
  - **SSE**: realtime events with `retry` hint and periodic heartbeats
 
+### Server flags and endpoints
+
+- `lotar serve --host 0.0.0.0 --port 8080 --open`
+    - `--host` controls the bind address (default: 127.0.0.1). Use `0.0.0.0` to listen on all interfaces.
+    - `--open` opens the default browser to the server URL, but does not change bind address.
+- Shutdown endpoint: `GET /shutdown` cleanly stops the server. For tests, `/__test/stop` remains available as an alias.
+
 ## Command Reference
 
 ```bash

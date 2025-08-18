@@ -104,7 +104,12 @@ impl CommandHandler for ScanHandler {
                     })
                 })
                 .collect();
-            renderer.emit_raw_stdout(&serde_json::to_string(&items).unwrap());
+            match serde_json::to_string(&items) {
+                Ok(s) => renderer.emit_raw_stdout(&s),
+                Err(e) => renderer.emit_raw_stdout(
+                    &serde_json::json!({"status":"error","message":format!("scan serialization failed: {}", e)}).to_string(),
+                ),
+            }
         } else if all_results.is_empty() {
             renderer.emit_success("No TODO comments found.");
         } else {

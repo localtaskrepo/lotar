@@ -23,10 +23,14 @@ pub fn generate_project_prefix(project_name: &str) -> String {
         clean_name.to_uppercase()
     } else {
         let normalized = clean_name.to_uppercase();
-        if normalized.contains('-') || normalized.contains('_') || normalized.contains(' ') {
+        if normalized.contains('-')
+            || normalized.contains('_')
+            || normalized.contains(' ')
+            || normalized.contains('.')
+        {
             // For hyphenated/underscored/spaced names, take first letters of each word
             normalized
-                .split(&['-', '_', ' '][..])
+                .split(&['-', '_', ' ', '.'][..])
                 .filter_map(|word| word.chars().next())
                 .take(4)
                 .collect::<String>()

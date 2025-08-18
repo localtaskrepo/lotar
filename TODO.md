@@ -19,6 +19,9 @@ Chores:
 - There are a lot of _ variables. We should check if they are all needed
 - Check if any of the auto features can be applied to MCP and web endpoints (or they already are)
 
+Bugs:
+- We have an operation that creates an empty config.yml and nothing else 
+
 ---
 
 # Implementation Roadmap — Smart Detection & Integrations (Aug 2025)
@@ -62,6 +65,8 @@ Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 - [x] Branch conventions: infer default task type from branch (feat/feature → Feature; fix/bugfix/hotfix → Bug; chore/docs/refactor/test/perf → Chore), gated by `auto.branch_infer_type`
 - [~] Config-aware mapping and aliases: type inference respects configured types with graceful fallback; status/priority inference and alias table pending
 cra- [x] Flags/docs to opt-in/out via config (`auto.branch_infer_type`), with tests and help docs
+
+--- CURRENT STATUS: CLEAN UP & REFACTOR ---
 
 ## Phase 5 — Source scan (MVP)
 - [ ] Rich TODO syntax (link-friendly):

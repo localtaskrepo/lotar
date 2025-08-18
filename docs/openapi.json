@@ -9,10 +9,10 @@
     { "url": "http://localhost:8080", "description": "Local server" }
   ],
   "paths": {
-    "/api/tasks/add": {
+  "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-  "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto.set_reporter is enabled in config, reporter is set automatically when not provided.",
+    "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
         "parameters": [
           {
             "name": "project",
@@ -77,6 +77,30 @@
             }
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/api/tasks/status": {
+      "post": {
+        "summary": "Change task status",
+        "description": "Sets the status of a task. Validates against configured workflow states and applies auto-assign rules if enabled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskSetStatusRequest" },
+              "examples": {
+                "inProgress": { "summary": "Move to IN_PROGRESS", "value": { "id": "TEST-1", "status": "IN_PROGRESS" } },
+                "done": { "summary": "Complete task", "value": { "id": "TEST-1", "status": "DONE" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeTask" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
           "500": { "$ref": "#/components/responses/InternalError" }
         }
       }
@@ -326,7 +350,7 @@
         "type": "object",
         "properties": {
           "title": { "type": "string", "nullable": true },
-          "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true },
+          "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true, "description": "Use /api/tasks/status for status transitions in REST." },
           "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
           "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
           "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
@@ -344,7 +368,7 @@
         "properties": {
           "id": { "type": "string" },
           "title": { "type": "string", "nullable": true },
-          "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true },
+          "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true, "description": "Ignored by /api/tasks/update; use /api/tasks/status." },
           "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
           "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
           "assignee": { "type": "string", "nullable": true },
@@ -356,6 +380,14 @@
           "custom_fields": { "type": "object", "additionalProperties": true, "nullable": true }
         },
         "required": ["id"]
+      },
+      "TaskSetStatusRequest": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "$ref": "#/components/schemas/TaskStatus" }
+        },
+        "required": ["id", "status"]
       },
       "TaskDeleteRequest": {
         "type": "object",
