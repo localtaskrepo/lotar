@@ -1,5 +1,5 @@
+use crate::LoTaRError;
 use crate::api_server::{ApiServer, HttpRequest, HttpResponse};
-use crate::errors::LoTaRError;
 use crate::services::{
     config_service::ConfigService, project_service::ProjectService, task_service::TaskService,
 };
@@ -65,7 +65,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Some(m)
             },
         };
-        match TaskService::create(&mut storage, req_create) {
+    match TaskService::create(&mut storage, req_create) {
             Ok(task) => {
                 let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
                 crate::api_events::emit_task_created(&task, actor.as_deref());
@@ -87,7 +87,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(m) => m,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
         };
-        let cfg = cfg_mgr.get_resolved_config();
+    let cfg = cfg_mgr.get_resolved_config();
 
         // Helpers to parse comma-separated values and validate
     let parse_list = |key: &str| -> Vec<String> {
@@ -133,7 +133,13 @@ pub fn initialize(api_server: &mut ApiServer) {
             text_query: req.query.get("q").cloned(),
         };
         let tasks = TaskService::list(&storage, &filter);
-        ok_json(200, json!({"data": tasks.iter().map(|(_, t)| t).collect::<Vec<_>>(), "meta": {"count": tasks.len()}}))
+        ok_json(
+            200,
+            json!({
+                "data": tasks.iter().map(|(_, t)| t).collect::<Vec<_>>(),
+                "meta": {"count": tasks.len()}
+            }),
+        )
     });
 
     // GET /api/tasks/get?id=ID[&project=PREFIX]
@@ -173,7 +179,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(m) => m,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
         };
-    let cfg = cfg_mgr.get_resolved_config();
+        let cfg = cfg_mgr.get_resolved_config();
         // Build patch
         let patch = crate::api_types::TaskUpdate {
             title: edit.title,
@@ -358,52 +364,38 @@ pub fn initialize(api_server: &mut ApiServer) {
 }
 
 fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
-    let body = match serde_json::to_vec(&v) {
-        Ok(b) => b,
-        Err(e) => format!(
-            "{{\"error\":{{\"code\":\"SERIALIZE\",\"message\":\"{}\"}}}}",
-            e
-        )
-        .into_bytes(),
-    };
-    HttpResponse {
-        status,
-        headers: vec![("Content-Type".into(), "application/json".into())],
-        body,
-    }
+    json_response(status, v).unwrap_or_else(json_serialize_error)
 }
 
 fn bad_request(msg: String) -> HttpResponse {
-    let val = json!({"error": {"code": "INVALID_ARGUMENT", "message": msg}});
-    let body = serde_json::to_vec(&val).unwrap_or_else(|_| {
-        b"{\"error\":{\"code\":\"INVALID_ARGUMENT\",\"message\":\"Bad request\"}}".to_vec()
-    });
-    HttpResponse {
-        status: 400,
-        headers: vec![("Content-Type".into(), "application/json".into())],
-        body,
-    }
+    ok_json(
+        400,
+        json!({"error": {"code": "INVALID_ARGUMENT", "message": msg}}),
+    )
 }
 
 fn internal(v: serde_json::Value) -> HttpResponse {
-    let body = serde_json::to_vec(&v).unwrap_or_else(|_| {
-        b"{\"error\":{\"code\":\"INTERNAL\",\"message\":\"Internal error\"}}".to_vec()
-    });
-    HttpResponse {
-        status: 500,
-        headers: vec![("Content-Type".into(), "application/json".into())],
-        body,
-    }
+    ok_json(500, v)
 }
 
 fn not_found(msg: String) -> HttpResponse {
-    let val = json!({"error": {"code": "NOT_FOUND", "message": msg}});
-    let body = serde_json::to_vec(&val).unwrap_or_else(|_| {
-        b"{\"error\":{\"code\":\"NOT_FOUND\",\"message\":\"Not found\"}}".to_vec()
-    });
-    HttpResponse {
-        status: 404,
+    ok_json(404, json!({"error": {"code": "NOT_FOUND", "message": msg}}))
+}
+
+fn json_response(status: u16, v: serde_json::Value) -> Result<HttpResponse, serde_json::Error> {
+    let body = serde_json::to_vec(&v)?;
+    Ok(HttpResponse {
+        status,
         headers: vec![("Content-Type".into(), "application/json".into())],
         body,
+    })
+}
+
+fn json_serialize_error(e: serde_json::Error) -> HttpResponse {
+    let fallback = json!({"error": {"code": "SERIALIZE", "message": e.to_string()}});
+    HttpResponse {
+        status: 500,
+        headers: vec![("Content-Type".into(), "application/json".into())],
+        body: serde_json::to_vec(&fallback).unwrap_or_else(|_| b"{}".to_vec()),
     }
 }

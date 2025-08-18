@@ -23,7 +23,7 @@ struct ApiHandler {
 }
 
 pub struct ApiServer {
-    // key is normalized "METHOD path"
+    // Key is normalized "METHOD path"
     handlers: HashMap<String, ApiHandler>,
 }
 
@@ -72,5 +72,3 @@ impl ApiServer {
         format!("{} {}", method.to_uppercase(), p)
     }
 }
-
-//unsafe impl Sync for ApiServer {}

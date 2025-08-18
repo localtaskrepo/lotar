@@ -1,4 +1,4 @@
-// Thin utils module root that organizes domain utilities and re-exports
+// Utilities root module: organizes domain utilities and re-exports
 
 // Domain submodules
 pub mod codeowners;
@@ -6,7 +6,7 @@ pub mod config;
 pub mod filesystem;
 pub mod identity;
 pub mod identity_detectors;
-// (git helpers are exposed at crate::utils_git)
+// Git helpers are exposed at crate::utils_git
 pub mod paths;
 pub mod project;
 pub mod workspace_labels;

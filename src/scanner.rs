@@ -1,9 +1,6 @@
-//! Source code scanner for TODO references in comment lines.
-//! - Recursively scans a directory for supported source files
-//! - Detects TODOs in comment lines across many languages
-//! - Extracts optional UUID and a title after the TODO token
+//! Simple source scanner for TODO-like references in comments across many languages.
 
-// Optimized file types configuration - removed duplicates and organized by comment style
+// Supported extensions mapped to their single-line comment tokens
 const FILE_TYPES: &[(&str, &str)] = &[
     // Single-line comment languages with //
     ("rs", "//"),

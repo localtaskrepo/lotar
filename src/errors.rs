@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-/// Custom error types for LoTaR operations
+/// Error types for LoTaR operations
 #[derive(Debug)]
 pub enum LoTaRError {
     IoError(std::io::Error),

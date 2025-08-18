@@ -5,12 +5,10 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct TasksDirectoryResolver {
     pub path: PathBuf,
-    #[allow(dead_code)]
     pub source: TasksDirectorySource,
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum TasksDirectorySource {
     CommandLineFlag,
     FoundInParent(PathBuf), // The parent directory where it was found
@@ -26,10 +24,10 @@ impl TasksDirectoryResolver {
         Self::resolve_internal(explicit_path, global_config_tasks_folder, None)
     }
 
-    /// Function to resolve with home directory override (primarily for testing)
+    /// Resolve with home directory override (primarily for testing)
     ///
-    /// This function allows tests to specify a custom home directory path for configuration
-    /// loading, enabling isolated testing of home config functionality.
+    /// Allows tests to specify a custom home directory path for configuration loading,
+    /// enabling isolated testing of home config functionality.
     #[cfg(test)] // Used in integration tests
     pub fn resolve_with_home_override(
         explicit_path: Option<&str>,
@@ -43,7 +41,7 @@ impl TasksDirectoryResolver {
         )
     }
 
-    /// Internal resolve function with optional home config override for testing
+    /// Internal resolve with optional home config override (used in tests)
     fn resolve_internal(
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,
@@ -76,15 +74,13 @@ impl TasksDirectoryResolver {
                 if !env_path.trim().is_empty() {
                     let path_buf = PathBuf::from(env_path.trim());
 
-                    // Special handling for relative paths: check if it's a simple directory name
-                    // that might exist in parent directories (like "./tasks" or "tasks")
+                    // Special handling for relative paths: simple directory names searched in parents
                     if path_buf.is_relative() {
                         // Extract the final directory name for simple cases
                         if let Some(dir_name) = path_buf.file_name() {
                             let dir_name_str = dir_name.to_string_lossy();
 
                             // For simple directory names (not complex paths), search parents first
-                            // This covers cases like "tasks", ".tasks", "./tasks", "./.tasks"
                             if !env_path.trim().contains('/') || env_path.trim().starts_with("./") {
                                 if let Some((found_path, parent_dir)) =
                                     Self::find_tasks_folder_in_parents(&dir_name_str)?
@@ -147,7 +143,7 @@ impl TasksDirectoryResolver {
         })
     }
 
-    /// Get the tasks folder name from environment, config, or default
+    /// Get the tasks folder name from config or fallback default
     fn get_tasks_folder_name(global_config_tasks_folder: Option<&str>) -> String {
         // 1. Global config setting
         if let Some(config_folder) = global_config_tasks_folder {
@@ -160,14 +156,11 @@ impl TasksDirectoryResolver {
         String::from(".tasks")
     }
 
-    /// Get tasks folder preference from home configuration
+    /// Read tasks folder preference from home configuration if available
     pub fn get_home_config_tasks_folder(
         home_config_override: &Option<PathBuf>,
     ) -> Result<Option<String>, String> {
-        // In test environments, ignore the user's home config to keep behavior deterministic
-        // and avoid leaking developer machine settings (like tasks_folder) into tests.
-        // Heuristics: RUST_TEST_THREADS is set by cargo test; LOTAR_TEST_MODE/LOTAR_IGNORE_HOME_CONFIG
-        // can be used to force-disable reading home config.
+        // In test environments, ignore the user's home config to keep behavior deterministic.
         if std::env::var("RUST_TEST_THREADS").is_ok()
             || std::env::var("LOTAR_TEST_MODE")
                 .map(|v| v == "1")
@@ -191,8 +184,7 @@ impl TasksDirectoryResolver {
         // Try to load the home config file
         match fs::read_to_string(&home_config_path) {
             Ok(content) => {
-                // Simple YAML parsing to extract tasks_folder setting
-                // This is a basic implementation - could be enhanced with full YAML parsing
+                // Simple YAML parsing to extract tasks_folder setting (minimal parser)
                 for line in content.lines() {
                     let line = line.trim();
                     if line.starts_with("tasks_folder:") {
@@ -215,7 +207,7 @@ impl TasksDirectoryResolver {
         // Use dirs crate for cross-platform home directory support
         let home_dir = dirs::home_dir().ok_or("Unable to determine home directory")?;
 
-        // On Windows, we might want to use a different location
+        // On Windows, use %APPDATA%/lotar/config.yml when available
         #[cfg(windows)]
         {
             // Try Windows-specific config location first
@@ -240,8 +232,7 @@ impl TasksDirectoryResolver {
             || env::var("LOTAR_TEST_MODE")
                 .map(|v| v == "1")
                 .unwrap_or(false);
-        // Determine a tighter boundary for Cargo tests: the nearest ancestor whose name resembles a temp dir
-        // like .tmpXXXX or tmp.XXXX (tempfile crate patterns). This keeps parent search within the test sandbox.
+        // Determine a tighter boundary for Cargo tests within the test sandbox.
         let temp_boundary = if test_env {
             let mut probe = current_dir.clone();
             let mut boundary: Option<PathBuf> = None;
@@ -289,7 +280,7 @@ impl TasksDirectoryResolver {
         Ok(None)
     }
 
-    /// Check if a path is in the current working directory
+    /// Check if a path is the current working directory
     #[allow(dead_code)]
     fn is_current_directory(path: &Path) -> bool {
         if let Ok(current_dir) = env::current_dir() {

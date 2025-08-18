@@ -16,57 +16,17 @@ Chores:
 - Replace parcel with vite
 - Check if we're Windows compatible
 - Test release workflow
-- There are a lot of _ variables. We should check if they are all needed
 - Check if any of the auto features can be applied to MCP and web endpoints (or they already are)
+- Tests names are a mess
 
 Bugs:
-- We have an operation that creates an empty config.yml and nothing else 
+- We have an operation that creates an empty config.yml and nothing else. Might be a test
 
 ---
 
 # Implementation Roadmap — Smart Detection & Integrations (Aug 2025)
 
 Legend: [ ] = TODO, [x] = Done, [~] = In Progress
-
-## Phase 1 — Detection foundation
-- [x] Detector trait and registry (Signals with value, confidence, provenance)
-- [x] Git detector: repo root, current branch, remotes, user.name/email (repo-local > global)
-	- Implemented: user.name/user.email + branch + remotes; repo root discovery (details exposed via explain)
-- [x] Project-config detector: package.json, Cargo.toml, .csproj (authors)
-- [x] System detector: OS username/hostname (fallback only)
-- [x] Merge policy (identity): config.default_reporter → project manifest author → git user.name/email → system env
-- [x] Configurable defaults override auto-detected values via feature toggles
-- [x] whoami --explain shows sources and confidence per field (with toggle states and git details)
-- [x] Caching and invalidation: added explain cache keyed by tasks root + env + git mtimes; invalidate function provided
-- [x] Feature toggles: `auto.identity`, `auto.identity_git` added and enforced by detectors
- - [x] Config schema normalization: accept dotted and nested YAML, canonicalize to a single nested form
-	 - Added `lotar config normalize` to rewrite files into the canonical nested form
- - [x] Validation: scan.ticket_patterns must be valid/non-ambiguous; clear errors/warnings
-	- [x] whoami --explain indicates when smart features are disabled and defaults are used
-
-## Phase 2 — Ownership and auto-assign
-- [x] CODEOWNERS parser and path matcher (supports wildcards, directory rules)
-- [x] Auto-assign on first non-initial status: CODEOWNERS owner > Git identity > system (config-gated)
-- [x] Option to disable CODEOWNERS auto-assign; when off, use configured defaults and ignore detector results
-- [~] Tests: precedence covered; add cases for multiple owners and no matches
-- [x] Docs: using CODEOWNERS for ownership and auto-assign
-
-## Phase 3 — Project context and monorepos
-- [x] Monorepo discovery: cargo workspaces, npm/yarn/pnpm workspaces, go workspaces
-	- Implemented upward detection: nearest package.json name (scope stripped), Cargo [package] name, go.mod module last segment; fallback to repo name then cwd; stops at repo root (supports .git dir/file)
-- [x] Derive project id/name: prefer manifest names; fallback to repo name or project root directory name
-	- Covered by the detection above; prefix generation unchanged
-- [x] Derive labels/tags from paths (e.g., packages/foo => label: foo)
-	- Heuristic: packages/<name>, apps/<name>, libs/<name>, services/<name>, examples/<name>; hidden names ignored; no generic leaf-dir fallback
-- [x] Tests: nested workspaces, worktrees (/.git file), submodule-like structures
-- [x] Docs/help: updated behavior and precedence; added monorepo-aware auto-tag notes
-
-## Phase 4 — Branch/PR awareness
-- [x] Branch conventions: infer default task type from branch (feat/feature → Feature; fix/bugfix/hotfix → Bug; chore/docs/refactor/test/perf → Chore), gated by `auto.branch_infer_type`
-- [~] Config-aware mapping and aliases: type inference respects configured types with graceful fallback; status/priority inference and alias table pending
-cra- [x] Flags/docs to opt-in/out via config (`auto.branch_infer_type`), with tests and help docs
-
---- CURRENT STATUS: CLEAN UP & REFACTOR ---
 
 ## Phase 5 — Source scan (MVP)
 - [ ] Rich TODO syntax (link-friendly):
@@ -171,7 +131,7 @@ Notes:
 ## Acceptance gates per phase
 - [ ] Build passes (lint/tests), new tests cover behavior and edge cases
 - [ ] Docs/help updated; --explain outputs verified
- - [ ] Scan MVP: idempotence tests green; dry-run JSON shape has golden tests; performance bounded by git-modified set and guardrails
+- [ ] Scan MVP: idempotence tests green; dry-run JSON shape has golden tests; performance bounded by git-modified set and guardrails
 
 ## Backlog — Later additions
 
