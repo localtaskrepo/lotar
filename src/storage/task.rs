@@ -1,4 +1,6 @@
-use crate::types::{CustomFields, Priority, TaskComment, TaskRelationships, TaskStatus, TaskType};
+use crate::types::{
+    CustomFields, Priority, ReferenceEntry, TaskComment, TaskRelationships, TaskStatus, TaskType,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -34,6 +36,10 @@ pub struct Task {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub comments: Vec<TaskComment>,
 
+    // General references attached to the task (code locations, links, etc.)
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub references: Vec<ReferenceEntry>,
+
     // Legacy fields (keeping for backward compatibility)
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub subtitle: Option<String>,
@@ -67,6 +73,7 @@ impl Task {
             acceptance_criteria: vec![],
             relationships: TaskRelationships::default(),
             comments: vec![],
+            references: vec![],
             subtitle: None,
             description: None,
             category: None,

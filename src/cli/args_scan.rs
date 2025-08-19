@@ -2,8 +2,8 @@ use clap::Args;
 
 #[derive(Args)]
 pub struct ScanArgs {
-    /// Path to scan (defaults to current directory)
-    pub path: Option<String>,
+    /// Paths to scan (defaults to project root when none are provided)
+    pub paths: Vec<String>,
 
     /// Include specific file extensions
     #[arg(long)]

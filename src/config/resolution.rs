@@ -150,6 +150,18 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
+    if override_config.scan_strip_attributes != defaults.scan_strip_attributes {
+        base.scan_strip_attributes = override_config.scan_strip_attributes;
+    }
+    if override_config.scan_ticket_patterns.is_some() {
+        base.scan_ticket_patterns = override_config.scan_ticket_patterns;
+    }
+    if override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
+        base.scan_enable_ticket_words = override_config.scan_enable_ticket_words;
+    }
+    if override_config.scan_enable_mentions != defaults.scan_enable_mentions {
+        base.scan_enable_mentions = override_config.scan_enable_mentions;
+    }
     if !override_config.branch_type_aliases.is_empty() {
         base.branch_type_aliases = override_config.branch_type_aliases;
     }
@@ -241,6 +253,18 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
     }
+    if override_config.scan_strip_attributes != defaults.scan_strip_attributes {
+        resolved.scan_strip_attributes = override_config.scan_strip_attributes;
+    }
+    if override_config.scan_ticket_patterns.is_some() {
+        resolved.scan_ticket_patterns = override_config.scan_ticket_patterns;
+    }
+    if override_config.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
+        resolved.scan_enable_ticket_words = override_config.scan_enable_ticket_words;
+    }
+    if override_config.scan_enable_mentions != defaults.scan_enable_mentions {
+        resolved.scan_enable_mentions = override_config.scan_enable_mentions;
+    }
     if !override_config.branch_type_aliases.is_empty() {
         resolved.branch_type_aliases = override_config.branch_type_aliases;
     }
@@ -318,6 +342,19 @@ pub fn get_project_config(
     if let Some(scan_words) = project_config.scan_signal_words {
         resolved.scan_signal_words = scan_words;
     }
+    if let Some(patterns) = project_config.scan_ticket_patterns {
+        resolved.scan_ticket_patterns = Some(patterns);
+    }
+    if let Some(enable) = project_config.scan_enable_ticket_words {
+        resolved.scan_enable_ticket_words = enable;
+    }
+    if let Some(enable) = project_config.scan_enable_mentions {
+        resolved.scan_enable_mentions = enable;
+    }
+    // project-level scan.strip_attributes override
+    if let Some(strip) = project_config.scan_strip_attributes {
+        resolved.scan_strip_attributes = strip;
+    }
     // Overlay project-level branch alias maps (if provided)
     if let Some(m) = project_config.branch_type_aliases {
         if !m.is_empty() {
@@ -390,6 +427,10 @@ impl ResolvedConfig {
             default_status: global.default_status,
             custom_fields: global.custom_fields,
             scan_signal_words: global.scan_signal_words,
+            scan_strip_attributes: global.scan_strip_attributes,
+            scan_ticket_patterns: global.scan_ticket_patterns,
+            scan_enable_ticket_words: global.scan_enable_ticket_words,
+            scan_enable_mentions: global.scan_enable_mentions,
             auto_identity: global.auto_identity,
             auto_identity_git: global.auto_identity_git,
             branch_type_aliases: global.branch_type_aliases,

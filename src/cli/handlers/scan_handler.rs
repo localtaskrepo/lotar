@@ -1,10 +1,12 @@
 use crate::cli::ScanArgs;
+use crate::cli::handlers::AddHandler;
 use crate::cli::handlers::CommandHandler;
 use crate::output::OutputRenderer;
 use crate::project;
 use crate::scanner;
 use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
+// feature-aware custom fields manipulation helpers are implemented below
 
 /// Handler for scan command
 pub struct ScanHandler;
@@ -50,25 +52,83 @@ impl CommandHandler for ScanHandler {
             }
         }
 
-        // Load config (global or project-specific) to obtain scan signal words
-        let cfg_words: Vec<String> = {
+        // Resolve effective project early for config purposes (so project overrides apply)
+        let mut project_resolver = crate::cli::project::ProjectResolver::new(_resolver)
+            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+        let effective_project_for_config = match project_resolver.resolve_project("", _project) {
+            Ok(project) => {
+                if project.is_empty() {
+                    None
+                } else {
+                    Some(project)
+                }
+            }
+            Err(_) => None,
+        };
+
+        // Load config (global or project-specific) to obtain scan settings
+        let (
+            cfg_words,
+            cfg_ticket_patterns,
+            cfg_enable_ticket_words,
+            cfg_enable_mentions,
+            issue_type_words,
+        ): (Vec<String>, Option<Vec<String>>, bool, bool, Vec<String>) = {
             let mgr = crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
                 _resolver.path.as_path(),
             )
             .ok();
             if let Some(mgr) = mgr {
-                if let Some(project_name) = _project {
+                if let Some(project_name) = effective_project_for_config.as_deref() {
                     if let Ok(resolved) = mgr.get_project_config(project_name) {
-                        resolved.scan_signal_words
+                        let mut type_words: Vec<String> = Vec::new();
+                        if resolved.scan_enable_ticket_words {
+                            type_words = resolved
+                                .issue_types
+                                .values
+                                .iter()
+                                .map(|t| t.to_string())
+                                .collect();
+                        }
+                        (
+                            resolved.scan_signal_words,
+                            resolved.scan_ticket_patterns,
+                            resolved.scan_enable_ticket_words,
+                            resolved.scan_enable_mentions,
+                            type_words,
+                        )
                     } else {
-                        mgr.get_resolved_config().scan_signal_words.clone()
+                        let r = mgr.get_resolved_config();
+                        let mut type_words: Vec<String> = Vec::new();
+                        if r.scan_enable_ticket_words {
+                            type_words =
+                                r.issue_types.values.iter().map(|t| t.to_string()).collect();
+                        }
+                        (
+                            r.scan_signal_words.clone(),
+                            r.scan_ticket_patterns.clone(),
+                            r.scan_enable_ticket_words,
+                            r.scan_enable_mentions,
+                            type_words,
+                        )
                     }
                 } else {
-                    mgr.get_resolved_config().scan_signal_words.clone()
+                    let r = mgr.get_resolved_config();
+                    let mut type_words: Vec<String> = Vec::new();
+                    if r.scan_enable_ticket_words {
+                        type_words = r.issue_types.values.iter().map(|t| t.to_string()).collect();
+                    }
+                    (
+                        r.scan_signal_words.clone(),
+                        r.scan_ticket_patterns.clone(),
+                        r.scan_enable_ticket_words,
+                        r.scan_enable_mentions,
+                        type_words,
+                    )
                 }
             } else {
                 // Fallback: use scanner defaults by returning empty to skip override
-                Vec::new()
+                (Vec::new(), None, false, true, Vec::new())
             }
         };
 
@@ -77,10 +137,20 @@ impl CommandHandler for ScanHandler {
             renderer.log_debug(&format!("scan: scanning path={}", root.display()));
             let mut scanner = scanner::Scanner::new(root)
                 .with_include_ext(&args.include)
-                .with_exclude_ext(&args.exclude);
-            if !cfg_words.is_empty() {
-                scanner = scanner.with_signal_words(&cfg_words);
+                .with_exclude_ext(&args.exclude)
+                .with_modified_only(args.modified_only);
+            // Merge regular signal words with issue-type words if enabled
+            let mut final_words = cfg_words.clone();
+            for w in &issue_type_words {
+                if !final_words.iter().any(|v| v.eq_ignore_ascii_case(w)) {
+                    final_words.push(w.clone());
+                }
             }
+            if !final_words.is_empty() {
+                scanner = scanner.with_signal_words(&final_words);
+            }
+            scanner = scanner
+                .with_ticket_detection(cfg_ticket_patterns.as_deref(), cfg_enable_ticket_words);
             let mut results = scanner.scan();
             all_results.append(&mut results);
         }
@@ -100,6 +170,7 @@ impl CommandHandler for ScanHandler {
                         "file": entry.file_path,
                         "line": entry.line_number,
                         "title": entry.title,
+                        "uuid": entry.uuid,
                         "annotation": entry.annotation
                     })
                 })
@@ -112,31 +183,615 @@ impl CommandHandler for ScanHandler {
             }
         } else if all_results.is_empty() {
             renderer.emit_success("No TODO comments found.");
+            // Even if we didn't find TODO comments, we can still try to relocate anchors for existing tasks
+            if !args.dry_run {
+                Self::reanchor_existing_references(_resolver, renderer, None)?;
+            }
         } else {
             renderer.emit_info(&format!("Found {} TODO comment(s):", all_results.len()));
+            // When applying, we'll need a storage context for creating tasks
+            let effective_project = match project_resolver.resolve_project("", _project) {
+                Ok(project) => {
+                    if project.is_empty() {
+                        None
+                    } else {
+                        Some(project)
+                    }
+                }
+                Err(e) => return Err(e),
+            };
+
+            // Resolve config to decide attribute stripping policy if not overridden
+            let cfg_strip = if let Some(p) = effective_project_for_config.as_deref() {
+                project_resolver
+                    .get_project_config(p)
+                    .map_err(|e| format!("Failed to resolve project config: {}", e))?
+                    .scan_strip_attributes
+            } else {
+                project_resolver.get_config().scan_strip_attributes
+            };
+            let strip_attributes = args.strip_attributes.unwrap_or(cfg_strip);
+
+            // Before applying insertions, attempt to re-anchor any existing references that drifted.
+            if !args.dry_run {
+                // Provide a small window for proximity search
+                Self::reanchor_existing_references(_resolver, renderer, Some(7))?;
+            }
+
+            let mut applied = 0usize;
             for entry in all_results {
+                // If detailed flag is set, emit a per-file header line
                 if args.detailed {
                     renderer.emit_raw_stdout(&format!("  📄 {}", entry.file_path.display()));
-                    renderer.emit_raw_stdout(&format!(
-                        "    Line {}: {}",
-                        entry.line_number,
-                        entry.title.trim()
-                    ));
-                    if !entry.annotation.is_empty() {
-                        renderer.emit_raw_stdout(&format!("    Note: {}", entry.annotation));
-                    }
-                    renderer.emit_raw_stdout("");
-                } else {
-                    renderer.emit_raw_stdout(&format!(
-                        "  {}:{} - {}",
-                        entry.file_path.display(),
-                        entry.line_number,
-                        entry.title.trim()
-                    ));
                 }
+                // Default behavior: apply changes (unless --dry-run)
+                // Read file and target line
+                if let Ok(contents) = std::fs::read_to_string(&entry.file_path) {
+                    let all_lines: Vec<&str> = contents.lines().collect();
+                    if let Some(orig_line) = all_lines.get(entry.line_number - 1).copied() {
+                        let tmp_scanner = scanner::Scanner::new(PathBuf::from("."))
+                            .with_ticket_detection(
+                                cfg_ticket_patterns.as_deref(),
+                                cfg_enable_ticket_words,
+                            );
+                        let existing_key = tmp_scanner.extract_ticket_key_from_line(orig_line);
+                        if existing_key.is_none() {
+                            // Parse inline attributes from the original line before any stripping
+                            let inline_attrs = parse_inline_attributes(orig_line);
+                            // Create task title from entry.title
+                            // Reuse AddHandler with smart defaults
+                            let cli_add_args = crate::cli::AddArgs {
+                                title: entry.title.clone(),
+                                task_type: inline_attrs.task_type,
+                                priority: inline_attrs.priority,
+                                assignee: inline_attrs.assignee,
+                                effort: inline_attrs.effort,
+                                due: inline_attrs.due,
+                                description: None,
+                                category: inline_attrs.category,
+                                tags: inline_attrs.tags,
+                                fields: inline_attrs.fields,
+                                bug: false,
+                                epic: false,
+                                critical: false,
+                                high: false,
+                                dry_run: false,
+                                explain: false,
+                            };
+                            let task_id = if args.dry_run {
+                                // Simulate an ID for preview purposes; we can use a placeholder
+                                // Use project prefix if known; else DEFAULT
+                                let effective = match &effective_project {
+                                    Some(p) => p.clone(),
+                                    None => crate::project::get_effective_project_name(_resolver),
+                                };
+                                format!("{}-NEW", effective)
+                            } else {
+                                AddHandler::execute(
+                                    cli_add_args,
+                                    effective_project.as_deref(),
+                                    _resolver,
+                                    renderer,
+                                )?
+                            };
+
+                            // If not dry-run, persist a reverse link in the created task (bi-directional reference)
+                            if !args.dry_run {
+                                if let Some(project_prefix) = crate::storage::operations::StorageOperations::get_project_for_task(&task_id) {
+                                        if let Some(mut storage) = crate::storage::manager::Storage::try_open(_resolver.path.clone()) {
+                                            if let Some(mut task) = storage.get(&task_id, project_prefix.clone()) {
+                                                // Store repo-relative or path string with #L<line> anchor
+                                                // Build a repo-relative (or cwd-relative) code anchor
+                                                let rel = crate::utils::paths::repo_relative_display(&entry.file_path);
+                                                let code_ref = format!("{}#L{}", rel, entry.line_number);
+                                                // If exact anchor already exists, skip; otherwise prune stale anchors for the same file path
+                                                let has_exact = task
+                                                    .references
+                                                    .iter()
+                                                    .any(|r| r.code.as_deref() == Some(&code_ref));
+                                                if args.reanchor {
+                                                    // Aggressively prune anchors across all files, keep only this anchor
+                                                    task.references.retain(|r| r.code.as_deref() == Some(&code_ref));
+                                                    if !has_exact {
+                                                        task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
+                                                    }
+                                                } else if !has_exact {
+                                                    // Remove older anchors that point to the same file (different line)
+                                                    let file_key = rel.clone();
+                                                    task.references.retain(|r| {
+                                                        if let Some(code) = &r.code {
+                                                            // Split on "#L" to compare only the file path portion
+                                                            let (file_part, _) = code.split_once("#L").unwrap_or((code.as_str(), ""));
+                                                            // Keep if different file, or exactly the same new anchor
+                                                            if file_part == file_key && code != &code_ref {
+                                                                return false; // prune stale same-file anchor
+                                                            }
+                                                        }
+                                                        true
+                                                    });
+                                                    task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
+                                                }
+                                                task.modified = chrono::Utc::now().to_rfc3339();
+                                                storage.edit(&task_id, &task);
+                                            }
+                                        }
+                                    }
+                            }
+
+                            // Insert (KEY) after signal word; optionally strip bracket attributes
+                            let mut new_line =
+                                match tmp_scanner.suggest_insertion_for_line(orig_line, &task_id) {
+                                    Some(l) => l,
+                                    None => orig_line.to_string(),
+                                };
+                            if strip_attributes {
+                                new_line = strip_bracket_attributes(&new_line);
+                            }
+
+                            // Optional: emit context snippet when requested
+                            if args.detailed && args.context > 0 {
+                                let start = entry.line_number.saturating_sub(args.context);
+                                // clamp to at least 1
+                                let start = if start == 0 { 1 } else { start };
+                                let end = (entry.line_number + args.context).min(all_lines.len());
+                                for ln in start..=end {
+                                    if ln == entry.line_number {
+                                        continue;
+                                    }
+                                    if let Some(ctx) = all_lines.get(ln - 1) {
+                                        renderer.emit_raw_stdout(&format!(
+                                            "    {}:{}",
+                                            entry.file_path.display(),
+                                            ln
+                                        ));
+                                        renderer.emit_raw_stdout(&format!("      {}", ctx));
+                                    }
+                                }
+                            }
+
+                            // Write file back with the updated line
+                            if let Some(updated) =
+                                replace_line(&contents, entry.line_number, &new_line)
+                            {
+                                if args.dry_run {
+                                    renderer.emit_raw_stdout(&format!(
+                                        "  📄 {}:{}\n    - {}\n    + {}",
+                                        entry.file_path.display(),
+                                        entry.line_number,
+                                        orig_line,
+                                        new_line
+                                    ));
+                                } else if let Err(e) = std::fs::write(&entry.file_path, updated) {
+                                    renderer.log_error(&format!(
+                                        "Failed to write changes to {}: {}",
+                                        entry.file_path.display(),
+                                        e
+                                    ));
+                                } else {
+                                    renderer.emit_raw_stdout(&format!(
+                                        "  📄 {}:{}\n    - {}\n    + {}",
+                                        entry.file_path.display(),
+                                        entry.line_number,
+                                        orig_line,
+                                        new_line
+                                    ));
+                                    applied += 1;
+                                }
+                            }
+                        } else if !args.dry_run && cfg_enable_mentions {
+                            // Movement/relocation resilience: if an existing key is present, ensure
+                            // the corresponding task has a code reference for this file+line.
+                            if let Some(task_id) = existing_key {
+                                if let Some(project_prefix) = crate::storage::operations::StorageOperations::get_project_for_task(&task_id) {
+                                    if let Some(mut storage) = crate::storage::manager::Storage::try_open(_resolver.path.clone()) {
+                                        if let Some(mut task) = storage.get(&task_id, project_prefix.clone()) {
+                                            let rel = crate::utils::paths::repo_relative_display(&entry.file_path);
+                                            let code_ref = format!("{}#L{}", rel, entry.line_number);
+                                            // If exact anchor already exists, skip; otherwise prune stale anchors for the same file path
+                                            let has_exact = task
+                                                .references
+                                                .iter()
+                                                .any(|r| r.code.as_deref() == Some(&code_ref));
+                                            if args.reanchor {
+                                                // Keep only this anchor across files
+                                                task.references.retain(|r| r.code.as_deref() == Some(&code_ref));
+                                                if !has_exact {
+                                                    task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
+                                                }
+                                                task.modified = chrono::Utc::now().to_rfc3339();
+                                                storage.edit(&task_id, &task);
+                                            } else if !has_exact {
+                                                let file_key = rel.clone();
+                                                task.references.retain(|r| {
+                                                    if let Some(code) = &r.code {
+                                                        let (file_part, _) = code.split_once("#L").unwrap_or((code.as_str(), ""));
+                                                        if file_part == file_key && code != &code_ref {
+                                                            return false;
+                                                        }
+                                                    }
+                                                    true
+                                                });
+                                                task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
+                                                task.modified = chrono::Utc::now().to_rfc3339();
+                                                storage.edit(&task_id, &task);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Apply path (and dry-run preview) prints patch above when changes occur; lines with existing keys are left untouched
+            }
+            if !args.dry_run && applied > 0 {
+                renderer.emit_success(&format!("Applied {} update(s).", applied));
             }
         }
 
         Ok(())
+    }
+}
+
+/// Replace a specific 1-based line in the file content and return the new content
+fn replace_line(contents: &str, line_number_1based: usize, new_line: &str) -> Option<String> {
+    let mut lines: Vec<&str> = contents.lines().collect();
+    if line_number_1based == 0 || line_number_1based > lines.len() {
+        return None;
+    }
+    lines[line_number_1based - 1] = new_line;
+    let mut out = String::new();
+    for (i, line) in lines.iter().enumerate() {
+        out.push_str(line);
+        if i + 1 < lines.len() || contents.ends_with('\n') {
+            out.push('\n');
+        }
+    }
+    Some(out)
+}
+
+/// Strip bracketed inline attributes like [key=value] appearing anywhere on the line
+fn strip_bracket_attributes(line: &str) -> String {
+    // Simple state machine to drop [...], handling nested brackets conservatively
+    let mut out = String::with_capacity(line.len());
+    let mut depth = 0usize;
+    for ch in line.chars() {
+        if ch == '[' {
+            depth += 1;
+            continue;
+        }
+        if ch == ']' {
+            depth = depth.saturating_sub(1);
+            continue;
+        }
+        if depth == 0 {
+            out.push(ch);
+        }
+    }
+    // Collapse extra spaces left by removals
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Parse inline bracket attributes like [key=value] and map them to AddArgs fields.
+/// Recognized keys (case-insensitive): assignee, priority, tags|tag, due|due_date,
+/// type, category, effort. Unknown keys go into fields Vec.
+fn parse_inline_attributes(line: &str) -> InlineAttrs {
+    let mut attrs = Vec::new();
+    // Collect top-level bracket contents
+    let mut current = String::new();
+    let mut depth = 0usize;
+    for ch in line.chars() {
+        match ch {
+            '[' => {
+                depth += 1;
+                if depth == 1 {
+                    current.clear();
+                } else {
+                    // nested, include the bracket content but we'll ignore for parsing simplicity
+                    current.push('[');
+                }
+            }
+            ']' => {
+                if depth > 0 {
+                    depth -= 1;
+                    if depth == 0 {
+                        if !current.trim().is_empty() {
+                            attrs.push(current.trim().to_string());
+                        }
+                        current.clear();
+                        continue;
+                    } else {
+                        current.push(']');
+                    }
+                }
+            }
+            c => {
+                if depth > 0 {
+                    current.push(c);
+                }
+            }
+        }
+    }
+
+    let mut out = InlineAttrs::default();
+    for a in attrs {
+        // Allow comma-separated pairs within a single [ ... ]
+        for part in a.split(',') {
+            let part = part.trim();
+            if part.is_empty() {
+                continue;
+            }
+            let (k, v) = if let Some((k, v)) = part.split_once('=') {
+                (k.trim().to_lowercase(), v.trim().to_string())
+            } else {
+                // Single flag form [tag=foo] is preferred; if bare token present, skip
+                continue;
+            };
+            match k.as_str() {
+                "assignee" | "assign" => out.assignee = Some(v),
+                "priority" => out.priority = Some(v),
+                "type" => out.task_type = Some(v),
+                "category" | "cat" => out.category = Some(v),
+                "effort" => out.effort = Some(v),
+                "due" | "due_date" => out.due = Some(v),
+                "tag" => out.tags.push(v),
+                "tags" => {
+                    // Split on commas or whitespace
+                    for t in v.split(|c: char| c == ',' || c.is_whitespace()) {
+                        let t = t.trim();
+                        if !t.is_empty() {
+                            out.tags.push(t.to_string());
+                        }
+                    }
+                }
+                // ticket indicates an existing key; ignore here (handled elsewhere)
+                "ticket" => {}
+                _ => out.fields.push((k.to_string(), v)),
+            }
+        }
+    }
+    out
+}
+
+#[derive(Default)]
+struct InlineAttrs {
+    assignee: Option<String>,
+    priority: Option<String>,
+    task_type: Option<String>,
+    category: Option<String>,
+    effort: Option<String>,
+    due: Option<String>,
+    tags: Vec<String>,
+    fields: Vec<(String, String)>,
+}
+
+// custom_fields-based source_refs helper removed; we now use Task.references with code anchors
+
+impl ScanHandler {
+    /// Re-anchor existing task references by searching for their key occurrences
+    /// near the previous anchor line, with a fallback to a full-file search.
+    /// If `window_hint` is None, a default small window will be used.
+    fn reanchor_existing_references(
+        _resolver: &crate::workspace::TasksDirectoryResolver,
+        renderer: &crate::output::OutputRenderer,
+        window_hint: Option<usize>,
+    ) -> Result<(), String> {
+        let window = window_hint.unwrap_or(7);
+        let mut storage = match crate::storage::manager::Storage::try_open(_resolver.path.clone()) {
+            Some(s) => s,
+            None => return Ok(()),
+        };
+
+        // Load all tasks (all projects)
+        let filter = crate::storage::TaskFilter::default();
+        let mut tasks = storage.search(&filter);
+        if tasks.is_empty() {
+            return Ok(());
+        }
+
+        let mut updates = 0usize;
+        // Compute repo root once for this pass
+        let repo_root = std::env::current_dir()
+            .ok()
+            .and_then(|cwd| crate::utils_git::find_repo_root(&cwd));
+        // Best-effort git rename map if inside a repo
+        let rename_map = if let Some(root) = &repo_root {
+            Self::git_rename_map(root)
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        for (task_id, mut task) in tasks.drain(..) {
+            // Skip tasks without references
+            if task.references.is_empty() {
+                continue;
+            }
+
+            // Track if this task changed
+            let mut changed = false;
+
+            for r in task.references.iter_mut() {
+                // Avoid borrowing r.code across mutations by cloning it first
+                let code_ref_opt = r.code.clone();
+                let Some(code_ref) = code_ref_opt else {
+                    continue;
+                };
+                let (path_str, orig_line_opt) = Self::parse_code_ref(&code_ref);
+                if path_str.is_empty() {
+                    continue;
+                }
+
+                // Resolve absolute file path if possible
+                let abs_path = if let Some(root) = &repo_root {
+                    root.join(&path_str)
+                } else {
+                    std::path::PathBuf::from(&path_str)
+                };
+
+                let abs_path = if abs_path.exists() {
+                    abs_path
+                } else {
+                    // File may have been renamed; try git rename map using repo-relative key
+                    let rel_key = &path_str;
+                    if let Some(new_rel) = rename_map.get(rel_key) {
+                        if let Some(root) = &repo_root {
+                            let candidate = root.join(new_rel);
+                            if candidate.exists() {
+                                candidate
+                            } else {
+                                // Fall back to skipping if new file also doesn't exist
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    }
+                };
+
+                // Determine the search key token for this task
+                let key = task_id.clone();
+
+                // Load file and gather lines
+                let Ok(content) = std::fs::read_to_string(&abs_path) else {
+                    continue;
+                };
+                let lines: Vec<&str> = content.lines().collect();
+
+                // If the original line still contains the key marker, nothing to do
+                if let Some(orig_line) = orig_line_opt {
+                    if let Some(existing) = lines.get(orig_line.saturating_sub(1)) {
+                        if Self::line_contains_key(existing, &key) {
+                            // Ensure canonical formatting of code ref
+                            let rel = crate::utils::paths::repo_relative_display(&abs_path);
+                            let new_code = format!("{}#L{}", rel, orig_line);
+                            if r.code.as_deref() != Some(&new_code) {
+                                r.code = Some(new_code.clone());
+                                changed = true;
+                            }
+                            continue;
+                        }
+                    }
+                }
+
+                // Proximity search window around original line (if known)
+                let mut best_line: Option<usize> = None;
+                if let Some(orig_line) = orig_line_opt {
+                    let start = orig_line.saturating_sub(window);
+                    let end = (orig_line + window).min(lines.len());
+                    for ln in start..=end {
+                        if ln == 0 || ln > lines.len() {
+                            continue;
+                        }
+                        let text = lines[ln - 1];
+                        if Self::line_contains_key(text, &key) {
+                            best_line = Some(ln);
+                            break;
+                        }
+                    }
+                }
+
+                // Fallback: full-file search for the exact key token markers
+                if best_line.is_none() {
+                    // Try to find all candidate lines and pick the closest to original, else the first
+                    let mut candidates: Vec<usize> = Vec::new();
+                    for (idx, text) in lines.iter().enumerate() {
+                        if Self::line_contains_key(text, &key) {
+                            candidates.push(idx + 1);
+                        }
+                    }
+                    if !candidates.is_empty() {
+                        if let Some(orig_line) = orig_line_opt {
+                            // Choose nearest to original
+                            candidates.sort_by_key(|&ln| ln.abs_diff(orig_line));
+                            best_line = candidates.first().copied();
+                        } else {
+                            best_line = candidates.first().copied();
+                        }
+                    }
+                }
+
+                if let Some(new_line) = best_line {
+                    let rel = crate::utils::paths::repo_relative_display(&abs_path);
+                    let new_code = format!("{}#L{}", rel, new_line);
+                    if r.code.as_deref() != Some(&new_code) {
+                        r.code = Some(new_code.clone());
+                        changed = true;
+                        renderer.log_debug(&format!("reanchor: {} -> {}", code_ref, new_code));
+                    }
+                }
+            }
+
+            if changed {
+                task.modified = chrono::Utc::now().to_rfc3339();
+                crate::storage::manager::Storage::edit(&mut storage, &task_id, &task);
+                updates += 1;
+            }
+        }
+
+        if updates > 0 {
+            renderer.emit_info(&format!("Re-anchored {} task(s).", updates));
+        }
+        Ok(())
+    }
+
+    fn parse_code_ref(code: &str) -> (String, Option<usize>) {
+        if let Some((path, line_part)) = code.split_once("#L") {
+            let line = line_part
+                .split(['-', ':', '#'])
+                .next()
+                .and_then(|s| s.parse::<usize>().ok());
+            (path.to_string(), line)
+        } else {
+            (code.to_string(), None)
+        }
+    }
+
+    fn line_contains_key(line: &str, key: &str) -> bool {
+        if line.contains(&format!("({})", key)) {
+            return true;
+        }
+        // Accept [ticket=KEY] with optional spaces and case-insensitive ticket
+        let pattern = format!(r"(?i)\[\s*ticket\s*=\s*{}\s*\]", regex::escape(key));
+        if regex::Regex::new(&pattern)
+            .map(|re| re.is_match(line))
+            .unwrap_or(false)
+        {
+            return true;
+        }
+        false
+    }
+
+    fn git_rename_map(repo_root: &std::path::Path) -> std::collections::HashMap<String, String> {
+        use std::process::Command;
+        let mut map = std::collections::HashMap::new();
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(repo_root)
+            .arg("status")
+            .arg("--porcelain")
+            .output();
+        let Ok(o) = out else {
+            return map;
+        };
+        if !o.status.success() {
+            return map;
+        }
+        let s = String::from_utf8_lossy(&o.stdout);
+        for line in s.lines() {
+            if line.len() < 4 {
+                continue;
+            }
+            let status = &line[..2];
+            if status.contains('R') {
+                if let Some(pos) = line.find(" -> ") {
+                    let old = line[3..pos].trim().to_string();
+                    let newp = line[pos + 4..].trim().to_string();
+                    map.insert(old, newp);
+                }
+            }
+        }
+        map
     }
 }

@@ -41,6 +41,9 @@ fn test_global_config_validation_valid() {
             "NOTE".to_string(),
         ],
         scan_ticket_patterns: None,
+        scan_enable_ticket_words: false,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
@@ -94,6 +97,9 @@ fn test_global_config_validation_privileged_port_warning() {
             "NOTE".to_string(),
         ],
         scan_ticket_patterns: None,
+        scan_enable_ticket_words: false,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
@@ -164,6 +170,9 @@ fn test_global_config_validation_empty_lists_error() {
             "NOTE".to_string(),
         ],
         scan_ticket_patterns: None,
+        scan_enable_ticket_words: false,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
@@ -236,6 +245,9 @@ fn test_global_config_validation_invalid_defaults() {
             "NOTE".to_string(),
         ],
         scan_ticket_patterns: None,
+        scan_enable_ticket_words: false,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
         auto_identity: true,
         auto_identity_git: true,
         auto_codeowners_assign: true,
@@ -293,9 +305,12 @@ fn test_project_config_validation_valid() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        scan_strip_attributes: None,
+        scan_enable_mentions: None,
         branch_type_aliases: None,
         branch_status_aliases: None,
         branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -326,9 +341,12 @@ fn test_project_config_validation_empty_project_name() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        scan_strip_attributes: None,
+        scan_enable_mentions: None,
         branch_type_aliases: None,
         branch_status_aliases: None,
         branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -366,9 +384,12 @@ fn test_project_config_validation_long_project_name() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        scan_strip_attributes: None,
+        scan_enable_mentions: None,
         branch_type_aliases: None,
         branch_status_aliases: None,
         branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -409,9 +430,12 @@ fn test_project_config_validation_invalid_defaults() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        scan_strip_attributes: None,
         branch_type_aliases: None,
         branch_status_aliases: None,
         branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
+        scan_enable_mentions: None,
     };
 
     let result = validator.validate_project_config(&config);
@@ -453,9 +477,12 @@ fn test_project_config_validation_invalid_email_format() {
         auto_assign_on_status: None,
         scan_signal_words: None,
         scan_ticket_patterns: None,
+        scan_enable_ticket_words: None,
+        scan_strip_attributes: None,
         branch_type_aliases: None,
         branch_status_aliases: None,
         branch_priority_aliases: None,
+        scan_enable_mentions: None,
     };
 
     let result = validator.validate_project_config(&config);

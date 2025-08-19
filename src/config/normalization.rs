@@ -176,6 +176,26 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
             cfg.scan_ticket_patterns = Some(list);
         }
     }
+    // scan.enable_ticket_words
+    if let Some(v) = get_path(&data, &["scan", "enable_ticket_words"]).and_then(cast::<bool>) {
+        cfg.scan_enable_ticket_words = v;
+    }
+    // scan.enable_mentions
+    if let Some(v) = get_path(&data, &["scan", "enable_mentions"]).and_then(cast::<bool>) {
+        cfg.scan_enable_mentions = v;
+    }
+    // scan.strip_attributes (global)
+    if let Some(v) = get_path(&data, &["scan", "strip_attributes"]).and_then(cast::<bool>) {
+        cfg.scan_strip_attributes = v;
+    }
+
+    // Back-compat: allow flat keys at root for scan toggles
+    if let Some(v) = get_path(&data, &["scan_enable_ticket_words"]).and_then(cast::<bool>) {
+        cfg.scan_enable_ticket_words = v;
+    }
+    if let Some(v) = get_path(&data, &["scan_enable_mentions"]).and_then(cast::<bool>) {
+        cfg.scan_enable_mentions = v;
+    }
 
     // auto.*
     if let Some(v) = get_path(&data, &["auto", "identity"]).and_then(cast::<bool>) {
@@ -315,6 +335,26 @@ pub fn parse_project_from_yaml_str(
     if let Some(v) = get_path(&data, &["scan", "ticket_patterns"]).cloned() {
         cfg.scan_ticket_patterns = serde_yaml::from_value(v).ok();
     }
+    // scan.enable_ticket_words (project)
+    if let Some(v) = get_path(&data, &["scan", "enable_ticket_words"]).and_then(cast::<bool>) {
+        cfg.scan_enable_ticket_words = Some(v);
+    }
+    // scan.enable_mentions (project)
+    if let Some(v) = get_path(&data, &["scan", "enable_mentions"]).and_then(cast::<bool>) {
+        cfg.scan_enable_mentions = Some(v);
+    }
+    // scan.strip_attributes (project)
+    if let Some(v) = get_path(&data, &["scan", "strip_attributes"]).and_then(cast::<bool>) {
+        cfg.scan_strip_attributes = Some(v);
+    }
+
+    // Back-compat: support flat keys for project toggles
+    if let Some(v) = get_path(&data, &["scan_enable_ticket_words"]).and_then(cast::<bool>) {
+        cfg.scan_enable_ticket_words = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["scan_enable_mentions"]).and_then(cast::<bool>) {
+        cfg.scan_enable_mentions = Some(v);
+    }
 
     // branch alias maps (project)
     if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
@@ -425,6 +465,13 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
         scan.insert(
             Y::String("ticket_patterns".into()),
             serde_yaml::to_value(patterns).unwrap_or(Y::Null),
+        );
+    }
+    // include scan.strip_attributes only if false to avoid redundant true defaults
+    if !cfg.scan_strip_attributes {
+        scan.insert(
+            Y::String("strip_attributes".into()),
+            Y::Bool(cfg.scan_strip_attributes),
         );
     }
     root.insert(Y::String("scan".into()), Y::Mapping(scan));
@@ -616,6 +663,9 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             Y::String("ticket_patterns".into()),
             serde_yaml::to_value(patterns).unwrap_or(Y::Null),
         );
+    }
+    if let Some(b) = &cfg.scan_strip_attributes {
+        scan.insert(Y::String("strip_attributes".into()), Y::Bool(*b));
     }
     if !scan.is_empty() {
         root.insert(Y::String("scan".into()), Y::Mapping(scan));

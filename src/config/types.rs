@@ -127,6 +127,14 @@ pub struct ProjectConfig {
     pub scan_signal_words: Option<Vec<String>>, // case-insensitive signal words for scanner
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_ticket_patterns: Option<Vec<String>>, // regex patterns to detect ticket keys
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub scan_enable_ticket_words: Option<bool>, // treat ticket keys as signal words when enabled
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub scan_enable_mentions: Option<bool>, // when true, add code references for existing keys found in source
+
+    // Scan mutation policy (project-level override)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub scan_strip_attributes: Option<bool>,
 
     // Optional per-project branch alias maps
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -157,6 +165,9 @@ impl ProjectConfig {
             auto_assign_on_status: None,
             scan_signal_words: None,
             scan_ticket_patterns: None,
+            scan_enable_ticket_words: None,
+            scan_enable_mentions: None,
+            scan_strip_attributes: None,
             branch_type_aliases: None,
             branch_status_aliases: None,
             branch_priority_aliases: None,
@@ -215,6 +226,14 @@ pub struct GlobalConfig {
     pub scan_signal_words: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_ticket_patterns: Option<Vec<String>>,
+    #[serde(default)]
+    pub scan_enable_ticket_words: bool,
+    #[serde(default = "default_true")]
+    pub scan_enable_mentions: bool,
+
+    // Scan mutation policy
+    #[serde(default = "default_true")]
+    pub scan_strip_attributes: bool,
 
     // Branch alias maps (global-level)
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -252,6 +271,11 @@ pub struct ResolvedConfig {
     pub default_status: Option<TaskStatus>,
     pub custom_fields: StringConfigField,
     pub scan_signal_words: Vec<String>,
+    pub scan_strip_attributes: bool,
+    // Effective scanner options
+    pub scan_ticket_patterns: Option<Vec<String>>, // effective patterns if configured
+    pub scan_enable_ticket_words: bool,
+    pub scan_enable_mentions: bool,
 
     // Automation toggles (effective)
     pub auto_identity: bool,
@@ -365,6 +389,10 @@ impl Default for GlobalConfig {
             custom_fields: default_custom_fields(),
             scan_signal_words: default_scan_signal_words(),
             scan_ticket_patterns: None,
+            scan_enable_ticket_words: true,
+            scan_enable_mentions: true,
+            // scan mutation policy
+            scan_strip_attributes: true,
             branch_type_aliases: HashMap::new(),
             branch_status_aliases: HashMap::new(),
             branch_priority_aliases: HashMap::new(),
@@ -388,3 +416,13 @@ pub fn maybe_project_scan_ticket_patterns(cfg: &ProjectConfig) -> Option<&Vec<St
 }
 
 // Constants that are actually used would go here if needed
+
+// Helper accessor for project-level enable flag
+pub fn maybe_project_scan_enable_ticket_words(cfg: &ProjectConfig) -> Option<bool> {
+    cfg.scan_enable_ticket_words
+}
+
+// Helper accessor for project-level mentions flag
+pub fn maybe_project_scan_enable_mentions(cfg: &ProjectConfig) -> Option<bool> {
+    cfg.scan_enable_mentions
+}

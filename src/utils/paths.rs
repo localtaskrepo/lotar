@@ -19,3 +19,21 @@ pub fn project_config_path(tasks_root: &Path, project_prefix: &str) -> PathBuf {
 pub fn global_config_path(tasks_root: &Path) -> PathBuf {
     tasks_root.join("config.yml")
 }
+
+/// Try to produce a path string relative to the git repo root, else to cwd, else absolute.
+pub fn repo_relative_display(path: &Path) -> String {
+    let repo_rel = path
+        .parent()
+        .and_then(crate::utils_git::find_repo_root)
+        .and_then(|root| path.strip_prefix(&root).ok())
+        .map(|p| p.to_path_buf());
+    if let Some(rel) = repo_rel {
+        return rel.display().to_string();
+    }
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Ok(rel) = path.strip_prefix(&cwd) {
+            return rel.display().to_string();
+        }
+    }
+    path.display().to_string()
+}

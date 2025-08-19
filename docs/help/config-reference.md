@@ -22,6 +22,9 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - custom.fields: string[]
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
+- scan.enable_ticket_words: boolean (default: true) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
+- scan.enable_mentions: boolean (default: true) — when true, add code anchors under `references` for existing ticket keys found in source
+- scan.strip_attributes: boolean (default: true) — when true, remove inline [key=value] attribute blocks from source after inserting the ticket key
 - auto.identity: boolean (default true)
 - auto.identity_git: boolean (default true)
 - auto.set_reporter: boolean (default true)
@@ -46,12 +49,16 @@ issue:
 scan:
 	signal_words: [TODO, FIXME]
 	ticket_patterns: ["[A-Z]{2,}-\\d+"]
+	enable_ticket_words: true
+	enable_mentions: true
 
 # .tasks/DEMO/config.yml (project)
 project:
 	id: DEMO
 issue:
 	types: [feature, bug, chore]
+scan:
+	enable_mentions: false  # example: disable adding anchors for existing keys in this project
 auto:
 	identity: true
 	identity_git: true

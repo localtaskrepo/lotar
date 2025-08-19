@@ -21,6 +21,7 @@ pub fn parse_output_format(s: &str) -> Result<OutputFormat, String> {
         // Backward-compatible aliases; render as plain text
         "table" | "markdown" | "md" => Ok(OutputFormat::Text),
         "json" => Ok(OutputFormat::Json),
+        "jsonl" | "json-lines" | "ndjson" => Ok(OutputFormat::Json), // alias to Json for now
         other => Err(format!(
             "invalid format: '{}' . Supported formats: text, json",
             other

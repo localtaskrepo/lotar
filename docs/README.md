@@ -1,16 +1,8 @@
 # LoTaR Documentation
 
-## Production Status - August 2025
+## Project Status - August 2025
 
-**🎉 PRODUCTION READY - 100% FUNCTIONAL**
-
-LoTaR is a complete, production-ready task management system with CLI interface, web server, and source code integration.
-
-- **225 tests passing** with zero failures
-- **All core features implemented**
-- **Zero compilation errors and warnings**
-- **Memory safe** with Rust's ownership system
-- **Enhanced project resolution logic** with intelligent conflict detection
+LoTaR is an actively developed task management tool with a CLI, web server, and source code integration. It includes a comprehensive test suite and aims for stable, predictable behavior.
 
 ## Quick Start
 
@@ -49,10 +41,11 @@ lotar scan ./src
 - **Direct File Operations**: Fast task filtering without indexing overhead
 
 ### Source Code Integration
-- **25+ Programming Languages** supported
-- **TODO Comment Detection** with UUID tracking
-- **Multiple Comment Styles**: //, #, --, ;, %, /* */
-- **Recursive Directory Scanning**
+- 25+ languages supported
+- TODO comment detection with optional ticket key extraction
+- Multiple comment styles: //, #, --, ;, %, /* */ and <!-- -->
+- Recursive directory scanning with .lotarignore and .gitignore support
+- When creating a task from a TODO, LoTaR writes back the task key into the comment and stores a minimal code anchor under `references` in the task (no code snippets are stored). If a TODO already has a key, LoTaR ensures a code anchor exists and prunes older anchors for the same file, keeping only the latest line for that file. Use `lotar scan --reanchor` to prune cross-file anchors and keep only the newest anchor. On subsequent scans, existing anchors are automatically re-anchored when code moves (nearby-window search) and are updated across simple git renames using `git status` information.
 
 ### Web Interface & API
 - **Built-in Web Server** with embedded React frontend

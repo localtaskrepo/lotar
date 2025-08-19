@@ -9,6 +9,8 @@ const FILE_TYPES: &[(&str, &str)] = &[
     ("java", "//"),
     ("js", "//"),
     ("ts", "//"),
+    ("jsx", "//"),
+    ("tsx", "//"),
     ("cpp", "//"),
     ("cc", "//"),
     ("cxx", "//"),
@@ -23,6 +25,7 @@ const FILE_TYPES: &[(&str, &str)] = &[
     ("kotlin", "//"),
     ("dart", "//"),
     ("fsharp", "//"),
+    ("lua", "--"),
     // Hash-based comment languages
     ("py", "#"),
     ("rb", "#"),
@@ -32,19 +35,25 @@ const FILE_TYPES: &[(&str, &str)] = &[
     ("r", "#"),
     ("elixir", "#"),
     ("powershell", "#"),
+    ("ps1", "#"),
     ("nim", "#"),
     ("yaml", "#"),
     ("yml", "#"),
+    ("toml", "#"),
+    ("hcl", "#"),
+    ("tf", "#"),
     // Double-dash comment languages
     ("hs", "--"),
     ("haskell", "--"),
     ("elm", "--"),
     ("pascal", "--"),
+    ("sql", "--"),
     // Semicolon comment languages
     ("clojure", ";"),
     ("scheme", ";"),
     ("commonlisp", ";"),
     ("racket", ";"),
+    ("ini", ";"),
     // Percent comment languages
     ("erlang", "%"),
     ("matlab", "%"),
@@ -82,9 +91,14 @@ pub struct Scanner {
     signal_regex: Regex,
     uuid_extract_regex: Regex,
     simple_extract_regex: Regex,
-    include_ext: Option<Vec<String>>, // lowercase extensions without dot
-    exclude_ext: Option<Vec<String>>, // lowercase extensions without dot
-    signal_words: Vec<String>,        // lowercase tokens like todo, fixme
+    ticket_attr_regex: Regex,                      // [ticket=KEY]
+    ticket_key_regex: Regex,                       // DEMO-123 style
+    include_ext: Option<Vec<String>>,              // lowercase extensions without dot
+    exclude_ext: Option<Vec<String>>,              // lowercase extensions without dot
+    signal_words: Vec<String>,                     // lowercase tokens like todo, fixme
+    custom_ticket_key_regexes: Option<Vec<Regex>>, // configured ticket key patterns
+    enable_ticket_words: bool,                     // treat ticket keys as triggers
+    modified_only: bool,                           // limit scan to git-modified files
 }
 
 impl Scanner {
@@ -99,6 +113,7 @@ impl Scanner {
         ];
         let (signal_regex, uuid_extract_regex, simple_extract_regex) =
             Self::build_signal_regexes(&default_words);
+        let (ticket_attr_regex, ticket_key_regex) = Self::build_ticket_regexes();
 
         Self {
             path,
@@ -109,6 +124,11 @@ impl Scanner {
             include_ext: None,
             exclude_ext: None,
             signal_words: default_words,
+            ticket_attr_regex,
+            ticket_key_regex,
+            custom_ticket_key_regexes: None,
+            enable_ticket_words: false,
+            modified_only: false,
         }
     }
 
@@ -163,6 +183,11 @@ impl Scanner {
         self
     }
 
+    pub fn with_modified_only(mut self, on: bool) -> Self {
+        self.modified_only = on;
+        self
+    }
+
     pub fn with_signal_words(mut self, words: &[String]) -> Self {
         if !words.is_empty() {
             self.signal_words = words.iter().map(|w| w.to_ascii_lowercase()).collect();
@@ -173,6 +198,39 @@ impl Scanner {
             self.simple_extract_regex = simple_extract_regex;
         }
         self
+    }
+
+    /// Configure ticket detection patterns and whether ticket keys should act as signal words
+    pub fn with_ticket_detection(
+        mut self,
+        patterns: Option<&[String]>,
+        enable_words: bool,
+    ) -> Self {
+        self.enable_ticket_words = enable_words;
+        if let Some(list) = patterns {
+            if !list.is_empty() {
+                let mut compiled: Vec<Regex> = Vec::new();
+                for p in list {
+                    if let Ok(re) = Regex::new(p) {
+                        compiled.push(re);
+                    }
+                }
+                if !compiled.is_empty() {
+                    self.custom_ticket_key_regexes = Some(compiled);
+                }
+            }
+        }
+        self
+    }
+
+    fn build_ticket_regexes() -> (Regex, Regex) {
+        // [ticket=DEMO-123] or [ticket = DEMO-123]
+        let ticket_attr_regex = Regex::new(r"(?i)\[\s*ticket\s*=\s*([A-Z][A-Z0-9]+-\d+)\s*\]")
+            .unwrap_or_else(|_| Regex::new(r"\[ticket=([A-Z]+-\d+)\]").unwrap());
+        // Generic key like DEMO-123
+        let ticket_key_regex = Regex::new(r"\b([A-Z][A-Z0-9]+-\d+)\b")
+            .unwrap_or_else(|_| Regex::new(r"([A-Z]+-\d+)").unwrap());
+        (ticket_attr_regex, ticket_key_regex)
     }
 
     pub fn scan(&mut self) -> Vec<Reference> {
@@ -203,34 +261,64 @@ impl Scanner {
     }
 
     fn is_supported_ext(ext: &str) -> bool {
-        Self::get_comment_token(ext).is_some()
+        if Self::get_comment_token(ext).is_some() {
+            return true;
+        }
+        let (open, close) = Self::block_tokens_for(ext);
+        open.is_some() && close.is_some()
     }
 
     fn collect_candidate_files(&self, dir_path: &Path) -> Vec<PathBuf> {
         let mut files = Vec::new();
 
-        // Build walker that respects .lotarignore or falls back to .gitignore
+        // If modified_only is enabled and we are inside a git repo, restrict to modified/renamed files
+        if self.modified_only {
+            if let Some(repo_root) = crate::utils_git::find_repo_root(dir_path) {
+                let modified = Self::git_modified_files(&repo_root);
+                for p in modified {
+                    // Keep only files under dir_path and supported extensions
+                    let abs = repo_root.join(&p);
+                    if abs.starts_with(dir_path) {
+                        if let Some(ext) = abs.extension().and_then(|e| e.to_str()) {
+                            let ext_lc = ext.to_ascii_lowercase();
+                            if Self::is_supported_ext(&ext_lc) {
+                                files.push(abs);
+                            }
+                        }
+                    }
+                }
+                return files;
+            }
+        }
+
+        // Build walker that honors .lotarignore (root and nested) with fallback to .gitignore
+        // when no root .lotarignore exists. If a root .lotarignore is present, gitignore fallback
+        // is disabled to match project semantics.
         let mut builder = WalkBuilder::new(dir_path);
         builder.hidden(true); // skip hidden by default
 
-        let lotarignore = dir_path.join(".lotarignore");
-        if lotarignore.exists() {
+        // Always discover nested .lotarignore files
+        builder.add_custom_ignore_filename(".lotarignore");
+
+        let root_lotar = dir_path.join(".lotarignore");
+        if root_lotar.exists() {
             // Use .lotarignore rules only (no gitignore fallback)
             builder.ignore(false);
             builder.git_ignore(false);
             builder.git_global(false);
             builder.git_exclude(false);
-            builder.add_ignore(lotarignore);
+            // Ensure root .lotarignore is loaded even if discovery misses it for any reason
+            builder.add_ignore(root_lotar);
         } else {
             // Fallback to git ignore files
-            builder.ignore(true);
-            builder.git_ignore(true);
+            builder.ignore(true); // .ignore
+            builder.git_ignore(true); // .gitignore
             builder.git_global(true);
             builder.git_exclude(true);
-            // Also explicitly add root .gitignore so it works even without a .git repo
-            let gitignore = dir_path.join(".gitignore");
-            if gitignore.exists() {
-                builder.add_ignore(gitignore);
+            // Explicitly add root .gitignore so it works even without a .git repo
+            let root_gitignore = dir_path.join(".gitignore");
+            if root_gitignore.exists() {
+                builder.add_ignore(root_gitignore);
             }
         }
 
@@ -261,6 +349,45 @@ impl Scanner {
         files
     }
 
+    /// Return paths from `git status --porcelain` that are modified/renamed/added/deleted
+    fn git_modified_files(repo_root: &Path) -> Vec<PathBuf> {
+        // Prefer parsing porcelain output via invoking git; avoid adding a dependency.
+        // If git not available or fails, return empty to fall back to full scan.
+        use std::process::Command;
+        let out = Command::new("git")
+            .arg("-C")
+            .arg(repo_root)
+            .arg("status")
+            .arg("--porcelain")
+            .output();
+        let output = match out {
+            Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
+            _ => return Vec::new(),
+        };
+        let mut files = Vec::new();
+        for line in output.lines() {
+            if line.len() < 4 {
+                continue;
+            }
+            // Format: XY <path> or R <old> -> <new>
+            let status = &line[..2];
+            // Handle renames with "R" in either position
+            if status.contains('R') {
+                if let Some(pos) = line.find(" -> ") {
+                    let new_path = &line[pos + 4..];
+                    files.push(PathBuf::from(new_path.trim()));
+                }
+                continue;
+            }
+            // Else take path after 3rd char
+            let path = line[3..].trim();
+            if !path.is_empty() {
+                files.push(PathBuf::from(path));
+            }
+        }
+        files
+    }
+
     fn get_comment_token(extension: &str) -> Option<&'static str> {
         FILE_TYPES
             .iter()
@@ -273,46 +400,219 @@ impl Scanner {
             if let Some(extension) = file_path.extension() {
                 if let Some(ext_str) = extension.to_str() {
                     let ext_str = ext_str.to_ascii_lowercase();
-                    // Find the correct comment token for this file type
-                    if let Some(start_comment) = Self::get_comment_token(&ext_str) {
-                        // Process each line to find TODOs in comments
-                        for (line_number, line) in file_contents.lines().enumerate() {
-                            // Check if line contains a comment and any configured signal word
-                            if line.contains(start_comment) && self.signal_regex.is_match(line) {
-                                let (uuid, title) = if let Some(c) =
-                                    self.uuid_extract_regex.captures(line)
-                                {
-                                    let uuid =
-                                        c.get(1).map_or(String::new(), |m| m.as_str().to_string());
-                                    let title = c
-                                        .get(2)
-                                        .map_or(String::new(), |m| m.as_str().trim().to_string());
-                                    (uuid, title)
-                                } else if let Some(c) = self.simple_extract_regex.captures(line) {
-                                    let title = c
-                                        .get(1)
-                                        .map_or(String::new(), |m| m.as_str().trim().to_string());
-                                    (String::new(), title)
-                                } else {
-                                    (String::new(), String::new())
-                                };
 
-                                let reference = Reference {
-                                    file_path: file_path.to_path_buf(),
-                                    line_number: line_number + 1, // 1-based line numbers
-                                    title,
-                                    uuid,
-                                    annotation: line.trim().to_string(),
-                                    code_block: String::new(),
-                                    comment_block: String::new(),
-                                };
-                                references.push(reference);
+                    // Determine comment syntaxes
+                    let single_line = Self::get_comment_token(&ext_str);
+                    let (block_open, block_close) = Self::block_tokens_for(&ext_str);
+
+                    // Process each line to find TODOs in comments
+                    let mut in_block = false;
+                    let mut block_start_line: usize = 0;
+
+                    for (line_number, raw_line) in file_contents.lines().enumerate() {
+                        let mut line = raw_line;
+
+                        // Handle block comment state transitions if supported
+                        if let (Some(open), Some(close)) = (&block_open, &block_close) {
+                            if !in_block {
+                                if let Some(open_idx) = line.find(open) {
+                                    in_block = true;
+                                    block_start_line = line_number + 1; // 1-based
+                                    // Consider the remainder after the opener for same-line checks
+                                    line = &line[open_idx + open.len()..];
+                                }
+                            }
+
+                            if in_block {
+                                // If the closer appears on this line, truncate to the part before closer
+                                if let Some(close_idx) = line.find(close) {
+                                    let before = &line[..close_idx];
+                                    // Process the content within the block on this line
+                                    self.process_comment_line(
+                                        file_path,
+                                        references,
+                                        block_start_line, // report first line for block start
+                                        before,
+                                    );
+                                    in_block = false;
+                                    continue; // move to next line
+                                } else {
+                                    // Entire line is within block; process as-is
+                                    self.process_comment_line(
+                                        file_path,
+                                        references,
+                                        line_number + 1,
+                                        line,
+                                    );
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Single-line comments (if defined for this extension)
+                        if let Some(start_comment) = single_line {
+                            if raw_line.contains(start_comment) {
+                                self.process_comment_line(
+                                    file_path,
+                                    references,
+                                    line_number + 1,
+                                    raw_line,
+                                );
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    fn process_comment_line(
+        &self,
+        file_path: &Path,
+        references: &mut Vec<Reference>,
+        line_number_1based: usize,
+        line: &str,
+    ) {
+        // Only proceed when a signal word is present. Bare ticket keys do not trigger scanning
+        // (they are handled as mentions by the scan handler if enabled).
+        if !self.signal_regex.is_match(line) {
+            return;
+        }
+
+        // Strip common leading block-comment adornments: *, /**, */ etc.
+        let trimmed = line.trim().trim_start_matches('*').trim();
+
+        // Prefer explicit UUID in parens after signal word, then [ticket=...], then generic DEMO-123 pattern
+        let (mut uuid, title) = if let Some(c) = self.uuid_extract_regex.captures(trimmed) {
+            let uuid = c.get(1).map_or(String::new(), |m| m.as_str().to_string());
+            let title = c
+                .get(2)
+                .map_or(String::new(), |m| m.as_str().trim().to_string());
+            (uuid, title)
+        } else if let Some(c) = self.ticket_attr_regex.captures(trimmed) {
+            let uuid = c.get(1).map_or(String::new(), |m| m.as_str().to_string());
+            let title = self
+                .simple_extract_regex
+                .captures(trimmed)
+                .and_then(|cap| cap.get(1).map(|m| m.as_str().trim().to_string()))
+                .unwrap_or_default();
+            (uuid, title)
+        } else if let Some(c) = self.simple_extract_regex.captures(trimmed) {
+            let title = c
+                .get(1)
+                .map_or(String::new(), |m| m.as_str().trim().to_string());
+            // Try to find a generic key within the line
+            if let Some(k) = self.ticket_key_regex.captures(trimmed) {
+                let uuid = k.get(1).map_or(String::new(), |m| m.as_str().to_string());
+                (uuid, title)
+            } else {
+                (String::new(), title)
+            }
+        } else {
+            (String::new(), String::new())
+        };
+
+        // Fallback: if uuid is still empty (e.g., bare key without signal words), try any configured ticket patterns
+        if uuid.is_empty() {
+            if let Some(k) = self.extract_ticket_key_from_line(trimmed) {
+                uuid = k;
+            }
+        }
+
+        let reference = Reference {
+            file_path: file_path.to_path_buf(),
+            line_number: line_number_1based,
+            title,
+            uuid,
+            annotation: trimmed.to_string(),
+            code_block: String::new(),
+            comment_block: String::new(),
+        };
+        references.push(reference);
+    }
+
+    fn block_tokens_for(ext: &str) -> (Option<&'static str>, Option<&'static str>) {
+        // Provide block comment tokens per language family
+        match ext {
+            // C-style block comments
+            "rs" | "rust" | "c" | "h" | "hpp" | "cpp" | "cc" | "cxx" | "js" | "ts" | "jsx"
+            | "tsx" | "java" | "cs" | "scala" | "kotlin" | "go" | "dart" | "swift" | "groovy"
+            | "css" | "scss" | "less" => (Some("/*"), Some("*/")),
+            // HTML/XML/Markdown style block comments
+            "html" | "htm" | "xml" | "vue" | "svelte" | "md" | "markdown" => {
+                (Some("<!--"), Some("-->"))
+            }
+            // Others: no block comments
+            _ => (None, None),
+        }
+    }
+
+    /// Suggest an idempotent insertion of ` (KEY)` right after the first signal word on the line.
+    /// Returns Some(edited_line) when an insertion is proposed, or None if not applicable
+    /// (no signal word found or the key already exists on the line).
+    pub fn suggest_insertion_for_line(&self, line: &str, key: &str) -> Option<String> {
+        if key.is_empty() {
+            return None;
+        }
+        if line.contains(&format!("({})", key)) {
+            return None; // idempotence: already present
+        }
+        // Find the first signal word
+        if let Some(m) = self.signal_regex.find(line) {
+            let end = m.end();
+            let before = &line[..end];
+            let after = &line[end..];
+
+            // Determine insertion point: before a following ':' or '-' (with optional spaces),
+            // otherwise directly after the signal word.
+            let after_trimmed = after;
+            let mut insert_at_end = true;
+            let mut split_idx = 0usize;
+            // pattern: ^\s*([:-])
+            for (i, ch) in after_trimmed.char_indices() {
+                if ch.is_whitespace() {
+                    continue;
+                }
+                if ch == ':' || ch == '-' {
+                    insert_at_end = false;
+                    split_idx = i; // insert before this punctuation
+                }
+                break;
+            }
+
+            let insertion = format!(" ({})", key);
+            let edited = if insert_at_end {
+                format!("{}{}{}", before, insertion, after)
+            } else {
+                let (left, right) = after_trimmed.split_at(split_idx);
+                format!("{}{}{}{}", before, insertion, left, right)
+            };
+
+            Some(edited)
+        } else {
+            None
+        }
+    }
+
+    /// Extract an existing ticket key from the given line, if present.
+    /// Order: [ticket=KEY] takes precedence, then generic KEY like DEMO-123.
+    pub fn extract_ticket_key_from_line(&self, line: &str) -> Option<String> {
+        if let Some(c) = self.ticket_attr_regex.captures(line) {
+            return c.get(1).map(|m| m.as_str().to_string());
+        }
+        if let Some(c) = self.ticket_key_regex.captures(line) {
+            return c.get(1).map(|m| m.as_str().to_string());
+        }
+        if let Some(list) = &self.custom_ticket_key_regexes {
+            for re in list {
+                if let Some(c) = re.captures(line) {
+                    if let Some(m) = c.get(1) {
+                        return Some(m.as_str().to_string());
+                    }
+                }
+            }
+        }
+        None
     }
 
     fn scan_file_collect(&self, file_path: &Path) -> Vec<Reference> {

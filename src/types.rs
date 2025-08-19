@@ -263,6 +263,17 @@ pub struct TaskComment {
     pub text: String,
 }
 
+// Typed external references attached to a task/ticket.
+// Minimal schema for now: support code references and generic links.
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReferenceEntry {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub code: Option<String>, // e.g., packages/api/src/retry.ts#L118 or with range #L118-152
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub link: Option<String>, // e.g., https://...
+}
+
 // Type alias for custom fields - can hold any YAML-serializable value
 // For schema generation, use serde_json::Value which has a JsonSchema implementation
 #[cfg(not(feature = "schema"))]
