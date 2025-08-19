@@ -1,5 +1,4 @@
 Features:
-- Due Date
 - Task relationship queries and graphs
 - Comments
 - Audit Log

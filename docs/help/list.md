@@ -54,8 +54,8 @@ lotar list --project=auth  # Uses environment directory
 - `--assignee, -a <ASSIGNEE>` - Tasks assigned to specific person (accepts @me)
 - `--unassigned` - Tasks with no assignee
  - Tip: Use `--assignee=@me` or `--mine, -m` to filter to your tasks. Your identity resolves from config default_reporter → git user → system username.
-- `--due-soon` - Tasks due within 7 days
-- `--overdue` - Tasks past their due date
+- `--overdue` - Tasks past their due date (strictly before now)
+- `--due-soon[=N]` - Tasks due within N days (default 7)
 
 ### Project & Organization
 - `--project, -p <PROJECT>` - Specific project (overrides auto-detection)

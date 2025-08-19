@@ -359,6 +359,15 @@ pub struct TaskSearchArgs {
     /// Limit results
     #[arg(long, short = 'L', default_value = "20")]
     pub limit: usize,
+
+    /// Show only overdue tasks (due date strictly before now)
+    #[arg(long)]
+    #[serde(default)]
+    pub overdue: bool,
+
+    /// Show only tasks due within N days (default 7 if not provided)
+    #[arg(long = "due-soon", num_args = 0..=1, value_name = "DAYS")]
+    pub due_soon: Option<Option<usize>>, // --due-soon or --due-soon=N
 }
 
 #[derive(Args, Deserialize, Debug)]

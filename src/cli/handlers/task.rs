@@ -387,6 +387,37 @@ impl CommandHandler for SearchHandler {
             tasks.retain(|(_, task)| task.priority == Priority::Critical);
         }
 
+        // Overdue filter: due_date strictly before now
+        if args.overdue {
+            let now = chrono::Utc::now();
+            tasks.retain(|(_, task)| {
+                if let Some(ref due) = task.due_date {
+                    if let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due) {
+                        return dt < now;
+                    }
+                }
+                false
+            });
+        }
+
+        // Due soon filter: due within N days from now (inclusive)
+        if let Some(due_soon_arg) = args.due_soon {
+            let days = match due_soon_arg {
+                Some(n) => n as i64,
+                None => 7,
+            };
+            let now = chrono::Utc::now();
+            let cutoff = now + chrono::Duration::days(days);
+            tasks.retain(|(_, task)| {
+                if let Some(ref due) = task.due_date {
+                    if let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due) {
+                        return dt >= now && dt <= cutoff;
+                    }
+                }
+                false
+            });
+        }
+
         // Apply sorting if requested
         if let Some(sort_field) = args.sort_by {
             use crate::cli::SortField;

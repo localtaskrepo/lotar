@@ -32,9 +32,13 @@ lotar due-date AUTH-001 2025-09-01 --format=json
 
 ## Supported date formats
 
-- ISO: YYYY-MM-DD (e.g., 2025-12-31)
-- Relative: today, tomorrow, next week, next monday (any weekday)
-- Offsets: +3d, +2w, +1 day, +2 weeks
+- ISO Date: `YYYY-MM-DD` (interpreted as local midnight, stored in UTC)
+- RFC3339 DateTime: `2025-12-31T15:04:05Z`, `2025-12-31T15:04:05+02:00`
+- Local DateTime (assumed local tz): `YYYY-MM-DD HH:MM[:SS]`, `YYYY-MM-DDTHH:MM[:SS]`
+- Relative keywords: `today`, `tomorrow`, `next week`, `next <weekday>`
+- Offsets: `+3d`, `+2w`, `+1 day`, `+2 weeks`, `in 3 days`, `in 2 weeks`
+- Business days: `+1bd`, `+3 business days`, `next business day`
+- Weekday shortcuts: `this friday`, `by friday`, `fri`, `next week monday`
 
 ## Task ID resolution
 
@@ -67,7 +71,8 @@ When no due date is set: `"due_date": null`.
 
 ## Notes
 
-- Validation checks format and supports only the formats listed above.
+- If a date is provided without a time or timezone, midnight local time is assumed and stored as an RFC3339 UTC timestamp.
+- Validation checks format and supports only the formats listed above. Error messages include hints with examples.
 - Works across multi-project workspaces; resolution is project-aware.
 
 ## Alternative interface
