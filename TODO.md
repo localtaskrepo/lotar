@@ -1,6 +1,5 @@
 Features:
 - Task relationship queries and graphs
-- Comments (quick command: lotar comment <Task-ID> <content>)
 - Effort
 - Shell completion with install command
 - Git Hooks (e.g. for scanner)
@@ -11,7 +10,7 @@ Features:
 - IntelliJ Plugin
 - Show source code snippets (e.g. around TODOs) in web ui and cli
 - Statistics for analysis
-- lock issue file in git if in progress?
+- lock issue file in git if in progress? (or provide a command e.g. lotar task un-/lock <Task-ID>)
 
 Chores:
 - Replace parcel with vite
@@ -20,12 +19,12 @@ Chores:
 - Check if any of the auto features can be applied to MCP and web endpoints (or they already are)
 - Tests names are a mess
 - Config validation may need an update
-- There's an ignored test
 
 Bugs:
 - We have an operation that creates an empty config.yml and nothing else
 - CI job is failing because of clippy for some reason
 - Help output shows raw markdown (Maybe we should split docs from direct help and more detailed help linked to)
+- `lotar scan src` in this project throws an error
 
 ---
 
@@ -37,7 +36,13 @@ Bugs:
 
 Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 
-## Feature: 
+## Feature: Comments
+
+- [x] CLI: support positional text, -m/--message, -F/--file, and stdin
+- [x] Storage: TaskComment drops author (use git blame/history for attribution)
+- [x] Handler: richer JSON with added_comment {date,text}
+- [x] Tests: positional, -m flag, and empty-content error
+- [ ] Docs: help page for `comment` with examples and JSON output
 
 ## Backlog
 - [ ] Include README and LICENSE in archives

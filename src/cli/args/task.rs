@@ -229,6 +229,20 @@ pub enum TaskAction {
         /// Commit SHA (or ref) to load
         commit: String,
     },
+
+    /// Add or list comments for a task
+    Comment {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Comment text (optional if using -m or -F)
+        text: Option<String>,
+        /// Comment message (useful for shell-safe multi-word input)
+        #[arg(short = 'm', long = "message")]
+        message: Option<String>,
+        /// Read comment text from file
+        #[arg(short = 'F', long = "file")]
+        file: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]

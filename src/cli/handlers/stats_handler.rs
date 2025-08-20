@@ -542,22 +542,17 @@ impl CommandHandler for StatsHandler {
                     text_query: None,
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
-                use std::collections::BTreeMap;
-                let mut by_author: BTreeMap<String, u64> = BTreeMap::new();
-                for (_id, t) in tasks.into_iter() {
-                    for c in t.comments {
-                        *by_author.entry(c.author).or_insert(0) += 1;
-                    }
-                }
-                let mut rows: Vec<_> = by_author
+                // Author attribute removed from TaskComment; we can't group by author without blame here.
+                // Fallback: show tasks with most comments.
+                let mut rows: Vec<_> = tasks
                     .into_iter()
-                    .map(|(a, n)| serde_json::json!({"author": a, "comments": n}))
+                    .map(|(id, t)| serde_json::json!({"task": id, "comments": t.comments.len()}))
                     .collect();
                 rows.sort_by(|a, b| b["comments"].as_u64().cmp(&a["comments"].as_u64()));
                 let rows: Vec<_> = rows.into_iter().take(limit).collect();
                 match renderer.format {
                     crate::output::OutputFormat::Json => {
-                        let obj = serde_json::json!({"status":"ok","action":"stats.comments.by_author","global":global,"project":scope_project,"count":rows.len(),"items":rows});
+                        let obj = serde_json::json!({"status":"ok","action":"stats.comments.by_task","global":global,"project":scope_project,"count":rows.len(),"items":rows});
                         renderer.emit_raw_stdout(&obj.to_string());
                     }
                     _ => {
@@ -565,9 +560,9 @@ impl CommandHandler for StatsHandler {
                             renderer.emit_success("No comments found.");
                         } else {
                             for r in &rows {
-                                let a = r["author"].as_str().unwrap_or("");
+                                let id = r["task"].as_str().unwrap_or("");
                                 let n = r["comments"].as_u64().unwrap_or(0);
-                                renderer.emit_raw_stdout(&format!("{:>4}  {}", n, a));
+                                renderer.emit_raw_stdout(&format!("{:>4}  {}", n, id));
                             }
                         }
                     }

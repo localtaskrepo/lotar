@@ -1,3 +1,4 @@
+use crate::cli::handlers::comment::{CommentArgs, CommentHandler};
 use crate::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use crate::cli::handlers::status::{StatusArgs as StatusHandlerArgs, StatusHandler};
 use crate::cli::handlers::{AddHandler, CommandHandler};
@@ -485,6 +486,44 @@ impl CommandHandler for TaskHandler {
             }
             TaskAction::Delete(delete_args) => {
                 DeleteHandler::execute(delete_args, project, resolver, renderer)
+            }
+            TaskAction::Comment {
+                id,
+                text,
+                message,
+                file,
+            } => {
+                // Resolve comment content from args: file > message > text > stdin
+                let resolved_text = if let Some(path) = file {
+                    std::fs::read_to_string(&path)
+                        .map(|s| s.trim_end_matches(['\n', '\r']).to_string())
+                        .unwrap_or_default()
+                } else if let Some(m) = message {
+                    m
+                } else if let Some(t) = text {
+                    t
+                } else {
+                    use std::io::{IsTerminal, Read};
+                    let mut buffer = String::new();
+                    if !std::io::stdin().is_terminal() {
+                        if std::io::stdin().read_to_string(&mut buffer).is_ok() {
+                            buffer.trim_end_matches(['\n', '\r']).to_string()
+                        } else {
+                            String::new()
+                        }
+                    } else {
+                        String::new()
+                    }
+                };
+                let args = CommentArgs {
+                    task_id: id,
+                    text: if resolved_text.trim().is_empty() {
+                        None
+                    } else {
+                        Some(resolved_text)
+                    },
+                };
+                CommentHandler::execute(args, project, resolver, renderer)
             }
         }
     }

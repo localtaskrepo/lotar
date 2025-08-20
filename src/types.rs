@@ -258,7 +258,6 @@ impl TaskRelationships {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskComment {
-    pub author: String,
     pub date: String,
     pub text: String,
 }

@@ -9,7 +9,7 @@ pub struct CommentHandler;
 
 pub struct CommentArgs {
     pub task_id: String,
-    pub text: String,
+    pub text: Option<String>,
 }
 
 impl CommandHandler for CommentHandler {
@@ -54,42 +54,78 @@ impl CommandHandler for CommentHandler {
             .get(&full_task_id, resolved_project.clone())
             .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
 
-        // Build comment
-        let author = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
-            .unwrap_or_else(|| "unknown".to_string());
-        let when = chrono::Utc::now().to_rfc3339();
-        let comment = crate::types::TaskComment {
-            author,
-            date: when,
-            text: args.text,
-        };
+        if let Some(text) = args.text.filter(|t| !t.trim().is_empty()) {
+            // Build comment and append
+            let when = chrono::Utc::now().to_rfc3339();
+            let comment = crate::types::TaskComment { date: when, text };
+            task.comments.push(comment);
+            task.modified = chrono::Utc::now().to_rfc3339();
+            storage.edit(&full_task_id, &task);
 
-        // Append and persist
-        task.comments.push(comment);
-        task.modified = chrono::Utc::now().to_rfc3339();
-        storage.edit(&full_task_id, &task);
-
-        match renderer.format {
-            crate::output::OutputFormat::Json => {
-                renderer.emit_raw_stdout(
-                    &serde_json::json!({
-                        "status": "success",
-                        "action": "task.comment",
-                        "task_id": full_task_id,
-                        "comments": task.comments.len()
-                    })
-                    .to_string(),
-                );
+            match renderer.format {
+                crate::output::OutputFormat::Json => {
+                    renderer.emit_raw_stdout(
+                        &serde_json::json!({
+                            "status": "success",
+                            "action": "task.comment",
+                            "task_id": full_task_id,
+                            "comments": task.comments.len(),
+                            "added_comment": {
+                                "date": task
+                                    .comments
+                                    .last()
+                                    .map(|c| c.date.clone())
+                                    .unwrap_or_default(),
+                                "text": task
+                                    .comments
+                                    .last()
+                                    .map(|c| c.text.clone())
+                                    .unwrap_or_default()
+                            }
+                        })
+                        .to_string(),
+                    );
+                }
+                _ => {
+                    renderer.emit_success(&format!(
+                        "Comment added to {} ({} total)",
+                        full_task_id,
+                        task.comments.len()
+                    ));
+                }
             }
-            _ => {
-                renderer.emit_success(&format!(
-                    "Comment added to {} ({} total)",
-                    full_task_id,
-                    task.comments.len()
-                ));
+            Ok(())
+        } else {
+            // List comments (no mutation)
+            match renderer.format {
+                crate::output::OutputFormat::Json => {
+                    let items: Vec<_> = task
+                        .comments
+                        .iter()
+                        .map(|c| serde_json::json!({"date": c.date, "text": c.text}))
+                        .collect();
+                    renderer.emit_raw_stdout(
+                        &serde_json::json!({
+                            "status": "ok",
+                            "action": "task.comment.list",
+                            "task_id": full_task_id,
+                            "comments": items.len(),
+                            "items": items
+                        })
+                        .to_string(),
+                    );
+                }
+                _ => {
+                    if task.comments.is_empty() {
+                        renderer.emit_success(&format!("No comments for {}.", full_task_id));
+                    } else {
+                        for c in &task.comments {
+                            renderer.emit_raw_stdout(&format!("{}  {}", c.date, c.text));
+                        }
+                    }
+                }
             }
+            Ok(())
         }
-
-        Ok(())
     }
 }

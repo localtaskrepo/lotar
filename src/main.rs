@@ -36,15 +36,17 @@ fn is_valid_command(command: &str) -> bool {
             | "status"
             | "priority"
             | "assignee"
-            | "comment"
-            | "changelog"
             | "due-date"
+            | "comment"
             | "task"
+            | "tasks"
             | "config"
             | "scan"
             | "serve"
             | "whoami"
             | "stats"
+            | "changelog"
+            | "mcp"
     )
 }
 
@@ -191,7 +193,7 @@ fn main() {
                 }
             }
         }
-        Commands::Priority { id, priority } | Commands::PriorityShort { id, priority } => {
+        Commands::Priority { id, priority } => {
             renderer.log_info("BEGIN PRIORITY");
             let priority_args = PriorityArgs::new(id, priority, cli.project.clone());
             match PriorityHandler::execute(
@@ -247,9 +249,48 @@ fn main() {
                 }
             }
         }
-        Commands::Comment { id, text } => {
+        Commands::Comment {
+            id,
+            text,
+            message,
+            file,
+        } => {
             renderer.log_info("BEGIN COMMENT");
-            let args = CommentArgs { task_id: id, text };
+            // Resolve comment content from args: file > message > text > stdin
+            let resolved_text = if let Some(path) = file {
+                std::fs::read_to_string(&path)
+                    .map(|s| s.trim_end_matches(['\n', '\r']).to_string())
+                    .map_err(|e| e.to_string())
+                    .unwrap_or_else(|_| {
+                        renderer.emit_error("Failed to read --file");
+                        String::new()
+                    })
+            } else if let Some(m) = message {
+                m
+            } else if let Some(t) = text {
+                t
+            } else {
+                // Fallback: read from stdin if piped
+                use std::io::{IsTerminal, Read};
+                let mut buffer = String::new();
+                if !std::io::stdin().is_terminal() {
+                    if std::io::stdin().read_to_string(&mut buffer).is_ok() {
+                        buffer.trim_end_matches(['\n', '\r']).to_string()
+                    } else {
+                        String::new()
+                    }
+                } else {
+                    String::new()
+                }
+            };
+            let args = CommentArgs {
+                task_id: id,
+                text: if resolved_text.trim().is_empty() {
+                    None
+                } else {
+                    Some(resolved_text)
+                },
+            };
             match CommentHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END COMMENT status=ok");

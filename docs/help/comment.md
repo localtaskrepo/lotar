@@ -1,31 +1,75 @@
-# Comment
+# lotar comment
 
-Quickly add a comment to a task.
+Add or list comments for a task. Supports positional text, message flag, file input, or stdin. If no text is provided, the command lists existing comments.
 
 ## Usage
 
-- Add a comment
+```bash
+lotar comment <TASK_ID> [TEXT]
+lotar comment <TASK_ID> -m|--message <TEXT>
+lotar comment <TASK_ID> -F|--file <PATH>
 
-  lotar comment <ID> "Your comment text"
+# Alias
+lotar c <TASK_ID> [TEXT]
 
-- Shorthand alias:
+# Alternate form
+lotar task comment <TASK_ID> [TEXT]
+```
 
-  lotar c <ID> "Your comment text"
-
-## Notes
-
-- Author is resolved from your local identity (config default → git user.name/email → system username).
-- Timestamp is set to the current time in UTC.
-- JSON output includes the action and new comment count.
+- If neither TEXT, -m, nor -F are provided, the command reads from stdin when piped; otherwise it lists existing comments for the task.
+- TEXT is optional when using -m/--message or -F/--file.
 
 ## Examples
 
-- Text output
+```bash
+# Positional text
+lotar comment AUTH-1 "Investigated and will fix tomorrow"
 
-  lotar comment AUTH-1 "Investigated and will fix tomorrow"
+# Message flag (shell-safe)
+lotar comment AUTH-1 -m "Re-tested with latest build; still failing"
 
-- JSON output
+# From file
+lotar comment AUTH-1 -F notes/update.txt
 
-  lotar --format json comment AUTH-1 "First note"
+# From stdin (multiline)
+printf "Line 1\nLine 2\n" | lotar comment AUTH-1
 
-  {"status":"success","action":"task.comment","task_id":"AUTH-1","comments":3}
+# JSON output
+lotar --format json comment AUTH-1 -m "First note"
+
+# List existing comments (no text provided)
+lotar comment AUTH-1
+lotar --format json comment AUTH-1
+lotar task comment AUTH-1
+```
+
+Example JSON response:
+```json
+{
+  "status": "success",
+  "action": "task.comment",
+  "task_id": "AUTH-1",
+  "comments": 3,
+  "added_comment": {
+    "date": "2025-08-19T10:30:42Z",
+    "text": "First note"
+  }
+}
+```
+
+Example JSON list response (when no text is provided):
+```json
+{
+  "status": "ok",
+  "action": "task.comment.list",
+  "task_id": "AUTH-1",
+  "comments": 0,
+  "items": []
+}
+```
+
+## Notes
+
+- Author attribution isn’t stored in the comment; use git blame/history to see who added or changed comments.
+- Each comment stores a UTC timestamp (RFC3339) and the text.
+- Project context can be inferred from the ID prefix (e.g., AUTH-1), the current repo, or set via `--project`.

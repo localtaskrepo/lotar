@@ -71,15 +71,6 @@ pub enum Commands {
         priority: Option<String>,
     },
 
-    /// Priority shortcut - same as priority command
-    #[command(alias = "p")]
-    PriorityShort {
-        /// Task ID (with or without project prefix)  
-        id: String,
-        /// New priority (must be valid for project). If omitted, shows current priority.
-        priority: Option<String>,
-    },
-
     /// Change task assignee
     Assignee {
         /// Task ID (with or without project prefix)
@@ -101,8 +92,14 @@ pub enum Commands {
     Comment {
         /// Task ID (with or without project prefix)
         id: String,
-        /// Comment text
-        text: String,
+        /// Comment text (optional if using -m or -F)
+        text: Option<String>,
+        /// Comment message (useful for shell-safe multi-word input)
+        #[arg(short = 'm', long = "message")]
+        message: Option<String>,
+        /// Read comment text from file
+        #[arg(short = 'F', long = "file")]
+        file: Option<String>,
     },
 
     /// Full task management (existing functionality)
