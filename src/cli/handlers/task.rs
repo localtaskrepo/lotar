@@ -58,6 +58,404 @@ impl CommandHandler for TaskHandler {
             TaskAction::Edit(edit_args) => {
                 EditHandler::execute(edit_args, project, resolver, renderer)
             }
+            TaskAction::History { id, limit } => {
+                // Resolve project and file path
+                let default_proj = project
+                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
+                // Prefer project prefix embedded in the ID (e.g., TEST-1)
+                let proj_prefix =
+                    crate::storage::operations::StorageOperations::get_project_for_task(&id)
+                        .unwrap_or(default_proj.clone());
+                let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(
+                    &resolver.path.join(&proj_prefix),
+                    &id,
+                )
+                .ok_or_else(|| "Task file not found".to_string())?;
+
+                // Compute repo-relative path
+                let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                    .ok_or_else(|| "Not in a git repository".to_string())?;
+                let tasks_abs = resolver.path.clone();
+                let tasks_rel = if tasks_abs.starts_with(&repo_root) {
+                    tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
+                } else {
+                    tasks_abs.clone()
+                };
+                let file_rel_to_repo =
+                    tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
+
+                let commits = crate::services::audit_service::AuditService::list_commits_for_file(
+                    &repo_root,
+                    &file_rel_to_repo,
+                )?;
+                let limited = commits.into_iter().take(limit).collect::<Vec<_>>();
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        let items: Vec<_> = limited
+                            .iter()
+                            .map(|c| {
+                                serde_json::json!({
+                                    "commit": c.commit,
+                                    "author": c.author,
+                                    "email": c.email,
+                                    "date": c.date.to_rfc3339(),
+                                    "message": c.message,
+                                })
+                            })
+                            .collect();
+                        let obj = serde_json::json!({"status":"ok","action":"task.history","id":id,"project":proj_prefix,"count":items.len(),"items":items});
+                        renderer.emit_raw_stdout(&obj.to_string());
+                    }
+                    _ => {
+                        if limited.is_empty() {
+                            renderer.emit_success("No history for this task.");
+                        } else {
+                            for c in &limited {
+                                renderer.emit_raw_stdout(&format!(
+                                    "{}  {} <{}>  {}",
+                                    c.date.to_rfc3339(),
+                                    c.author,
+                                    c.email,
+                                    c.commit
+                                ));
+                                if !c.message.is_empty() {
+                                    renderer.emit_raw_stdout(&format!("    {}", c.message));
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(())
+            }
+            TaskAction::HistoryByField { field, id, limit } => {
+                // Resolve project and file path similar to History
+                let default_proj = project
+                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
+                let proj_prefix =
+                    crate::storage::operations::StorageOperations::get_project_for_task(&id)
+                        .unwrap_or(default_proj.clone());
+                let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(
+                    &resolver.path.join(&proj_prefix),
+                    &id,
+                )
+                .ok_or_else(|| "Task file not found".to_string())?;
+
+                let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                    .ok_or_else(|| "Not in a git repository".to_string())?;
+                let tasks_abs = resolver.path.clone();
+                let tasks_rel = if tasks_abs.starts_with(&repo_root) {
+                    tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
+                } else {
+                    tasks_abs.clone()
+                };
+                let file_rel_to_repo =
+                    tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
+
+                // List commits and load snapshots for diffing
+                let commits = crate::services::audit_service::AuditService::list_commits_for_file(
+                    &repo_root,
+                    &file_rel_to_repo,
+                )?;
+                // For each commit (newest->oldest), diff this commit vs next to compute property changes
+                #[derive(Clone)]
+                struct TaskSnapshot {
+                    status: Option<crate::types::TaskStatus>,
+                    priority: Option<crate::types::Priority>,
+                    assignee: Option<String>,
+                    tags: Vec<String>,
+                }
+                let mut snapshots: Vec<(String, TaskSnapshot)> = Vec::with_capacity(commits.len());
+                for c in &commits {
+                    if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(
+                        &repo_root,
+                        &c.commit,
+                        &file_rel_to_repo,
+                    ) {
+                        if let Ok(task) =
+                            serde_yaml::from_str::<crate::storage::task::Task>(&content)
+                        {
+                            snapshots.push((
+                                c.commit.clone(),
+                                TaskSnapshot {
+                                    status: Some(task.status),
+                                    priority: Some(task.priority),
+                                    assignee: task.assignee,
+                                    tags: task.tags,
+                                },
+                            ));
+                        }
+                    }
+                }
+                // Compute changes when a field value differs from the next snapshot
+                let mut changes: Vec<serde_json::Value> = Vec::new();
+                for w in snapshots.windows(2) {
+                    let (commit_new, snap_new) = &w[0];
+                    let (_commit_old, snap_old) = &w[1];
+                    match field {
+                        crate::cli::args::task::HistoryField::Status => {
+                            if snap_new.status != snap_old.status {
+                                changes.push(serde_json::json!({
+                                    "field": "status",
+                                    "new": snap_new.status.as_ref().map(|s| s.to_string()),
+                                    "old": snap_old.status.as_ref().map(|s| s.to_string()),
+                                    "commit": commit_new,
+                                }));
+                            }
+                        }
+                        crate::cli::args::task::HistoryField::Priority => {
+                            if snap_new.priority != snap_old.priority {
+                                changes.push(serde_json::json!({
+                                    "field": "priority",
+                                    "new": snap_new.priority.as_ref().map(|s| s.to_string()),
+                                    "old": snap_old.priority.as_ref().map(|s| s.to_string()),
+                                    "commit": commit_new,
+                                }));
+                            }
+                        }
+                        crate::cli::args::task::HistoryField::Assignee => {
+                            if snap_new.assignee != snap_old.assignee {
+                                changes.push(serde_json::json!({
+                                    "field": "assignee",
+                                    "new": snap_new.assignee,
+                                    "old": snap_old.assignee,
+                                    "commit": commit_new,
+                                }));
+                            }
+                        }
+                        crate::cli::args::task::HistoryField::Tags => {
+                            if snap_new.tags != snap_old.tags {
+                                changes.push(serde_json::json!({
+                                    "field": "tags",
+                                    "new": snap_new.tags,
+                                    "old": snap_old.tags,
+                                    "commit": commit_new,
+                                }));
+                            }
+                        }
+                    }
+                }
+                // Limit and render
+                let limited: Vec<_> = changes.into_iter().take(limit).collect();
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        let obj = serde_json::json!({
+                            "status":"ok",
+                            "action":"task.history_field",
+                            "field": format!("{}", match field { crate::cli::args::task::HistoryField::Status=>"status", crate::cli::args::task::HistoryField::Priority=>"priority", crate::cli::args::task::HistoryField::Assignee=>"assignee", crate::cli::args::task::HistoryField::Tags=>"tags" }),
+                            "id": id,
+                            "project": proj_prefix,
+                            "count": limited.len(),
+                            "items": limited,
+                        });
+                        renderer.emit_raw_stdout(&obj.to_string());
+                    }
+                    _ => {
+                        if limited.is_empty() {
+                            renderer.emit_success("No changes detected for the selected field.");
+                        } else {
+                            for ch in &limited {
+                                renderer.emit_raw_stdout(&format!("{}", ch));
+                            }
+                        }
+                    }
+                }
+                Ok(())
+            }
+            TaskAction::Diff { id, commit, fields } => {
+                let default_proj = project
+                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
+                let proj_prefix =
+                    crate::storage::operations::StorageOperations::get_project_for_task(&id)
+                        .unwrap_or(default_proj.clone());
+                let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(
+                    &resolver.path.join(&proj_prefix),
+                    &id,
+                )
+                .ok_or_else(|| "Task file not found".to_string())?;
+                let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                    .ok_or_else(|| "Not in a git repository".to_string())?;
+                let tasks_abs = resolver.path.clone();
+                let tasks_rel = if tasks_abs.starts_with(&repo_root) {
+                    tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
+                } else {
+                    tasks_abs.clone()
+                };
+                let file_rel_to_repo =
+                    tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
+                let commit_sha = if let Some(c) = commit {
+                    c
+                } else {
+                    let commits =
+                        crate::services::audit_service::AuditService::list_commits_for_file(
+                            &repo_root,
+                            &file_rel_to_repo,
+                        )?;
+                    commits
+                        .first()
+                        .map(|c| c.commit.clone())
+                        .ok_or_else(|| "No commits for this task file".to_string())?
+                };
+                if fields {
+                    // Load current and parent snapshots and compute a basic field delta
+                    // Resolve parent commit affecting this file
+                    let parent_commit = {
+                        let commits =
+                            crate::services::audit_service::AuditService::list_commits_for_file(
+                                &repo_root,
+                                &file_rel_to_repo,
+                            )?;
+                        commits.get(1).map(|c| c.commit.clone())
+                    };
+                    let current = crate::services::audit_service::AuditService::show_file_at(
+                        &repo_root,
+                        &commit_sha,
+                        &file_rel_to_repo,
+                    )?;
+                    let prev = if let Some(pc) = parent_commit {
+                        crate::services::audit_service::AuditService::show_file_at(
+                            &repo_root,
+                            &pc,
+                            &file_rel_to_repo,
+                        )
+                        .ok()
+                    } else {
+                        None
+                    };
+
+                    let cur_task: Option<crate::storage::task::Task> =
+                        serde_yaml::from_str(&current).ok();
+                    let prev_task: Option<crate::storage::task::Task> =
+                        prev.as_deref().and_then(|s| serde_yaml::from_str(s).ok());
+
+                    let mut deltas = serde_json::Map::new();
+                    let mut push_change =
+                        |k: &str, old: serde_json::Value, new: serde_json::Value| {
+                            if old != new {
+                                deltas.insert(
+                                    k.to_string(),
+                                    serde_json::json!({"old": old, "new": new}),
+                                );
+                            }
+                        };
+                    if let (Some(cur), Some(prev)) = (cur_task.as_ref(), prev_task.as_ref()) {
+                        push_change(
+                            "title",
+                            serde_json::json!(prev.title),
+                            serde_json::json!(cur.title),
+                        );
+                        push_change(
+                            "status",
+                            serde_json::json!(prev.status.to_string()),
+                            serde_json::json!(cur.status.to_string()),
+                        );
+                        push_change(
+                            "priority",
+                            serde_json::json!(prev.priority.to_string()),
+                            serde_json::json!(cur.priority.to_string()),
+                        );
+                        push_change(
+                            "task_type",
+                            serde_json::json!(prev.task_type.to_string()),
+                            serde_json::json!(cur.task_type.to_string()),
+                        );
+                        push_change(
+                            "assignee",
+                            serde_json::json!(prev.assignee),
+                            serde_json::json!(cur.assignee),
+                        );
+                        push_change(
+                            "reporter",
+                            serde_json::json!(prev.reporter),
+                            serde_json::json!(cur.reporter),
+                        );
+                        push_change(
+                            "due_date",
+                            serde_json::json!(prev.due_date),
+                            serde_json::json!(cur.due_date),
+                        );
+                        push_change(
+                            "effort",
+                            serde_json::json!(prev.effort),
+                            serde_json::json!(cur.effort),
+                        );
+                        push_change(
+                            "category",
+                            serde_json::json!(prev.category),
+                            serde_json::json!(cur.category),
+                        );
+                        push_change(
+                            "tags",
+                            serde_json::json!(prev.tags),
+                            serde_json::json!(cur.tags),
+                        );
+                    }
+                    let result = serde_json::Value::Object(deltas);
+                    match renderer.format {
+                        crate::output::OutputFormat::Json => {
+                            let obj = serde_json::json!({"status":"ok","action":"task.diff","mode":"fields","id":id,"project":proj_prefix,"commit":commit_sha,"diff":result});
+                            renderer.emit_raw_stdout(&obj.to_string());
+                        }
+                        _ => renderer.emit_raw_stdout(&result.to_string()),
+                    }
+                } else {
+                    let patch = crate::services::audit_service::AuditService::show_file_diff(
+                        &repo_root,
+                        &commit_sha,
+                        &file_rel_to_repo,
+                    )?;
+                    match renderer.format {
+                        crate::output::OutputFormat::Json => {
+                            let obj = serde_json::json!({"status":"ok","action":"task.diff","id":id,"project":proj_prefix,"commit":commit_sha,"patch":patch});
+                            renderer.emit_raw_stdout(&obj.to_string());
+                        }
+                        _ => renderer.emit_raw_stdout(&patch),
+                    }
+                }
+                Ok(())
+            }
+            TaskAction::At { id, commit } => {
+                let default_proj = project
+                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
+                let proj_prefix =
+                    crate::storage::operations::StorageOperations::get_project_for_task(&id)
+                        .unwrap_or(default_proj.clone());
+                let file_rel = crate::storage::operations::StorageOperations::get_file_path_for_id(
+                    &resolver.path.join(&proj_prefix),
+                    &id,
+                )
+                .ok_or_else(|| "Task file not found".to_string())?;
+                let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
+                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                    .ok_or_else(|| "Not in a git repository".to_string())?;
+                let tasks_abs = resolver.path.clone();
+                let tasks_rel = if tasks_abs.starts_with(&repo_root) {
+                    tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
+                } else {
+                    tasks_abs.clone()
+                };
+                let file_rel_to_repo =
+                    tasks_rel.join(file_rel.strip_prefix(&resolver.path).unwrap_or(&file_rel));
+                let content = crate::services::audit_service::AuditService::show_file_at(
+                    &repo_root,
+                    &commit,
+                    &file_rel_to_repo,
+                )?;
+                match renderer.format {
+                    crate::output::OutputFormat::Json => {
+                        let obj = serde_json::json!({"status":"ok","action":"task.at","id":id,"project":proj_prefix,"commit":commit,"content":content});
+                        renderer.emit_raw_stdout(&obj.to_string());
+                    }
+                    _ => renderer.emit_raw_stdout(&content),
+                }
+                Ok(())
+            }
             TaskAction::Status(status_args) => {
                 let handler_args = StatusHandlerArgs::new(
                     status_args.id,

@@ -112,10 +112,41 @@ lotar list --format=markdown  # Markdown output
 lotar scan ./src
 ```
 
+### Git-derived Stats (read-only)
+```bash
+# Tickets changed in the last 14 days (project by default)
+lotar stats changed --since 14d
+
+# Highest churn (commits per ticket) across all projects in the last 30 days
+lotar stats churn --since 30d --global
+
+# Top authors touching tasks in the last 90 days
+lotar stats authors --since 90d --global
+
+# Activity grouped by day (or author|week|project) in the last 60 days
+lotar stats activity --since 60d --group-by day
+
+# JSON output for scripting
+lotar --format json stats changed --since 7d
+```
+
 ### Web Interface
 ```bash
 # Built-in web server with React frontend
 lotar serve --host 127.0.0.1 --port 8080
+```
+
+### Task History (read-only, from git)
+```bash
+# Show commit history for a task
+lotar task history PROJ-123
+
+# Show raw diff for the latest commit touching the task (or specify --commit)
+lotar task diff PROJ-123
+lotar task diff PROJ-123 --commit abcdef1
+
+# Show the task file snapshot at a specific commit
+lotar task at PROJ-123 abcdef1
 ```
 
 ## 📁 How It Works
@@ -232,6 +263,7 @@ lotar config templates
 - [📇 Help Index](docs/help/index.md) - Central links to command help and references
 - [⚖️ Resolution & Precedence](docs/help/precedence.md) - Config/identity/path source order
 - [🧠 Smart Project Management](docs/smart-project-management.md) - Intelligent project resolution and auto-detection
+- [🕓 Git-based History & Stats](docs/mcp-web-foundation-plan.md) - Read-only history design and analytics overview
 - [🏗️ Architecture & Technical Reference](docs/architecture-decisions.md) - System design and file formats
 
 **Advanced:**

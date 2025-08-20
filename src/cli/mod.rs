@@ -6,8 +6,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 pub mod args;
 pub use args::{
     AddArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
-    ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, TaskAction,
-    TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, StatsArgs,
+    TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs,
+    parse_key_value,
 };
 
 #[derive(Parser)]
@@ -45,6 +46,7 @@ pub enum Commands {
     Add(AddArgs),
 
     /// Quick list tasks  
+    #[command(aliases = ["ls"])]
     List(TaskSearchArgs),
 
     /// Change task status (validates against project config)
@@ -94,6 +96,15 @@ pub enum Commands {
         due_date: Option<String>,
     },
 
+    /// Add a comment to a task (shortcut)
+    #[command(alias = "c")]
+    Comment {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Comment text
+        text: String,
+    },
+
     /// Full task management (existing functionality)
     #[command(alias = "tasks")]
     Task {
@@ -112,6 +123,18 @@ pub enum Commands {
 
     /// Start web server (existing)
     Serve(ServeArgs),
+
+    /// Statistics and analytics (read-only)
+    Stats(StatsArgs),
+
+    /// Show task changes (default: vs HEAD working tree; optionally vs a ref)
+    Changelog {
+        /// Compare since this git ref (e.g., HEAD~1, a tag, or a commit); if omitted, compares working tree vs HEAD
+        since: Option<String>,
+        /// Span all projects under .tasks instead of the current/effective project
+        #[arg(long)]
+        global: bool,
+    },
 
     /// Start MCP JSON-RPC server over stdio
     Mcp,

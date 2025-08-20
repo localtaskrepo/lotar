@@ -187,6 +187,56 @@ pub enum TaskAction {
     },
     /// Delete a task
     Delete(TaskDeleteArgs),
+
+    /// Show git history for a task file (read-only)
+    History {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Limit number of commits
+        #[arg(long, short = 'L', default_value = "20")]
+        limit: usize,
+    },
+
+    /// Show per-field change history derived from git snapshots
+    #[command(alias = "history-field")]
+    HistoryByField {
+        /// Field to trace (status|priority|assignee|tags)
+        #[arg(value_enum)]
+        field: HistoryField,
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Limit number of changes (default 20)
+        #[arg(long, short = 'L', default_value = "20")]
+        limit: usize,
+    },
+
+    /// Show raw diff patch for the latest or given commit touching the task
+    Diff {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Specific commit SHA to show (default: latest for this file)
+        #[arg(long)]
+        commit: Option<String>,
+        /// Show structured field-level diff instead of raw patch
+        #[arg(long, default_value_t = false)]
+        fields: bool,
+    },
+
+    /// Show the file snapshot at a specific commit
+    At {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// Commit SHA (or ref) to load
+        commit: String,
+    },
+}
+
+#[derive(Clone, Debug, ValueEnum)]
+pub enum HistoryField {
+    Status,
+    Priority,
+    Assignee,
+    Tags,
 }
 
 #[derive(Args, Deserialize, Debug)]

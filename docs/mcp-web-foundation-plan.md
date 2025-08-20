@@ -1,7 +1,7 @@
 # MCP + Web API Foundation Plan (Tasks & Projects)
 
-Last updated: 2025-08-08 (evening, MCP tools wired + logging/setLevel)
-Status: In progress (MCP + Web API foundations)
+Last updated: 2025-08-20 (watcher integrated; SSE heartbeats/ready shipped; tests green)
+Status: In progress — MCP + Web API foundations; Git-backed audit & history complete; SSE watcher integrated
 Owners: Core CLI + Storage maintainers
 
 ## Goals
@@ -39,11 +39,26 @@ Owners: Core CLI + Storage maintainers
 - Web
   - `web_server.rs` implements a minimal TCP HTTP server with routing; serves static files from `target/web` and `/api/*` dispatch via `api_server::ApiServer`
   - Structured request parsing (method, path, query, headers, body), permissive CORS, and SSE endpoints `/api/events` and `/api/tasks/stream` are implemented
-  - SSE supports per-connection debounce and filters via query params; filesystem watcher integration is still pending
+  - SSE supports per-connection debounce and filters via query params. Filesystem watcher (notify) is integrated and emits `project_changed` on .tasks changes; project filter matches `task_*` events by ID prefix and `project_changed` via `data.name`. Keep-alive heartbeats and an optional `ready` event are supported.
 - MCP
   - Implemented JSON-RPC 2.0 stdio server with MCP handshake (protocolVersion "2025-06-18")
   - Tools exposed (see MCP Tools below); accepts both legacy slash names and host-compatible underscore names
   - Added logging capability and logging/setLevel handler (stores level; keeps stdout clean)
+
+— Git-backed Audit & History (new)
+- Read-only analytics sourced entirely from Git history; no DB or automatic Git writes
+- Stats subcommands:
+  - `stats changed` (recently changed tasks with last commit metadata)
+  - `stats churn` (commit counts per task)
+  - `stats authors` (contributors and counts)
+  - `stats activity` (group by author/day/week/project)
+  - `stats stale` (tasks with no changes since threshold, supports Nd/Nw)
+- Task history views:
+  - `task history` (commit timeline for an ID)
+  - `task diff` (show YAML diff at a commit)
+  - `task at` (show file at a commit)
+- Shared time parsing for `--since/--until` and thresholds; project-by-default scoping with `--global` override
+- Help docs embedded; `docs/help/stats.md` and task history pages updated
 
 Implication: We need a real API surface (methods, bodies, errors) and a thin adapter in both Web and MCP to call into a new service layer.
 
@@ -62,6 +77,14 @@ Implication: We need a real API surface (methods, bodies, errors) and a thin ada
       - list_tasks(filter: TaskListFilter, ctx) -> Result<Vec<TaskDTO>>
     - Notes: Implements project isolation; maps file-backed Task to API DTO by attaching `id`
   - `project_service.rs`
+  - `audit_service.rs` (Git-backed, read-only)
+    - Functions:
+      - list_changed_tasks(repo_root, tasks_rel, since, until, author_filter, project_filter)
+      - list_activity(..., group_by)
+      - list_commits_for_file(repo_root, file_rel)
+      - show_file_at(repo_root, commit, file_rel) / show_file_diff(...)
+      - list_last_change_per_task(repo_root, tasks_rel, project_filter) — utility, not on CLI
+    - Notes: shells out to `git` only; no mutations; supports project scoping
     - Functions:
       - list_projects(ctx) -> Result<Vec<ProjectDTO>> (directory names under tasks root)
       - project_stats(project: &str, ctx) -> Result<ProjectStatsDTO>
@@ -159,8 +182,9 @@ Realtime events (SSE)
   - Per-connection filters (implemented):
     - `debounce_ms` (number, default 100) — debounce before emitting buffered events
     - `kinds` (CSV) — only emit matching event kinds, e.g. `kinds=task_created,task_updated`
-    - `project` (string) — filter events by ID prefix (e.g. `LOTAR`)
-  - Keep-alive comments (not yet implemented)
+    - `project` (string) — project scoping; for `task_*` events this matches by ID prefix (e.g., `LOTAR`), for `project_changed` it matches `data.name`
+    - `ready` (bool) — when truthy, emit a one-time `ready` event after subscription
+  - Keep-alive heartbeats are sent periodically to keep connections alive
 
 Error model
 - 4xx/5xx always: { error: { code, message, details? } }
@@ -224,13 +248,20 @@ Phase 1 – Web API + SSE (PR2)
  - Add config endpoints: `GET /api/config/show`, `POST /api/config/set` (global and project)
  - Emit `config_updated` SSE after successful writes
 
-- Phase 2 – MCP minimal (PR3)
+Phase 2 – MCP minimal (PR3)
 - [x] Implement MCP server with JSON-RPC over stdio (initialize, tools/list, tools/call)
 - [x] Tools: task_create/get/update/delete/list; project_list/stats; config_show/set (no streaming)
 - [x] Accept both underscore and slash method names
 - [x] Add logging capability and logging/setLevel handler
-- [ ] Map DTOs and errors; tests for basic tool calls (add a small in-proc harness)
- - Add config tools: `config/show`, `config/set` (unary)
+- [x] Map DTOs and errors; tests for basic tool calls
+  - Config tools: `config/show`, `config/set` (unary)
+
+Phase 2.5 – Git-backed Audit & History (PRs merged)
+- [x] Shared time parsing utilities for `--since/--until` and thresholds
+- [x] `stats changed`/`churn`/`authors`/`activity` implemented with tests and docs
+- [x] `task history`/`diff`/`at` implemented; resolves project from ID
+- [x] `stats stale` implemented; global/project scopes; docs and tests added
+- [x] Help system updated with new pages and index links
 
 Phase 3 – Hardening & DX (PR4)
 - Input validation and helpful error messages
@@ -293,6 +324,7 @@ Optional Phase – Swap to a tiny HTTP crate later
 Configuration
 - SSE debounce: configurable via env var `LOTAR_SSE_DEBOUNCE_MS`; per-connection override via query `debounce_ms`.
 - Default debounce is 100ms when not set; no default value written to config.yml.
+ - SSE ready handshake: enable default `ready` emission with env var `LOTAR_SSE_READY=1`; clients can also request per-connection via query `ready=1`.
  - Config editing: multiple fields can be set via CLI and API; rely on git for history; write-through updates (no temp/backup files)
  - Validation: disallow unknown config keys; reuse existing config validation logic across CLI/Web/MCP
  - Project rename: only updates display name; prefix/folder rename is a separate migration and must not cause collisions
@@ -364,7 +396,7 @@ PR2 – Web API & SSE
 - [x] Extend `api_server.rs` router: method, path, query, JSON body parsing
 - [x] Implement REST endpoints: POST/GET/PATCH/DELETE `/api/tasks`, GET `/api/tasks`, GET `/api/projects`, GET `/api/projects/{name}/stats`
 - [x] Implement SSE endpoints: GET `/api/events`, GET `/api/tasks/stream`
-- [ ] Watcher: notify integration, configurable debounce (default 100ms), change normalization
+ - [x] Watcher: notify integration, configurable debounce (default 100ms), change normalization
 - [x] Broadcast manager for multi-client SSE; full payloads for create/update, id-only for delete
 - [x] CORS allow-all; OPTIONS preflight handling
 - [x] Parameter parity: map CLI long options to query/body keys (snake_case)
@@ -372,8 +404,13 @@ PR2 – Web API & SSE
 
 PR3 – MCP (Unary)
 - [x] Implement minimal MCP server with JSON-RPC over stdio (scaffold)
-- [ ] Tools: task/create,get,update,delete,list; project/list,stats (no streaming)
-- [ ] Map DTOs and errors; tests for basic tool calls
+- [x] Tools: task/create,get,update,delete,list; project/list,stats (no streaming)
+- [x] Map DTOs and errors; tests for basic tool calls
+
+PRX – Git-backed Audit & History
+- [x] Stats (changed, churn, authors, activity, stale) with tests and docs
+- [x] Task history (history, diff, at) with project-from-ID resolution
+- [x] Shared time parsing and CLI consistency
 
 PR4 – Hardening & DX
 - [ ] Input validation and helpful error messages

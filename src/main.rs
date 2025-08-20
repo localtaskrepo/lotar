@@ -5,11 +5,12 @@ use clap::Parser;
 use std::env;
 
 use lotar::cli::handlers::assignee::{AssigneeArgs, AssigneeHandler};
+use lotar::cli::handlers::comment::{CommentArgs, CommentHandler};
 use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
-    AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, TaskHandler,
+    AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, StatsHandler, TaskHandler,
 };
 use lotar::cli::{Cli, Commands, TaskAction};
 use lotar::workspace::TasksDirectoryResolver;
@@ -31,15 +32,19 @@ fn is_valid_command(command: &str) -> bool {
         command,
         "add"
             | "list"
+            | "ls"
             | "status"
             | "priority"
             | "assignee"
+            | "comment"
+            | "changelog"
             | "due-date"
             | "task"
             | "config"
             | "scan"
             | "serve"
             | "whoami"
+            | "stats"
     )
 }
 
@@ -242,6 +247,21 @@ fn main() {
                 }
             }
         }
+        Commands::Comment { id, text } => {
+            renderer.log_info("BEGIN COMMENT");
+            let args = CommentArgs { task_id: id, text };
+            match CommentHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END COMMENT status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END COMMENT status=err");
+                    Err(e)
+                }
+            }
+        }
         Commands::Task { action } => {
             renderer.log_info("BEGIN TASK");
             match TaskHandler::execute(action, cli.project.as_deref(), &resolver, &renderer) {
@@ -296,6 +316,353 @@ fn main() {
                     renderer.log_info("END SERVE status=err");
                     Err(e)
                 }
+            }
+        }
+        Commands::Stats(args) => {
+            renderer.log_info("BEGIN STATS");
+            match StatsHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END STATS status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END STATS status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Changelog { since, global } => {
+            renderer.log_info("BEGIN CHANGELOG");
+            // Inline small implementation to avoid a new handler file
+            // Determine repo root
+            let cwd = std::env::current_dir().map_err(|e| e.to_string()).unwrap();
+            let maybe_repo = lotar::utils_git::find_repo_root(&cwd);
+            if let Some(repo_root) = maybe_repo {
+                // Compute tasks relative path
+                let tasks_abs = resolver.path.clone();
+                let tasks_rel = if tasks_abs.starts_with(&repo_root) {
+                    tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
+                } else {
+                    tasks_abs.clone()
+                };
+                // Resolve project scoping
+                let project_filter: Option<String> = if global {
+                    None
+                } else {
+                    Some(if let Some(p) = cli.project.as_deref() {
+                        lotar::utils::resolve_project_input(p, resolver.path.as_path())
+                    } else {
+                        lotar::project::get_effective_project_name(&resolver)
+                    })
+                };
+
+                // Gather changed task files
+                let changed_files: Vec<std::path::PathBuf> = if let Some(ref_base) = &since {
+                    // Range: ref_base..HEAD
+                    let mut cmd = std::process::Command::new("git");
+                    cmd.arg("-C")
+                        .arg(&repo_root)
+                        .arg("diff")
+                        .arg("--name-only")
+                        .arg(format!("{}..HEAD", ref_base))
+                        .arg("--")
+                        .arg(&tasks_rel);
+                    match cmd.output() {
+                        Ok(o) if o.status.success() => {
+                            let out_str = String::from_utf8_lossy(&o.stdout).to_string();
+                            let base_iter = out_str
+                                .lines()
+                                .map(|l| std::path::PathBuf::from(l.trim()))
+                                .filter(|p| !p.as_os_str().is_empty())
+                                .filter(|p| p.starts_with(&tasks_rel));
+                            let iter = if let Some(ref proj) = project_filter {
+                                let expect = tasks_rel.join(proj);
+                                Box::new(base_iter.filter(move |p| p.starts_with(&expect)))
+                                    as Box<dyn Iterator<Item = std::path::PathBuf>>
+                            } else {
+                                Box::new(base_iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
+                            };
+                            iter.collect()
+                        }
+                        _ => Vec::new(),
+                    }
+                } else {
+                    // Working + staged vs HEAD, use porcelain to detect .tasks changes
+                    use std::process::Command;
+                    let out = Command::new("git")
+                        .arg("-C")
+                        .arg(&repo_root)
+                        .arg("status")
+                        .arg("--porcelain")
+                        .output();
+                    match out {
+                        Ok(o) if o.status.success() => {
+                            let mut files = Vec::new();
+                            for line in String::from_utf8_lossy(&o.stdout).lines() {
+                                if line.len() < 4 {
+                                    continue;
+                                }
+                                let status = &line[..2];
+                                if status.contains('R') {
+                                    if let Some(pos) = line.find(" -> ") {
+                                        let new_path = &line[pos + 4..];
+                                        files.push(std::path::PathBuf::from(new_path.trim()));
+                                    }
+                                    continue;
+                                }
+                                let path = line[3..].trim();
+                                if !path.is_empty() {
+                                    files.push(std::path::PathBuf::from(path));
+                                }
+                            }
+                            let iter = files.into_iter().filter(|p| p.starts_with(&tasks_rel));
+                            let iter = if let Some(ref proj) = project_filter {
+                                let expect = tasks_rel.join(proj);
+                                Box::new(iter.filter(move |p| p.starts_with(&expect)))
+                                    as Box<dyn Iterator<Item = std::path::PathBuf>>
+                            } else {
+                                Box::new(iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
+                            };
+                            iter.collect()
+                        }
+                        _ => Vec::new(),
+                    }
+                };
+
+                // For each changed file, compute field-level deltas
+                #[derive(Clone, Debug)]
+                struct BasicDelta {
+                    field: String,
+                    old: serde_json::Value,
+                    new: serde_json::Value,
+                }
+                #[derive(Clone, Debug)]
+                struct Item {
+                    id: String,
+                    project: String,
+                    file: String,
+                    changes: Vec<BasicDelta>,
+                }
+
+                let mut items: Vec<Item> = Vec::new();
+                for rel_path in changed_files {
+                    if rel_path.extension().and_then(|e| e.to_str()) != Some("yml") {
+                        continue;
+                    }
+                    // Resolve ID from path .tasks/<PROJECT>/<NUM>.yml
+                    let file_name = match rel_path.file_stem().and_then(|s| s.to_str()) {
+                        Some(s) => s,
+                        None => continue,
+                    };
+                    let numeric: u64 = match file_name.parse() {
+                        Ok(n) => n,
+                        Err(_) => continue,
+                    };
+                    let project = match rel_path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .and_then(|s| s.to_str())
+                    {
+                        Some(p) => p.to_string(),
+                        None => continue,
+                    };
+                    let id = format!("{}-{}", project, numeric);
+
+                    // Load snapshots
+                    let load_yaml_as_task = |content: &str| -> Option<lotar::storage::task::Task> {
+                        serde_yaml::from_str::<lotar::storage::task::Task>(content).ok()
+                    };
+
+                    // Current content (right side)
+                    let current_content: Option<String> = if since.is_some() {
+                        // Right = HEAD version
+                        lotar::services::audit_service::AuditService::show_file_at(
+                            &repo_root, "HEAD", &rel_path,
+                        )
+                        .ok()
+                    } else {
+                        // Working tree absolute path
+                        let abs = repo_root.join(&rel_path);
+                        std::fs::read_to_string(abs).ok()
+                    };
+
+                    // Base content (left side)
+                    let base_content: Option<String> = if let Some(ref_base) = &since {
+                        lotar::services::audit_service::AuditService::show_file_at(
+                            &repo_root, ref_base, &rel_path,
+                        )
+                        .ok()
+                    } else {
+                        // HEAD version
+                        lotar::services::audit_service::AuditService::show_file_at(
+                            &repo_root, "HEAD", &rel_path,
+                        )
+                        .ok()
+                    };
+
+                    let cur_task = current_content.as_deref().and_then(load_yaml_as_task);
+                    let base_task = base_content.as_deref().and_then(load_yaml_as_task);
+
+                    // If both failed to parse, skip
+                    if cur_task.is_none() && base_task.is_none() {
+                        continue;
+                    }
+
+                    // Compute minimal field deltas using the same approach as task diff --fields
+                    let mut deltas: Vec<BasicDelta> = Vec::new();
+                    let mut push = |k: &str, old: serde_json::Value, new: serde_json::Value| {
+                        if old != new {
+                            deltas.push(BasicDelta {
+                                field: k.to_string(),
+                                old,
+                                new,
+                            });
+                        }
+                    };
+                    match (cur_task.as_ref(), base_task.as_ref()) {
+                        (Some(cur), Some(prev)) => {
+                            push(
+                                "title",
+                                serde_json::json!(prev.title),
+                                serde_json::json!(cur.title),
+                            );
+                            push(
+                                "status",
+                                serde_json::json!(prev.status.to_string()),
+                                serde_json::json!(cur.status.to_string()),
+                            );
+                            push(
+                                "priority",
+                                serde_json::json!(prev.priority.to_string()),
+                                serde_json::json!(cur.priority.to_string()),
+                            );
+                            push(
+                                "task_type",
+                                serde_json::json!(prev.task_type.to_string()),
+                                serde_json::json!(cur.task_type.to_string()),
+                            );
+                            push(
+                                "assignee",
+                                serde_json::json!(prev.assignee),
+                                serde_json::json!(cur.assignee),
+                            );
+                            push(
+                                "reporter",
+                                serde_json::json!(prev.reporter),
+                                serde_json::json!(cur.reporter),
+                            );
+                            push(
+                                "due_date",
+                                serde_json::json!(prev.due_date),
+                                serde_json::json!(cur.due_date),
+                            );
+                            push(
+                                "effort",
+                                serde_json::json!(prev.effort),
+                                serde_json::json!(cur.effort),
+                            );
+                            push(
+                                "category",
+                                serde_json::json!(prev.category),
+                                serde_json::json!(cur.category),
+                            );
+                            push(
+                                "tags",
+                                serde_json::json!(prev.tags),
+                                serde_json::json!(cur.tags),
+                            );
+                        }
+                        (Some(cur), None) => {
+                            // Created
+                            push(
+                                "created",
+                                serde_json::Value::Null,
+                                serde_json::json!(cur.title),
+                            );
+                        }
+                        (None, Some(_prev)) => {
+                            // Deleted
+                            push("deleted", serde_json::json!(true), serde_json::Value::Null);
+                        }
+                        (None, None) => {}
+                    }
+
+                    if !deltas.is_empty() {
+                        items.push(Item {
+                            id,
+                            project,
+                            file: rel_path.to_string_lossy().to_string(),
+                            changes: deltas,
+                        });
+                    }
+                }
+
+                // Sort stable by id for determinism
+                items.sort_by(|a, b| a.id.cmp(&b.id));
+
+                match renderer.format {
+                    output::OutputFormat::Json => {
+                        let items_json: Vec<_> = items
+                            .iter()
+                            .map(|it| {
+                                serde_json::json!({
+                                    "id": it.id,
+                                    "project": it.project,
+                                    "file": it.file,
+                                    "changes": it.changes.iter().map(|d| serde_json::json!({
+                                        "field": d.field,
+                                        "old": d.old,
+                                        "new": d.new,
+                                    })).collect::<Vec<_>>()
+                                })
+                            })
+                            .collect();
+                        renderer.emit_raw_stdout(
+                            &serde_json::json!({
+                                "status": "ok",
+                                "action": "changelog",
+                                "mode": if since.is_some() { "range" } else { "working" },
+                                "count": items_json.len(),
+                                "items": items_json
+                            })
+                            .to_string(),
+                        );
+                    }
+                    _ => {
+                        if items.is_empty() {
+                            renderer.emit_success("No task changes.");
+                        } else {
+                            for it in &items {
+                                let mut parts: Vec<String> = Vec::new();
+                                for d in &it.changes {
+                                    // Compact representation for commit messages
+                                    let s = match (&d.old, &d.new) {
+                                        (serde_json::Value::Null, v) => {
+                                            format!("{}: ∅ → {}", d.field, v)
+                                        }
+                                        (o, serde_json::Value::Null) => {
+                                            format!("{}: {} → ∅", d.field, o)
+                                        }
+                                        (o, n) => format!("{}: {} → {}", d.field, o, n),
+                                    };
+                                    parts.push(s);
+                                }
+                                renderer.emit_raw_stdout(&format!(
+                                    "{}  {}",
+                                    it.id,
+                                    parts.join("; ")
+                                ));
+                            }
+                        }
+                    }
+                }
+                renderer.log_info("END CHANGELOG status=ok");
+                Ok(())
+            } else {
+                renderer.emit_warning("Not a git repository. No changelog.");
+                renderer.log_info("END CHANGELOG status=ok");
+                Ok(())
             }
         }
         Commands::Mcp => {

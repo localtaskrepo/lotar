@@ -1,4 +1,4 @@
-# lotar list
+# lotar list (aliases: ls, l)
 
 Display tasks with filtering and multiple output formats.
 
@@ -6,6 +6,10 @@ Display tasks with filtering and multiple output formats.
 
 ```bash
 lotar list [OPTIONS]
+# or
+lotar ls [OPTIONS]
+# or
+lotar l [OPTIONS]
 ```
 
 ## Quick Examples

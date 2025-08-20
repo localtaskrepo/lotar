@@ -812,3 +812,63 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
     }
     stop_server_on(port);
 }
+
+#[test]
+fn sse_project_changed_emitted_on_fs_change() {
+    // Serialize CWD changes to avoid races with other tests
+    let _guard = lock_var("LOTAR_CWD");
+    // Enable fast paths and ready event
+    unsafe {
+        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
+        std::env::set_var("LOTAR_SSE_READY", "1");
+    }
+
+    // Create an isolated workspace with .tasks/DEMO
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().to_path_buf();
+    let tasks_dir = root.join(".tasks").join("DEMO");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+
+    // Temporarily change process CWD so the watcher sees our .tasks directory
+    let prev_cwd = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&root).unwrap();
+
+    let port = find_free_port();
+    start_server_on(port);
+
+    // Open SSE stream with project filter and kinds=project_changed
+    let (mut sse, leftover) = open_sse(
+        port,
+        "debounce_ms=0&kinds=project_changed&project=DEMO&ready=1",
+    );
+    // Drain the ready event if present
+    let _ = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+
+    // Give the watcher a moment to start listening, then create a YAML file
+    std::thread::sleep(Duration::from_millis(60));
+    let file_path = tasks_dir.join("1.yml");
+    std::fs::write(&file_path, b"title: From watcher\n").unwrap();
+    // Nudge: perform a quick modify to reduce chance of missing the initial create
+    std::thread::sleep(Duration::from_millis(10));
+    std::fs::write(&file_path, b"title: From watcher updated\n").unwrap();
+
+    // Read one project_changed event
+    let events = read_sse_events(&mut sse, 1, Duration::from_millis(2000), Vec::new());
+    assert!(
+        !events.is_empty(),
+        "expected a project_changed event from watcher, got: {events:?}"
+    );
+    let (kind, data) = &events[0];
+    assert_eq!(kind, "project_changed", "unexpected event kind: {kind}");
+    // Data should be JSON with { name: "DEMO" }
+    let v: serde_json::Value = serde_json::from_str(data).unwrap_or_else(|_| serde_json::json!({}));
+    assert_eq!(v.get("name").and_then(|s| s.as_str()), Some("DEMO"));
+
+    // Cleanup and restore CWD
+    stop_server_on(port);
+    std::env::set_current_dir(prev_cwd).unwrap();
+    unsafe {
+        std::env::remove_var("LOTAR_TEST_FAST_IO");
+        std::env::remove_var("LOTAR_SSE_READY");
+    }
+}

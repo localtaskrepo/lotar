@@ -1,6 +1,7 @@
 use crate::api_server::{self, HttpRequest};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, include_dir};
+use notify::{Config as NotifyConfig, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
@@ -27,6 +28,9 @@ pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16
     if let Ok(mut map) = STOP_FLAGS.lock() {
         map.insert(port, false);
     }
+
+    // Best-effort: start a filesystem watcher thread to emit SSE events on changes under .tasks
+    start_tasks_watcher();
 
     for stream in listener.incoming() {
         // Check for test-initiated shutdown before handling the next connection
@@ -335,17 +339,23 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
                         }
                     }
                     if let Some(ref pf) = project_filter {
-                        let id_opt = if evt.kind == "task_deleted" {
-                            evt.data.get("id").and_then(|v| v.as_str())
-                        } else {
-                            evt.data.get("id").and_then(|v| v.as_str())
+                        let matches_project = match evt.kind.as_str() {
+                            // Filesystem watcher emits { name: <PROJECT> }
+                            "project_changed" => evt
+                                .data
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .map(|name| name == pf)
+                                .unwrap_or(false),
+                            // Task events include { id: "PREFIX-N" }
+                            _ => evt
+                                .data
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .map(|id_str| id_str.split('-').next().unwrap_or("") == pf)
+                                .unwrap_or(false),
                         };
-                        if let Some(id_str) = id_opt {
-                            let prefix = id_str.split('-').next().unwrap_or("");
-                            if prefix != pf {
-                                continue;
-                            }
-                        } else {
+                        if !matches_project {
                             continue;
                         }
                     }
@@ -433,4 +443,62 @@ fn url_decode(s: &str) -> String {
         }
     }
     out
+}
+
+// Lightweight watcher that monitors the nearest .tasks directory under CWD and emits project_changed
+fn start_tasks_watcher() {
+    // Don't crash server if watcher setup fails
+    let cwd = match std::env::current_dir() {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let tasks_dir = cwd.join(".tasks");
+    if !tasks_dir.exists() {
+        return;
+    }
+    // Spawn a detached thread that owns the watcher
+    std::thread::spawn(move || {
+        // Channel for notify events
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut watcher = match RecommendedWatcher::new(tx, NotifyConfig::default()) {
+            Ok(w) => w,
+            Err(_) => return,
+        };
+        if watcher.watch(&tasks_dir, RecursiveMode::Recursive).is_err() {
+            return;
+        }
+        // Simple loop: for any modify/create/remove, emit project_changed events.
+        while let Ok(res) = rx.recv() {
+            let Ok(event) = res else {
+                continue;
+            };
+            match event.kind {
+                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
+                    // Derive project from path: .tasks/<PROJECT>/.../N.yml
+                    if let Some(paths) = (!event.paths.is_empty()).then_some(event.paths) {
+                        for p in paths {
+                            if p.extension().and_then(|e| e.to_str()) != Some("yml") {
+                                continue;
+                            }
+                            // Expect .tasks/<PROJECT>/...
+                            let proj = p
+                                .parent()
+                                .and_then(|d| d.file_name())
+                                .and_then(|s| s.to_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if proj.is_empty() {
+                                continue;
+                            }
+                            crate::api_events::emit(crate::api_events::ApiEvent {
+                                kind: "project_changed".to_string(),
+                                data: serde_json::json!({ "name": proj }),
+                            });
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
 }

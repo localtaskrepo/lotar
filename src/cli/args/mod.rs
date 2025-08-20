@@ -3,6 +3,7 @@ pub mod config;
 pub mod index;
 pub mod scan;
 pub mod serve;
+pub mod stats;
 pub mod task;
 
 // Re-exports for ergonomic imports from crate::cli::args
@@ -14,6 +15,7 @@ pub use config::{
 pub use index::{IndexAction, IndexArgs};
 pub use scan::ScanArgs;
 pub use serve::ServeArgs;
+pub use stats::{StatsAction, StatsArgs};
 pub use task::{
     AddArgs, SortField, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs,
     TaskStatusArgs,

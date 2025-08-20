@@ -9,11 +9,13 @@ use crate::workspace::TasksDirectoryResolver;
 use serde_json;
 
 pub mod assignee;
+pub mod comment;
 pub mod config_handler;
 pub mod duedate;
 pub mod priority;
 pub mod scan_handler;
 pub mod serve_handler;
+pub mod stats_handler;
 pub mod status;
 pub mod task;
 
@@ -21,6 +23,7 @@ pub mod task;
 pub use config_handler::ConfigHandler;
 pub use scan_handler::ScanHandler;
 pub use serve_handler::ServeHandler;
+pub use stats_handler::StatsHandler;
 pub use task::TaskHandler;
 
 /// Trait for command handlers

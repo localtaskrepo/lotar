@@ -39,6 +39,7 @@ lotar scan ./src
 - **Project Isolation**: Each project gets its own directory
 - **Git-friendly**: All files are version-controllable
 - **Direct File Operations**: Fast task filtering without indexing overhead
+- **Read-only Git Analytics**: Stats derived from repo history (no git writes)
 
 ### Source Code Integration
 - 25+ languages supported
@@ -76,7 +77,16 @@ lotar assignee PROJ-001 user@example.com
 # System Commands
 lotar serve 8080          # Start web server
 lotar scan ./src          # Scan for TODOs
+lotar stats changed --since 14d  # Tickets changed in a window
+lotar stats churn --since 30d    # Churn: commits per ticket (sorted)
+lotar stats authors --since 90d  # Top authors by commits touching tasks
+lotar stats activity --since 60d --group-by day  # Activity by day (author|week|project also)
 lotar config set key val  # Configuration
+
+# Task history (read-only)
+lotar task history PROJ-1
+lotar task diff PROJ-1 --commit <sha>
+lotar task at PROJ-1 <sha>
 ```
 
 ## File Structure
