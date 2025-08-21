@@ -15,17 +15,19 @@ impl StorageSearch {
         {
             use std::fs::OpenOptions;
             use std::io::Write;
-            if let Ok(mut f) = OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/lotar_search_debug.log")
-            {
-                let _ = writeln!(
-                    f,
-                    "[SEARCH] root={} project={:?}",
-                    root_path.display(),
-                    filter.project
-                );
+            if std::env::var("LOTAR_DEBUG").is_ok() {
+                if let Ok(mut f) = OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/lotar_search_debug.log")
+                {
+                    let _ = writeln!(
+                        f,
+                        "[SEARCH] root={} project={:?}",
+                        root_path.display(),
+                        filter.project
+                    );
+                }
             }
         }
 
@@ -99,13 +101,15 @@ impl StorageSearch {
             {
                 use std::fs::OpenOptions;
                 use std::io::Write;
-                if let Ok(mut f) = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/tmp/lotar_search_debug.log")
-                {
-                    let names: Vec<String> = subdirs.iter().map(|(n, _)| n.clone()).collect();
-                    let _ = writeln!(f, "[SUBDIRS] {:?}", names);
+                if std::env::var("LOTAR_DEBUG").is_ok() {
+                    if let Ok(mut f) = OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open("/tmp/lotar_search_debug.log")
+                    {
+                        let names: Vec<String> = subdirs.iter().map(|(n, _)| n.clone()).collect();
+                        let _ = writeln!(f, "[SUBDIRS] {:?}", names);
+                    }
                 }
             }
             let all_files: Vec<(String, std::path::PathBuf)> = subdirs
@@ -115,18 +119,20 @@ impl StorageSearch {
                     {
                         use std::fs::OpenOptions;
                         use std::io::Write;
-                        if let Ok(mut f) = OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open("/tmp/lotar_search_debug.log")
-                        {
-                            let _ = writeln!(
-                                f,
-                                "[FILES] project={} count={} dir={}",
-                                project_folder,
-                                files.len(),
-                                dir_path.display()
-                            );
+                        if std::env::var("LOTAR_DEBUG").is_ok() {
+                            if let Ok(mut f) = OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open("/tmp/lotar_search_debug.log")
+                            {
+                                let _ = writeln!(
+                                    f,
+                                    "[FILES] project={} count={} dir={}",
+                                    project_folder,
+                                    files.len(),
+                                    dir_path.display()
+                                );
+                            }
                         }
                     }
                     files.into_iter().map(move |p| (project_folder.clone(), p))
@@ -176,17 +182,19 @@ impl StorageSearch {
                             Err(e) => {
                                 use std::fs::OpenOptions;
                                 use std::io::Write;
-                                if let Ok(mut f) = OpenOptions::new()
-                                    .create(true)
-                                    .append(true)
-                                    .open("/tmp/lotar_search_debug.log")
-                                {
-                                    let _ = writeln!(
-                                        f,
-                                        "[PARSE_ERR] file={} err={}",
-                                        task_path.display(),
-                                        e
-                                    );
+                                if std::env::var("LOTAR_DEBUG").is_ok() {
+                                    if let Ok(mut f) = OpenOptions::new()
+                                        .create(true)
+                                        .append(true)
+                                        .open("/tmp/lotar_search_debug.log")
+                                    {
+                                        let _ = writeln!(
+                                            f,
+                                            "[PARSE_ERR] file={} err={}",
+                                            task_path.display(),
+                                            e
+                                        );
+                                    }
                                 }
                                 None
                             }
@@ -196,12 +204,14 @@ impl StorageSearch {
                 {
                     use std::fs::OpenOptions;
                     use std::io::Write;
-                    if let Ok(mut f) = OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open("/tmp/lotar_search_debug.log")
-                    {
-                        let _ = writeln!(f, "[RESULTS] {}", results.len());
+                    if std::env::var("LOTAR_DEBUG").is_ok() {
+                        if let Ok(mut f) = OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open("/tmp/lotar_search_debug.log")
+                        {
+                            let _ = writeln!(f, "[RESULTS] {}", results.len());
+                        }
                     }
                 }
             }

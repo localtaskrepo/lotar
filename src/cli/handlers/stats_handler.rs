@@ -491,7 +491,7 @@ impl CommandHandler for StatsHandler {
                             );
                         }
                     };
-                    {
+                    if std::env::var("LOTAR_DEBUG").is_ok() {
                         use std::fs::OpenOptions;
                         use std::io::Write;
                         if let Ok(mut f) = OpenOptions::new()
@@ -525,7 +525,7 @@ impl CommandHandler for StatsHandler {
                             .map(std::path::PathBuf::from)
                             .unwrap_or(tasks_abs.clone())
                     };
-                    {
+                    if std::env::var("LOTAR_DEBUG").is_ok() {
                         use std::fs::OpenOptions;
                         use std::io::Write;
                         if let Ok(mut f) = OpenOptions::new()
@@ -553,7 +553,7 @@ impl CommandHandler for StatsHandler {
                             Ok(c) => c,
                             Err(_) => return false,
                         };
-                        {
+                        if std::env::var("LOTAR_DEBUG").is_ok() {
                             use std::fs::OpenOptions;
                             use std::io::Write;
                             if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
@@ -569,7 +569,7 @@ impl CommandHandler for StatsHandler {
                             if let Ok(content) = crate::services::audit_service::AuditService::show_file_at(&repo_root_real, &c.commit, &file_rel) {
                                 if let Some(ts) = parse_status_from_yaml(&content) {
                                     let curr_status = ts.to_string();
-                                    {
+                                    if std::env::var("LOTAR_DEBUG").is_ok() {
                                         use std::fs::OpenOptions;
                                         use std::io::Write;
                                         if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
@@ -579,7 +579,7 @@ impl CommandHandler for StatsHandler {
                                     if c.date >= since_dt && c.date <= until_dt {
                                         // Detect transition into target within the window
                                         if prev_status.as_deref() != Some(curr_status.as_str()) && curr_status == trans_status {
-                                            {
+                                            if std::env::var("LOTAR_DEBUG").is_ok() {
                                                 use std::fs::OpenOptions;
                                                 use std::io::Write;
                                                 if let Ok(mut f) = OpenOptions::new().create(true).append(true).open("/tmp/lotar_transitions_debug.log") {
@@ -595,7 +595,7 @@ impl CommandHandler for StatsHandler {
                         }
                         false
                     });
-                    {
+                    if std::env::var("LOTAR_DEBUG").is_ok() {
                         use std::fs::OpenOptions;
                         use std::io::Write;
                         if let Ok(mut f) = OpenOptions::new()
@@ -867,13 +867,15 @@ impl CommandHandler for StatsHandler {
                                 }
                             }
                         }
-                        if let Ok(mut f) = std::fs::OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open("/tmp/lotar_transitions_debug.log")
-                        {
-                            use std::io::Write;
-                            let _ = writeln!(f, "[FALLBACK] tasks_added={}", matched.len());
+                        if std::env::var("LOTAR_DEBUG").is_ok() {
+                            if let Ok(mut f) = std::fs::OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open("/tmp/lotar_transitions_debug.log")
+                            {
+                                use std::io::Write;
+                                let _ = writeln!(f, "[FALLBACK] tasks_added={}", matched.len());
+                            }
                         }
                         if !matched.is_empty() {
                             tasks = matched;
@@ -996,19 +998,21 @@ impl CommandHandler for StatsHandler {
                         if let Some(vals) = resolve_group_key(&id, &t, fk, cfg)
                             .map(|vs| vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>())
                         {
-                            // Debug output for filter matching
-                            use std::fs::OpenOptions;
-                            use std::io::Write;
-                            if let Ok(mut f) = OpenOptions::new()
-                                .create(true)
-                                .append(true)
-                                .open("/tmp/lotar_stats_debug.log")
-                            {
-                                let _ = writeln!(
-                                    f,
-                                    "[FILTER] key={}, allowed={:?}, vals={:?}",
-                                    fk, allowed, vals
-                                );
+                            if std::env::var("LOTAR_DEBUG").is_ok() {
+                                // Debug output for filter matching
+                                use std::fs::OpenOptions;
+                                use std::io::Write;
+                                if let Ok(mut f) = OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open("/tmp/lotar_stats_debug.log")
+                                {
+                                    let _ = writeln!(
+                                        f,
+                                        "[FILTER] key={}, allowed={:?}, vals={:?}",
+                                        fk, allowed, vals
+                                    );
+                                }
                             }
                             // Use centralized fuzzy property matching utility
                             use crate::utils::fuzzy_match::fuzzy_set_match;
@@ -1064,19 +1068,21 @@ impl CommandHandler for StatsHandler {
                     } else {
                         keys
                     };
-                    for key in keys.iter() {
-                        use std::fs::OpenOptions;
-                        use std::io::Write;
-                        if let Ok(mut f) = OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open("/tmp/lotar_stats_debug.log")
-                        {
-                            let _ = writeln!(
-                                f,
-                                "[DEBUG] Task: id={}, assignee={:?}, effort={:?}, kind={}, group_key={:?}",
-                                id, t.assignee, t.effort, effort_kind, key
-                            );
+                    if std::env::var("LOTAR_DEBUG").is_ok() {
+                        for key in keys.iter() {
+                            use std::fs::OpenOptions;
+                            use std::io::Write;
+                            if let Ok(mut f) = OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open("/tmp/lotar_stats_debug.log")
+                            {
+                                let _ = writeln!(
+                                    f,
+                                    "[DEBUG] Task: id={}, assignee={:?}, effort={:?}, kind={}, group_key={:?}",
+                                    id, t.assignee, t.effort, effort_kind, key
+                                );
+                            }
                         }
                     }
                     for key in keys.into_iter() {

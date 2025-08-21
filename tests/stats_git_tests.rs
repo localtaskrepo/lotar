@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
 
+// --- Shared helper functions for stats git-related tests ---
 fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = ProcCommand::new("git");
     cmd.current_dir(repo).args(args);
@@ -53,6 +54,338 @@ fn add_and_commit(
     run_git(repo, &["commit", "-m", message], &envs);
 }
 
+// --- Merged from stats_time_in_status_git_test.rs ---
+#[test]
+fn stats_time_in_status_basic_window() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    init_repo(&temp);
+
+    // Setup project and task
+    write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+    // Initial commit at 2025-08-01T10:00Z - status TODO
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nstatus: Todo\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Alice", "alice@example.com"),
+        "2025-08-01T10:00:00Z",
+        "add 1",
+    );
+
+    // Move to IN_PROGRESS at 2025-08-10T09:00Z
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nstatus: InProgress\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-10T09:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Bob", "bob@example.com"),
+        "2025-08-10T09:00:00Z",
+        "progress",
+    );
+
+    // Move to DONE at 2025-08-17T12:00Z
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nstatus: Done\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-17T12:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Alice", "alice@example.com"),
+        "2025-08-17T12:00:00Z",
+        "done",
+    );
+
+    // Query time-in-status in a window up to 2025-08-18T00:00Z (global scope)
+    let output = Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(root)
+        .args([
+            "--format",
+            "json",
+            "stats",
+            "time-in-status",
+            "--since",
+            "2025-08-01T00:00:00Z",
+            "--until",
+            "2025-08-18T00:00:00Z",
+            "--global",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stats time-in-status failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(v["status"], "ok");
+    let items = v["items"].as_array().unwrap();
+    assert!(!items.is_empty());
+    // Find TEST-1
+    let my = items
+        .iter()
+        .find(|it| it["id"].as_str() == Some("TEST-1"))
+        .expect("missing TEST-1 in results");
+
+    let rows = my["items"].as_array().unwrap();
+    let get_secs = |name: &str| -> i64 {
+        rows.iter()
+            .find(|r| r["status"].as_str() == Some(name))
+            .and_then(|r| r["seconds"].as_i64())
+            .unwrap_or(0)
+    };
+
+    // Expected seconds
+    assert_eq!(get_secs("TODO"), 774_000);
+    assert_eq!(get_secs("IN_PROGRESS"), 615_600);
+    assert_eq!(get_secs("DONE"), 43_200);
+}
+
+// --- Merged from stats_time_in_status_single_task_test.rs ---
+#[test]
+fn stats_time_in_status_single_task() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    init_repo(&temp);
+
+    // Setup project and task
+    write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+    // Initial commit at 2025-08-01T10:00Z - status Todo (PascalCase)
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nstatus: Todo\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Alice", "alice@example.com"),
+        "2025-08-01T10:00:00Z",
+        "add 1",
+    );
+
+    // Move to IN_PROGRESS at 2025-08-10T09:00Z
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nstatus: InProgress\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-10T09:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Bob", "bob@example.com"),
+        "2025-08-10T09:00:00Z",
+        "progress",
+    );
+
+    // Move to DONE at 2025-08-17T12:00Z
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nstatus: Done\npriority: Medium\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-17T12:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Alice", "alice@example.com"),
+        "2025-08-17T12:00:00Z",
+        "done",
+    );
+
+    // Query per-ticket time-in-status
+    let output = Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(root)
+        .args([
+            "--format",
+            "json",
+            "stats",
+            "status",
+            "TEST-1",
+            "--time-in-status",
+            "--since",
+            "2025-08-01T00:00:00Z",
+            "--until",
+            "2025-08-18T00:00:00Z",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stats status --time-in-status failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let v: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(v["status"], "ok");
+    let items = v["items"].as_array().unwrap();
+    assert!(!items.is_empty());
+    let row = &items[0];
+    assert_eq!(row["id"].as_str(), Some("TEST-1"));
+    let rows = row["items"].as_array().unwrap();
+    let get_secs = |name: &str| -> i64 {
+        rows.iter()
+            .find(|r| r["status"].as_str() == Some(name))
+            .and_then(|r| r["seconds"].as_i64())
+            .unwrap_or(0)
+    };
+    assert_eq!(get_secs("TODO"), 774_000);
+    assert_eq!(get_secs("IN_PROGRESS"), 615_600);
+    assert_eq!(get_secs("DONE"), 43_200);
+}
+
+// --- Merged from stats_effort_transitions_window_test.rs ---
+#[test]
+fn stats_effort_with_transitions_window_filters_tasks() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+    init_repo(&temp);
+
+    // Project config
+    write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+
+    // TEST-1: transitions to IN_PROGRESS within window (2025-08-12)
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nassignee: Alice\nstatus: TODO\npriority: MEDIUM\neffort: 4h\ncreated: 2025-08-10T10:00:00Z\nmodified: 2025-08-10T10:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Alice", "alice@example.com"),
+        "2025-08-10T10:00:00Z",
+        "add 1",
+    );
+    // Change status to IN_PROGRESS inside window; keep effort
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nassignee: Alice\nstatus: IN_PROGRESS\npriority: MEDIUM\neffort: 4h\ncreated: 2025-08-10T10:00:00Z\nmodified: 2025-08-12T09:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Bob", "bob@example.com"),
+        "2025-08-12T09:00:00Z",
+        "move to in_progress",
+    );
+    // Later change to DONE (outside the query until)
+    write_file(
+        root,
+        ".tasks/TEST/1.yml",
+        "title: One\nassignee: Alice\nstatus: DONE\npriority: MEDIUM\neffort: 4h\ncreated: 2025-08-10T10:00:00Z\nmodified: 2025-08-16T12:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/1.yml",
+        ("Alice", "alice@example.com"),
+        "2025-08-16T12:00:00Z",
+        "done 1",
+    );
+
+    // TEST-2: transitions to IN_PROGRESS before window (should be excluded)
+    write_file(
+        root,
+        ".tasks/TEST/2.yml",
+        "title: Two\nassignee: Bob\nstatus: TODO\npriority: LOW\neffort: 2h\ncreated: 2025-08-05T11:00:00Z\nmodified: 2025-08-05T11:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/2.yml",
+        ("Bob", "bob@example.com"),
+        "2025-08-05T11:00:00Z",
+        "add 2",
+    );
+    write_file(
+        root,
+        ".tasks/TEST/2.yml",
+        "title: Two\nassignee: Bob\nstatus: IN_PROGRESS\npriority: LOW\neffort: 2h\ncreated: 2025-08-05T11:00:00Z\nmodified: 2025-08-09T08:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/2.yml",
+        ("Bob", "bob@example.com"),
+        "2025-08-09T08:00:00Z",
+        "move 2 to in_progress (before window)",
+    );
+
+    // TEST-3: transitions to DONE inside window (filter asks for IN_PROGRESS, should be excluded)
+    write_file(
+        root,
+        ".tasks/TEST/3.yml",
+        "title: Three\nassignee: Carol\nstatus: TODO\npriority: LOW\neffort: 1h\ncreated: 2025-08-11T10:00:00Z\nmodified: 2025-08-11T10:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/3.yml",
+        ("Carol", "carol@example.com"),
+        "2025-08-11T10:00:00Z",
+        "add 3",
+    );
+    write_file(
+        root,
+        ".tasks/TEST/3.yml",
+        "title: Three\nassignee: Carol\nstatus: DONE\npriority: LOW\neffort: 1h\ncreated: 2025-08-11T10:00:00Z\nmodified: 2025-08-12T10:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/3.yml",
+        ("Carol", "carol@example.com"),
+        "2025-08-12T10:00:00Z",
+        "move 3 to done (inside window)",
+    );
+
+    // Query: window that includes 2025-08-12 only, transitions to IN_PROGRESS
+    let output = Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(root)
+        .args([
+            "--format",
+            "json",
+            "stats",
+            "effort",
+            "--by",
+            "assignee",
+            "--unit",
+            "hours",
+            "--since",
+            "2025-08-11T00:00:00Z",
+            "--until",
+            "2025-08-13T00:00:00Z",
+            "--transitions",
+            "IN_PROGRESS",
+            "--global",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "stats effort with transitions failed"
+    );
+    let v: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(v["status"], "ok");
+    let items = v["items"].as_array().unwrap();
+    assert_eq!(
+        items.len(),
+        1,
+        "expected exactly one matching group, got {items:?}"
+    );
+    let hours = items[0]["hours"].as_f64().unwrap_or(0.0);
+    assert!((3.99..=4.01).contains(&hours), "unexpected hours: {hours}");
+}
 #[test]
 fn stats_changed_and_churn_and_authors() {
     let temp = TempDir::new().unwrap();

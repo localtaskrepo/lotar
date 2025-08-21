@@ -32,96 +32,44 @@ Bugs:
 - Help output shows raw markdown (Maybe we should split docs from direct help and more detailed help linked to)
 - `lotar scan src` in this project throws an error
 
----
-
-– Shared relative date/time parser for due & stats windows (single source of truth)
-	• Added utils/time.rs: parse_human_datetime_to_utc() and parse_since_until()
-	• Next: refactor due-date handler to reuse it; use for stats --since/--until
-
 # Implementation Roadmap
 
 Legend: [ ] = TODO, [x] = Done, [~] = In Progress
 
-## Feature: Effort
+## Chore: Test Cleanup
 
-Goals
-- Support multiple effort systems (time and points first; mixed allowed) with a single normalized parser.
-- Provide powerful, generic stats by status/assignee/type/category/project/tags/project-declared fields.
-- No special "done" or "sprint" configuration in this phase; rely on filters (status=…) and project-declared fields.
-- Project-declared fields are first-class: stored at top-level in task files; no legacy bags or formats.
-- Unified keys everywhere (no prefixes): users write the same key for built-ins and project defined custom fields.
+Goals:
+- Reduce number of test binaries by consolidating many single-test files.
+- Standardize file and test names for quick grepability and consistency.
+- Keep all-tests-green and clippy clean; no behavior changes.
 
-Milestones
-- [x] M1: Core Effort util (parse/normalize)
-	- [x] Add `src/utils/effort.rs` with:
-		- [x] EffortParsed/EffortKind (time_hours|points) and canonical string formatter
-		- [x] Parse inputs: minutes(m), hours(h), days(d), weeks(w); combined (e.g., "1d 2h", "90m"); decimals; trim; lowercase; reject negatives
-		- [x] Parse points: `p|pt|pts` and bare numbers; reject mixing with time within one expression
-	- [x] Replace `cli/validation::validate_effort` to delegate to the new util (BC: accept only h/d/w for now)
-	- [x] Normalize effort on write (add/edit/scan/API) to canonical form; preserve semantics
-	- [x] Backward compatibility: prior strings remain valid and parseable
-	- [x] Unit tests for util (minutes/combined/points/mixed invalid)
+Naming conventions:
+- File names: group by domain and intent: cli_*, config_*, scanner_*, stats_*, storage_*, web_*, mcp_*.
+- Prefer pattern: {domain}_{topic}_tests.rs for suites; use module blocks inside for subtopics.
+- Test names: verb-phrases, snake_case, e.g., parses_branch_alias_maps, infers_status_from_branch_alias.
 
-- [x] M2: Generic stats (grouping, filters, windows)
-	- [x] Extend `stats effort` args:
-		- [x] `--by <key>` where <key> is any built-in or project-declared field (status|assignee|type|category|project|tags|sprint|…)
-		- [x] `--where key=value` (repeatable). Keys resolve to built-ins first, then project-declared fields. For tags accept `tag=<val>` alias.
-		- [x] `--unit` hours|days|weeks|points|auto
-		- [x] `--since` / `--until` using the shared relative date/time parser in utils/time.rs
-		- [x] `--transitions` (opt-in): filter tasks that changed into a status within the window via git history
-	- [x] Implement aggregation basics with unified field resolver; includes hours/points handling and JSON/text outputs
-	- [x] Performance: guardrail for large datasets (aggregation cap via LOTAR_STATS_EFFORT_CAP)
+Low-risk first merges (source -> target suite):
+- stats_time_in_status_single_task_test.rs -> stats_git_tests.rs (module time_in_status_single_task)
+- stats_time_in_status_git_test.rs -> stats_git_tests.rs (module time_in_status_git)
+- stats_effort_transitions_window_test.rs -> stats_git_tests.rs (module effort_transitions)
+- stats_effort_unit_option_test.rs, stats_effort_points_and_auto_and_filters_test.rs, stats_effort_comments_custom_test.rs -> stats_snapshot_tests.rs (modules effort_unit, effort_points_auto_filters, effort_comments_custom)
+- changelog_range_test.rs, changelog_range_json_test.rs, changelog_smoke_test.rs, changelog_working_tree_test.rs -> changelog_tests.rs (modules range_text, range_json, smoke, working_tree)
+- list_effort_filters_and_sort_test.rs -> cli_tests.rs (module list_effort)
+- effort_normalization_on_write_test.rs -> cli_unit_tests.rs (module effort_normalization)
+- help_module_unit_test.rs -> cli_unit_tests.rs (module help_module)
+- output_format_consistency_test_simple.rs -> output_format_consistency_test.rs (module simple)
 
-- [x] M3: CLI UX for effort and lists
-	- [x] Add `lotar task effort <ID> [<effort NEW>] [--clear] [--dry-run] [--explain]`
-		- [x] Wire CLI args (subcommand added) and top-level `lotar effort <ID> [NEW]`
-		- [x] Implement view current effort if NEW not provided
-		- [x] Implement set/clear effort with normalization; support `--dry-run` and `--explain`
-	- [x] List enhancements:
-		- [x] `--sort-by <key>` unified (added effort and custom field keys via `field:<name>`) with reverse support
-		- [x] `--where key=value` unified filtering for list (built-ins and custom fields with fuzzy matching)
-		- [x] `--effort-min` / `--effort-max` (accept effort formats; compares within same kinds time/points)
+Next merges:
+- scanner_block_comments_test.rs, scanner_custom_ticket_patterns_test.rs, scanner_inline_effort_test.rs, scanner_insertion_suggestion_test.rs, scanner_signal_words_test.rs, scanner_ticket_extraction_test.rs, scanner_ticket_words_toggle_test.rs -> scanner_tests_new.rs (modules block_comments, custom_patterns, inline_effort, insertion_suggestion, signal_words, ticket_extraction, words_toggle)
+- scan_bidir_references_test.rs, scan_ignore_and_filters_test.rs -> scanner_tests.rs (modules bidir_references, ignore_and_filters)
 
-- [x] M4: Project-declared fields as first-class
-	- [x] Collision guard: when project config declares a field that matches a built-in, error and guide to use the built-in
-	- [x] Writes: `--field key=value` errors for reserved built-in names; otherwise key must be declared in project config
-	- [x] Filtering/grouping/sorting parity: users pass plain keys; resolver handles built-in vs project fields (docs updated)
-	- [x] API: ensure server-side filters accept property names uniformly (built-in and project-declared); supports @me and fuzzy matching; OpenAPI/help updated; tests added
+Housekeeping:
+- Gate ad-hoc debug file logging behind LOTAR_DEBUG (done) to avoid FS I/O during tests.
+- Add cargo test -- --list checks in CI to track test count trend.
+- Consider #[cfg(test)] feature-gating of heavy logs or use tracing with env filter.
 
-- [ ] M5: Scanner integration
-	- [x] Validate/normalize inline `effort` via Effort util
-	- [x] Accept minutes and combined time inputs in inline attributes
-
-- [~] M6: Tests
-	- [x] Effort util unit tests: minutes/combined, points, mixed-invalid, canonicalization basics
-	- [x] CLI tests: add/edit normalization to canonical form
-	- [x] Stats tests: `--unit` (hours/days/weeks/points/auto) and `--where` filters (including @me), grouping by tag/assignee
-	- [x] List: `--sort-by effort` coverage; `--effort-min/max` filters coverage
-	- [x] Stats: `--since/--until` window with `--transitions` coverage (git-derived)
-	- [ ] Scanner: inline effort variations
-	- [x] Collision tests: custom field name colliding with built-ins rejected in CLI/config
-
-- [~] M7: Docs
-	- [x] New `docs/help/effort.md`: formats (time & points), normalization, examples
-	- [x] Updated Add/Edit/List/Stats docs: unified keys (`--by <key>`, `--where key=value`, `--sort-by <key>`), effort min/max, units (incl. auto)
-	- [x] API docs: `/api/tasks/list` flexible filters with @me and fuzzy matching noted in help and OpenAPI
-	- [x] Stats docs: expand transitions/window examples and response fields per unit
-
-- [ ] M8: Quality gates
-	- [ ] Clippy/rustfmt clean; ensure no panics on malformed inputs
-	- [ ] Backward compatibility validated on existing tasks with effort strings
-	- [ ] Smoke performance run on a repo with 5k tasks (stats and list paths)
-
-Non-goals (this phase)
-- No dedicated "done" status configuration; users filter by `status=<value>` themselves
-- No sprint configuration; users use any property via unified keys (`--where` / `--by` / `--sort-by`)
-- No legacy formats or config support; we can break to improve design since unreleased
-
-Acceptance criteria
-- Adding/editing/scanning effort normalizes values consistently; invalid inputs get clear errors
-- `stats effort` supports grouping, generic filters, unit control, and time windows; works without any done/sprint config
-- Custom fields can be used everywhere users can use built-ins for filtering and grouping, with safe collision checks
-- Tests and docs cover time-and-points, mixed datasets, and status-in-window queries
+Success metric:
+- Reduce total tests binaries by ~30-40% without flakiness; test wall time noticeably lower locally and in CI.
 
 ## Backlog
 - [ ] Include README and LICENSE in archives
