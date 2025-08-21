@@ -29,3 +29,4 @@ When the server is running, a lightweight, best-effort filesystem watcher observ
 - No files are written; this is notify-only and read-only.
 - Debounce: you can tune the debounce window via the environment variable `LOTAR_SSE_DEBOUNCE_MS` (default: 250ms).
 - Ready event: set `LOTAR_SSE_READY=1` to emit a one-time `ready` event on new connections, useful for tests and clients.
+- Snapshot on ready: when `ready=1` is sent in the query, if you also provide `project=<PREFIX>` and include `project_changed` in `kinds`, the server will immediately emit a `project_changed` event for that project (if it exists under `.tasks`). This helps clients avoid races with the filesystem watcher during startup.

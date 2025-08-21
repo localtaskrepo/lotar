@@ -16,3 +16,7 @@ config:
     - Bug
     - Epic
     - Chore
+  tags:
+    - "*"
+  categories:
+    - "*"

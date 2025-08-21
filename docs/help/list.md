@@ -126,7 +126,7 @@ Documentation-friendly tables:
 ## Sorting & Grouping
 
 ### Sorting Options
-- `--sort-by, -S <FIELD>` - Sort by: priority, due_date, created, modified, status
+- `--sort-by, -S <FIELD>` - Sort by: priority, status, effort, due-date, created, modified, assignee, type, category, project, id, or a declared custom field (you can also use `field:<name>`)
 - `--reverse, -R` - Reverse sort order
 - `--limit, -L <N>` - Limit results (default: 20)
 
@@ -135,6 +135,31 @@ Documentation-friendly tables:
 - `--show-counts` - Show task counts per group
 
 ## Advanced Filtering
+
+### Unified filters (built-in and custom fields)
+- `--where key=value` (repeatable) — filter by any property. Supported keys: assignee, status, priority, type, tag (or tags), category, project, and custom fields declared by your project. You can pass declared custom field names directly (e.g., `sprint=W35`) or use `field:<name>` explicitly (both work).
+- Matching is fuzzy and case-insensitive for strings. For tags, matching applies to the set of tags.
+
+Examples:
+```bash
+# Built-ins
+lotar list --where status=todo --where priority=high
+
+# Tags and category
+lotar list --where tag=auth --where category=backend
+
+# Custom fields declared by your project (example: sprint)
+lotar list --where sprint=2025-W35
+# `field:` prefix also works (legacy/explicit form)
+lotar list --where field:sprint=2025-W35
+```
+
+### Effort filters
+- `--effort-min <VAL>` — minimum effort (e.g., 2h, 1d, 8h, or points like 3)
+- `--effort-max <VAL>` — maximum effort
+
+Notes:
+- Time is normalized to hours internally (m/h/d=8h/w=40h). Points are numeric. Mixed kinds aren’t compared: a time filter doesn’t include point-only tasks and vice versa.
 
 ### Multiple Criteria
 ```bash
@@ -155,6 +180,12 @@ lotar list --overdue --priority=critical --format=table
 
 # Unassigned features for sprint planning
 lotar list --type=feature --unassigned --sort-by=priority
+
+# Tasks in a sprint with effort window and custom sort
+lotar list \
+  --where field:sprint=2025-W35 \
+  --effort-min=4h --effort-max=2d \
+  --sort-by=effort
 ```
 
 ## Performance Notes

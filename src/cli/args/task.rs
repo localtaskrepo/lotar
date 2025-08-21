@@ -15,7 +15,19 @@ pub enum SortField {
     Status,
 }
 
+// ...existing code...
+
 // Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
+// ...existing code...
+
+// Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
+// ...existing code...
+// ...existing code...
+
+// ...existing code...
+// Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
+
+#[allow(dead_code)]
 fn deserialize_kv_pairs<'de, D>(deserializer: D) -> Result<Vec<(String, String)>, D::Error>
 where
     D: Deserializer<'de>,
@@ -156,6 +168,9 @@ pub struct AddArgs {
 
 #[derive(Subcommand)]
 pub enum TaskAction {
+    /// View or update effort for a task
+    Effort(TaskEffortArgs),
+
     /// Add a new task
     Add(TaskAddArgs),
     /// List tasks (with optional filters)
@@ -243,6 +258,23 @@ pub enum TaskAction {
         #[arg(short = 'F', long = "file")]
         file: Option<String>,
     },
+}
+
+#[derive(Args, Debug)]
+pub struct TaskEffortArgs {
+    /// Task ID (with or without project prefix)
+    pub id: String,
+    /// New effort value (e.g., 2d, 5h, 1w). If omitted, shows current effort.
+    pub effort: Option<String>,
+    /// Clear effort value
+    #[arg(long)]
+    pub clear: bool,
+    /// Preview changes without saving
+    #[arg(long)]
+    pub dry_run: bool,
+    /// Explain normalization and parsing
+    #[arg(long)]
+    pub explain: bool,
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -411,9 +443,9 @@ pub struct TaskSearchArgs {
     #[serde(default)]
     pub critical: bool,
 
-    /// Sort tasks by field (priority, due-date, created, modified, status)
+    /// Sort tasks by key (priority|due-date|created|modified|status|assignee|type|category|project|id)
     #[arg(long, short = 'S')]
-    pub sort_by: Option<SortField>,
+    pub sort_by: Option<String>,
 
     /// Reverse sort order
     #[arg(long, short = 'R')]
@@ -432,6 +464,19 @@ pub struct TaskSearchArgs {
     /// Show only tasks due within N days (default 7 if not provided)
     #[arg(long = "due-soon", num_args = 0..=1, value_name = "DAYS")]
     pub due_soon: Option<Option<usize>>, // --due-soon or --due-soon=N
+
+    /// Unified filters: key=value, repeatable (keys: assignee|status|priority|type|tag|category|project|field:<name>)
+    #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=0.., value_delimiter=None)]
+    #[serde(default)]
+    pub r#where: Vec<(String, String)>,
+
+    /// Minimum effort (accepts effort format e.g., 2h, 1d, or points number)
+    #[arg(long = "effort-min")]
+    pub effort_min: Option<String>,
+
+    /// Maximum effort (accepts effort format e.g., 2h, 1d, or points number)
+    #[arg(long = "effort-max")]
+    pub effort_max: Option<String>,
 }
 
 #[derive(Args, Deserialize, Debug)]

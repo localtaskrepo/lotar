@@ -3,6 +3,10 @@ use crate::cli::{ConfigAction, ConfigNormalizeArgs, ConfigShowArgs, ConfigValida
 use crate::config::ConfigManager;
 use crate::output::OutputRenderer;
 use crate::types::{Priority, TaskStatus};
+use crate::utils::project::generate_project_prefix;
+use crate::utils::project::generate_unique_project_prefix;
+use crate::utils::project::resolve_project_input;
+use crate::utils::project::validate_explicit_prefix;
 use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
 use std::fs;
@@ -177,7 +181,7 @@ impl ConfigHandler {
                     .map(|_| "env"),
                 "default_project" => std::env::var("LOTAR_PROJECT")
                     .ok()
-                    .map(|proj| crate::utils::generate_project_prefix(&proj))
+                    .map(|proj| generate_project_prefix(&proj))
                     .filter(|p| p == &resolved.default_prefix)
                     .map(|_| "env"),
                 "default_assignee" => std::env::var("LOTAR_DEFAULT_ASSIGNEE")
@@ -326,8 +330,7 @@ impl ConfigHandler {
 
         if let Some(project_name) = project {
             // Show project-specific config
-            let project_prefix =
-                crate::utils::resolve_project_input(&project_name, resolver.path.as_path());
+            let project_prefix = resolve_project_input(&project_name, resolver.path.as_path());
             let resolved_project = config_manager
                 .get_project_config(&project_prefix)
                 .map_err(|e| format!("Failed to load project config: {}", e))?;
@@ -742,7 +745,7 @@ impl ConfigHandler {
                 // Validate explicit prefix
                 if let Some(ref project_name) = project {
                     if let Err(conflict) =
-                        crate::utils::validate_explicit_prefix(prefix, project_name, &resolver.path)
+                        validate_explicit_prefix(prefix, project_name, &resolver.path)
                     {
                         renderer.emit_raw_stdout(&format!("  ❌ Conflict detected: {}", conflict));
                         return Err(conflict);
@@ -754,7 +757,7 @@ impl ConfigHandler {
                 renderer.emit_raw_stdout(&format!("  • Project name: {}", project));
                 // Show what prefix would be generated and check for conflicts
                 if prefix.is_none() {
-                    match crate::utils::generate_unique_project_prefix(project, &resolver.path) {
+                    match generate_unique_project_prefix(project, &resolver.path) {
                         Ok(generated_prefix) => {
                             renderer.emit_raw_stdout(&format!(
                                 "  • Generated prefix: {} ✅",
@@ -764,7 +767,7 @@ impl ConfigHandler {
                         Err(conflict) => {
                             renderer.emit_raw_stdout(&format!(
                                 "  • Generated prefix: {} ❌",
-                                crate::utils::generate_project_prefix(project)
+                                generate_project_prefix(project)
                             ));
                             renderer
                                 .emit_raw_stdout(&format!("  ❌ Conflict detected: {}", conflict));
@@ -783,10 +786,9 @@ impl ConfigHandler {
                 let project_prefix = if let Some(ref prefix) = prefix {
                     prefix.clone()
                 } else {
-                    match crate::utils::generate_unique_project_prefix(project_name, &resolver.path)
-                    {
+                    match generate_unique_project_prefix(project_name, &resolver.path) {
                         Ok(prefix) => prefix,
-                        Err(_) => crate::utils::generate_project_prefix(project_name), // For display purposes
+                        Err(_) => generate_project_prefix(project_name), // For display purposes
                     }
                 };
                 renderer.emit_raw_stdout(&format!(
@@ -929,15 +931,11 @@ impl ConfigHandler {
             // Generate prefix from project name with conflict detection
             let project_prefix = if let Some(explicit_prefix) = prefix {
                 // User provided explicit prefix, validate it doesn't conflict
-                crate::utils::validate_explicit_prefix(
-                    &explicit_prefix,
-                    project_name,
-                    &resolver.path,
-                )?;
+                validate_explicit_prefix(&explicit_prefix, project_name, &resolver.path)?;
                 explicit_prefix
             } else {
                 // Generate prefix with conflict detection
-                crate::utils::generate_unique_project_prefix(project_name, &resolver.path)?
+                generate_unique_project_prefix(project_name, &resolver.path)?
             };
 
             let project_dir = crate::utils::paths::project_dir(&resolver.path, &project_prefix);

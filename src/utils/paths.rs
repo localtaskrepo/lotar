@@ -24,7 +24,7 @@ pub fn global_config_path(tasks_root: &Path) -> PathBuf {
 pub fn repo_relative_display(path: &Path) -> String {
     let repo_rel = path
         .parent()
-        .and_then(crate::utils_git::find_repo_root)
+        .and_then(crate::utils::git::find_repo_root)
         .and_then(|root| path.strip_prefix(&root).ok())
         .map(|p| p.to_path_buf());
     if let Some(rel) = repo_rel {

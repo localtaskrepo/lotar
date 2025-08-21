@@ -108,6 +108,7 @@
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
+        "description": "Supports built-in filters via named query params (status, priority, type, assignee, tags, category, project, q). In addition, any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching.",
         "parameters": [
           { "name": "project", "in": "query", "schema": { "type": "string" } },
           { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "CSV of statuses (TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE)" },

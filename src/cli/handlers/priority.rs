@@ -3,6 +3,7 @@ use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::output::OutputRenderer;
 use crate::storage::manager::Storage;
+use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
 
 /// Handler for priority change commands
@@ -55,7 +56,7 @@ impl CommandHandler for PriorityHandler {
             None => return Err("No tasks found. Use 'lotar add' to create tasks first.".into()),
         };
         let project_prefix = if let Some(project) = final_effective_project {
-            crate::utils::resolve_project_input(project, resolver.path.as_path())
+            resolve_project_input(project, resolver.path.as_path())
         } else {
             crate::project::get_effective_project_name(resolver)
         };

@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde_yaml::Value;
 
 use crate::config::types::{ConfigError, GlobalConfig, ProjectConfig, StringConfigField};
+use crate::types::{Priority, TaskStatus, TaskType};
 
 fn expand_dotted_keys(value: Value) -> Value {
     match value {
@@ -77,6 +78,124 @@ fn cast<T: DeserializeOwned>(v: &Value) -> Option<T> {
     serde_yaml::from_value::<T>(v.clone()).ok()
 }
 
+// Normalize token strings to a tolerant, comparable form: camelCase/PascalCase -> snake, hyphens/spaces -> underscores, lowercased
+fn normalize_token(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    let mut prev_is_sep = false;
+    for (i, ch) in s.chars().enumerate() {
+        if ch == '-' || ch == ' ' || ch == '_' {
+            if !prev_is_sep {
+                out.push('_');
+                prev_is_sep = true;
+            }
+            continue;
+        }
+        prev_is_sep = false;
+        if ch.is_ascii_uppercase() {
+            if i > 0 {
+                // insert underscore for camel boundary if previous isn't sep or underscore
+                if !out.ends_with('_') {
+                    out.push('_');
+                }
+            }
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push(ch);
+        }
+    }
+    // collapse multiple underscores possibly introduced
+    let mut collapsed = String::with_capacity(out.len());
+    let mut last_us = false;
+    for c in out.chars() {
+        if c == '_' {
+            if !last_us {
+                collapsed.push('_');
+                last_us = true;
+            }
+        } else {
+            last_us = false;
+            collapsed.push(c);
+        }
+    }
+    collapsed.trim_matches('_').to_string()
+}
+
+fn parse_task_status_tolerant(s: &str) -> Option<TaskStatus> {
+    match normalize_token(s).as_str() {
+        "todo" => Some(TaskStatus::Todo),
+        "in_progress" => Some(TaskStatus::InProgress),
+        "verify" => Some(TaskStatus::Verify),
+        "blocked" => Some(TaskStatus::Blocked),
+        "done" => Some(TaskStatus::Done),
+        _ => None,
+    }
+}
+
+fn parse_priority_tolerant(s: &str) -> Option<Priority> {
+    match normalize_token(s).as_str() {
+        "low" => Some(Priority::Low),
+        "medium" => Some(Priority::Medium),
+        "high" => Some(Priority::High),
+        "critical" => Some(Priority::Critical),
+        _ => None,
+    }
+}
+
+fn parse_task_type_tolerant(s: &str) -> Option<TaskType> {
+    match normalize_token(s).as_str() {
+        "feature" => Some(TaskType::Feature),
+        "bug" => Some(TaskType::Bug),
+        "epic" => Some(TaskType::Epic),
+        "spike" => Some(TaskType::Spike),
+        "chore" => Some(TaskType::Chore),
+        _ => None,
+    }
+}
+
+pub fn parse_issue_states_tolerant(
+    v: Value,
+) -> Option<crate::config::types::ConfigurableField<TaskStatus>> {
+    // Try strict first
+    if let Ok(cf) =
+        serde_yaml::from_value::<crate::config::types::ConfigurableField<TaskStatus>>(v.clone())
+    {
+        return Some(cf);
+    }
+    // Fallback vector of strings
+    if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v) {
+        let mapped: Vec<TaskStatus> = list
+            .into_iter()
+            .filter_map(|s| parse_task_status_tolerant(&s))
+            .collect();
+        if !mapped.is_empty() {
+            return Some(crate::config::types::ConfigurableField { values: mapped });
+        }
+    }
+    None
+}
+
+fn parse_alias_map_tolerant<T: serde::de::DeserializeOwned>(
+    v: Value,
+    parse: fn(&str) -> Option<T>,
+) -> Option<std::collections::HashMap<String, T>> {
+    // Try strict first
+    if let Ok(mut map) = serde_yaml::from_value::<std::collections::HashMap<String, T>>(v.clone()) {
+        let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
+        return Some(map2);
+    }
+    // Fallback: parse as map of strings
+    if let Ok(mut raw) = serde_yaml::from_value::<std::collections::HashMap<String, String>>(v) {
+        let mut out = std::collections::HashMap::new();
+        for (k, sv) in raw.drain() {
+            if let Some(tv) = parse(&sv) {
+                out.insert(k.to_lowercase(), tv);
+            }
+        }
+        return Some(out);
+    }
+    None
+}
+
 /// Parse global config supporting both existing flat schema and nested/dotted form
 pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigError> {
     let raw: Value = serde_yaml::from_str(content)
@@ -119,13 +238,14 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
 
     // issue.*
     if let Some(v) = get_path(&data, &["issue", "states"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.issue_states.values = list;
+        // tolerant: accept mixed-case strings like Todo, InProgress, Done
+        if let Some(cf) = parse_issue_states_tolerant(v) {
+            cfg.issue_states = cf;
         }
     }
     if let Some(v) = get_path(&data, &["issue", "types"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.issue_types.values = list;
+        if let Some(cf) = parse_issue_types_tolerant(v) {
+            cfg.issue_types = cf;
         }
     }
     if let Some(v) = get_path(&data, &["issue", "priorities"]).cloned() {
@@ -228,28 +348,18 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
 
     // branch.* alias maps (global)
     if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
-        if let Ok(mut map) =
-            serde_yaml::from_value::<std::collections::HashMap<String, crate::types::TaskType>>(v)
-        {
-            // normalize keys to lowercase
-            let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
-            cfg.branch_type_aliases = map2;
+        if let Some(map) = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant) {
+            cfg.branch_type_aliases = map;
         }
     }
     if let Some(v) = get_path(&data, &["branch", "status_aliases"]).cloned() {
-        if let Ok(mut map) =
-            serde_yaml::from_value::<std::collections::HashMap<String, crate::types::TaskStatus>>(v)
-        {
-            let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
-            cfg.branch_status_aliases = map2;
+        if let Some(map) = parse_alias_map_tolerant::<TaskStatus>(v, parse_task_status_tolerant) {
+            cfg.branch_status_aliases = map;
         }
     }
     if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned() {
-        if let Ok(mut map) =
-            serde_yaml::from_value::<std::collections::HashMap<String, crate::types::Priority>>(v)
-        {
-            let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
-            cfg.branch_priority_aliases = map2;
+        if let Some(map) = parse_alias_map_tolerant::<Priority>(v, parse_priority_tolerant) {
+            cfg.branch_priority_aliases = map;
         }
     }
 
@@ -297,10 +407,10 @@ pub fn parse_project_from_yaml_str(
     }
     // issue.*
     if let Some(v) = get_path(&data, &["issue", "states"]).cloned() {
-        cfg.issue_states = serde_yaml::from_value(v).ok();
+        cfg.issue_states = parse_issue_states_tolerant(v);
     }
     if let Some(v) = get_path(&data, &["issue", "types"]).cloned() {
-        cfg.issue_types = serde_yaml::from_value(v).ok();
+        cfg.issue_types = parse_issue_types_tolerant(v);
     }
     if let Some(v) = get_path(&data, &["issue", "priorities"]).cloned() {
         cfg.issue_priorities = serde_yaml::from_value(v).ok();
@@ -358,13 +468,15 @@ pub fn parse_project_from_yaml_str(
 
     // branch alias maps (project)
     if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
-        cfg.branch_type_aliases = serde_yaml::from_value(v).ok();
+        cfg.branch_type_aliases = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant);
     }
     if let Some(v) = get_path(&data, &["branch", "status_aliases"]).cloned() {
-        cfg.branch_status_aliases = serde_yaml::from_value(v).ok();
+        cfg.branch_status_aliases =
+            parse_alias_map_tolerant::<TaskStatus>(v, parse_task_status_tolerant);
     }
     if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned() {
-        cfg.branch_priority_aliases = serde_yaml::from_value(v).ok();
+        cfg.branch_priority_aliases =
+            parse_alias_map_tolerant::<Priority>(v, parse_priority_tolerant);
     }
 
     Ok(cfg)
@@ -591,16 +703,34 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     // issue
     let mut issue = serde_yaml::Mapping::new();
     if let Some(v) = &cfg.issue_states {
-        issue.insert(
-            Y::String("states".into()),
-            serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
-        );
+        // Render as PascalCase strings (e.g., Todo, InProgress) for human-friendly config
+        let vals: Vec<Y> = v
+            .values
+            .iter()
+            .map(|s| match s {
+                crate::types::TaskStatus::Todo => Y::String("Todo".into()),
+                crate::types::TaskStatus::InProgress => Y::String("InProgress".into()),
+                crate::types::TaskStatus::Verify => Y::String("Verify".into()),
+                crate::types::TaskStatus::Blocked => Y::String("Blocked".into()),
+                crate::types::TaskStatus::Done => Y::String("Done".into()),
+            })
+            .collect();
+        issue.insert(Y::String("states".into()), Y::Sequence(vals));
     }
     if let Some(v) = &cfg.issue_types {
-        issue.insert(
-            Y::String("types".into()),
-            serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
-        );
+        // Render as PascalCase strings (e.g., Feature, Bug) for human-friendly config
+        let vals: Vec<Y> = v
+            .values
+            .iter()
+            .map(|t| match t {
+                crate::types::TaskType::Feature => Y::String("Feature".into()),
+                crate::types::TaskType::Bug => Y::String("Bug".into()),
+                crate::types::TaskType::Epic => Y::String("Epic".into()),
+                crate::types::TaskType::Spike => Y::String("Spike".into()),
+                crate::types::TaskType::Chore => Y::String("Chore".into()),
+            })
+            .collect();
+        issue.insert(Y::String("types".into()), Y::Sequence(vals));
     }
     if let Some(v) = &cfg.issue_priorities {
         issue.insert(
@@ -717,4 +847,27 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
 
     serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())
+}
+
+// Helper: tolerant parser for issue.types accepting mixed-case strings mapping to TaskType
+fn parse_issue_types_tolerant(
+    v: serde_yaml::Value,
+) -> Option<crate::config::types::ConfigurableField<crate::types::TaskType>> {
+    use crate::config::types::ConfigurableField;
+    use crate::types::TaskType;
+    use std::str::FromStr;
+
+    if let Ok(cf) = serde_yaml::from_value::<ConfigurableField<TaskType>>(v.clone()) {
+        return Some(cf);
+    }
+    if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v.clone()) {
+        let mut out: Vec<TaskType> = Vec::new();
+        for s in list {
+            if let Ok(tt) = TaskType::from_str(&s) {
+                out.push(tt);
+            }
+        }
+        return Some(ConfigurableField { values: out });
+    }
+    None
 }

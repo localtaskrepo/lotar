@@ -1,5 +1,6 @@
 use crate::config::types::*;
 use crate::types::{Priority, TaskStatus, TaskType};
+use crate::utils::project::generate_project_prefix;
 use std::fs;
 use std::path::Path;
 
@@ -93,7 +94,7 @@ fn apply_field_to_global_config(
         }
         "default_prefix" | "default_project" => {
             // Normalize to storage prefix, accepting either full project name or prefix
-            config.default_prefix = crate::utils::generate_project_prefix(value);
+            config.default_prefix = generate_project_prefix(value);
         }
         "default_assignee" => {
             config.default_assignee = if value.is_empty() {
@@ -121,6 +122,16 @@ fn apply_field_to_global_config(
         }
         "categories" | "tags" | "custom_fields" => {
             let values: Vec<String> = value.split(',').map(|s| s.trim().to_string()).collect();
+            if field == "custom_fields" {
+                for v in &values {
+                    if let Some(canonical) = crate::utils::fields::is_reserved_field(v) {
+                        return Err(ConfigError::ParseError(format!(
+                            "Custom field '{}' collides with built-in field '{}'. Choose a different name.",
+                            v, canonical
+                        )));
+                    }
+                }
+            }
             let field_config = StringConfigField { values };
 
             match field {
@@ -221,6 +232,16 @@ fn apply_field_to_project_config(
         }
         "categories" | "tags" | "custom_fields" => {
             let values: Vec<String> = value.split(',').map(|s| s.trim().to_string()).collect();
+            if field == "custom_fields" {
+                for v in &values {
+                    if let Some(canonical) = crate::utils::fields::is_reserved_field(v) {
+                        return Err(ConfigError::ParseError(format!(
+                            "Custom field '{}' collides with built-in field '{}'. Choose a different name.",
+                            v, canonical
+                        )));
+                    }
+                }
+            }
             let field_config = StringConfigField { values };
 
             match field {

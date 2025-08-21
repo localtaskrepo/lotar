@@ -3,6 +3,7 @@
 
 use clap::Parser;
 use std::env;
+use std::str::FromStr;
 
 use lotar::cli::handlers::assignee::{AssigneeArgs, AssigneeHandler};
 use lotar::cli::handlers::comment::{CommentArgs, CommentHandler};
@@ -13,6 +14,7 @@ use lotar::cli::handlers::{
     AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, StatsHandler, TaskHandler,
 };
 use lotar::cli::{Cli, Commands, TaskAction};
+use lotar::utils::resolve_project_input;
 use lotar::workspace::TasksDirectoryResolver;
 use lotar::{help, output};
 
@@ -37,6 +39,7 @@ fn is_valid_command(command: &str) -> bool {
             | "priority"
             | "assignee"
             | "due-date"
+            | "effort"
             | "comment"
             | "task"
             | "tasks"
@@ -231,6 +234,38 @@ fn main() {
                 }
             }
         }
+        Commands::Effort {
+            id,
+            effort,
+            clear,
+            dry_run,
+            explain,
+        } => {
+            renderer.log_info("BEGIN EFFORT");
+            let args = lotar::cli::handlers::effort::EffortArgs {
+                task_id: id,
+                new_effort: effort,
+                clear,
+                dry_run,
+                explain,
+            };
+            match lotar::cli::handlers::effort::EffortHandler::execute(
+                args,
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
+                Ok(()) => {
+                    renderer.log_info("END EFFORT status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END EFFORT status=err");
+                    Err(e)
+                }
+            }
+        }
         Commands::Assignee { id, assignee } => {
             renderer.log_info("BEGIN ASSIGNEE");
             let args = AssigneeArgs {
@@ -378,7 +413,7 @@ fn main() {
             // Inline small implementation to avoid a new handler file
             // Determine repo root
             let cwd = std::env::current_dir().map_err(|e| e.to_string()).unwrap();
-            let maybe_repo = lotar::utils_git::find_repo_root(&cwd);
+            let maybe_repo = lotar::utils::git::find_repo_root(&cwd);
             if let Some(repo_root) = maybe_repo {
                 // Compute tasks relative path
                 let tasks_abs = resolver.path.clone();
@@ -392,7 +427,7 @@ fn main() {
                     None
                 } else {
                     Some(if let Some(p) = cli.project.as_deref() {
-                        lotar::utils::resolve_project_input(p, resolver.path.as_path())
+                        resolve_project_input(p, resolver.path.as_path())
                     } else {
                         lotar::project::get_effective_project_name(&resolver)
                     })
@@ -510,9 +545,72 @@ fn main() {
                     };
                     let id = format!("{}-{}", project, numeric);
 
-                    // Load snapshots
+                    // Load snapshots with tolerant fallback for mixed-case enums in YAML
                     let load_yaml_as_task = |content: &str| -> Option<lotar::storage::task::Task> {
-                        serde_yaml::from_str::<lotar::storage::task::Task>(content).ok()
+                        // First try strict parse
+                        if let Ok(t) = serde_yaml::from_str::<lotar::storage::task::Task>(content) {
+                            return Some(t);
+                        }
+                        // Fallback: tolerant parse via serde_yaml::Value and FromStr for enums
+                        let v: serde_yaml::Value = serde_yaml::from_str(content).ok()?;
+                        let get_str = |k: &str| -> Option<String> {
+                            v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
+                        };
+                        let get_vec_str = |k: &str| -> Vec<String> {
+                            v.get(k)
+                                .and_then(|x| x.as_sequence())
+                                .map(|seq| {
+                                    seq.iter()
+                                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                        .collect()
+                                })
+                                .unwrap_or_default()
+                        };
+
+                        let title = get_str("title").unwrap_or_else(|| "".to_string());
+
+                        let status = get_str("status")
+                            .and_then(|s| lotar::types::TaskStatus::from_str(&s).ok())
+                            .unwrap_or_default();
+                        let priority = get_str("priority")
+                            .and_then(|s| lotar::types::Priority::from_str(&s).ok())
+                            .unwrap_or_default();
+                        let task_type = get_str("task_type")
+                            .and_then(|s| lotar::types::TaskType::from_str(&s).ok())
+                            .unwrap_or_default();
+
+                        let reporter = get_str("reporter");
+                        let assignee = get_str("assignee");
+                        let created = get_str("created")
+                            .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+                        let modified = get_str("modified")
+                            .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+                        let due_date = get_str("due_date");
+                        let effort = get_str("effort");
+                        let category = get_str("category");
+                        let tags = get_vec_str("tags");
+
+                        Some(lotar::storage::task::Task {
+                            title,
+                            status,
+                            priority,
+                            task_type,
+                            reporter,
+                            assignee,
+                            created,
+                            modified,
+                            due_date,
+                            effort,
+                            acceptance_criteria: vec![],
+                            relationships: lotar::types::TaskRelationships::default(),
+                            comments: vec![],
+                            references: vec![],
+                            subtitle: None,
+                            description: None,
+                            category,
+                            tags,
+                            custom_fields: std::collections::HashMap::new(),
+                        })
                     };
 
                     // Current content (right side)

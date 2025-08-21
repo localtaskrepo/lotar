@@ -10,6 +10,7 @@ use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::cli::{TaskAction, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs};
 use crate::storage::{TaskFilter, manager::Storage, task::Task};
+use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
 
 /// Handler for all task subcommands
@@ -26,6 +27,18 @@ impl CommandHandler for TaskHandler {
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
         match args {
+            TaskAction::Effort(effort_args) => {
+                let args = crate::cli::handlers::effort::EffortArgs {
+                    task_id: effort_args.id,
+                    new_effort: effort_args.effort,
+                    clear: effort_args.clear,
+                    dry_run: effort_args.dry_run,
+                    explain: effort_args.explain,
+                };
+                crate::cli::handlers::effort::EffortHandler::execute(
+                    args, project, resolver, renderer,
+                )
+            }
             TaskAction::Add(add_args) => {
                 let cli_add_args = crate::cli::AddArgs {
                     title: add_args.title,
@@ -62,7 +75,7 @@ impl CommandHandler for TaskHandler {
             TaskAction::History { id, limit } => {
                 // Resolve project and file path
                 let default_proj = project
-                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .map(|p| resolve_project_input(p, resolver.path.as_path()))
                     .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
                 // Prefer project prefix embedded in the ID (e.g., TEST-1)
                 let proj_prefix =
@@ -76,7 +89,7 @@ impl CommandHandler for TaskHandler {
 
                 // Compute repo-relative path
                 let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                let repo_root = crate::utils::git::find_repo_root(&cwd)
                     .ok_or_else(|| "Not in a git repository".to_string())?;
                 let tasks_abs = resolver.path.clone();
                 let tasks_rel = if tasks_abs.starts_with(&repo_root) {
@@ -133,7 +146,7 @@ impl CommandHandler for TaskHandler {
             TaskAction::HistoryByField { field, id, limit } => {
                 // Resolve project and file path similar to History
                 let default_proj = project
-                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .map(|p| resolve_project_input(p, resolver.path.as_path()))
                     .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
                 let proj_prefix =
                     crate::storage::operations::StorageOperations::get_project_for_task(&id)
@@ -145,7 +158,7 @@ impl CommandHandler for TaskHandler {
                 .ok_or_else(|| "Task file not found".to_string())?;
 
                 let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                let repo_root = crate::utils::git::find_repo_root(&cwd)
                     .ok_or_else(|| "Not in a git repository".to_string())?;
                 let tasks_abs = resolver.path.clone();
                 let tasks_rel = if tasks_abs.starts_with(&repo_root) {
@@ -268,7 +281,7 @@ impl CommandHandler for TaskHandler {
             }
             TaskAction::Diff { id, commit, fields } => {
                 let default_proj = project
-                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .map(|p| resolve_project_input(p, resolver.path.as_path()))
                     .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
                 let proj_prefix =
                     crate::storage::operations::StorageOperations::get_project_for_task(&id)
@@ -279,7 +292,7 @@ impl CommandHandler for TaskHandler {
                 )
                 .ok_or_else(|| "Task file not found".to_string())?;
                 let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                let repo_root = crate::utils::git::find_repo_root(&cwd)
                     .ok_or_else(|| "Not in a git repository".to_string())?;
                 let tasks_abs = resolver.path.clone();
                 let tasks_rel = if tasks_abs.starts_with(&repo_root) {
@@ -422,7 +435,7 @@ impl CommandHandler for TaskHandler {
             }
             TaskAction::At { id, commit } => {
                 let default_proj = project
-                    .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
+                    .map(|p| resolve_project_input(p, resolver.path.as_path()))
                     .unwrap_or_else(|| crate::project::get_effective_project_name(resolver));
                 let proj_prefix =
                     crate::storage::operations::StorageOperations::get_project_for_task(&id)
@@ -433,7 +446,7 @@ impl CommandHandler for TaskHandler {
                 )
                 .ok_or_else(|| "Task file not found".to_string())?;
                 let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
-                let repo_root = crate::utils_git::find_repo_root(&cwd)
+                let repo_root = crate::utils::git::find_repo_root(&cwd)
                     .ok_or_else(|| "Not in a git repository".to_string())?;
                 let tasks_abs = resolver.path.clone();
                 let tasks_rel = if tasks_abs.starts_with(&repo_root) {
@@ -581,7 +594,7 @@ impl CommandHandler for EditHandler {
 
         // Resolve project prefix for loading
         let project_prefix = if let Some(project) = project {
-            crate::utils::resolve_project_input(project, resolver.path.as_path())
+            resolve_project_input(project, resolver.path.as_path())
         } else {
             crate::project::get_effective_project_name(resolver)
         };
@@ -613,7 +626,11 @@ impl CommandHandler for EditHandler {
         }
 
         if let Some(effort) = args.effort {
-            task.effort = Some(effort);
+            // Normalize effort to canonical form before persisting
+            task.effort = match crate::utils::effort::parse_effort(&effort) {
+                Ok(parsed) => Some(parsed.canonical),
+                Err(_) => Some(effort), // validator should have caught invalids; keep original defensively
+            };
         }
 
         if let Some(due) = args.due {
@@ -778,8 +795,7 @@ impl CommandHandler for SearchHandler {
 
         if let Some(project) = project {
             // Resolve project name to prefix, just like in AddHandler
-            let project_prefix =
-                crate::utils::resolve_project_input(project, resolver.path.as_path());
+            let project_prefix = resolve_project_input(project, resolver.path.as_path());
             task_filter.project = Some(project_prefix);
         } // Execute search/list
         renderer.log_debug("list: executing search");
@@ -855,40 +871,212 @@ impl CommandHandler for SearchHandler {
             });
         }
 
-        // Apply sorting if requested
-        if let Some(sort_field) = args.sort_by {
-            use crate::cli::SortField;
-            // Priority and TaskStatus implement Ord; use cmp on enums directly
-
-            tasks.sort_by(|(_, task_a), (_, task_b)| {
-                let comparison = match sort_field {
-                    SortField::Priority => task_a.priority.cmp(&task_b.priority),
-                    SortField::Status => task_a.status.cmp(&task_b.status),
-                    SortField::DueDate => {
-                        // Sort by due date (tasks without due date go last)
-                        match (&task_a.due_date, &task_b.due_date) {
-                            (Some(a), Some(b)) => a.cmp(b),
-                            (Some(_), None) => std::cmp::Ordering::Less,
-                            (None, Some(_)) => std::cmp::Ordering::Greater,
-                            (None, None) => std::cmp::Ordering::Equal,
+        // Apply unified --where filters (in addition to discrete flags)
+        if !args.r#where.is_empty() {
+            // Build map of allowed sets per key
+            use std::collections::HashMap;
+            let mut filters: HashMap<String, std::collections::HashSet<String>> = HashMap::new();
+            for (k, v) in &args.r#where {
+                filters.entry(k.clone()).or_default().insert(v.clone());
+            }
+            let resolve_vals = |id: &str, t: &Task, key: &str| -> Option<Vec<String>> {
+                let raw = key.trim();
+                let k_norm = raw.to_lowercase();
+                // Prefer built-ins if the key collides
+                if let Some(canon) = crate::utils::fields::is_reserved_field(raw) {
+                    match canon {
+                        "assignee" => return Some(vec![t.assignee.clone().unwrap_or_default()]),
+                        "reporter" => return Some(vec![t.reporter.clone().unwrap_or_default()]),
+                        "type" => return Some(vec![t.task_type.to_string()]),
+                        "status" => return Some(vec![t.status.to_string()]),
+                        "priority" => return Some(vec![t.priority.to_string()]),
+                        "project" => {
+                            return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
+                        }
+                        "category" => return Some(vec![t.category.clone().unwrap_or_default()]),
+                        "tags" => return Some(t.tags.clone()),
+                        _ => {}
+                    }
+                }
+                // Handle explicit custom field: field:<name>
+                let mut field_name: Option<&str> = None;
+                if let Some(rest) = k_norm.strip_prefix("field:") {
+                    field_name = Some(rest.trim());
+                } else {
+                    // Treat as plain custom field name if declared (or wildcard)
+                    if args
+                        .r#where
+                        .iter()
+                        .any(|(k, _)| k.trim().eq_ignore_ascii_case(raw))
+                    {
+                        // We still need to ensure this name is allowed by config
+                        if config.custom_fields.has_wildcard()
+                            || config.custom_fields.values.iter().any(|v| v == raw)
+                        {
+                            field_name = Some(raw);
                         }
                     }
-                    SortField::Created => {
-                        // Sort by creation timestamp
-                        task_a.created.cmp(&task_b.created)
+                }
+                if let Some(name) = field_name {
+                    // Try exact match first; then case-insensitive match to the actual stored key
+                    if let Some(v) = t.custom_fields.get(name) {
+                        return Some(vec![crate::types::custom_value_to_string(v)]);
                     }
-                    SortField::Modified => {
-                        // Sort by modification timestamp
-                        task_a.modified.cmp(&task_b.modified)
+                    // Fallback: search by case-insensitive key if declared in config
+                    let name_lower = name.to_lowercase();
+                    if let Some((_, v)) = t
+                        .custom_fields
+                        .iter()
+                        .find(|(k, _)| k.to_lowercase() == name_lower)
+                    {
+                        return Some(vec![crate::types::custom_value_to_string(v)]);
+                    }
+                }
+                None
+            };
+            tasks.retain(|(id, t)| {
+                for (k, allowed) in &filters {
+                    let vals = match resolve_vals(id, t, k) {
+                        Some(vs) => vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>(),
+                        None => return false,
+                    };
+                    if vals.is_empty() {
+                        return false;
+                    }
+                    // Use fuzzy matching for properties
+                    let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
+                    if !crate::utils::fuzzy_match::fuzzy_set_match(&vals, &allowed_vec) {
+                        return false;
+                    }
+                }
+                true
+            });
+        }
+
+        // Effort min/max filtering
+        if args.effort_min.is_some() || args.effort_max.is_some() {
+            let min_parsed = args
+                .effort_min
+                .as_ref()
+                .map(|s| crate::utils::effort::parse_effort(s));
+            let max_parsed = args
+                .effort_max
+                .as_ref()
+                .map(|s| crate::utils::effort::parse_effort(s));
+            let min = match min_parsed.transpose() {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Invalid --effort-min: {}", e)),
+            };
+            let max = match max_parsed.transpose() {
+                Ok(v) => v,
+                Err(e) => return Err(format!("Invalid --effort-max: {}", e)),
+            };
+            tasks.retain(|(_, t)| {
+                let Some(eff) = t.effort.as_deref() else {
+                    return false;
+                };
+                let parsed = match crate::utils::effort::parse_effort(eff) {
+                    Ok(p) => p,
+                    Err(_) => return false,
+                };
+                let mut ok = true;
+                if let Some(ref m) = min {
+                    ok &= parsed.total_cmp_ge(m);
+                }
+                if let Some(ref m) = max {
+                    ok &= parsed.total_cmp_le(m);
+                }
+                ok
+            });
+        }
+
+        // Apply sorting if requested (supports string keys)
+        if let Some(sort_key) = args.sort_by.as_deref() {
+            let key_raw = sort_key.trim();
+            let key = key_raw.to_lowercase();
+            tasks.sort_by(|(id_a, a), (id_b, b)| {
+                use std::cmp::Ordering::*;
+                let ord = match key.as_str() {
+                    "priority" => a.priority.cmp(&b.priority),
+                    "status" => a.status.cmp(&b.status),
+                    "effort" => {
+                        // Compare normalized effort values; missing values sort last
+                        let pa = a
+                            .effort
+                            .as_deref()
+                            .and_then(|s| crate::utils::effort::parse_effort(s).ok());
+                        let pb = b
+                            .effort
+                            .as_deref()
+                            .and_then(|s| crate::utils::effort::parse_effort(s).ok());
+                        use std::cmp::Ordering::*;
+                        match (pa, pb) {
+                            (Some(x), Some(y)) => match (x.kind, y.kind) {
+                                (
+                                    crate::utils::effort::EffortKind::TimeHours(ax),
+                                    crate::utils::effort::EffortKind::TimeHours(by),
+                                ) => ax.partial_cmp(&by).unwrap_or(Equal),
+                                (
+                                    crate::utils::effort::EffortKind::Points(ax),
+                                    crate::utils::effort::EffortKind::Points(by),
+                                ) => ax.partial_cmp(&by).unwrap_or(Equal),
+                                // Different kinds: keep stable ordering by canonical string to avoid cross-kind numeric compare
+                                _ => x.canonical.cmp(&y.canonical),
+                            },
+                            (Some(_), None) => Less,
+                            (None, Some(_)) => Greater,
+                            (None, None) => Equal,
+                        }
+                    }
+                    "due-date" | "due" => match (&a.due_date, &b.due_date) {
+                        (Some(x), Some(y)) => x.cmp(y),
+                        (Some(_), None) => Less,
+                        (None, Some(_)) => Greater,
+                        (None, None) => Equal,
+                    },
+                    "created" => a.created.cmp(&b.created),
+                    "modified" => a.modified.cmp(&b.modified),
+                    "assignee" => a.assignee.cmp(&b.assignee),
+                    "type" => a.task_type.to_string().cmp(&b.task_type.to_string()),
+                    "category" => a.category.cmp(&b.category),
+                    "project" => id_a.split('-').next().cmp(&id_b.split('-').next()),
+                    "id" => id_a.cmp(id_b),
+                    other => {
+                        // Support custom fields via field:<name> or plain declared names
+                        let mut name_opt: Option<&str> = None;
+                        if let Some(rest) = other.strip_prefix("field:") {
+                            name_opt = Some(rest.trim());
+                        } else if config.custom_fields.has_wildcard()
+                            || config
+                                .custom_fields
+                                .values
+                                .iter()
+                                .any(|v| v.eq_ignore_ascii_case(key_raw))
+                        {
+                            name_opt = Some(key_raw);
+                        }
+                        if let Some(name) = name_opt {
+                            let pick = |t: &Task| -> String {
+                                if let Some(v) = t.custom_fields.get(name) {
+                                    return crate::types::custom_value_to_string(v);
+                                }
+                                let lname = name.to_lowercase();
+                                if let Some((_, v)) = t
+                                    .custom_fields
+                                    .iter()
+                                    .find(|(k, _)| k.to_lowercase() == lname)
+                                {
+                                    return crate::types::custom_value_to_string(v);
+                                }
+                                String::new()
+                            };
+                            pick(a).cmp(&pick(b))
+                        } else {
+                            Equal
+                        }
                     }
                 };
-
-                // Apply reverse if requested
-                if args.reverse {
-                    comparison.reverse()
-                } else {
-                    comparison
-                }
+                if args.reverse { ord.reverse() } else { ord }
             });
         }
 
@@ -1006,7 +1194,7 @@ impl CommandHandler for DeleteHandler {
 
         // Resolve project prefix
         let project_prefix = if let Some(project) = project {
-            crate::utils::resolve_project_input(project, resolver.path.as_path())
+            resolve_project_input(project, resolver.path.as_path())
         } else {
             crate::project::get_effective_project_name(resolver)
         };

@@ -72,6 +72,13 @@ lotar task assignee <TASK_ID> [NEW_ASSIGNEE]
 lotar task due-date <TASK_ID> [NEW_DATE]
 ```
 
+### effort
+Change or view task effort (also available as a top-level command `lotar effort`).
+
+```bash
+lotar task effort <TASK_ID> [NEW_EFFORT] [--clear] [--dry-run] [--explain]
+```
+
 ### delete
 Delete a task.
 

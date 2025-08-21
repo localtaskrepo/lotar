@@ -24,6 +24,8 @@ fn init_repo(temp: &TempDir) {
     run_git(root, &["init"], &[]);
     run_git(root, &["config", "user.name", "Test User"], &[]);
     run_git(root, &["config", "user.email", "test@example.com"], &[]);
+    // Ensure commits don't require signing in CI/dev machines with enforced signing
+    run_git(root, &["config", "commit.gpgsign", "false"], &[]);
 }
 
 #[test]

@@ -7,6 +7,7 @@ use std::str::FromStr;
 use schemars::JsonSchema;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "PascalCase")]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub enum TaskStatus {
     #[default]
@@ -129,13 +130,19 @@ impl TaskStatus {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub enum TaskType {
     #[default]
+    #[serde(alias = "Feature")]
     Feature,
+    #[serde(alias = "Bug")]
     Bug,
+    #[serde(alias = "Epic")]
     Epic,
+    #[serde(alias = "Spike")]
     Spike,
+    #[serde(alias = "Chore")]
     Chore,
 }
 
@@ -296,7 +303,35 @@ pub fn custom_value_string<S: Into<String>>(s: S) -> serde_json::Value {
     serde_json::Value::String(s.into())
 }
 
+/// Convert a custom field value to a comparable display string for sorting/filtering.
+#[cfg(feature = "schema")]
+pub fn custom_value_to_string(v: &CustomFieldValue) -> String {
+    match v {
+        serde_json::Value::Null => String::new(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Array(_) => "[array]".to_string(),
+        serde_json::Value::Object(_) => "{object}".to_string(),
+    }
+}
+
+/// Convert a custom field value to a comparable display string for sorting/filtering.
+#[cfg(not(feature = "schema"))]
+pub fn custom_value_to_string(v: &CustomFieldValue) -> String {
+    match v {
+        serde_yaml::Value::Null => String::new(),
+        serde_yaml::Value::Bool(b) => b.to_string(),
+        serde_yaml::Value::Number(n) => n.to_string(),
+        serde_yaml::Value::String(s) => s.clone(),
+        serde_yaml::Value::Sequence(_) => "[array]".to_string(),
+        serde_yaml::Value::Mapping(_) => "{object}".to_string(),
+        _ => "other".to_string(),
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Copy, Default)]
+#[serde(rename_all = "PascalCase")]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub enum Priority {
     Low,

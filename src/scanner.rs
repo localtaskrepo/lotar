@@ -273,7 +273,7 @@ impl Scanner {
 
         // If modified_only is enabled and we are inside a git repo, restrict to modified/renamed files
         if self.modified_only {
-            if let Some(repo_root) = crate::utils_git::find_repo_root(dir_path) {
+            if let Some(repo_root) = crate::utils::git::find_repo_root(dir_path) {
                 let modified = Self::git_modified_files(&repo_root);
                 for p in modified {
                     // Keep only files under dir_path and supported extensions

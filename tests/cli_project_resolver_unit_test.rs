@@ -3,7 +3,7 @@ use lotar::cli::project::test_support::resolver_from_config;
 use lotar::config::StringConfigField;
 use lotar::config::types::{ConfigurableField, ResolvedConfig};
 use lotar::types::{Priority, TaskStatus, TaskType};
-use lotar::utils::{
+use lotar::utils::project::{
     generate_project_prefix, generate_unique_project_prefix, resolve_project_input,
     validate_explicit_prefix,
 };

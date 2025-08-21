@@ -19,3 +19,4 @@ config:
     - backend
     - docs
   tags:
+    - "*"

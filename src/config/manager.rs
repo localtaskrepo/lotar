@@ -1,4 +1,5 @@
 use crate::config::types::*;
+use crate::utils::project::generate_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -72,7 +73,7 @@ impl ConfigManager {
             } else {
                 // No existing projects, generate from current directory
                 if let Some(project_name) = crate::project::get_project_name() {
-                    crate::utils::generate_project_prefix(&project_name)
+                    generate_project_prefix(&project_name)
                 } else {
                     "DEFAULT".to_string()
                 }

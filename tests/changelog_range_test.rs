@@ -36,6 +36,11 @@ fn changelog_with_ref_range_runs() {
         .args(["config", "user.name", "Dev"])
         .assert()
         .success();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "commit.gpgsign", "false"])
+        .assert()
+        .success();
 
     // initial commit
     write_task(root, "TEST", "1", "first");

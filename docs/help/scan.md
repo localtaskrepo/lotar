@@ -83,6 +83,11 @@ Examples:
 
 After creating the task and inserting the key, attribute blocks can be removed from the source depending on `scan.strip_attributes` (config) or the `--strip-attributes` override.
 
+Effort notes:
+- Time units: m, h, d, w (also words like minute(s), hour(s), day(s), week(s)) are supported, including combined tokens like "1h 30m"; values are normalized to hours with two decimals (e.g., 90m -> 1.50h).
+- Points: pt/pts/point(s) and bare numbers are treated as points and preserved as such (e.g., 3pt).
+- Mixing time and points in a single value is rejected.
+
 Bi-directional references
 
 When scan creates a task from a TODO that lacks a key, it also records a back-link in the created task under the top-level `references` array. Each entry is a minimal reference with either:

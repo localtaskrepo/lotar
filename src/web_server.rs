@@ -2,7 +2,7 @@ use crate::api_server::{self, HttpRequest};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, include_dir};
 use notify::{Config as NotifyConfig, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -299,6 +299,36 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
     {
         let _ = stream.write_all(b"event: ready\ndata: {}\n\n");
         let _ = stream.flush();
+
+        // If a project filter is active and client is interested in project_changed,
+        // emit a synthetic snapshot event to avoid races with watcher startup.
+        if let Some(proj_name) = project_filter.as_ref() {
+            let wants_project_changed = match &kinds_filter {
+                None => true,
+                Some(kinds) => kinds
+                    .iter()
+                    .any(|k| k.eq_ignore_ascii_case("project_changed")),
+            };
+            if wants_project_changed {
+                let cwd_ok = std::env::current_dir().ok();
+                if let Some(cwd) = cwd_ok {
+                    let proj_dir = cwd.join(".tasks").join(proj_name);
+                    if proj_dir.exists() {
+                        // Emit via bus (picked up by forwarder) and also write one immediate event inline
+                        crate::api_events::emit(crate::api_events::ApiEvent {
+                            kind: "project_changed".to_string(),
+                            data: serde_json::json!({ "name": proj_name }),
+                        });
+                        let inline = format!(
+                            "event: project_changed\ndata: {{\"name\":\"{}\"}}\n\n",
+                            proj_name
+                        );
+                        let _ = stream.write_all(inline.as_bytes());
+                        let _ = stream.flush();
+                    }
+                }
+            }
+        }
     }
 
     // Spawn a thread to forward events
@@ -474,26 +504,39 @@ fn start_tasks_watcher() {
             };
             match event.kind {
                 EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
-                    // Derive project from path: .tasks/<PROJECT>/.../N.yml
+                    // Derive project(s) from paths by finding the component under ".tasks"
                     if let Some(paths) = (!event.paths.is_empty()).then_some(event.paths) {
+                        let mut emitted: HashSet<String> = HashSet::new();
                         for p in paths {
-                            if p.extension().and_then(|e| e.to_str()) != Some("yml") {
-                                continue;
+                            // Walk ancestors to locate the ".tasks" directory and take the next component as project
+                            let mut proj: Option<String> = None;
+                            for anc in p.ancestors() {
+                                if let Some(name) = anc.file_name().and_then(|s| s.to_str()) {
+                                    if name == ".tasks" {
+                                        // The path immediately under .tasks is the project directory
+                                        if let Some(project) = p
+                                            .strip_prefix(anc)
+                                            .ok()
+                                            .and_then(|rest| rest.components().next())
+                                            .and_then(|c| match c {
+                                                std::path::Component::Normal(os) => os.to_str(),
+                                                _ => None,
+                                            })
+                                        {
+                                            proj = Some(project.to_string());
+                                        }
+                                        break;
+                                    }
+                                }
                             }
-                            // Expect .tasks/<PROJECT>/...
-                            let proj = p
-                                .parent()
-                                .and_then(|d| d.file_name())
-                                .and_then(|s| s.to_str())
-                                .unwrap_or("")
-                                .to_string();
-                            if proj.is_empty() {
-                                continue;
+                            if let Some(project) = proj {
+                                if emitted.insert(project.clone()) {
+                                    crate::api_events::emit(crate::api_events::ApiEvent {
+                                        kind: "project_changed".to_string(),
+                                        data: serde_json::json!({ "name": project }),
+                                    });
+                                }
                             }
-                            crate::api_events::emit(crate::api_events::ApiEvent {
-                                kind: "project_changed".to_string(),
-                                data: serde_json::json!({ "name": proj }),
-                            });
                         }
                     }
                 }

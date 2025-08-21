@@ -30,6 +30,11 @@ fn init_repo(root: &Path) {
         .args(["config", "user.name", "Dev"])
         .assert()
         .success();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "commit.gpgsign", "false"])
+        .assert()
+        .success();
 }
 
 #[test]

@@ -158,15 +158,30 @@ pub enum StatsAction {
 
     /// Aggregate effort estimates across tasks (snapshot)
     Effort {
-        /// Grouping key: assignee|type|project
-        #[arg(long = "by", value_enum, default_value_t = StatsEffortGroupBy::Assignee)]
-        by: StatsEffortGroupBy,
+        /// Grouping key (built-ins: assignee|type|project|status|priority|reporter|category|tag|field:<name>)
+        #[arg(long = "by", default_value = "assignee")]
+        by: String,
+        /// Filters: --where key=value (repeatable). Keys same as --by; for custom fields use field:<name>.
+        #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=0.., value_delimiter=None)]
+        r#where: Vec<(String, String)>,
+        /// Output unit: hours|days|weeks|points|auto
+        #[arg(long = "unit", value_enum, default_value_t = StatsEffortUnit::Hours)]
+        unit: StatsEffortUnit,
         /// Limit number of groups (default 20)
         #[arg(long, default_value = "20")]
         limit: usize,
         /// Span all projects (default: current project only)
         #[arg(long)]
         global: bool,
+        /// Since (e.g., 14d, 2025-01-01, "2025-01-01T10:00Z")
+        #[arg(long)]
+        since: Option<String>,
+        /// Until (defaults to now)
+        #[arg(long)]
+        until: Option<String>,
+        /// Transitions: only include tasks that changed into this status within the window
+        #[arg(long = "transitions")]
+        transitions: Option<String>,
     },
 
     /// Comments statistics (snapshot)
@@ -264,9 +279,13 @@ pub enum StatsAgeDistribution {
     Month,
 }
 
+// Note: StatsEffortGroupBy removed in favor of free-form string keys via unified field resolver
+
 #[derive(clap::ValueEnum, Clone, Debug)]
-pub enum StatsEffortGroupBy {
-    Assignee,
-    Type,
-    Project,
+pub enum StatsEffortUnit {
+    Hours,
+    Days,
+    Weeks,
+    Points,
+    Auto,
 }

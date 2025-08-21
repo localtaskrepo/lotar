@@ -2,7 +2,7 @@ use crate::config::{ConfigManager, types::ProjectConfig};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use crate::storage::task::Task;
 #[cfg(test)]
-use crate::utils::generate_project_prefix;
+use crate::utils::project::generate_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
 

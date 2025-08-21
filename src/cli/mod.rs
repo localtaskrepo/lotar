@@ -87,6 +87,23 @@ pub enum Commands {
         due_date: Option<String>,
     },
 
+    /// Change or view task effort estimate
+    Effort {
+        /// Task ID (with or without project prefix)
+        id: String,
+        /// New effort value (e.g., 2d, 5h, 1w, or points as a number). If omitted, shows current effort.
+        effort: Option<String>,
+        /// Clear effort value
+        #[arg(long)]
+        clear: bool,
+        /// Preview the change without saving
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+        /// Explain normalization and parsing
+        #[arg(long, short = 'e')]
+        explain: bool,
+    },
+
     /// Add a comment to a task (shortcut)
     #[command(alias = "c")]
     Comment {

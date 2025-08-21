@@ -68,7 +68,9 @@ lotar serve  # Uses environment-configured directory
 		- `tags` (CSV)
 		- `category`
 		- `q` (free-text search)
-	- Notes: Invalid values for `status`, `priority`, or `type` return HTTP 400
+	- Notes:
+		- Invalid values for `status`, `priority`, or `type` return HTTP 400
+		- Any additional query key is treated as a property filter. Declared custom fields can be used directly (e.g., `?sprint=W35`). Multiple values allowed via CSV; matching is case- and separator-insensitive.
 - `GET /api/tasks/get?id=...` - Get task by id (returns HTTP 404 if not found)
 - `POST /api/tasks/update` - Update task (body: TaskUpdateRequest: flat fields with `id` + optional properties; supports `@me` for reporter/assignee)
 - `POST /api/tasks/delete` - Delete task (body: { id })

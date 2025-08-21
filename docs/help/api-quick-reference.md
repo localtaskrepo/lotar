@@ -13,6 +13,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 
 Notes
 - People fields accept `@me`.
+- /api/tasks/list accepts additional query keys beyond the documented ones: declared custom field names can be used directly (e.g., `?sprint=W35`). Values support CSV and fuzzy matching (case/sep-insensitive).
 - /api/tasks/update ignores `status` (status changes via CLI); other fields are updated.
 - Validation errors return 400 with INVALID_ARGUMENT.
 

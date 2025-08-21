@@ -17,3 +17,9 @@ config:
     - Bug
     - Spike
     - Chore
+  tags:
+    - "*"
+  categories:
+    - "*"
+  custom.fields:
+    - "sprint"

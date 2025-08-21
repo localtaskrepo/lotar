@@ -5,13 +5,16 @@ use crate::config::types::ResolvedConfig;
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use crate::storage::{manager::Storage, task::Task};
 use crate::types::{Priority, TaskStatus, TaskType};
+use crate::utils::project::{generate_project_prefix, resolve_project_input};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json;
+use std::io::Write;
 
 pub mod assignee;
 pub mod comment;
 pub mod config_handler;
 pub mod duedate;
+pub mod effort;
 pub mod priority;
 pub mod scan_handler;
 pub mod serve_handler;
@@ -25,6 +28,7 @@ pub use scan_handler::ScanHandler;
 pub use serve_handler::ServeHandler;
 pub use stats_handler::StatsHandler;
 pub use task::TaskHandler;
+// effort handler re-export not strictly needed, used via module path in task
 
 /// Trait for command handlers
 pub trait CommandHandler {
@@ -91,8 +95,8 @@ impl CommandHandler for AddHandler {
         // Optionally infer type from current git branch when flags/type not provided
         fn branch_and_token() -> Option<(String, String)> {
             let cwd = std::env::current_dir().ok()?;
-            let root = crate::utils_git::find_repo_root(&cwd)?;
-            let branch = crate::utils_git::read_current_branch(&root)?;
+            let root = crate::utils::git::find_repo_root(&cwd)?;
+            let branch = crate::utils::git::read_current_branch(&root)?;
             let branch_lower = branch.to_lowercase();
             let first_segment = branch_lower
                 .split('/')
@@ -190,7 +194,9 @@ impl CommandHandler for AddHandler {
                             TaskType::Feature
                         }
                     } else {
-                        // If branch-inferred type is allowed by config, use it; otherwise fallback
+                        // No branch inference: do NOT consult branch or alias maps at all.
+                        // Prefer "Feature" if allowed by project; otherwise pick the first
+                        // project-configured type.
                         if let Ok(f) = validator.validate_task_type("Feature") {
                             f
                         } else if let Some(first) = config.issue_types.values.first() {
@@ -382,12 +388,29 @@ impl CommandHandler for AddHandler {
 
         // Set validated properties
         task.task_type = validated_type;
+        if std::env::var("LOTAR_DEBUG_ADD").ok().as_deref() == Some("1") {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/tmp/lotar_add_debug.log")
+            {
+                let _ = writeln!(f, "[ADD] chosen_type={}", task.task_type);
+            }
+        }
         // Resolve @me if present so previews and persisted task show actual identity
         task.assignee = validated_assignee.and_then(|a| {
             crate::utils::identity::resolve_me_alias(&a, Some(resolver.path.as_path()))
         });
         task.due_date = validated_due_date;
-        task.effort = validated_effort;
+        // Normalize effort on write to canonical form (e.g., hours with 2 decimals or Npt)
+        task.effort = if let Some(e) = validated_effort {
+            match crate::utils::effort::parse_effort(&e) {
+                Ok(parsed) => Some(parsed.canonical),
+                Err(_) => Some(e), // should not happen after validation; keep original if it does
+            }
+        } else {
+            None
+        };
         task.description = args.description;
         task.category = validated_category;
         task.tags = validated_tags;
@@ -429,12 +452,11 @@ impl CommandHandler for AddHandler {
 
         let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
             // If we have an explicit project from command line, resolve it to its prefix
-            let prefix =
-                crate::utils::resolve_project_input(explicit_project, resolver.path.as_path());
+            let prefix = resolve_project_input(explicit_project, resolver.path.as_path());
             (prefix, Some(explicit_project))
         } else if let Some(ref detected) = detected_name {
             // Auto-detected project name - generate prefix but use original name for config
-            let prefix = crate::utils::generate_project_prefix(detected);
+            let prefix = generate_project_prefix(detected);
             (prefix, Some(detected.as_str()))
         } else {
             // Fall back to effective project logic (from global config default)
@@ -459,6 +481,17 @@ impl CommandHandler for AddHandler {
                         "priority": task.priority.to_string(),
                         "status_value": task.status.to_string(),
                     });
+                    // Optional debug fields to help diagnose config-driven defaults in tests
+                    if std::env::var("LOTAR_DEBUG_ADD").ok().as_deref() == Some("1") {
+                        obj["debug_auto_branch_infer_type"] =
+                            serde_json::Value::Bool(config.auto_branch_infer_type);
+                        obj["debug_issue_types"] = serde_json::to_value(&config.issue_types.values)
+                            .unwrap_or(serde_json::Value::Null);
+                        obj["debug_tasks_dir"] =
+                            serde_json::Value::String(resolver.path.to_string_lossy().to_string());
+                        obj["debug_effective_project"] =
+                            serde_json::Value::String(project_for_storage.clone());
+                    }
                     if let Some(a) = &task.assignee {
                         obj["assignee"] = serde_json::Value::String(a.clone());
                     }

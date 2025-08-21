@@ -1,5 +1,6 @@
 use crate::config::manager::ConfigManager;
 use crate::config::types::ResolvedConfig;
+use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
 
 /// Project detection and resolution logic
@@ -79,7 +80,7 @@ impl ProjectResolver {
     /// Resolve a project name (which could be a full name) to its prefix
     pub fn resolve_project_name_to_prefix(&self, project_name: &str) -> String {
         // Use the existing utility function that handles project name -> prefix mapping
-        crate::utils::resolve_project_input(project_name, self.tasks_dir.as_path())
+        resolve_project_input(project_name, self.tasks_dir.as_path())
     }
 
     /// Validate project name format

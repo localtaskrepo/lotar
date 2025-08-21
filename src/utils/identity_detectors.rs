@@ -79,7 +79,7 @@ impl GitConfigDetector {
         let start = tasks_root
             .and_then(|root| root.parent().map(|p| p.to_path_buf()))
             .or_else(|| std::env::current_dir().ok())?;
-        let repo_root = crate::utils_git::find_repo_root(&start)?;
+        let repo_root = crate::utils::git::find_repo_root(&start)?;
         let config = repo_root.join(".git").join("config");
         Some((repo_root, config))
     }
@@ -92,8 +92,8 @@ impl IdentityDetector for GitConfigDetector {
             return None;
         }
         let contents = std::fs::read_to_string(&config_path).ok()?;
-        let branch = crate::utils_git::read_current_branch(&repo_root);
-        let remotes = crate::utils_git::read_remotes(&repo_root);
+        let branch = crate::utils::git::read_current_branch(&repo_root);
+        let remotes = crate::utils::git::read_remotes(&repo_root);
 
         // user.name
         for line in contents.lines() {
@@ -155,7 +155,7 @@ impl ProjectManifestDetector {
             .and_then(|root| root.parent().map(|p| p.to_path_buf()))
             .or_else(|| std::env::current_dir().ok())
         {
-            if let Some(repo) = crate::utils_git::find_repo_root(&start) {
+            if let Some(repo) = crate::utils::git::find_repo_root(&start) {
                 roots.push(repo);
             }
             // Also check the immediate start dir in case not at repo root

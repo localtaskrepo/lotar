@@ -1,18 +1,18 @@
-// Utilities root module: organizes domain utilities and re-exports
-
-// Domain submodules
 pub mod codeowners;
 pub mod config;
+pub mod effort;
+pub mod fields;
 pub mod filesystem;
+pub mod fuzzy_match;
+pub mod git;
 pub mod identity;
 pub mod identity_detectors;
-// Git helpers are exposed at crate::utils_git
 pub mod paths;
 pub mod project;
 pub mod time;
 pub mod workspace_labels;
 
-// Backwards-compatible re-exports for widely used project helpers
+// Back-compat re-exports used across the codebase
 pub use project::{
     generate_project_prefix, generate_unique_project_prefix, resolve_project_input,
     validate_explicit_prefix,

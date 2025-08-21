@@ -1,7 +1,8 @@
 use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::{manager::Storage, task::Task};
-use crate::utils;
+use crate::utils::project::generate_project_prefix;
+// ...existing code...
 use crate::utils::identity::{resolve_current_user, resolve_me_alias};
 
 pub struct TaskService;
@@ -20,7 +21,7 @@ impl TaskService {
                 // Fallback to detected project name
                 .or_else(crate::project::get_project_name)
                 .unwrap_or_else(|| "default".to_string());
-            utils::generate_project_prefix(&repo_name)
+            generate_project_prefix(&repo_name)
         });
 
         let priority = req.priority.unwrap_or_default();
@@ -57,7 +58,13 @@ impl TaskService {
             .assignee
             .and_then(|a| resolve_me_alias(&a, Some(&storage.root_path)));
         t.due_date = req.due_date;
-        t.effort = req.effort;
+        // Normalize effort on write
+        t.effort = req
+            .effort
+            .map(|e| match crate::utils::effort::parse_effort(&e) {
+                Ok(parsed) => parsed.canonical,
+                Err(_) => e,
+            });
         t.description = req.description;
         t.category = req.category;
         t.tags = req.tags;
@@ -121,7 +128,10 @@ impl TaskService {
             t.due_date = Some(v);
         }
         if let Some(v) = patch.effort {
-            t.effort = Some(v);
+            t.effort = match crate::utils::effort::parse_effort(&v) {
+                Ok(parsed) => Some(parsed.canonical),
+                Err(_) => Some(v),
+            };
         }
         if let Some(v) = patch.description {
             t.description = Some(v);

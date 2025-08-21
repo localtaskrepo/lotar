@@ -5,6 +5,8 @@ Read-only analytics derived from git history (no git writes).
 
 Project scope defaults to the current project; use `--global` to span all projects.
 
+Performance note: some aggregations apply a safety cap to the number of tasks processed. Override via `LOTAR_STATS_EFFORT_CAP` when needed.
+
 ## Usage
 
 ```bash
@@ -245,9 +247,23 @@ Example JSON output (excerpt):
 
 Aggregate effort estimates across tasks (snapshot). Effort strings support h (hours), d (days=8h), w (weeks=40h).
 
+Options:
+- `--by <key>` grouping key. Built-ins: assignee, reporter, type, status, priority, project, category, tag. Declared custom fields are accepted directly (e.g., `--by sprint`). You can also use `field:<name>` explicitly.
+- `--where key=value` (repeatable) filters. Keys follow the same rules as `--by`. Tags accept `tag` or `tags`.
+- `--unit hours|days|weeks|points|auto` select output unit; auto picks hours if any present, else points.
+- `--since <date>` / `--until <date>` window filters (RFC3339 or relative like `14d`, `yesterday`, weekday names).
+- `--transitions <STATUS>` include only tasks that transitioned into STATUS within the window (requires git).
+  - Window semantics: a task is included if a commit inside [since, until] shows its status changed into STATUS. Commits outside the window are ignored for this filter.
+- `--limit <N>` cap number of groups (default 20); `--global` to span all projects.
+
+Examples:
+```bash
+lotar stats effort --by assignee --unit hours
+lotar stats effort --by sprint --where sprint=2025-W35
+lotar stats effort --by field:sprint --where status=todo --since 14d
 ```
-lotar stats effort [--by assignee|type|project] [--limit N] [--global]
-```
+
+Tip: Use an RFC3339 window like `--since 2025-08-11T00:00:00Z --until 2025-08-13T00:00:00Z` to precisely target a day when testing transitions.
 
 JSON output example:
 ```json

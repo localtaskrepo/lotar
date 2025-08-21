@@ -34,6 +34,11 @@ fn changelog_range_mode_json() {
         .args(["config", "user.name", "Dev"])
         .assert()
         .success();
+    Command::new("git")
+        .current_dir(root)
+        .args(["config", "commit.gpgsign", "false"])
+        .assert()
+        .success();
 
     write_task(root, "PRJ", "1", "v1");
     Command::new("git")

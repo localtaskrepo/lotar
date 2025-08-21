@@ -597,3 +597,48 @@ fn test_validation_result_merge() {
     assert!(result1.has_errors());
     assert!(result1.has_warnings());
 }
+
+#[test]
+fn config_custom_fields_collision_rejected_global_and_project() {
+    use lotar::config::operations::{save_global_config, save_project_config, update_config_field};
+    let temp_dir = TempDir::new().unwrap();
+    let tasks_dir = temp_dir.path();
+
+    // Start with clean configs
+    let global = GlobalConfig::default();
+    save_global_config(tasks_dir, &global).unwrap();
+
+    // Global: attempt to set custom_fields with a reserved name
+    let err = update_config_field(tasks_dir, "custom_fields", "status,foo,bar", None)
+        .expect_err("expected collision error");
+    match err {
+        lotar::config::types::ConfigError::ParseError(msg) => {
+            assert!(
+                msg.contains("collides with built-in"),
+                "unexpected msg: {msg}"
+            );
+        }
+        other => panic!("unexpected error type: {other:?}"),
+    }
+
+    // Project: attempt the same
+    let project_prefix = "DEMO";
+    let proj = ProjectConfig::new("Demo".into());
+    save_project_config(tasks_dir, project_prefix, &proj).unwrap();
+    let err = update_config_field(
+        tasks_dir,
+        "custom_fields",
+        "Due_Date,baz",
+        Some(project_prefix),
+    )
+    .expect_err("expected collision error");
+    match err {
+        lotar::config::types::ConfigError::ParseError(msg) => {
+            assert!(
+                msg.contains("collides with built-in"),
+                "unexpected msg: {msg}"
+            );
+        }
+        other => panic!("unexpected error type: {other:?}"),
+    }
+}

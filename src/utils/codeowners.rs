@@ -127,7 +127,7 @@ fn pattern_matches(pattern: &str, anchored: bool, path: &str) -> bool {
 
 pub fn repo_root_from_tasks_root(tasks_root: &Path) -> Option<PathBuf> {
     let start = tasks_root.parent().unwrap_or(tasks_root);
-    crate::utils_git::find_repo_root(start)
+    crate::utils::git::find_repo_root(start)
 }
 
 #[cfg(test)]

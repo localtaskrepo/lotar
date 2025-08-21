@@ -94,9 +94,22 @@ fn validate_effort_formats() {
     assert!(validator.validate_effort("2h").is_ok());
     assert!(validator.validate_effort("1.5d").is_ok());
     assert!(validator.validate_effort("1w").is_ok());
-    assert!(validator.validate_effort("2").is_err());
+    assert!(validator.validate_effort("2").is_ok()); // points unit (plain number) is now valid
     assert!(validator.validate_effort("2x").is_err());
     assert!(validator.validate_effort("abc").is_err());
+}
+
+#[test]
+fn custom_field_collision_is_rejected() {
+    let conf = cfg();
+    let validator = CliValidator::new(&conf);
+    // Built-in names should be rejected as custom fields (case/sep insensitive)
+    for bad in ["status", "Status", "due-date", "Due_Date", "TAGS", "effort"] {
+        assert!(
+            validator.validate_custom_field_name(bad).is_err(),
+            "expected collision for {bad}"
+        );
+    }
 }
 
 // Merged from types_priority_unit_test.rs

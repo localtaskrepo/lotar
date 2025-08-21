@@ -690,7 +690,7 @@ mod tag_filtering_tests {
         assert_eq!(task["description"], "This is a detailed description");
         assert_eq!(task["category"], "web");
         assert_eq!(task["assignee"], "developer@example.com");
-        assert_eq!(task["effort"], "5d");
+        assert_eq!(task["effort"], "40.00h");
 
         let tags = task["tags"].as_array().expect("Tags should be an array");
         assert_eq!(tags.len(), 2);

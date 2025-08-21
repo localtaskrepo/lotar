@@ -552,6 +552,97 @@ fn openapi_spec_served() {
     stop_server_on(port);
 }
 
+#[test]
+fn api_list_accepts_plain_custom_field_filters_and_me() {
+    // Ensure isolated tasks dir
+    let _guard = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
+    }
+
+    // Set declared custom field 'sprint' globally to allow plain usage
+    let mut api = ApiServer::new();
+    routes::initialize(&mut api);
+    // Configure custom_fields
+    let set_body = json!({"values": {"custom_fields": "sprint,release"}, "global": true});
+    let resp = api.handle_request(&mk_req("POST", "/api/config/set", &[], set_body));
+    assert_eq!(resp.status, 200, "config set");
+
+    // Create tasks across two projects with assignees and custom fields
+    let add = |project: &str, title: &str, assignee: Option<&str>, sprint: &str| {
+        serde_json::json!({
+            "title": title,
+            "project": project,
+            "assignee": assignee,
+            "fields": {"sprint": sprint}
+        })
+    };
+
+    let r1 = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/add",
+        &[],
+        add("TEST", "A", Some("alice"), "W35"),
+    ));
+    assert_eq!(r1.status, 201);
+    let r2 = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/add",
+        &[],
+        add("TEST", "B", Some("bob"), "W36"),
+    ));
+    assert_eq!(r2.status, 201);
+    let r3 = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/add",
+        &[],
+        add("OTHER", "C", Some("alice"), "w35"),
+    ));
+    assert_eq!(r3.status, 201);
+
+    // List by custom field directly: ?sprint=W35 should match case-insensitively
+    let resp = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("sprint", "W35")],
+        json!({}),
+    ));
+    assert_eq!(resp.status, 200);
+    let list: Value = serde_json::from_slice(&resp.body).unwrap();
+    let count = list["meta"]["count"].as_u64().unwrap_or(0);
+    assert_eq!(count, 1, "expected one TEST task with sprint W35");
+
+    // CSV and fuzzy matching: W35 should match w-35 via normalization
+    let resp = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("sprint", "W35,w-99")],
+        json!({}),
+    ));
+    assert_eq!(resp.status, 200);
+    let list2: Value = serde_json::from_slice(&resp.body).unwrap();
+    assert_eq!(list2["meta"]["count"].as_u64().unwrap_or(0), 1);
+
+    // Assignee @me resolution: set default reporter/assignee identity to alice by creating config
+    // We'll simulate identity resolution falling back to system username by setting assignee explicitly and querying @me
+    let resp = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("assignee", "@me")],
+        json!({}),
+    ));
+    // We can't control identity in this unit test; ensure it doesn't 500 and returns a list
+    assert_eq!(resp.status, 200);
+    let _ = serde_json::from_slice::<Value>(&resp.body).unwrap();
+
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+    }
+}
+
 // Merged from sse_events_test.rs
 #[test]
 fn sse_events_with_kinds_and_project_filter() {

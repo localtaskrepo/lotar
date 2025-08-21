@@ -1,3 +1,4 @@
+use crate::utils::project::generate_project_prefix;
 use crate::workspace::TasksDirectoryResolver;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,7 +21,7 @@ pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
 
     // Fall back to auto-detection (but generate prefix from detected name)
     if let Some(project_name) = get_project_name() {
-        crate::utils::generate_project_prefix(&project_name)
+        generate_project_prefix(&project_name)
     } else {
         "DEFAULT".to_string()
     }
@@ -44,7 +45,7 @@ pub fn detect_project_name() -> Option<String> {
     }
 
     // 3. Use git repo name when available
-    if let Some(repo_root) = crate::utils_git::find_repo_root(&std::env::current_dir().ok()?) {
+    if let Some(repo_root) = crate::utils::git::find_repo_root(&std::env::current_dir().ok()?) {
         if let Some(repo_name) = repo_root.file_name().and_then(|s| s.to_str()) {
             return Some(repo_name.to_string());
         }
@@ -62,7 +63,7 @@ pub fn detect_project_name() -> Option<String> {
 fn detect_from_project_files() -> Option<String> {
     let mut dir = std::env::current_dir().ok()?;
     // Walk up to repo root (if known) or filesystem root
-    let repo_root = crate::utils_git::find_repo_root(&dir);
+    let repo_root = crate::utils::git::find_repo_root(&dir);
     loop {
         // Prefer package.json name
         if let Some(name) = read_package_json_name(&dir) {

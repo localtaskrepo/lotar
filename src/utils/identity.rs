@@ -50,7 +50,7 @@ fn explain_cache_key(tasks_root: Option<&Path>) -> String {
         .and_then(|r| r.parent().map(|p| p.to_path_buf()))
         .or_else(|| std::env::current_dir().ok());
     let (git_cfg_mtime, head_mtime) = if let Some(start) = start {
-        if let Some(repo_root) = crate::utils_git::find_repo_root(&start) {
+        if let Some(repo_root) = crate::utils::git::find_repo_root(&start) {
             let git_cfg = repo_root.join(".git").join("config");
             let head = repo_root.join(".git").join("HEAD");
             let cfg_m = std::fs::metadata(&git_cfg)

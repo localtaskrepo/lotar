@@ -133,6 +133,104 @@ pub fn initialize(api_server: &mut ApiServer) {
             text_query: req.query.get("q").cloned(),
         };
         let tasks = TaskService::list(&storage, &filter);
+        // API parity: accept additional query keys (built-ins or declared custom fields)
+        // Build filters map from unknown keys and assignee
+        use std::collections::{BTreeMap, BTreeSet};
+        let mut uf: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let known = [
+            "project", "status", "priority", "type", "category", "tags", "q",
+        ];
+        // Assignee (supports @me)
+        if let Some(a) = req.query.get("assignee") {
+            let v = if a == "@me" {
+                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
+                    .unwrap_or_else(|| a.clone())
+            } else {
+                a.clone()
+            };
+            uf.entry("assignee".into()).or_default().insert(v);
+        }
+        // Other keys
+        for (k, v) in req.query.iter() {
+            if known.contains(&k.as_str()) || k == "assignee" {
+                continue;
+            }
+            // CSV allowed
+            for part in v.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+                uf.entry(k.clone()).or_default().insert(part.to_string());
+            }
+        }
+
+        // Apply in-memory filters if any
+        let mut tasks = tasks; // shadow mutable
+        if !uf.is_empty() {
+            let resolve_vals = |id: &str,
+                                t: &crate::api_types::TaskDTO,
+                                key: &str,
+                                cfg: &crate::config::types::ResolvedConfig|
+             -> Option<Vec<String>> {
+                let raw = key.trim();
+                let k = raw.to_lowercase();
+                if let Some(canon) = crate::utils::fields::is_reserved_field(raw) {
+                    match canon {
+                        "assignee" => return Some(vec![t.assignee.clone().unwrap_or_default()]),
+                        "reporter" => return Some(vec![t.reporter.clone().unwrap_or_default()]),
+                        "type" => return Some(vec![t.task_type.to_string()]),
+                        "status" => return Some(vec![t.status.to_string()]),
+                        "priority" => return Some(vec![t.priority.to_string()]),
+                        "project" => {
+                            return Some(vec![id.split('-').next().unwrap_or("").to_string()])
+                        }
+                        "category" => return Some(vec![t.category.clone().unwrap_or_default()]),
+                        "tags" => return Some(t.tags.clone()),
+                        _ => {}
+                    }
+                }
+                if let Some(rest) = k.strip_prefix("field:") {
+                    let name = rest.trim();
+                    let v = t.custom_fields.get(name)?;
+                    return Some(vec![crate::types::custom_value_to_string(v)]);
+                }
+                if cfg.custom_fields.has_wildcard()
+                    || cfg
+                        .custom_fields
+                        .values
+                        .iter()
+                        .any(|v| v.eq_ignore_ascii_case(raw))
+                {
+                    if let Some(vv) = t.custom_fields.get(raw) {
+                        return Some(vec![crate::types::custom_value_to_string(vv)]);
+                    }
+                    let lname = raw.to_lowercase();
+                    if let Some((_, vv)) = t
+                        .custom_fields
+                        .iter()
+                        .find(|(k, _)| k.to_lowercase() == lname)
+                    {
+                        return Some(vec![crate::types::custom_value_to_string(vv)]);
+                    }
+                }
+                None
+            };
+
+            tasks.retain(|(id, t)| {
+                for (fk, allowed) in &uf {
+                    let vals = match resolve_vals(id, t, fk, cfg) {
+                        Some(vs) => vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>(),
+                        None => return false,
+                    };
+                    if vals.is_empty() {
+                        return false;
+                    }
+                    let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
+                    if !crate::utils::fuzzy_match::fuzzy_set_match(&vals, &allowed_vec) {
+                        return false;
+                    }
+                }
+                true
+            });
+        }
+
         ok_json(
             200,
             json!({

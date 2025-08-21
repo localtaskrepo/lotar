@@ -1,4 +1,5 @@
 use crate::config::types::*;
+use crate::utils::project::generate_project_prefix;
 use std::env;
 use std::fs;
 use std::path::Path;
@@ -136,7 +137,7 @@ pub fn apply_env_overrides(config: &mut GlobalConfig) {
 
     if let Ok(project) = env::var("LOTAR_PROJECT") {
         // Convert project name to prefix for storage
-        config.default_prefix = crate::utils::generate_project_prefix(&project);
+        config.default_prefix = generate_project_prefix(&project);
     }
 
     if let Ok(assignee) = env::var("LOTAR_DEFAULT_ASSIGNEE") {

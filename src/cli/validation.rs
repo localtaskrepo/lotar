@@ -80,6 +80,15 @@ impl<'a> CliValidator<'a> {
 
     /// Validate custom field name against project configuration
     pub fn validate_custom_field_name(&self, field_name: &str) -> Result<String, String> {
+        // M4: Collision guard - prevent using reserved built-in field names as custom fields
+        if let Some(canonical) = crate::utils::fields::is_reserved_field(field_name) {
+            return Err(format!(
+                "Field name '{}' collides with built-in field '{}'. Use the built-in option instead (e.g., --{}), or pick a different custom field name.",
+                field_name,
+                canonical,
+                canonical.replace('_', "-")
+            ));
+        }
         if self.config.custom_fields.has_wildcard() {
             // Any custom field is allowed
             Ok(field_name.to_string())
@@ -237,19 +246,11 @@ impl<'a> CliValidator<'a> {
 
     /// Validate effort estimate format
     pub fn validate_effort(&self, effort: &str) -> Result<String, String> {
-        // Support formats like: 2h, 3d, 1w, 0.5d, etc.
-        let effort_lower = effort.to_lowercase();
-
-        if effort_lower.ends_with('h') || effort_lower.ends_with('d') || effort_lower.ends_with('w')
-        {
-            let number_part = &effort_lower[..effort_lower.len() - 1];
-            if number_part.parse::<f64>().is_ok() {
-                Ok(effort.to_string())
-            } else {
-                Err("Invalid effort format. Use number followed by h (hours), d (days), or w (weeks). Example: 2h, 1.5d, 1w".to_string())
-            }
-        } else {
-            Err("Invalid effort format. Use number followed by h (hours), d (days), or w (weeks). Example: 2h, 1.5d, 1w".to_string())
+        // Accept both time and points units as valid effort formats.
+        let t = effort.trim().to_lowercase();
+        match crate::utils::effort::parse_effort(&t) {
+            Ok(_) => Ok(effort.to_string()),
+            Err(_) => Err("Invalid effort format. Use a number followed by a valid unit (h, d, w, m, pt, points, etc.), e.g., 2h, 1.5d, 1w, 5pt, 3points".to_string()),
         }
     }
 }

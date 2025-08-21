@@ -16,7 +16,6 @@ pub mod services;
 pub mod storage;
 pub mod types;
 pub mod utils;
-pub mod utils_git;
 pub mod web_server;
 pub mod workspace;
 

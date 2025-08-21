@@ -593,7 +593,7 @@ impl ScanHandler {
         // Compute repo root once for this pass
         let repo_root = std::env::current_dir()
             .ok()
-            .and_then(|cwd| crate::utils_git::find_repo_root(&cwd));
+            .and_then(|cwd| crate::utils::git::find_repo_root(&cwd));
         // Best-effort git rename map if inside a repo
         let rename_map = if let Some(root) = &repo_root {
             Self::git_rename_map(root)

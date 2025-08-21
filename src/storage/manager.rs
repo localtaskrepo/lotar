@@ -3,6 +3,7 @@ use crate::storage::TaskFilter;
 use crate::storage::backend::{FsBackend, StorageBackend};
 use crate::storage::search::StorageSearch;
 use crate::storage::task::Task;
+use crate::utils::project::generate_unique_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -67,18 +68,14 @@ impl Storage {
     ) -> Option<String> {
         // 1. Use explicit project context if provided
         if let Some(project_name) = project_context {
-            if let Ok(prefix) =
-                crate::utils::generate_unique_project_prefix(project_name, root_path)
-            {
+            if let Ok(prefix) = generate_unique_project_prefix(project_name, root_path) {
                 return Some(prefix);
             }
         }
 
         // 2. Try auto-detection from current directory
         if let Some(auto_detected) = crate::project::detect_project_name() {
-            if let Ok(prefix) =
-                crate::utils::generate_unique_project_prefix(&auto_detected, root_path)
-            {
+            if let Ok(prefix) = generate_unique_project_prefix(&auto_detected, root_path) {
                 return Some(prefix);
             }
         }
