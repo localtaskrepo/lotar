@@ -3,7 +3,7 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
+use crate::common::env_mutex::EnvVarGuard;
 
 use lotar::api_types::TaskCreate;
 use lotar::services::task_service::TaskService;
@@ -29,7 +29,7 @@ issue.priorities: [Low, Medium, High]
 
 #[test]
 fn whoami_uses_config_default_reporter() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes the env var safely
 
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -38,9 +38,7 @@ fn whoami_uses_config_default_reporter() {
     // Configure a deterministic reporter identity
     write_minimal_config(&tasks_dir, "default.reporter: alice@example.com\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp.path())
@@ -49,14 +47,12 @@ fn whoami_uses_config_default_reporter() {
         .success()
         .stdout(predicate::str::contains("alice@example.com"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // restored by _guard drop
 }
 
 #[test]
 fn whoami_explain_text_includes_source_and_confidence() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes the env var safely
 
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -65,9 +61,7 @@ fn whoami_explain_text_includes_source_and_confidence() {
     // Deterministic reporter identity
     write_minimal_config(&tasks_dir, "default.reporter: carol\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let mut cmd = Command::cargo_bin("lotar").unwrap();
     cmd.current_dir(temp.path())
@@ -78,14 +72,12 @@ fn whoami_explain_text_includes_source_and_confidence() {
         .stdout(predicate::str::contains("source:"))
         .stdout(predicate::str::contains("confidence:"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // restored by _guard drop
 }
 
 #[test]
 fn whoami_json_compact_and_explain_fields() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes the env var safely
 
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -93,9 +85,7 @@ fn whoami_json_compact_and_explain_fields() {
 
     write_minimal_config(&tasks_dir, "default.reporter: dave\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Compact JSON (no extra fields)
     let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -115,14 +105,12 @@ fn whoami_json_compact_and_explain_fields() {
         .stdout(predicate::str::contains("\"source\":"))
         .stdout(predicate::str::contains("\"confidence\":"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // restored by _guard drop
 }
 
 #[test]
 fn status_dry_run_explain_previews_and_does_not_write() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes the env var safely
 
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -131,9 +119,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
     // Default reporter used for auto-assign preview
     write_minimal_config(&tasks_dir, "default.reporter: bob\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Create a task via service to get a known ID
     let mut storage = Storage::new(tasks_dir.clone());
@@ -177,14 +163,12 @@ fn status_dry_run_explain_previews_and_does_not_write() {
         .stdout(predicate::str::contains(" status: "))
         .stdout(predicate::str::contains("TODO"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // restored by _guard drop
 }
 
 #[test]
 fn add_dry_run_explain_creates_no_task_files() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes the env var safely
 
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -192,9 +176,7 @@ fn add_dry_run_explain_creates_no_task_files() {
 
     write_minimal_config(&tasks_dir, "");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Snapshot YAML files before
     let before_count = count_task_yaml_files(&tasks_dir);
@@ -221,9 +203,7 @@ fn add_dry_run_explain_creates_no_task_files() {
         "dry-run should not write task files"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // restored by _guard drop
 }
 
 fn count_task_yaml_files(tasks_dir: &std::path::Path) -> usize {

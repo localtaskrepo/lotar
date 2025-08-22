@@ -1,0 +1,15 @@
+profile.default.junit = { path = "target/nextest/junit.xml" }
+
+# Increase per-binary concurrency; nextest schedules across binaries efficiently.
+profile.default.test-threads = "num-cpus"
+
+# Keep output lean and fail fast when a test fails.
+profile.default.success-output = "never"
+profile.default.failure-output = "immediate"
+profile.default.status-level = "fail"
+profile.default.fail-fast = true
+
+# Guardrail for hangs: reasonable per-test slow marker
+profile.default.slow-timeout = "90s"
+
+# Mark slow tests here in the future if desired (no ignored tests per policy).

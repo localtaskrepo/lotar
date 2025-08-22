@@ -316,6 +316,16 @@ cargo build     # Development build
 cargo clippy    # Code quality
 ```
 
+### Testing (faster local runs)
+```bash
+# Standard
+cargo test --all-features
+
+# Faster harness (optional)
+cargo nextest run --all-features
+```
+Nextest uses a more efficient test harness and parallelism; see `.config/nextest.toml`.
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.

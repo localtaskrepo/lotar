@@ -258,16 +258,16 @@ impl CommandHandler for StatsHandler {
                     if let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(content) {
                         return Some(task.status);
                     }
-                    if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content) {
-                        if let Some(s) = val.get("status").and_then(|v| match v {
+                    if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content)
+                        && let Some(s) = val.get("status").and_then(|v| match v {
                             serde_yaml::Value::String(s) => Some(s.clone()),
                             _ => None,
-                        }) {
-                            if let Some(ts) = parse_status_str_tolerant(&s) {
-                                return Some(ts);
-                            }
-                            return s.parse::<crate::types::TaskStatus>().ok();
+                        })
+                    {
+                        if let Some(ts) = parse_status_str_tolerant(&s) {
+                            return Some(ts);
                         }
+                        return s.parse::<crate::types::TaskStatus>().ok();
                     }
                     None
                 }

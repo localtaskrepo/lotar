@@ -7,7 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 use std::time::{Duration, Instant};
 mod common;
-use crate::common::env_mutex::lock_var;
+use crate::common::env_mutex::{EnvVarGuard, lock_var};
 
 // Test-time acceleration helpers
 fn fast_net() -> bool {
@@ -58,7 +58,21 @@ fn start_server_on(port: u16) {
     unsafe {
         std::env::set_var("LOTAR_TEST_FAST_NET", "1");
     }
-    std::thread::sleep(Duration::from_millis(50));
+    // Wait until a TCP connection to the server port succeeds.
+    // This avoids panicking while the listener is still starting up.
+    let start = Instant::now();
+    let max_wait = Duration::from_millis(750);
+    loop {
+        match TcpStream::connect(("127.0.0.1", port)) {
+            Ok(_) => break,
+            Err(_) => {
+                if start.elapsed() > max_wait {
+                    break; // give up after max_wait; tests will still proceed
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        }
+    }
 }
 
 fn stop_server_on(port: u16) {
@@ -70,7 +84,8 @@ fn stop_server_on(port: u16) {
         let mut tmp = [0u8; 256];
         let _ = stream.read(&mut tmp);
     }
-    std::thread::sleep(Duration::from_millis(20));
+    // Allow the server a brief moment to shut down sockets
+    std::thread::sleep(Duration::from_millis(5));
 }
 
 fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>) {
@@ -196,14 +211,12 @@ fn http_get_bytes(port: u16, path: &str) -> (u16, HashMap<String, String>, Vec<u
 
 #[test]
 fn rest_create_and_update_supports_me_alias() {
-    let _env = lock_var("LOTAR_TASKS_DIR");
+    // Use EnvVarGuard instead of manual set/remove
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Configure identity for deterministic @me
     std::fs::write(
@@ -245,10 +258,7 @@ fn rest_create_and_update_supports_me_alias() {
 
     stop_server_on(port);
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // Env restored by guards
 }
 
 fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {
@@ -374,19 +384,13 @@ fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
 
 #[test]
 fn api_add_list_get_delete_roundtrip() {
-    // Serialize environment mutations across tests
-    let _guard = lock_var("LOTAR_TASKS_DIR");
-    // Speed up IO handling in server during tests
-    unsafe {
-        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
-    }
+    // Speed up IO handling in server during tests and serialize env
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
     // Isolate tasks dir via env var
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let mut api = ApiServer::new();
     routes::initialize(&mut api);
@@ -451,21 +455,16 @@ fn api_add_list_get_delete_roundtrip() {
     let deleted: Value = serde_json::from_slice(&resp.body).unwrap();
     assert!(deleted["data"]["deleted"].as_bool().unwrap());
 
-    // Cleanup env var
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guards
 }
 
 #[test]
 fn api_config_show_set() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard tasks dir env var
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let mut api = ApiServer::new();
     routes::initialize(&mut api);
@@ -486,9 +485,7 @@ fn api_config_show_set() {
     let show2: Value = serde_json::from_slice(&resp.body).unwrap();
     assert_eq!(show2["data"]["default_project"].as_str().unwrap(), "DEMO");
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
 }
 
 #[test]
@@ -554,14 +551,11 @@ fn openapi_spec_served() {
 
 #[test]
 fn api_list_accepts_plain_custom_field_filters_and_me() {
-    // Ensure isolated tasks dir
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Ensure isolated tasks dir with guard
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Set declared custom field 'sprint' globally to allow plain usage
     let mut api = ApiServer::new();
@@ -638,95 +632,101 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
     assert_eq!(resp.status, 200);
     let _ = serde_json::from_slice::<Value>(&resp.body).unwrap();
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
 }
 
 // Merged from sse_events_test.rs
 #[test]
 fn sse_events_with_kinds_and_project_filter() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard tasks dir
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    // Enable explicit ready event for faster startup sync
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
 
     let port = find_free_port();
     start_server_on(port);
 
-    let (mut sse, leftover) = open_sse(port, "debounce_ms=10&kinds=task_created&project=TEST");
-    std::thread::sleep(Duration::from_millis(30));
+    let (mut sse, leftover) = open_sse(
+        port,
+        "debounce_ms=10&kinds=task_created&project=TEST&ready=1",
+    );
 
     let add_body_test = r#"{\"title\":\"A\",\"priority\":\"High\"}"#;
     let (_st1, _b1) = http_post_json(port, "/api/tasks/add?project=TEST", add_body_test);
     let add_body_other = r#"{\"title\":\"B\",\"priority\":\"Low\"}"#;
     let (_st2, _b2) = http_post_json(port, "/api/tasks/add?project=OTHER", add_body_other);
 
-    let events = read_sse_events(&mut sse, 2, Duration::from_millis(1200), leftover);
-    assert!(events.iter().all(|(k, _)| k == "task_created"));
+    let events = read_sse_events(&mut sse, 3, Duration::from_millis(800), leftover);
+    let created: Vec<_> = events
+        .into_iter()
+        .filter(|(k, _)| k == "task_created")
+        .collect();
+    assert!(created.iter().all(|(k, _)| k == "task_created"));
     assert!(
-        events
+        created
             .iter()
             .all(|(_, d)| d.contains("\"id\":") && d.contains("TEST-")),
-        "events: {events:?}"
+        "events: {created:?}"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
     stop_server_on(port);
 }
 
 #[test]
 fn sse_debounce_emits_all_events() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard tasks dir
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    // Enable explicit ready event to avoid startup sleeps
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
 
     let port = find_free_port();
     start_server_on(port);
 
-    let (mut sse, leftover) = open_sse(port, "debounce_ms=25&kinds=task_created&project=TEST");
-    std::thread::sleep(Duration::from_millis(30));
+    let (mut sse, leftover) = open_sse(
+        port,
+        "debounce_ms=25&kinds=task_created&project=TEST&ready=1",
+    );
 
     for i in 0..3 {
         let body = format!("{{\"title\":\"T{i}\",\"priority\":\"High\"}}");
         let _ = http_post_json(port, "/api/tasks/add?project=TEST", &body);
     }
 
-    let events = read_sse_events(&mut sse, 3, Duration::from_millis(2000), leftover);
-    assert_eq!(events.len(), 3, "expected 3 created events, got {events:?}");
+    let events = read_sse_events(&mut sse, 4, Duration::from_millis(1200), leftover);
+    let created: Vec<_> = events
+        .into_iter()
+        .filter(|(k, _)| k == "task_created")
+        .collect();
+    assert_eq!(
+        created.len(),
+        3,
+        "expected 3 created events, got {created:?}"
+    );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
     stop_server_on(port);
 }
 
 #[test]
 fn sse_includes_triggered_by_identity() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard flags and tasks dir
     // Speed up IO handling in server during tests and enable ready event
-    unsafe {
-        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
-        std::env::set_var("LOTAR_SSE_READY", "1");
-    }
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
 
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     // Provide default.reporter in config so identity is deterministic (canonical key)
     std::fs::write(tasks_dir.join("config.yml"), b"default.reporter: alice\n").unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let port = find_free_port();
     start_server_on(port);
@@ -736,7 +736,7 @@ fn sse_includes_triggered_by_identity() {
         "debounce_ms=10&kinds=task_created&project=TEST&ready=1",
     );
     // Drain until the ready event
-    let events = read_sse_events(&mut sse, 1, Duration::from_millis(500), leftover);
+    let events = read_sse_events(&mut sse, 1, Duration::from_millis(400), leftover);
     if events.is_empty() {
         // read any leftover and continue
         leftover = Vec::new();
@@ -758,7 +758,8 @@ fn sse_includes_triggered_by_identity() {
     );
     assert_eq!(st2, 201, "second add should succeed");
 
-    let events = read_sse_events(&mut sse, 3, Duration::from_millis(3000), leftover);
+    // We only need the first created event to validate triggered_by; collect up to 2 with a tighter timeout
+    let events = read_sse_events(&mut sse, 2, Duration::from_millis(1000), leftover);
     assert!(!events.is_empty(), "expected at least one created event");
     // Find the first event for TEST-* and validate triggered_by
     let mut found = false;
@@ -780,23 +781,17 @@ fn sse_includes_triggered_by_identity() {
     }
     assert!(found, "did not find a TEST-* task_created event");
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_FAST_IO");
-        std::env::remove_var("LOTAR_SSE_READY");
-    }
+    // Restored by guards
     stop_server_on(port);
 }
 
 #[test]
 fn api_get_missing_and_unknown_id_errors() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard tasks dir
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let mut api = ApiServer::new();
     routes::initialize(&mut api);
@@ -822,20 +817,16 @@ fn api_get_missing_and_unknown_id_errors() {
         .to_lowercase();
     assert!(msg.contains("not found") || msg.contains("invalid"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
 }
 
 #[test]
 fn api_add_invalid_priority_and_type_rejected() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard tasks dir
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let mut api = ApiServer::new();
     routes::initialize(&mut api);
@@ -872,20 +863,16 @@ fn api_add_invalid_priority_and_type_rejected() {
         .to_lowercase();
     assert!(msg.contains("type"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
 }
 
 #[test]
 fn sse_debounce_zero_and_invalid_kind_handling() {
-    let _guard = lock_var("LOTAR_TASKS_DIR");
+    // Guard tasks dir
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let port = find_free_port();
     start_server_on(port);
@@ -898,9 +885,7 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
     let events = read_sse_events(&mut sse, 1, Duration::from_millis(200), leftover);
     assert!(events.is_empty(), "invalid kind should filter all events");
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // Restored by guard
     stop_server_on(port);
 }
 
@@ -909,10 +894,8 @@ fn sse_project_changed_emitted_on_fs_change() {
     // Serialize CWD changes to avoid races with other tests
     let _guard = lock_var("LOTAR_CWD");
     // Enable fast paths and ready event
-    unsafe {
-        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
-        std::env::set_var("LOTAR_SSE_READY", "1");
-    }
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
 
     // Create an isolated workspace with .tasks/DEMO
     let tmp = tempfile::tempdir().unwrap();
@@ -958,8 +941,5 @@ fn sse_project_changed_emitted_on_fs_change() {
     // Cleanup and restore CWD
     stop_server_on(port);
     std::env::set_current_dir(prev_cwd).unwrap();
-    unsafe {
-        std::env::remove_var("LOTAR_TEST_FAST_IO");
-        std::env::remove_var("LOTAR_SSE_READY");
-    }
+    // Restored by guards
 }

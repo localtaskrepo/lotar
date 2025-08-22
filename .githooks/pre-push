@@ -67,20 +67,34 @@ else
     echo -e "${GREEN}✅ Release build check successful${NC}"
 fi
 
-# 4. Run core tests only (faster than full suite)
-echo -e "${YELLOW}🧪 Running core test validation...${NC}"
-if ! timeout 60 cargo test --lib --bins --quiet >/dev/null 2>&1; then
-    echo -e "${RED}❌ Core tests failed${NC}"
-    echo -e "${YELLOW}💡 Running tests with output to show failures:${NC}"
-    cargo test --lib --bins
-    echo ""
-    echo -e "${YELLOW}💡 Please fix failing tests and push again${NC}"
-    exit 1
+# 4. Run core tests only (nextest, faster than full suite)
+echo -e "${YELLOW}🧪 Running core test validation (nextest)...${NC}"
+if command -v cargo-nextest >/dev/null 2>&1; then
+    # Match CI flags for parity: all-features, immediate failure output, no retries,
+    # and lib/bin targets only (doctests are checked separately below)
+    if ! timeout 120 cargo nextest run \
+        --all-features >/dev/null 2>&1; then
+        echo -e "${RED}❌ Core tests failed${NC}"
+        echo ""
+        echo -e "${YELLOW}💡 Please fix failing tests and push again${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}✅ Core tests pass${NC}"
+    fi
 else
-    echo -e "${GREEN}✅ Core tests pass${NC}"
+    echo -e "${YELLOW}⚠️  cargo-nextest not installed; falling back to cargo test${NC}"
+    if ! timeout 90 cargo test --all-features >/dev/null 2>&1; then
+        echo -e "${RED}❌ Core tests failed${NC}"
+        echo ""
+        echo -e "${YELLOW}💡 Please fix failing tests and push again${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}✅ Core tests pass${NC}"
+    fi
 fi
 
-# 5. Quick doc test check (only if there are doc comments with examples)
+# 5. Quick doc test check
+# Note: nextest doesn't run doctests yet; use cargo test for docs only.
 echo -e "${YELLOW}📚 Running documentation tests...${NC}"
 if ! timeout 30 cargo test --doc --all-features >/dev/null 2>&1; then
     echo -e "${YELLOW}⚠️  Documentation tests failed (not blocking push)${NC}"

@@ -3,7 +3,7 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
+use common::env_mutex::EnvVarGuard;
 use lotar::utils::paths;
 
 fn write_minimal_config(tasks_dir: &std::path::Path, extra: &str) {
@@ -25,8 +25,6 @@ issue.priorities: [Low, Medium, High]
 
 #[test]
 fn add_with_assignee_me_resolves_identity() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
-
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
@@ -34,10 +32,8 @@ fn add_with_assignee_me_resolves_identity() {
     // Configure a deterministic reporter identity
     write_minimal_config(&tasks_dir, "default.reporter: alice@example.com\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Create a task with @me
     let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -75,8 +71,5 @@ fn add_with_assignee_me_resolves_identity() {
             .any(|t| t.get("title").and_then(|v| v.as_str()) == Some("ME Alias Task"))
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // restored by guards
 }

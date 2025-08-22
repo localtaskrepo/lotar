@@ -3,19 +3,16 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
+use common::env_mutex::EnvVarGuard;
 
 #[test]
 fn config_set_global_categories_and_tags_and_defaults() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes and restores env safely
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Set categories, tags, default_category, default_tags in global
     Command::cargo_bin("lotar")
@@ -72,15 +69,12 @@ fn config_set_global_categories_and_tags_and_defaults() {
                 ),
         );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // restored by guards
 }
 
 #[test]
 fn config_set_project_categories_and_tags_and_defaults() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard serializes and restores env safely
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
@@ -97,10 +91,8 @@ fn config_set_project_categories_and_tags_and_defaults() {
     std::fs::create_dir_all(&proj_dir).unwrap();
     std::fs::write(proj_dir.join("config.yml"), "project.id: Test\n").unwrap();
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Use global default_project to enable project set without explicit --project
     Command::cargo_bin("lotar")
@@ -159,8 +151,5 @@ fn config_set_project_categories_and_tags_and_defaults() {
     assert!(contents.contains("category: Bugfix"));
     assert!(contents.contains("tags:"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // restored by guards
 }

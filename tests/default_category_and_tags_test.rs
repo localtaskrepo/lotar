@@ -3,7 +3,7 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
+use common::env_mutex::EnvVarGuard;
 
 fn write_global_with_defaults(tasks_dir: &std::path::Path) {
     let yaml = r#"
@@ -22,16 +22,14 @@ default.tags: [team, backend]
 
 #[test]
 fn add_uses_global_default_category_and_tags_when_missing() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard will serialize and restore env vars per-var
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
 
     write_global_with_defaults(&tasks_dir);
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+    let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Dry-run JSON to avoid creating files; verify category/tags injected
     let assert = Command::cargo_bin("lotar")
@@ -55,24 +53,19 @@ fn add_uses_global_default_category_and_tags_when_missing() {
         "JSON: {output}"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // guards drop here
 }
 
 #[test]
 fn add_user_values_override_defaults_for_category_and_tags() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard per-var lock
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
 
     write_global_with_defaults(&tasks_dir);
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+    let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Provide explicit category and a single allowed tag; defaults must not be applied
     let assert = Command::cargo_bin("lotar")
@@ -96,10 +89,7 @@ fn add_user_values_override_defaults_for_category_and_tags() {
     // Only the provided tag should appear (no merging with defaults when any tag is supplied)
     assert!(output.contains("\"tags\":[\"team\"]"), "JSON: {output}");
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // guards drop here
 }
 
 #[test]
@@ -131,7 +121,7 @@ fn normalize_canonical_includes_default_category_and_tags_global() {
 
 #[test]
 fn normalize_global_flag_includes_default_category_and_tags() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard per-var lock
     let temp = tempfile::TempDir::new().unwrap();
     let tasks = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks).unwrap();
@@ -144,10 +134,8 @@ fn normalize_global_flag_includes_default_category_and_tags() {
     .unwrap();
 
     // Pin to this tasks dir to avoid resolver choosing a different root in read-only mode
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks.to_string_lossy().as_ref());
+    let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Run normalize explicitly with --global and verify defaults appear
     Command::cargo_bin("lotar")
@@ -162,16 +150,12 @@ fn normalize_global_flag_includes_default_category_and_tags() {
                 .and(predicate::str::contains("tags:")),
         );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // guards drop here
 }
 
 #[test]
 fn normalize_project_canonical_includes_default_category_and_tags() {
-    // Serialize LOTAR_TASKS_DIR mutations across tests
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard per-var lock
     let temp = TempDir::new().unwrap();
     let tasks = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks).unwrap();
@@ -193,10 +177,8 @@ fn normalize_project_canonical_includes_default_category_and_tags() {
     .unwrap();
 
     // Normalize project with --write and ensure defaults remain in canonical output
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks.to_string_lossy().as_ref());
+    let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     Command::cargo_bin("lotar")
         .unwrap()
@@ -210,8 +192,5 @@ fn normalize_project_canonical_includes_default_category_and_tags() {
     assert!(contents.contains("category: Bugfix"));
     assert!(contents.contains("tags:"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // guards drop here
 }

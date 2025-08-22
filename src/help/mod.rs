@@ -96,12 +96,11 @@ impl HelpSystem {
         for entry in dir.entries() {
             match entry {
                 DirEntry::File(file) => {
-                    if let Some(name) = file.path().file_name() {
-                        if let Some(name_str) = name.to_str() {
-                            if name_str.ends_with(".md") {
-                                files.push(name_str.to_string());
-                            }
-                        }
+                    if let Some(name) = file.path().file_name()
+                        && let Some(name_str) = name.to_str()
+                        && name_str.ends_with(".md")
+                    {
+                        files.push(name_str.to_string());
                     }
                 }
                 DirEntry::Dir(subdir) => {
@@ -113,17 +112,17 @@ impl HelpSystem {
 
     #[allow(dead_code)]
     fn extract_description(&self, filename: &str) -> Option<String> {
-        if let Some(file) = self.find_help_file(filename) {
-            if let Some(content) = file.contents_utf8() {
-                // Extract first line after # header as description
-                for line in content.lines() {
-                    let line = line.trim();
-                    if line.starts_with('#') {
-                        continue;
-                    }
-                    if !line.is_empty() {
-                        return Some(line.to_string());
-                    }
+        if let Some(file) = self.find_help_file(filename)
+            && let Some(content) = file.contents_utf8()
+        {
+            // Extract first line after # header as description
+            for line in content.lines() {
+                let line = line.trim();
+                if line.starts_with('#') {
+                    continue;
+                }
+                if !line.is_empty() {
+                    return Some(line.to_string());
                 }
             }
         }

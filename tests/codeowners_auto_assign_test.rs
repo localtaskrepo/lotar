@@ -2,7 +2,7 @@ use assert_cmd::Command;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
+use common::env_mutex::EnvVarGuard;
 
 use lotar::api_types::TaskCreate;
 use lotar::services::task_service::TaskService;
@@ -33,7 +33,7 @@ fn init_fake_repo_with_codeowners(repo_root: &std::path::Path, codeowners: &str)
 
 #[test]
 fn codeowners_assigns_owner_on_first_status_change() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // EnvVarGuard will restore LOTAR_TASKS_DIR automatically
 
     let temp = TempDir::new().unwrap();
     let repo_root = temp.path();
@@ -44,9 +44,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
     // Enable codeowners-based assignment
     write_minimal_config(&tasks_dir, "auto.codeowners_assign: true\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     // Create a task with a custom field 'path' that matches CODEOWNERS
     let mut storage = Storage::new(tasks_dir.clone());
@@ -100,14 +98,12 @@ fn codeowners_assigns_owner_on_first_status_change() {
     // Path-based matching removed; default owner should be applied
     assert_eq!(fetched.assignee.as_deref(), Some("global"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 #[test]
 fn codeowners_disabled_falls_back_to_identity() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // serialize via EnvVarGuard not needed; per-var mutex inside
 
     let temp = TempDir::new().unwrap();
     let repo_root = temp.path();
@@ -121,9 +117,7 @@ fn codeowners_disabled_falls_back_to_identity() {
         "auto.codeowners_assign: false\ndefault.reporter: bob\n",
     );
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let mut storage = Storage::new(tasks_dir.clone());
     let created = TaskService::create(
@@ -174,14 +168,12 @@ fn codeowners_disabled_falls_back_to_identity() {
     // Should fall back to identity (default.reporter 'bob')
     assert_eq!(fetched.assignee.as_deref(), Some("bob"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 #[test]
 fn codeowners_default_multiple_owners_picks_first() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // use EnvVarGuard for LOTAR_TASKS_DIR
 
     let temp = TempDir::new().unwrap();
     let repo_root = temp.path();
@@ -192,9 +184,7 @@ fn codeowners_default_multiple_owners_picks_first() {
 
     write_minimal_config(&tasks_dir, "auto.codeowners_assign: true\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let mut storage = Storage::new(tasks_dir.clone());
     let created = TaskService::create(
@@ -245,14 +235,12 @@ fn codeowners_default_multiple_owners_picks_first() {
     // Should pick the first owner from the default owner rule
     assert_eq!(fetched.assignee.as_deref(), Some("alice"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 #[test]
 fn codeowners_no_match_and_no_default_falls_back_to_identity() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // use EnvVarGuard for LOTAR_TASKS_DIR
 
     let temp = TempDir::new().unwrap();
     let repo_root = temp.path();
@@ -267,9 +255,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
         "auto.codeowners_assign: true\ndefault.reporter: bob\n",
     );
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let mut storage = Storage::new(tasks_dir.clone());
     let created = TaskService::create(
@@ -320,7 +306,5 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
     // With no matching rule and no default owner, should fall back to identity (bob)
     assert_eq!(fetched.assignee.as_deref(), Some("bob"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }

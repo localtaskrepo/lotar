@@ -2,7 +2,7 @@ use assert_cmd::Command;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
+use common::env_mutex::EnvVarGuard;
 
 fn write_global(tasks_dir: &std::path::Path, extra: &str) {
     let base = r#"default.project: TEST
@@ -23,7 +23,6 @@ issue.tags: [api, web]
 
 #[test]
 fn disables_path_tag_when_flag_off() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
     let temp = TempDir::new().unwrap();
     let repo_root = temp.path();
     let tasks_dir = repo_root.join(".tasks");
@@ -35,10 +34,8 @@ fn disables_path_tag_when_flag_off() {
 
     write_global(&tasks_dir, "auto.tags_from_path: false\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Dry-run JSON to inspect derived tags
     let assert = Command::cargo_bin("lotar")
@@ -61,15 +58,11 @@ fn disables_path_tag_when_flag_off() {
         "Expected no derived tags field, got: {output}"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // restored by guards
 }
 
 #[test]
 fn enables_path_tag_when_flag_on() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
     let temp = TempDir::new().unwrap();
     let repo_root = temp.path();
     let tasks_dir = repo_root.join(".tasks");
@@ -79,10 +72,8 @@ fn enables_path_tag_when_flag_on() {
 
     write_global(&tasks_dir, "auto.tags_from_path: true\n");
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-        std::env::set_var("LOTAR_TEST_SILENT", "1");
-    }
+    let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
+    let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     let assert = Command::cargo_bin("lotar")
         .unwrap()
@@ -104,8 +95,5 @@ fn enables_path_tag_when_flag_on() {
         "Expected derived tag 'api', got: {output}"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-    }
+    // restored by guards
 }

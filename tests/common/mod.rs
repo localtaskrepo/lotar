@@ -153,6 +153,14 @@ pub fn cargo_bin_silent() -> Command {
     cmd
 }
 
+/// Spawn the CLI with LOTAR_TEST_SILENT and cwd set to the fixture dir.
+#[allow(dead_code)]
+pub fn cargo_bin_in(fixtures: &TestFixtures) -> Command {
+    let mut cmd = cargo_bin_silent();
+    cmd.current_dir(fixtures.get_temp_path());
+    cmd
+}
+
 /// Assertion helpers for testing
 pub mod assertions {
     use std::path::Path;

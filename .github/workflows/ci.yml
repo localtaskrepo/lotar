@@ -82,6 +82,7 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
+        toolchain: 1.88.0
         components: rustfmt, clippy
         
     - name: Download frontend build
@@ -97,6 +98,11 @@ jobs:
         # More aggressive caching for CI
         shared-key: "ci-cache"
         save-if: ${{ github.ref == 'refs/heads/main' }}
+
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@v2
+      with:
+        tool: nextest
         
     - name: Check code formatting
       run: cargo fmt --all --check
@@ -107,8 +113,22 @@ jobs:
     - name: Build project (debug)
       run: cargo build --all-features
       
-    - name: Run core tests (fast)
-      run: cargo test --lib --bins --quiet --jobs $(nproc)
+    - name: Run tests (nextest, fast)
+      run: |
+        cargo nextest run \
+          --all-features \
+          --failure-output=immediate-final \
+          --retries 0 \
+          --lib --bins
+
+    - name: Upload nextest report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: nextest-report
+        path: target/nextest/junit.xml
+        if-no-files-found: ignore
+        retention-days: 7
         
     - name: Build release (check only for speed)
       run: cargo check --release --all-features

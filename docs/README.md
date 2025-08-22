@@ -134,3 +134,17 @@ cargo fmt             # Formatting
 ```
 
 Ready for production use with no known critical issues.
+
+### Faster local tests with nextest (optional)
+
+Install nextest once, then use it directly:
+
+```bash
+cargo install cargo-nextest --locked
+cargo nextest run --all-features
+```
+
+Nextest configuration is in `.config/nextest.toml` and sets:
+- run-threads = num-cpus
+- failure-output = immediate, status-level = fail, fail-fast = true
+- a 90s per-test timeout as a guardrail

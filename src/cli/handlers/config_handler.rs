@@ -208,119 +208,131 @@ impl ConfigHandler {
             // compare against home then global, else default
             match key {
                 "server_port" => {
-                    if let Some(home) = home_cfg {
-                        if home.server_port == resolved.server_port {
-                            return "home";
-                        }
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.server_port == resolved.server_port)
+                    {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.server_port == resolved.server_port {
-                            return "global";
-                        }
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.server_port == resolved.server_port)
+                    {
+                        return "global";
                     }
                     "default"
                 }
                 "default_project" => {
-                    if let Some(home) = home_cfg {
-                        if home.default_prefix == resolved.default_prefix {
-                            return "home";
-                        }
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.default_prefix == resolved.default_prefix)
+                    {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.default_prefix == resolved.default_prefix {
-                            return "global";
-                        }
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.default_prefix == resolved.default_prefix)
+                    {
+                        return "global";
                     }
                     "default"
                 }
                 "default_assignee" => {
-                    if let Some(home) = home_cfg {
-                        if home.default_assignee == resolved.default_assignee {
-                            return "home";
-                        }
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.default_assignee == resolved.default_assignee)
+                    {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.default_assignee == resolved.default_assignee {
-                            return "global";
-                        }
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.default_assignee == resolved.default_assignee)
+                    {
+                        return "global";
                     }
                     "default"
                 }
                 "default_reporter" => {
-                    if let Some(home) = home_cfg {
-                        if home.default_reporter == resolved.default_reporter {
-                            return "home";
-                        }
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.default_reporter == resolved.default_reporter)
+                    {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.default_reporter == resolved.default_reporter {
-                            return "global";
-                        }
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.default_reporter == resolved.default_reporter)
+                    {
+                        return "global";
                     }
                     "default"
                 }
                 "default_priority" => {
-                    if let Some(home) = home_cfg {
-                        if Some(home.default_priority) == Some(resolved.default_priority) {
-                            return "home";
-                        }
+                    if home_cfg.as_ref().is_some_and(|home| {
+                        Some(home.default_priority) == Some(resolved.default_priority)
+                    }) {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if Some(glob.default_priority) == Some(resolved.default_priority) {
-                            return "global";
-                        }
+                    if global_cfg.as_ref().is_some_and(|glob| {
+                        Some(glob.default_priority) == Some(resolved.default_priority)
+                    }) {
+                        return "global";
                     }
                     "default"
                 }
                 "default_status" => {
-                    if let Some(home) = home_cfg {
-                        if home.default_status == resolved.default_status {
-                            return "home";
-                        }
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.default_status == resolved.default_status)
+                    {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.default_status == resolved.default_status {
-                            return "global";
-                        }
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.default_status == resolved.default_status)
+                    {
+                        return "global";
                     }
                     "default"
                 }
                 "issue_states" => {
-                    if let Some(home) = home_cfg {
-                        if home.issue_states.values == resolved.issue_states.values {
-                            return "home";
-                        }
+                    if home_cfg.as_ref().is_some_and(|home| {
+                        home.issue_states.values == resolved.issue_states.values
+                    }) {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.issue_states.values == resolved.issue_states.values {
-                            return "global";
-                        }
+                    if global_cfg.as_ref().is_some_and(|glob| {
+                        glob.issue_states.values == resolved.issue_states.values
+                    }) {
+                        return "global";
                     }
                     "default"
                 }
                 "issue_types" => {
-                    if let Some(home) = home_cfg {
-                        if home.issue_types.values == resolved.issue_types.values {
-                            return "home";
-                        }
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.issue_types.values == resolved.issue_types.values)
+                    {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.issue_types.values == resolved.issue_types.values {
-                            return "global";
-                        }
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.issue_types.values == resolved.issue_types.values)
+                    {
+                        return "global";
                     }
                     "default"
                 }
                 "issue_priorities" => {
-                    if let Some(home) = home_cfg {
-                        if home.issue_priorities.values == resolved.issue_priorities.values {
-                            return "home";
-                        }
+                    if home_cfg.as_ref().is_some_and(|home| {
+                        home.issue_priorities.values == resolved.issue_priorities.values
+                    }) {
+                        return "home";
                     }
-                    if let Some(glob) = global_cfg {
-                        if glob.issue_priorities.values == resolved.issue_priorities.values {
-                            return "global";
-                        }
+                    if global_cfg.as_ref().is_some_and(|glob| {
+                        glob.issue_priorities.values == resolved.issue_priorities.values
+                    }) {
+                        return "global";
                     }
                     "default"
                 }
@@ -1016,10 +1028,11 @@ impl ConfigHandler {
         if let Some(source_map) = source_config.as_mapping() {
             // Copy relevant fields (excluding project_name which should be unique)
             for (key, value) in source_map {
-                if let Some(key_str) = key.as_str() {
-                    if key_str != "project_name" && key_str != "prefix" {
-                        target_config.insert(key.clone(), value.clone());
-                    }
+                if let Some(key_str) = key.as_str()
+                    && key_str != "project_name"
+                    && key_str != "prefix"
+                {
+                    target_config.insert(key.clone(), value.clone());
                 }
             }
         }

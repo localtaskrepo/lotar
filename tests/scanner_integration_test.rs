@@ -10,7 +10,7 @@ use predicates::prelude::*;
 use std::fs;
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, cargo_bin_in};
 
 // =============================================================================
 // Basic Scanner Functionality
@@ -39,8 +39,7 @@ mod basic_scanning {
         .unwrap();
 
         // Test basic scan command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let _cmd = cargo_bin_in(&test_fixtures)
             .arg("scan")
             .assert()
             .success()
@@ -68,8 +67,7 @@ mod basic_scanning {
         fs::write(temp_dir.join("data.json"), r#"{"key": "value"}"#).unwrap();
 
         // Test basic scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let _cmd = cargo_bin_in(&test_fixtures)
             .arg("scan")
             .assert()
             .success()
@@ -97,8 +95,7 @@ mod basic_scanning {
         .unwrap();
 
         // Test recursive scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let _cmd = cargo_bin_in(&test_fixtures)
             .arg("scan")
             .assert()
             .success()
@@ -119,8 +116,7 @@ mod basic_scanning {
         fs::write(temp_dir.join("clean.py"), "print('Hello World')").unwrap();
 
         // Test scan with no TODOs
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let _cmd = cargo_bin_in(&test_fixtures)
             .arg("scan")
             .assert()
             .success()
@@ -140,8 +136,7 @@ mod basic_scanning {
         .unwrap();
 
         // Test scan with detailed output
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let _cmd = cargo_bin_in(&test_fixtures)
             .arg("scan")
             .arg("--detailed")
             .assert()
@@ -343,5 +338,202 @@ mod system_integration {
             .assert()
             .success()
             .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+    }
+}
+
+// =============================================================================
+// Consolidated additions
+// =============================================================================
+
+mod bidir_references {
+    use crate::common::TestFixtures;
+    use assert_cmd::Command;
+    use predicates::prelude::*;
+    use std::fs;
+
+    #[test]
+    fn scan_creates_task_with_source_reference() {
+        let tf = TestFixtures::new();
+        let root = tf.temp_dir.path();
+
+        // Create a simple source file with a TODO missing a key
+        let src = r#"// TODO: connect bi-dir link test"#;
+        let file_path = root.join("main.rs");
+        fs::write(&file_path, src).unwrap();
+        let canon_path = fs::canonicalize(&file_path).unwrap();
+        let canon_str = canon_path.display().to_string();
+
+        // Run scan (apply-by-default)
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        cmd.current_dir(root)
+            .arg("scan")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("Found 1 TODO comment(s):"));
+
+        // Determine project folder (default)
+        let tasks_dir = root.join(".tasks");
+        let mut projects = std::fs::read_dir(&tasks_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        projects.sort();
+        assert!(
+            !projects.is_empty(),
+            "expected a project folder under .tasks"
+        );
+        let project = &projects[0];
+
+        // Find the created task file (1.yml)
+        let task_file = tasks_dir.join(project).join("1.yml");
+        assert!(
+            task_file.exists(),
+            "expected {} to exist",
+            task_file.display()
+        );
+        let yaml = fs::read_to_string(&task_file).unwrap();
+
+        // Verify references contains a code entry with file path and #L1 anchor
+        assert!(
+            yaml.contains("references:"),
+            "expected references in YAML: {yaml}"
+        );
+        let anchor1 = format!("code: {canon_str}#L1");
+        assert!(
+            yaml.contains(&anchor1) || yaml.contains("code: main.rs#L1"),
+            "expected code reference with #L1 in YAML: {yaml}"
+        );
+    }
+}
+
+mod ignore_and_filters {
+    use std::fs;
+    use std::io::Write;
+    use std::path::PathBuf;
+
+    use tempfile::tempdir;
+
+    use lotar::scanner::Scanner;
+
+    fn write(path: &std::path::Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let mut f = fs::File::create(path).unwrap();
+        f.write_all(content.as_bytes()).unwrap();
+    }
+
+    fn filenames(results: &[lotar::scanner::Reference]) -> Vec<String> {
+        let mut v: Vec<String> = results
+            .iter()
+            .map(|r| {
+                r.file_path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string()
+            })
+            .collect();
+        v.sort();
+        v
+    }
+
+    #[test]
+    fn include_filter_limits_extensions() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+
+        write(&root.join("a.rs"), "// TODO: in rust");
+        write(&root.join("b.py"), "# TODO: in python");
+
+        let mut scanner = Scanner::new(PathBuf::from(root)).with_include_ext(&["rs".into()]);
+        let results = scanner.scan();
+
+        assert_eq!(results.len(), 1, "only .rs should be scanned");
+        assert_eq!(filenames(&results), vec!["a.rs".to_string()]);
+    }
+
+    #[test]
+    fn exclude_overrides_include() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+
+        write(&root.join("a.rs"), "// TODO: rust");
+        write(&root.join("b.py"), "# TODO: py");
+
+        let mut scanner = Scanner::new(PathBuf::from(root))
+            .with_include_ext(&["rs".into(), "py".into()])
+            .with_exclude_ext(&["py".into()]);
+        let results = scanner.scan();
+
+        assert_eq!(results.len(), 1, "py should be excluded");
+        assert_eq!(filenames(&results), vec!["a.rs".to_string()]);
+    }
+
+    #[test]
+    fn gitignore_is_respected_when_no_lotarignore() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+
+        write(&root.join(".gitignore"), "nested/\n*.log\n");
+        write(
+            &root.join("nested/ignored.js"),
+            "// TODO: hidden by gitignore",
+        );
+        write(&root.join("visible.rs"), "// TODO: visible");
+
+        let mut scanner = Scanner::new(PathBuf::from(root));
+        let results = scanner.scan();
+
+        let names = filenames(&results);
+        assert!(names.contains(&"visible.rs".to_string()));
+        assert!(
+            !names.contains(&"ignored.js".to_string()),
+            ".gitignore should hide nested/"
+        );
+    }
+
+    #[test]
+    fn lotarignore_overrides_gitignore() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+
+        write(&root.join(".gitignore"), "nested/\n");
+        write(&root.join(".lotarignore"), "# custom rules (none)\n");
+        write(
+            &root.join("nested/scan.js"),
+            "// TODO: should be scanned when .lotarignore present",
+        );
+
+        let mut scanner = Scanner::new(PathBuf::from(root));
+        let results = scanner.scan();
+
+        let names = filenames(&results);
+        assert!(
+            names.contains(&"scan.js".to_string()),
+            ".lotarignore present => fallback to gitignore disabled"
+        );
+    }
+
+    #[test]
+    fn lotarignore_can_exclude() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+
+        write(&root.join(".lotarignore"), "nested/\n");
+        write(
+            &root.join("nested/skip.ts"),
+            "// TODO: should be excluded by .lotarignore",
+        );
+        write(&root.join("keep.rs"), "// TODO: keep");
+
+        let mut scanner = Scanner::new(PathBuf::from(root));
+        let results = scanner.scan();
+
+        let names = filenames(&results);
+        assert!(names.contains(&"keep.rs".to_string()));
+        assert!(!names.contains(&"skip.ts".to_string()));
     }
 }

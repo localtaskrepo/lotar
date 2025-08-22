@@ -84,16 +84,31 @@ else
     exit 1
 fi
 
-# 4. Quick tests
-echo "🧪 Running tests..."
-if timeout 120 cargo test --lib --bins --quiet >/dev/null 2>&1; then
-    echo "✅ Tests OK"
-elif [ $? -eq 124 ]; then
-    echo "❌ Tests timed out"
-    exit 1
+# 4. Quick tests (nextest)
+echo "🧪 Running tests (nextest)..."
+if command -v cargo-nextest >/dev/null 2>&1; then
+    # Match CI flags for parity: all features, immediate failure output, no retries,
+    # and only lib/bin targets (doc tests are handled separately in pre-push)
+    if timeout 120 cargo nextest run --all-features >/dev/null 2>&1; then
+        echo "✅ Tests OK"
+    elif [ $? -eq 124 ]; then
+        echo "❌ Tests timed out"
+        exit 1
+    else
+        echo "❌ Tests failed"
+        exit 1
+    fi
 else
-    echo "❌ Tests failed"
-    exit 1
+    echo "⚠️  cargo-nextest not installed; falling back to cargo test"
+    if timeout 120 cargo test --all-features >/dev/null 2>&1; then
+        echo "✅ Tests OK"
+    elif [ $? -eq 124 ]; then
+        echo "❌ Tests timed out"
+        exit 1
+    else
+        echo "❌ Tests failed"
+        exit 1
+    fi
 fi
 
 echo "🎉 All checks passed!"

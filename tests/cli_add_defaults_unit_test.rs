@@ -1,10 +1,12 @@
 use lotar::cli::handlers::test_support as add_test_support;
+mod common;
+use common::env_mutex::EnvVarGuard;
 use lotar::config::types::{ConfigurableField, ResolvedConfig, StringConfigField};
 use lotar::types::{Priority, TaskStatus, TaskType};
 
-fn quiet() {
+fn quiet() -> EnvVarGuard {
     // Ensure warnings are silenced during these unit tests
-    unsafe { std::env::set_var("LOTAR_TEST_SILENT", "1") };
+    EnvVarGuard::set("LOTAR_TEST_SILENT", "1")
 }
 
 fn make_cfg(
@@ -64,7 +66,7 @@ fn make_cfg(
 
 #[test]
 fn smart_default_basic_string_cases() {
-    quiet();
+    let _silent = quiet();
     let project_values = vec!["Alpha".to_string(), "Beta".to_string(), "Gamma".to_string()];
     let global_default = "Beta".to_string();
 
@@ -115,7 +117,7 @@ fn smart_default_basic_string_cases() {
 
 #[test]
 fn default_priority_scenarios() {
-    quiet();
+    let _silent = quiet();
     // 1: global default present
     let cfg = make_cfg(
         vec![Priority::Low, Priority::Medium, Priority::High],
@@ -146,7 +148,7 @@ fn default_priority_scenarios() {
 
 #[test]
 fn default_status_scenarios() {
-    quiet();
+    let _silent = quiet();
     // 1: explicit present
     let cfg = make_cfg(
         vec![Priority::Medium],
@@ -192,7 +194,7 @@ fn default_status_scenarios() {
 
 #[test]
 fn edge_case_single_values() {
-    quiet();
+    let _silent = quiet();
     let cfg = make_cfg(
         vec![Priority::Critical],
         Priority::Medium,

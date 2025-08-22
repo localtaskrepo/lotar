@@ -24,6 +24,8 @@ fn init_repo(temp: &TempDir) {
     run_git(root, &["init"], &[]);
     run_git(root, &["config", "user.name", "Test User"], &[]);
     run_git(root, &["config", "user.email", "test@example.com"], &[]);
+    // Ensure no signing prompts or external agents interfere with tests
+    run_git(root, &["config", "commit.gpgsign", "false"], &[]);
 }
 
 fn write_file(root: &std::path::Path, rel: &str, content: &str) {

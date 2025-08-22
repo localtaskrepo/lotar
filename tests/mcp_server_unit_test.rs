@@ -1,5 +1,5 @@
 mod common;
-use crate::common::env_mutex::lock_var;
+use crate::common::env_mutex::EnvVarGuard;
 
 #[test]
 fn mcp_tools_list_includes_underscore_names() {
@@ -53,13 +53,10 @@ fn mcp_logging_set_level_acknowledged() {
 
 #[test]
 fn mcp_tools_call_accepts_underscore_name_for_task_create() {
-    let _env = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -92,21 +89,16 @@ fn mcp_tools_call_accepts_underscore_name_for_task_create() {
         "expected id to start with MCP-, got {id}"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 // Merged from mcp_smoke_test.rs: basic storage smoke via MCP-shaped flow
 #[test]
 fn mcp_task_create_and_get() {
-    let _env_guard = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let create =
         serde_json::json!({"title":"From MCP","project":"MCP","priority":"High","tags":[]});
@@ -120,9 +112,7 @@ fn mcp_task_create_and_get() {
     let got = lotar::services::task_service::TaskService::get(&storage, &task.id, None).unwrap();
     assert_eq!(got.id, task.id);
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 #[test]
@@ -142,13 +132,10 @@ fn mcp_tools_call_with_invalid_tool_name_returns_method_not_found() {
 
 #[test]
 fn mcp_task_create_missing_title_returns_invalid_params() {
-    let _env = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -168,15 +155,12 @@ fn mcp_task_create_missing_title_returns_invalid_params() {
         .to_lowercase();
     assert!(msg.contains("missing") && msg.contains("title"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 // Merged from mcp_me_alias_test.rs
 #[test]
 fn mcp_task_create_resolves_me_alias() {
-    let _env = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
@@ -188,9 +172,7 @@ fn mcp_task_create_resolves_me_alias() {
     )
     .unwrap();
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -224,15 +206,12 @@ fn mcp_task_create_resolves_me_alias() {
         Some("carol")
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }
 
 // Merged from mcp_update_me_alias_test.rs
 #[test]
 fn mcp_task_update_resolves_me_in_patch() {
-    let _env = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
@@ -244,9 +223,7 @@ fn mcp_task_update_resolves_me_in_patch() {
     )
     .unwrap();
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     // Create a task (using service for convenience)
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
@@ -311,7 +288,5 @@ fn mcp_task_update_resolves_me_in_patch() {
         Some("dave")
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    // guard drops here
 }

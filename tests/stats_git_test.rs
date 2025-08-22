@@ -386,6 +386,7 @@ fn stats_effort_with_transitions_window_filters_tasks() {
     let hours = items[0]["hours"].as_f64().unwrap_or(0.0);
     assert!((3.99..=4.01).contains(&hours), "unexpected hours: {hours}");
 }
+
 #[test]
 fn stats_changed_and_churn_and_authors() {
     let temp = TempDir::new().unwrap();

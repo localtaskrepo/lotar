@@ -3,8 +3,7 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 mod common;
-use common::env_mutex::lock_var;
-
+use crate::common::env_mutex::EnvVarGuard;
 use lotar::utils::paths;
 
 fn write_minimal_config_without_reporter(tasks_dir: &std::path::Path) {
@@ -18,7 +17,7 @@ issue.priorities: [Low, Medium, High]
 
 #[test]
 fn whoami_uses_project_manifest_author_when_no_default_reporter() {
-    let _env_tasks = lock_var("LOTAR_TASKS_DIR");
+    // Use EnvVarGuard; no separate lock_var to avoid double-locking
 
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -30,28 +29,23 @@ fn whoami_uses_project_manifest_author_when_no_default_reporter() {
     // Create a package.json with author
     let pkg = temp.path().join("package.json");
     let pkg_contents = r#"{
-  "name": "demo",
-  "version": "0.0.1",
-  "author": {
-    "name": "manifest-user",
-    "email": "m@example.com"
-  }
+    "name": "demo",
+    "version": "0.0.1",
+    "author": {
+        "name": "manifest-user",
+        "email": "m@example.com"
+    }
 }
 "#;
     std::fs::write(&pkg, pkg_contents).unwrap();
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().to_string());
-    }
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
-    cmd.current_dir(temp.path())
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(temp.path())
         .args(["whoami"]) // text mode
         .assert()
         .success()
         .stdout(predicate::str::contains("manifest-user"));
-
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
 }

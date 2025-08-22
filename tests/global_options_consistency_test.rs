@@ -3,7 +3,7 @@ use std::fs;
 
 mod common;
 use crate::common::TestFixtures;
-use crate::common::env_mutex::lock_var;
+use crate::common::env_mutex::{EnvVarGuard, lock_var};
 
 // Global mutex to ensure environment variable tests don't run in parallel
 // Use shared ENV_MUTEX from tests/common/env_mutex.rs for any env mutations
@@ -82,8 +82,7 @@ mod tasks_dir_consistency {
 
     #[test]
     fn test_tasks_dir_overrides_default_detection() {
-        // Use mutex to ensure this test doesn't run in parallel (changes working directory)
-        // Lock current directory changes and LOTAR_TASKS_DIR separately
+        // Serialize working directory changes for this test scope
         let _cwd_guard = lock_var("CWD");
 
         let fixtures = TestFixtures::new();
@@ -137,7 +136,7 @@ mod tasks_dir_consistency {
 
     #[test]
     fn test_tasks_dir_with_relative_paths() {
-        // Use mutex to ensure this test doesn't run in parallel (changes working directory)
+        // Serialize working directory changes for this test scope
         let _cwd_guard = lock_var("CWD");
 
         let fixtures = TestFixtures::new();
@@ -178,17 +177,18 @@ mod tasks_dir_consistency {
 mod environment_variable_consistency {
     use super::*;
 
+    fn reset_env(var: &str) {
+        let _g = lock_var(var);
+        unsafe { env::remove_var(var) }
+        // guard drops here, releasing the per-var lock
+    }
+
     /// Combined test for environment variable scenarios to avoid parallel execution conflicts
     #[test]
     fn test_environment_variable_scenarios_combined() {
-        // Use mutex to ensure this test doesn't run in parallel with other env var tests
-        let _env_guard = lock_var("LOTAR_TASKS_DIR");
-
-        // Clean up any leftover environment variables from other tests
-        unsafe {
-            env::remove_var("LOTAR_TASKS_DIR");
-            env::remove_var("LOTAR_DEFAULT_ASSIGNEE");
-        }
+        // Ensure a clean environment before starting (scoped resets under lock)
+        reset_env("LOTAR_TASKS_DIR");
+        reset_env("LOTAR_DEFAULT_ASSIGNEE");
 
         // === SCENARIO 1: LOTAR_TASKS_DIR environment variable ===
         {
@@ -197,9 +197,7 @@ mod environment_variable_consistency {
             fs::create_dir_all(&env_tasks_dir).unwrap();
 
             // Set environment variable
-            unsafe {
-                env::set_var("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap());
-            }
+            let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap());
 
             // Commands should use environment variable when no --tasks-dir is specified
             let output = fixtures.run_command(&["config", "show"]);
@@ -236,19 +234,14 @@ mod environment_variable_consistency {
                 "Task should be created using LOTAR_TASKS_DIR"
             );
 
-            // Clean up for next scenario
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-            }
+            // Guard drops here
         }
 
         // === SCENARIO 2: Fallback behavior without environment variables ===
         {
             // Ensure no environment variables are set
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-                env::remove_var("LOTAR_DEFAULT_ASSIGNEE");
-            }
+            reset_env("LOTAR_TASKS_DIR");
+            reset_env("LOTAR_DEFAULT_ASSIGNEE");
 
             let fixtures = TestFixtures::new();
 
@@ -299,10 +292,8 @@ mod environment_variable_consistency {
         // === SCENARIO 3: Precedence order testing ===
         {
             // Ensure clean state
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-                env::remove_var("LOTAR_DEFAULT_ASSIGNEE");
-            }
+            reset_env("LOTAR_TASKS_DIR");
+            reset_env("LOTAR_DEFAULT_ASSIGNEE");
 
             let fixtures = TestFixtures::new();
 
@@ -313,9 +304,7 @@ mod environment_variable_consistency {
             fs::create_dir_all(&env_dir).unwrap();
 
             // Set environment variable
-            unsafe {
-                env::set_var("LOTAR_TASKS_DIR", env_dir.to_str().unwrap());
-            }
+            let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", env_dir.to_str().unwrap());
 
             // Test 1: CLI option should win over environment variable
             let output = fixtures.run_command(&[
@@ -346,19 +335,14 @@ mod environment_variable_consistency {
                 "Environment variable should be used when no CLI override"
             );
 
-            // Clean up for next scenario
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-            }
+            // Guard drops here
         }
 
         // === SCENARIO 4: CLI override behavior ===
         {
             // Ensure clean state
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-                env::remove_var("LOTAR_DEFAULT_ASSIGNEE");
-            }
+            reset_env("LOTAR_TASKS_DIR");
+            reset_env("LOTAR_DEFAULT_ASSIGNEE");
 
             let fixtures = TestFixtures::new();
 
@@ -369,9 +353,7 @@ mod environment_variable_consistency {
             fs::create_dir_all(&cli_tasks_dir).unwrap();
 
             // Set environment variable
-            unsafe {
-                env::set_var("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap());
-            }
+            let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap());
 
             // Command line option should override environment variable
             let output = fixtures.run_command(&[
@@ -405,10 +387,7 @@ mod environment_variable_consistency {
                 "Task should NOT be in environment directory"
             );
 
-            // Clean up for next scenario
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-            }
+            // Guard drops here
         }
 
         // === SCENARIO 3: LOTAR_TASKS_DIR with relative paths ===
@@ -416,9 +395,7 @@ mod environment_variable_consistency {
             let fixtures = TestFixtures::new();
 
             // Set environment variable to relative path
-            unsafe {
-                env::set_var("LOTAR_TASKS_DIR", "./rel_tasks");
-            }
+            let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", "./rel_tasks");
 
             // Commands should use relative path from current directory
             let output = fixtures.run_command(&["config", "show"]);
@@ -458,10 +435,7 @@ mod environment_variable_consistency {
                 "Task project directory should be created in relative path"
             );
 
-            // Clean up this scenario
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-            }
+            // Guard drops here
         }
 
         // === SCENARIO 4: Command line flag should override relative environment variable ===
@@ -471,9 +445,7 @@ mod environment_variable_consistency {
             fs::create_dir_all(&cli_tasks_dir).unwrap();
 
             // Set environment variable to relative path
-            unsafe {
-                env::set_var("LOTAR_TASKS_DIR", "./env_rel_tasks");
-            }
+            let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", "./env_rel_tasks");
 
             // Command line option should override environment variable
             let output = fixtures.run_command(&[
@@ -505,17 +477,12 @@ mod environment_variable_consistency {
                 "Environment relative directory should not be created when CLI override is used"
             );
 
-            // Clean up this scenario
-            unsafe {
-                env::remove_var("LOTAR_TASKS_DIR");
-            }
+            // Guard drops here
         }
 
         // Final cleanup
-        unsafe {
-            env::remove_var("LOTAR_TASKS_DIR");
-            env::remove_var("LOTAR_DEFAULT_ASSIGNEE");
-        }
+        reset_env("LOTAR_TASKS_DIR");
+        reset_env("LOTAR_DEFAULT_ASSIGNEE");
     }
 }
 
@@ -614,9 +581,8 @@ mod global_options_integration {
 
     #[test]
     fn test_complex_scenario_with_all_global_options() {
-        // Use per-var locks to avoid cross-test interference
-        let _tasks_guard = lock_var("LOTAR_TASKS_DIR");
-        let _assignee_guard = lock_var("LOTAR_DEFAULT_ASSIGNEE");
+        // Use EnvVarGuard for per-var environment isolation
+        let _assignee_guard = EnvVarGuard::set("LOTAR_DEFAULT_ASSIGNEE", "env-assignee");
 
         let fixtures = TestFixtures::new();
 
@@ -629,10 +595,7 @@ mod global_options_integration {
         fs::create_dir_all(&tasks_dir).unwrap();
         fs::create_dir_all(&work_dir).unwrap();
 
-        // Set environment variables
-        unsafe {
-            env::set_var("LOTAR_DEFAULT_ASSIGNEE", "env-assignee");
-        }
+        // Environment already set by guard above
 
         // Test global options integration: environment variable + explicit --tasks-dir
         // This tests the precedence: CLI args > Environment > defaults
