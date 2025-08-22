@@ -20,11 +20,6 @@ Chores:
 - Config validation may need an update
 - properties that don't have any special functions associated with them (e.g. categories) should be custom properties that just allow generic querying by matching terms like all custom properties should support. Only when we add special function should we promote them to standard fields.
 
-Bugs:
-- We have an operation that creates an empty config.yml and nothing else
-- Help output shows raw markdown (Maybe we should split docs from direct help and more detailed help linked to)
-- `lotar scan src` in this project throws an error
-
 # Implementation Roadmap
 
 Legend: [ ] = TODO, [x] = Done, [~] = In Progress

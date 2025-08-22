@@ -7,15 +7,15 @@ Scan source code files for comment lines containing TODO and other signal words.
 ```bash
 lotar scan [PATH ...] [OPTIONS]
 ```
+
 ## Examples
 
-
+```bash
 # Scan a specific directory (recursively)
 lotar scan src
 
 # Custom tasks directory
 lotar scan --tasks-dir=/custom/path src/
-
 ```
 
 ## Options
@@ -88,7 +88,7 @@ Effort notes:
 - Points: pt/pts/point(s) and bare numbers are treated as points and preserved as such (e.g., 3pt).
 - Mixing time and points in a single value is rejected.
 
-Bi-directional references
+### Bi-directional references
 
 When scan creates a task from a TODO that lacks a key, it also records a back-link in the created task under the top-level `references` array. Each entry is a minimal reference with either:
 - `code`: a repo-relative code anchor like `path/to/file.rs#L118` (no code snippets are stored), or
@@ -103,7 +103,6 @@ Relocation resilience (automatic re-anchoring):
 - It searches for the task key near the previously anchored line using a small proximity window; if not found, it scans the entire file.
 - If the file was renamed, LoTaR uses `git status --porcelain` to map old paths to new ones and re-anchors in the new file when possible.
 - This re-anchoring runs even if no new TODOs are found. Use `--reanchor` if you also want to prune cross-file anchors down to the newest one during updates.
-
 
 ## Example Output
 
@@ -141,7 +140,7 @@ Precedence (highest wins): CLI > env > home > project > global > defaults. In pr
 
 Examples:
 
-```
+```yaml
 # ~/.lotar (home config)
 scan:
   signal_words:
@@ -151,17 +150,18 @@ scan:
   - IDEA
 ```
 
-```
+```yaml
 # .tasks/MYPROJ/config.yml (project)
 scan:
   signal_words:
   - TODO
   - BUG
   - PERF
+```
 
 You can also add regex-based ticket key detection under `scan.ticket_patterns`, and control whether issue-type words act as signal words with `scan.enable_ticket_words`. Bare ticket keys alone do not create tasks; when `scan.enable_mentions` is true (default), they only add code anchors under `references`.
 
-```
+```yaml
 # .tasks/config.yml (global)
 scan:
   strip_attributes: true # default: remove [key=value] from source after creating the task
@@ -174,6 +174,5 @@ scan:
 ```
 
 Precedence: CLI `--strip-attributes` > project config > global config > defaults.
-```
 
 See also: [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md).

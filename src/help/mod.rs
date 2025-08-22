@@ -1,6 +1,8 @@
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, DirEntry, include_dir};
+use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
 use regex::Regex;
+use std::io::IsTerminal;
 use std::sync::LazyLock;
 
 static HELP_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/docs/help");
@@ -41,10 +43,10 @@ impl HelpSystem {
                 })
                 .to_string()),
                 _ => {
-                    // Render Markdown with terminal hyperlinks (OSC 8) by default.
-                    // Links remain readable text if the terminal doesn't support OSC 8.
+                    // Render Markdown to ANSI/Plain text depending on TTY & NO_COLOR.
                     let base_dir = format!("{}/docs/help", ROOT_DIR);
-                    Ok(self.render_with_hyperlinks(content, &base_dir))
+                    let with_links = self.render_with_hyperlinks(content, &base_dir);
+                    Ok(self.render_markdown(&with_links))
                 }
             }
         } else {
@@ -167,6 +169,148 @@ impl HelpSystem {
         out
     }
 
+    fn render_markdown(&self, markdown: &str) -> String {
+        // Choose style based on TTY/NO_COLOR: ANSI when TTY and NO_COLOR not set, else plain
+        let style = match std::env::var("LOTAR_HELP_STYLE").ok().as_deref() {
+            Some("ansi") => HelpStyle::Ansi,
+            Some("plain") => HelpStyle::Plain,
+            _ => {
+                let no_color = std::env::var("NO_COLOR").is_ok();
+                let is_tty = std::io::stdout().is_terminal();
+                if !no_color && is_tty {
+                    HelpStyle::Ansi
+                } else {
+                    HelpStyle::Plain
+                }
+            }
+        };
+
+        let mut out = String::with_capacity(markdown.len() + 64);
+        let mut list_level: usize = 0;
+        let parser = Parser::new_ext(markdown, pulldown_cmark::Options::empty());
+        let mut in_code_block = false;
+
+        for event in parser {
+            match event {
+                Event::Start(Tag::Heading(level, _, _)) => {
+                    // Ensure a blank line before headings (except at very start)
+                    if !out.is_empty() && !out.ends_with("\n\n") {
+                        if !out.ends_with('\n') {
+                            out.push('\n');
+                        }
+                        out.push('\n');
+                    }
+                    let (pre, post) = match (style, level) {
+                        (HelpStyle::Ansi, HeadingLevel::H1) => ("\x1b[1m\x1b[4m", "\x1b[0m\n"),
+                        (HelpStyle::Ansi, HeadingLevel::H2) => ("\x1b[1m", "\x1b[0m\n"),
+                        (HelpStyle::Ansi, _) => ("\x1b[1m", "\x1b[0m\n"),
+                        (HelpStyle::Plain, _) => ("", "\n"),
+                    };
+                    out.push_str(pre);
+                    // We'll close with post on End(Heading)
+                    // Store marker by pushing post at End
+                    STYLE_STACK.with(|s| s.borrow_mut().push(post.to_string()));
+                }
+                Event::End(Tag::Heading(_, _, _)) => {
+                    if let Some(post) = STYLE_STACK.with(|s| s.borrow_mut().pop()) {
+                        out.push_str(&post);
+                    } else {
+                        out.push('\n');
+                    }
+                    // Ensure a blank line after headings
+                    if !out.ends_with("\n\n") {
+                        out.push('\n');
+                    }
+                }
+                Event::Start(Tag::List(_)) => {
+                    list_level += 1;
+                }
+                Event::End(Tag::List(_)) => {
+                    list_level = list_level.saturating_sub(1);
+                }
+                Event::Start(Tag::Item) => {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                    out.push_str(&"  ".repeat(list_level.saturating_sub(1)));
+                    out.push_str("• ");
+                }
+                Event::End(Tag::Item) => {}
+                Event::Start(Tag::CodeBlock(_)) => {
+                    in_code_block = true;
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                }
+                Event::End(Tag::CodeBlock(_)) => {
+                    in_code_block = false;
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                    // Add a blank line after code blocks for readability
+                    if !out.ends_with("\n\n") {
+                        out.push('\n');
+                    }
+                }
+                Event::Start(Tag::BlockQuote) => {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                }
+                Event::End(Tag::BlockQuote) => {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                }
+                Event::Text(text) => {
+                    if in_code_block {
+                        for line in text.lines() {
+                            match style {
+                                HelpStyle::Ansi => {
+                                    out.push_str(&format!("    \x1b[2m{}\x1b[0m\n", line))
+                                }
+                                HelpStyle::Plain => {
+                                    out.push_str("    ");
+                                    out.push_str(line);
+                                    out.push('\n');
+                                }
+                            }
+                        }
+                    } else {
+                        out.push_str(&text);
+                    }
+                }
+                Event::Code(inline) => match style {
+                    HelpStyle::Ansi => out.push_str(&format!("\x1b[2m`{}`\x1b[0m", inline)),
+                    HelpStyle::Plain => {
+                        out.push('`');
+                        out.push_str(&inline);
+                        out.push('`');
+                    }
+                },
+                Event::SoftBreak | Event::HardBreak => out.push('\n'),
+                Event::Rule => {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                    let line = "────";
+                    out.push_str(line);
+                    out.push('\n');
+                }
+                Event::Html(html) => {
+                    out.push_str(&html);
+                }
+                Event::Start(Tag::Paragraph) | Event::End(Tag::Paragraph) => {
+                    if !out.ends_with('\n') {
+                        out.push('\n');
+                    }
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
     fn resolve_link_target(&self, target: &str, base_dir: &str) -> String {
         use std::path::{Path, PathBuf};
 
@@ -230,6 +374,16 @@ impl HelpSystem {
 
         format!("{}{}", base_url, repo_rel)
     }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+enum HelpStyle {
+    Ansi,
+    Plain,
+}
+
+thread_local! {
+    static STYLE_STACK: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 // inline tests moved to tests/help_module_unit_test.rs
