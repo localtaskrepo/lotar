@@ -349,33 +349,36 @@ impl CommandHandler for ScanHandler {
                                 }
                             }
 
-                            // Write file back with the updated line
-                            if let Some(updated) =
-                                replace_line(&contents, entry.line_number, &new_line)
-                            {
-                                if args.dry_run {
-                                    renderer.emit_raw_stdout(&format!(
-                                        "  📄 {}:{}\n    - {}\n    + {}",
-                                        entry.file_path.display(),
-                                        entry.line_number,
-                                        orig_line,
-                                        new_line
-                                    ));
-                                } else if let Err(e) = std::fs::write(&entry.file_path, updated) {
-                                    renderer.log_error(&format!(
-                                        "Failed to write changes to {}: {}",
-                                        entry.file_path.display(),
-                                        e
-                                    ));
-                                } else {
-                                    renderer.emit_raw_stdout(&format!(
-                                        "  📄 {}:{}\n    - {}\n    + {}",
-                                        entry.file_path.display(),
-                                        entry.line_number,
-                                        orig_line,
-                                        new_line
-                                    ));
-                                    applied += 1;
+                            // Only emit and write when a real change occurs
+                            if new_line != orig_line {
+                                if let Some(updated) =
+                                    replace_line(&contents, entry.line_number, &new_line)
+                                {
+                                    if args.dry_run {
+                                        renderer.emit_raw_stdout(&format!(
+                                            "  📄 {}:{}\n    - {}\n    + {}",
+                                            entry.file_path.display(),
+                                            entry.line_number,
+                                            orig_line,
+                                            new_line
+                                        ));
+                                    } else if let Err(e) = std::fs::write(&entry.file_path, updated)
+                                    {
+                                        renderer.log_error(&format!(
+                                            "Failed to write changes to {}: {}",
+                                            entry.file_path.display(),
+                                            e
+                                        ));
+                                    } else {
+                                        renderer.emit_raw_stdout(&format!(
+                                            "  📄 {}:{}\n    - {}\n    + {}",
+                                            entry.file_path.display(),
+                                            entry.line_number,
+                                            orig_line,
+                                            new_line
+                                        ));
+                                        applied += 1;
+                                    }
                                 }
                             }
                         } else if !args.dry_run && cfg_enable_mentions {
@@ -450,26 +453,99 @@ fn replace_line(contents: &str, line_number_1based: usize, new_line: &str) -> Op
     Some(out)
 }
 
-/// Strip bracketed inline attributes like [key=value] appearing anywhere on the line
+/// Strip inline attribute blocks like [key=value] without altering any other whitespace.
+/// This preserves all spacing/alignment and only removes bracket sections that contain
+/// an equals sign, which distinguishes them from language generics (e.g., Vec<String>)
+/// or indexers (e.g., arr[0]).
 fn strip_bracket_attributes(line: &str) -> String {
-    // Simple state machine to drop [...], handling nested brackets conservatively
     let mut out = String::with_capacity(line.len());
     let mut depth = 0usize;
+    let mut buf = String::new(); // collect content when inside brackets
+
     for ch in line.chars() {
-        if ch == '[' {
-            depth += 1;
-            continue;
-        }
-        if ch == ']' {
-            depth = depth.saturating_sub(1);
-            continue;
-        }
-        if depth == 0 {
-            out.push(ch);
+        match ch {
+            '[' => {
+                if depth == 0 {
+                    // starting a new top-level bracket; reset buffer and decide later
+                    buf.clear();
+                } else {
+                    // nested bracket content
+                    buf.push('[');
+                }
+                depth += 1;
+            }
+            ']' => {
+                if depth > 0 {
+                    depth -= 1;
+                    if depth == 0 {
+                        // End of a top-level bracket. Decide whether to drop it.
+                        // If the inner content contains an '=', treat it as an attribute and drop.
+                        // Otherwise, keep the original bracket with its content.
+                        if buf.contains('=') {
+                            // drop entire [ ... ] including its content; do not write anything
+                        } else {
+                            out.push('[');
+                            out.push_str(&buf);
+                            out.push(']');
+                        }
+                        buf.clear();
+                        continue;
+                    } else {
+                        // closing a nested level inside top-level; record literal
+                        buf.push(']');
+                        continue;
+                    }
+                }
+                // Unbalanced ']' outside any bracket: write through
+                out.push(']');
+            }
+            c => {
+                if depth == 0 {
+                    out.push(c);
+                } else {
+                    buf.push(c);
+                }
+            }
         }
     }
-    // Collapse extra spaces left by removals
-    out.split_whitespace().collect::<Vec<_>>().join(" ")
+    // If brackets are unbalanced and we're still inside, write them back literally
+    if depth > 0 {
+        out.push('[');
+        out.push_str(&buf);
+    }
+    out
+}
+
+#[cfg(test)]
+mod scan_handler_tests {
+    use super::strip_bracket_attributes;
+
+    #[test]
+    fn strip_preserves_leading_indentation() {
+        let input = "\t    // TODO: Do it [assignee=me]  [priority=high]";
+        let out = strip_bracket_attributes(input);
+        assert!(out.starts_with("\t    // TODO: Do it"));
+        // Ensure no brackets remain
+        assert!(!out.contains('[') && !out.contains(']'));
+        // Ensure indentation didn't collapse
+        assert_eq!(&out[..5], "\t    ");
+    }
+
+    #[test]
+    fn strip_does_not_collapse_spacing_or_alignments() {
+        let input = "    signal_words: Vec<String>,                     // TODO handle words [tag=scan]  [due=2025-12-31]";
+        let out = strip_bracket_attributes(input);
+        // Leading spaces preserved
+        assert!(out.starts_with(
+            "    signal_words: Vec<String>,                     // TODO handle words"
+        ));
+        // No brackets remain
+        assert!(!out.contains('[') && !out.contains(']'));
+        // The run of spaces before the comment should still be long (>= 5)
+        let after_comma = out.split("Vec<String>,").nth(1).unwrap_or("");
+        // Expect at least 5 spaces before the // comment after the comma
+        assert!(after_comma.starts_with("     "));
+    }
 }
 
 /// Parse inline bracket attributes like [key=value] and map them to AddArgs fields.

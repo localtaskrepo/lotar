@@ -22,7 +22,6 @@ Chores:
 
 Bugs:
 - We have an operation that creates an empty config.yml and nothing else
-- CI job is failing because of clippy for some reason
 - Help output shows raw markdown (Maybe we should split docs from direct help and more detailed help linked to)
 - `lotar scan src` in this project throws an error
 

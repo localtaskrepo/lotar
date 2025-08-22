@@ -168,7 +168,9 @@ impl Scanner {
         };
         (signal_re, uuid_re, simple_re)
     }
+}
 
+impl Scanner {
     pub fn with_include_ext(mut self, exts: &[String]) -> Self {
         if !exts.is_empty() {
             self.include_ext = Some(exts.iter().map(|e| e.to_ascii_lowercase()).collect());
@@ -557,8 +559,35 @@ impl Scanner {
         if line.contains(&format!("({})", key)) {
             return None; // idempotence: already present
         }
-        // Find the first signal word
+        // Find the first signal word, but only insert if it's the first token in the comment text.
         if let Some(m) = self.signal_regex.find(line) {
+            // Identify the start of the comment segment
+            let mut comment_pos: Option<(usize, usize)> = None; // (idx, token_len)
+            for (tok, len) in [
+                ("//", 2usize),
+                ("#", 1usize),
+                ("--", 2usize),
+                (";", 1usize),
+                ("%", 1usize),
+            ] {
+                if let Some(idx) = line.find(tok) {
+                    comment_pos = match comment_pos {
+                        Some((cur_idx, cur_len)) if cur_idx <= idx => Some((cur_idx, cur_len)),
+                        _ => Some((idx, len)),
+                    };
+                }
+            }
+            // If we can't identify a comment start, bail to avoid altering non-comment content
+            let (cidx, clen) = comment_pos?;
+            let comment = &line[cidx + clen..];
+            // Compute the absolute index of the first non-decorative char in the comment
+            let trimmed = comment.trim_start_matches(|c: char| c.is_whitespace() || c == '*');
+            let offset = comment.len() - trimmed.len();
+            let first_token_abs = cidx + clen + offset;
+            // Only insert if the match begins exactly at the first token in the comment
+            if m.start() != first_token_abs {
+                return None;
+            }
             let end = m.end();
             let before = &line[..end];
             let after = &line[end..];
@@ -619,5 +648,29 @@ impl Scanner {
         let mut refs = Vec::new();
         self.scan_file(file_path, &mut refs);
         refs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signal_regexes_compile_with_unicode_features() {
+        let words = vec!["todo".to_string(), "fixme".to_string()];
+        let (signal, uuid, simple) = Scanner::build_signal_regexes(&words);
+        assert!(signal.is_match("TODO something"));
+        assert!(uuid.is_match("TODO (ABC-123): rest"));
+        assert!(simple.is_match("TODO: rest"));
+    }
+
+    #[test]
+    fn insertion_skips_example_comments_not_starting_with_signal() {
+        let s = Scanner::new(PathBuf::from("."));
+        let line =
+            "signal_words: Vec<String>,                     // lowercase tokens like todo, fixme";
+        let edited = s.suggest_insertion_for_line(line, "DEMO-1");
+        // Should not insert into 'like todo' example
+        assert!(edited.is_none());
     }
 }
