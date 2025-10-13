@@ -137,6 +137,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         },
     )
@@ -161,7 +162,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
         .success()
         .stdout(predicate::str::contains("Task "))
         .stdout(predicate::str::contains(" status: "))
-        .stdout(predicate::str::contains("TODO"));
+        .stdout(predicate::str::contains("Todo"));
 
     // restored by _guard drop
 }

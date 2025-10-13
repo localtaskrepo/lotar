@@ -14,9 +14,10 @@ General guidance:
 
 Runner policy:
 - Use nextest by default for speed and reliability.
-- Local: `cargo nextest run --all-features --failure-output=immediate-final --retries 0 --lib --bins`.
+- Local: `cargo nextest run --all-features --failure-output=immediate-final --retries 0 --lib --bins` (or `npm run test`).
 	- CI uses the same flags and writes JUnit to `target/nextest/junit.xml`.
 	- Doc tests are run separately via `cargo test --doc --all-features` (not supported by nextest yet).
+- The legacy `cargo test` harness is intentionally disabled and prints guidance to use nextest.
 
  Lint/format parity with CI:
  - Format: `cargo fmt --all --check` (pre-commit auto-fixes when possible).

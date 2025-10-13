@@ -14,13 +14,21 @@ fn test_global_config_validation_valid() {
         server_port: 8080,
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField {
-            values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+            values: vec![
+                TaskStatus::from("Todo"),
+                TaskStatus::from("InProgress"),
+                TaskStatus::from("Done"),
+            ],
         },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature, TaskType::Bug],
+            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         },
         issue_priorities: ConfigurableField {
-            values: vec![Priority::Low, Priority::Medium, Priority::High],
+            values: vec![
+                Priority::from("Low"),
+                Priority::from("Medium"),
+                Priority::from("High"),
+            ],
         },
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
@@ -30,8 +38,8 @@ fn test_global_config_validation_valid() {
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
-        default_priority: Priority::Medium,
-        default_status: Some(TaskStatus::Todo),
+        default_priority: Priority::from("Medium"),
+        default_status: Some(TaskStatus::from("Todo")),
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![
             "TODO".to_string(),
@@ -70,13 +78,13 @@ fn test_global_config_validation_privileged_port_warning() {
         server_port: 80, // Privileged port should trigger warning
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField {
-            values: vec![TaskStatus::Todo],
+            values: vec![TaskStatus::from("Todo")],
         },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature],
+            values: vec![TaskType::from("Feature")],
         },
         issue_priorities: ConfigurableField {
-            values: vec![Priority::Medium],
+            values: vec![Priority::from("Medium")],
         },
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
@@ -86,8 +94,8 @@ fn test_global_config_validation_privileged_port_warning() {
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
-        default_priority: Priority::Medium,
-        default_status: Some(TaskStatus::Todo),
+        default_priority: Priority::from("Medium"),
+        default_status: Some(TaskStatus::from("Todo")),
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![
             "TODO".to_string(),
@@ -159,7 +167,7 @@ fn test_global_config_validation_empty_lists_error() {
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
-        default_priority: Priority::Medium,
+        default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![
@@ -218,13 +226,13 @@ fn test_global_config_validation_invalid_defaults() {
         server_port: 8080,
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField {
-            values: vec![TaskStatus::Todo, TaskStatus::InProgress],
+            values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
         },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature],
+            values: vec![TaskType::from("Feature")],
         },
         issue_priorities: ConfigurableField {
-            values: vec![Priority::Low], // Default priority is Medium but only Low is in list
+            values: vec![Priority::from("Low")], // Default priority is Medium but only Low is in list
         },
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
@@ -234,8 +242,8 @@ fn test_global_config_validation_invalid_defaults() {
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,
-        default_priority: Priority::Medium, // This should cause an error
-        default_status: Some(TaskStatus::Done), // This should cause an error (Done not in states)
+        default_priority: Priority::from("Medium"), // This should cause an error
+        default_status: Some(TaskStatus::from("Done")), // This should cause an error (Done not in states)
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![
             "TODO".to_string(),
@@ -267,12 +275,12 @@ fn test_global_config_validation_invalid_defaults() {
     assert!(
         error_messages
             .iter()
-            .any(|msg| msg.contains("Default priority 'MEDIUM' not found"))
+            .any(|msg| msg.contains("Default priority 'Medium' not found"))
     );
     assert!(
         error_messages
             .iter()
-            .any(|msg| msg.contains("Default status 'DONE' not found"))
+            .any(|msg| msg.contains("Default status 'Done' not found"))
     );
 }
 
@@ -284,13 +292,21 @@ fn test_project_config_validation_valid() {
     let config = ProjectConfig {
         project_name: "Test Project".to_string(),
         issue_states: Some(ConfigurableField {
-            values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+            values: vec![
+                TaskStatus::from("Todo"),
+                TaskStatus::from("InProgress"),
+                TaskStatus::from("Done"),
+            ],
         }),
         issue_types: Some(ConfigurableField {
-            values: vec![TaskType::Feature, TaskType::Bug],
+            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         }),
         issue_priorities: Some(ConfigurableField {
-            values: vec![Priority::Low, Priority::Medium, Priority::High],
+            values: vec![
+                Priority::from("Low"),
+                Priority::from("Medium"),
+                Priority::from("High"),
+            ],
         }),
         categories: None,
         tags: None,
@@ -298,8 +314,8 @@ fn test_project_config_validation_valid() {
         default_reporter: None,
         default_category: None,
         default_tags: None,
-        default_priority: Some(Priority::Medium),
-        default_status: Some(TaskStatus::Todo),
+        default_priority: Some(Priority::from("Medium")),
+        default_status: Some(TaskStatus::from("Todo")),
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
@@ -411,11 +427,11 @@ fn test_project_config_validation_invalid_defaults() {
     let config = ProjectConfig {
         project_name: "Test Project".to_string(),
         issue_states: Some(ConfigurableField {
-            values: vec![TaskStatus::Todo, TaskStatus::InProgress],
+            values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
         }),
         issue_types: None,
         issue_priorities: Some(ConfigurableField {
-            values: vec![Priority::Low, Priority::High],
+            values: vec![Priority::from("Low"), Priority::from("High")],
         }),
         categories: None,
         tags: None,
@@ -423,8 +439,8 @@ fn test_project_config_validation_invalid_defaults() {
         default_reporter: None,
         default_category: None,
         default_tags: None,
-        default_priority: Some(Priority::Medium), // Medium not in priorities list
-        default_status: Some(TaskStatus::Done),   // Done not in states list
+        default_priority: Some(Priority::from("Medium")), // Medium not in priorities list
+        default_status: Some(TaskStatus::from("Done")),   // Done not in states list
         custom_fields: None,
         auto_set_reporter: None,
         auto_assign_on_status: None,
@@ -445,12 +461,12 @@ fn test_project_config_validation_invalid_defaults() {
     assert!(
         error_messages
             .iter()
-            .any(|msg| msg.contains("Default priority 'MEDIUM' not found"))
+            .any(|msg| msg.contains("Default priority 'Medium' not found"))
     );
     assert!(
         error_messages
             .iter()
-            .any(|msg| msg.contains("Default status 'DONE' not found"))
+            .any(|msg| msg.contains("Default status 'Done' not found"))
     );
 }
 

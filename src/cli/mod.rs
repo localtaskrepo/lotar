@@ -1,6 +1,5 @@
 use crate::output::{LogLevel, OutputFormat};
-use crate::types::{Priority, TaskType};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 
 // CLI argument modules consolidated under cli/args
 pub mod args;
@@ -10,6 +9,7 @@ pub use args::{
     TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs,
     parse_key_value,
 };
+pub mod preprocess;
 
 #[derive(Parser)]
 #[command(name = "lotar")]
@@ -162,47 +162,6 @@ pub enum Commands {
 }
 
 // AddArgs moved to args_task
-
-// CLI-compatible enums that map to our internal types
-#[derive(Clone, Debug, ValueEnum)]
-pub enum CliTaskType {
-    Feature,
-    Bug,
-    Epic,
-    Spike,
-    Chore,
-}
-
-impl From<CliTaskType> for TaskType {
-    fn from(cli_type: CliTaskType) -> Self {
-        match cli_type {
-            CliTaskType::Feature => TaskType::Feature,
-            CliTaskType::Bug => TaskType::Bug,
-            CliTaskType::Epic => TaskType::Epic,
-            CliTaskType::Spike => TaskType::Spike,
-            CliTaskType::Chore => TaskType::Chore,
-        }
-    }
-}
-
-#[derive(Clone, Debug, ValueEnum)]
-pub enum CliPriority {
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-impl From<CliPriority> for Priority {
-    fn from(cli_priority: CliPriority) -> Self {
-        match cli_priority {
-            CliPriority::Low => Priority::Low,
-            CliPriority::Medium => Priority::Medium,
-            CliPriority::High => Priority::High,
-            CliPriority::Critical => Priority::Critical,
-        }
-    }
-}
 
 // Task-related arg structs and enums are re-exported from args_task
 

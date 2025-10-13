@@ -121,34 +121,46 @@ fn normalize_token(s: &str) -> String {
 }
 
 fn parse_task_status_tolerant(s: &str) -> Option<TaskStatus> {
+    let original = s.trim();
+    if original.is_empty() {
+        return None;
+    }
     match normalize_token(s).as_str() {
-        "todo" => Some(TaskStatus::Todo),
-        "in_progress" => Some(TaskStatus::InProgress),
-        "verify" => Some(TaskStatus::Verify),
-        "blocked" => Some(TaskStatus::Blocked),
-        "done" => Some(TaskStatus::Done),
-        _ => None,
+        "todo" => Some(TaskStatus::from("Todo")),
+        "in_progress" | "inprogress" => Some(TaskStatus::from("InProgress")),
+        "verify" => Some(TaskStatus::from("Verify")),
+        "blocked" => Some(TaskStatus::from("Blocked")),
+        "done" => Some(TaskStatus::from("Done")),
+        _ => Some(TaskStatus::from(original)),
     }
 }
 
 fn parse_priority_tolerant(s: &str) -> Option<Priority> {
+    let original = s.trim();
+    if original.is_empty() {
+        return None;
+    }
     match normalize_token(s).as_str() {
-        "low" => Some(Priority::Low),
-        "medium" => Some(Priority::Medium),
-        "high" => Some(Priority::High),
-        "critical" => Some(Priority::Critical),
-        _ => None,
+        "low" => Some(Priority::from("Low")),
+        "medium" => Some(Priority::from("Medium")),
+        "high" => Some(Priority::from("High")),
+        "critical" => Some(Priority::from("Critical")),
+        _ => Some(Priority::from(original)),
     }
 }
 
 fn parse_task_type_tolerant(s: &str) -> Option<TaskType> {
+    let original = s.trim();
+    if original.is_empty() {
+        return None;
+    }
     match normalize_token(s).as_str() {
-        "feature" => Some(TaskType::Feature),
-        "bug" => Some(TaskType::Bug),
-        "epic" => Some(TaskType::Epic),
-        "spike" => Some(TaskType::Spike),
-        "chore" => Some(TaskType::Chore),
-        _ => None,
+        "feature" => Some(TaskType::from("Feature")),
+        "bug" => Some(TaskType::from("Bug")),
+        "epic" => Some(TaskType::from("Epic")),
+        "spike" => Some(TaskType::from("Spike")),
+        "chore" => Some(TaskType::from("Chore")),
+        _ => Some(TaskType::from(original)),
     }
 }
 
@@ -517,7 +529,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
     default.insert(
         Y::String("priority".into()),
-        serde_yaml::to_value(cfg.default_priority).unwrap_or(Y::Null),
+        serde_yaml::to_value(&cfg.default_priority).unwrap_or(Y::Null),
     );
     if let Some(v) = &cfg.default_status {
         default.insert(
@@ -703,32 +715,18 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     // issue
     let mut issue = serde_yaml::Mapping::new();
     if let Some(v) = &cfg.issue_states {
-        // Render as PascalCase strings (e.g., Todo, InProgress) for human-friendly config
         let vals: Vec<Y> = v
             .values
             .iter()
-            .map(|s| match s {
-                crate::types::TaskStatus::Todo => Y::String("Todo".into()),
-                crate::types::TaskStatus::InProgress => Y::String("InProgress".into()),
-                crate::types::TaskStatus::Verify => Y::String("Verify".into()),
-                crate::types::TaskStatus::Blocked => Y::String("Blocked".into()),
-                crate::types::TaskStatus::Done => Y::String("Done".into()),
-            })
+            .map(|s| Y::String(s.as_str().to_string()))
             .collect();
         issue.insert(Y::String("states".into()), Y::Sequence(vals));
     }
     if let Some(v) = &cfg.issue_types {
-        // Render as PascalCase strings (e.g., Feature, Bug) for human-friendly config
         let vals: Vec<Y> = v
             .values
             .iter()
-            .map(|t| match t {
-                crate::types::TaskType::Feature => Y::String("Feature".into()),
-                crate::types::TaskType::Bug => Y::String("Bug".into()),
-                crate::types::TaskType::Epic => Y::String("Epic".into()),
-                crate::types::TaskType::Spike => Y::String("Spike".into()),
-                crate::types::TaskType::Chore => Y::String("Chore".into()),
-            })
+            .map(|t| Y::String(t.as_str().to_string()))
             .collect();
         issue.insert(Y::String("types".into()), Y::Sequence(vals));
     }

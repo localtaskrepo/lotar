@@ -37,6 +37,10 @@ pub struct TaskDTO {
     pub relationships: crate::types::TaskRelationships,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub comments: Vec<crate::types::TaskComment>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub references: Vec<crate::types::ReferenceEntry>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub history: Vec<crate::types::TaskChangeLogEntry>,
     #[serde(skip_serializing_if = "crate::api_types::map_is_empty", default)]
     pub custom_fields: crate::types::CustomFields,
 }
@@ -62,6 +66,8 @@ pub struct TaskCreate {
     pub description: Option<String>,
     pub category: Option<String>,
     pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub relationships: Option<crate::types::TaskRelationships>,
     pub custom_fields: Option<crate::types::CustomFields>,
 }
 
@@ -79,6 +85,7 @@ pub struct TaskUpdate {
     pub description: Option<String>,
     pub category: Option<String>,
     pub tags: Option<Vec<String>>, // replace whole list
+    pub relationships: Option<crate::types::TaskRelationships>,
     pub custom_fields: Option<crate::types::CustomFields>,
 }
 
@@ -109,6 +116,27 @@ pub struct ProjectStatsDTO {
     pub done_count: u64,
     pub recent_modified: Option<String>,
     pub tags_top: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReferenceSnippetLineDTO {
+    pub number: usize,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ReferenceSnippetDTO {
+    pub path: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub highlight_start: usize,
+    pub highlight_end: usize,
+    pub lines: Vec<ReferenceSnippetLineDTO>,
+    pub has_more_before: bool,
+    pub has_more_after: bool,
+    pub total_lines: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -68,7 +68,7 @@ impl StorageSearch {
                             let task_id = format!("{}-{}", project_folder, numeric_id);
                             let content = fs::read_to_string(path).ok()?;
                             let task: Task = serde_yaml::from_str(&content).ok()?;
-                            if Self::task_matches_filter(&task, filter) {
+                            if Self::task_matches_filter(&task_id, &task, filter) {
                                 Some((task_id, task))
                             } else {
                                 None
@@ -84,7 +84,7 @@ impl StorageSearch {
                             let task_id = format!("{}-{}", project_folder, numeric_id);
                             let content = fs::read_to_string(path).ok()?;
                             let task: Task = serde_yaml::from_str(&content).ok()?;
-                            if Self::task_matches_filter(&task, filter) {
+                            if Self::task_matches_filter(&task_id, &task, filter) {
                                 Some((task_id, task))
                             } else {
                                 None
@@ -148,7 +148,7 @@ impl StorageSearch {
                         let task_id = format!("{}-{}", project_folder, numeric_id);
                         let content = fs::read_to_string(task_path).ok()?;
                         let task: Task = serde_yaml::from_str(&content).ok()?;
-                        if Self::task_matches_filter(&task, filter) {
+                        if Self::task_matches_filter(&task_id, &task, filter) {
                             Some((task_id, task))
                         } else {
                             None
@@ -173,7 +173,7 @@ impl StorageSearch {
                         };
                         match serde_yaml::from_str::<Task>(&content) {
                             Ok(task) => {
-                                if Self::task_matches_filter(&task, filter) {
+                                if Self::task_matches_filter(&task_id, &task, filter) {
                                     Some((task_id, task))
                                 } else {
                                     None
@@ -234,7 +234,7 @@ impl StorageSearch {
     }
 
     /// Helper method to check if a task matches all filter criteria
-    pub fn task_matches_filter(task: &Task, filter: &TaskFilter) -> bool {
+    pub fn task_matches_filter(task_id: &str, task: &Task, filter: &TaskFilter) -> bool {
         // Check status filter (OR logic - match any of the specified statuses)
         if !filter.status.is_empty() && !filter.status.contains(&task.status) {
             return false;
@@ -258,16 +258,17 @@ impl StorageSearch {
         }
 
         // Check text query
-        if !Self::matches_text_filter(task, &filter.text_query) {
+        if !Self::matches_text_filter(task_id, task, &filter.text_query) {
             return false;
         }
 
         // Check tag filters (OR logic - match any of the specified tags)
         if !filter.tags.is_empty() {
-            let task_has_matching_tag = filter
-                .tags
-                .iter()
-                .any(|filter_tag| task.tags.iter().any(|task_tag| task_tag == filter_tag));
+            let task_has_matching_tag = filter.tags.iter().any(|filter_tag| {
+                task.tags
+                    .iter()
+                    .any(|task_tag| crate::utils::fuzzy_match::fuzzy_contains(task_tag, filter_tag))
+            });
             if !task_has_matching_tag {
                 return false;
             }
@@ -277,10 +278,12 @@ impl StorageSearch {
     }
 
     /// Check if a task matches text filter criteria
-    pub fn matches_text_filter(task: &Task, text_query: &Option<String>) -> bool {
+    pub fn matches_text_filter(task_id: &str, task: &Task, text_query: &Option<String>) -> bool {
         if let Some(query) = text_query {
             let query_lower = query.to_lowercase();
-            task.title.to_lowercase().contains(&query_lower)
+            let id_lower = task_id.to_lowercase();
+            id_lower.contains(&query_lower)
+                || task.title.to_lowercase().contains(&query_lower)
                 || task
                     .subtitle
                     .as_ref()

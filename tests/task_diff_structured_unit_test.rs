@@ -24,8 +24,8 @@ modified: 2025-08-02T10:00:00Z
 }
 
 #[test]
-fn structured_diff_wont_detect_if_yaml_doesnt_parse() {
-    // Uppercase enum prevents parsing → indicates need for fallback path for diffs
+fn structured_diff_handles_uppercase_enum_values() {
+    // Uppercase enum values should still parse and allow structured diffs to run
     let prev = r#"
 title: Keep Title
 status: TODO
@@ -42,11 +42,11 @@ task_type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-02T10:00:00Z
 "#;
-    let prev_task: Result<lotar::Task, _> = serde_yaml::from_str(prev);
-    let cur_task: Result<lotar::Task, _> = serde_yaml::from_str(cur);
+    let prev_task: lotar::Task =
+        serde_yaml::from_str(prev).expect("Uppercase enums should parse for previous task");
+    let cur_task: lotar::Task =
+        serde_yaml::from_str(cur).expect("Uppercase enums should parse for current task");
 
-    assert!(
-        prev_task.is_err() || cur_task.is_err(),
-        "At least one snapshot fails to parse, so typed structured diff cannot run."
-    );
+    assert_eq!(prev_task.status.as_str(), "TODO");
+    assert_eq!(cur_task.status.as_str(), "TODO");
 }

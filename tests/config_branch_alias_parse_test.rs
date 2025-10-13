@@ -15,18 +15,17 @@ branch:
     let cfg = parse_global_from_yaml_str(cfg_yaml).expect("parse");
     assert_eq!(
         cfg.branch_status_aliases.get("wip").unwrap().to_string(),
-        "IN_PROGRESS"
+        "InProgress"
     );
     assert_eq!(
         cfg.branch_priority_aliases
             .get("hotfix")
             .unwrap()
             .to_string(),
-        "CRITICAL"
+        "Critical"
     );
-    // TaskType Display renders lowercase variant names (e.g., "feature").
     assert_eq!(
         cfg.branch_type_aliases.get("feat").unwrap().to_string(),
-        "feature"
+        "Feature"
     );
 }

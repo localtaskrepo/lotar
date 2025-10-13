@@ -106,6 +106,7 @@ impl CommandHandler for AssigneeHandler {
                     description: None,
                     category: None,
                     tags: None,
+                    relationships: None,
                     custom_fields: None,
                 };
                 let updated = TaskService::update(&mut storage, &full_task_id, patch)

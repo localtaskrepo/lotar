@@ -123,7 +123,7 @@ impl TestFixtures {
         Task::new(
             self.tasks_root.clone(),
             "Sample Test Task".to_string(),
-            Priority::Medium,
+            Priority::from("Medium"),
         )
     }
 

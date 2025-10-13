@@ -349,6 +349,10 @@ pub struct TaskEditArgs {
     #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
+    /// New reporter
+    #[arg(long, short = 'R')]
+    pub reporter: Option<String>,
+
     /// New assignee
     #[arg(long, short = 'a')]
     pub assignee: Option<String>,

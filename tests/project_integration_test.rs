@@ -666,9 +666,7 @@ mod integration {
             .arg("--project=WorkflowTest")
             .assert()
             .success()
-            .stdout(
-                predicate::str::contains("in_progress").or(predicate::str::contains("IN_PROGRESS")),
-            );
+            .stdout(predicate::str::contains("[InProgress]"));
     }
 
     #[test]

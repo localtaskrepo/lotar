@@ -14,9 +14,5 @@ config:
     - Feature
     - Bug
     - Chore
-  categories:
-    - frontend
-    - backend
-    - docs
   tags:
     - "*"

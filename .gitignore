@@ -5,3 +5,4 @@ node_modules/
 /.tasks/
 /dist/
 /.history/
+.playwright-mcp/

@@ -131,7 +131,7 @@ mod crud_operations {
             .arg("--project=UpdateTest")
             .assert()
             .success()
-            .stdout(predicate::str::contains("IN_PROGRESS"));
+            .stdout(predicate::str::contains("[InProgress]"));
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod crud_operations {
             .arg("--project=CompleteTest")
             .assert()
             .success()
-            .stdout(predicate::str::contains("DONE"));
+            .stdout(predicate::str::contains("[Done]"));
     }
 }
 

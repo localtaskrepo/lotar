@@ -680,7 +680,7 @@ mod status_patterns {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: TODO"));
+            .stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
@@ -712,7 +712,7 @@ mod status_patterns {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "status changed from TODO to IN_PROGRESS",
+                "status changed from Todo to InProgress",
             ));
     }
 
@@ -753,7 +753,7 @@ mod status_patterns {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: DONE"));
+            .stdout(predicate::str::contains("status: Done"));
     }
 
     #[test]
@@ -783,7 +783,7 @@ mod status_patterns {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: TODO"));
+            .stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
@@ -815,7 +815,7 @@ mod status_patterns {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "status changed from TODO to IN_PROGRESS",
+                "status changed from Todo to InProgress",
             ));
     }
 
@@ -844,7 +844,7 @@ mod status_patterns {
             .arg("todo")
             .assert()
             .success()
-            .stderr(predicate::str::contains("already has status 'TODO'"));
+            .stderr(predicate::str::contains("already has status 'Todo'"));
     }
 
     #[test]
@@ -930,7 +930,7 @@ mod status_patterns {
             .arg(task_id)
             .assert()
             .success()
-            .stdout(predicate::str::contains(format!("{task_id} status: TODO")));
+            .stdout(predicate::str::contains(format!("{task_id} status: Todo")));
     }
 
     #[test]
@@ -981,7 +981,7 @@ mod status_patterns {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: DONE"));
+            .stdout(predicate::str::contains("status: Done"));
     }
 }
 
@@ -1460,6 +1460,7 @@ issue.priorities: [Low, Medium, High]
                 description: None,
                 category: None,
                 tags: vec![],
+                relationships: None,
                 custom_fields: None,
             },
         )
@@ -1482,7 +1483,7 @@ issue.priorities: [Low, Medium, High]
             .success()
             .stdout(predicate::str::contains("Task "))
             .stdout(predicate::str::contains(" status: "))
-            .stdout(predicate::str::contains("TODO"));
+            .stdout(predicate::str::contains("Todo"));
     }
 
     #[test]
@@ -1836,7 +1837,11 @@ mod list_features {
             if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
                 for task in tasks {
                     if let Some(status) = task.get("status").and_then(|s| s.as_str()) {
-                        assert_eq!(status, "TODO", "Status filter should work");
+                        assert_eq!(
+                            status.to_ascii_lowercase(),
+                            "todo",
+                            "Status filter should work"
+                        );
                     }
                 }
                 assert!(!tasks.is_empty(), "Should find some TODO tasks");
@@ -1999,7 +2004,8 @@ mod list_features {
                     for task in tasks {
                         if let Some(task_type) = task.get("task_type").and_then(|t| t.as_str()) {
                             assert_eq!(
-                                task_type, "bug",
+                                task_type.to_ascii_lowercase(),
+                                "bug",
                                 "Type filter should only return bug tasks"
                             );
                         }
@@ -2456,8 +2462,8 @@ mod list_features {
             assert!(task.get("custom_fields").is_some());
 
             assert_eq!(task["title"], "Complete task");
-            assert_eq!(task["priority"], "HIGH");
-            assert_eq!(task["task_type"], "feature");
+            assert_eq!(task["priority"], "High");
+            assert_eq!(task["task_type"], "Feature");
             assert_eq!(task["description"], "This is a detailed description");
             assert_eq!(task["category"], "web");
             assert_eq!(task["assignee"], "developer@example.com");
@@ -3364,14 +3370,16 @@ mod file_structure {
 
         let quick_str = String::from_utf8(quick_output.stdout).unwrap();
         let full_str = String::from_utf8(full_output.stdout).unwrap();
+        let quick_upper = quick_str.to_ascii_uppercase();
+        let full_upper = full_str.to_ascii_uppercase();
 
         // Both should have similar structure (both show detailed task info)
         assert!(quick_str.contains("✅ Created task:"));
         assert!(full_str.contains("✅ Created task:"));
         assert!(quick_str.contains("Title:"));
         assert!(full_str.contains("Title:"));
-        assert!(quick_str.contains("Priority: HIGH"));
-        assert!(full_str.contains("Priority: HIGH"));
+        assert!(quick_upper.contains("PRIORITY: HIGH"));
+        assert!(full_upper.contains("PRIORITY: HIGH"));
 
         // Test with JSON output
         let mut quick_json_cmd = Command::cargo_bin("lotar").unwrap();
@@ -3418,13 +3426,17 @@ mod file_structure {
         );
         assert!(quick_json.get("task").is_some());
         assert!(full_json.get("task").is_some());
-        assert!(
-            quick_json.get("task").unwrap().get("priority")
-                == Some(&serde_json::Value::String("LOW".to_string()))
-        );
-        assert!(
-            full_json.get("task").unwrap().get("priority")
-                == Some(&serde_json::Value::String("LOW".to_string()))
-        );
+        let quick_priority = quick_json
+            .get("task")
+            .and_then(|task| task.get("priority"))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        let full_priority = full_json
+            .get("task")
+            .and_then(|task| task.get("priority"))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        assert_eq!(quick_priority, "Low");
+        assert_eq!(full_priority, "Low");
     }
 }

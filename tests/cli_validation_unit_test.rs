@@ -7,13 +7,25 @@ fn cfg() -> ResolvedConfig {
         server_port: 8080,
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField {
-            values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+            values: vec![
+                TaskStatus::from("Todo"),
+                TaskStatus::from("InProgress"),
+                TaskStatus::from("Done"),
+            ],
         },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature, TaskType::Bug, TaskType::Epic],
+            values: vec![
+                TaskType::from("Feature"),
+                TaskType::from("Bug"),
+                TaskType::from("Epic"),
+            ],
         },
         issue_priorities: ConfigurableField {
-            values: vec![Priority::Low, Priority::Medium, Priority::High],
+            values: vec![
+                Priority::from("Low"),
+                Priority::from("Medium"),
+                Priority::from("High"),
+            ],
         },
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
@@ -24,7 +36,7 @@ fn cfg() -> ResolvedConfig {
         auto_set_reporter: true,
         auto_assign_on_status: true,
         auto_codeowners_assign: true,
-        default_priority: Priority::Medium,
+        default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![
@@ -56,6 +68,8 @@ fn validate_status_variants() {
     let validator = CliValidator::new(&conf);
     assert!(validator.validate_status("TODO").is_ok());
     assert!(validator.validate_status("IN_PROGRESS").is_ok());
+    assert!(validator.validate_status("InProgress").is_ok());
+    assert!(validator.validate_status("in progress").is_ok());
     assert!(validator.validate_status("DONE").is_ok());
     assert!(validator.validate_status("todo").is_ok());
     assert!(validator.validate_status("in_progress").is_ok());
@@ -73,6 +87,15 @@ fn validate_assignee_formats() {
     assert!(validator.validate_assignee("not-an-email").is_err());
     assert!(validator.validate_assignee("@").is_err());
     assert!(validator.validate_assignee("john@").is_err());
+}
+
+#[test]
+fn validate_tags_trim_and_reject_empty() {
+    let conf = cfg();
+    let validator = CliValidator::new(&conf);
+    assert_eq!(validator.validate_tag(" backend ").unwrap(), "backend");
+    assert!(validator.validate_tag("").is_err());
+    assert!(validator.validate_tag("   ").is_err());
 }
 
 #[test]
@@ -115,8 +138,8 @@ fn custom_field_collision_is_rejected() {
 // Merged from types_priority_unit_test.rs
 #[test]
 fn priority_serialization() {
-    let priority = Priority::High;
-    assert_eq!(priority.to_string(), "HIGH");
+    let priority = Priority::from("High");
+    assert_eq!(priority.to_string(), "High");
     let yaml = serde_yaml::to_string(&priority).unwrap();
     assert!(yaml.contains("High"));
     let json = serde_json::to_string(&priority).unwrap();

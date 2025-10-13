@@ -8,22 +8,26 @@ fn cfg() -> ResolvedConfig {
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![
-                TaskStatus::Todo,
-                TaskStatus::InProgress,
-                TaskStatus::Verify,
-                TaskStatus::Blocked,
-                TaskStatus::Done,
+                TaskStatus::from("Todo"),
+                TaskStatus::from("InProgress"),
+                TaskStatus::from("Verify"),
+                TaskStatus::from("Blocked"),
+                TaskStatus::from("Done"),
             ],
         },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature, TaskType::Bug, TaskType::Epic],
+            values: vec![
+                TaskType::from("Feature"),
+                TaskType::from("Bug"),
+                TaskType::from("Epic"),
+            ],
         },
         issue_priorities: ConfigurableField {
             values: vec![
-                Priority::Low,
-                Priority::Medium,
-                Priority::High,
-                Priority::Critical,
+                Priority::from("Low"),
+                Priority::from("Medium"),
+                Priority::from("High"),
+                Priority::from("Critical"),
             ],
         },
         categories: StringConfigField::new_wildcard(),
@@ -35,7 +39,7 @@ fn cfg() -> ResolvedConfig {
         auto_set_reporter: true,
         auto_assign_on_status: true,
         auto_codeowners_assign: true,
-        default_priority: Priority::Medium,
+        default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![
@@ -78,13 +82,13 @@ fn due_date_next_weekday_and_offsets() {
 #[test]
 fn ordering_invariants_for_status_and_priority() {
     // Priority: Low < Medium < High < Critical
-    assert!(Priority::Low < Priority::Medium);
-    assert!(Priority::Medium < Priority::High);
-    assert!(Priority::High < Priority::Critical);
+    assert!(Priority::from("Low") < Priority::from("Medium"));
+    assert!(Priority::from("Medium") < Priority::from("High"));
+    assert!(Priority::from("High") < Priority::from("Critical"));
 
     // TaskStatus: Todo < InProgress < Verify < Blocked < Done
-    assert!(TaskStatus::Todo < TaskStatus::InProgress);
-    assert!(TaskStatus::InProgress < TaskStatus::Verify);
-    assert!(TaskStatus::Verify < TaskStatus::Blocked);
-    assert!(TaskStatus::Blocked < TaskStatus::Done);
+    assert!(TaskStatus::from("Todo") < TaskStatus::from("InProgress"));
+    assert!(TaskStatus::from("InProgress") < TaskStatus::from("Verify"));
+    assert!(TaskStatus::from("Verify") < TaskStatus::from("Blocked"));
+    assert!(TaskStatus::from("Blocked") < TaskStatus::from("Done"));
 }

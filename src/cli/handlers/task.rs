@@ -831,13 +831,11 @@ impl CommandHandler for SearchHandler {
         }
 
         if args.high {
-            use crate::types::Priority;
-            tasks.retain(|(_, task)| task.priority == Priority::High);
+            tasks.retain(|(_, task)| task.priority.eq_ignore_case("high"));
         }
 
         if args.critical {
-            use crate::types::Priority;
-            tasks.retain(|(_, task)| task.priority == Priority::Critical);
+            tasks.retain(|(_, task)| task.priority.eq_ignore_case("critical"));
         }
 
         // Overdue filter: due_date strictly before now
@@ -997,8 +995,8 @@ impl CommandHandler for SearchHandler {
             tasks.sort_by(|(id_a, a), (id_b, b)| {
                 use std::cmp::Ordering::*;
                 let ord = match key.as_str() {
-                    "priority" => a.priority.cmp(&b.priority),
-                    "status" => a.status.cmp(&b.status),
+                    "priority" => a.priority.as_str().cmp(b.priority.as_str()),
+                    "status" => a.status.as_str().cmp(b.status.as_str()),
                     "effort" => {
                         // Compare normalized effort values; missing values sort last
                         let pa = a

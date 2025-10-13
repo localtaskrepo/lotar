@@ -30,7 +30,7 @@ mod status_command_pattern {
             .assert()
             .success();
 
-        // Get the status (should be TODO by default)
+        // Get the status (should be Todo by default)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
@@ -38,7 +38,7 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: TODO"));
+            .stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
@@ -66,7 +66,7 @@ mod status_command_pattern {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "status changed from TODO to IN_PROGRESS",
+                "status changed from Todo to InProgress",
             ));
     }
 
@@ -103,7 +103,7 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: DONE"));
+            .stdout(predicate::str::contains("status: Done"));
     }
 
     #[test]
@@ -129,7 +129,7 @@ mod status_command_pattern {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: TODO"));
+            .stdout(predicate::str::contains("status: Todo"));
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod status_command_pattern {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "status changed from TODO to IN_PROGRESS",
+                "status changed from Todo to InProgress",
             ));
     }
 
@@ -174,7 +174,7 @@ mod status_command_pattern {
             .assert()
             .success();
 
-        // Try to set status to the same value (TODO)
+        // Try to set status to the same value (Todo)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
@@ -182,7 +182,7 @@ mod status_command_pattern {
             .arg("todo")
             .assert()
             .success()
-            .stderr(predicate::str::contains("already has status 'TODO'"));
+            .stderr(predicate::str::contains("already has status 'Todo'"));
     }
 
     #[test]
@@ -256,7 +256,7 @@ mod status_command_pattern {
             .arg(task_id)
             .assert()
             .success()
-            .stdout(predicate::str::contains(format!("{task_id} status: TODO")));
+            .stdout(predicate::str::contains(format!("{task_id} status: Todo")));
     }
 
     #[test]
@@ -298,6 +298,6 @@ mod status_command_pattern {
             .arg("1")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: DONE"));
+            .stdout(predicate::str::contains("status: Done"));
     }
 }

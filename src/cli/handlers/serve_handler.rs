@@ -19,19 +19,15 @@ impl CommandHandler for ServeHandler {
         _resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
-        let port = args.port.unwrap_or(8080);
-        let host = args.host;
-        renderer.log_info(&format!(
-            "serve: host={} port={} open={}",
-            host, port, args.open
-        ));
+        let ServeArgs { port, host, open } = args;
+        renderer.log_info(&format!("serve: host={} port={} open={}", host, port, open));
 
         renderer.emit_success("Starting LoTaR web server...");
         renderer.emit_raw_stdout(&format!("   Host: {}", host));
         renderer.emit_raw_stdout(&format!("   Port: {}", port));
         renderer.emit_raw_stdout(&format!("   URL: http://{}:{}", host, port));
 
-        if args.open {
+        if open {
             // Open browser automatically
             let url = format!("http://{}:{}", host, port);
             if let Err(e) = open_browser(&url) {

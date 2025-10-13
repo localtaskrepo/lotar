@@ -247,11 +247,11 @@ impl CommandHandler for StatsHandler {
                     fn parse_status_str_tolerant(s: &str) -> Option<crate::types::TaskStatus> {
                         let norm = s.to_ascii_lowercase().replace(['_', '-'], "");
                         match norm.as_str() {
-                            "todo" => Some(crate::types::TaskStatus::Todo),
-                            "inprogress" => Some(crate::types::TaskStatus::InProgress),
-                            "verify" => Some(crate::types::TaskStatus::Verify),
-                            "blocked" => Some(crate::types::TaskStatus::Blocked),
-                            "done" => Some(crate::types::TaskStatus::Done),
+                            "todo" => Some(crate::types::TaskStatus::from("Todo")),
+                            "inprogress" => Some(crate::types::TaskStatus::from("InProgress")),
+                            "verify" => Some(crate::types::TaskStatus::from("Verify")),
+                            "blocked" => Some(crate::types::TaskStatus::from("Blocked")),
+                            "done" => Some(crate::types::TaskStatus::from("Done")),
                             _ => None,
                         }
                     }
@@ -450,11 +450,11 @@ impl CommandHandler for StatsHandler {
                         fn parse_status_str_tolerant(s: &str) -> Option<crate::types::TaskStatus> {
                             let norm = s.to_ascii_lowercase().replace(['_', '-'], "");
                             match norm.as_str() {
-                                "todo" => Some(crate::types::TaskStatus::Todo),
-                                "inprogress" => Some(crate::types::TaskStatus::InProgress),
-                                "verify" => Some(crate::types::TaskStatus::Verify),
-                                "blocked" => Some(crate::types::TaskStatus::Blocked),
-                                "done" => Some(crate::types::TaskStatus::Done),
+                                "todo" => Some(crate::types::TaskStatus::from("Todo")),
+                                "inprogress" => Some(crate::types::TaskStatus::from("InProgress")),
+                                "verify" => Some(crate::types::TaskStatus::from("Verify")),
+                                "blocked" => Some(crate::types::TaskStatus::from("Blocked")),
+                                "done" => Some(crate::types::TaskStatus::from("Done")),
                                 _ => None,
                             }
                         }
@@ -690,6 +690,8 @@ impl CommandHandler for StatsHandler {
                                             custom_fields,
                                             relationships,
                                             comments,
+                                            references,
+                                            history,
                                         ) = (|| {
                                             let content =
                                                 fs::read_to_string(&abs_file).unwrap_or_default();
@@ -716,6 +718,8 @@ impl CommandHandler for StatsHandler {
                                                     tags: task.tags,
                                                     relationships: task.relationships,
                                                     comments: task.comments,
+                                                    references: task.references,
+                                                    history: task.history,
                                                     custom_fields: task.custom_fields,
                                                 };
                                                 return (
@@ -733,6 +737,8 @@ impl CommandHandler for StatsHandler {
                                                     dto.custom_fields,
                                                     dto.relationships,
                                                     dto.comments,
+                                                    dto.references,
+                                                    dto.history,
                                                 );
                                             }
                                             // Tolerant parse via generic YAML
@@ -750,6 +756,10 @@ impl CommandHandler for StatsHandler {
                                             let relationships =
                                                 crate::types::TaskRelationships::default();
                                             let comments: Vec<crate::types::TaskComment> =
+                                                Vec::new();
+                                            let references: Vec<crate::types::ReferenceEntry> =
+                                                Vec::new();
+                                            let history: Vec<crate::types::TaskChangeLogEntry> =
                                                 Vec::new();
                                             let custom_fields: crate::types::CustomFields =
                                                 Default::default();
@@ -840,6 +850,8 @@ impl CommandHandler for StatsHandler {
                                                 custom_fields,
                                                 relationships,
                                                 comments,
+                                                references,
+                                                history,
                                             )
                                         })();
                                         let dto = crate::api_types::TaskDTO {
@@ -860,6 +872,8 @@ impl CommandHandler for StatsHandler {
                                             tags,
                                             relationships,
                                             comments,
+                                            references,
+                                            history,
                                             custom_fields,
                                         };
                                         matched.push((id, dto));
@@ -1513,11 +1527,11 @@ impl CommandHandler for StatsHandler {
                         fn parse_status_str_tolerant(s: &str) -> Option<crate::types::TaskStatus> {
                             let norm = s.to_ascii_lowercase().replace(['_', '-'], "");
                             match norm.as_str() {
-                                "todo" => Some(crate::types::TaskStatus::Todo),
-                                "inprogress" => Some(crate::types::TaskStatus::InProgress),
-                                "verify" => Some(crate::types::TaskStatus::Verify),
-                                "blocked" => Some(crate::types::TaskStatus::Blocked),
-                                "done" => Some(crate::types::TaskStatus::Done),
+                                "todo" => Some(crate::types::TaskStatus::from("Todo")),
+                                "inprogress" => Some(crate::types::TaskStatus::from("InProgress")),
+                                "verify" => Some(crate::types::TaskStatus::from("Verify")),
+                                "blocked" => Some(crate::types::TaskStatus::from("Blocked")),
+                                "done" => Some(crate::types::TaskStatus::from("Done")),
                                 _ => None,
                             }
                         }

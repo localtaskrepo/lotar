@@ -279,7 +279,7 @@ pub enum StatsAgeDistribution {
     Month,
 }
 
-// Note: StatsEffortGroupBy removed in favor of free-form string keys via unified field resolver
+// Note (LOTA-1): StatsEffortGroupBy removed in favor of free-form string keys via unified field resolver
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum StatsEffortUnit {

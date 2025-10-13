@@ -18,5 +18,5 @@ config:
     - Chore
   tags:
     - "*"
-  categories:
-    - "*"
+  custom.fields:
+    - "category"

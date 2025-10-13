@@ -14,13 +14,13 @@ fn make_resolver() -> ProjectResolver {
         server_port: 8080,
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField {
-            values: vec![TaskStatus::Todo, TaskStatus::Done],
+            values: vec![TaskStatus::from("Todo"), TaskStatus::from("Done")],
         },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature, TaskType::Bug],
+            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         },
         issue_priorities: ConfigurableField {
-            values: vec![Priority::Low, Priority::High],
+            values: vec![Priority::from("Low"), Priority::from("High")],
         },
         categories: StringConfigField::new_wildcard(),
         tags: StringConfigField::new_wildcard(),
@@ -31,7 +31,7 @@ fn make_resolver() -> ProjectResolver {
         auto_set_reporter: true,
         auto_assign_on_status: true,
         auto_codeowners_assign: true,
-        default_priority: Priority::Medium,
+        default_priority: Priority::from("Medium"),
         default_status: None,
         custom_fields: StringConfigField::new_wildcard(),
         scan_signal_words: vec![

@@ -791,6 +791,28 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     }
                     m
                 });
+            let relationships = match req.params.get("relationships") {
+                Some(value) => {
+                    match serde_json::from_value::<crate::types::TaskRelationships>(value.clone()) {
+                        Ok(rel) => {
+                            if rel.is_empty() {
+                                None
+                            } else {
+                                Some(rel)
+                            }
+                        }
+                        Err(e) => {
+                            return err(
+                                req.id,
+                                -32602,
+                                &format!("Invalid relationships payload: {}", e),
+                                None,
+                            );
+                        }
+                    }
+                }
+                None => None,
+            };
 
             // Assemble DTO
             let dto = crate::api_types::TaskCreate {
@@ -811,6 +833,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 description,
                 category,
                 tags,
+                relationships,
                 custom_fields,
             };
 
@@ -1064,6 +1087,31 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                         .filter_map(|x| x.as_str().map(|s| s.to_string()))
                         .collect(),
                 );
+            }
+            if let Some(rel_val) = patch_val.get("relationships") {
+                if rel_val.is_null() {
+                    patch.relationships = Some(crate::types::TaskRelationships::default());
+                } else {
+                    match serde_json::from_value::<crate::types::TaskRelationships>(rel_val.clone())
+                    {
+                        Ok(rel) => {
+                            if rel.is_empty() {
+                                patch.relationships =
+                                    Some(crate::types::TaskRelationships::default());
+                            } else {
+                                patch.relationships = Some(rel);
+                            }
+                        }
+                        Err(e) => {
+                            return err(
+                                req.id,
+                                -32602,
+                                &format!("Invalid relationships payload: {}", e),
+                                None,
+                            );
+                        }
+                    }
+                }
             }
             if let Some(obj) = patch_val.get("custom_fields").and_then(|v| v.as_object()) {
                 fn json_to_custom(val: &serde_json::Value) -> crate::types::CustomFieldValue {

@@ -57,13 +57,18 @@ impl<'a> CliValidator<'a> {
 
     /// Validate tag against project configuration
     pub fn validate_tag(&self, tag: &str) -> Result<String, String> {
+        let normalized = tag.trim();
+        if normalized.is_empty() {
+            return Err("Tag cannot be empty or whitespace".to_string());
+        }
+
         if self.config.tags.has_wildcard() {
             // Any tag is allowed
-            Ok(tag.to_string())
-        } else if self.config.tags.values.contains(&tag.to_string()) {
-            Ok(tag.to_string())
+            Ok(normalized.to_string())
+        } else if self.config.tags.values.contains(&normalized.to_string()) {
+            Ok(normalized.to_string())
         } else {
-            let suggestion = find_closest_match(tag, &self.config.tags.values);
+            let suggestion = find_closest_match(normalized, &self.config.tags.values);
             let suggestion_text = match suggestion {
                 Some(s) => format!(" Did you mean '{}'?", s),
                 None => String::new(),
@@ -71,7 +76,7 @@ impl<'a> CliValidator<'a> {
 
             Err(format!(
                 "Tag '{}' is not allowed in this project. Valid tags: {}.{}",
-                tag,
+                normalized,
                 self.config.tags.values.join(", "),
                 suggestion_text
             ))

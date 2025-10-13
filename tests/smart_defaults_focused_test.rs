@@ -40,8 +40,8 @@ mod assignment {
         let req = TaskCreate {
             title: "Auto reporter".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::High),
-            task_type: Some(TaskType::Feature),
+            priority: Some(Priority::from("High")),
+            task_type: Some(TaskType::from("Feature")),
             reporter: None,
             assignee: None,
             due_date: None,
@@ -49,6 +49,7 @@ mod assignment {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -81,6 +82,7 @@ mod assignment {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -110,6 +112,7 @@ mod assignment {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -147,6 +150,7 @@ mod assignment {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         };
         let created = TaskService::create(&mut storage, create).unwrap();
@@ -157,7 +161,7 @@ mod assignment {
             &mut storage,
             &created.id,
             TaskUpdate {
-                status: Some(TaskStatus::InProgress),
+                status: Some(TaskStatus::from("InProgress")),
                 ..Default::default()
             },
         )
@@ -190,6 +194,7 @@ mod assignment {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         };
         let created = TaskService::create(&mut storage, create).unwrap();
@@ -200,7 +205,7 @@ mod assignment {
             &mut storage,
             &created.id,
             TaskUpdate {
-                status: Some(TaskStatus::Done),
+                status: Some(TaskStatus::from("Done")),
                 ..Default::default()
             },
         )
@@ -239,6 +244,7 @@ mod assignment {
                 description: None,
                 category: None,
                 tags: vec![],
+                relationships: None,
                 custom_fields: None,
             },
         )
@@ -250,7 +256,7 @@ mod assignment {
             &mut storage,
             &created.id,
             TaskUpdate {
-                status: Some(TaskStatus::InProgress),
+                status: Some(TaskStatus::from("InProgress")),
                 ..Default::default()
             },
         )
@@ -279,6 +285,7 @@ mod assignment {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         };
         let created = TaskService::create(&mut storage, req).expect("create");
@@ -392,7 +399,7 @@ mod priority_smart_defaults {
         env.create_task("prio-global", "Test global default priority");
 
         // Should use global default (Medium) since it's in the project list
-        env.assert_task_priority("prio-global", "MEDIUM");
+        env.assert_task_priority("prio-global", "Medium");
     }
 
     #[test]
@@ -408,7 +415,7 @@ mod priority_smart_defaults {
         );
 
         // Should fall back to first in list (Critical)
-        env.assert_task_priority("prio-fallback", "CRITICAL");
+        env.assert_task_priority("prio-fallback", "Critical");
     }
 
     #[test]
@@ -425,7 +432,7 @@ mod priority_smart_defaults {
         env.create_task("prio-explicit", "Test explicit priority");
 
         // Should use explicit project default (High)
-        env.assert_task_priority("prio-explicit", "HIGH");
+        env.assert_task_priority("prio-explicit", "High");
     }
 
     #[test]
@@ -442,7 +449,7 @@ mod priority_smart_defaults {
         );
 
         // Should fall back to first in list (Critical)
-        env.assert_task_priority("prio-invalid", "CRITICAL");
+        env.assert_task_priority("prio-invalid", "Critical");
     }
 }
 
@@ -499,8 +506,8 @@ mod status_smart_defaults {
         // Don't customize issue_states - use template defaults
         env.create_task("status-default", "Test default status");
 
-        // Should use first from default template (TODO)
-        env.assert_task_status("status-default", "TODO");
+        // Should use first from default template (Todo)
+        env.assert_task_status("status-default", "Todo");
     }
 }
 
@@ -527,7 +534,7 @@ mod combined_scenarios {
         );
 
         // Should get fallback priority + explicit status
-        env.assert_task_priority("mixed", "CRITICAL");
+        env.assert_task_priority("mixed", "Critical");
         env.assert_task_status("mixed", "BLOCKED");
     }
 
@@ -551,7 +558,7 @@ mod combined_scenarios {
         env.create_task("both-explicit", "Test both explicit");
 
         // Should use both explicit defaults
-        env.assert_task_priority("both-explicit", "HIGH");
+        env.assert_task_priority("both-explicit", "High");
         env.assert_task_status("both-explicit", "VERIFY");
     }
 
@@ -594,7 +601,7 @@ mod edge_cases {
         );
 
         // Should use the only available priority
-        env.assert_task_priority("single-prio", "CRITICAL");
+        env.assert_task_priority("single-prio", "Critical");
     }
 
     #[test]
@@ -636,8 +643,8 @@ mod edge_cases {
             .unwrap();
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        // Should have 3 tasks all with CRITICAL priority and VERIFY status
-        assert_eq!(stdout.matches("(CRITICAL)").count(), 3);
+        // Should have 3 tasks all with Critical priority and VERIFY status
+        assert_eq!(stdout.matches("(Critical)").count(), 3);
         assert_eq!(stdout.matches("[VERIFY]").count(), 3);
     }
 }
@@ -646,11 +653,13 @@ mod edge_cases {
 mod default_status_tests {
     use super::*;
     use common::TestFixtures;
+    use common::env_mutex::EnvVarGuard;
 
     #[test]
     fn test_new_task_uses_first_configured_status() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
+        let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -692,6 +701,7 @@ mod default_status_tests {
     fn test_explicit_default_status_config() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
+        let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -743,6 +753,7 @@ mod default_status_tests {
     fn test_fallback_to_todo_when_no_config() {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
+        let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
@@ -757,6 +768,6 @@ mod default_status_tests {
             .arg("1")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: TODO"));
+            .stdout(predicate::str::contains("status: Todo"));
     }
 }

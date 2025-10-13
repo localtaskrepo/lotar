@@ -62,6 +62,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -134,6 +135,7 @@ fn codeowners_disabled_falls_back_to_identity() {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -201,6 +203,7 @@ fn codeowners_default_multiple_owners_picks_first() {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -272,6 +275,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]

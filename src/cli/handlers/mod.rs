@@ -191,7 +191,7 @@ impl CommandHandler for AddHandler {
                         } else if let Some(first) = config.issue_types.values.first() {
                             first.clone()
                         } else {
-                            TaskType::Feature
+                            TaskType::from("Feature")
                         }
                     } else {
                         // No branch inference: do NOT consult branch or alias maps at all.
@@ -202,7 +202,7 @@ impl CommandHandler for AddHandler {
                         } else if let Some(first) = config.issue_types.values.first() {
                             first.clone()
                         } else {
-                            TaskType::Feature
+                            TaskType::from("Feature")
                         }
                     }
                 }
@@ -246,7 +246,7 @@ impl CommandHandler for AddHandler {
                                         || branch_lower.starts_with(&format!("{k}_"))
                                         || branch_lower.starts_with(&format!("{k}/"))
                                     {
-                                        matched = Some(*v);
+                                        matched = Some(v.clone());
                                         break;
                                     }
                                 }
@@ -477,7 +477,7 @@ impl CommandHandler for AddHandler {
                         "action": "create",
                         "project": project_for_storage,
                         "title": task.title,
-                        "type": format!("{:?}", task.task_type),
+                        "type": task.task_type.to_string(),
                         "priority": task.priority.to_string(),
                         "status_value": task.status.to_string(),
                     });
@@ -529,6 +529,12 @@ impl CommandHandler for AddHandler {
             "add: writing task to storage project={} original={:?}",
             project_for_storage, original_project_name
         ));
+        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
+            eprintln!(
+                "[lotar][debug] add storing project={} original={:?}",
+                project_for_storage, original_project_name
+            );
+        }
         let task_id = storage.add(&task, &project_for_storage, original_project_name);
         renderer.log_info(&format!("add: created id={}", task_id));
 
@@ -663,7 +669,7 @@ impl AddHandler {
         field_name: &str,
     ) -> Result<T, String>
     where
-        T: Clone + PartialEq + std::fmt::Debug,
+        T: Clone + PartialEq + std::fmt::Debug + std::fmt::Display,
     {
         // Error if project has no values configured (user configuration error)
         if project_values.is_empty() {
@@ -679,9 +685,14 @@ impl AddHandler {
                 return Ok(explicit.clone());
             } else {
                 // Emit warning unless silenced for tests
+                let formatted_values = project_values
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 Self::warn_logger().log_warn(&format!(
-                    "Warning: Project default {} '{:?}' is not in configured {} list {:?}. Using smart fallback.",
-                    field_name, explicit, field_name, project_values
+                    "Warning: Project default {} '{}' is not in configured {} list [{}]. Using smart fallback.",
+                    field_name, explicit, field_name, formatted_values
                 ));
             }
         }
@@ -691,9 +702,14 @@ impl AddHandler {
             return Ok(global_default.clone());
         } else {
             // Emit warning unless silenced for tests
+            let formatted_values = project_values
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
             Self::warn_logger().log_warn(&format!(
-                "Warning: Global default {} '{:?}' is not in project {} list {:?}. Using first configured value.",
-                field_name, global_default, field_name, project_values
+                "Warning: Global default {} '{}' is not in project {} list [{}]. Using first configured value.",
+                field_name, global_default, field_name, formatted_values
             ));
         }
 
@@ -703,7 +719,7 @@ impl AddHandler {
 
     /// Get default priority with smart fallback logic
     fn get_default_priority(config: &ResolvedConfig) -> Priority {
-        // Note: ResolvedConfig.default_priority is always set (not Option)
+        // Note (LOTA-9): ResolvedConfig.default_priority is always set (not Option)
         // We treat it as the global default, and there's no separate project explicit default for priority
         match Self::get_smart_default(
             None, // No project explicit default for priority in current design
@@ -736,9 +752,16 @@ impl AddHandler {
                 return explicit.clone();
             } else {
                 // Emit warning unless silenced for tests
+                let formatted_values = config
+                    .issue_states
+                    .values
+                    .iter()
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 Self::warn_logger().log_warn(&format!(
-                    "Warning: Project default status '{:?}' is not in configured status list {:?}. Using smart fallback.",
-                    explicit, config.issue_states.values
+                    "Warning: Project default status '{}' is not in configured status list [{}]. Using smart fallback.",
+                    explicit, formatted_values
                 ));
             }
         }

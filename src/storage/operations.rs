@@ -50,6 +50,9 @@ impl StorageOperations {
 
         // Get file path using the numeric ID
         let file_path = Self::get_file_path(project_prefix, next_numeric_id, root_path);
+        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
+            eprintln!("[lotar][debug] writing task file {}", file_path.display());
+        }
         let file_string = serde_yaml::to_string(task)?;
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent)?;

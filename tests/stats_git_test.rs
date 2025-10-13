@@ -35,6 +35,10 @@ fn write_file(root: &std::path::Path, rel: &str, content: &str) {
     std::fs::write(&path, content).unwrap();
 }
 
+fn normalize_status_key(value: &str) -> String {
+    value.to_ascii_lowercase().replace(['_', '-', ' '], "")
+}
+
 fn add_and_commit(
     repo: &std::path::Path,
     rel: &str,
@@ -140,8 +144,14 @@ fn stats_time_in_status_basic_window() {
 
     let rows = my["items"].as_array().unwrap();
     let get_secs = |name: &str| -> i64 {
+        let expect_key = normalize_status_key(name);
         rows.iter()
-            .find(|r| r["status"].as_str() == Some(name))
+            .find(|r| {
+                r["status"]
+                    .as_str()
+                    .map(|status| normalize_status_key(status) == expect_key)
+                    .unwrap_or(false)
+            })
             .and_then(|r| r["seconds"].as_i64())
             .unwrap_or(0)
     };
@@ -235,8 +245,14 @@ fn stats_time_in_status_single_task() {
     assert_eq!(row["id"].as_str(), Some("TEST-1"));
     let rows = row["items"].as_array().unwrap();
     let get_secs = |name: &str| -> i64 {
+        let expect_key = normalize_status_key(name);
         rows.iter()
-            .find(|r| r["status"].as_str() == Some(name))
+            .find(|r| {
+                r["status"]
+                    .as_str()
+                    .map(|status| normalize_status_key(status) == expect_key)
+                    .unwrap_or(false)
+            })
             .and_then(|r| r["seconds"].as_i64())
             .unwrap_or(0)
     };
@@ -472,11 +488,12 @@ fn stats_changed_and_churn_and_authors() {
     assert!(ids.contains(&"TEST-2".to_string()));
 
     // stats churn: TEST-1 should have the most commits (>=2 commits)
+    // Use a 90-day window to ensure both commits land inside the range regardless of test execution time
     let output = Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(root)
         .args([
-            "--format", "json", "stats", "churn", "--since", "60d", "--global",
+            "--format", "json", "stats", "churn", "--since", "90d", "--global",
         ])
         .output()
         .unwrap();

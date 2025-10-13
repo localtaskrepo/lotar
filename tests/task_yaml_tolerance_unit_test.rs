@@ -13,9 +13,9 @@ modified: 2025-08-01T10:00:00Z
 }
 
 #[test]
-fn task_yaml_parse_uppercase_status_fails() {
-    // Uppercase enum strings are commonly present in legacy/manual files
-    // Derive(Deserialize) expects the Rust variant names (e.g., Todo), so this should fail.
+fn task_yaml_parse_uppercase_status_succeeds() {
+    // Uppercase enum strings are commonly present in legacy/manual files.
+    // The parser should accept them and preserve the configured value.
     let yml = r#"
 title: Sample
 status: TODO
@@ -26,13 +26,13 @@ modified: 2025-08-01T10:00:00Z
 "#;
     let t: Result<lotar::Task, _> = serde_yaml::from_str(yml);
     assert!(
-        t.is_err(),
-        "Uppercase status should not parse with derived enum deserializer"
+        t.is_ok(),
+        "Uppercase status should parse successfully into Task"
     );
 }
 
 #[test]
-fn task_yaml_parse_uppercase_priority_fails() {
+fn task_yaml_parse_uppercase_priority_succeeds() {
     let yml = r#"
 title: Sample
 status: Todo
@@ -43,8 +43,8 @@ modified: 2025-08-01T10:00:00Z
 "#;
     let t: Result<lotar::Task, _> = serde_yaml::from_str(yml);
     assert!(
-        t.is_err(),
-        "Uppercase priority should not parse with derived enum deserializer"
+        t.is_ok(),
+        "Uppercase priority should parse successfully into Task"
     );
 }
 

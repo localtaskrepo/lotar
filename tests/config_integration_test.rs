@@ -357,7 +357,7 @@ mod config_operations {
         let config_path = temp_dir.join(".tasks").join("SETT").join("config.yml");
         let config_content = fs::read_to_string(&config_path).unwrap();
         assert!(config_content.contains("default:"));
-        assert!(config_content.contains("priority: High"));
+        assert!(config_content.contains("priority: HIGH"));
         assert!(config_content.contains("issue:"));
         assert!(config_content.contains("states:"));
     }
@@ -615,7 +615,7 @@ mod inheritance {
             .success()
             // With canonicalization, a provided project name is displayed as its prefix
             .stdout(predicate::str::contains("Project prefix: INHE"))
-            .stdout(predicate::str::contains("Default Priority: High")); // Project-specific
+            .stdout(predicate::str::contains("Default Priority: HIGH")); // Project-specific
     }
 }
 

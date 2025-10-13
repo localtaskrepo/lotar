@@ -11,11 +11,11 @@ pub struct Task {
     // Built-in standard fields (special handling in UI)
     // Note: ID is no longer stored in file - it's derived from folder+filename
     pub title: String,
-    #[serde(skip_serializing_if = "TaskStatus::is_default", default)]
+    #[serde(skip_serializing_if = "TaskStatus::is_empty", default)]
     pub status: TaskStatus,
-    #[serde(skip_serializing_if = "Priority::is_default", default)]
+    #[serde(skip_serializing_if = "Priority::is_empty", default)]
     pub priority: Priority,
-    #[serde(skip_serializing_if = "TaskType::is_default", default)]
+    #[serde(skip_serializing_if = "TaskType::is_empty", default)]
     pub task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub reporter: Option<String>,
@@ -35,6 +35,8 @@ pub struct Task {
     pub relationships: TaskRelationships,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub comments: Vec<TaskComment>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub history: Vec<crate::types::TaskChangeLogEntry>,
 
     // General references attached to the task (code locations, links, etc.)
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -73,6 +75,7 @@ impl Task {
             acceptance_criteria: vec![],
             relationships: TaskRelationships::default(),
             comments: vec![],
+            history: vec![],
             references: vec![],
             subtitle: None,
             description: None,

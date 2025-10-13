@@ -9,6 +9,7 @@ pub mod identity;
 pub mod identity_detectors;
 pub mod paths;
 pub mod project;
+pub mod tags;
 pub mod time;
 pub mod workspace_labels;
 

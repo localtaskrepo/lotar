@@ -9,7 +9,17 @@ use crate::utils::project::resolve_project_input;
 use crate::utils::project::validate_explicit_prefix;
 use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
+use std::fmt::Display;
 use std::fs;
+
+fn format_value_list<T: Display>(values: &[T]) -> String {
+    let joined = values
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("[{}]", joined)
+}
 
 /// Handler for config commands
 pub struct ConfigHandler;
@@ -20,7 +30,7 @@ impl CommandHandler for ConfigHandler {
 
     fn execute(
         args: Self::Args,
-        _project: Option<&str>,
+        project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
@@ -34,7 +44,9 @@ impl CommandHandler for ConfigHandler {
                 dry_run,
                 force,
                 global,
-            }) => Self::handle_config_set(resolver, renderer, field, value, dry_run, force, global),
+            }) => Self::handle_config_set(
+                resolver, renderer, field, value, dry_run, force, global, project,
+            ),
             ConfigAction::Init(crate::cli::ConfigInitArgs {
                 template,
                 prefix,
@@ -268,14 +280,16 @@ impl ConfigHandler {
                     "default"
                 }
                 "default_priority" => {
-                    if home_cfg.as_ref().is_some_and(|home| {
-                        Some(home.default_priority) == Some(resolved.default_priority)
-                    }) {
+                    if home_cfg
+                        .as_ref()
+                        .is_some_and(|home| home.default_priority == resolved.default_priority)
+                    {
                         return "home";
                     }
-                    if global_cfg.as_ref().is_some_and(|glob| {
-                        Some(glob.default_priority) == Some(resolved.default_priority)
-                    }) {
+                    if global_cfg
+                        .as_ref()
+                        .is_some_and(|glob| glob.default_priority == resolved.default_priority)
+                    {
                         return "global";
                     }
                     "default"
@@ -365,28 +379,28 @@ impl ConfigHandler {
                 renderer.emit_raw_stdout(&format!("  Default assignee: {}", assignee));
             }
             renderer.emit_raw_stdout(&format!(
-                "  Default Priority: {:?}",
+                "  Default Priority: {}",
                 resolved_project.default_priority
             ));
 
             // Show default status if configured
             if let Some(status) = &resolved_project.default_status {
-                renderer.emit_raw_stdout(&format!("  Default Status: {:?}", status));
+                renderer.emit_raw_stdout(&format!("  Default Status: {}", status));
             }
             renderer.emit_raw_stdout("");
 
             // Issue Types, States, and Priorities
             renderer.emit_raw_stdout(&format!(
-                "Issue States: {:?}",
-                resolved_project.issue_states.values
+                "Issue States: {}",
+                format_value_list(&resolved_project.issue_states.values)
             ));
             renderer.emit_raw_stdout(&format!(
-                "Issue Types: {:?}",
-                resolved_project.issue_types.values
+                "Issue Types: {}",
+                format_value_list(&resolved_project.issue_types.values)
             ));
             renderer.emit_raw_stdout(&format!(
-                "Issue Priorities: {:?}",
-                resolved_project.issue_priorities.values
+                "Issue Priorities: {}",
+                format_value_list(&resolved_project.issue_priorities.values)
             ));
 
             if explain {
@@ -595,6 +609,7 @@ impl ConfigHandler {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn handle_config_set(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -603,6 +618,7 @@ impl ConfigHandler {
         dry_run: bool,
         force: bool,
         mut global: bool,
+        project: Option<&str>,
     ) -> Result<(), String> {
         // Auto-detect global-only fields
         let global_only_fields = ["server_port", "default_prefix", "default_project"];
@@ -665,6 +681,15 @@ impl ConfigHandler {
         // Determine project prefix if not global
         let project_prefix = if global {
             None
+        } else if let Some(explicit_project) = project.and_then(|p| {
+            let trimmed = p.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(resolve_project_input(trimmed, &resolver.path))
+            }
+        }) {
+            Some(explicit_project)
         } else {
             // For project-specific config, we need to determine the project
             // This could be explicitly provided or auto-detected from current context
@@ -845,7 +870,7 @@ impl ConfigHandler {
     ) -> Result<Vec<String>, String> {
         let mut conflicts = Vec::new();
 
-        // TODO: Implement actual conflict detection
+        // TODO (LOTA-4): Implement actual conflict detection
         // This would:
         // 1. Load existing tasks
         // 2. Check if any task values would become invalid with new config
@@ -865,7 +890,7 @@ impl ConfigHandler {
     /// Load a configuration template
     fn load_template(template_name: &str) -> Result<serde_yaml::Value, String> {
         // For now, return a basic template structure
-        // TODO: Load actual template from embedded files or resources
+        // TODO (LOTA-5): Load actual template from embedded files or resources
         let template_content = match template_name {
             "default" => include_str!("../../config/templates/default.yml"),
             "agile" => include_str!("../../config/templates/agile.yml"),

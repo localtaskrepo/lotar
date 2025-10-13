@@ -459,6 +459,81 @@ fn api_add_list_get_delete_roundtrip() {
 }
 
 #[test]
+fn api_comment_update_edits_existing_comment() {
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+
+    let mut api = ApiServer::new();
+    routes::initialize(&mut api);
+
+    // Create a task to attach comments to
+    let add_body = json!({
+        "title": "Comment editing",
+        "project": "EDIT",
+    });
+    let resp = api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add_body));
+    assert_eq!(resp.status, 201, "task creation status");
+    let created: Value = serde_json::from_slice(&resp.body).unwrap();
+    let id = created["data"]["id"].as_str().unwrap().to_string();
+
+    // Add initial comment
+    let resp = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/comment",
+        &[],
+        json!({ "id": id.clone(), "text": "Initial note" }),
+    ));
+    assert_eq!(resp.status, 200, "add comment status");
+    let with_comment: Value = serde_json::from_slice(&resp.body).unwrap();
+    let comment_text = with_comment["data"]["comments"][0]["text"]
+        .as_str()
+        .unwrap();
+    assert_eq!(comment_text, "Initial note");
+
+    // Edit the comment
+    let resp = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/comment/update",
+        &[],
+        json!({ "id": id.clone(), "index": 0, "text": " Edited note " }),
+    ));
+    assert_eq!(resp.status, 200, "edit comment status");
+    let updated: Value = serde_json::from_slice(&resp.body).unwrap();
+    let updated_text = updated["data"]["comments"][0]["text"].as_str().unwrap();
+    assert_eq!(
+        updated_text, "Edited note",
+        "comment text should be trimmed and updated"
+    );
+    let history = updated["data"]["history"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let last_change = history.last().expect("history entry for comment edit");
+    let change_field = last_change["changes"][0]["field"].as_str().unwrap();
+    assert_eq!(change_field, "comment#1");
+    assert_eq!(
+        last_change["changes"][0]["old"].as_str().unwrap(),
+        "Initial note"
+    );
+    assert_eq!(
+        last_change["changes"][0]["new"].as_str().unwrap(),
+        "Edited note"
+    );
+
+    // Invalid index should be rejected
+    let resp = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/comment/update",
+        &[],
+        json!({ "id": id, "index": 5, "text": "Nope" }),
+    ));
+    assert_eq!(resp.status, 400, "invalid index should fail");
+}
+
+#[test]
 fn api_config_show_set() {
     // Guard tasks dir env var
     let tmp = tempfile::tempdir().unwrap();
@@ -597,6 +672,26 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
     ));
     assert_eq!(r3.status, 201);
 
+    let created_a: Value = serde_json::from_slice(&r1.body).unwrap();
+    let task_a_id = created_a["data"]["id"].as_str().unwrap().to_string();
+    let status_resp = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/status",
+        &[],
+        json!({"id": task_a_id, "status": "InProgress"}),
+    ));
+    assert_eq!(status_resp.status, 200);
+
+    let resp = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("status", "InProgress")],
+        json!({}),
+    ));
+    assert_eq!(resp.status, 200, "filtering by InProgress should succeed");
+    let filtered: Value = serde_json::from_slice(&resp.body).unwrap();
+    assert_eq!(filtered["meta"]["count"].as_u64().unwrap_or(0), 1);
+
     // List by custom field directly: ?sprint=W35 should match case-insensitively
     let resp = api.handle_request(&mk_req(
         "GET",
@@ -633,6 +728,80 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
     let _ = serde_json::from_slice::<Value>(&resp.body).unwrap();
 
     // Restored by guard
+}
+
+#[test]
+fn api_list_supports_fuzzy_tag_filters() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+
+    let mut api = ApiServer::new();
+    routes::initialize(&mut api);
+
+    let add = |title: &str, tags: &[&str]| {
+        json!({
+            "title": title,
+            "project": "TEST",
+            "tags": tags,
+        })
+    };
+
+    let add_one = |title: &str, tags: &[&str]| {
+        api.handle_request(&mk_req("POST", "/api/tasks/add", &[], add(title, tags)))
+    };
+
+    let r1 = add_one("DevOps upgrade", &["DevOps", "backend"]);
+    assert_eq!(r1.status, 201);
+    let r2 = add_one("Frontend polish", &["frontend"]);
+    assert_eq!(r2.status, 201);
+    let r3 = add_one("Database tuning", &["db", "storage"]);
+    assert_eq!(r3.status, 201);
+
+    let ids_from = |resp: &serde_json::Value| -> Vec<String> {
+        resp["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
+            .collect()
+    };
+
+    let resp_ops = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("tags", "ops")],
+        json!({}),
+    ));
+    assert_eq!(resp_ops.status, 200);
+    let parsed_ops: Value = serde_json::from_slice(&resp_ops.body).unwrap();
+    let ops_ids = ids_from(&parsed_ops);
+    assert_eq!(parsed_ops["meta"]["count"].as_u64().unwrap_or(0), 1);
+    assert!(ops_ids.iter().any(|id| id.starts_with("TEST-")));
+
+    let resp_case = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("tags", "DEVOPS")],
+        json!({}),
+    ));
+    assert_eq!(resp_case.status, 200);
+    let parsed_case: Value = serde_json::from_slice(&resp_case.body).unwrap();
+    let case_ids = ids_from(&parsed_case);
+    assert_eq!(case_ids, ops_ids);
+
+    let resp_partial = api.handle_request(&mk_req(
+        "GET",
+        "/api/tasks/list",
+        &[("project", "TEST"), ("tags", "front")],
+        json!({}),
+    ));
+    assert_eq!(resp_partial.status, 200);
+    let parsed_partial: Value = serde_json::from_slice(&resp_partial.body).unwrap();
+    assert_eq!(parsed_partial["meta"]["count"].as_u64().unwrap_or(0), 1);
+    let partial_ids = ids_from(&parsed_partial);
+    assert_ne!(partial_ids, ops_ids);
 }
 
 // Merged from sse_events_test.rs

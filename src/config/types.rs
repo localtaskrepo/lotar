@@ -291,6 +291,48 @@ pub struct ResolvedConfig {
     pub branch_priority_aliases: HashMap<String, Priority>,
 }
 
+impl ResolvedConfig {
+    pub fn effective_default_status(&self) -> Option<TaskStatus> {
+        if self.issue_states.values.is_empty() {
+            return None;
+        }
+
+        if let Some(explicit) = &self.default_status {
+            if self.issue_states.values.contains(explicit) {
+                return Some(explicit.clone());
+            }
+        }
+
+        Some(self.issue_states.values[0].clone())
+    }
+
+    pub fn effective_default_priority(&self) -> Option<Priority> {
+        if self.issue_priorities.values.is_empty() {
+            return None;
+        }
+
+        let configured = self.default_priority.clone();
+        if self
+            .issue_priorities
+            .values
+            .iter()
+            .any(|value| value.eq_ignore_case(configured.as_str()))
+        {
+            return Some(configured);
+        }
+
+        Some(self.issue_priorities.values[0].clone())
+    }
+
+    pub fn effective_default_task_type(&self) -> Option<TaskType> {
+        if self.issue_types.values.is_empty() {
+            return None;
+        }
+
+        Some(self.issue_types.values[0].clone())
+    }
+}
+
 #[derive(Debug)]
 pub enum ConfigError {
     IoError(String),
@@ -320,24 +362,36 @@ fn default_prefix_name() -> String {
     "".to_string()
 }
 fn default_priority() -> Priority {
-    Priority::Medium
+    Priority::from("Medium")
 }
 
 fn default_issue_states() -> ConfigurableField<TaskStatus> {
     ConfigurableField {
-        values: vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+        values: vec![
+            TaskStatus::from("Todo"),
+            TaskStatus::from("InProgress"),
+            TaskStatus::from("Done"),
+        ],
     }
 }
 
 fn default_issue_types() -> ConfigurableField<TaskType> {
     ConfigurableField {
-        values: vec![TaskType::Feature, TaskType::Bug, TaskType::Chore],
+        values: vec![
+            TaskType::from("Feature"),
+            TaskType::from("Bug"),
+            TaskType::from("Chore"),
+        ],
     }
 }
 
 fn default_issue_priorities() -> ConfigurableField<Priority> {
     ConfigurableField {
-        values: vec![Priority::Low, Priority::Medium, Priority::High],
+        values: vec![
+            Priority::from("Low"),
+            Priority::from("Medium"),
+            Priority::from("High"),
+        ],
     }
 }
 

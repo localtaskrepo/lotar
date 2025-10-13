@@ -246,7 +246,7 @@ mod dual_interface_tests {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: TODO"));
+            .stdout(predicate::str::contains("status: Todo"));
 
         // Test status SET operation
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -257,7 +257,7 @@ mod dual_interface_tests {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status changed from TODO to DONE"));
+            .stdout(predicate::str::contains("status changed from Todo to Done"));
 
         // Test status command GET operation
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -267,7 +267,7 @@ mod dual_interface_tests {
             .arg("--project=test-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains("status: DONE"));
+            .stdout(predicate::str::contains("status: Done"));
 
         // Test priority GET operation (if priority command is working)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -319,7 +319,7 @@ mod dual_interface_tests {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "status changed from TODO to IN_PROGRESS",
+                "status changed from Todo to InProgress",
             ));
     }
 }

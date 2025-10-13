@@ -311,20 +311,16 @@ export PATH="$PATH:$(pwd)/target/release"
 
 ### Development
 ```bash
-cargo test      # Run tests
-cargo build     # Development build
-cargo clippy    # Code quality
+npm run test            # Preferred full test run (uses nextest)
+cargo nextest run --all-features  # Direct harness access
+cargo build             # Development build
+cargo clippy            # Code quality
 ```
 
-### Testing (faster local runs)
-```bash
-# Standard
-cargo test --all-features
-
-# Faster harness (optional)
-cargo nextest run --all-features
-```
-Nextest uses a more efficient test harness and parallelism; see `.config/nextest.toml`.
+### Additional testing notes
+- Nextest uses a more efficient harness and parallelism; see `.config/nextest.toml` for defaults.
+- Doc tests remain available via `cargo test --doc --all-features`.
+- The legacy `cargo test` command intentionally errors and instructs you to use nextest.
 
 ## 📄 License
 

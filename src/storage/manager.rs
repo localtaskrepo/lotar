@@ -124,6 +124,100 @@ impl Storage {
         self.backend.get(&self.root_path, id, &project)
     }
 
+    pub fn find_task_by_numeric_id(&self, numeric_id: &str) -> Option<(String, Task)> {
+        if !numeric_id.chars().all(|c| c.is_ascii_digit()) {
+            return None;
+        }
+
+        let debug_scan = std::env::var("LOTAR_DEBUG_STATUS").is_ok();
+
+        let mut candidate_roots = Vec::new();
+        candidate_roots.push(self.root_path.clone());
+        if let Ok(canonical) = std::fs::canonicalize(&self.root_path) {
+            if canonical != self.root_path {
+                candidate_roots.push(canonical);
+            }
+        }
+        if let Some(parent) = self.root_path.parent() {
+            for (name, dir_path) in crate::utils::filesystem::list_visible_subdirs(parent) {
+                let child_tasks = dir_path.join(".tasks");
+                if child_tasks.exists() && child_tasks.is_dir() {
+                    if debug_scan {
+                        eprintln!(
+                            "[lotar][debug] considering sibling tasks root {} from {}",
+                            child_tasks.display(),
+                            name
+                        );
+                    }
+                    candidate_roots.push(child_tasks);
+                }
+            }
+        }
+
+        candidate_roots.sort();
+        candidate_roots.dedup();
+
+        for root in candidate_roots {
+            if debug_scan {
+                eprintln!("[lotar][debug] scanning tasks root {}", root.display());
+                match std::fs::read_dir(&root) {
+                    Ok(entries) => {
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            eprintln!(
+                                "[lotar][debug]   root entry: {} (dir={})",
+                                path.display(),
+                                path.is_dir()
+                            );
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "[lotar][debug]   unable to read root {}: {}",
+                            root.display(),
+                            err
+                        );
+                    }
+                }
+            }
+
+            for (prefix, dir_path) in crate::utils::filesystem::list_visible_subdirs(&root) {
+                if debug_scan {
+                    let candidate_file = dir_path.join(format!("{}.yml", numeric_id));
+                    eprintln!(
+                        "[lotar][debug]   probing numeric={} candidate_prefix={} dir={} exists={} file_exists={}",
+                        numeric_id,
+                        prefix,
+                        dir_path.display(),
+                        dir_path.exists(),
+                        candidate_file.exists()
+                    );
+                }
+
+                let full_id = format!("{}-{}", prefix, numeric_id);
+                if let Some(task) = self.backend.get(&self.root_path, &full_id, &prefix) {
+                    if debug_scan {
+                        eprintln!(
+                            "[lotar][debug]   matched numeric={} as {}",
+                            numeric_id, full_id
+                        );
+                    }
+                    return Some((full_id, task));
+                }
+            }
+        }
+
+        if debug_scan {
+            eprintln!(
+                "[lotar][debug] numeric={} not found under {}",
+                numeric_id,
+                self.root_path.display()
+            );
+        }
+
+        None
+    }
+
     pub fn edit(&mut self, id: &str, new_task: &Task) {
         let _ = self.backend.edit(&self.root_path, id, new_task);
     }

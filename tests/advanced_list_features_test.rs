@@ -80,7 +80,11 @@ fn test_current_filtering_capabilities() {
         if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
             for task in tasks {
                 if let Some(status) = task.get("status").and_then(|s| s.as_str()) {
-                    assert_eq!(status, "TODO", "Status filter should work");
+                    assert_eq!(
+                        status.to_ascii_lowercase(),
+                        "todo",
+                        "Status filter should work"
+                    );
                 }
             }
             assert!(!tasks.is_empty(), "Should find some TODO tasks");
@@ -242,7 +246,11 @@ fn test_single_type_filtering() {
                 // Should only include bug tasks
                 for task in tasks {
                     if let Some(task_type) = task.get("task_type").and_then(|t| t.as_str()) {
-                        assert_eq!(task_type, "bug", "Type filter should only return bug tasks");
+                        assert_eq!(
+                            task_type.to_ascii_lowercase(),
+                            "bug",
+                            "Type filter should only return bug tasks"
+                        );
                     }
                 }
             }
@@ -685,8 +693,8 @@ mod tag_filtering_tests {
         assert!(task.get("custom_fields").is_some());
 
         assert_eq!(task["title"], "Complete task");
-        assert_eq!(task["priority"], "HIGH");
-        assert_eq!(task["task_type"], "feature");
+        assert_eq!(task["priority"], "High");
+        assert_eq!(task["task_type"], "Feature");
         assert_eq!(task["description"], "This is a detailed description");
         assert_eq!(task["category"], "web");
         assert_eq!(task["assignee"], "developer@example.com");

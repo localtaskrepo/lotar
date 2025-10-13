@@ -13,6 +13,7 @@ use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
     AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, StatsHandler, TaskHandler,
 };
+use lotar::cli::preprocess::normalize_args;
 use lotar::cli::{Cli, Commands, TaskAction};
 use lotar::utils::resolve_project_input;
 use lotar::workspace::TasksDirectoryResolver;
@@ -101,8 +102,19 @@ fn main() {
         }
     }
 
+    // Normalize arguments (serve command uses additional syntactic sugar)
+    let normalized_args = match normalize_args(&args) {
+        Ok(v) => v,
+        Err(message) => {
+            let renderer =
+                output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
+            renderer.emit_error(&message);
+            std::process::exit(1);
+        }
+    };
+
     // Parse with Clap
-    let cli = match Cli::try_parse() {
+    let cli = match Cli::try_parse_from(normalized_args) {
         Ok(cli) => cli,
         Err(e) => {
             let renderer =
@@ -605,6 +617,7 @@ fn main() {
                             relationships: lotar::types::TaskRelationships::default(),
                             comments: vec![],
                             references: vec![],
+                            history: vec![],
                             subtitle: None,
                             description: None,
                             category,

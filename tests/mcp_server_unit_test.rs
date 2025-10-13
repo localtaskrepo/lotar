@@ -242,6 +242,7 @@ fn mcp_task_update_resolves_me_in_patch() {
             description: None,
             category: None,
             tags: vec![],
+            relationships: None,
             custom_fields: None,
         },
     )

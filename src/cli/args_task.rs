@@ -45,10 +45,7 @@ where
                         if let Some((k, val)) = s.split_once('=') {
                             out.push((k.trim().to_string(), val.trim().to_string()));
                         } else {
-                            return Err(DeError::custom(format!(
-                                "Invalid key=value entry: {}",
-                                s
-                            )));
+                            return Err(DeError::custom(format!("Invalid key=value entry: {}", s)));
                         }
                     }
                     JsonValue::Array(two) if two.len() == 2 => {
@@ -63,12 +60,16 @@ where
                     JsonValue::Object(o) => {
                         // {"key": "value"} single entry
                         if o.len() != 1 {
-                            return Err(DeError::custom("Object must contain exactly one key for pair"));
+                            return Err(DeError::custom(
+                                "Object must contain exactly one key for pair",
+                            ));
                         }
                         if let Some((k, v)) = o.into_iter().next() {
                             out.push((k, v.as_str().unwrap_or(&v.to_string()).to_string()));
                         } else {
-                            return Err(DeError::custom("Object must contain exactly one key for pair"));
+                            return Err(DeError::custom(
+                                "Object must contain exactly one key for pair",
+                            ));
                         }
                     }
                     other => {
@@ -252,6 +253,10 @@ pub struct TaskEditArgs {
     /// New priority
     #[arg(long)]
     pub priority: Option<String>,
+
+    /// New reporter
+    #[arg(long)]
+    pub reporter: Option<String>,
 
     /// New assignee
     #[arg(long)]

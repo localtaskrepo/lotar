@@ -20,7 +20,7 @@ fn make_cfg(
         default_prefix: "TEST".to_string(),
         issue_states: ConfigurableField { values: statuses },
         issue_types: ConfigurableField {
-            values: vec![TaskType::Feature, TaskType::Bug],
+            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         },
         issue_priorities: ConfigurableField { values: priorities },
         categories: StringConfigField {
@@ -120,30 +120,51 @@ fn default_priority_scenarios() {
     let _silent = quiet();
     // 1: global default present
     let cfg = make_cfg(
-        vec![Priority::Low, Priority::Medium, Priority::High],
-        Priority::Medium,
-        vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+        vec![
+            Priority::from("Low"),
+            Priority::from("Medium"),
+            Priority::from("High"),
+        ],
+        Priority::from("Medium"),
+        vec![
+            TaskStatus::from("Todo"),
+            TaskStatus::from("InProgress"),
+            TaskStatus::from("Done"),
+        ],
         None,
     );
-    assert_eq!(add_test_support::default_priority(&cfg), Priority::Medium);
+    assert_eq!(
+        add_test_support::default_priority(&cfg),
+        Priority::from("Medium")
+    );
 
     // 2: global default not in project -> first
     let cfg = make_cfg(
-        vec![Priority::Critical, Priority::High],
-        Priority::Medium,
-        vec![TaskStatus::Todo, TaskStatus::InProgress],
+        vec![Priority::from("Critical"), Priority::from("High")],
+        Priority::from("Medium"),
+        vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
         None,
     );
-    assert_eq!(add_test_support::default_priority(&cfg), Priority::Critical);
+    assert_eq!(
+        add_test_support::default_priority(&cfg),
+        Priority::from("Critical")
+    );
 
     // 3: global default Low exists -> Low
     let cfg = make_cfg(
-        vec![Priority::High, Priority::Medium, Priority::Low],
-        Priority::Low,
-        vec![TaskStatus::Todo],
+        vec![
+            Priority::from("High"),
+            Priority::from("Medium"),
+            Priority::from("Low"),
+        ],
+        Priority::from("Low"),
+        vec![TaskStatus::from("Todo")],
         None,
     );
-    assert_eq!(add_test_support::default_priority(&cfg), Priority::Low);
+    assert_eq!(
+        add_test_support::default_priority(&cfg),
+        Priority::from("Low")
+    );
 }
 
 #[test]
@@ -151,57 +172,77 @@ fn default_status_scenarios() {
     let _silent = quiet();
     // 1: explicit present
     let cfg = make_cfg(
-        vec![Priority::Medium],
-        Priority::Medium,
-        vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
-        Some(TaskStatus::InProgress),
+        vec![Priority::from("Medium")],
+        Priority::from("Medium"),
+        vec![
+            TaskStatus::from("Todo"),
+            TaskStatus::from("InProgress"),
+            TaskStatus::from("Done"),
+        ],
+        Some(TaskStatus::from("InProgress")),
     );
     assert_eq!(
         add_test_support::default_status(&cfg),
-        TaskStatus::InProgress
+        TaskStatus::from("InProgress")
     );
 
     // 2: no explicit -> first
     let cfg = make_cfg(
-        vec![Priority::Medium],
-        Priority::Medium,
-        vec![TaskStatus::Todo, TaskStatus::InProgress, TaskStatus::Done],
+        vec![Priority::from("Medium")],
+        Priority::from("Medium"),
+        vec![
+            TaskStatus::from("Todo"),
+            TaskStatus::from("InProgress"),
+            TaskStatus::from("Done"),
+        ],
         None,
-    );
-    assert_eq!(add_test_support::default_status(&cfg), TaskStatus::Todo);
-
-    // 3: explicit invalid -> first
-    let cfg = make_cfg(
-        vec![Priority::Medium],
-        Priority::Medium,
-        vec![TaskStatus::InProgress, TaskStatus::Done],
-        Some(TaskStatus::Todo),
     );
     assert_eq!(
         add_test_support::default_status(&cfg),
-        TaskStatus::InProgress
+        TaskStatus::from("Todo")
+    );
+
+    // 3: explicit invalid -> first
+    let cfg = make_cfg(
+        vec![Priority::from("Medium")],
+        Priority::from("Medium"),
+        vec![TaskStatus::from("InProgress"), TaskStatus::from("Done")],
+        Some(TaskStatus::from("Todo")),
+    );
+    assert_eq!(
+        add_test_support::default_status(&cfg),
+        TaskStatus::from("InProgress")
     );
 
     // 4: variety
     let cfg = make_cfg(
-        vec![Priority::Medium],
-        Priority::Medium,
-        vec![TaskStatus::Verify, TaskStatus::Blocked],
-        Some(TaskStatus::Verify),
+        vec![Priority::from("Medium")],
+        Priority::from("Medium"),
+        vec![TaskStatus::from("Verify"), TaskStatus::from("Blocked")],
+        Some(TaskStatus::from("Verify")),
     );
-    assert_eq!(add_test_support::default_status(&cfg), TaskStatus::Verify);
+    assert_eq!(
+        add_test_support::default_status(&cfg),
+        TaskStatus::from("Verify")
+    );
 }
 
 #[test]
 fn edge_case_single_values() {
     let _silent = quiet();
     let cfg = make_cfg(
-        vec![Priority::Critical],
-        Priority::Medium,
-        vec![TaskStatus::Todo],
+        vec![Priority::from("Critical")],
+        Priority::from("Medium"),
+        vec![TaskStatus::from("Todo")],
         None,
     );
 
-    assert_eq!(add_test_support::default_priority(&cfg), Priority::Critical);
-    assert_eq!(add_test_support::default_status(&cfg), TaskStatus::Todo);
+    assert_eq!(
+        add_test_support::default_priority(&cfg),
+        Priority::from("Critical")
+    );
+    assert_eq!(
+        add_test_support::default_status(&cfg),
+        TaskStatus::from("Todo")
+    );
 }

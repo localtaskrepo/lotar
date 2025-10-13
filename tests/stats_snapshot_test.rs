@@ -112,7 +112,7 @@ fn stats_distribution_snapshot() {
         "\"action\":\"stats.distribution\"",
     ))
     .stdout(predicate::str::contains("\"field\":\"status\""))
-    .stdout(predicate::str::contains("TODO"));
+    .stdout(predicate::str::contains("\"Todo\""));
 
     // By tag should include our tags
     let mut c = Command::cargo_bin("lotar").unwrap();

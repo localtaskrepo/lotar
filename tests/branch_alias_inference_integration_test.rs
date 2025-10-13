@@ -52,7 +52,7 @@ branch:
         .success();
     let out = String::from_utf8_lossy(&assert.get_output().stdout);
     assert!(
-        out.contains("\"status_value\":\"IN_PROGRESS\""),
+        out.contains("\"status_value\":\"InProgress\""),
         "Output: {out}"
     );
 }
@@ -91,7 +91,7 @@ branch:
         .assert()
         .success();
     let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"priority\":\"CRITICAL\""), "Output: {out}");
+    assert!(out.contains("\"priority\":\"Critical\""), "Output: {out}");
 }
 
 #[test]
@@ -132,8 +132,8 @@ branch:
         .assert()
         .success();
     let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"status_value\":\"TODO\""), "Output: {out}");
-    assert!(out.contains("\"priority\":\"MEDIUM\""), "Output: {out}");
+    assert!(out.contains("\"status_value\":\"Todo\""), "Output: {out}");
+    assert!(out.contains("\"priority\":\"Medium\""), "Output: {out}");
 }
 
 #[test]
@@ -177,5 +177,5 @@ branch:
         .assert()
         .success();
     let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"priority\":\"LOW\""), "Output: {out}");
+    assert!(out.contains("\"priority\":\"Low\""), "Output: {out}");
 }

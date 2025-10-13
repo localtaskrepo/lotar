@@ -84,12 +84,19 @@ pub trait Outputable {
 // Implement Outputable for Task
 impl Outputable for Task {
     fn to_text(&self) -> String {
-        let status_emoji = match self.status {
-            TaskStatus::Todo => "📋",
-            TaskStatus::InProgress => "🚧",
-            TaskStatus::Verify => "🔍",
-            TaskStatus::Blocked => "🚫",
-            TaskStatus::Done => "✅",
+        let status_key = self
+            .status
+            .as_str()
+            .trim()
+            .to_ascii_lowercase()
+            .replace([' ', '_', '-'], "");
+        let status_emoji = match status_key.as_str() {
+            "todo" => "📋",
+            "inprogress" => "🚧",
+            "verify" => "🔍",
+            "blocked" => "🚫",
+            "done" => "✅",
+            _ => "•",
         };
 
         let priority_str = self.priority.to_string();

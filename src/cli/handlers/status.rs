@@ -36,18 +36,14 @@ impl CommandHandler for StatusHandler {
         // ProjectResolver can validate consistency.
         let final_effective_project = project.or(args.explicit_project.as_deref());
 
-        let resolved_project = project_resolver
+        let mut resolved_project = project_resolver
             .resolve_project(&args.task_id, final_effective_project)
             .map_err(|e| format!("Could not resolve project: {}", e))?;
 
         // Get full task ID with project prefix
-        let full_task_id = project_resolver
+        let mut full_task_id = project_resolver
             .get_full_task_id(&args.task_id, final_effective_project)
             .map_err(|e| format!("Could not determine full task ID: {}", e))?;
-
-        // Now that we have resolved the project, get the appropriate config
-        let config = project_resolver.get_config();
-        let validator = CliValidator::new(config);
 
         // Load the task
         // Try to open existing storage without creating directories
@@ -61,8 +57,33 @@ impl CommandHandler for StatusHandler {
             "status: loading task full_id={} project={}",
             full_task_id, resolved_project
         ));
-        let task_result = storage.get(&full_task_id, resolved_project.clone());
-        let mut task = task_result.ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
+        let numeric_only = args.task_id.chars().all(|c| c.is_ascii_digit());
+        let mut task = match storage.get(&full_task_id, resolved_project.clone()) {
+            Some(task) => task,
+            None if numeric_only => {
+                if let Some((actual_id, task)) = storage.find_task_by_numeric_id(&args.task_id) {
+                    renderer.log_debug(&format!(
+                        "status: fallback resolved numeric id={} -> {}",
+                        args.task_id, actual_id
+                    ));
+                    if let Some(prefix) = actual_id.split('-').next() {
+                        resolved_project = prefix.to_string();
+                    }
+                    full_task_id = actual_id;
+                    task
+                } else {
+                    return Err(format!("Task '{}' not found", full_task_id));
+                }
+            }
+            None => return Err(format!("Task '{}' not found", full_task_id)),
+        };
+
+        // Now that we have resolved the project, get the appropriate config
+        let mut effective_config = project_resolver.get_config().clone();
+        if let Ok(project_specific) = project_resolver.get_project_config(&resolved_project) {
+            effective_config = project_specific;
+        }
+        let validator = CliValidator::new(&effective_config);
 
         match args.new_status {
             // Get current status
@@ -119,13 +140,13 @@ impl CommandHandler for StatusHandler {
                 // Prepare preview message if dry-run
                 if args.dry_run {
                     // First-change semantics: only if moving away from project default
-                    let cfg = project_resolver.get_config();
+                    let cfg = &effective_config;
                     let project_default_status = cfg
                         .default_status
                         .clone()
                         .unwrap_or_else(|| cfg.issue_states.values[0].clone());
                     let would_assign = task.assignee.is_none()
-                        && project_resolver.get_config().auto_assign_on_status
+                        && cfg.auto_assign_on_status
                         && task.status == project_default_status
                         && task.status != validated_status;
                     let resolved_assignee = if would_assign {
@@ -170,8 +191,8 @@ impl CommandHandler for StatusHandler {
 
                 task.status = validated_status.clone();
                 // Auto-assign assignee if none is set (configurable)
-                if task.assignee.is_none() && project_resolver.get_config().auto_assign_on_status {
-                    let cfg = project_resolver.get_config();
+                if task.assignee.is_none() && effective_config.auto_assign_on_status {
+                    let cfg = &effective_config;
                     let project_default_status = cfg
                         .default_status
                         .clone()
