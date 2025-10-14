@@ -60,6 +60,7 @@ vi.mock('../composables/useConfig', () => {
             priorities: ref(['Low', 'Medium', 'High']),
             types: ref(['bug', 'feature']),
             tags: ref(['alpha', 'beta']),
+            customFields: ref(['product']),
             defaults: ref({
                 project: 'DEMO',
                 status: 'Open',
@@ -67,8 +68,8 @@ vi.mock('../composables/useConfig', () => {
                 type: 'bug',
                 reporter: '',
                 assignee: '',
-                category: '',
                 tags: [] as string[],
+                customFields: { product: '' },
             }),
             refresh: vi.fn(async () => { }),
         }),

@@ -104,16 +104,6 @@ pub enum StatsAction {
         global: bool,
     },
 
-    /// Top categories across tasks (current state snapshot)
-    Categories {
-        /// Limit number of categories (default 20)
-        #[arg(long, default_value = "20", alias = "top")]
-        limit: usize,
-        /// Span all projects (default: current project only)
-        #[arg(long)]
-        global: bool,
-    },
-
     /// Distribution of tasks by a field (snapshot)
     Distribution {
         /// Field to group by
@@ -158,7 +148,7 @@ pub enum StatsAction {
 
     /// Aggregate effort estimates across tasks (snapshot)
     Effort {
-        /// Grouping key (built-ins: assignee|type|project|status|priority|reporter|category|tag|field:<name>)
+        /// Grouping key (built-ins: assignee|type|project|status|priority|reporter|tag|field:<name>)
         #[arg(long = "by", default_value = "assignee")]
         by: String,
         /// Filters: --where key=value (repeatable). Keys same as --by; for custom fields use field:<name>.
@@ -269,7 +259,6 @@ pub enum StatsDistributionField {
     Reporter,
     Project,
     Tag,
-    Category,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

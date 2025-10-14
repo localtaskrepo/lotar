@@ -41,8 +41,7 @@ const apiFixtures = vi.hoisted(() => {
                 ],
             },
         ],
-        custom_fields: {},
-        category: null,
+    custom_fields: { product: 'Core' },
     }
 
     const baseCommits = [
@@ -72,6 +71,10 @@ const apiFixtures = vi.hoisted(() => {
             ...patch,
             tags: patch.tags !== undefined ? [...patch.tags] : state.task.tags,
             relationships: patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
+            custom_fields:
+                patch.custom_fields !== undefined
+                    ? clone(patch.custom_fields)
+                    : clone(state.task.custom_fields),
         }
         return clone(state.task)
     })
@@ -104,6 +107,7 @@ const apiFixtures = vi.hoisted(() => {
         issue_priorities: ['Low', 'Medium', 'High'],
         issue_types: ['bug', 'feature'],
         tags: ['alpha', 'beta', 'gamma'],
+        custom_fields: ['product'],
         default_prefix: 'DEMO',
         default_status: 'Open',
         default_priority: 'Medium',
@@ -167,6 +171,7 @@ const apiFixtures = vi.hoisted(() => {
             issue_priorities: ['Low', 'Medium', 'High'],
             issue_types: ['bug', 'feature'],
             tags: ['alpha', 'beta', 'gamma'],
+            custom_fields: ['product'],
             default_prefix: 'DEMO',
             default_status: 'Open',
             default_priority: 'Medium',
@@ -234,6 +239,7 @@ vi.mock('../composables/useConfig', () => {
     const priorities = ref(['Low', 'Medium', 'High'])
     const types = ref(['bug', 'feature'])
     const tags = ref(['alpha', 'beta', 'gamma'])
+    const customFields = ref(['product'])
     const defaults = {
         project: 'DEMO',
         status: 'Open',
@@ -241,8 +247,8 @@ vi.mock('../composables/useConfig', () => {
         type: 'bug',
         reporter: '',
         assignee: '',
-        category: '',
         tags: [] as string[],
+        customFields: { product: 'Core Systems' },
     }
     return {
         useConfig: () => ({
@@ -250,6 +256,7 @@ vi.mock('../composables/useConfig', () => {
             priorities,
             types,
             tags,
+            customFields,
             defaults: { value: defaults },
             refresh,
         }),

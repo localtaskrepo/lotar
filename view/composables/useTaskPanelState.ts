@@ -31,13 +31,19 @@ interface CommitEntry {
     message: string
 }
 
-const CATEGORY_CUSTOM_FIELD_KEY = 'category'
-
 export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPanelEmit) {
     const mode = computed(() => (props.taskId && props.taskId !== 'new' ? 'edit' : 'create'))
 
     const { projects, refresh: refreshProjects } = useProjects()
-    const { statuses, priorities, types, tags: configTags, defaults, refresh: refreshConfig } = useConfig()
+    const {
+        statuses,
+        priorities,
+        types,
+        tags: configTags,
+        customFields: configCustomFields,
+        defaults,
+        refresh: refreshConfig,
+    } = useConfig()
 
     const statusOptions = computed(() => statuses.value ?? [])
     const priorityOptions = computed(() => priorities.value ?? [])
@@ -251,7 +257,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     function buildCustomFields() {
         const out: Record<string, string> = {}
         Object.entries(customFields).forEach(([key, value]) => {
-            const target = customFieldKeys[key] || key
+            const target = (customFieldKeys[key] || key || '').trim()
             if (target) {
                 out[target] = value
             }
@@ -287,21 +293,36 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         newField.value = ''
     }
 
-    function seedCategoryField(value?: string | null) {
-        const trimmed = typeof value === 'string' ? value.trim() : ''
-        if (!trimmed) return
-        const existingKey = Object.keys(customFields).find((key) => key.toLowerCase() === CATEGORY_CUSTOM_FIELD_KEY)
-        if (existingKey) {
-            if (!customFieldKeys[existingKey]) {
-                customFieldKeys[existingKey] = existingKey
+    function ensureConfiguredCustomFields() {
+        const existingKeys = Object.keys(customFields)
+        const lowerToActual = new Map<string, string>()
+        existingKeys.forEach((key) => {
+            lowerToActual.set(key.toLowerCase(), key)
+            if (!customFieldKeys[key]) {
+                customFieldKeys[key] = key
             }
-            if (!customFields[existingKey]) {
-                customFields[existingKey] = trimmed
+        })
+
+        const addKey = (raw: string) => {
+            const trimmed = (raw || '').trim()
+            if (!trimmed) return
+            const lower = trimmed.toLowerCase()
+            const existing = lowerToActual.get(lower)
+            if (existing) {
+                if (!customFieldKeys[existing]) {
+                    customFieldKeys[existing] = existing
+                }
+                return
             }
-            return
+            customFields[trimmed] = ''
+            customFieldKeys[trimmed] = trimmed
+            lowerToActual.set(lower, trimmed)
         }
-        customFields[CATEGORY_CUSTOM_FIELD_KEY] = trimmed
-        customFieldKeys[CATEGORY_CUSTOM_FIELD_KEY] = CATEGORY_CUSTOM_FIELD_KEY
+
+        const configured = Array.isArray(configCustomFields.value)
+            ? configCustomFields.value.filter((key: string) => key && key !== '*')
+            : []
+        configured.forEach(addKey)
     }
 
     function projectFromList() {
@@ -571,7 +592,18 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             .map((tag: string) => tag.trim())
             .filter((tag: string) => tag.length > 0)
         mergeKnownTags(form.tags)
-        seedCategoryField(defaults.value.category)
+        ensureConfiguredCustomFields()
+        const defaultCustomFields = defaults.value.customFields || {}
+        Object.entries(defaultCustomFields).forEach(([key, value]) => {
+            const trimmedKey = (key || '').trim()
+            if (!trimmedKey) return
+            if (customFields[trimmedKey] === undefined) {
+                customFields[trimmedKey] = value === undefined || value === null ? '' : String(value)
+            }
+            if (!customFieldKeys[trimmedKey]) {
+                customFieldKeys[trimmedKey] = trimmedKey
+            }
+        })
         syncOwnershipControls()
         preloadPeople(form.project)
         nextTick(() => (suppressWatch.value = false))
@@ -612,11 +644,14 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         preloadPeople(form.project)
         resetCustomFields()
         const custom = (data.custom_fields || {}) as Record<string, unknown>
-        Object.entries(custom).forEach(([key, value]) => {
-            customFields[key] = value === undefined || value === null ? '' : String(value)
-            customFieldKeys[key] = key
+        Object.entries(custom).forEach(([rawKey, value]) => {
+            const targetKey = (rawKey || '').trim()
+            if (!targetKey) return
+            const strValue = value === undefined || value === null ? '' : String(value)
+            customFields[targetKey] = strValue
+            customFieldKeys[targetKey] = targetKey
         })
-        seedCategoryField(data.category)
+        ensureConfiguredCustomFields()
         applyRelationshipsFromTask(data)
         cancelEditCommentRef()
         snapshotRelationshipsBaselineFromTask(data)

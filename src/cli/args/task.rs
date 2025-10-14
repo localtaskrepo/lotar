@@ -121,10 +121,6 @@ pub struct AddArgs {
     #[arg(long, short = 'D', alias = "desc")]
     pub description: Option<String>,
 
-    /// Category
-    #[arg(long, short = 'c', alias = "cat")]
-    pub category: Option<String>,
-
     /// Tags (can be used multiple times)
     #[arg(long = "tag", short = 'i')]
     #[serde(default)]
@@ -316,10 +312,6 @@ pub struct TaskAddArgs {
     #[arg(long, short = 'D', alias = "desc")]
     pub description: Option<String>,
 
-    /// Category
-    #[arg(long, short = 'c', alias = "cat")]
-    pub category: Option<String>,
-
     /// Tags (can be used multiple times)
     #[arg(long = "tag", short = 'i')]
     #[serde(default)]
@@ -369,10 +361,6 @@ pub struct TaskEditArgs {
     /// New description
     #[arg(long, short = 'D')]
     pub description: Option<String>,
-
-    /// New category
-    #[arg(long, short = 'c')]
-    pub category: Option<String>,
 
     /// Add tags (can be used multiple times)
     #[arg(long = "tag", short = 'i')]
@@ -433,10 +421,6 @@ pub struct TaskSearchArgs {
     #[serde(default, alias = "tags")]
     pub tag: Vec<String>,
 
-    /// Filter by category
-    #[arg(long, short = 'c')]
-    pub category: Option<String>,
-
     /// Show only high priority tasks
     #[arg(long, short = 'H')]
     #[serde(default)]
@@ -447,7 +431,7 @@ pub struct TaskSearchArgs {
     #[serde(default)]
     pub critical: bool,
 
-    /// Sort tasks by key (priority|due-date|created|modified|status|assignee|type|category|project|id)
+    /// Sort tasks by key (priority|due-date|created|modified|status|assignee|type|project|id)
     #[arg(long, short = 'S')]
     pub sort_by: Option<String>,
 
@@ -469,7 +453,7 @@ pub struct TaskSearchArgs {
     #[arg(long = "due-soon", num_args = 0..=1, value_name = "DAYS")]
     pub due_soon: Option<Option<usize>>, // --due-soon or --due-soon=N
 
-    /// Unified filters: key=value, repeatable (keys: assignee|status|priority|type|tag|category|project|field:<name>)
+    /// Unified filters: key=value, repeatable (keys: assignee|status|priority|type|tag|project|field:<name>)
     #[arg(long = "where", value_parser = crate::cli::args::common::parse_key_value, num_args=0.., value_delimiter=None)]
     #[serde(default)]
     pub r#where: Vec<(String, String)>,

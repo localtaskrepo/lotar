@@ -140,7 +140,6 @@ impl CommandHandler for AddHandler {
                 }
             }
 
-            // 2) Try matching configured type names (from config.issue_types) against branch
             //    Exact match on tokens, or prefix with common delimiters
             for t in &config.issue_types.values {
                 let name = t.to_string(); // lowercased by Display
@@ -304,24 +303,6 @@ impl CommandHandler for AddHandler {
             None
         };
 
-        // Validate category if provided; otherwise use default.category if configured
-        let validated_category = if let Some(ref category) = args.category {
-            Some(
-                validator
-                    .validate_category(category)
-                    .map_err(|e| format!("Category validation failed: {}", e))?,
-            )
-        } else {
-            match &config.default_category {
-                Some(default_cat) => Some(
-                    validator
-                        .validate_category(default_cat)
-                        .map_err(|e| format!("Category validation failed: {}", e))?,
-                ),
-                None => None,
-            }
-        };
-
         // Validate tags
         let mut validated_tags = Vec::new();
         let mut base_tags = if args.tags.is_empty() {
@@ -412,7 +393,6 @@ impl CommandHandler for AddHandler {
             None
         };
         task.description = args.description;
-        task.category = validated_category;
         task.tags = validated_tags;
 
         // Handle arbitrary fields with validation
@@ -501,11 +481,12 @@ impl CommandHandler for AddHandler {
                     if let Some(e) = &task.effort {
                         obj["effort"] = serde_json::Value::String(e.clone());
                     }
-                    if let Some(c) = &task.category {
-                        obj["category"] = serde_json::Value::String(c.clone());
-                    }
                     if !task.tags.is_empty() {
                         obj["tags"] = serde_json::json!(task.tags);
+                    }
+                    if !task.custom_fields.is_empty() {
+                        obj["custom_fields"] = serde_json::to_value(&task.custom_fields)
+                            .unwrap_or(serde_json::Value::Null);
                     }
                     if args.explain {
                         obj["explain"] = serde_json::Value::String("default status and priority via smart defaults; reporter/assignee per config/defaults".to_string());

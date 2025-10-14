@@ -104,7 +104,6 @@ impl CommandHandler for DueDateHandler {
                     due_date: Some(normalized),
                     effort: None,
                     description: None,
-                    category: None,
                     tags: None,
                     relationships: None,
                     custom_fields: None,

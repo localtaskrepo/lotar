@@ -23,15 +23,11 @@ fn make_cfg(
             values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         },
         issue_priorities: ConfigurableField { values: priorities },
-        categories: StringConfigField {
-            values: vec!["*".to_string()],
-        },
         tags: StringConfigField {
             values: vec!["*".to_string()],
         },
         default_assignee: None,
         default_reporter: None,
-        default_category: None,
         default_tags: vec![],
         auto_set_reporter: true,
         auto_assign_on_status: true,

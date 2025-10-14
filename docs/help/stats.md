@@ -111,33 +111,19 @@ Example JSON output:
 }
 ```
 
-### categories
-Top categories across current tasks (snapshot).
-
-```bash
-lotar stats categories [--limit N] [--global]
-```
-Defaults: `--limit 20`.
-
-Example JSON output:
-```json
-{
-  "status": "ok",
-  "action": "stats.categories",
-  "items": [
-    { "category": "bug", "count": 12 },
-    { "category": "feature", "count": 9 }
-  ]
-}
-```
-
 ### distribution
 Distribution of tasks by a field (snapshot).
 
 ```bash
-lotar stats distribution --field status|priority|type|assignee|reporter|project|tag|category [--limit N] [--global]
+lotar stats distribution --field status|priority|type|assignee|reporter|project|tag [--limit N] [--global]
 ```
 Defaults: `--limit 20`.
+
+To bucket by custom metadata (for example a `product` field), use:
+
+```bash
+lotar stats custom-field --field product [--limit N] [--global]
+```
 
 Example JSON output:
 ```json
@@ -197,6 +183,7 @@ Compute time spent in each status for tasks within a window (derived from git hi
 
 ```bash
 lotar stats time-in-status [--since <when>] [--until <when>] [--limit N] [--global]
+```
 ### age
 
 Group tasks by age since creation as a snapshot, using day/week/month buckets.
@@ -248,7 +235,7 @@ Example JSON output (excerpt):
 Aggregate effort estimates across tasks (snapshot). Effort strings support h (hours), d (days=8h), w (weeks=40h).
 
 Options:
-- `--by <key>` grouping key. Built-ins: assignee, reporter, type, status, priority, project, category, tag. Declared custom fields are accepted directly (e.g., `--by sprint`). You can also use `field:<name>` explicitly.
+- `--by <key>` grouping key. Built-ins: assignee, reporter, type, status, priority, project, tag. Declared custom fields are accepted directly (e.g., `--by sprint`). You can also use `field:<name>` explicitly.
 - `--where key=value` (repeatable) filters. Keys follow the same rules as `--by`. Tags accept `tag` or `tags`.
 - `--unit hours|days|weeks|points|auto` select output unit; auto picks hours if any present, else points.
 - `--since <date>` / `--until <date>` window filters (RFC3339 or relative like `14d`, `yesterday`, weekday names).

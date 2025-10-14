@@ -20,7 +20,7 @@ pub struct FileCommitEvent {
 #[derive(Debug, Serialize, Clone)]
 pub struct ActivityFeedChange {
     pub field: String,
-    pub category: String,
+    pub kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub old: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -143,7 +143,7 @@ fn to_feed_history_entry(entry: TaskChangeLogEntry) -> ActivityFeedHistoryEntry 
             .map(|change: TaskChange| {
                 let TaskChange { field, old, new } = change;
                 ActivityFeedChange {
-                    category: classify_change(&field).to_string(),
+                    kind: classify_change(&field).to_string(),
                     field,
                     old,
                     new,

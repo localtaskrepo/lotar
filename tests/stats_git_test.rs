@@ -471,7 +471,7 @@ fn stats_changed_and_churn_and_authors() {
         .unwrap()
         .current_dir(root)
         .args([
-            "--format", "json", "stats", "changed", "--since", "60d", "--global",
+            "--format", "json", "stats", "changed", "--since", "120d", "--global",
         ])
         .output()
         .unwrap();

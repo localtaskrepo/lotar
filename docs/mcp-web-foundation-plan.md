@@ -7,7 +7,7 @@ Owners: Core CLI + Storage maintainers
 ## Goals
 
 - Expose core project and task operations over two channels:
-  1) Web API (JSON over HTTP) to power the React UI and programmatic clients
+  1) Web API (JSON over HTTP) to power the Vue UI and programmatic clients
   2) MCP tools (JSON-RPC/stdio) to let AI agents interact with LoTaR safely
 - Keep behavior consistent with the existing CLI and storage semantics (YAML, project isolation).
 - Keep it small and dependency-light; reuse OutputRenderer for diagnostics.
@@ -89,11 +89,11 @@ Implication: We need a real API surface (methods, bodies, errors) and a thin ada
       - list_projects(ctx) -> Result<Vec<ProjectDTO>> (directory names under tasks root)
       - project_stats(project: &str, ctx) -> Result<ProjectStatsDTO>
 
-- Shared DTOs (new): `src/api_types.rs`
-  - TaskDTO { id, title, status, priority, task_type, assignee, created, modified, due_date, effort, subtitle?, description?, category?, tags[], custom_fields{}, relationships, comments[] }
-  - TaskCreate { title, project?, priority?, task_type?, assignee?, due_date?, effort?, description?, category?, tags[], custom_fields{} }
+- Shared DTOs (stable): `src/api_types.rs`
+  - TaskDTO { id, title, status, priority, task_type, assignee, created, modified, due_date, effort, subtitle?, description?, tags[], custom_fields{}, relationships, comments[] }
+  - TaskCreate { title, project?, priority?, task_type?, assignee?, due_date?, effort?, description?, tags[], custom_fields{} }
   - TaskUpdate { same as create but all Option<...> to PATCH semantics; status?, priority? }
-  - TaskListFilter { status[], priority[], task_type[], project?, category?, tags[], text_query? }
+  - TaskListFilter { status[], priority[], task_type[], project?, tags[], text_query? }
   - ProjectDTO { name, prefix }
   - ProjectStatsDTO { name, open_count, done_count, recent_modified, tags_top[] }
   - Error payload: { code: string, message: string, details?: object }
@@ -147,7 +147,7 @@ Endpoint style
   - Query: id
   - 200 { data: TaskDTO } | 404 { error }
 - GET /tasks/list
-  - Query: status, priority, type, project, tags, category, q
+  - Query: status, priority, type, project, tags, q
   - 200 { data: TaskDTO[], meta: { count } }
 - GET /tasks/stream (SSE streaming list)
   - Content-Type: text/event-stream
@@ -159,7 +159,7 @@ Endpoint style
 - GET /projects/list
   - 200 { data: ProjectDTO[] }
 - GET /projects/stats
-  - Query: name
+  - Query: project
   - 200 { data: ProjectStatsDTO } | 404 { error }
 
 - GET /config/show
@@ -234,7 +234,7 @@ Phase 0 – Scaffolding (PR1)
 - Add `src/api_types.rs` DTOs and serde derives
 - Wire services to storage and convert Task <-> TaskDTO
 - Unit tests for services
- - Add optional `schema` cargo feature and `schemars` derive on DTOs to generate JSON Schemas for third‑party devs
+ - Add optional `schema` cargo feature and `schemars` derive on DTOs to generate JSON Schemas for third‑party devs (DTOs are stable; schemas help external tools)
  - Add a tiny schema export harness (dev-only) that writes `docs/schemas/*.json`
 
 Phase 1 – Web API + SSE (PR2)
@@ -356,7 +356,7 @@ Configuration
 3) Pagination vs streaming for `/tasks`?
 • Answered: Prefer streaming while scanning the filesystem.
 4) MCP tool naming convention?
-• Answered: Slash-separated names (e.g., `task/create`).
+• Answered: Underscore-separated names (e.g., `task_create`).
 5) Feature gating?
 • Answered: Enabled by default in initial release.
 6) Error codes policy?
@@ -417,3 +417,101 @@ PR4 – Hardening & DX
 - [ ] Request logging polish (BEGIN/END per request and per SSE broadcast)
 - [ ] Optional OpenAPI doc and examples; publish JSON Schemas
 - [ ] Performance passes and small fixes
+
+---
+
+## Web Interface Plan (UI stack, MVP, tasks)
+
+Goals
+- Ship a fast, local-first web UI that mirrors CLI behavior and surfaces realtime updates via SSE.
+- Keep the footprint small. Prefer zero state management libraries unless clearly needed. Reuse existing API and SSE endpoints.
+- Maintain parity with CLI semantics (filters, enums, project isolation), and avoid introducing breaking API needs.
+- Favor testable design: small pure data utilities, isolated fetch/SSE layers, and component tests running in jsdom.
+
+Stack Decisions (updated)
+- Frontend: Vue 3 + vue-router 4
+- Build: Vite, output directory `target/web` (served by existing Rust web server)
+- Styles: keep lightweight styles with small custom CSS tokens/utilities (no heavy UI framework)
+- No SSR; static assets only; no external runtime deps
+
+UI Architecture
+- Routing: vue-router 4
+  - `/` → TasksList (filters in querystring)
+  - `/task/:id` → TaskDetails (includes comments/relationships)
+  - `/insights` → ProjectInsights (Git-backed analytics and reports; read-only)
+  - Future: `/config` → Config editor (global and per-project)
+- Data access: tiny fetch wrapper with AbortController; JSON only; map to DTOs from `api_types.rs`.
+- State: local component state + URL params for filters; avoid heavy global stores initially.
+- Realtime: EventSource to `/api/events` with per-tab filters. Update list/detail views on `task_created|task_updated|task_deleted`.
+
+API Integration (REST)
+- List: `GET /api/tasks/list?project=TEST&status=IN_PROGRESS,TODO&priority=HIGH&q=login`
+- Get: `GET /api/tasks/get?id=TEST-1`
+- Create: `POST /api/tasks/add { TaskCreate }`
+- Update: `POST /api/tasks/update { id, ...patch }`
+- Delete: `POST /api/tasks/delete { id }`
+- Projects: `GET /api/projects/list`, `GET /api/projects/stats?project=TEST`
+- Config: `GET /api/config/show`, `POST /api/config/set`
+
+Realtime (SSE)
+- Subscribe to `/api/events?kinds=task_created,task_updated,task_deleted&project=TEST&ready=1`.
+- Keep-alive heartbeats present; ignore in UI. Use a per-tab debounce_ms override only if needed.
+- List streaming (`/api/tasks/stream`) is available for large repos; TasksList can optionally swap to it behind a feature flag.
+
+MVP Scope (Phase A)
+1) Tasks List
+  - Filters: project, status, priority, type, assignee (@me), tags, q (search)
+  - Sort by: priority, due_date, created, modified, status
+  - Live updates via SSE (apply patches to the list in-place)
+2) Task Details
+  - Read-only details pane with relationships and comments
+  - Link to open in editor via `lotar:` custom URL (optional) or copy ID
+3) Create/Edit
+  - Create modal/form using TaskCreate
+  - Edit selected fields (title, type, assignee, due_date, effort, tags, description)
+  - Dedicated status change action (uses appropriate endpoint/CLI parity)
+4) Delete
+  - Soft confirm; update list optimistically and reconcile on SSE
+5) Basic Statistics
+  - Show top cards (open count, done count, recent modified) from ProjectStatsDTO
+
+Phase B (Nice-to-haves)
+- Inline quick actions in list (status/priority toggle)
+- Bulk selection with multi-actions
+- Saved filters via query presets
+- Config page (global/project) with validation and post-update toast; listen for `config_updated`
+- Task anchors view (read-only) when present in DTO
+- SSE-driven streaming list for very large workspaces
+
+UI Task Breakdown (tracked under PRs)
+- PR-UI-1: API client and DTO adapters (fetch wrapper, error mapping)
+- PR-UI-2: TasksList with filters, empty/error states, skeletons
+- PR-UI-3: SSE integration; reconcile events into list and details
+- PR-UI-4: TaskDetails page; deep link `/task/:id`
+- PR-UI-5: Create/Edit forms; status change action with optimistic updates
+- PR-UI-6: Delete flow with optimistic removal and SSE reconciliation
+- PR-UI-7: Project switcher & basic statistics panel
+- PR-UI-8: Polish (toasts, keyboard nav, focus traps, a11y tweaks)
+- PR-UI-9 (optional): Streaming list mode (`/api/tasks/stream`)
+
+Small Contracts (for UI data)
+- TaskDTO minimal fields required to render a list row: id, title, status, priority, task_type, assignee, due_date, modified, tags[]
+- Error envelope: `{ error: { code, message, details? } }` — show `message`
+- Success envelope for single resources: `{ data: TaskDTO }`; for lists: `{ data: TaskDTO[], meta: { count } }`
+
+Edge Cases
+- Deleted on server while open in UI → SSE `task_deleted` with `{ id }` → navigate back to list
+- Concurrent edits → last write wins; UI always fetches fresh after write
+- Large file scans → prefer `/api/tasks/stream` or paginate locally as a fallback
+- Nonexistent project filters → REST returns empty list; UI shows zero state
+
+Acceptance Criteria (UI MVP)
+- Lists, filtering, and details work against the local API with no page reloads
+- Create/edit/delete/status changes reflect immediately and reconcile with SSE
+- Error handling shows user-friendly messages; no console errors in happy path
+- Output bundle continues to be served from `target/web` and loads under `lotar serve`
+- No new server dependencies introduced; tests remain green; clippy stays warning-free
+
+Research Notes
+- Vue/Vite chosen to keep UI lean and fast.
+- OpenAPI types generation for the UI is optional; DTOs are considered stable enough now for direct use.

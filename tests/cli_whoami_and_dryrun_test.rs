@@ -135,7 +135,6 @@ fn status_dry_run_explain_previews_and_does_not_write() {
             due_date: None,
             effort: None,
             description: None,
-            category: None,
             tags: vec![],
             relationships: None,
             custom_fields: None,

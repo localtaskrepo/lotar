@@ -8,7 +8,7 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 
 ### Core Components
 
-**Storage Layer (`store.rs`)**
+**Storage Layer (`src/storage/*`)**
 - YAML-based persistence with human-readable `.yml` files
 - Project isolation with separate directories
 - Automatic ID generation (`PROJ-1` format with 4-character prefixes)
@@ -21,11 +21,10 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 - Relationships struct for dependencies and hierarchies
 - Custom fields HashMap for team-specific data
 
-**Indexing System (`index.rs`)**
-- Global tag index for fast cross-project searches
-- ID to file path mapping for O(1) lookups
-- Sub-100ms query performance optimization
-- YAML persistence consistent with task format
+**Search & Filtering (`src/storage/search.rs`)**
+- Query helpers over on-disk tasks without a DB
+- Filtering by status, priority, task type, tags, text
+- Case-insensitive fuzzy matching utilities for flexible queries
 
 **Scanner Engine (`scanner.rs`)**
 - Multi-language support (25+ programming languages)
@@ -33,14 +32,14 @@ LoTaR follows a clean, modular architecture built around Rust's type safety and 
 - UUID tracking for persistent TODO identification
 - File type recognition via extension mapping
 
-**CLI Interface (`main.rs`, `tasks.rs`)**
+**CLI Interface (`src/cli/*`)**
 - Command pattern for extensible command structure
 - Robust enum-based argument validation
 - Custom error types with proper propagation
 - Automatic project context detection
 
 **Web Server (`web_server.rs`, `api_server.rs`)**
-- Embedded React frontend built into binary
+- Embedded Vue frontend built via Vite into `target/web`
 - REST API with JSON endpoints
 - Static file serving with proper MIME types
 - Configurable port and path settings
@@ -79,7 +78,6 @@ comments:
 # Legacy fields (backward compatibility)
 subtitle: "OAuth integration for web app"
 description: "Detailed implementation notes..."
-category: "authentication"
 tags: ["auth", "security", "oauth"]
 
 # Custom fields (team-specific)
@@ -130,7 +128,7 @@ custom_fields:
 **Rationale**: Sub-100ms performance, cross-project search, scalability
 
 ### AD-007: Embedded Web Interface
-**Decision**: Include React frontend in Rust binary  
+**Decision**: Include Vue frontend (built with Vite) in Rust binary  
 **Rationale**: Single binary deployment, no external dependencies, portability
 
 ### AD-008: Multi-Language Scanner
@@ -146,42 +144,27 @@ custom_fields:
 ### Response Times
 - **Task operations**: < 50ms for typical workloads
 - **Search operations**: < 100ms for 100+ tasks
-- **Index rebuilds**: < 500ms for moderate datasets
-- **File operations**: Atomic writes with error handling
-
-### Memory Usage
 - **Minimal footprint**: Lazy loading of task content
 - **No memory leaks**: Rust ownership prevents issues
-- **Efficient serialization**: Optimized YAML processing
-- **Zero-copy operations**: Where possible
-
-## Security Model
-
-### Project Isolation
-- Each project stored in separate directory
-- Task IDs include project prefix for uniqueness
 - Cross-project access explicitly prevented
 - Security boundaries enforced at storage layer
-
-### File System Safety
-- All paths validated and sanitized
-- No external access beyond `.tasks/` directory
 - Atomic file operations where possible
 - Proper error handling for failures
-
-## Extension Points
-
-### Custom Fields
+**Web Server (`web_server.rs`, `api_server.rs`)**
+- Embedded Vue frontend built (Vite) into the binary (`target/web`)
+- Server-Sent Events (SSE) for realtime updates on `/api/events` and list streaming on `/api/tasks/stream`
 Tasks support arbitrary custom fields via `custom_fields` HashMap:
 - Sprint numbers, story points, team assignments
-- Custom workflow states, external system IDs
+### Test Coverage
+- **Handler Unit Tests**: CLI command handler validation with mocking
 - Any YAML-serializable data type
 
-### Scanner Languages
-New programming languages added by extending `FILE_TYPES` configuration
-
-### Command Extensions
-New CLI commands via Command trait implementation and registration
+**Quality Metrics**
+- Zero build warnings (clippy clean)
+- All tests passing
+- Memory safety via Rust ownership
+- Project isolation validated
+- Performance targets verified in CI
 
 ## Design Principles
 
@@ -233,12 +216,12 @@ LoTaR includes a comprehensive, multi-layered testing framework ensuring product
 ### Development Workflow
 ```bash
 # Run full test suite
-cargo test
+cargo nextest run --all-features
 
 # Run specific test categories
-cargo test handler_unit_tests
-cargo test integration_workflows
-cargo test experimental_cli
+cargo nextest run --all-features --filter handler_unit_tests
+cargo nextest run --all-features --filter integration_workflows
+cargo nextest run --all-features --filter experimental_cli
 
 # Performance and code quality
 cargo clippy    # Zero warnings enforced

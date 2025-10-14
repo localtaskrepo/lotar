@@ -250,13 +250,6 @@ impl StorageSearch {
             return false;
         }
 
-        // Check category filter
-        if let Some(category) = &filter.category {
-            if task.category.as_ref() != Some(category) {
-                return false;
-            }
-        }
-
         // Check text query
         if !Self::matches_text_filter(task_id, task, &filter.text_query) {
             return false;

@@ -10,10 +10,10 @@ fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::asse
 }
 
 #[test]
-fn stats_tags_and_categories_snapshot() {
+fn stats_tags_and_custom_field_snapshot() {
     let temp = TempDir::new().unwrap();
 
-    // Create tasks with tags and categories
+    // Create tasks with tags and custom fields
     let mut c = Command::cargo_bin("lotar").unwrap();
     run(
         &mut c,
@@ -24,7 +24,7 @@ fn stats_tags_and_categories_snapshot() {
             "T1",
             "--tag=infra",
             "--tag=build",
-            "--category=bug",
+            "--field=product=bug",
         ],
     ) // ID 1
     .success();
@@ -32,7 +32,13 @@ fn stats_tags_and_categories_snapshot() {
     run(
         &mut c,
         &temp,
-        &["task", "add", "T2", "--tag=infra", "--category=feature"],
+        &[
+            "task",
+            "add",
+            "T2",
+            "--tag=infra",
+            "--field=product=feature",
+        ],
     )
     .success();
 
@@ -54,42 +60,68 @@ fn stats_tags_and_categories_snapshot() {
     .stdout(predicate::str::contains("\"action\":\"stats.tags\""))
     .stdout(predicate::str::contains("infra"));
 
-    // Categories: bug=1, feature=1
-    let mut c = Command::cargo_bin("lotar").unwrap();
-    run(&mut c, &temp, &["stats", "categories", "--global"]) // project scope not required here
-        .success()
-        .stdout(predicate::str::contains("bug"))
-        .stdout(predicate::str::contains("feature"));
-
-    // And JSON for categories
+    // Custom field values: bug=1, feature=1
     let mut c = Command::cargo_bin("lotar").unwrap();
     run(
         &mut c,
         &temp,
-        &["--format", "json", "stats", "categories", "--global"],
+        &["stats", "custom-field", "--field", "product", "--global"],
+    ) // project scope not required here
+    .success()
+    .stdout(predicate::str::contains("bug"))
+    .stdout(predicate::str::contains("feature"));
+
+    // And JSON for custom field distribution
+    let mut c = Command::cargo_bin("lotar").unwrap();
+    run(
+        &mut c,
+        &temp,
+        &[
+            "--format",
+            "json",
+            "stats",
+            "custom-field",
+            "--field",
+            "product",
+            "--global",
+        ],
     )
     .success()
-    .stdout(predicate::str::contains("\"action\":\"stats.categories\""))
+    .stdout(predicate::str::contains(
+        "\"action\":\"stats.custom.field\"",
+    ))
+    .stdout(predicate::str::contains("\"field\":\"product\""))
     .stdout(predicate::str::contains("bug"));
+
+    // Custom keys should include product
+    let mut c = Command::cargo_bin("lotar").unwrap();
+    run(
+        &mut c,
+        &temp,
+        &["--format", "json", "stats", "custom-keys", "--global"],
+    )
+    .success()
+    .stdout(predicate::str::contains("\"action\":\"stats.custom.keys\""))
+    .stdout(predicate::str::contains("product"));
 }
 
 #[test]
 fn stats_distribution_snapshot() {
     let temp = TempDir::new().unwrap();
 
-    // Add some tasks with tags and categories to populate fields
+    // Add some tasks with tags and custom fields to populate fields
     let mut c = Command::cargo_bin("lotar").unwrap();
     run(
         &mut c,
         &temp,
-        &["task", "add", "D1", "--tag=ui", "--category=feature"],
+        &["task", "add", "D1", "--tag=ui", "--field=product=feature"],
     )
     .success();
     let mut c = Command::cargo_bin("lotar").unwrap();
     run(
         &mut c,
         &temp,
-        &["task", "add", "D2", "--tag=api", "--category=bug"],
+        &["task", "add", "D2", "--tag=api", "--field=product=bug"],
     )
     .success();
 

@@ -12,12 +12,10 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - default.reporter: string
 - default.priority: enum Priority
 - default.status: enum TaskStatus
-- default.category: string
 - default.tags: string[]
 - issue.states: string[] (e.g., [Todo, InProgress, Done])
 - issue.types: string[] (feature, bug, epic, spike, chore)
 - issue.priorities: string[] (Low, Medium, High, Critical)
-- issue.categories: string[]
 - issue.tags: string[]
 - custom.fields: string[]
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
@@ -35,6 +33,8 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 
 ## Home and Project keys
 Same shape as global; project values override global for that project. Use `project.id` for the project identifier.
+
+> Legacy: older configs may include `issue.categories`. The key is normalized for compatibility but is not consumed by the runtime. Prefer modeling these labels with `custom.fields`.
 
 ## Examples
 ```yaml
@@ -64,7 +64,6 @@ auto:
 	identity_git: true
 	assign_on_status: true
 default:
-	category: Engineering
 	tags: [oncall, sev]
 ```
 

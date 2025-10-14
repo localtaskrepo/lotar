@@ -102,19 +102,15 @@
           v-model:default-reporter="form.defaultReporter"
           v-model:default-assignee="form.defaultAssignee"
           v-model:default-tags="form.defaultTags"
-          v-model:default-category="form.defaultCategory"
           :tag-suggestions="tagSuggestions"
-          :category-suggestions="categorySuggestions"
           :default-reporter-error="errors.default_reporter"
           :default-assignee-error="errors.default_assignee"
           :default-tags-error="errors.default_tags"
-          :default-category-error="errors.default_category"
           :provenance-label="provenanceLabel"
           :provenance-class="provenanceClass"
           :default-reporter-source="sourceFor('default_reporter')"
           :default-assignee-source="sourceFor('default_assignee')"
           :default-tags-source="sourceFor('default_tags')"
-          :default-category-source="sourceFor('default_category')"
           @validate="validateField"
         />
 
@@ -139,16 +135,12 @@
 
         <ConfigTaxonomySection
           :description="taxonomyDescription"
-          v-model:categories="form.categories"
           v-model:tags="form.tags"
           v-model:custom-fields="form.customFields"
-          :category-wildcard="categoryWildcard"
           :tag-wildcard="tagWildcard"
           :custom-field-wildcard="customFieldWildcard"
-          :categories-error="errors.categories"
           :tags-error="errors.tags"
           :custom-fields-error="errors.custom_fields"
-          :categories-source="sourceFor('categories')"
           :tags-source="sourceFor('tags')"
           :custom-fields-source="sourceFor('custom_fields')"
           :provenance-label="provenanceLabel"
@@ -282,9 +274,7 @@ const {
   currentProject,
   tagWildcard,
   customFieldWildcard,
-  categoryWildcard,
   tagSuggestions,
-  categorySuggestions,
   statusOptions,
   priorityOptions,
   statusSuggestions,

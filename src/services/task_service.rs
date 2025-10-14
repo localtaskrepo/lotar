@@ -24,7 +24,6 @@ impl TaskService {
             due_date,
             effort,
             description,
-            category,
             tags,
             relationships,
             custom_fields,
@@ -103,7 +102,6 @@ impl TaskService {
             Err(_) => e,
         });
         t.description = description;
-        t.category = category;
         t.tags = normalize_tags(tags);
         if let Some(rel) = relationships {
             t.relationships = rel;
@@ -259,14 +257,6 @@ impl TaskService {
                 t.description = new_value;
             }
         }
-        if let Some(v) = patch.category {
-            let new_value = Some(v.clone());
-            let previous = t.category.clone();
-            if previous != new_value {
-                record_change("category", previous, new_value.clone());
-                t.category = new_value;
-            }
-        }
         if let Some(v) = patch.tags {
             let new_tags = normalize_tags(v);
             let previous = t.tags.clone();
@@ -323,7 +313,6 @@ impl TaskService {
             priority: filter.priority.clone(),
             task_type: filter.task_type.clone(),
             project: filter.project.clone(),
-            category: filter.category.clone(),
             tags: filter.tags.clone(),
             text_query: filter.text_query.clone(),
         };
@@ -364,7 +353,6 @@ impl TaskService {
             effort: task.effort,
             subtitle: task.subtitle,
             description: task.description,
-            category: task.category,
             tags: task.tags,
             relationships: task.relationships,
             comments: task.comments,
@@ -404,16 +392,6 @@ impl TaskService {
                 task.task_type = default_type;
             }
         }
-
-        if task.category.is_none() {
-            if let Some(default_category) = config.default_category.clone() {
-                let trimmed = default_category.trim();
-                if !trimmed.is_empty() {
-                    task.category = Some(trimmed.to_string());
-                }
-            }
-        }
-
         if task.tags.is_empty() && !config.default_tags.is_empty() {
             task.tags = config.default_tags.clone();
         }

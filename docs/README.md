@@ -10,7 +10,10 @@ LoTaR is an actively developed task management tool with a CLI, web server, and 
 # Install and build
 git clone https://github.com/mallox/lotar
 cd lotar
-cargo build --release
+
+# Build web UI (Vue + Vite) into target/web and the Rust binary
+npm install
+npm run build
 
 # Create your first task
 lotar add "Setup project" --project=myapp --priority=HIGH
@@ -18,8 +21,8 @@ lotar add "Setup project" --project=myapp --priority=HIGH
 # List tasks
 lotar list --project=myapp
 
-# Start web interface
-lotar serve 8080
+# Start web interface (serves static assets from target/web)
+lotar serve -p 8080
 
 # Scan source code for TODOs
 lotar scan ./src
@@ -49,19 +52,25 @@ lotar scan ./src
 - When creating a task from a TODO, LoTaR writes back the task key into the comment and stores a minimal code anchor under `references` in the task (no code snippets are stored). If a TODO already has a key, LoTaR ensures a code anchor exists and prunes older anchors for the same file, keeping only the latest line for that file. Use `lotar scan --reanchor` to prune cross-file anchors and keep only the newest anchor. On subsequent scans, existing anchors are automatically re-anchored when code moves (nearby-window search) and are updated across simple git renames using `git status` information.
 
 ### Web Interface & API
-- **Built-in Web Server** with embedded React frontend
+- **Built-in Web Server** with embedded Vue frontend (built via Vite into `target/web`)
 - **REST API** for all task operations
     - Multi-value filters for list: `status`, `priority`, `type`, `tags`
     - Proper 404 for unknown resources
     - CORS preflight support for `/api/*`
-- **Configurable ports** (default 8080)
- - **SSE**: realtime events with `retry` hint and periodic heartbeats
+- **Configurable ports** (default 8080, use `-p` as a shorthand for `--port`)
+- **Personalized chrome** — Preferences page lets each user choose system/light/dark themes and an optional custom accent color; browser chrome tint follows the active theme.
+- **SSE**: realtime events with `retry` hint and periodic heartbeats
+- **Productive task board UI**
+    - Saved views persist locally and sync with the current URL so you can return to curated filters quickly.
+    - Smart filter chips toggle common slices like Mine, Unassigned, High, In progress, Blocked, Due soon (7d), Overdue, and No estimate without touching the full filter bar.
+    - `?` opens an in-app keyboard overlay listing navigation shortcuts (`g t`, `g b`, `g i`, `/` to focus search), with more shortcuts landing soon.
 
 ### Server flags and endpoints
 
 - `lotar serve --host 0.0.0.0 --port 8080 --open`
     - `--host` controls the bind address (default: 127.0.0.1). Use `0.0.0.0` to listen on all interfaces.
     - `--open` opens the default browser to the server URL, but does not change bind address.
+    - `-p` is accepted as a shorthand for `--port`; positional `lotar serve 8080` also continues to work for backward compatibility.
 - Shutdown endpoint: `GET /shutdown` cleanly stops the server. For tests, `/__test/stop` remains available as an alias.
 
 ## Command Reference
@@ -75,7 +84,7 @@ lotar status PROJ-001 DONE
 lotar assignee PROJ-001 user@example.com
 
 # System Commands
-lotar serve 8080          # Start web server
+lotar serve -p 8080       # Start web server
 lotar scan ./src          # Scan for TODOs
 lotar stats changed --since 14d  # Tickets changed in a window
 lotar stats churn --since 30d    # Churn: commits per ticket (sorted)
@@ -128,16 +137,37 @@ lotar task at PROJ-1 <sha>
 ```bash
 cargo build           # Debug build
 cargo build --release # Release build
-cargo test            # Run all tests
+cargo nextest run --all-features # Run all tests (preferred harness)
 cargo clippy          # Linting
 cargo fmt             # Formatting
 ```
 
+### UI (local dev)
+
+In one terminal:
+
+```bash
+npm run dev
+```
+
+This serves the UI on http://localhost:5173 for fast iteration. In another terminal, run the server:
+
+```bash
+cargo run -- serve -p 8080
+```
+
+Or build UI and run the server that serves embedded static files:
+
+```bash
+npm run build
+cargo run -- serve -p 8080
+```
+
 Ready for production use with no known critical issues.
 
-### Faster local tests with nextest (optional)
+### Test harness
 
-Install nextest once, then use it directly:
+Install nextest once, then use it directly (or run `npm run test`, which wraps the same command):
 
 ```bash
 cargo install cargo-nextest --locked
@@ -148,3 +178,9 @@ Nextest configuration is in `.config/nextest.toml` and sets:
 - run-threads = num-cpus
 - failure-output = immediate, status-level = fail, fail-fast = true
 - a 90s per-test timeout as a guardrail
+
+Need Rust doc tests? Run them explicitly:
+
+```bash
+cargo test --doc --all-features
+```

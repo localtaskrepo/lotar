@@ -14,11 +14,14 @@ lotar serve [OPTIONS]
 # Start server on default port (8080)
 lotar serve
 
-# Start on custom port
-lotar serve --port=3000
+# Start on custom port (short flag)
+lotar serve -p 3000
+
+# Positional port is still accepted for compatibility
+lotar serve 4200
 
 # Start with specific host binding
-lotar serve --host=0.0.0.0 --port=8080
+lotar serve --host=0.0.0.0 -p 8080
 
 # Open browser automatically
 lotar serve --open
@@ -33,28 +36,25 @@ lotar serve  # Uses environment-configured directory
 
 ## Options
 
-- `--port <PORT>` - Port to bind server to (default: 8080)
+- `-p, --port <PORT>` - Port to bind server to (default: 8080)
 - `--host <HOST>` - Host address to bind to (default: localhost)
 - `--open` - Automatically open browser after starting server
-
-## Global Options
-
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
-- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
+- `--tasks-dir <PATH>` - Override tasks directory resolution
+
+> Tip: Unlike other commands, `lotar serve` does not take a project context. The short `-p` flag is dedicated to the port; use the long `--project` form alongside serve if you need to influence project resolution.
 
 ## Environment Variables
-
 - `LOTAR_TASKS_DIR` - Default tasks directory location
-
-## Features
 
 ### Web Interface
 - **Task Dashboard** - Overview of all tasks and projects
 - **Task Management** - Create, edit, and update tasks
 - **Project Views** - Project-specific task organization
 - **Search & Filtering** - Advanced task filtering and search
-- **Statistics** - Task completion and project metrics
+- **Insights** - Task completion and project metrics
+- **Personalization** - Preferences page lets you pick system/light/dark themes and optionally set a custom accent color that updates focus rings and browser chrome.
 
 ### API Endpoints
 - `POST /api/tasks/add` - Create new task (body: TaskCreate; supports `@me` for people fields; auto-set reporter if enabled)
@@ -66,7 +66,6 @@ lotar serve  # Uses environment-configured directory
 		- `type` (CSV; validated against config)
 		- `assignee` (supports `@me` to filter to current user)
 		- `tags` (CSV)
-		- `category`
 		- `q` (free-text search)
 	- Notes:
 		- Invalid values for `status`, `priority`, or `type` return HTTP 400

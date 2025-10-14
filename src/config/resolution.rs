@@ -97,9 +97,6 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.issue_priorities.values != defaults.issue_priorities.values {
         base.issue_priorities = override_config.issue_priorities;
     }
-    if override_config.categories.values != defaults.categories.values {
-        base.categories = override_config.categories;
-    }
     if override_config.tags.values != defaults.tags.values {
         base.tags = override_config.tags;
     }
@@ -110,9 +107,6 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     }
     if override_config.default_reporter.is_some() {
         base.default_reporter = override_config.default_reporter;
-    }
-    if override_config.default_category.is_some() {
-        base.default_category = override_config.default_category;
     }
     if !override_config.default_tags.is_empty() {
         base.default_tags = override_config.default_tags;
@@ -201,9 +195,6 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if override_config.issue_priorities.values != defaults.issue_priorities.values {
         resolved.issue_priorities = override_config.issue_priorities;
     }
-    if override_config.categories.values != defaults.categories.values {
-        resolved.categories = override_config.categories;
-    }
     if override_config.tags.values != defaults.tags.values {
         resolved.tags = override_config.tags;
     }
@@ -213,9 +204,6 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.default_reporter.is_some() {
         resolved.default_reporter = override_config.default_reporter;
-    }
-    if override_config.default_category.is_some() {
-        resolved.default_category = override_config.default_category;
     }
     if !override_config.default_tags.is_empty() {
         resolved.default_tags = override_config.default_tags;
@@ -312,9 +300,6 @@ pub fn get_project_config(
     if let Some(priorities) = project_config.issue_priorities {
         resolved.issue_priorities = priorities;
     }
-    if let Some(categories) = project_config.categories {
-        resolved.categories = categories;
-    }
     if let Some(tags) = project_config.tags {
         resolved.tags = tags;
     }
@@ -410,11 +395,9 @@ impl ResolvedConfig {
             issue_states: global.issue_states,
             issue_types: global.issue_types,
             issue_priorities: global.issue_priorities,
-            categories: global.categories,
             tags: global.tags,
             default_assignee: global.default_assignee,
             default_reporter: global.default_reporter,
-            default_category: global.default_category,
             default_tags: global.default_tags,
             auto_set_reporter: global.auto_set_reporter,
             auto_assign_on_status: global.auto_assign_on_status,

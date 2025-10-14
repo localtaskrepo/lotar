@@ -444,8 +444,8 @@ const activitySeries = computed(() => {
       if (iso < startIso || iso > endIso) return
       const bucket = dayBuckets.get(iso) ?? {}
       entry.changes.forEach(change => {
-        const category = (change.category || 'other').toLowerCase()
-        bucket[category] = (bucket[category] ?? 0) + 1
+        const kind = (change.kind || 'other').toLowerCase()
+        bucket[kind] = (bucket[kind] ?? 0) + 1
       })
       dayBuckets.set(iso, bucket)
     })

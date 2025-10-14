@@ -16,7 +16,6 @@ Canonical fields and enums for tasks.
 - effort?: string
 - subtitle?: string
 - description?: string
-- category?: string
 - tags: string[]
 - relationships: object
 - comments: TaskComment[]

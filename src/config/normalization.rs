@@ -231,9 +231,6 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     if let Some(v) = get_path(&data, &["default", "reporter"]).and_then(cast::<String>) {
         cfg.default_reporter = Some(v);
     }
-    if let Some(v) = get_path(&data, &["default", "category"]).and_then(cast::<String>) {
-        cfg.default_category = Some(v);
-    }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
         if let Ok(list) = serde_yaml::from_value(v) {
             cfg.default_tags = list;
@@ -267,22 +264,12 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     }
 
     // taxonomy.* (legacy) — will be overridden by issue.* if present
-    if let Some(v) = get_path(&data, &["taxonomy", "categories"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.categories = StringConfigField { values: list };
-        }
-    }
     if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned() {
         if let Ok(list) = serde_yaml::from_value(v) {
             cfg.tags = StringConfigField { values: list };
         }
     }
-    // issue.categories/tags (preferred canonical)
-    if let Some(v) = get_path(&data, &["issue", "categories"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.categories = StringConfigField { values: list };
-        }
-    }
+    // issue.tags (preferred canonical)
     if let Some(v) = get_path(&data, &["issue", "tags"]).cloned() {
         if let Ok(list) = serde_yaml::from_value(v) {
             cfg.tags = StringConfigField { values: list };
@@ -396,9 +383,6 @@ pub fn parse_project_from_yaml_str(
     if let Some(v) = get_path(&data, &["default", "reporter"]).and_then(cast::<String>) {
         cfg.default_reporter = Some(v);
     }
-    if let Some(v) = get_path(&data, &["default", "category"]).and_then(cast::<String>) {
-        cfg.default_category = Some(v);
-    }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
         cfg.default_tags = serde_yaml::from_value(v).ok();
     }
@@ -410,9 +394,6 @@ pub fn parse_project_from_yaml_str(
     }
     if let Some(v) = get_path(&data, &["default", "status"]).cloned() {
         cfg.default_status = serde_yaml::from_value(v).ok();
-    }
-    if let Some(v) = get_path(&data, &["default", "category"]).and_then(cast::<String>) {
-        cfg.default_category = Some(v);
     }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
         cfg.default_tags = serde_yaml::from_value(v).ok();
@@ -428,25 +409,20 @@ pub fn parse_project_from_yaml_str(
         cfg.issue_priorities = serde_yaml::from_value(v).ok();
     }
     // taxonomy.* (legacy)
-    if let Some(v) = get_path(&data, &["taxonomy", "categories"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.categories = Some(StringConfigField { values: list });
-        }
-    }
     if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned() {
         if let Ok(list) = serde_yaml::from_value(v) {
             cfg.tags = Some(StringConfigField { values: list });
         }
     }
-    // issue.categories/tags (preferred)
-    if let Some(v) = get_path(&data, &["issue", "categories"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.categories = Some(StringConfigField { values: list });
-        }
-    }
+    // issue.tags (preferred)
     if let Some(v) = get_path(&data, &["issue", "tags"]).cloned() {
         if let Ok(list) = serde_yaml::from_value(v) {
             cfg.tags = Some(StringConfigField { values: list });
+        }
+    }
+    if let Some(v) = get_path(&data, &["custom", "fields"]).cloned() {
+        if let Ok(list) = serde_yaml::from_value(v) {
+            cfg.custom_fields = Some(StringConfigField { values: list });
         }
     }
     // scan.signal_words
@@ -518,9 +494,6 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if let Some(v) = &cfg.default_reporter {
         default.insert(Y::String("reporter".into()), Y::String(v.clone()));
     }
-    if let Some(v) = &cfg.default_category {
-        default.insert(Y::String("category".into()), Y::String(v.clone()));
-    }
     if !cfg.default_tags.is_empty() {
         default.insert(
             Y::String("tags".into()),
@@ -555,15 +528,11 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     );
     root.insert(Y::String("issue".into()), Y::Mapping(issue));
 
-    // categories/tags now live under issue.* in canonical form
+    // tags now live under issue.* in canonical form
     if let Some(mut imap) = root
         .get_mut(Y::String("issue".into()))
         .and_then(|v| v.as_mapping().cloned())
     {
-        imap.insert(
-            Y::String("categories".into()),
-            serde_yaml::to_value(&cfg.categories.values).unwrap_or(Y::Null),
-        );
         imap.insert(
             Y::String("tags".into()),
             serde_yaml::to_value(&cfg.tags.values).unwrap_or(Y::Null),
@@ -685,9 +654,6 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     if let Some(v) = &cfg.default_reporter {
         default.insert(Y::String("reporter".into()), Y::String(v.clone()));
     }
-    if let Some(v) = &cfg.default_category {
-        default.insert(Y::String("category".into()), Y::String(v.clone()));
-    }
     if let Some(tags) = &cfg.default_tags {
         if !tags.is_empty() {
             default.insert(
@@ -740,25 +706,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         root.insert(Y::String("issue".into()), Y::Mapping(issue));
     }
 
-    // categories/tags under issue.* in canonical project YAML
-    if let Some(v) = &cfg.categories {
-        if let Some(issue_map) = root
-            .get_mut(Y::String("issue".into()))
-            .and_then(|v| v.as_mapping_mut())
-        {
-            issue_map.insert(
-                Y::String("categories".into()),
-                serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
-            );
-        } else {
-            let mut im = serde_yaml::Mapping::new();
-            im.insert(
-                Y::String("categories".into()),
-                serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
-            );
-            root.insert(Y::String("issue".into()), Y::Mapping(im));
-        }
-    }
+    // tags under issue.* in canonical project YAML
     if let Some(v) = &cfg.tags {
         if let Some(issue_map) = root
             .get_mut(Y::String("issue".into()))
@@ -776,6 +724,15 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             );
             root.insert(Y::String("issue".into()), Y::Mapping(im));
         }
+    }
+
+    if let Some(fields) = &cfg.custom_fields {
+        let mut custom = serde_yaml::Mapping::new();
+        custom.insert(
+            Y::String("fields".into()),
+            serde_yaml::to_value(&fields.values).unwrap_or(Y::Null),
+        );
+        root.insert(Y::String("custom".into()), Y::Mapping(custom));
     }
 
     // scan

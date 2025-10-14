@@ -197,7 +197,6 @@ impl CommandHandler for EffortHandler {
                 due_date: None,
                 effort: Some(normalized.clone()),
                 description: None,
-                category: None,
                 tags: None,
                 relationships: None,
                 custom_fields: None,

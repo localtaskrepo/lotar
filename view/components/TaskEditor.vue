@@ -168,17 +168,17 @@ const localFields = reactive<Record<string, string>>({})
 const fieldKeysMap = reactive<Record<string,string>>({})
 const newFieldKey = ref('')
 const newFieldVal = ref('')
+function normalizeFieldKey(key: string) {
+  return (key || '').trim()
+}
 function loadFields(){
   localFieldsClear()
   const src = form.custom_fields || {}
-  for (const k of Object.keys(src)) { fieldKeysMap[k] = k; localFields[k] = String((src as any)[k]) }
-  const legacyCategory = typeof (form as any).category === 'string' ? (form as any).category.trim() : ''
-  if (legacyCategory && localFields['category'] === undefined) {
-    fieldKeysMap['category'] = 'category'
-    localFields['category'] = legacyCategory
-  }
-  if ('category' in form) {
-    delete (form as any).category
+  for (const rawKey of Object.keys(src)) {
+    const targetKey = normalizeFieldKey(rawKey)
+    if (!targetKey) continue
+    fieldKeysMap[targetKey] = targetKey
+    localFields[targetKey] = String((src as any)[rawKey])
   }
 }
 function localFieldsClear(){ for (const k of Object.keys(localFields)) delete localFields[k]; for (const k of Object.keys(fieldKeysMap)) delete fieldKeysMap[k] }
@@ -188,7 +188,8 @@ function exportFields(): Record<string,string> {
   // Normalize renamed keys
   const out: Record<string,string> = {}
   for (const oldKey of Object.keys(localFields)) {
-    const newKey = fieldKeysMap[oldKey] || oldKey
+    const newKey = normalizeFieldKey(fieldKeysMap[oldKey] || oldKey)
+    if (!newKey) continue
     out[newKey] = localFields[oldKey]
   }
   return out
@@ -202,7 +203,12 @@ async function preloadFields() {
     const proj = (form.project || (form.id ? String(form.id).split('-')[0] : '')) || undefined
     const cfg = await api.showConfig(proj)
     const names = Array.isArray(cfg?.custom_fields) ? cfg.custom_fields : []
-    configuredFieldNames.value = names.map((x: any) => String(x))
+    const normalized = new Set<string>()
+    names.forEach((x: any) => {
+      const key = normalizeFieldKey(String(x))
+      if (key) normalized.add(key)
+    })
+    configuredFieldNames.value = Array.from(normalized)
     for (const n of configuredFieldNames.value) { if (localFields[n] === undefined) { localFields[n] = ''; fieldKeysMap[n] = n } }
   } catch {}
 }
@@ -260,7 +266,6 @@ function emitSave(){
   const payload: any = { ...form }
   payload.custom_fields = exportFields()
   if (props.mode === 'edit') payload.relationships = exportRels()
-  if ('category' in payload) delete payload.category
   emit('save', payload)
 }
 

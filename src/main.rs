@@ -599,7 +599,6 @@ fn main() {
                             .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
                         let due_date = get_str("due_date");
                         let effort = get_str("effort");
-                        let category = get_str("category");
                         let tags = get_vec_str("tags");
 
                         Some(lotar::storage::task::Task {
@@ -620,7 +619,6 @@ fn main() {
                             history: vec![],
                             subtitle: None,
                             description: None,
-                            category,
                             tags,
                             custom_fields: std::collections::HashMap::new(),
                         })
@@ -713,11 +711,6 @@ fn main() {
                                 "effort",
                                 serde_json::json!(prev.effort),
                                 serde_json::json!(cur.effort),
-                            );
-                            push(
-                                "category",
-                                serde_json::json!(prev.category),
-                                serde_json::json!(cur.category),
                             );
                             push(
                                 "tags",

@@ -60,9 +60,9 @@ vi.mock('../composables/useConfig', () => ({
     statuses: { value: ['open', 'done'] },
     priorities: { value: ['low'] },
     types: { value: ['task'] },
-    categories: { value: [] },
+    customFields: { value: ['product'] },
     tags: { value: [] },
-    defaults: { value: { project: '', status: 'open', priority: 'low', type: 'task', reporter: '', assignee: '', category: '', tags: [] } },
+    defaults: { value: { project: '', status: 'open', priority: 'low', type: 'task', reporter: '', assignee: '', tags: [], customFields: { product: '' } } },
     refresh: vi.fn(async () => { }),
   }),
 }))

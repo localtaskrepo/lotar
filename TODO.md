@@ -30,6 +30,7 @@ Chores:
 
 Bugs:
 - "Category" which should now be a custom property is still treated as a first-class property in some places and should be removed. The task list for example still have a category column shown by default, indicating that it's still a first-class property.
+- Add smoke testing framework for cli commands in tmp directories (doesn't need to use rust)
 
 # Implementation Roadmap
 

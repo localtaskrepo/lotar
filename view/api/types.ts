@@ -17,7 +17,6 @@ export interface TaskDTO {
   effort?: string | null
   subtitle?: string | null
   description?: string | null
-  category?: string | null
   tags: string[]
   relationships: TaskRelationships
   comments: any[]
@@ -72,7 +71,7 @@ export interface TaskHistoryChange {
 
 export interface ActivityFeedChange {
   field: string
-  category: string
+  kind: string
   old?: string | null
   new?: string | null
 }
@@ -104,7 +103,6 @@ export interface TaskCreate {
   due_date?: string
   effort?: string
   description?: string
-  category?: string
   tags?: string[]
   relationships?: TaskRelationships
   custom_fields?: Record<string, unknown>
@@ -120,7 +118,6 @@ export interface TaskUpdate {
   due_date?: string
   effort?: string
   description?: string
-  category?: string
   tags?: string[]
   relationships?: TaskRelationships
   custom_fields?: Record<string, unknown>
@@ -131,7 +128,6 @@ export interface TaskListFilter {
   priority?: Priority[]
   task_type?: TaskType[]
   project?: string
-  category?: string
   tags?: string[]
   q?: string
   assignee?: string
@@ -156,14 +152,12 @@ export interface ResolvedConfigDTO {
   default_prefix: string
   default_assignee?: string | null
   default_reporter?: string | null
-  default_category?: string | null
   default_tags: string[]
   default_priority: string
   default_status?: string | null
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]
-  categories: string[]
   tags: string[]
   custom_fields: string[]
   auto_set_reporter: boolean
@@ -191,11 +185,9 @@ export interface GlobalConfigRaw {
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]
-  categories: string[]
   tags: string[]
   default_assignee?: string | null
   default_reporter?: string | null
-  default_category?: string | null
   default_tags: string[]
   auto_set_reporter: boolean
   auto_assign_on_status: boolean
@@ -224,11 +216,9 @@ export interface ProjectConfigRaw {
   issue_states?: string[]
   issue_types?: string[]
   issue_priorities?: string[]
-  categories?: string[]
   tags?: string[]
   default_assignee?: string | null
   default_reporter?: string | null
-  default_category?: string | null
   default_tags?: string[]
   default_priority?: string | null
   default_status?: string | null

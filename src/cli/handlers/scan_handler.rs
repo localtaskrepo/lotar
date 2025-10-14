@@ -248,7 +248,6 @@ impl CommandHandler for ScanHandler {
                                 effort: inline_attrs.effort,
                                 due: inline_attrs.due,
                                 description: None,
-                                category: inline_attrs.category,
                                 tags: inline_attrs.tags,
                                 fields: inline_attrs.fields,
                                 bug: false,
@@ -518,7 +517,7 @@ fn strip_bracket_attributes(line: &str) -> String {
 
 #[cfg(test)]
 mod scan_handler_tests {
-    use super::strip_bracket_attributes;
+    use super::{parse_inline_attributes, strip_bracket_attributes};
 
     #[test]
     fn strip_preserves_leading_indentation() {
@@ -546,11 +545,20 @@ mod scan_handler_tests {
         // Expect at least 5 spaces before the // comment after the comma
         assert!(after_comma.starts_with("     "));
     }
+
+    #[test]
+    fn parse_inline_attributes_preserves_custom_field_key() {
+        let attrs = parse_inline_attributes("// TODO tidy [product=Platform]");
+        assert_eq!(
+            attrs.fields,
+            vec![("product".to_string(), "Platform".to_string())]
+        );
+    }
 }
 
 /// Parse inline bracket attributes like [key=value] and map them to AddArgs fields.
 /// Recognized keys (case-insensitive): assignee, priority, tags|tag, due|due_date,
-/// type, category, effort. Unknown keys go into fields Vec.
+/// type, effort. Unknown keys go into fields Vec.
 fn parse_inline_attributes(line: &str) -> InlineAttrs {
     let mut attrs = Vec::new();
     // Collect top-level bracket contents
@@ -607,7 +615,6 @@ fn parse_inline_attributes(line: &str) -> InlineAttrs {
                 "assignee" | "assign" => out.assignee = Some(v),
                 "priority" => out.priority = Some(v),
                 "type" => out.task_type = Some(v),
-                "category" | "cat" => out.category = Some(v),
                 "effort" => out.effort = Some(v),
                 "due" | "due_date" => out.due = Some(v),
                 "tag" => out.tags.push(v),
@@ -634,7 +641,6 @@ struct InlineAttrs {
     assignee: Option<String>,
     priority: Option<String>,
     task_type: Option<String>,
-    category: Option<String>,
     effort: Option<String>,
     due: Option<String>,
     tags: Vec<String>,

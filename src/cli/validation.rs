@@ -27,34 +27,6 @@ impl<'a> CliValidator<'a> {
         Priority::parse_with_config(priority, self.config)
     }
 
-    /// Validate category against project configuration
-    pub fn validate_category(&self, category: &str) -> Result<String, String> {
-        if self.config.categories.has_wildcard() {
-            // Any category is allowed
-            Ok(category.to_string())
-        } else if self
-            .config
-            .categories
-            .values
-            .contains(&category.to_string())
-        {
-            Ok(category.to_string())
-        } else {
-            let suggestion = find_closest_match(category, &self.config.categories.values);
-            let suggestion_text = match suggestion {
-                Some(s) => format!(" Did you mean '{}'?", s),
-                None => String::new(),
-            };
-
-            Err(format!(
-                "Category '{}' is not allowed in this project. Valid categories: {}.{}",
-                category,
-                self.config.categories.values.join(", "),
-                suggestion_text
-            ))
-        }
-    }
-
     /// Validate tag against project configuration
     pub fn validate_tag(&self, tag: &str) -> Result<String, String> {
         let normalized = tag.trim();

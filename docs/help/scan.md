@@ -72,7 +72,7 @@ Use the global `--format` option:
 Scan will parse inline metadata in bracket form on the TODO line and apply them to the created task when no key exists yet:
 
 Recognized keys (case-insensitive):
-- `assignee`, `priority`, `type`, `category`, `effort`, `due` (or `due_date`), `tag`/`tags`
+- `assignee`, `priority`, `type`, `effort`, `due` (or `due_date`), `tag`/`tags`
 - Unknown keys are preserved as custom fields on the task
 
 Examples:

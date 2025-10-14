@@ -252,7 +252,7 @@ fn apply_field_to_global_config(
             let priorities = parse_token_list::<Priority>(value, "priority")?;
             config.issue_priorities = ConfigurableField { values: priorities };
         }
-        "categories" | "tags" | "custom_fields" => {
+        "tags" | "custom_fields" => {
             let values = parse_simple_csv(value);
             if field == "custom_fields" {
                 for v in &values {
@@ -267,18 +267,10 @@ fn apply_field_to_global_config(
             let field_config = StringConfigField { values };
 
             match field {
-                "categories" => config.categories = field_config,
                 "tags" => config.tags = field_config,
                 "custom_fields" => config.custom_fields = field_config,
                 _ => unreachable!(),
             }
-        }
-        "default_category" => {
-            config.default_category = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
         }
         "default_tags" => {
             let tags: Vec<String> = value
@@ -402,13 +394,6 @@ fn apply_field_to_project_config(
             })?;
             config.default_status = Some(status);
         }
-        "default_category" => {
-            config.default_category = if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            };
-        }
         "default_tags" => {
             let values: Vec<String> = value
                 .split(',')
@@ -430,7 +415,7 @@ fn apply_field_to_project_config(
             let priorities = parse_token_list::<Priority>(value, "priority")?;
             config.issue_priorities = Some(ConfigurableField { values: priorities });
         }
-        "categories" | "tags" | "custom_fields" => {
+        "tags" | "custom_fields" => {
             let values = parse_simple_csv(value);
             if field == "custom_fields" {
                 for v in &values {
@@ -445,7 +430,6 @@ fn apply_field_to_project_config(
             let field_config = StringConfigField { values };
 
             match field {
-                "categories" => config.categories = Some(field_config),
                 "tags" => config.tags = Some(field_config),
                 "custom_fields" => config.custom_fields = Some(field_config),
                 _ => unreachable!(),
@@ -524,11 +508,9 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "default_project",
         "default_assignee",
         "default_reporter",
-        "default_category",
         "default_tags",
         "default_priority",
         "default_status",
-        "categories",
         "tags",
         "custom_fields",
         "issue_states",
@@ -556,14 +538,12 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "project_name",
         "default_assignee",
         "default_reporter",
-        "default_category",
         "default_tags",
         "default_priority",
         "default_status",
         "issue_states",
         "issue_types",
         "issue_priorities",
-        "categories",
         "tags",
         "custom_fields",
         "auto_set_reporter",
@@ -650,14 +630,7 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 )));
             }
         }
-        "default_category" => {
-            if value.len() > 100 {
-                return Err(ConfigError::ParseError(
-                    "default_category cannot be longer than 100 characters".to_string(),
-                ));
-            }
-        }
-        "default_tags" | "categories" | "tags" | "custom_fields" => {
+        "default_tags" | "tags" | "custom_fields" => {
             // Basic validation: allow comma-separated values, each up to 50 chars
             for part in value.split(',') {
                 let p = part.trim();
@@ -740,7 +713,6 @@ pub fn clear_project_field(
         // Scalar option fields
         "default_assignee" => project_config.default_assignee = None,
         "default_reporter" => project_config.default_reporter = None,
-        "default_category" => project_config.default_category = None,
         "default_priority" => project_config.default_priority = None,
         "default_status" => project_config.default_status = None,
         // List option fields
@@ -750,7 +722,6 @@ pub fn clear_project_field(
         "issue_types" => project_config.issue_types = None,
         "issue_priorities" => project_config.issue_priorities = None,
         // String-config lists
-        "categories" => project_config.categories = None,
         "tags" => project_config.tags = None,
         "custom_fields" => project_config.custom_fields = None,
         "auto_set_reporter" => project_config.auto_set_reporter = None,

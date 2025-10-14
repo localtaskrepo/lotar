@@ -34,7 +34,7 @@
               </header>
               <ul class="change-list">
                 <li v-for="change in historyEntry.changes" :key="change.field + ':' + (change.new ?? '')" class="change">
-                  <span class="category" :class="'category--' + change.category">{{ formatCategory(change.category) }}</span>
+                  <span class="change-kind" :class="'change-kind--' + change.kind">{{ formatKind(change.kind) }}</span>
                   <span class="change-label">{{ change.field }}</span>
                   <span v-if="change.old || change.new" class="change-values">
                     <template v-if="change.old && change.new">{{ change.old }} → <strong>{{ change.new }}</strong></template>
@@ -97,8 +97,8 @@ function formatDate(value: string | Date) {
   return date.toLocaleString()
 }
 
-function formatCategory(category: string) {
-  switch (category) {
+function formatKind(kind: string) {
+  switch (kind) {
     case 'created':
       return 'Created'
     case 'status':
@@ -118,7 +118,7 @@ function formatCategory(category: string) {
     case 'planning':
       return 'Planning'
     default:
-      return category.charAt(0).toUpperCase() + category.slice(1)
+      return kind.charAt(0).toUpperCase() + kind.slice(1)
   }
 }
 
@@ -270,7 +270,7 @@ watch(
   font-size: 13px;
 }
 
-.category {
+.change-kind {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 999px;
@@ -279,61 +279,61 @@ watch(
   letter-spacing: 0.04em;
 }
 
-.category--created {
+.change-kind--created {
   background: color-mix(in oklab, #16a34a 12%, transparent);
   border-color: #16a34a33;
   color: #166534;
 }
 
-.category--status {
+.change-kind--status {
   background: color-mix(in oklab, #2563eb 12%, transparent);
   border-color: #2563eb33;
   color: #1e3a8a;
 }
 
-.category--assignment {
+.change-kind--assignment {
   background: color-mix(in oklab, #f59e0b 12%, transparent);
   border-color: #f59e0b33;
   color: #92400e;
 }
 
-.category--comment {
+.change-kind--comment {
   background: color-mix(in oklab, #0ea5e9 12%, transparent);
   border-color: #0ea5e933;
   color: #155e75;
 }
 
-.category--tags {
+.change-kind--tags {
   background: color-mix(in oklab, #10b981 12%, transparent);
   border-color: #10b98133;
   color: #047857;
 }
 
-.category--relationships {
+.change-kind--relationships {
   background: color-mix(in oklab, #a855f7 12%, transparent);
   border-color: #a855f733;
   color: #6b21a8;
 }
 
-.category--custom {
+.change-kind--custom {
   background: color-mix(in oklab, #f97316 12%, transparent);
   border-color: #f9731633;
   color: #9a3412;
 }
 
-.category--content {
+.change-kind--content {
   background: color-mix(in oklab, #ec4899 12%, transparent);
   border-color: #ec489933;
   color: #9d174d;
 }
 
-.category--planning {
+.change-kind--planning {
   background: color-mix(in oklab, #14b8a6 12%, transparent);
   border-color: #14b8a633;
   color: #0f766e;
 }
 
-.category--other {
+.change-kind--other {
   background: color-mix(in oklab, #6b7280 12%, transparent);
   border-color: #6b728033;
   color: #374151;

@@ -63,7 +63,6 @@ lotar list --project=auth  # Uses environment directory
 
 ### Project & Organization
 - `--project, -p <PROJECT>` - Specific project (overrides auto-detection)
-- `--category, -c <CATEGORY>` - Tasks in specific category
 - `--tag, -i <TAG>` - Tasks with specific tag (can be used multiple times)
 
 ### Text Search
@@ -126,7 +125,7 @@ Documentation-friendly tables:
 ## Sorting & Grouping
 
 ### Sorting Options
-- `--sort-by, -S <FIELD>` - Sort by: priority, status, effort, due-date, created, modified, assignee, type, category, project, id, or a declared custom field (you can also use `field:<name>`)
+- `--sort-by, -S <FIELD>` - Sort by: priority, status, effort, due-date, created, modified, assignee, type, project, id, or a declared custom field (you can also use `field:<name>`)
 - `--reverse, -R` - Reverse sort order
 - `--limit, -L <N>` - Limit results (default: 20)
 
@@ -137,7 +136,7 @@ Documentation-friendly tables:
 ## Advanced Filtering
 
 ### Unified filters (built-in and custom fields)
-- `--where key=value` (repeatable) — filter by any property. Supported keys: assignee, status, priority, type, tag (or tags), category, project, and custom fields declared by your project. You can pass declared custom field names directly (e.g., `sprint=W35`) or use `field:<name>` explicitly (both work).
+- `--where key=value` (repeatable) — filter by any property. Supported keys: assignee, status, priority, type, tag (or tags), project, and custom fields declared by your project. You can pass declared custom field names directly (e.g., `sprint=W35`) or use `field:<name>` explicitly (both work).
 - Matching is fuzzy and case-insensitive for strings. For tags, matching applies to the set of tags.
 
 Examples:
@@ -145,8 +144,8 @@ Examples:
 # Built-ins
 lotar list --where status=todo --where priority=high
 
-# Tags and category
-lotar list --where tag=auth --where category=backend
+# Tags
+lotar list --where tag=auth
 
 # Custom fields declared by your project (example: sprint)
 lotar list --where sprint=2025-W35

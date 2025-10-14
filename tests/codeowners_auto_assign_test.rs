@@ -60,7 +60,6 @@ fn codeowners_assigns_owner_on_first_status_change() {
             due_date: None,
             effort: None,
             description: None,
-            category: None,
             tags: vec![],
             relationships: None,
             custom_fields: Some({
@@ -133,7 +132,6 @@ fn codeowners_disabled_falls_back_to_identity() {
             due_date: None,
             effort: None,
             description: None,
-            category: None,
             tags: vec![],
             relationships: None,
             custom_fields: Some({
@@ -201,7 +199,6 @@ fn codeowners_default_multiple_owners_picks_first() {
             due_date: None,
             effort: None,
             description: None,
-            category: None,
             tags: vec![],
             relationships: None,
             custom_fields: Some({
@@ -273,7 +270,6 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
             due_date: None,
             effort: None,
             description: None,
-            category: None,
             tags: vec![],
             relationships: None,
             custom_fields: Some({

@@ -47,8 +47,6 @@ pub struct Task {
     pub subtitle: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub category: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<String>,
 
@@ -79,7 +77,6 @@ impl Task {
             references: vec![],
             subtitle: None,
             description: None,
-            category: None,
             tags: vec![],
             custom_fields: HashMap::new(),
         }
@@ -90,13 +87,12 @@ impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\ncategory: {:?}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
+            "title: {}\nstatus: {}\nsubtitle: {:?}\ndescription: {:?}\npriority: {}\ncreated: {}\nmodified: {}\ndue_date: {:?}\ntags: {:?}",
             self.title,
             self.status,
             self.subtitle,
             self.description,
             self.priority,
-            self.category,
             self.created,
             self.modified,
             self.due_date,

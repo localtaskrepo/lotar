@@ -517,7 +517,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                                 "assignee": {"type": ["string", "null"]},
                                 "due_date": {"type": ["string", "null"]},
                                 "effort": {"type": ["string", "null"]},
-                                "category": {"type": ["string", "null"]},
                                 "tags": {"type": "array", "items": {"type": "string"}},
                                 "custom_fields": {"type": "object"}
                             },
@@ -556,7 +555,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                                         "assignee": {"type": ["string", "null"]},
                                         "due_date": {"type": ["string", "null"]},
                                         "effort": {"type": ["string", "null"]},
-                                        "category": {"type": ["string", "null"]},
                                         "tags": {"type": "array", "items": {"type": "string"}},
                                         "custom_fields": {"type": "object"}
                                     },
@@ -753,11 +751,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 .get("description")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
-            let category = req
-                .params
-                .get("category")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
             let tags = req
                 .params
                 .get("tags")
@@ -779,7 +772,10 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
                 }
             }
-            let custom_fields = req
+            let custom_fields_map: std::collections::HashMap<
+                String,
+                crate::types::CustomFieldValue,
+            > = req
                 .params
                 .get("custom_fields")
                 .and_then(|v| v.as_object())
@@ -790,7 +786,13 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                         m.insert(k.clone(), json_to_custom(v));
                     }
                     m
-                });
+                })
+                .unwrap_or_default();
+            let custom_fields = if custom_fields_map.is_empty() {
+                None
+            } else {
+                Some(custom_fields_map)
+            };
             let relationships = match req.params.get("relationships") {
                 Some(value) => {
                     match serde_json::from_value::<crate::types::TaskRelationships>(value.clone()) {
@@ -831,7 +833,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 due_date,
                 effort,
                 description,
-                category,
                 tags,
                 relationships,
                 custom_fields,
@@ -1078,9 +1079,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
             if let Some(s) = patch_val.get("description").and_then(|v| v.as_str()) {
                 patch.description = Some(s.to_string());
             }
-            if let Some(s) = patch_val.get("category").and_then(|v| v.as_str()) {
-                patch.category = Some(s.to_string());
-            }
             if let Some(arr) = patch_val.get("tags").and_then(|v| v.as_array()) {
                 patch.tags = Some(
                     arr.iter()
@@ -1113,7 +1111,13 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     }
                 }
             }
+            let mut custom_fields_map: std::collections::HashMap<
+                String,
+                crate::types::CustomFieldValue,
+            > = patch.custom_fields.take().unwrap_or_default();
+            let mut custom_fields_provided = false;
             if let Some(obj) = patch_val.get("custom_fields").and_then(|v| v.as_object()) {
+                custom_fields_provided = true;
                 fn json_to_custom(val: &serde_json::Value) -> crate::types::CustomFieldValue {
                     #[cfg(feature = "schema")]
                     {
@@ -1124,12 +1128,12 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                         serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
                     }
                 }
-                let mut m: std::collections::HashMap<String, crate::types::CustomFieldValue> =
-                    std::collections::HashMap::new();
                 for (k, v) in obj.iter() {
-                    m.insert(k.clone(), json_to_custom(v));
+                    custom_fields_map.insert(k.clone(), json_to_custom(v));
                 }
-                patch.custom_fields = Some(m);
+            }
+            if custom_fields_provided || !custom_fields_map.is_empty() {
+                patch.custom_fields = Some(custom_fields_map);
             }
             let mut storage = crate::storage::manager::Storage::new(resolver.path);
             match crate::services::task_service::TaskService::update(
@@ -1250,11 +1254,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 .get("project")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
-            let category = req
-                .params
-                .get("category")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
             let tag = req
                 .params
                 .get("tag")
@@ -1275,7 +1274,6 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 priority,
                 task_type,
                 project,
-                category,
                 tags,
                 text_query,
             };

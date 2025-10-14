@@ -58,37 +58,11 @@
         <p v-if="defaultTagsError" class="field-error">{{ defaultTagsError }}</p>
       </div>
 
-      <div class="field">
-        <label class="field-label">
-          <span>Default category</span>
-          <span
-            v-if="defaultCategorySource"
-            :class="['provenance', provenanceClass(defaultCategorySource)]"
-          >
-            {{ provenanceLabel(defaultCategorySource) }}
-          </span>
-        </label>
-        <UiInput
-          v-model="defaultCategory"
-          :list="categoryOptionsId"
-          maxlength="100"
-          placeholder="Optional"
-          @blur="handleBlur('default_category')"
-        />
-        <datalist :id="categoryOptionsId">
-          <option v-for="option in categorySuggestions" :key="option" :value="option" />
-        </datalist>
-        <p v-if="showCategoryHint" class="field-hint">
-          Inherit global category list unless you override it below.
-        </p>
-        <p v-if="defaultCategoryError" class="field-error">{{ defaultCategoryError }}</p>
-      </div>
     </div>
   </ConfigGroup>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import type { ConfigSource } from '../api/types'
 import ConfigGroup from './ConfigGroup.vue'
 import TokenInput from './TokenInput.vue'
@@ -97,49 +71,37 @@ import UiInput from './UiInput.vue'
 const defaultReporter = defineModel<string>('defaultReporter', { required: true })
 const defaultAssignee = defineModel<string>('defaultAssignee', { required: true })
 const defaultTags = defineModel<string[]>('defaultTags', { required: true })
-const defaultCategory = defineModel<string>('defaultCategory', { required: true })
-
 const {
   description,
   isGlobal,
   tagSuggestions = [],
-  categorySuggestions = [],
   defaultReporterError = null,
   defaultAssigneeError = null,
   defaultTagsError = null,
-  defaultCategoryError = null,
   provenanceLabel,
   provenanceClass,
   defaultReporterSource,
   defaultAssigneeSource,
   defaultTagsSource,
-  defaultCategorySource,
-  categoryOptionsId = 'default-category-options',
 } = defineProps<{
   description: string
   isGlobal: boolean
   tagSuggestions?: string[]
-  categorySuggestions?: string[]
   defaultReporterError?: string | null
   defaultAssigneeError?: string | null
   defaultTagsError?: string | null
-  defaultCategoryError?: string | null
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
   defaultReporterSource?: ConfigSource
   defaultAssigneeSource?: ConfigSource
   defaultTagsSource?: ConfigSource
-  defaultCategorySource?: ConfigSource
-  categoryOptionsId?: string
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'default_reporter' | 'default_assignee' | 'default_tags' | 'default_category'): void
+  (e: 'validate', field: 'default_reporter' | 'default_assignee' | 'default_tags'): void
 }>()
 
-const showCategoryHint = computed(() => categorySuggestions.length > 0 && !isGlobal)
-
-function handleBlur(field: 'default_reporter' | 'default_assignee' | 'default_category') {
+function handleBlur(field: 'default_reporter' | 'default_assignee') {
   emit('validate', field)
 }
 

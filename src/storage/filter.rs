@@ -7,7 +7,6 @@ pub struct TaskFilter {
     pub priority: Vec<Priority>,
     pub task_type: Vec<TaskType>,
     pub project: Option<String>,
-    pub category: Option<String>,
     pub tags: Vec<String>,
     pub text_query: Option<String>,
 }

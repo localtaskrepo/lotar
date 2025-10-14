@@ -102,15 +102,11 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub issue_priorities: Option<ConfigurableField<Priority>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub categories: Option<StringConfigField>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tags: Option<StringConfigField>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_assignee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_reporter: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub default_category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -152,11 +148,9 @@ impl ProjectConfig {
             issue_states: None,
             issue_types: None,
             issue_priorities: None,
-            categories: None,
             tags: None,
             default_assignee: None,
             default_reporter: None,
-            default_category: None,
             default_tags: None,
             default_priority: None,
             default_status: None,
@@ -189,8 +183,6 @@ pub struct GlobalConfig {
     pub issue_types: ConfigurableField<TaskType>,
     #[serde(default = "default_issue_priorities")]
     pub issue_priorities: ConfigurableField<Priority>,
-    #[serde(default = "default_categories")]
-    pub categories: StringConfigField,
     #[serde(default = "default_tags")]
     pub tags: StringConfigField,
 
@@ -198,8 +190,6 @@ pub struct GlobalConfig {
     pub default_assignee: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_reporter: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub default_category: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub default_tags: Vec<String>,
     #[serde(default = "default_true")]
@@ -258,11 +248,9 @@ pub struct ResolvedConfig {
     pub issue_states: ConfigurableField<TaskStatus>,
     pub issue_types: ConfigurableField<TaskType>,
     pub issue_priorities: ConfigurableField<Priority>,
-    pub categories: StringConfigField,
     pub tags: StringConfigField,
     pub default_assignee: Option<String>,
     pub default_reporter: Option<String>,
-    pub default_category: Option<String>,
     pub default_tags: Vec<String>,
     pub auto_set_reporter: bool,
     pub auto_assign_on_status: bool,
@@ -395,10 +383,6 @@ fn default_issue_priorities() -> ConfigurableField<Priority> {
     }
 }
 
-fn default_categories() -> StringConfigField {
-    StringConfigField::new_wildcard()
-}
-
 fn default_tags() -> StringConfigField {
     StringConfigField::new_wildcard()
 }
@@ -425,11 +409,9 @@ impl Default for GlobalConfig {
             issue_states: default_issue_states(),
             issue_types: default_issue_types(),
             issue_priorities: default_issue_priorities(),
-            categories: default_categories(),
             tags: default_tags(),
             default_assignee: None,
             default_reporter: None,
-            default_category: None,
             default_tags: Vec::new(),
             auto_set_reporter: true,
             auto_assign_on_status: true,

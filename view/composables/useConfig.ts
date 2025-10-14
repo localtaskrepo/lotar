@@ -9,8 +9,8 @@ type ConfigDefaults = {
   type: string
   reporter: string
   assignee: string
-  category: string
   tags: string[]
+  customFields: Record<string, string>
 }
 
 function sanitizeStringList(list: string[]): string[] {
@@ -45,14 +45,14 @@ export function useConfig() {
     type: '',
     reporter: '',
     assignee: '',
-    category: '',
     tags: [],
+    customFields: {},
   })
 
   const statuses = ref<string[]>([])
   const priorities = ref<string[]>([])
   const types = ref<string[]>([])
-  const categories = ref<string[]>([])
+  const customFieldKeys = ref<string[]>([])
   const tags = ref<string[]>([])
 
   const cfgResource = createResource<any, [string?]>(
@@ -70,7 +70,7 @@ export function useConfig() {
     statuses.value = []
     priorities.value = []
     types.value = []
-    categories.value = []
+    customFieldKeys.value = []
     tags.value = []
     defaults.project = currentProject.value || ''
     defaults.status = ''
@@ -78,8 +78,8 @@ export function useConfig() {
     defaults.type = ''
     defaults.reporter = ''
     defaults.assignee = ''
-    defaults.category = ''
     defaults.tags = []
+    defaults.customFields = {}
   }
 
   function applyConfig(config: any) {
@@ -87,22 +87,21 @@ export function useConfig() {
       statuses: sanitizeStringList(pickArray(c, ['issue_states', 'values'], pickArray(c, ['issue_states']))),
       priorities: sanitizeStringList(pickArray(c, ['issue_priorities', 'values'], pickArray(c, ['issue_priorities']))),
       types: sanitizeStringList(pickArray(c, ['issue_types', 'values'], pickArray(c, ['issue_types']))),
-      categories: sanitizeStringList(pickArray(c, ['categories', 'values'], pickArray(c, ['categories']))),
       tags: sanitizeStringList(pickArray(c, ['tags', 'values'], pickArray(c, ['tags']))),
+      customFields: sanitizeStringList(pickArray(c, ['custom_fields', 'values'], pickArray(c, ['custom_fields']))),
     })
 
     const base = extractLists(config)
     statuses.value = base.statuses
     priorities.value = base.priorities
     types.value = base.types
-    categories.value = base.categories
     tags.value = base.tags
+    customFieldKeys.value = base.customFields
 
     const defaultStatus = config?.default_status
     const defaultPriority = config?.default_priority
     const defaultReporter = config?.default_reporter
     const defaultAssignee = config?.default_assignee
-    const defaultCategory = config?.default_category
     const defaultTags = config?.default_tags
     const defaultPrefix = config?.default_prefix || config?.default_project || ''
 
@@ -112,10 +111,10 @@ export function useConfig() {
     defaults.type = types.value[0] || ''
     defaults.reporter = (defaultReporter && String(defaultReporter)) || ''
     defaults.assignee = (defaultAssignee && String(defaultAssignee)) || ''
-    defaults.category = (defaultCategory && String(defaultCategory)) || ''
     defaults.tags = Array.isArray(defaultTags)
       ? sanitizeStringList(defaultTags.map((t: any) => String(t)))
       : []
+    defaults.customFields = {}
   }
 
   watch(
@@ -143,7 +142,7 @@ export function useConfig() {
     statuses,
     priorities,
     types,
-    categories,
+    customFields: customFieldKeys,
     tags,
     defaults: computed(() => defaults),
     refresh,

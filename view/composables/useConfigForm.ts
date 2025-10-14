@@ -17,11 +17,9 @@ export interface ConfigFormState {
     defaultTags: string[]
     defaultPriority: string
     defaultStatus: string
-    defaultCategory: string
     issueStates: string[]
     issueTypes: string[]
     issuePriorities: string[]
-    categories: string[]
     tags: string[]
     customFields: string[]
     autoSetReporter: ToggleValue
@@ -81,10 +79,8 @@ type UseConfigFormReturn = {
     currentProject: ComputedRef<ProjectDTO | null>
     tagWildcard: ComputedRef<boolean>
     customFieldWildcard: ComputedRef<boolean>
-    categoryWildcard: ComputedRef<boolean>
     projectExists: ComputedRef<boolean>
     tagSuggestions: ComputedRef<string[]>
-    categorySuggestions: ComputedRef<string[]>
     statusOptions: ComputedRef<string[]>
     priorityOptions: ComputedRef<string[]>
     typeOptions: ComputedRef<string[]>
@@ -131,11 +127,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         defaultTags: [],
         defaultPriority: '',
         defaultStatus: '',
-        defaultCategory: '',
         issueStates: [],
         issueTypes: [],
         issuePriorities: [],
-        categories: [],
         tags: [],
         customFields: [],
         autoSetReporter: 'inherit',
@@ -165,18 +159,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     const tagWildcard = computed(() => inspectData.value?.effective.tags.includes('*') ?? false)
     const customFieldWildcard = computed(() => inspectData.value?.effective.custom_fields.includes('*') ?? false)
-    const categoryWildcard = computed(() => inspectData.value?.effective.categories.includes('*') ?? false)
     const projectExists = computed(() => inspectData.value?.project_exists ?? false)
 
     const tagSuggestions = computed(() =>
         Array.from(new Set([...(inspectData.value?.effective.tags ?? []), ...(inspectData.value?.effective.default_tags ?? [])]))
             .filter((value) => value && value !== '*')
-    )
-
-    const categorySuggestions = computed(() =>
-        Array.from(
-            new Set([...(inspectData.value?.effective.categories ?? []), ...(inspectData.value?.global_effective.categories ?? [])]),
-        ).filter((value) => value && value !== '*')
     )
 
     function dedupeCaseInsensitive(values: string[]): string[] {
@@ -384,11 +371,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             defaultTags: [...form.defaultTags],
             defaultPriority: form.defaultPriority,
             defaultStatus: form.defaultStatus,
-            defaultCategory: form.defaultCategory,
             issueStates: [...form.issueStates],
             issueTypes: [...form.issueTypes],
             issuePriorities: [...form.issuePriorities],
-            categories: [...form.categories],
             tags: [...form.tags],
             customFields: [...form.customFields],
             autoSetReporter: form.autoSetReporter,
@@ -420,11 +405,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.defaultTags = [...snapshot.defaultTags]
         form.defaultPriority = snapshot.defaultPriority
         form.defaultStatus = snapshot.defaultStatus
-        form.defaultCategory = snapshot.defaultCategory
         form.issueStates = [...snapshot.issueStates]
         form.issueTypes = [...snapshot.issueTypes]
         form.issuePriorities = [...snapshot.issuePriorities]
-        form.categories = [...snapshot.categories]
         form.tags = [...snapshot.tags]
         form.customFields = [...snapshot.customFields]
         form.autoSetReporter = snapshot.autoSetReporter
@@ -611,30 +594,10 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 errors.default_tags = invalid ? `"${invalid}" is too long (max 50 characters).` : null
                 break
             }
-            case 'default_category': {
-                const value = form.defaultCategory.trim()
-                if (value.length > 100) {
-                    errors.default_category = 'Default category must be 100 characters or less.'
-                } else {
-                    errors.default_category = null
-                }
-                break
-            }
             case 'tags': {
                 const values = form.tags
                 const invalid = values.find((value) => value.trim().length > 50)
                 errors.tags = invalid ? `"${invalid}" is too long (max 50 characters).` : null
-                break
-            }
-            case 'categories': {
-                const values = form.categories
-                const invalid = values.find((value) => value.trim().length > 50)
-                if (invalid) {
-                    errors.categories = `"${invalid}" is too long (max 50 characters).`
-                    break
-                }
-                const duplicate = findDuplicateValue(values.map((value) => value.trim()).filter(Boolean))
-                errors.categories = duplicate ? `"${duplicate}" appears more than once.` : null
                 break
             }
             case 'custom_fields': {
@@ -790,13 +753,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'default_reporter',
             'default_assignee',
             'default_tags',
-            'default_category',
             'default_priority',
             'default_status',
             'issue_states',
             'issue_types',
             'issue_priorities',
-            'categories',
             'tags',
             'custom_fields',
             'scan_signal_words',
@@ -823,11 +784,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.defaultTags = [...effective.default_tags]
         form.defaultPriority = effective.default_priority ?? ''
         form.defaultStatus = effective.default_status ?? ''
-        form.defaultCategory = effective.default_category ?? ''
         form.issueStates = [...effective.issue_states]
         form.issueTypes = [...effective.issue_types]
         form.issuePriorities = [...effective.issue_priorities]
-        form.categories = (effective.categories ?? []).filter((value) => value !== '*')
         form.tags = (effective.tags ?? []).filter((value) => value !== '*')
         form.customFields = (effective.custom_fields ?? []).filter((value) => value !== '*')
         form.autoCodeownersAssign = toToggle(!!effective.auto_codeowners_assign)
@@ -949,13 +908,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addValue('defaultAssignee', 'default_assignee', { trim: true })
         addValue('defaultPriority', 'default_priority', { trim: true })
         addValue('defaultStatus', 'default_status', { trim: true, allowEmpty: true })
-        addValue('defaultCategory', 'default_category', { trim: true, allowEmpty: true })
 
         addArray('defaultTags', 'default_tags')
         addArray('issueStates', 'issue_states')
         addArray('issueTypes', 'issue_types')
         addArray('issuePriorities', 'issue_priorities')
-        addArray('categories', 'categories')
         addArray('tags', 'tags')
         addArray('customFields', 'custom_fields')
         addArray('scanSignalWords', 'scan_signal_words')
@@ -992,10 +949,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         currentProject,
         tagWildcard,
         customFieldWildcard,
-        categoryWildcard,
         projectExists,
         tagSuggestions,
-        categorySuggestions,
         statusOptions,
         priorityOptions,
         typeOptions,

@@ -13,9 +13,8 @@ fn task_add_args_deserialize_full() {
         "effort": "3d",
         "due_date": "2025-09-01",
         "description": "Build the HTTP API",
-        "category": "backend",
         "tags": ["api", "rust"],
-        "fields": {"estimate": "5", "sprint": "24"}
+        "fields": {"estimate": "5", "sprint": "24", "product": "backend"}
     });
 
     let args: cli::TaskAddArgs = serde_json::from_value(payload).expect("valid add args");
@@ -26,10 +25,14 @@ fn task_add_args_deserialize_full() {
     assert_eq!(args.effort.as_deref(), Some("3d"));
     assert_eq!(args.due.as_deref(), Some("2025-09-01"));
     assert_eq!(args.description.as_deref(), Some("Build the HTTP API"));
-    assert_eq!(args.category.as_deref(), Some("backend"));
     assert_eq!(args.tags, vec!["api", "rust"]);
     assert!(args.fields.iter().any(|(k, v)| k == "estimate" && v == "5"));
     assert!(args.fields.iter().any(|(k, v)| k == "sprint" && v == "24"));
+    assert!(
+        args.fields
+            .iter()
+            .any(|(k, v)| k == "product" && v == "backend")
+    );
 }
 
 #[test]

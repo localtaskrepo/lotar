@@ -31,7 +31,7 @@ lotar --format json task history AUTH-123 -L 50
 ### diff
 Show the raw unified patch for the latest (or specified) commit touching the task file.
 
-With `--fields`, emit a structured YAML-aware delta for common fields (title, status, priority, type, assignee, due_date, effort, category, tags). Falls back to raw patch by default when not requested.
+With `--fields`, emit a structured YAML-aware delta for common fields (title, status, priority, type, assignee, due_date, effort, tags). Falls back to raw patch by default when not requested.
 
 ```bash
 lotar task diff AUTH-123

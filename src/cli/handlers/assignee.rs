@@ -104,7 +104,6 @@ impl CommandHandler for AssigneeHandler {
                     due_date: None,
                     effort: None,
                     description: None,
-                    category: None,
                     tags: None,
                     relationships: None,
                     custom_fields: None,

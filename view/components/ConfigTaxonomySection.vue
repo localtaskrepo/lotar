@@ -2,27 +2,6 @@
   <ConfigGroup title="Taxonomy" :description="description">
     <div class="field">
       <label class="field-label">
-        <span>Categories</span>
-        <span
-          v-if="categoriesSource"
-          :class="['provenance', provenanceClass(categoriesSource)]"
-        >
-          {{ provenanceLabel(categoriesSource) }}
-        </span>
-      </label>
-      <TokenInput
-        v-model="categories"
-        placeholder="backend"
-        @update:modelValue="handleUpdate('categories')"
-      />
-      <p v-if="categoryWildcard" class="field-hint">
-        Wildcard enabled — leave empty to accept any category.
-      </p>
-      <p v-if="categoriesError" class="field-error">{{ categoriesError }}</p>
-    </div>
-
-    <div class="field">
-      <label class="field-label">
         <span>Tags</span>
         <span
           v-if="tagsSource"
@@ -73,32 +52,25 @@ import type { ConfigSource } from '../api/types'
 import ConfigGroup from './ConfigGroup.vue'
 import TokenInput from './TokenInput.vue'
 
-const categories = defineModel<string[]>('categories', { required: true })
 const tags = defineModel<string[]>('tags', { required: true })
 const customFields = defineModel<string[]>('customFields', { required: true })
 
 const {
   description,
-  categoryWildcard = false,
   tagWildcard = false,
   customFieldWildcard = false,
-  categoriesError = null,
   tagsError = null,
   customFieldsError = null,
-  categoriesSource,
   tagsSource,
   customFieldsSource,
   provenanceLabel,
   provenanceClass,
 } = defineProps<{
   description: string
-  categoryWildcard?: boolean
   tagWildcard?: boolean
   customFieldWildcard?: boolean
-  categoriesError?: string | null
   tagsError?: string | null
   customFieldsError?: string | null
-  categoriesSource?: ConfigSource
   tagsSource?: ConfigSource
   customFieldsSource?: ConfigSource
   provenanceLabel: (source: ConfigSource | undefined) => string
@@ -106,10 +78,10 @@ const {
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'categories' | 'tags' | 'custom_fields'): void
+  (e: 'validate', field: 'tags' | 'custom_fields'): void
 }>()
 
-function handleUpdate(field: 'categories' | 'tags' | 'custom_fields') {
+function handleUpdate(field: 'tags' | 'custom_fields') {
   emit('validate', field)
 }
 </script>

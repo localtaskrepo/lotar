@@ -234,7 +234,7 @@ lotar config templates
 - `issue_states`: Valid task statuses (TODO, IN_PROGRESS, DONE, etc.)
 - `issue_types`: Task types (feature, bug, chore, epic, etc.)
 - `issue_priorities`: Priority levels (LOW, MEDIUM, HIGH, etc.)
-- `categories`: Organizational categories (wildcard by default)
+- `custom_fields`: Additional fields like `product`, `sprint`, etc. (wildcard or curated lists)
 - `tags`: Task tags (wildcard by default)
 - `default_assignee`: Default task assignee
 - `default_priority`: Default priority level

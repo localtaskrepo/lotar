@@ -68,7 +68,6 @@ pub struct TaskDisplayInfo {
     pub project: Option<String>,
     pub due_date: Option<String>,
     pub effort: Option<String>,
-    pub category: Option<String>,
     pub tags: Vec<String>,
     pub created: String,
     pub modified: String,

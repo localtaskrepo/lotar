@@ -17,7 +17,6 @@ pub fn is_reserved_field(name: &str) -> Option<&'static str> {
         "type" | "tasktype" => Some("type"),
         "assignee" => Some("assignee"),
         "reporter" => Some("reporter"),
-        "category" => Some("category"),
         "project" => Some("project"),
         "tag" | "tags" => Some("tags"),
         "effort" => Some("effort"),

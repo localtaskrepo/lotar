@@ -62,7 +62,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -428,7 +427,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -684,7 +682,6 @@ impl CommandHandler for StatsHandler {
                                             status,
                                             created,
                                             modified,
-                                            category,
                                             reporter,
                                             tags,
                                             custom_fields,
@@ -714,7 +711,6 @@ impl CommandHandler for StatsHandler {
                                                     effort: task.effort,
                                                     subtitle: task.subtitle,
                                                     description: task.description,
-                                                    category: task.category,
                                                     tags: task.tags,
                                                     relationships: task.relationships,
                                                     comments: task.comments,
@@ -731,7 +727,6 @@ impl CommandHandler for StatsHandler {
                                                     dto.status,
                                                     dto.created,
                                                     dto.modified,
-                                                    dto.category,
                                                     dto.reporter,
                                                     dto.tags,
                                                     dto.custom_fields,
@@ -750,7 +745,6 @@ impl CommandHandler for StatsHandler {
                                             let mut status = crate::types::TaskStatus::default();
                                             let mut created = String::new();
                                             let mut modified = String::new();
-                                            let mut category: Option<String> = None;
                                             let mut reporter: Option<String> = None;
                                             let mut tags: Vec<String> = Vec::new();
                                             let relationships =
@@ -815,11 +809,6 @@ impl CommandHandler for StatsHandler {
                                                     modified = s.to_string();
                                                 }
                                                 if let Some(s) =
-                                                    val.get("category").and_then(|v| v.as_str())
-                                                {
-                                                    category = Some(s.to_string());
-                                                }
-                                                if let Some(s) =
                                                     val.get("reporter").and_then(|v| v.as_str())
                                                 {
                                                     reporter = Some(s.to_string());
@@ -844,7 +833,6 @@ impl CommandHandler for StatsHandler {
                                                 status,
                                                 created,
                                                 modified,
-                                                category,
                                                 reporter,
                                                 tags,
                                                 custom_fields,
@@ -868,7 +856,6 @@ impl CommandHandler for StatsHandler {
                                             effort,
                                             subtitle: None,
                                             description: None,
-                                            category,
                                             tags,
                                             relationships,
                                             comments,
@@ -919,9 +906,6 @@ impl CommandHandler for StatsHandler {
                             "priority" => return Some(vec![t.priority.to_string()]),
                             "project" => {
                                 return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
-                            }
-                            "category" => {
-                                return Some(vec![t.category.clone().unwrap_or_default()]);
                             }
                             "tags" => return Some(t.tags.clone()),
                             _ => {}
@@ -1216,7 +1200,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -1265,7 +1248,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -1311,7 +1293,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -1366,7 +1347,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -2322,7 +2302,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -2371,75 +2350,6 @@ impl CommandHandler for StatsHandler {
                 }
                 Ok(())
             }
-            StatsAction::Categories { limit, global } => {
-                // Determine scope
-                let scope_project = if global {
-                    None
-                } else {
-                    project
-                        .map(|p| resolve_project_input(p, resolver.path.as_path()))
-                        .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
-                };
-
-                // Load all tasks (current snapshot)
-                let storage = crate::storage::manager::Storage::new(resolver.path.clone());
-                let filter = crate::api_types::TaskListFilter {
-                    status: Vec::new(),
-                    priority: Vec::new(),
-                    task_type: Vec::new(),
-                    project: scope_project.clone(),
-                    category: None,
-                    tags: Vec::new(),
-                    text_query: None,
-                };
-                let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
-
-                // Aggregate category frequencies
-                use std::collections::HashMap;
-                let mut freq: HashMap<String, usize> = HashMap::new();
-                for (_id, t) in tasks.into_iter() {
-                    if let Some(cat) = t.category {
-                        let key = cat.trim().to_string();
-                        if key.is_empty() {
-                            continue;
-                        }
-                        *freq.entry(key).or_insert(0) += 1;
-                    }
-                }
-                let mut items: Vec<(String, usize)> = freq.into_iter().collect();
-                items.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-                let limited: Vec<_> = items.into_iter().take(limit).collect();
-
-                match renderer.format {
-                    crate::output::OutputFormat::Json => {
-                        let json_items: Vec<_> = limited
-                            .iter()
-                            .map(
-                                |(cat, count)| serde_json::json!({"category": cat, "count": count}),
-                            )
-                            .collect();
-                        let obj = serde_json::json!({
-                            "status": "ok",
-                            "action": "stats.categories",
-                            "global": global,
-                            "project": scope_project,
-                            "count": json_items.len(),
-                            "items": json_items,
-                        });
-                        renderer.emit_raw_stdout(&obj.to_string());
-                    }
-                    _ => {
-                        if limited.is_empty() {
-                            renderer.emit_success("No categories found.");
-                        } else {
-                            for (cat, count) in &limited {
-                                renderer.emit_raw_stdout(&format!("{:>6}  {}", count, cat));
-                            }
-                        }
-                    }
-                }
-                Ok(())
-            }
             StatsAction::Distribution {
                 field,
                 limit,
@@ -2461,7 +2371,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };
@@ -2501,13 +2410,6 @@ impl CommandHandler for StatsHandler {
                                 *freq.entry(tag).or_insert(0) += 1;
                             }
                         }
-                        crate::cli::args::stats::StatsDistributionField::Category => {
-                            let key = t.category.unwrap_or_else(|| "".to_string());
-                            if key.trim().is_empty() {
-                                continue;
-                            }
-                            *freq.entry(key).or_insert(0) += 1;
-                        }
                     }
                 }
 
@@ -2524,7 +2426,6 @@ impl CommandHandler for StatsHandler {
                     crate::cli::args::stats::StatsDistributionField::Reporter => "reporter",
                     crate::cli::args::stats::StatsDistributionField::Project => "project",
                     crate::cli::args::stats::StatsDistributionField::Tag => "tag",
-                    crate::cli::args::stats::StatsDistributionField::Category => "category",
                 };
 
                 match renderer.format {
@@ -2575,7 +2476,6 @@ impl CommandHandler for StatsHandler {
                     priority: Vec::new(),
                     task_type: Vec::new(),
                     project: scope_project.clone(),
-                    category: None,
                     tags: Vec::new(),
                     text_query: None,
                 };

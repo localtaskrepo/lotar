@@ -22,7 +22,6 @@ fn task_to_dto(id: &str, task: &crate::storage::task::Task) -> crate::api_types:
         effort: task.effort.clone(),
         subtitle: task.subtitle.clone(),
         description: task.description.clone(),
-        category: task.category.clone(),
         tags: task.tags.clone(),
         relationships: task.relationships.clone(),
         comments: task.comments.clone(),
@@ -86,7 +85,6 @@ pub fn initialize(api_server: &mut ApiServer) {
             due_date: add.due,
             effort: add.effort,
             description: add.description,
-            category: add.category,
             tags: add.tags,
             relationships: match body.get("relationships") {
                 Some(value) => match serde_json::from_value::<crate::types::TaskRelationships>(
@@ -170,7 +168,6 @@ pub fn initialize(api_server: &mut ApiServer) {
             priority: priorities,
             task_type: types_vec,
             project: req.query.get("project").cloned(),
-            category: req.query.get("category").cloned(),
             tags: req
                 .query
                 .get("tags")
@@ -183,9 +180,7 @@ pub fn initialize(api_server: &mut ApiServer) {
         // Build filters map from unknown keys and assignee
         use std::collections::{BTreeMap, BTreeSet};
         let mut uf: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        let known = [
-            "project", "status", "priority", "type", "category", "tags", "q",
-        ];
+        let known = ["project", "status", "priority", "type", "tags", "q"];
         // Assignee (supports @me)
         if let Some(a) = req.query.get("assignee") {
             let v = if a == "@me" {
@@ -227,7 +222,6 @@ pub fn initialize(api_server: &mut ApiServer) {
                         "project" => {
                             return Some(vec![id.split('-').next().unwrap_or("").to_string()])
                         }
-                        "category" => return Some(vec![t.category.clone().unwrap_or_default()]),
                         "tags" => return Some(t.tags.clone()),
                         _ => {}
                     }
@@ -332,7 +326,6 @@ pub fn initialize(api_server: &mut ApiServer) {
             priority: priorities,
             task_type: types_vec,
             project: req.query.get("project").cloned(),
-            category: req.query.get("category").cloned(),
             tags: req
                 .query
                 .get("tags")
@@ -506,7 +499,6 @@ pub fn initialize(api_server: &mut ApiServer) {
             due_date: edit.due,
             effort: edit.effort,
             description: edit.description,
-            category: edit.category,
             tags: tags_override.or(if edit.tags.is_empty() { None } else { Some(edit.tags) }),
             relationships: match body.get("relationships") {
                 Some(value) => match serde_json::from_value::<crate::types::TaskRelationships>(
@@ -576,7 +568,6 @@ pub fn initialize(api_server: &mut ApiServer) {
             due_date: None,
             effort: None,
             description: None,
-            category: None,
             tags: None,
             relationships: None,
             custom_fields: None,

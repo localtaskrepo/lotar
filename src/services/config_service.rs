@@ -128,18 +128,6 @@ impl ConfigService {
                     },
                 );
             }
-            if project_raw.categories.is_some() {
-                mark("categories", "project");
-            } else {
-                mark(
-                    "categories",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
             if project_raw.tags.is_some() {
                 mark("tags", "project");
             } else {
@@ -181,18 +169,6 @@ impl ConfigService {
             } else {
                 mark(
                     "default_reporter",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.default_category.is_some() {
-                mark("default_category", "project");
-            } else {
-                mark(
-                    "default_category",
                     if has_global_file {
                         "global"
                     } else {
@@ -377,11 +353,9 @@ impl ConfigService {
                 "default_prefix",
                 "default_assignee",
                 "default_reporter",
-                "default_category",
                 "default_tags",
                 "default_priority",
                 "default_status",
-                "categories",
                 "tags",
                 "custom_fields",
                 "issue_states",
@@ -555,11 +529,6 @@ impl ConfigService {
                             .collect();
                         lv == gv
                     }
-                    // string-config lists
-                    "categories" => {
-                        let gv: Vec<String> = g.categories.values.clone();
-                        csv(v) == gv
-                    }
                     "tags" => {
                         let gv: Vec<String> = g.tags.values.clone();
                         csv(v) == gv
@@ -589,13 +558,6 @@ impl ConfigService {
                     }
                     "default_reporter" => {
                         g.default_reporter
-                            .as_ref()
-                            .map(|s| s.to_string())
-                            .unwrap_or_default()
-                            == v_trim
-                    }
-                    "default_category" => {
-                        g.default_category
                             .as_ref()
                             .map(|s| s.to_string())
                             .unwrap_or_default()

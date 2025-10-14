@@ -33,6 +33,7 @@ lotar add "Environment task"  # Uses environment-configured directory
 - `--format <FORMAT>` - Output format: text, table, json, markdown (default: text)
 - `--verbose` - Enable verbose output
 - `--project <PROJECT>`, `-p <PROJECT>` - Specify project context (overrides auto-detection)
+  - _Serve-specific note_: On `lotar serve`, `-p` is reused as a shorthand for `--port`. Use the long `--project` form if you need to point the server at a specific project directory.
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides all auto-detection)
 
 ## Environment Variables

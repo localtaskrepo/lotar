@@ -26,8 +26,6 @@ pub struct TaskDTO {
     pub subtitle: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub category: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<String>,
     #[serde(
@@ -64,7 +62,6 @@ pub struct TaskCreate {
     pub due_date: Option<String>,
     pub effort: Option<String>,
     pub description: Option<String>,
-    pub category: Option<String>,
     pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub relationships: Option<crate::types::TaskRelationships>,
@@ -83,7 +80,6 @@ pub struct TaskUpdate {
     pub due_date: Option<String>,
     pub effort: Option<String>,
     pub description: Option<String>,
-    pub category: Option<String>,
     pub tags: Option<Vec<String>>, // replace whole list
     pub relationships: Option<crate::types::TaskRelationships>,
     pub custom_fields: Option<crate::types::CustomFields>,
@@ -96,7 +92,6 @@ pub struct TaskListFilter {
     pub priority: Vec<crate::types::Priority>,
     pub task_type: Vec<crate::types::TaskType>,
     pub project: Option<String>,
-    pub category: Option<String>,
     pub tags: Vec<String>,
     pub text_query: Option<String>,
 }

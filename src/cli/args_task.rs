@@ -121,10 +121,6 @@ pub struct AddArgs {
     #[arg(long, alias = "desc")]
     pub description: Option<String>,
 
-    /// Category
-    #[arg(long, alias = "cat")]
-    pub category: Option<String>,
-
     /// Tags (can be used multiple times)
     #[arg(long = "tag")]
     #[serde(default)]
@@ -221,10 +217,6 @@ pub struct TaskAddArgs {
     #[arg(long, alias = "desc")]
     pub description: Option<String>,
 
-    /// Category
-    #[arg(long, alias = "cat")]
-    pub category: Option<String>,
-
     /// Tags (can be used multiple times)
     #[arg(long = "tag")]
     #[serde(default)]
@@ -274,10 +266,6 @@ pub struct TaskEditArgs {
     /// New description
     #[arg(long)]
     pub description: Option<String>,
-
-    /// New category
-    #[arg(long)]
-    pub category: Option<String>,
 
     /// Add tags (can be used multiple times)
     #[arg(long = "tag")]
@@ -336,10 +324,6 @@ pub struct TaskSearchArgs {
     #[arg(long)]
     #[serde(default, alias = "tags")]
     pub tag: Vec<String>,
-
-    /// Filter by category
-    #[arg(long)]
-    pub category: Option<String>,
 
     /// Show only high priority tasks
     #[arg(long)]

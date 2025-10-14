@@ -6,7 +6,7 @@ mod common;
 use common::env_mutex::EnvVarGuard;
 
 #[test]
-fn config_set_global_categories_and_tags_and_defaults() {
+fn config_set_global_custom_fields_and_tags() {
     // EnvVarGuard serializes and restores env safely
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -14,13 +14,16 @@ fn config_set_global_categories_and_tags_and_defaults() {
     let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    // Set categories, tags, default_category, default_tags in global
     Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "categories", "Feat,Bug,Chore", "--global"])
         .assert()
-        .success();
+        .failure()
+        .stderr(
+            predicate::str::contains("Invalid global config field")
+                .and(predicate::str::contains("'categories'")),
+        );
 
     Command::cargo_bin("lotar")
         .unwrap()
@@ -32,7 +35,13 @@ fn config_set_global_categories_and_tags_and_defaults() {
     Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "set", "default_category", "Bug", "--global"])
+        .args([
+            "config",
+            "set",
+            "custom_fields",
+            "product,component",
+            "--global",
+        ])
         .assert()
         .success();
 
@@ -51,29 +60,29 @@ fn config_set_global_categories_and_tags_and_defaults() {
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("issue:")
-                .and(predicate::str::contains("categories:"))
-                .and(predicate::str::contains("- Feat"))
-                .and(predicate::str::contains("- Bug"))
-                .and(predicate::str::contains("- Chore"))
+            predicate::str::contains("custom:")
+                .and(predicate::str::contains("fields:"))
+                .and(predicate::str::contains("- product"))
+                .and(predicate::str::contains("- component"))
+                .and(predicate::str::contains("issue:"))
                 .and(predicate::str::contains("tags:"))
                 .and(predicate::str::contains("- team"))
                 .and(predicate::str::contains("- backend"))
                 .and(predicate::str::contains("- ui"))
                 .and(predicate::str::contains("default:"))
-                .and(predicate::str::contains("category: Bug"))
                 .and(
                     predicate::str::contains("tags:")
                         .and(predicate::str::contains("- team"))
                         .and(predicate::str::contains("- ui")),
-                ),
+                )
+                .and(predicate::str::contains("product")),
         );
 
     // restored by guards
 }
 
 #[test]
-fn config_set_project_categories_and_tags_and_defaults() {
+fn config_set_project_custom_fields_and_tags() {
     // EnvVarGuard serializes and restores env safely
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
@@ -108,7 +117,11 @@ fn config_set_project_categories_and_tags_and_defaults() {
         .current_dir(temp.path())
         .args(["config", "set", "categories", "Feat,Bugfix"])
         .assert()
-        .success();
+        .failure()
+        .stderr(
+            predicate::str::contains("Invalid project config field")
+                .and(predicate::str::contains("'categories'")),
+        );
 
     Command::cargo_bin("lotar")
         .unwrap()
@@ -120,7 +133,7 @@ fn config_set_project_categories_and_tags_and_defaults() {
     Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "set", "default_category", "Bugfix"])
+        .args(["config", "set", "custom_fields", "product,feature"])
         .assert()
         .success();
 
@@ -140,16 +153,43 @@ fn config_set_project_categories_and_tags_and_defaults() {
         .success();
 
     let contents = std::fs::read_to_string(proj_dir.join("config.yml")).unwrap();
-    assert!(contents.contains("issue:"));
-    assert!(contents.contains("categories:"));
-    assert!(contents.contains("- Feat"));
-    assert!(contents.contains("- Bugfix"));
-    assert!(contents.contains("tags:"));
-    assert!(contents.contains("- team"));
-    assert!(contents.contains("- backend"));
-    assert!(contents.contains("default:"));
-    assert!(contents.contains("category: Bugfix"));
-    assert!(contents.contains("tags:"));
+    let doc: serde_yaml::Value = serde_yaml::from_str(&contents).expect("valid yaml");
+
+    let custom_fields = doc
+        .get("custom")
+        .and_then(|v| v.get("fields"))
+        .and_then(|v| v.as_sequence())
+        .expect("custom.fields present");
+    let field_names: Vec<String> = custom_fields
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(field_names.contains(&"product".to_string()));
+    assert!(field_names.contains(&"feature".to_string()));
+
+    let issue_tags = doc
+        .get("issue")
+        .and_then(|v| v.get("tags"))
+        .and_then(|v| v.as_sequence())
+        .expect("issue.tags present");
+    let tag_names: Vec<String> = issue_tags
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(tag_names.contains(&"team".to_string()));
+    assert!(tag_names.contains(&"backend".to_string()));
+
+    let default_tags = doc
+        .get("default")
+        .and_then(|v| v.get("tags"))
+        .and_then(|v| v.as_sequence())
+        .expect("default.tags present");
+    let default_names: Vec<String> = default_tags
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(default_names.contains(&"team".to_string()));
+    assert!(doc.get("issue").and_then(|v| v.get("categories")).is_none());
 
     // restored by guards
 }

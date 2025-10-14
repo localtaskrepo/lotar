@@ -36,7 +36,6 @@ fn service_filters_blank_tags_on_create_and_update() {
         due_date: None,
         effort: None,
         description: None,
-        category: Some("Cat".to_string()),
         tags: vec!["api".into(), " ".into(), "backend ".into(), "".into()],
         relationships: None,
         custom_fields: None,

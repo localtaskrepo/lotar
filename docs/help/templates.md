@@ -17,9 +17,12 @@ lotar config templates
 
 ## What templates contain
 
-- Issue fields as plain arrays (no legacy `values:` wrapper)
-  - issue.states, issue.types, issue.priorities, issue.categories, issue.tags
-- Optional defaults under the `default.*` group
+- Issue vocabularies are plain arrays (no legacy `values:` wrapper)
+  - `issue.states`, `issue.types`, `issue.priorities`, `issue.tags`
+  - Some templates also ship `issue.categories` for teams that still label work that way (feel free to remove it if unused)
+- Custom field hints live under `custom.fields`
+  - Agile/Kanban templates still include a `category` custom field for legacy compatibility; rename or drop it if your workflow prefers `product` or other custom properties
+- Optional defaults appear under the `default.*` group when a template needs them
 - No automation flags are written; automation defaults are already enabled globally
 
 Resulting files are written in the canonical nested YAML shape. You can also run:
@@ -50,7 +53,7 @@ Initialize a project with the agile template:
 lotar config init --project=backend --template=agile
 ```
 
-A minimal project config produced by a template (canonical shape):
+A minimal project config produced by the simple template (canonical shape):
 
 ```yaml
 project:
@@ -59,17 +62,21 @@ issue:
   states: [Todo, InProgress, Done]
   types: [feature, bug, chore]
   priorities: [Low, Medium, High]
-  categories: ["*"]
   tags: ["*"]
+# Some templates (for example "default") also include:
+# issue:
+#   categories: ["*"]
+# Agile/Kanban add custom field stubs such as:
+# custom:
+#   fields: ["category", "sprint"]
 # default, custom, and scan sections are added when needed
 # automation is enabled globally; add `auto.*` only if overriding
 
 After initializing, you can set defaults and vocabularies via config set:
 
 ```bash
-lotar config set default.category Engineering --project=DEMO
 lotar config set default.tags '["triage","sev"]' --project=DEMO
-lotar config set issue.categories '["Engineering","QA","Ops"]' --project=DEMO
+lotar config set custom.fields '["product","sprint"]' --project=DEMO
 lotar config set issue.tags '["frontend","backend"]' --project=DEMO
 ```
 ```
@@ -78,4 +85,4 @@ lotar config set issue.tags '["frontend","backend"]' --project=DEMO
 
 - Older templates used `values:` wrappers; these are no longer used. Arrays are written directly.
 - The deprecated `require_assignee` key has been removed from templates; auto-assign on status change is controlled by `auto.assign_on_status` (default true).
-- Legacy `taxonomy.categories` and `taxonomy.tags` are still accepted on input, but normalization now writes them under `issue.categories` and `issue.tags`.
+- Legacy `taxonomy.categories` and `taxonomy.tags` are still accepted on input, but normalization now writes them under `issue.categories` and `issue.tags` respectively.

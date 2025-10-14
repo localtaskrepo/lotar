@@ -6,19 +6,24 @@
     "description": "REST API for LoTaR task management. Includes task CRUD, projects, config, and realtime events via SSE."
   },
   "servers": [
-    { "url": "http://localhost:8080", "description": "Local server" }
+    {
+      "url": "http://localhost:8080",
+      "description": "Local server"
+    }
   ],
   "paths": {
-  "/api/tasks/add": {
+    "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-    "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
+        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
         "parameters": [
           {
             "name": "project",
             "in": "query",
             "required": false,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Project prefix for the new task (e.g., TEST)"
           }
         ],
@@ -26,15 +31,25 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TaskCreate" },
+              "schema": {
+                "$ref": "#/components/schemas/TaskCreate"
+              },
               "examples": {
                 "withMeAlias": {
                   "summary": "Create with @me",
-                  "value": {"title":"New task","project":"TEST","assignee":"@me"}
+                  "value": {
+                    "title": "New task",
+                    "project": "TEST",
+                    "assignee": "@me"
+                  }
                 },
                 "basic": {
                   "summary": "Basic create",
-                  "value": {"title":"Implement search","priority":"High","task_type":"feature"}
+                  "value": {
+                    "title": "Implement search",
+                    "priority": "High",
+                    "task_type": "feature"
+                  }
                 }
               }
             }
@@ -45,7 +60,9 @@
             "description": "Created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/EnvelopeTask" },
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTask"
+                },
                 "examples": {
                   "created": {
                     "summary": "Created response",
@@ -64,9 +81,14 @@
                         "effort": null,
                         "subtitle": null,
                         "description": null,
-                        "category": null,
                         "tags": [],
-                        "relationships": {"depends_on":[],"blocks":[],"related":[],"children":[],"fixes":[]},
+                        "relationships": {
+                          "depends_on": [],
+                          "blocks": [],
+                          "related": [],
+                          "children": [],
+                          "fixes": []
+                        },
                         "comments": [],
                         "custom_fields": {}
                       }
@@ -76,8 +98,12 @@
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
@@ -89,35 +115,111 @@
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TaskSetStatusRequest" },
+              "schema": {
+                "$ref": "#/components/schemas/TaskSetStatusRequest"
+              },
               "examples": {
-                "inProgress": { "summary": "Move to IN_PROGRESS", "value": { "id": "TEST-1", "status": "IN_PROGRESS" } },
-                "done": { "summary": "Complete task", "value": { "id": "TEST-1", "status": "DONE" } }
+                "inProgress": {
+                  "summary": "Move to IN_PROGRESS",
+                  "value": {
+                    "id": "TEST-1",
+                    "status": "IN_PROGRESS"
+                  }
+                },
+                "done": {
+                  "summary": "Complete task",
+                  "value": {
+                    "id": "TEST-1",
+                    "status": "DONE"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeTask" } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTask"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
-        "description": "Supports built-in filters via named query params (status, priority, type, assignee, tags, category, project, q). In addition, any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching.",
+        "description": "Supports built-in filters via named query params (status, priority, type, assignee, tags, project, q). In addition, any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching.",
         "parameters": [
-          { "name": "project", "in": "query", "schema": { "type": "string" } },
-          { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "CSV of statuses (TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE)" },
-          { "name": "priority", "in": "query", "schema": { "type": "string" }, "description": "CSV of priorities (LOW, MEDIUM, HIGH, CRITICAL)" },
-          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "CSV of types (feature, bug, epic, spike, chore)" },
-          { "name": "assignee", "in": "query", "schema": { "type": "string" }, "description": "Assignee filter; supports @me to resolve the current user" },
-          { "name": "tags", "in": "query", "schema": { "type": "string" }, "description": "CSV of tags" },
-          { "name": "category", "in": "query", "schema": { "type": "string" } },
-          { "name": "q", "in": "query", "schema": { "type": "string" }, "description": "Free-text search" }
+          {
+            "name": "project",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of statuses (TODO, IN_PROGRESS, VERIFY, BLOCKED, DONE)"
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of priorities (LOW, MEDIUM, HIGH, CRITICAL)"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of types (feature, bug, epic, spike, chore)"
+          },
+          {
+            "name": "assignee",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Assignee filter; supports @me to resolve the current user"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of tags"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Free-text search"
+          }
         ],
         "responses": {
           "200": {
@@ -129,32 +231,74 @@
                   "properties": {
                     "data": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/TaskDTO" }
+                      "items": {
+                        "$ref": "#/components/schemas/TaskDTO"
+                      }
                     },
                     "meta": {
                       "type": "object",
-                      "properties": { "count": { "type": "integer", "format": "int64" } },
-                      "required": ["count"]
+                      "properties": {
+                        "count": {
+                          "type": "integer",
+                          "format": "int64"
+                        }
+                      },
+                      "required": [
+                        "count"
+                      ]
                     }
                   },
-                  "required": ["data", "meta"]
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
                 },
                 "examples": {
                   "list": {
                     "summary": "List response",
                     "value": {
                       "data": [
-                        {"id":"TEST-1","title":"Implement search","status":"TODO","priority":"HIGH","task_type":"feature","reporter":"alice","assignee":null,"created":"2025-08-13T10:00:00Z","modified":"2025-08-13T10:00:00Z","due_date":null,"effort":null,"subtitle":null,"description":null,"category":null,"tags":[],"relationships":{"depends_on":[],"blocks":[],"related":[],"children":[],"fixes":[]},"comments":[],"custom_fields":{}}
+                        {
+                          "id": "TEST-1",
+                          "title": "Implement search",
+                          "status": "TODO",
+                          "priority": "HIGH",
+                          "task_type": "feature",
+                          "reporter": "alice",
+                          "assignee": null,
+                          "created": "2025-08-13T10:00:00Z",
+                          "modified": "2025-08-13T10:00:00Z",
+                          "due_date": null,
+                          "effort": null,
+                          "subtitle": null,
+                          "description": null,
+                          "tags": [],
+                          "relationships": {
+                            "depends_on": [],
+                            "blocks": [],
+                            "related": [],
+                            "children": [],
+                            "fixes": []
+                          },
+                          "comments": [],
+                          "custom_fields": {}
+                        }
                       ],
-                      "meta": {"count": 1}
+                      "meta": {
+                        "count": 1
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
@@ -162,47 +306,136 @@
       "get": {
         "summary": "Get task by id",
         "parameters": [
-          { "name": "id", "in": "query", "required": true, "schema": { "type": "string" } },
-          { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeTask" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTask"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
     "/api/tasks/update": {
       "post": {
         "summary": "Update a task by id",
-  "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto.assign_on_status) applies when status transitions via supported channels.",
+        "description": "Updates task fields. People fields support @me. Note: The 'status' field is ignored by this REST route; status changes are handled by CLI. Auto-assign on status change (auto.assign_on_status) applies when status transitions via supported channels.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "allOf": [
-                  { "$ref": "#/components/schemas/TaskUpdateRequest" }
+                  {
+                    "$ref": "#/components/schemas/TaskUpdateRequest"
+                  }
                 ]
               },
               "examples": {
                 "updateMeAlias": {
                   "summary": "Update reporter with @me",
-                  "value": {"id":"TEST-1","reporter":"@me"}
+                  "value": {
+                    "id": "TEST-1",
+                    "reporter": "@me"
+                  }
                 },
                 "editFields": {
                   "summary": "Update description and tags",
-                  "value": {"id":"TEST-1","description":"Details","tags":["api","docs"]}
+                  "value": {
+                    "id": "TEST-1",
+                    "description": "Details",
+                    "tags": [
+                      "api",
+                      "docs"
+                    ]
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeTask" }, "examples": {"updated": {"summary":"Updated response","value":{"data": {"id":"TEST-1","title":"Implement search","status":"IN_PROGRESS","priority":"HIGH","task_type":"feature","reporter":"erin","assignee":"erin","created":"2025-08-13T10:00:00Z","modified":"2025-08-13T10:10:00Z","due_date":null,"effort":null,"subtitle":null,"description":"Details","category":null,"tags":["api","docs"],"relationships":{"depends_on":[],"blocks":[],"related":[],"children":[],"fixes":[]},"comments":[],"custom_fields":{}}}} } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTask"
+                },
+                "examples": {
+                  "updated": {
+                    "summary": "Updated response",
+                    "value": {
+                      "data": {
+                        "id": "TEST-1",
+                        "title": "Implement search",
+                        "status": "IN_PROGRESS",
+                        "priority": "HIGH",
+                        "task_type": "feature",
+                        "reporter": "erin",
+                        "assignee": "erin",
+                        "created": "2025-08-13T10:00:00Z",
+                        "modified": "2025-08-13T10:10:00Z",
+                        "due_date": null,
+                        "effort": null,
+                        "subtitle": null,
+                        "description": "Details",
+                        "tags": [
+                          "api",
+                          "docs"
+                        ],
+                        "relationships": {
+                          "depends_on": [],
+                          "blocks": [],
+                          "related": [],
+                          "children": [],
+                          "fixes": []
+                        },
+                        "comments": [],
+                        "custom_fields": {}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
@@ -211,12 +444,31 @@
         "summary": "Delete a task by id",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TaskDeleteRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskDeleteRequest"
+              }
+            }
+          }
         },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeDeleted" } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeDeleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
@@ -226,33 +478,103 @@
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeProjects" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeProjects"
+                }
+              }
+            }
           },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
     "/api/projects/stats": {
       "get": {
         "summary": "Get project stats",
-        "parameters": [ { "name": "project", "in": "query", "required": true, "schema": { "type": "string" } } ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeProjectStats" } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeProjectStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
     "/api/config/show": {
       "get": {
         "summary": "Show resolved config",
-        "parameters": [ { "name": "project", "in": "query", "required": false, "schema": { "type": "string" } } ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeConfig" }, "examples": {"show": {"summary":"Resolved config","value": {"data": {"default": {"project": "TEST"}, "issue": {"states": ["TODO","IN_PROGRESS","DONE"]}, "auto": {"set_reporter": true, "assign_on_status": true}}}}} } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeConfig"
+                },
+                "examples": {
+                  "show": {
+                    "summary": "Resolved config",
+                    "value": {
+                      "data": {
+                        "default": {
+                          "project": "TEST"
+                        },
+                        "issue": {
+                          "states": [
+                            "TODO",
+                            "IN_PROGRESS",
+                            "DONE"
+                          ]
+                        },
+                        "auto": {
+                          "set_reporter": true,
+                          "assign_on_status": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
@@ -261,30 +583,82 @@
         "summary": "Set config values",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfigSetRequest" } } }
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigSetRequest"
+              }
+            }
+          }
         },
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EnvelopeUpdated" } } } },
-          "400": { "$ref": "#/components/responses/BadRequest" },
-          "500": { "$ref": "#/components/responses/InternalError" }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
         }
       }
     },
     "/api/events": {
       "get": {
         "summary": "Realtime events (SSE)",
-        "description": "Server-Sent Events stream of task and config changes. Sends an initial 'retry: 1000' hint and periodic ':heartbeat' comments.",
+        "description": "Server-Sent Events stream of task and config changes. Sends an initial 'retry: 1000' hint and periodic ':heartbeat' comments. Optional 'ready' event can be enabled via LOTAR_SSE_READY=1 and requested per-connection.",
         "parameters": [
-          { "name": "debounce_ms", "in": "query", "schema": { "type": "integer", "format": "int64", "default": 100 } },
-          { "name": "kinds", "in": "query", "schema": { "type": "string" }, "description": "CSV of kinds: task_created, task_updated, task_deleted, config_updated" },
-          { "name": "project", "in": "query", "schema": { "type": "string" }, "description": "Project prefix filter" }
+          {
+            "name": "debounce_ms",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "default": 100
+            }
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of kinds: task_created, task_updated, task_deleted, config_updated, project_changed"
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project prefix filter"
+          },
+          {
+            "name": "ready",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true and LOTAR_SSE_READY=1 is set, emit a one-time ready event after subscription"
+          }
         ],
         "responses": {
           "200": {
             "description": "Event stream",
             "content": {
               "text/event-stream": {
-                "schema": { "type": "string", "description": "SSE event stream" }
+                "schema": {
+                  "type": "string",
+                  "description": "SSE event stream"
+                }
               }
             }
           }
@@ -292,13 +666,24 @@
       }
     },
     "/api/tasks/stream": {
-      "get": { "$ref": "#/paths/~1api~1events/get" }
+      "get": {
+        "$ref": "#/paths/~1api~1events/get"
+      }
     },
     "/api/openapi.json": {
       "get": {
         "summary": "OpenAPI spec",
         "responses": {
-          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "object" } } } }
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -308,172 +693,512 @@
       "TaskDTO": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "status": { "$ref": "#/components/schemas/TaskStatus" },
-          "priority": { "$ref": "#/components/schemas/Priority" },
-          "task_type": { "$ref": "#/components/schemas/TaskType" },
-          "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
-          "assignee": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
-          "created": { "type": "string" },
-          "modified": { "type": "string" },
-          "due_date": { "type": "string", "nullable": true },
-          "effort": { "type": "string", "nullable": true },
-          "subtitle": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "category": { "type": "string", "nullable": true },
-          "tags": { "type": "array", "items": { "type": "string" } },
-          "relationships": { "$ref": "#/components/schemas/TaskRelationships" },
-          "comments": { "type": "array", "items": { "$ref": "#/components/schemas/TaskComment" } },
-          "custom_fields": { "type": "object", "additionalProperties": true }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority"
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType"
+          },
+          "reporter": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supports @me to resolve to current user"
+          },
+          "assignee": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supports @me to resolve to current user"
+          },
+          "created": {
+            "type": "string"
+          },
+          "modified": {
+            "type": "string"
+          },
+          "due_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "effort": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "relationships": {
+            "$ref": "#/components/schemas/TaskRelationships"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskComment"
+            }
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
-        "required": ["id", "title", "status", "priority", "task_type", "created", "modified", "tags", "relationships", "comments", "custom_fields"]
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority",
+          "task_type",
+          "created",
+          "modified",
+          "tags",
+          "relationships",
+          "comments",
+          "custom_fields"
+        ]
       },
       "TaskCreate": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "project": { "type": "string", "nullable": true },
-          "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
-          "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
-          "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
-          "assignee": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
-          "due_date": { "type": "string", "nullable": true },
-          "effort": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "category": { "type": "string", "nullable": true },
-          "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
-          "custom_fields": { "type": "object", "additionalProperties": true, "nullable": true }
+          "title": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority",
+            "nullable": true
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType",
+            "nullable": true
+          },
+          "reporter": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supports @me to resolve to current user"
+          },
+          "assignee": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supports @me to resolve to current user"
+          },
+          "due_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "effort": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
         },
-        "required": ["title"]
+        "required": [
+          "title"
+        ]
       },
       "TaskUpdate": {
         "type": "object",
         "properties": {
-          "title": { "type": "string", "nullable": true },
-          "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true, "description": "Use /api/tasks/status for status transitions in REST." },
-          "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
-          "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
-          "reporter": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
-          "assignee": { "type": "string", "nullable": true, "description": "Supports @me to resolve to current user" },
-          "due_date": { "type": "string", "nullable": true },
-          "effort": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "category": { "type": "string", "nullable": true },
-          "tags": { "type": "array", "items": { "type": "string" }, "nullable": true },
-          "custom_fields": { "type": "object", "additionalProperties": true, "nullable": true }
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "nullable": true,
+            "description": "Use /api/tasks/status for status transitions in REST."
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority",
+            "nullable": true
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType",
+            "nullable": true
+          },
+          "reporter": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supports @me to resolve to current user"
+          },
+          "assignee": {
+            "type": "string",
+            "nullable": true,
+            "description": "Supports @me to resolve to current user"
+          },
+          "due_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "effort": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
         }
       },
       "TaskUpdateRequest": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string", "nullable": true },
-          "status": { "$ref": "#/components/schemas/TaskStatus", "nullable": true, "description": "Ignored by /api/tasks/update; use /api/tasks/status." },
-          "priority": { "$ref": "#/components/schemas/Priority", "nullable": true },
-          "task_type": { "$ref": "#/components/schemas/TaskType", "nullable": true },
-          "assignee": { "type": "string", "nullable": true },
-          "due_date": { "type": "string", "nullable": true },
-          "effort": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "category": { "type": "string", "nullable": true },
-          "tags": { "type": "array", "items": { "type": "string" }, "nullable": true },
-          "custom_fields": { "type": "object", "additionalProperties": true, "nullable": true }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "nullable": true,
+            "description": "Ignored by /api/tasks/update; use /api/tasks/status."
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Priority",
+            "nullable": true
+          },
+          "task_type": {
+            "$ref": "#/components/schemas/TaskType",
+            "nullable": true
+          },
+          "assignee": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "effort": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "custom_fields": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
         },
-        "required": ["id"]
+        "required": [
+          "id"
+        ]
       },
       "TaskSetStatusRequest": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "status": { "$ref": "#/components/schemas/TaskStatus" }
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          }
         },
-        "required": ["id", "status"]
+        "required": [
+          "id",
+          "status"
+        ]
       },
       "TaskDeleteRequest": {
         "type": "object",
-        "properties": { "id": { "type": "string" } },
-        "required": ["id"]
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
       },
       "TaskRelationships": {
         "type": "object",
         "properties": {
-          "depends_on": { "type": "array", "items": { "type": "string" } },
-          "blocks": { "type": "array", "items": { "type": "string" } },
-          "related": { "type": "array", "items": { "type": "string" } },
-          "parent": { "type": "string", "nullable": true },
-          "children": { "type": "array", "items": { "type": "string" } },
-          "fixes": { "type": "array", "items": { "type": "string" } },
-          "duplicate_of": { "type": "string", "nullable": true }
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "related": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "parent": {
+            "type": "string",
+            "nullable": true
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "fixes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "duplicate_of": {
+            "type": "string",
+            "nullable": true
+          }
         },
-        "required": ["depends_on", "blocks", "related", "children", "fixes"]
+        "required": [
+          "depends_on",
+          "blocks",
+          "related",
+          "children",
+          "fixes"
+        ]
       },
       "TaskComment": {
         "type": "object",
         "properties": {
-          "author": { "type": "string" },
-          "date": { "type": "string" },
-          "text": { "type": "string" }
+          "author": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
         },
-        "required": ["author", "date", "text"]
+        "required": [
+          "author",
+          "date",
+          "text"
+        ]
       },
       "TaskStatus": {
         "type": "string",
-        "enum": ["TODO", "IN_PROGRESS", "VERIFY", "BLOCKED", "DONE"]
+        "enum": [
+          "TODO",
+          "IN_PROGRESS",
+          "VERIFY",
+          "BLOCKED",
+          "DONE"
+        ]
       },
       "Priority": {
         "type": "string",
-        "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ]
       },
       "TaskType": {
         "type": "string",
-        "enum": ["feature", "bug", "epic", "spike", "chore"]
+        "enum": [
+          "feature",
+          "bug",
+          "epic",
+          "spike",
+          "chore"
+        ]
       },
       "ProjectDTO": {
         "type": "object",
-        "properties": { "name": { "type": "string" }, "prefix": { "type": "string" } },
-        "required": ["name", "prefix"]
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "prefix"
+        ]
       },
       "ProjectStatsDTO": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "open_count": { "type": "integer", "format": "int64" },
-          "done_count": { "type": "integer", "format": "int64" },
-          "recent_modified": { "type": "string", "nullable": true },
-          "tags_top": { "type": "array", "items": { "type": "string" } }
+          "name": {
+            "type": "string"
+          },
+          "open_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "done_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recent_modified": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags_top": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
-        "required": ["name", "open_count", "done_count", "tags_top"]
+        "required": [
+          "name",
+          "open_count",
+          "done_count",
+          "tags_top"
+        ]
       },
       "EnvelopeTask": {
         "type": "object",
-        "properties": { "data": { "$ref": "#/components/schemas/TaskDTO" } },
-        "required": ["data"]
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "EnvelopeDeleted": {
         "type": "object",
-        "properties": { "data": { "type": "object", "properties": { "deleted": { "type": "boolean" } }, "required": ["deleted"] } },
-        "required": ["data"]
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "deleted": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "deleted"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "EnvelopeProjects": {
         "type": "object",
-        "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/ProjectDTO" } } },
-        "required": ["data"]
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectDTO"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "EnvelopeProjectStats": {
         "type": "object",
-        "properties": { "data": { "$ref": "#/components/schemas/ProjectStatsDTO" } },
-        "required": ["data"]
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProjectStatsDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "EnvelopeConfig": {
         "type": "object",
-        "properties": { "data": { "type": "object", "additionalProperties": true } },
-        "required": ["data"]
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "EnvelopeUpdated": {
         "type": "object",
-        "properties": { "data": { "type": "object", "properties": { "updated": { "type": "boolean" } }, "required": ["updated"] } },
-        "required": ["data"]
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "updated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "updated"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "ApiError": {
         "type": "object",
@@ -481,28 +1206,57 @@
           "error": {
             "type": "object",
             "properties": {
-              "code": { "type": "string" },
-              "message": { "type": "string" },
-              "details": { "nullable": true }
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {
+                "nullable": true
+              }
             },
-            "required": ["code", "message"]
+            "required": [
+              "code",
+              "message"
+            ]
           }
         },
-        "required": ["error"]
+        "required": [
+          "error"
+        ]
       }
     },
     "responses": {
       "BadRequest": {
         "description": "Bad Request",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
       },
       "NotFound": {
         "description": "Not Found",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
       },
       "InternalError": {
         "description": "Internal Server Error",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiError" } } }
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiError"
+            }
+          }
+        }
       }
     }
   }

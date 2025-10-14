@@ -1458,7 +1458,6 @@ issue.priorities: [Low, Medium, High]
                 due_date: None,
                 effort: None,
                 description: None,
-                category: None,
                 tags: vec![],
                 relationships: None,
                 custom_fields: None,
@@ -2421,7 +2420,7 @@ mod list_features {
                 .arg("--tag=urgent")
                 .arg("--tag=frontend")
                 .arg("--description=This is a detailed description")
-                .arg("--category=web")
+                .arg("--field=product=web")
                 .arg("--assignee=developer@example.com")
                 .arg("--effort=5d")
                 .arg("--field=custom=value")
@@ -2455,7 +2454,6 @@ mod list_features {
             assert!(task.get("project").is_some());
             assert!(task.get("due_date").is_some());
             assert!(task.get("effort").is_some());
-            assert!(task.get("category").is_some());
             assert!(task.get("tags").is_some());
             assert!(task.get("created").is_some());
             assert!(task.get("modified").is_some());
@@ -2465,7 +2463,6 @@ mod list_features {
             assert_eq!(task["priority"], "High");
             assert_eq!(task["task_type"], "Feature");
             assert_eq!(task["description"], "This is a detailed description");
-            assert_eq!(task["category"], "web");
             assert_eq!(task["assignee"], "developer@example.com");
             assert_eq!(task["effort"], "40.00h");
 
@@ -2480,6 +2477,7 @@ mod list_features {
             let custom_fields = task["custom_fields"]
                 .as_object()
                 .expect("Custom fields should be an object");
+            assert_eq!(custom_fields.get("product").unwrap(), "web");
             assert!(custom_fields.contains_key("custom"));
         }
 

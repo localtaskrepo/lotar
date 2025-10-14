@@ -5,10 +5,10 @@ import TaskEditor from '../components/TaskEditor.vue'
 vi.mock('../api/client', () => ({
   api: {
     whoami: () => Promise.resolve('me'),
-    showConfig: () => Promise.resolve({}),
+    showConfig: () => Promise.resolve({ custom_fields: ['product'] }),
     listTasks: () => Promise.resolve([
-      { id: 'PRJ-1', title: 'A', status: 'open', priority: 'low', task_type: 'task', assignee: 'alice', created: '', modified: '', tags: ['x', 'y'], relationships: {}, comments: [], custom_fields: { category: 'frontend' } },
-      { id: 'PRJ-2', title: 'B', status: 'open', priority: 'low', task_type: 'task', assignee: 'bob', created: '', modified: '', tags: ['y', 'z'], relationships: {}, comments: [], custom_fields: { category: 'backend' } },
+      { id: 'PRJ-1', title: 'A', status: 'open', priority: 'low', task_type: 'task', assignee: 'alice', created: '', modified: '', tags: ['x', 'y'], relationships: {}, comments: [], custom_fields: { product: 'frontend' } },
+      { id: 'PRJ-2', title: 'B', status: 'open', priority: 'low', task_type: 'task', assignee: 'bob', created: '', modified: '', tags: ['y', 'z'], relationships: {}, comments: [], custom_fields: { product: 'backend' } },
     ]),
     suggestTasks: () => Promise.resolve([]),
   }
@@ -41,13 +41,21 @@ describe('TaskEditor suggestions', () => {
     expect((wrapper.vm as any).form.reporter).toBeTruthy()
   })
 
-  it('moves legacy category into custom fields on save', async () => {
-    const wrapper = mount(TaskEditor as any, { props: { ...propsBase, modelValue: { ...propsBase.modelValue, category: 'frontend' } } as any })
-    expect((wrapper.vm as any).localFields.category).toBe('frontend')
+  it('preserves product custom field without remapping on save', async () => {
+    const wrapper = mount(TaskEditor as any, {
+      props: {
+        ...propsBase,
+        modelValue: {
+          ...propsBase.modelValue,
+          custom_fields: { product: 'frontend', other: 'value' },
+        },
+      } as any,
+    })
     await (wrapper.vm as any).emitSave()
     const emitted = wrapper.emitted()
     const payload = (emitted['save']?.[0] as any)?.[0]
-    expect(payload?.custom_fields?.category).toBe('frontend')
-    expect('category' in payload).toBe(false)
+    expect(payload?.product).toBeUndefined()
+    expect(payload?.custom_fields?.product).toBe('frontend')
+    expect(payload?.custom_fields?.other).toBe('value')
   })
 })

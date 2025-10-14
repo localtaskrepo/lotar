@@ -42,8 +42,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 - `--due <DATE>` - Due date (YYYY-MM-DD or relative like 'tomorrow')
 - `--effort <ESTIMATE>`, `-E <ESTIMATE>` - Effort estimate (e.g., 2d, 5h, 1w)
 
-### Organization  
-- `--category <CATEGORY>`, `-c <CATEGORY>` - Project category
+### Organization
 - `--tag <TAG>`, `-i <TAG>` - Tags (can be used multiple times)
 - `--description <TEXT>`, `-D <TEXT>` - Detailed description
 
@@ -104,7 +103,6 @@ All task properties are validated against project configuration:
 - **Task Type**: Must be in configured `issue_types` list
 - **Priority**: Must be in configured `issue_priorities` list  
 - **Status**: Defaults to first state in `issue_states`
-- **Categories**: Validated against `categories` config
 - **Tags**: Validated against `tags` config
 - **Custom Fields**: Validated for format and allowed values
 

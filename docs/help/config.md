@@ -92,13 +92,9 @@ lotar config set default.priority HIGH --project=backend --dry-run
 # Set global configuration (server port)
 lotar config set server.port 9000 --global
 
-# Set a project's default category and tags
-lotar config set default.category Engineering --project=backend
-lotar config set default.tags '["oncall","sev"]' --project=backend
-
-# Set global categories and tags for all projects (arrays)
-lotar config set issue.categories '["Engineering","QA","Ops"]' --global
+# Set global tags and custom fields for all projects (arrays)
 lotar config set issue.tags '["frontend","backend","urgent"]' --global
+lotar config set custom.fields '["product","sprint"]' --global
 
 # Environment variable integration
 export LOTAR_TASKS_DIR=/custom/tasks
@@ -147,7 +143,7 @@ LoTaR accepts both dotted keys and nested sections in YAML. Internally, values a
 
 Notes:
 - Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).
-- Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility, but canonicalization writes them under `issue.categories` and `issue.tags`.
+- Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility. They are normalized, but `issue.categories` is considered legacy and is no longer consumed directly—prefer using `custom.fields` instead.
 - Branch alias maps live under a top-level `branch` section and are merged with project-level overrides.
 
 ### Automatic Prefix Generation
@@ -180,16 +176,16 @@ lotar config init --project=new-service --copy-from=existing-service
 
 ## Configuration Keys
 
+> Legacy note: older configurations may still carry `issue.categories`. The value is normalized for backwards compatibility, but the runtime no longer uses it—model the same information with `custom.fields` instead.
+
 ### Project-Level
 - `project.id` - Project identifier
 - `issue.states` - Available task statuses
 - `issue.types` - Available task types  
 - `issue.priorities` - Available priorities
-- `issue.categories` - Available categories
 - `issue.tags` - Available tags
 - `default.assignee` - Default task assignee
 - `default.reporter` - Default task reporter (also used for auto-assign resolution)
-- `default.category` - Default category for new tasks (if none provided)
 - `default.tags` - Default tags for new tasks (applied when no tags provided)
 - `default.priority` - Default task priority
 - `default.status` - Default task status
@@ -207,11 +203,9 @@ Automation (defaults inherited from global):
 - `issue.states` - Default task statuses for all projects
 - `issue.types` - Default task types for all projects
 - `issue.priorities` - Default priorities for all projects
-- `issue.categories` - Default categories for all projects
 - `issue.tags` - Default tags for all projects
 - `default.assignee` - Default task assignee for all projects
 - `default.reporter` - Default task reporter for all projects (also used for auto-assign resolution)
-- `default.category` - Global default category for new tasks
 - `default.tags` - Global default tags for new tasks
 - `default.priority` - Default task priority for all projects
 - `default.status` - Default task status for all projects

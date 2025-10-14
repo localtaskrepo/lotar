@@ -32,7 +32,6 @@ const apiFixtures = vi.hoisted(() => {
         ],
         history: [],
         custom_fields: {},
-        category: null,
     }
 
     const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -72,6 +71,7 @@ const apiFixtures = vi.hoisted(() => {
         issue_priorities: ['Low', 'Medium', 'High'],
         issue_types: ['bug', 'feature'],
         tags: ['alpha', 'beta', 'gamma'],
+        custom_fields: ['product'],
         default_prefix: 'DEMO',
         default_status: 'Open',
         default_priority: 'Medium',
@@ -119,6 +119,7 @@ const apiFixtures = vi.hoisted(() => {
             issue_priorities: ['Low', 'Medium', 'High'],
             issue_types: ['bug', 'feature'],
             tags: ['alpha', 'beta', 'gamma'],
+            custom_fields: ['product'],
             default_prefix: 'DEMO',
             default_status: 'Open',
             default_priority: 'Medium',
@@ -190,8 +191,8 @@ vi.mock('../composables/useConfig', () => {
         type: 'bug',
         reporter: '',
         assignee: '',
-        category: '',
         tags: [] as string[],
+        customFields: { product: '' },
     }
     return {
         useConfig: () => ({
@@ -199,6 +200,7 @@ vi.mock('../composables/useConfig', () => {
             priorities,
             types,
             tags,
+            customFields: ref(['product']),
             defaults: { value: defaults },
             refresh,
         }),

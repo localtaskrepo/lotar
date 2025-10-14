@@ -11,9 +11,8 @@ default.project: TEST
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature, Bug, Epic]
 issue.priorities: [Low, Medium, High, Critical]
-issue.categories: [Feat, Bugfix]
-issue.tags: [team, backend, one, two]
-default.category: Bugfix
+issue.tags: [team, backend, ui, one, two]
+custom.fields: [product]
 default.tags: [team, backend]
 "#;
     std::fs::create_dir_all(tasks_dir).unwrap();
@@ -21,17 +20,14 @@ default.tags: [team, backend]
 }
 
 #[test]
-fn add_uses_global_default_category_and_tags_when_missing() {
-    // EnvVarGuard will serialize and restore env vars per-var
+fn add_applies_default_tags_and_custom_field_flag() {
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
-
     write_global_with_defaults(&tasks_dir);
 
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
     let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    // Dry-run JSON to avoid creating files; verify category/tags injected
     let assert = Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(temp.path())
@@ -39,35 +35,42 @@ fn add_uses_global_default_category_and_tags_when_missing() {
             "add",
             "Task with defaults",
             "--project=TEST",
+            "--field",
+            "product=Bugfix",
             "--dry-run",
             "--format=json",
         ])
         .assert()
         .success();
 
-    let output = String::from_utf8_lossy(&assert.get_output().stdout);
-    // Expect category and tags present from defaults
-    assert!(output.contains("\"category\":\"Bugfix\""), "JSON: {output}");
-    assert!(
-        output.contains("\"tags\":[\"team\",\"backend\"]"),
-        "JSON: {output}"
-    );
+    let value: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("valid json output");
+    let custom = value
+        .get("custom_fields")
+        .and_then(|v| v.as_object())
+        .expect("custom_fields present");
+    assert_eq!(custom.get("product").unwrap().as_str().unwrap(), "Bugfix");
 
-    // guards drop here
+    let tags = value
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .expect("tags present");
+    let tag_strings: Vec<_> = tags
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(tag_strings, vec!["team".to_string(), "backend".to_string()]);
 }
 
 #[test]
-fn add_user_values_override_defaults_for_category_and_tags() {
-    // EnvVarGuard per-var lock
+fn add_explicit_tags_override_defaults() {
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
-
     write_global_with_defaults(&tasks_dir);
 
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
     let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    // Provide explicit category and a single allowed tag; defaults must not be applied
     let assert = Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(temp.path())
@@ -75,108 +78,84 @@ fn add_user_values_override_defaults_for_category_and_tags() {
             "add",
             "Task with explicit values",
             "--project=TEST",
-            "--category=Feat",
+            "--field",
+            "product=Feat",
             "--tag",
             "team",
+            "--tag",
+            "ui",
             "--dry-run",
             "--format=json",
         ])
         .assert()
         .success();
 
-    let output = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(output.contains("\"category\":\"Feat\""), "JSON: {output}");
-    // Only the provided tag should appear (no merging with defaults when any tag is supplied)
-    assert!(output.contains("\"tags\":[\"team\"]"), "JSON: {output}");
+    let value: serde_json::Value =
+        serde_json::from_slice(&assert.get_output().stdout).expect("valid json output");
+    let custom = value
+        .get("custom_fields")
+        .and_then(|v| v.as_object())
+        .expect("custom_fields present");
+    assert_eq!(custom.get("product").unwrap().as_str().unwrap(), "Feat");
 
-    // guards drop here
+    let tags = value
+        .get("tags")
+        .and_then(|v| v.as_array())
+        .expect("tags present");
+    let tag_strings: Vec<_> = tags
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(tag_strings, vec!["team".to_string(), "ui".to_string()]);
 }
 
 #[test]
-fn normalize_canonical_includes_default_category_and_tags_global() {
+fn normalize_canonical_includes_custom_fields_global() {
     let temp = TempDir::new().unwrap();
     let tasks = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks).unwrap();
 
-    // Write dotted-form config to test canonicalization
     std::fs::write(
         tasks.join("config.yml"),
-        "server.port: 8080\ndefault.project: TEST\nissue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low]\ndefault.category: Bugfix\ndefault.tags: [team, backend]\n",
+    "server.port: 8080\ndefault.project: TEST\nissue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low]\ncustom.fields: [product]\ndefault.tags: [team, backend]\n",
     )
     .unwrap();
 
-    // Dry run normalize should print nested default block with category/tags
     Command::cargo_bin("lotar")
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "normalize"]) // no --write
+        .args(["config", "normalize"])
         .assert()
         .success()
         .stdout(
-            predicate::str::contains("default:")
-                .and(predicate::str::contains("category: Bugfix"))
+            predicate::str::contains("custom:")
+                .and(predicate::str::contains("fields:"))
+                .and(predicate::str::contains("- product"))
+                .and(predicate::str::contains("default:"))
                 .and(predicate::str::contains("tags:")),
         );
 }
 
 #[test]
-fn normalize_global_flag_includes_default_category_and_tags() {
-    // EnvVarGuard per-var lock
-    let temp = tempfile::TempDir::new().unwrap();
-    let tasks = temp.path().join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-
-    // Write a minimal global config including defaults in dotted form
-    std::fs::write(
-        tasks.join("config.yml"),
-        "server.port: 8080\ndefault.project: TEST\nissue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low]\ndefault.category: Bugfix\ndefault.tags: [team]\n",
-    )
-    .unwrap();
-
-    // Pin to this tasks dir to avoid resolver choosing a different root in read-only mode
-    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks.to_string_lossy().as_ref());
-    let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
-
-    // Run normalize explicitly with --global and verify defaults appear
-    Command::cargo_bin("lotar")
-        .unwrap()
-        .current_dir(temp.path())
-        .args(["config", "normalize", "--global"]) // explicit scope
-        .assert()
-        .success()
-        .stdout(
-            predicate::str::contains("default:")
-                .and(predicate::str::contains("category: Bugfix"))
-                .and(predicate::str::contains("tags:")),
-        );
-
-    // guards drop here
-}
-
-#[test]
-fn normalize_project_canonical_includes_default_category_and_tags() {
-    // EnvVarGuard per-var lock
+fn normalize_project_canonical_includes_custom_fields() {
     let temp = TempDir::new().unwrap();
     let tasks = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks).unwrap();
 
-    // Minimal global to appease loader
     std::fs::write(
         tasks.join("config.yml"),
         "issue_states: [Todo]\nissue_types: [Feature]\nissue_priorities: [Low]\n",
     )
     .unwrap();
 
-    // Create project config with defaults
     let proj = tasks.join("TEST");
     std::fs::create_dir_all(&proj).unwrap();
     std::fs::write(
         proj.join("config.yml"),
-        "project.id: Test Project\nissue.categories: [Feat, Bugfix]\nissue.tags: [team, backend]\ndefault.category: Bugfix\ndefault.tags: [team]\n",
+    "project.id: Test Project\ncustom.fields: [product, component]\nissue.tags: [team, backend]\ndefault.tags: [team]\n",
     )
     .unwrap();
 
-    // Normalize project with --write and ensure defaults remain in canonical output
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks.to_string_lossy().as_ref());
     let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
@@ -188,9 +167,38 @@ fn normalize_project_canonical_includes_default_category_and_tags() {
         .success();
 
     let contents = std::fs::read_to_string(proj.join("config.yml")).unwrap();
-    assert!(contents.contains("default:"));
-    assert!(contents.contains("category: Bugfix"));
-    assert!(contents.contains("tags:"));
+    let doc: serde_yaml::Value = serde_yaml::from_str(&contents).expect("valid yaml");
+    let custom_fields = doc
+        .get("custom")
+        .and_then(|v| v.get("fields"))
+        .and_then(|v| v.as_sequence())
+        .expect("custom.fields present");
+    let field_names: Vec<String> = custom_fields
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(field_names.contains(&"product".to_string()));
+    assert!(field_names.contains(&"component".to_string()));
 
-    // guards drop here
+    let default_tags = doc
+        .get("default")
+        .and_then(|v| v.get("tags"))
+        .and_then(|v| v.as_sequence())
+        .expect("default.tags present");
+    let default_names: Vec<String> = default_tags
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(default_names.contains(&"team".to_string()));
+
+    let issue_tags = doc
+        .get("issue")
+        .and_then(|v| v.get("tags"))
+        .and_then(|v| v.as_sequence())
+        .expect("issue.tags present");
+    let issue_names: Vec<String> = issue_tags
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect();
+    assert!(issue_names.contains(&"backend".to_string()));
 }

@@ -48,7 +48,6 @@ impl CommandHandler for TaskHandler {
                     effort: add_args.effort,
                     due: add_args.due,
                     description: add_args.description,
-                    category: add_args.category,
                     tags: add_args.tags,
                     fields: add_args.fields,
                     bug: false,
@@ -399,11 +398,6 @@ impl CommandHandler for TaskHandler {
                             serde_json::json!(cur.effort),
                         );
                         push_change(
-                            "category",
-                            serde_json::json!(prev.category),
-                            serde_json::json!(cur.category),
-                        );
-                        push_change(
                             "tags",
                             serde_json::json!(prev.tags),
                             serde_json::json!(cur.tags),
@@ -650,10 +644,6 @@ impl CommandHandler for EditHandler {
             task.description = Some(description);
         }
 
-        if let Some(category) = args.category {
-            task.category = Some(category);
-        }
-
         // Add new tags (don't replace existing ones)
         for tag in args.tags {
             if !task.tags.contains(&tag) {
@@ -789,10 +779,6 @@ impl CommandHandler for SearchHandler {
 
         task_filter.tags = args.tag;
 
-        if let Some(category) = args.category {
-            task_filter.category = Some(category);
-        }
-
         if let Some(project) = project {
             // Resolve project name to prefix, just like in AddHandler
             let project_prefix = resolve_project_input(project, resolver.path.as_path());
@@ -891,7 +877,6 @@ impl CommandHandler for SearchHandler {
                         "project" => {
                             return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
                         }
-                        "category" => return Some(vec![t.category.clone().unwrap_or_default()]),
                         "tags" => return Some(t.tags.clone()),
                         _ => {}
                     }
@@ -1036,7 +1021,6 @@ impl CommandHandler for SearchHandler {
                     "modified" => a.modified.cmp(&b.modified),
                     "assignee" => a.assignee.cmp(&b.assignee),
                     "type" => a.task_type.to_string().cmp(&b.task_type.to_string()),
-                    "category" => a.category.cmp(&b.category),
                     "project" => id_a.split('-').next().cmp(&id_b.split('-').next()),
                     "id" => id_a.cmp(id_b),
                     other => {
@@ -1120,7 +1104,6 @@ impl CommandHandler for SearchHandler {
                         project,
                         due_date: task.due_date,
                         effort: task.effort,
-                        category: task.category,
                         tags: task.tags,
                         created: task.created,
                         modified: task.modified,
