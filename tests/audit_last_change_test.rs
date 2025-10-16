@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
 
+mod common;
+
 fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = ProcCommand::new("git");
     cmd.current_dir(repo).args(args);
@@ -30,7 +32,7 @@ fn init_repo(temp: &TempDir) {
 
 #[test]
 fn audit_list_last_change_per_task_smoke() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
 

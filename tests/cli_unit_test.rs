@@ -3,6 +3,8 @@
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::StatusArgs;
 
+mod common;
+
 #[test]
 fn priority_args_get_only() {
     let args = PriorityArgs::new("TEST-1".to_string(), None, Some("test-project".to_string()));
@@ -54,7 +56,7 @@ mod effort_normalization {
 
     #[test]
     fn effort_is_normalized_on_add_and_edit() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
 
         // Create a task with a variety of effort spellings that should normalize to hours
         run(

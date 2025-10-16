@@ -2,6 +2,8 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
+mod common;
+
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp_dir.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -11,7 +13,7 @@ fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::asse
 
 #[test]
 fn stats_tags_and_custom_field_snapshot() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Create tasks with tags and custom fields
     let mut c = Command::cargo_bin("lotar").unwrap();
@@ -107,7 +109,7 @@ fn stats_tags_and_custom_field_snapshot() {
 
 #[test]
 fn stats_distribution_snapshot() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Add some tasks with tags and custom fields to populate fields
     let mut c = Command::cargo_bin("lotar").unwrap();
@@ -162,7 +164,7 @@ fn stats_distribution_snapshot() {
 fn stats_due_buckets_snapshot() {
     use chrono::{Duration, Utc};
 
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     let today = Utc::now().date_naive();
     let fmt = |d: chrono::NaiveDate| d.format("%Y-%m-%d").to_string();
@@ -204,7 +206,7 @@ fn stats_due_buckets_snapshot() {
 fn stats_due_overdue_threshold_snapshot() {
     use chrono::{Duration, Utc};
 
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     let today = Utc::now().date_naive();
     let fmt = |d: chrono::NaiveDate| d.format("%Y-%m-%d").to_string();
@@ -269,11 +271,10 @@ fn stats_due_overdue_threshold_snapshot() {
 mod effort_unit {
     use assert_cmd::Command;
     use serde_json::Value;
-    use tempfile::TempDir;
 
     #[test]
     fn stats_effort_respects_unit_flag() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
 
         // Two tasks: 8h (1 day) and 2d (16h, 2 days)
         Command::cargo_bin("lotar")
@@ -338,11 +339,10 @@ mod effort_unit {
 mod effort_points_auto_filters {
     use assert_cmd::Command;
     use serde_json::Value;
-    use tempfile::TempDir;
 
     #[test]
     fn stats_effort_points_and_auto_and_filters() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
 
         // Create three tasks with mixed effort and attributes
         // T1: hours, assignee @me, tag x
@@ -488,7 +488,7 @@ mod effort_comments_custom {
 
     #[test]
     fn stats_effort_and_comments_and_custom_snapshot() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
 
         // Create a few tasks with effort and custom fields
         run(

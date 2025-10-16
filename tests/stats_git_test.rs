@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
 
+mod common;
+
 // --- Shared helper functions for stats git-related tests ---
 fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = ProcCommand::new("git");
@@ -61,7 +63,7 @@ fn add_and_commit(
 // --- Merged from stats_time_in_status_git_test.rs ---
 #[test]
 fn stats_time_in_status_basic_window() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
 
@@ -165,7 +167,7 @@ fn stats_time_in_status_basic_window() {
 // --- Merged from stats_time_in_status_single_task_test.rs ---
 #[test]
 fn stats_time_in_status_single_task() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
 
@@ -264,7 +266,7 @@ fn stats_time_in_status_single_task() {
 // --- Merged from stats_effort_transitions_window_test.rs ---
 #[test]
 fn stats_effort_with_transitions_window_filters_tasks() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
 
@@ -405,7 +407,7 @@ fn stats_effort_with_transitions_window_filters_tasks() {
 
 #[test]
 fn stats_changed_and_churn_and_authors() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
 

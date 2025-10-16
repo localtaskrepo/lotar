@@ -291,6 +291,8 @@ mod assignment {
 
 impl TestEnvironment {
     fn new() -> Self {
+        crate::common::reset_lotar_test_environment();
+
         TestEnvironment {
             temp_dir: TempDir::new().unwrap(),
         }

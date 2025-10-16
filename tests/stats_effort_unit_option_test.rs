@@ -1,10 +1,10 @@
 use assert_cmd::Command;
 use serde_json::Value;
-use tempfile::TempDir;
+mod common;
 
 #[test]
 fn stats_effort_respects_unit_flag() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Two tasks: 8h (1 day) and 2d (16h, 2 days)
     Command::cargo_bin("lotar")

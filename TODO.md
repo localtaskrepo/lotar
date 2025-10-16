@@ -22,15 +22,14 @@ Chores:
 - Tickets without ticket type (using default type) do not store that information in the file on disk
 - Check if we're Windows compatible
 - Test release workflow
-- Check if any of the auto features can be applied to MCP and web endpoints (or they already are)
+- Check if any of the auto features are applied to MPC as well.
 - Config validation may need an update
-- properties that don't have any special functions associated with them (e.g. categories) should be custom properties that just allow generic querying by matching terms like all custom properties should support. Only when we add special function should we promote them to standard fields.
-- The project config file has an "id property" that it shouldn't have, because the directory is teh ID.
 - Add option to add project in config page
 
 Bugs:
-- "Category" which should now be a custom property is still treated as a first-class property in some places and should be removed. The task list for example still have a category column shown by default, indicating that it's still a first-class property.
-- Add smoke testing framework for cli commands in tmp directories (doesn't need to use rust)
+- The global configs file saves a lot of values that are defaults on project creation.
+- In general we should only save values (in all files) that are not defaults, or explicitely set through either a parameter or an input in the UI. Otherwise UI components should show what the defaults are when empty.
+- The project config file has an "id property" that it shouldn't have, because the directory is the ID.
 
 # Implementation Roadmap
 

@@ -2,15 +2,18 @@
   "name": "@localtaskrepo/lotar",
   "version": "0.1.0",
   "description": "A task and project management tool that runs locally and can be synced via repo",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build && cargo build --release",
-    "preview": "vite preview",
-    "test:ui": "vitest",
-    "test:ui:run": "vitest run",
-    "test": "cargo nextest run --release",
-    "clean": "cargo clean && rm -rf node_modules target/web",
-    "clean:all": "npm run clean"
+    "test": "npm run test:rust && npm run test:ui",
+    "test:rust": "cargo nextest run --release",
+    "test:ui": "vitest run --config view/vitest.config.ts",
+    "test:smoke": "npm run build && vitest run --config smoke/vitest.config.ts",
+    "test:smoke:quick": "vitest run --config smoke/vitest.config.ts",
+    "smoke": "npm run test:smoke",
+    "playwright:install": "npx playwright install --with-deps chromium",
+    "clean": "cargo clean && rm -rf node_modules target/web"
   },
   "keywords": [
     "local",
@@ -23,16 +26,24 @@
   "author": "Ravi Gairola <mallox@pyxzl.net>",
   "license": "ISC",
   "dependencies": {
-    "chart.js": "^4.5.0",
-    "vue": "^3.5.0",
-    "vue-router": "^4.3.0"
+    "chart.js": "^4.5.1",
+    "vue": "^3.5.22",
+    "vue-router": "^4.6.3"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^5.0.4",
+    "@playwright/test": "^1.48.2",
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.1",
     "@vue/test-utils": "^2.4.6",
-    "jsdom": "^25.0.0",
-    "typescript": "^5.6.2",
-    "vite": "^5.4.0",
-    "vitest": "^2.0.5"
+    "execa": "^9.6.0",
+    "fs-extra": "^11.2.0",
+    "get-port": "^7.0.0",
+    "jsdom": "^27.0.0",
+    "tmp-promise": "^3.0.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.10",
+    "vitest": "^3.2.4",
+    "yaml": "^2.6.0"
   }
 }

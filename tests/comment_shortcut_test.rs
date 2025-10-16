@@ -2,6 +2,8 @@ use assert_cmd::prelude::*;
 use std::process::Command;
 use tempfile::TempDir;
 
+mod common;
+
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp_dir.path())
         .args(["--format", "json"]) // stable json output
@@ -11,7 +13,7 @@ fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::asse
 
 #[test]
 fn comment_shortcut_adds_comment() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     // Create a task
     run(
         &mut Command::cargo_bin("lotar").unwrap(),

@@ -180,6 +180,9 @@ function applySmartFilters(q: Record<string, string>) {
 }
 
 async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
+  if (disposed) return
+  const onTasksRoute = router.currentRoute.value.path === '/'
+  if (!onTasksRoute) return
   const q = { ...raw }
   const qnorm: Record<string, string> = {}
   if (q.q) qnorm.q = q.q
@@ -194,10 +197,12 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
   if (q.needs) qnorm.needs = q.needs
   qnorm.order = (q.order === 'asc' || q.order === 'desc') ? q.order : 'desc'
 
+  if (disposed) return
+
   if (nav === 'replace') {
-    router.replace({ path: '/', query: qnorm })
+    if (!disposed) await router.replace({ path: '/', query: qnorm })
   } else if (nav === 'push') {
-    router.push({ path: '/', query: qnorm })
+    if (!disposed) await router.push({ path: '/', query: qnorm })
   }
 
   const serverFilter: any = {}
@@ -209,10 +214,16 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
   if (qnorm.assignee && qnorm.assignee !== '__none__') serverFilter.assignee = qnorm.assignee
   if (qnorm.tags) serverFilter.tags = qnorm.tags.split(',').map(s => s.trim()).filter(Boolean)
 
+  if (disposed) return
+
   await refreshConfig(serverFilter.project)
+  if (disposed) return
   await refresh(serverFilter)
+  if (disposed) return
 
   applySmartFilters(qnorm)
+
+  if (disposed) return
 
   const dir = qnorm.order === 'asc' ? 'asc' : 'desc'
   items.value.sort((a,b) => (dir === 'desc' ? b.modified.localeCompare(a.modified) : a.modified.localeCompare(b.modified)))

@@ -6,9 +6,7 @@ import Calendar from './pages/Calendar.vue'
 import ConfigView from './pages/ConfigView.vue'
 import Preferences from './pages/Preferences.vue'
 import ProjectInsights from './pages/ProjectInsights.vue'
-import ProjectsList from './pages/ProjectsList.vue'
 import TaskDetails from './pages/TaskDetails.vue'
-import TaskStatistics from './pages/TaskStatistics.vue'
 import TasksList from './pages/TasksList.vue'
 import './styles.css'
 import { initializeThemeFromStorage } from './utils/theme'
@@ -23,8 +21,6 @@ const router = createRouter({
     { path: '/', component: TasksList },
     { path: '/boards', component: Board },
     { path: '/calendar', component: Calendar },
-    { path: '/projects', component: ProjectsList },
-    { path: '/statistics', component: TaskStatistics },
     { path: '/insights', component: ProjectInsights },
     { path: '/task/:id', component: TaskDetails },
     { path: '/config', component: ConfigView },

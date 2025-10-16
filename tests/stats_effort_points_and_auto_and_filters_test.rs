@@ -1,10 +1,10 @@
 use assert_cmd::Command;
 use serde_json::Value;
-use tempfile::TempDir;
+mod common;
 
 #[test]
 fn stats_effort_points_and_auto_and_filters() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Create three tasks with mixed effort and attributes
     // T1: hours, assignee @me, tag x

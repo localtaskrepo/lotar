@@ -2,7 +2,8 @@ use assert_cmd::prelude::*;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use tempfile::TempDir;
+
+mod common;
 
 fn write_task(dir: &Path, proj: &str, id: &str, title: &str) {
     let tasks = dir.join(".tasks").join(proj);
@@ -42,7 +43,7 @@ mod smoke {
 
     #[test]
     fn changelog_outside_git_no_crash() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
         // No git repo here; command should not crash
         Command::cargo_bin("lotar")
             .unwrap()
@@ -58,7 +59,7 @@ mod range {
 
     #[test]
     fn changelog_with_ref_range_runs() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
         let root = temp.path();
 
         init_repo(root);
@@ -104,7 +105,7 @@ mod range_json {
 
     #[test]
     fn changelog_range_mode_json() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
         let root = temp.path();
 
         init_repo(root);
@@ -158,7 +159,7 @@ mod working_tree {
 
     #[test]
     fn changelog_working_tree_modified_json() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
         let root = temp.path();
         init_repo(root);
 
@@ -211,7 +212,7 @@ mod working_tree {
 
     #[test]
     fn changelog_working_tree_created_and_deleted() {
-        let temp = TempDir::new().unwrap();
+        let temp = crate::common::temp_dir();
         let root = temp.path();
         init_repo(root);
 

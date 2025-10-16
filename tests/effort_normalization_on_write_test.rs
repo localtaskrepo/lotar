@@ -2,6 +2,8 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
 
+mod common;
+
 fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp_dir.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -11,7 +13,7 @@ fn run(cmd: &mut Command, temp_dir: &TempDir, args: &[&str]) -> assert_cmd::asse
 
 #[test]
 fn effort_is_normalized_on_add_and_edit() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Create a task with a variety of effort spellings that should normalize to hours
     run(

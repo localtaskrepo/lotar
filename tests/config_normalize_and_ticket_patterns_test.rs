@@ -2,7 +2,7 @@ use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::fs;
 use std::process::Command;
-use tempfile::TempDir;
+mod common;
 
 // Helper to run lotar with args in a given cwd
 fn run_lotar(cwd: &std::path::Path, args: &[&str]) -> assert_cmd::assert::Assert {
@@ -14,7 +14,7 @@ fn run_lotar(cwd: &std::path::Path, args: &[&str]) -> assert_cmd::assert::Assert
 
 #[test]
 fn normalize_outputs_canonical_yaml_in_dry_run() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = crate::common::temp_dir();
     let tasks = tmp.path().join(".tasks");
     fs::create_dir_all(&tasks).unwrap();
 
@@ -51,7 +51,7 @@ auto.identity_git: false
 
 #[test]
 fn normalize_writes_when_write_flag_is_set() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = crate::common::temp_dir();
     let tasks = tmp.path().join(".tasks");
     fs::create_dir_all(&tasks).unwrap();
 
@@ -68,7 +68,7 @@ fn normalize_writes_when_write_flag_is_set() {
 
 #[test]
 fn validation_reports_invalid_and_ambiguous_ticket_patterns_global() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = crate::common::temp_dir();
     let tasks = tmp.path().join(".tasks");
     fs::create_dir_all(&tasks).unwrap();
 
@@ -99,7 +99,7 @@ issue_priorities: [Low, Medium]
 
 #[test]
 fn validation_reports_invalid_ticket_patterns_project() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = crate::common::temp_dir();
     let tasks = tmp.path().join(".tasks");
     fs::create_dir_all(&tasks).unwrap();
 

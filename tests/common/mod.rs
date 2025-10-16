@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use ctor::ctor;
 use lotar::types::Priority;
 use lotar::{Storage, Task};
 use std::fs;
@@ -16,9 +17,37 @@ pub struct TestFixtures {
     pub tasks_root: PathBuf,
 }
 
+#[ctor]
+fn init_lotar_test_environment() {
+    reset_lotar_test_environment();
+}
+
+/// Remove shared LOTAR environment variables that can leak in from other test suites or manual runs.
+/// Ensures each integration test starts with a clean slate and only opts into specific env overrides when needed.
+pub fn reset_lotar_test_environment() {
+    // Manipulating process-wide environment variables is intrinsically unsafe per Rust's
+    // `unsafe_env` lint, but tests rely on a clean state. Guard with an unsafe block
+    // and keep the scope minimal.
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+        std::env::remove_var("LOTAR_HOME");
+        std::env::remove_var("LOTAR_TEST_SILENT");
+        std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
+        std::env::remove_var("LOTAR_IGNORE_HOME_CONFIG");
+    }
+}
+
+#[allow(dead_code)]
+pub fn temp_dir() -> TempDir {
+    reset_lotar_test_environment();
+    TempDir::new().expect("Failed to create temp directory")
+}
+
 impl TestFixtures {
     #[allow(dead_code)]
     pub fn new() -> Self {
+        reset_lotar_test_environment();
+
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let tasks_root = temp_dir.path().join(".tasks");
         fs::create_dir_all(&tasks_root).expect("Failed to create tasks directory");

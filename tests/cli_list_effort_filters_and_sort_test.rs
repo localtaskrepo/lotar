@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::process::Command;
 use tempfile::TempDir;
 
+mod common;
+
 fn run(cmd: &mut Command, temp: &TempDir, args: &[&str]) -> assert_cmd::assert::Assert {
     cmd.current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -12,7 +14,7 @@ fn run(cmd: &mut Command, temp: &TempDir, args: &[&str]) -> assert_cmd::assert::
 
 #[test]
 fn list_sort_by_effort_time_only_asc_and_desc() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Create three tasks with time efforts: 30m (0.50h), 2h (2.00h), 1d (8.00h)
     run(
@@ -86,7 +88,7 @@ fn list_sort_by_effort_time_only_asc_and_desc() {
 
 #[test]
 fn list_effort_min_max_time_window() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Time efforts: 0.50h, 2.00h, 8.00h
     run(
@@ -142,7 +144,7 @@ fn list_effort_min_max_time_window() {
 
 #[test]
 fn list_effort_min_points_excludes_time() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
 
     // Mixed: time and points
     run(

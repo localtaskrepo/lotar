@@ -3,6 +3,8 @@ use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
 
+mod common;
+
 fn run_git(repo: &std::path::Path, args: &[&str], envs: &[(&str, &str)]) {
     let mut cmd = ProcCommand::new("git");
     cmd.current_dir(repo).args(args);
@@ -55,7 +57,7 @@ fn add_and_commit(
 
 #[test]
 fn task_diff_fields_reports_structured_changes() {
-    let temp = TempDir::new().unwrap();
+    let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
 
