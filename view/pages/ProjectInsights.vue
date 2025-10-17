@@ -11,7 +11,7 @@
       <div class="controls row" style="gap:8px; flex-wrap: wrap; align-items: center;">
         <UiSelect v-model="selectedProject" style="min-width:220px;">
           <option value="">All projects</option>
-          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ p.prefix }} — {{ p.name }}</option>
+          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
         <div class="tag-filter-group">
           <div class="tag-filter">
@@ -266,6 +266,7 @@ import { useActivity } from '../composables/useActivity'
 import { useProjects } from '../composables/useProjects'
 import { useTasks } from '../composables/useTasks'
 import { parseTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
+import { formatProjectLabel } from '../utils/projectLabels'
 
 defineOptions({ name: 'ProjectInsights' })
 

@@ -4,7 +4,7 @@
       <UiInput v-model="form.title" placeholder="Title" style="min-width: 320px; flex:1;" />
       <UiSelect v-model="form.project" :disabled="mode==='edit'">
         <option value="">Project</option>
-        <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ p.name }}</option>
+        <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
       </UiSelect>
       <UiSelect v-model="form.status">
         <option value="">Status</option>
@@ -132,6 +132,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { ProjectDTO } from '../api/types'
+import { formatProjectLabel } from '../utils/projectLabels'
 import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
 import UiSelect from './UiSelect.vue'

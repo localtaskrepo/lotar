@@ -375,9 +375,21 @@ pub fn parse_project_from_yaml_str(
     let data = expand_dotted_keys(raw);
     let mut cfg = ProjectConfig::new(project_name.to_string());
 
-    // project.id
-    if let Some(v) = get_path(&data, &["project", "id"]).and_then(cast::<String>) {
+    // project.name (preferred) / project.id (legacy)
+    if let Some(v) = get_path(&data, &["project", "name"]).and_then(cast::<String>) {
+        if !v.trim().is_empty() {
+            cfg.project_name = v;
+        }
+    } else if let Some(v) = get_path(&data, &["project", "id"]).and_then(cast::<String>) {
         cfg.project_name = v;
+    } else if let Some(v) = get_path(&data, &["config", "project_name"]).and_then(cast::<String>) {
+        if !v.trim().is_empty() {
+            cfg.project_name = v;
+        }
+    } else if let Some(v) = get_path(&data, &["project_name"]).and_then(cast::<String>) {
+        if !v.trim().is_empty() {
+            cfg.project_name = v;
+        }
     }
     // default.*
     if let Some(v) = get_path(&data, &["default", "reporter"]).and_then(cast::<String>) {
@@ -642,9 +654,14 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     let mut root = serde_yaml::Mapping::new();
 
     // project
-    let mut project = serde_yaml::Mapping::new();
-    project.insert(Y::String("id".into()), Y::String(cfg.project_name.clone()));
-    root.insert(Y::String("project".into()), Y::Mapping(project));
+    if !cfg.project_name.trim().is_empty() {
+        let mut project = serde_yaml::Mapping::new();
+        project.insert(
+            Y::String("name".into()),
+            Y::String(cfg.project_name.clone()),
+        );
+        root.insert(Y::String("project".into()), Y::Mapping(project));
+    }
 
     // default
     let mut default = serde_yaml::Mapping::new();

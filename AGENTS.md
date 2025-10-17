@@ -1,5 +1,6 @@
-- Only use `npm test` for running tests. Legacy `cargo test` is forbidden.
+- Only use `npm test` or `cargo nextest` for running tests. Legacy `cargo test` is forbidden.
 - Always run linting and formatting checks before completing a task.
 - Always ensure the code builds without warnings before completing a task.
 - Always complete a task with running `npm test` and `npm run smoke`.
+- Running smoke tests automatically builds the project, so no need to run `npm build` separately.
 - Never use git to recover lost code. Use the .history folder instead to access previous versions of files.

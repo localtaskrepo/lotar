@@ -57,7 +57,7 @@ A minimal project config produced by the simple template (canonical shape):
 
 ```yaml
 project:
-  id: DEMO
+  name: Demo Service
 issue:
   states: [Todo, InProgress, Done]
   types: [feature, bug, chore]

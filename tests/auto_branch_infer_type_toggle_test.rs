@@ -35,7 +35,7 @@ fn disables_branch_infer_when_flag_off() {
     std::fs::create_dir_all(&proj).unwrap();
     std::fs::write(
         proj.join("config.yml"),
-        "project.id: TEST\nissue.types: [Feature]\n",
+        "project.name: TEST\nissue.types: [Feature]\n",
     )
     .unwrap();
 

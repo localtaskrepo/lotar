@@ -34,7 +34,11 @@ mod dual_interface_tests {
         assert!(quick_output.contains("Created task:"));
 
         // Extract task ID from quick interface
-        let quick_task_id = quick_output.split("Created task: ").nth(1).unwrap().trim();
+        let quick_task_id = quick_output
+            .split("Created task: ")
+            .nth(1)
+            .and_then(|section| section.split_whitespace().next())
+            .expect("quick add output should contain task id");
 
         // Test 2: Full subcommand interface - lotar task add
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -52,7 +56,11 @@ mod dual_interface_tests {
         assert!(full_output.contains("Created task:"));
 
         // Extract task ID from full interface
-        let full_task_id = full_output.split("Created task: ").nth(1).unwrap().trim();
+        let full_task_id = full_output
+            .split("Created task: ")
+            .nth(1)
+            .and_then(|section| section.split_whitespace().next())
+            .expect("task add output should contain task id");
 
         // Verify both tasks were created with consistent project prefix
         assert!(quick_task_id.starts_with("TP-"));

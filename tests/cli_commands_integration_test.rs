@@ -265,6 +265,80 @@ mod output_formatting {
             .assert()
             .success();
     }
+
+    #[test]
+    fn project_label_falls_back_to_prefix_when_name_missing() {
+        let temp = TempDir::new().unwrap();
+
+        // Initialize project with a display name
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp.path())
+            .args([
+                "config",
+                "init",
+                "--project",
+                "Example Project",
+                "--prefix",
+                "EXM",
+            ])
+            .assert()
+            .success();
+
+        // Strip the project name so only the prefix remains
+        let project_config = temp.path().join(".tasks").join("EXM").join("config.yml");
+        std::fs::write(project_config, "default_priority: High\n")
+            .expect("failed to overwrite project config");
+
+        // Add a task with explicit project prefix
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp.path())
+            .args(["task", "add", "Test Task", "--project", "EXM"])
+            .assert()
+            .success();
+
+        // Config show should display the prefix-only label
+        let show_output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp.path())
+            .args(["config", "show", "--project", "EXM"])
+            .output()
+            .expect("failed to run config show");
+        assert!(
+            show_output.status.success(),
+            "config show failed: {}",
+            String::from_utf8_lossy(&show_output.stderr)
+        );
+        let show_stdout = String::from_utf8_lossy(&show_output.stdout);
+        assert!(show_stdout.contains("Configuration for project: EXM"));
+
+        // Config validate should also show prefix-only label
+        let validate_output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp.path())
+            .args(["config", "validate", "--project", "EXM"])
+            .output()
+            .expect("failed to run config validate");
+        assert!(
+            validate_output.status.success(),
+            "config validate failed: {}",
+            String::from_utf8_lossy(&validate_output.stderr)
+        );
+        let validate_stdout = String::from_utf8_lossy(&validate_output.stdout);
+        assert!(validate_stdout.contains("Validating project configuration for 'EXM'"));
+
+        // Ensure task add success output uses prefix when name missing
+        let add_output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp.path())
+            .args(["task", "add", "Another Task", "--project", "EXM"])
+            .output()
+            .expect("failed to add task twice");
+        assert!(add_output.status.success(), "second add failed");
+        let add_stdout = String::from_utf8_lossy(&add_output.stdout);
+        assert!(add_stdout.contains("Created task: EXM-2"));
+    }
 }
 
 // =============================================================================
@@ -3328,13 +3402,18 @@ mod file_structure {
         // For temp directory, it will be detected as the directory name (starting with tmp)
         // So we just verify it's not the prefix (which would be uppercase)
         assert!(
-            config_content.contains("project:\n  id:") || config_content.contains("project.id:"),
-            "Config should contain canonical project.id field"
+            config_content.contains("project:\n  name:")
+                || config_content.contains("project.name:"),
+            "Config should contain canonical project.name field"
         );
         assert!(
-            !config_content.contains(&format!("project.id: {prefix}"))
-                && !config_content.contains(&format!("id: {prefix}")),
-            "Project config should NOT contain prefix '{prefix}' as project id. Config content: {config_content}"
+            !config_content.contains(&format!("project.name: {prefix}"))
+                && !config_content.contains(&format!("name: {prefix}")),
+            "Project config should NOT contain prefix '{prefix}' as project name. Config content: {config_content}"
+        );
+        assert!(
+            !config_content.contains("project.id:") && !config_content.contains("\n  id:"),
+            "Project config should not include legacy project.id field. Config content: {config_content}"
         );
     }
 

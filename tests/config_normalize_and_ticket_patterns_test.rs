@@ -116,7 +116,7 @@ fn validation_reports_invalid_ticket_patterns_project() {
     let proj_cfg = proj.join("config.yml");
     let yaml = r#"
 project:
-  id: DEMO
+    name: DEMO
 scan:
   ticket_patterns:
     - "(unclosed"  # invalid regex

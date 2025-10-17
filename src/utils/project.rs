@@ -218,3 +218,113 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String
     // This could be a new project being created, so return the generated prefix
     generated_prefix
 }
+
+/// Format a human-friendly project label given a prefix and optional display name.
+///
+/// Rules mirror the web helpers:
+/// - When a display name is present, show "{name} ({PREFIX})"
+/// - When display name is absent but prefix exists, show the prefix alone
+/// - When both are missing, fall back to the word "Project"
+pub fn format_project_label(prefix: &str, display_name: Option<&str>) -> String {
+    let trimmed_prefix = prefix.trim();
+    let trimmed_name = display_name.unwrap_or("").trim();
+
+    if !trimmed_name.is_empty() {
+        if trimmed_prefix.is_empty() {
+            trimmed_name.to_string()
+        } else {
+            format!("{} ({})", trimmed_name, trimmed_prefix)
+        }
+    } else if !trimmed_prefix.is_empty() {
+        trimmed_prefix.to_string()
+    } else {
+        "Project".to_string()
+    }
+}
+
+/// Attempt to load the display name for a project from its configuration file.
+/// Returns `None` when no config is present or the name is blank.
+pub fn project_display_name_from_config(
+    tasks_dir: &std::path::Path,
+    project_prefix: &str,
+) -> Option<String> {
+    let config_path = crate::utils::paths::project_config_path(tasks_dir, project_prefix);
+
+    let explicit_name = std::fs::read_to_string(&config_path)
+        .ok()
+        .and_then(|content| serde_yaml::from_str::<serde_yaml::Value>(&content).ok())
+        .and_then(|value| extract_project_name(&value));
+
+    if let Some(name) = explicit_name {
+        let trimmed = name.trim();
+        if !trimmed.is_empty() {
+            return Some(trimmed.to_string());
+        }
+    }
+
+    crate::config::persistence::load_project_config_from_dir(project_prefix, tasks_dir)
+        .ok()
+        .map(|cfg| cfg.project_name.trim().to_string())
+        .filter(|name| !name.is_empty() && !name.eq_ignore_ascii_case(project_prefix))
+}
+
+fn extract_project_name(value: &serde_yaml::Value) -> Option<String> {
+    use serde_yaml::Value;
+
+    if let Value::Mapping(map) = value {
+        let project_key = Value::String("project".to_string());
+        if let Some(Value::Mapping(project)) = map.get(&project_key) {
+            let project_name_key = Value::String("name".to_string());
+            if let Some(Value::String(name)) = project.get(&project_name_key) {
+                let trimmed = name.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+            let project_id_key = Value::String("id".to_string());
+            if let Some(Value::String(id)) = project.get(&project_id_key) {
+                let trimmed = id.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+
+        let config_key = Value::String("config".to_string());
+        if let Some(Value::Mapping(cfg)) = map.get(&config_key) {
+            let cfg_project_name_key = Value::String("project_name".to_string());
+            if let Some(Value::String(name)) = cfg.get(&cfg_project_name_key) {
+                let trimmed = name.trim();
+                if !trimmed.is_empty() {
+                    return Some(trimmed.to_string());
+                }
+            }
+        }
+
+        let project_name_key = Value::String("project_name".to_string());
+        if let Some(Value::String(name)) = map.get(&project_name_key) {
+            let trimmed = name.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+
+        for (key, val) in map {
+            if let Value::String(key_str) = key {
+                match key_str.as_str() {
+                    "project.name" | "project.id" | "config.project_name" | "project_name" => {
+                        if let Value::String(name) = val {
+                            let trimmed = name.trim();
+                            if !trimmed.is_empty() {
+                                return Some(trimmed.to_string());
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    None
+}

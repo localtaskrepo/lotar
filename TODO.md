@@ -29,7 +29,6 @@ Chores:
 Bugs:
 - The global configs file saves a lot of values that are defaults on project creation.
 - In general we should only save values (in all files) that are not defaults, or explicitely set through either a parameter or an input in the UI. Otherwise UI components should show what the defaults are when empty.
-- The project config file has an "id property" that it shouldn't have, because the directory is the ID.
 
 # Implementation Roadmap
 

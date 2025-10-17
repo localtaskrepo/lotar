@@ -146,7 +146,8 @@ mod project_config {
         assert!(!config_content.contains("null"));
         // Canonical nested project id
         assert!(config_content.contains("project:"));
-        assert!(config_content.contains("id: MyVeryLongProjectName"));
+        assert!(config_content.contains("name: MyVeryLongProjectName"));
+        assert!(!config_content.contains("project.id"));
         // Template-based configs contain all template fields, not just project name
         let lines: Vec<&str> = config_content.lines().collect();
         assert!(lines.len() > 1); // Should contain multiple lines from template
@@ -245,7 +246,8 @@ mod templates {
         let config_path = temp_dir.join(".tasks").join("SIMP").join("config.yml");
         let config_content = fs::read_to_string(&config_path).unwrap();
         assert!(config_content.contains("project:"));
-        assert!(config_content.contains("id: SimpleProject"));
+        assert!(config_content.contains("name: SimpleProject"));
+        assert!(!config_content.contains("project.id"));
         assert!(config_content.contains("issue:"));
         assert!(config_content.contains("states:"));
         assert!(config_content.contains("Todo"));
@@ -266,7 +268,8 @@ mod templates {
         let agile_config_path = temp_dir.join(".tasks").join("AGIL").join("config.yml");
         let agile_config_content = fs::read_to_string(&agile_config_path).unwrap();
         assert!(agile_config_content.contains("project:"));
-        assert!(agile_config_content.contains("id: AgileProject"));
+        assert!(agile_config_content.contains("name: AgileProject"));
+        assert!(!agile_config_content.contains("project.id"));
         assert!(agile_config_content.contains("issue:"));
         assert!(agile_config_content.contains("types:"));
         assert!(agile_config_content.contains("Epic"));

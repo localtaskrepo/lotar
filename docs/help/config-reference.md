@@ -32,7 +32,7 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - auto.branch_infer_type: boolean (default true)
 
 ## Home and Project keys
-Same shape as global; project values override global for that project. Use `project.id` for the project identifier.
+Same shape as global; project values override global for that project. Use `project.name` for an optional human-readable label (the folder name remains the canonical identifier).
 
 > Legacy: older configs may include `issue.categories`. The key is normalized for compatibility but is not consumed by the runtime. Prefer modeling these labels with `custom.fields`.
 
@@ -54,7 +54,7 @@ scan:
 
 # .tasks/DEMO/config.yml (project)
 project:
-	id: DEMO
+	name: Demo Service
 issue:
 	types: [feature, bug, chore]
 scan:

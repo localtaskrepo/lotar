@@ -150,7 +150,7 @@ fn test_config_validate_project_valid() {
     fs::write(
         project_dir.join("config.yml"),
         r#"
-project.id: "Test Project"
+project.name: "Test Project"
 issue.states:
     - Todo
     - InProgress
@@ -179,7 +179,7 @@ default.assignee: "user@example.com"
     assert!(output.status.success());
 
     let stdout = String::from_utf8(output.stdout).unwrap();
-    assert!(stdout.contains("Validating project configuration for 'TEST'"));
+    assert!(stdout.contains("Validating project configuration for 'Test Project (TEST)'"));
     assert!(stdout.contains("✅ All configurations are valid"));
 }
 
@@ -276,7 +276,7 @@ default.priority: Medium
     fs::write(
         project_dir.join("config.yml"),
         r#"
-project.id: "Test Project"
+project.name: "Test Project"
 default.assignee: "user@example.com"
 "#,
     )
@@ -310,7 +310,7 @@ fn test_config_validate_prefix_conflicts() {
     fs::write(
         project_dir.join("config.yml"),
         r#"
-project.id: "Existing Project"
+project.name: "Existing Project"
 "#,
     )
     .unwrap();

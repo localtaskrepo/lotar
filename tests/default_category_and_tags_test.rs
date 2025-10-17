@@ -152,7 +152,7 @@ fn normalize_project_canonical_includes_custom_fields() {
     std::fs::create_dir_all(&proj).unwrap();
     std::fs::write(
         proj.join("config.yml"),
-    "project.id: Test Project\ncustom.fields: [product, component]\nissue.tags: [team, backend]\ndefault.tags: [team]\n",
+    "project.name: Test Project\ncustom.fields: [product, component]\nissue.tags: [team, backend]\ndefault.tags: [team]\n",
     )
     .unwrap();
 

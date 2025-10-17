@@ -8,7 +8,7 @@
       <div class="page-actions">
         <UiSelect v-model="project" class="scope-select">
           <option value="">Global defaults</option>
-          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ p.name }} ({{ p.prefix }})</option>
+          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
   <button class="btn" type="button" @click="handleReload" :disabled="loading">Reload</button>
         <button class="btn secondary" type="button" @click="helpOpen = true">Help</button>
@@ -259,6 +259,7 @@ import UiSelect from '../components/UiSelect.vue'
 import { showToast } from '../components/toast'
 import { useConfigForm } from '../composables/useConfigForm'
 import { useConfigScope } from '../composables/useConfigScope'
+import { formatProjectLabel } from '../utils/projectLabels'
 
 const { projects, project, loading, error: loadError, inspectData, lastLoadedAt, reload } = useConfigScope()
 const saving = ref(false)

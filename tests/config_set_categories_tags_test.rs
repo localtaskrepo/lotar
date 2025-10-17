@@ -98,7 +98,7 @@ fn config_set_project_custom_fields_and_tags() {
     // Create project directory
     let proj_dir = tasks_dir.join("TEST");
     std::fs::create_dir_all(&proj_dir).unwrap();
-    std::fs::write(proj_dir.join("config.yml"), "project.id: Test\n").unwrap();
+    std::fs::write(proj_dir.join("config.yml"), "project.name: Test\n").unwrap();
 
     let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");

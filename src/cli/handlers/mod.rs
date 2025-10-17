@@ -548,16 +548,18 @@ impl AddHandler {
         let read_root = resolver.path.clone();
 
         if let Some(storage) = Storage::try_open(read_root) {
-            let project_name = cli_project.map(|s| s.to_string()).unwrap_or_else(|| {
-                // Extract project from task ID (e.g., "TTF-1" -> "TTF")
-                if let Some(dash_pos) = task_id.find('-') {
-                    task_id[..dash_pos].to_string()
-                } else {
-                    "default".to_string()
-                }
-            });
+            let project_prefix = cli_project
+                .map(|name| resolve_project_input(name, resolver.path.as_path()))
+                .unwrap_or_else(|| {
+                    // Extract project from task ID (e.g., "TTF-1" -> "TTF")
+                    if let Some(dash_pos) = task_id.find('-') {
+                        task_id[..dash_pos].to_string()
+                    } else {
+                        crate::project::get_effective_project_name(resolver)
+                    }
+                });
 
-            if let Some(task) = storage.get(task_id, project_name) {
+            if let Some(task) = storage.get(task_id, project_prefix.clone()) {
                 match renderer.format {
                     OutputFormat::Json => {
                         let response = serde_json::json!({

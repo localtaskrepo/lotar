@@ -3,7 +3,7 @@
     <UiInput v-model="query" placeholder="Search…" />
     <UiSelect v-model="project">
       <option value="">Project</option>
-      <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ p.name }}</option>
+      <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
     </UiSelect>
     <UiSelect v-model="status">
       <option value="">Status</option>
@@ -31,6 +31,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch, watchEffect } from 'vue'
 import { useProjects } from '../composables/useProjects'
+import { formatProjectLabel } from '../utils/projectLabels'
 import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
 import UiSelect from './UiSelect.vue'

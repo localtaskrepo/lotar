@@ -8,11 +8,29 @@ pub struct ProjectService;
 
 impl ProjectService {
     pub fn list(storage: &Storage) -> Vec<ProjectDTO> {
-        crate::utils::filesystem::list_visible_subdirs(&storage.root_path)
+        let tasks_root = &storage.root_path;
+
+        crate::utils::filesystem::list_visible_subdirs(tasks_root)
             .into_iter()
-            .map(|(name, _)| ProjectDTO {
-                prefix: name.clone(),
-                name,
+            .map(|(prefix, _)| {
+                let name = match crate::config::persistence::load_project_config_from_dir(
+                    &prefix, tasks_root,
+                ) {
+                    Ok(cfg) => {
+                        let trimmed = cfg.project_name.trim();
+                        if trimmed.is_empty() {
+                            prefix.clone()
+                        } else {
+                            trimmed.to_string()
+                        }
+                    }
+                    Err(_) => prefix.clone(),
+                };
+
+                ProjectDTO {
+                    prefix: prefix.clone(),
+                    name,
+                }
             })
             .collect()
     }

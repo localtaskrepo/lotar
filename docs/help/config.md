@@ -179,7 +179,7 @@ lotar config init --project=new-service --copy-from=existing-service
 > Legacy note: older configurations may still carry `issue.categories`. The value is normalized for backwards compatibility, but the runtime no longer uses it—model the same information with `custom.fields` instead.
 
 ### Project-Level
-- `project.id` - Project identifier
+- `project.name` - Optional human-readable project name; folder name remains the canonical identifier
 - `issue.states` - Available task statuses
 - `issue.types` - Available task types  
 - `issue.priorities` - Available priorities

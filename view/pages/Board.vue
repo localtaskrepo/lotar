@@ -5,7 +5,7 @@
       <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
         <UiSelect v-model="project" @change="onProjectChange" style="min-width:240px;">
           <option value="">Select project…</option>
-          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ p.prefix }} — {{ p.name }}</option>
+          <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
         <details class="wip-editor">
           <summary class="btn">WIP limits</summary>
@@ -113,6 +113,7 @@ import { useConfig } from '../composables/useConfig'
 import { useProjects } from '../composables/useProjects'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTasks } from '../composables/useTasks'
+import { formatProjectLabel } from '../utils/projectLabels'
 
 const router = useRouter()
 const route = useRoute()

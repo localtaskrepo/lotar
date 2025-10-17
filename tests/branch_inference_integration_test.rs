@@ -104,7 +104,7 @@ issue.tags: [*]
     // Also add a project-specific config to be explicit about allowed types
     let proj_dir = tasks.join("TEST");
     std::fs::create_dir_all(&proj_dir).unwrap();
-    let proj_cfg = r#"project.id: TEST
+    let proj_cfg = r#"project.name: TEST
 issue.types: [Feature]
 "#;
     std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();

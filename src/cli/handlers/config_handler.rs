@@ -361,7 +361,20 @@ impl ConfigHandler {
                 .get_project_config(&project_prefix)
                 .map_err(|e| format!("Failed to load project config: {}", e))?;
 
-            renderer.emit_info(&format!("Configuration for project: {}", project_name));
+            let project_cfg_raw = crate::config::persistence::load_project_config_from_dir(
+                &project_prefix,
+                &effective_read_root,
+            )
+            .ok();
+            let project_label = crate::utils::project::format_project_label(
+                &project_prefix,
+                project_cfg_raw.as_ref().and_then(|cfg| {
+                    let name = cfg.project_name.trim();
+                    if name.is_empty() { None } else { Some(name) }
+                }),
+            );
+
+            renderer.emit_info(&format!("Configuration for project: {}", project_label));
 
             // Project Settings section (no server settings for project config)
             renderer.emit_info("Project Settings:");
@@ -433,11 +446,6 @@ impl ConfigHandler {
                 // If JSON format, emit a structured explanation block
                 if matches!(renderer.format, crate::output::OutputFormat::Json) {
                     // Determine per-field source using project config file presence
-                    let project_cfg_raw = crate::config::persistence::load_project_config_from_dir(
-                        &project_prefix,
-                        &effective_read_root,
-                    )
-                    .ok();
                     let global_cfg =
                         crate::config::persistence::load_global_config(Some(&effective_read_root))
                             .ok();
@@ -476,6 +484,8 @@ impl ConfigHandler {
                         "status": "success",
                         "scope": "project",
                         "project": project_name,
+                        "project_prefix": project_prefix,
+                        "project_label": project_label,
                         "config": resolved_project,
                         "sources": {
                             "default_assignee": src("default_assignee"),
@@ -1004,16 +1014,16 @@ impl ConfigHandler {
                 .and_then(|p| p.file_name())
                 .and_then(|s| s.to_str())
                 .unwrap_or("");
-            // Use the human-readable project name for project.id if provided
-            let project_id = project
+            // Use the human-readable project name for storage metadata if provided
+            let project_name_value = project
                 .as_deref()
                 .or_else(|| config.get("project_name").and_then(|v| v.as_str()))
                 .unwrap_or(prefix);
-            let parsed =
-                crate::config::normalization::parse_project_from_yaml_str(project_id, &tmp_yaml)
-                    .map_err(|e| {
-                        format!("Failed to parse project config for canonicalization: {}", e)
-                    })?;
+            let parsed = crate::config::normalization::parse_project_from_yaml_str(
+                project_name_value,
+                &tmp_yaml,
+            )
+            .map_err(|e| format!("Failed to parse project config for canonicalization: {}", e))?;
             crate::config::normalization::to_canonical_project_yaml(&parsed)
         };
 
@@ -1162,9 +1172,17 @@ impl ConfigHandler {
 
         // Validate project config if requested or available
         if let Some(project_name) = project {
+            let project_display_name = crate::utils::project::project_display_name_from_config(
+                &resolver.path,
+                &project_name,
+            );
+            let project_label = crate::utils::project::format_project_label(
+                &project_name,
+                project_display_name.as_deref(),
+            );
             renderer.emit_info(&format!(
                 "Validating project configuration for '{}'",
-                project_name
+                project_label
             ));
 
             // Load project config directly from file
@@ -1192,7 +1210,7 @@ impl ConfigHandler {
                                 if combined_result.has_errors() || combined_result.has_warnings() {
                                     has_errors |= combined_result.has_errors(); // Only actual errors affect exit code
                                     all_results.push((
-                                        format!("Project Config ({})", project_name),
+                                        format!("Project Config ({})", project_label),
                                         combined_result,
                                     ));
                                 } else {

@@ -154,7 +154,7 @@ branch:
     write_global_with_aliases(&tasks, cfg);
     let proj_dir = tasks.join("TEST");
     std::fs::create_dir_all(&proj_dir).unwrap();
-    let proj_cfg = r#"project.id: TEST
+    let proj_cfg = r#"project.name: TEST
 branch:
   priority_aliases: { feat: Low }
 "#;
