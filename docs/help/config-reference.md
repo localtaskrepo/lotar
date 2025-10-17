@@ -1,6 +1,6 @@
 # Configuration Reference
 
-All configuration keys by scope with types and notes. Canonical YAML uses nested groups.
+All configuration keys by scope with types and notes. Canonical YAML uses nested groups and only emits values that differ from the built-in defaults. If `.tasks/config.yml` contains just a comment, you're still using the defaults listed below.
 
 ## Precedence
 CLI > env > home > project > global > defaults. See [Resolution & Precedence](./precedence.md).
@@ -20,7 +20,7 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - custom.fields: string[]
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
-- scan.enable_ticket_words: boolean (default: true) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
+- scan.enable_ticket_words: boolean (default: false) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
 - scan.enable_mentions: boolean (default: true) — when true, add code anchors under `references` for existing ticket keys found in source
 - scan.strip_attributes: boolean (default: true) — when true, remove inline [key=value] attribute blocks from source after inserting the ticket key
 - auto.identity: boolean (default true)
@@ -30,6 +30,8 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - auto.codeowners_assign: boolean (default true)
 - auto.tags_from_path: boolean (default true)
 - auto.branch_infer_type: boolean (default true)
+- auto.branch_infer_status: boolean (default true)
+- auto.branch_infer_priority: boolean (default true)
 
 ## Home and Project keys
 Same shape as global; project values override global for that project. Use `project.name` for an optional human-readable label (the folder name remains the canonical identifier).

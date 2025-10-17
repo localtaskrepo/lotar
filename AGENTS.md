@@ -4,3 +4,4 @@
 - Always complete a task with running `npm test` and `npm run smoke`.
 - Running smoke tests automatically builds the project, so no need to run `npm build` separately.
 - Never use git to recover lost code. Use the .history folder instead to access previous versions of files.
+- Prefer creating smoke tests instead of manually testing using tmp directories.

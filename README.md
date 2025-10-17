@@ -198,7 +198,7 @@ lotar config init --template=agile --project=myapp
 lotar config set server_port 9000
 lotar config set issue_states TODO,WORKING,REVIEW,DONE --project=myapp
 
-# List available templates (default, agile, kanban, simple)
+# List available templates (default, agile, kanban)
 lotar config templates
 # See also: docs/help/templates.md for details
 ```
@@ -219,10 +219,9 @@ lotar config templates
 - `LOTAR_DEFAULT_ASSIGNEE`: Set default assignee for all tasks
 
 ### Available Templates
-- **simple**: Minimal workflow (TODO/IN_PROGRESS/DONE)
-- **agile**: Full agile workflow with epics, sprints, and stories
-- **kanban**: Continuous flow; uses simple defaults
-- **default**: Basic configuration using global defaults
+- **default**: Basic workflow using global defaults (Todo/InProgress/Done, Feature/Bug/Chore, Low/Medium/High, wildcard tags, and categories)
+- **agile**: Full agile workflow with epics, spikes, sprints, and rich vocabularies
+- **kanban**: Continuous flow with verify gate, feature/bug/epic/chore types, and category custom field
 
 ### Configurable Fields
 **Global Settings:**

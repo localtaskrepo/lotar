@@ -7,7 +7,6 @@ Quick reference for initializing project configuration from built-in templates.
 - default — Basic task management
 - agile — Agile/Scrum workflow (statuses/types tuned for sprints)
 - kanban — Kanban style setup
-- simple — Minimal configuration
 
 List them anytime:
 
@@ -19,7 +18,7 @@ lotar config templates
 
 - Issue vocabularies are plain arrays (no legacy `values:` wrapper)
   - `issue.states`, `issue.types`, `issue.priorities`, `issue.tags`
-  - Some templates also ship `issue.categories` for teams that still label work that way (feel free to remove it if unused)
+  - The default template also includes `issue.categories` to ease migrations; remove or rename if unwanted
 - Custom field hints live under `custom.fields`
   - Agile/Kanban templates still include a `category` custom field for legacy compatibility; rename or drop it if your workflow prefers `product` or other custom properties
 - Optional defaults appear under the `default.*` group when a template needs them
@@ -53,19 +52,17 @@ Initialize a project with the agile template:
 lotar config init --project=backend --template=agile
 ```
 
-A minimal project config produced by the simple template (canonical shape):
+An example canonical project config produced by the default template:
 
 ```yaml
 project:
   name: Demo Service
 issue:
   states: [Todo, InProgress, Done]
-  types: [feature, bug, chore]
+  types: [Feature, Bug, Chore]
   priorities: [Low, Medium, High]
   tags: ["*"]
-# Some templates (for example "default") also include:
-# issue:
-#   categories: ["*"]
+  categories: ["*"]
 # Agile/Kanban add custom field stubs such as:
 # custom:
 #   fields: ["category", "sprint"]

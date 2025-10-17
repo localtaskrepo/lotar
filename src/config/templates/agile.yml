@@ -5,20 +5,28 @@
 name: "Agile"
 description: "Full agile workflow with comprehensive issue types including Epics and Spikes"
 config:
-  project_name: "{{project_name}}"
-  issue_states:
-    - Todo        # Backlog items
-    - InProgress  # Active sprint work
-    - Verify      # Code review/testing phase
-    - Done        # Completed work
-  issue_types:
-    - Epic
-    - Feature
-    - Bug
-    - Spike
-    - Chore
-  tags:
-    - "*"
-  custom.fields:
-    - "category"
-    - "sprint"
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo        # Backlog items
+      - InProgress  # Active sprint work
+      - Verify      # Code review/testing phase
+      - Done        # Completed work
+    types:
+      - Epic
+      - Feature
+      - Bug
+      - Spike
+      - Chore
+    priorities:
+      - Low
+      - Medium
+      - High
+      - Critical
+    tags:
+      - "*"
+  custom:
+    fields:
+      - "category"
+      - "sprint"

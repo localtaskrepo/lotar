@@ -4,8 +4,22 @@
 name: "Default"
 description: "Basic project configuration using global defaults"
 config:
-  project_name: "{{project_name}}"
-  tags:
-    - "*"
-  categories:
-    - "*"
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo
+      - InProgress
+      - Done
+    types:
+      - Feature
+      - Bug
+      - Chore
+    priorities:
+      - Low
+      - Medium
+      - High
+    tags:
+      - "*"
+    categories:
+      - "*"

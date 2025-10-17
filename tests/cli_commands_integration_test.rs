@@ -3164,19 +3164,19 @@ mod file_structure {
             "Global config.yml SHOULD be created by write operations"
         );
 
-        // Verify it's a valid global config with default settings (canonical nested YAML)
+        // Verify it's a valid global config file, even if all values are defaults
         let config_content = fs::read_to_string(&global_config).unwrap();
         assert!(
-            config_content.contains("server:") && config_content.contains("port:"),
-            "Global config should have server.port"
+            config_content.contains("default:\n  project:"),
+            "Global config should record default project prefix"
         );
         assert!(
-            config_content.contains("issue:") && config_content.contains("states:"),
-            "Global config should have issue.states"
+            !config_content.contains("server:"),
+            "Default global config should not redundantly include server section"
         );
         assert!(
-            config_content.contains("default:") && config_content.contains("project:"),
-            "Global config should have default.project setting"
+            !config_content.contains("issue:"),
+            "Default global config should omit issue taxonomy defaults"
         );
     }
 

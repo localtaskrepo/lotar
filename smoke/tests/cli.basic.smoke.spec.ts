@@ -57,4 +57,20 @@ describe.concurrent('CLI smoke harness', () => {
             await workspace.dispose();
         }
     });
+
+    it('writes minimal global config when only defaults are required', async () => {
+        const workspace = await SmokeWorkspace.create();
+
+        try {
+            await workspace.runLotar(['add', 'Defaults Only Smoke Test']);
+
+            const config = await workspace.read('.tasks/config.yml');
+
+            expect(config).toContain('default:\n  project:');
+            expect(config).not.toContain('server:');
+            expect(config).not.toContain('issue:');
+        } finally {
+            await workspace.dispose();
+        }
+    });
 });

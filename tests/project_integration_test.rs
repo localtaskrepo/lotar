@@ -586,7 +586,7 @@ mod integration {
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
-            .arg("--template=simple")
+            .arg("--template=default")
             .arg("--project=WorkflowTest")
             .assert()
             .success();

@@ -5,18 +5,25 @@
 name: "Kanban"
 description: "Continuous flow workflow with assignee requirements"
 config:
-  project_name: "{{project_name}}"
-  issue_states:
-    - Todo        # Backlog
-    - InProgress  # Active work
-    - Verify      # Review/Testing
-    - Done        # Completed
-  issue_types:
-    - Feature
-    - Bug
-    - Epic
-    - Chore
-  tags:
-    - "*"
-  custom.fields:
-    - "category"
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo        # Backlog
+      - InProgress  # Active work
+      - Verify      # Review/Testing
+      - Done        # Completed
+    types:
+      - Feature
+      - Bug
+      - Epic
+      - Chore
+    priorities:
+      - Low
+      - Medium
+      - High
+    tags:
+      - "*"
+  custom:
+    fields:
+      - "category"

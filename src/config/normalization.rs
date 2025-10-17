@@ -485,16 +485,19 @@ pub fn parse_project_from_yaml_str(
 /// Render GlobalConfig into canonical nested YAML form
 pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     use serde_yaml::Value as Y;
+    let defaults = GlobalConfig::default();
     let mut root = serde_yaml::Mapping::new();
 
     // server
-    let mut server = serde_yaml::Mapping::new();
-    server.insert(Y::String("port".into()), Y::Number(cfg.server_port.into()));
-    root.insert(Y::String("server".into()), Y::Mapping(server));
+    if cfg.server_port != defaults.server_port {
+        let mut server = serde_yaml::Mapping::new();
+        server.insert(Y::String("port".into()), Y::Number(cfg.server_port.into()));
+        root.insert(Y::String("server".into()), Y::Mapping(server));
+    }
 
     // default
     let mut default = serde_yaml::Mapping::new();
-    if !cfg.default_prefix.is_empty() {
+    if cfg.default_prefix != defaults.default_prefix && !cfg.default_prefix.is_empty() {
         default.insert(
             Y::String("project".into()),
             Y::String(cfg.default_prefix.clone()),
@@ -512,64 +515,88 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             serde_yaml::to_value(&cfg.default_tags).unwrap_or(Y::Null),
         );
     }
-    default.insert(
-        Y::String("priority".into()),
-        serde_yaml::to_value(&cfg.default_priority).unwrap_or(Y::Null),
-    );
+    if cfg.default_priority != defaults.default_priority {
+        default.insert(
+            Y::String("priority".into()),
+            serde_yaml::to_value(&cfg.default_priority).unwrap_or(Y::Null),
+        );
+    }
     if let Some(v) = &cfg.default_status {
         default.insert(
             Y::String("status".into()),
             serde_yaml::to_value(v).unwrap_or(Y::Null),
         );
     }
-    root.insert(Y::String("default".into()), Y::Mapping(default));
+    if !default.is_empty() {
+        root.insert(Y::String("default".into()), Y::Mapping(default));
+    }
 
     // issue
     let mut issue = serde_yaml::Mapping::new();
-    issue.insert(
-        Y::String("states".into()),
-        serde_yaml::to_value(&cfg.issue_states.values).unwrap_or(Y::Null),
-    );
-    issue.insert(
-        Y::String("types".into()),
-        serde_yaml::to_value(&cfg.issue_types.values).unwrap_or(Y::Null),
-    );
-    issue.insert(
-        Y::String("priorities".into()),
-        serde_yaml::to_value(&cfg.issue_priorities.values).unwrap_or(Y::Null),
-    );
-    root.insert(Y::String("issue".into()), Y::Mapping(issue));
-
-    // tags now live under issue.* in canonical form
-    if let Some(mut imap) = root
-        .get_mut(Y::String("issue".into()))
-        .and_then(|v| v.as_mapping().cloned())
-    {
-        imap.insert(
+    if cfg.issue_states.values != defaults.issue_states.values {
+        issue.insert(
+            Y::String("states".into()),
+            serde_yaml::to_value(&cfg.issue_states.values).unwrap_or(Y::Null),
+        );
+    }
+    if cfg.issue_types.values != defaults.issue_types.values {
+        issue.insert(
+            Y::String("types".into()),
+            serde_yaml::to_value(&cfg.issue_types.values).unwrap_or(Y::Null),
+        );
+    }
+    if cfg.issue_priorities.values != defaults.issue_priorities.values {
+        issue.insert(
+            Y::String("priorities".into()),
+            serde_yaml::to_value(&cfg.issue_priorities.values).unwrap_or(Y::Null),
+        );
+    }
+    if cfg.tags.values != defaults.tags.values {
+        issue.insert(
             Y::String("tags".into()),
             serde_yaml::to_value(&cfg.tags.values).unwrap_or(Y::Null),
         );
-        root.insert(Y::String("issue".into()), Y::Mapping(imap));
+    }
+    if !issue.is_empty() {
+        root.insert(Y::String("issue".into()), Y::Mapping(issue));
     }
 
     // custom
     let mut custom = serde_yaml::Mapping::new();
-    custom.insert(
-        Y::String("fields".into()),
-        serde_yaml::to_value(&cfg.custom_fields.values).unwrap_or(Y::Null),
-    );
-    root.insert(Y::String("custom".into()), Y::Mapping(custom));
+    if cfg.custom_fields.values != defaults.custom_fields.values {
+        custom.insert(
+            Y::String("fields".into()),
+            serde_yaml::to_value(&cfg.custom_fields.values).unwrap_or(Y::Null),
+        );
+    }
+    if !custom.is_empty() {
+        root.insert(Y::String("custom".into()), Y::Mapping(custom));
+    }
 
     // scan
     let mut scan = serde_yaml::Mapping::new();
-    scan.insert(
-        Y::String("signal_words".into()),
-        serde_yaml::to_value(&cfg.scan_signal_words).unwrap_or(Y::Null),
-    );
+    if cfg.scan_signal_words != defaults.scan_signal_words {
+        scan.insert(
+            Y::String("signal_words".into()),
+            serde_yaml::to_value(&cfg.scan_signal_words).unwrap_or(Y::Null),
+        );
+    }
     if let Some(patterns) = crate::config::types::maybe_scan_ticket_patterns(cfg) {
         scan.insert(
             Y::String("ticket_patterns".into()),
             serde_yaml::to_value(patterns).unwrap_or(Y::Null),
+        );
+    }
+    if cfg.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
+        scan.insert(
+            Y::String("enable_ticket_words".into()),
+            Y::Bool(cfg.scan_enable_ticket_words),
+        );
+    }
+    if cfg.scan_enable_mentions != defaults.scan_enable_mentions {
+        scan.insert(
+            Y::String("enable_mentions".into()),
+            Y::Bool(cfg.scan_enable_mentions),
         );
     }
     // include scan.strip_attributes only if false to avoid redundant true defaults
@@ -579,44 +606,66 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             Y::Bool(cfg.scan_strip_attributes),
         );
     }
-    root.insert(Y::String("scan".into()), Y::Mapping(scan));
+    if !scan.is_empty() {
+        root.insert(Y::String("scan".into()), Y::Mapping(scan));
+    }
 
     // auto
     let mut auto = serde_yaml::Mapping::new();
-    auto.insert(Y::String("identity".into()), Y::Bool(cfg.auto_identity));
-    auto.insert(
-        Y::String("identity_git".into()),
-        Y::Bool(cfg.auto_identity_git),
-    );
-    auto.insert(
-        Y::String("set_reporter".into()),
-        Y::Bool(cfg.auto_set_reporter),
-    );
-    auto.insert(
-        Y::String("assign_on_status".into()),
-        Y::Bool(cfg.auto_assign_on_status),
-    );
-    auto.insert(
-        Y::String("codeowners_assign".into()),
-        Y::Bool(cfg.auto_codeowners_assign),
-    );
-    auto.insert(
-        Y::String("tags_from_path".into()),
-        Y::Bool(cfg.auto_tags_from_path),
-    );
-    auto.insert(
-        Y::String("branch_infer_type".into()),
-        Y::Bool(cfg.auto_branch_infer_type),
-    );
-    auto.insert(
-        Y::String("branch_infer_status".into()),
-        Y::Bool(cfg.auto_branch_infer_status),
-    );
-    auto.insert(
-        Y::String("branch_infer_priority".into()),
-        Y::Bool(cfg.auto_branch_infer_priority),
-    );
-    root.insert(Y::String("auto".into()), Y::Mapping(auto));
+    if cfg.auto_identity != defaults.auto_identity {
+        auto.insert(Y::String("identity".into()), Y::Bool(cfg.auto_identity));
+    }
+    if cfg.auto_identity_git != defaults.auto_identity_git {
+        auto.insert(
+            Y::String("identity_git".into()),
+            Y::Bool(cfg.auto_identity_git),
+        );
+    }
+    if cfg.auto_set_reporter != defaults.auto_set_reporter {
+        auto.insert(
+            Y::String("set_reporter".into()),
+            Y::Bool(cfg.auto_set_reporter),
+        );
+    }
+    if cfg.auto_assign_on_status != defaults.auto_assign_on_status {
+        auto.insert(
+            Y::String("assign_on_status".into()),
+            Y::Bool(cfg.auto_assign_on_status),
+        );
+    }
+    if cfg.auto_codeowners_assign != defaults.auto_codeowners_assign {
+        auto.insert(
+            Y::String("codeowners_assign".into()),
+            Y::Bool(cfg.auto_codeowners_assign),
+        );
+    }
+    if cfg.auto_tags_from_path != defaults.auto_tags_from_path {
+        auto.insert(
+            Y::String("tags_from_path".into()),
+            Y::Bool(cfg.auto_tags_from_path),
+        );
+    }
+    if cfg.auto_branch_infer_type != defaults.auto_branch_infer_type {
+        auto.insert(
+            Y::String("branch_infer_type".into()),
+            Y::Bool(cfg.auto_branch_infer_type),
+        );
+    }
+    if cfg.auto_branch_infer_status != defaults.auto_branch_infer_status {
+        auto.insert(
+            Y::String("branch_infer_status".into()),
+            Y::Bool(cfg.auto_branch_infer_status),
+        );
+    }
+    if cfg.auto_branch_infer_priority != defaults.auto_branch_infer_priority {
+        auto.insert(
+            Y::String("branch_infer_priority".into()),
+            Y::Bool(cfg.auto_branch_infer_priority),
+        );
+    }
+    if !auto.is_empty() {
+        root.insert(Y::String("auto".into()), Y::Mapping(auto));
+    }
 
     // branch alias maps (canonical)
     if !cfg.branch_type_aliases.is_empty()
@@ -643,6 +692,11 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             );
         }
         root.insert(Y::String("branch".into()), Y::Mapping(branch));
+    }
+
+    if root.is_empty() {
+        return "# Global configuration uses built-in defaults.\n# See docs/help/config.md for available settings.\n"
+            .to_string();
     }
 
     serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())

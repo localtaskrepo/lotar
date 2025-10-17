@@ -84,7 +84,7 @@ lotar config init --project="Long Project Name" --prefix=LPN --template=kanban
 lotar config init --project=frontend --copy-from=backend --template=agile
 
 # Force overwrite existing configuration
-lotar config init --project=backend --template=simple --force
+lotar config init --project=backend --template=default --force
 
 # Set configuration with validation preview (use dotted canonical keys)
 lotar config set default.priority HIGH --project=backend --dry-run
@@ -141,7 +141,7 @@ Notes:
 ### Canonical YAML shape
 LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to a nested structure with these groups: server, default, issue, custom, scan, auto. Use `lotar config normalize` to rewrite files into this canonical form.
 
-Notes:
+- When a config file only uses built-in defaults the canonical writer produces a short comment instead of redundant YAML. Modify a value (for example `lotar config set server.port 9000 --global`) and rerun `lotar config normalize --write` to emit the corresponding section.
 - Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).
 - Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility. They are normalized, but `issue.categories` is considered legacy and is no longer consumed directly—prefer using `custom.fields` instead.
 - Branch alias maps live under a top-level `branch` section and are merged with project-level overrides.
@@ -210,16 +210,21 @@ Automation (defaults inherited from global):
 - `default.priority` - Default task priority for all projects
 - `default.status` - Default task status for all projects
 - `custom.fields` - Default custom fields for all projects
-Automation:
-- `auto.set_reporter` - Enable auto reporter when missing (default: true)
-- `auto.assign_on_status` - Enable first-change auto-assign (default: true)
-- `auto.identity` - Enable smart identity detection beyond configured default (default: true)
-- `auto.identity_git` - Enable git-based identity detection (default: true)
- - `auto.codeowners_assign` - Prefer CODEOWNERS owner on first status change when task has no assignee (default: true)
- - `auto.tags_from_path` - Derive a tag from monorepo paths like packages/<name> when no tags provided and no defaults exist (default: true)
- - `auto.branch_infer_type` - Infer task type from branch name prefixes like feat/, fix/, chore/ (default: true)
- - `auto.branch_infer_status` - Infer status from `branch.status_aliases` using the first branch token (default: false)
- - `auto.branch_infer_priority` - Infer priority from `branch.priority_aliases` using the first branch token (default: false)
+- `scan.signal_words` - Default scanner keywords (default: `["TODO","FIXME","HACK","BUG","NOTE"]`)
+- `scan.ticket_patterns` - Regex patterns used globally for ticket detection
+- `scan.enable_ticket_words` - Promote task type words (e.g., "Feature") to signal words (default: false)
+- `scan.enable_mentions` - Emit references for existing ticket keys (default: true)
+- `scan.strip_attributes` - Remove inline attribute blocks after insertion (default: true)
+- Automation:
+    - `auto.set_reporter` - Enable auto reporter when missing (default: true)
+    - `auto.assign_on_status` - Enable first-change auto-assign (default: true)
+    - `auto.identity` - Enable smart identity detection beyond configured default (default: true)
+    - `auto.identity_git` - Enable git-based identity detection (default: true)
+    - `auto.codeowners_assign` - Prefer CODEOWNERS owner on first status change when task has no assignee (default: true)
+    - `auto.tags_from_path` - Derive a tag from monorepo paths like packages/<name> when no tags provided and no defaults exist (default: true)
+    - `auto.branch_infer_type` - Infer task type from branch name prefixes like feat/, fix/, chore/ (default: true)
+    - `auto.branch_infer_status` - Infer status from `branch.status_aliases` using the first branch token (default: true)
+    - `auto.branch_infer_priority` - Infer priority from `branch.priority_aliases` using the first branch token (default: true)
 
 Branch alias maps (global- and project-level):
 - `branch.type_aliases` - Map branch tokens to task types. Example: `{ feat: Feature, fix: Bug }`
@@ -257,7 +262,6 @@ branch:
 - `default` - Basic task management
 - `agile` - Agile/Scrum workflow
 - `kanban` - Kanban board style
-- `simple` - Minimal configuration
 
 ## Global Options
 

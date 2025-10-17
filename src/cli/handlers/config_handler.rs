@@ -71,7 +71,6 @@ impl CommandHandler for ConfigHandler {
                 renderer.emit_raw_stdout("  • default - Basic task management setup");
                 renderer.emit_raw_stdout("  • agile - Agile/Scrum workflow configuration");
                 renderer.emit_raw_stdout("  • kanban - Kanban board style setup");
-                renderer.emit_raw_stdout("  • simple - Minimal configuration");
                 renderer.emit_info(
                     "Use 'lotar config init --template=<n>' to initialize with a template.",
                 );
@@ -905,7 +904,6 @@ impl ConfigHandler {
             "default" => include_str!("../../config/templates/default.yml"),
             "agile" => include_str!("../../config/templates/agile.yml"),
             "kanban" => include_str!("../../config/templates/kanban.yml"),
-            "simple" => include_str!("../../config/templates/simple.yml"),
             _ => return Err(format!("Unknown template: {}", template_name)),
         };
 
@@ -934,32 +932,23 @@ impl ConfigHandler {
 
         let mut config = config_section.clone();
 
-        // Transform template format to config format by flattening "values" fields
         if let Some(config_map) = config.as_mapping_mut() {
-            Self::flatten_template_values(config_map);
+            Self::normalize_template_config(config_map);
         }
 
-        // Apply customizations
         if let Some(config_map) = config.as_mapping_mut() {
-            // Set project prefix if provided
-            if let Some(ref prefix) = prefix {
-                config_map.insert(
-                    serde_yaml::Value::String("prefix".to_string()),
-                    serde_yaml::Value::String(prefix.clone()),
-                );
+            if let Some(source_project) = copy_from.as_deref() {
+                Self::merge_config_from_project(config_map, resolver, renderer, source_project)?;
+                // Re-normalize after merge to ensure canonical structure
+                Self::normalize_template_config(config_map);
             }
 
-            // Set project name if provided
-            if let Some(ref project_name) = project {
-                config_map.insert(
-                    serde_yaml::Value::String("project_name".to_string()),
+            if let Some(project_name) = project.as_ref() {
+                Self::set_nested_value(
+                    config_map,
+                    &["project", "name"],
                     serde_yaml::Value::String(project_name.clone()),
                 );
-            }
-
-            // Copy settings from another project if specified
-            if let Some(source_project) = copy_from {
-                Self::merge_config_from_project(config_map, resolver, renderer, &source_project)?;
             }
         }
 
@@ -970,19 +959,21 @@ impl ConfigHandler {
                 .map_err(|e| format!("Failed to create tasks directory: {}", e))?;
             crate::utils::paths::global_config_path(&resolver.path)
         } else {
-            let project_name = project
+            let detected_project_name = Self::extract_project_name(&config);
+            let project_name_owned = project
                 .as_deref()
-                .or_else(|| config.get("project_name").and_then(|v| v.as_str()))
-                .unwrap_or("DEFAULT");
+                .map(|s| s.to_string())
+                .or_else(|| detected_project_name.clone())
+                .unwrap_or_else(|| "DEFAULT".to_string());
 
             // Generate prefix from project name with conflict detection
-            let project_prefix = if let Some(explicit_prefix) = prefix {
+            let project_prefix = if let Some(explicit_prefix) = &prefix {
                 // User provided explicit prefix, validate it doesn't conflict
-                validate_explicit_prefix(&explicit_prefix, project_name, &resolver.path)?;
-                explicit_prefix
+                validate_explicit_prefix(explicit_prefix, &project_name_owned, &resolver.path)?;
+                explicit_prefix.clone()
             } else {
                 // Generate prefix with conflict detection
-                generate_unique_project_prefix(project_name, &resolver.path)?
+                generate_unique_project_prefix(&project_name_owned, &resolver.path)?
             };
 
             let project_dir = crate::utils::paths::project_dir(&resolver.path, &project_prefix);
@@ -1006,6 +997,7 @@ impl ConfigHandler {
             // Global config
             let parsed = crate::config::normalization::parse_global_from_yaml_str(&tmp_yaml)
                 .map_err(|e| format!("Failed to parse config for canonicalization: {}", e))?;
+            Self::validate_generated_global_config(resolver, renderer, &parsed)?;
             crate::config::normalization::to_canonical_global_yaml(&parsed)
         } else {
             // Project config; derive prefix from parent dir name
@@ -1015,15 +1007,17 @@ impl ConfigHandler {
                 .and_then(|s| s.to_str())
                 .unwrap_or("");
             // Use the human-readable project name for storage metadata if provided
+            let detected_project_name = Self::extract_project_name(&config);
             let project_name_value = project
                 .as_deref()
-                .or_else(|| config.get("project_name").and_then(|v| v.as_str()))
+                .or(detected_project_name.as_deref())
                 .unwrap_or(prefix);
             let parsed = crate::config::normalization::parse_project_from_yaml_str(
                 project_name_value,
                 &tmp_yaml,
             )
             .map_err(|e| format!("Failed to parse project config for canonicalization: {}", e))?;
+            Self::validate_generated_project_config(resolver, renderer, &parsed)?;
             crate::config::normalization::to_canonical_project_yaml(&parsed)
         };
 
@@ -1061,11 +1055,12 @@ impl ConfigHandler {
             .map_err(|e| format!("Failed to parse source config: {}", e))?;
 
         if let Some(source_map) = source_config.as_mapping() {
-            // Copy relevant fields (excluding project_name which should be unique)
+            // Copy relevant fields (excluding identity-specific keys like project name/prefix)
             for (key, value) in source_map {
                 if let Some(key_str) = key.as_str()
                     && key_str != "project_name"
                     && key_str != "prefix"
+                    && key_str != "project"
                 {
                     target_config.insert(key.clone(), value.clone());
                 }
@@ -1079,54 +1074,155 @@ impl ConfigHandler {
         Ok(())
     }
 
-    /// Flatten template "values" structure to direct arrays for config fields
-    fn flatten_template_values(config_map: &mut serde_yaml::Mapping) {
-        let fields_to_flatten = vec![
-            "issue_states",
-            "issue_types",
-            "issue_priorities",
-            "categories",
-            "tags",
-            "custom_fields",
-        ];
+    fn normalize_template_config(config_map: &mut serde_yaml::Mapping) {
+        use serde_yaml::Value as Y;
 
-        for field_name in fields_to_flatten {
-            let field_key = serde_yaml::Value::String(field_name.to_string());
-            if let Some(field_value) = config_map.get_mut(&field_key) {
-                if let Some(field_map) = field_value.as_mapping() {
-                    if let Some(values) =
-                        field_map.get(serde_yaml::Value::String("values".to_string()))
-                    {
-                        // Replace the nested structure with just the values array
-                        *field_value = values.clone();
+        if let Some(project_name_value) = config_map.remove(Y::String("project_name".into())) {
+            Self::set_nested_value(config_map, &["project", "name"], project_name_value);
+        }
+
+        // "prefix" is only used for CLI arguments; canonical templates shouldn't store it
+        config_map.remove(Y::String("prefix".into()));
+
+        if let Some(value) = config_map.remove(Y::String("issue_states".into())) {
+            let normalized = Self::unwrap_template_values(value);
+            Self::set_nested_value(config_map, &["issue", "states"], normalized);
+        }
+        if let Some(value) = config_map.remove(Y::String("issue_types".into())) {
+            let normalized = Self::unwrap_template_values(value);
+            Self::set_nested_value(config_map, &["issue", "types"], normalized);
+        }
+        if let Some(value) = config_map.remove(Y::String("issue_priorities".into())) {
+            let normalized = Self::unwrap_template_values(value);
+            Self::set_nested_value(config_map, &["issue", "priorities"], normalized);
+        }
+        if let Some(value) = config_map.remove(Y::String("tags".into())) {
+            let normalized = Self::unwrap_template_values(value);
+            Self::set_nested_value(config_map, &["issue", "tags"], normalized);
+        }
+        if let Some(value) = config_map.remove(Y::String("categories".into())) {
+            let normalized = Self::unwrap_template_values(value);
+            Self::set_nested_value(config_map, &["issue", "categories"], normalized);
+        }
+        if let Some(value) = config_map.remove(Y::String("custom_fields".into())) {
+            let normalized = Self::unwrap_template_values(value);
+            Self::set_nested_value(config_map, &["custom", "fields"], normalized);
+        }
+    }
+
+    fn unwrap_template_values(value: serde_yaml::Value) -> serde_yaml::Value {
+        use serde_yaml::Value as Y;
+        match value {
+            Y::Mapping(mut map) => {
+                let values_key = Y::String("values".into());
+                if let Some(inner) = map.remove(&values_key) {
+                    return inner;
+                }
+                let primitive_key = Y::String("primitive".into());
+                if let Some(inner) = map.remove(&primitive_key) {
+                    return inner;
+                }
+                Y::Mapping(map)
+            }
+            other => other,
+        }
+    }
+
+    fn set_nested_value(map: &mut serde_yaml::Mapping, path: &[&str], value: serde_yaml::Value) {
+        use serde_yaml::Value as Y;
+
+        if path.is_empty() {
+            return;
+        }
+
+        let key = Y::String(path[0].to_string());
+        if path.len() == 1 {
+            map.insert(key, value);
+            return;
+        }
+
+        let mut child = match map.remove(&key) {
+            Some(Y::Mapping(existing)) => existing,
+            _ => serde_yaml::Mapping::new(),
+        };
+
+        Self::set_nested_value(&mut child, &path[1..], value);
+        map.insert(key, Y::Mapping(child));
+    }
+
+    fn extract_project_name(config: &serde_yaml::Value) -> Option<String> {
+        use serde_yaml::Value as Y;
+
+        let map = config.as_mapping()?;
+        if let Some(project_value) = map.get(Y::String("project".into())) {
+            if let Some(project_map) = project_value.as_mapping() {
+                if let Some(name_value) = project_map.get(Y::String("name".into())) {
+                    if let Some(name_str) = name_value.as_str() {
+                        let trimmed = name_str.trim();
+                        if trimmed.is_empty() || trimmed.contains("{{") {
+                            return None;
+                        }
+                        return Some(trimmed.to_string());
                     }
                 }
             }
         }
 
-        // Rename flat keys to dotted keys expected by canonical parser
-        // Collect changes to avoid mutating while iterating
-        let mut renames: Vec<(serde_yaml::Value, serde_yaml::Value)> = Vec::new();
-        for key in [
-            ("issue_states", "issue.states"),
-            ("issue_types", "issue.types"),
-            ("issue_priorities", "issue.priorities"),
-            ("categories", "issue.categories"),
-            ("tags", "issue.tags"),
-            ("custom_fields", "custom.fields"),
-        ] {
-            let from = serde_yaml::Value::String(key.0.to_string());
-            if let Some(val) = config_map.get(&from).cloned() {
-                let to = serde_yaml::Value::String(key.1.to_string());
-                renames.push((from, to.clone()));
-                // Preserve value under new key
-                config_map.insert(to.clone(), val);
+        if let Some(legacy_name) = map.get(Y::String("project_name".into())) {
+            if let Some(name_str) = legacy_name.as_str() {
+                let trimmed = name_str.trim();
+                if trimmed.is_empty() || trimmed.contains("{{") {
+                    return None;
+                }
+                return Some(trimmed.to_string());
             }
         }
-        // Remove old flat keys
-        for (from, _) in renames {
-            config_map.remove(&from);
+
+        None
+    }
+
+    fn validate_generated_project_config(
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+        config: &crate::config::types::ProjectConfig,
+    ) -> Result<(), String> {
+        let validator = crate::config::validation::ConfigValidator::new(&resolver.path);
+        let result = validator.validate_project_config(config);
+
+        for warning in &result.warnings {
+            renderer.emit_warning(&warning.to_string());
         }
+
+        if result.has_errors() {
+            for error in &result.errors {
+                renderer.emit_error(&error.to_string());
+            }
+            return Err("Generated project configuration failed validation".to_string());
+        }
+
+        Ok(())
+    }
+
+    fn validate_generated_global_config(
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+        config: &crate::config::types::GlobalConfig,
+    ) -> Result<(), String> {
+        let validator = crate::config::validation::ConfigValidator::new(&resolver.path);
+        let result = validator.validate_global_config(config);
+
+        for warning in &result.warnings {
+            renderer.emit_warning(&warning.to_string());
+        }
+
+        if result.has_errors() {
+            for error in &result.errors {
+                renderer.emit_error(&error.to_string());
+            }
+            return Err("Generated global configuration failed validation".to_string());
+        }
+
+        Ok(())
     }
 
     fn handle_config_validate(

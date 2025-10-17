@@ -70,9 +70,19 @@ mod global_config {
         // Verify the config content doesn't contain null values
         let config_content = fs::read_to_string(&global_config_path).unwrap();
         assert!(!config_content.contains("null"));
-        // Canonical nested YAML output
-        assert!(config_content.contains("server:"));
-        assert!(config_content.contains("port: 8080"));
+        // Defaults should collapse to minimal YAML without redundant sections
+        assert!(
+            config_content.contains("default:\n  project:"),
+            "Default global config should record project prefix"
+        );
+        assert!(
+            !config_content.contains("server:"),
+            "Default global config should omit server section"
+        );
+        assert!(
+            !config_content.contains("issue:"),
+            "Default global config should omit issue taxonomy"
+        );
     }
 
     #[test]
@@ -232,16 +242,16 @@ mod templates {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
 
-        // Test simple template
+        // Test default template
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
-            .arg("--template=simple")
+            .arg("--template=default")
             .arg("--project=SimpleProject")
             .assert()
             .success()
-            .stdout(predicate::str::contains("template 'simple'"));
+            .stdout(predicate::str::contains("template 'default'"));
 
         let config_path = temp_dir.join(".tasks").join("SIMP").join("config.yml");
         let config_content = fs::read_to_string(&config_path).unwrap();
@@ -291,7 +301,6 @@ mod templates {
                 "Available Configuration Templates:",
             ))
             .stdout(predicate::str::contains("default"))
-            .stdout(predicate::str::contains("simple"))
             .stdout(predicate::str::contains("agile"))
             .stdout(predicate::str::contains("kanban"));
     }
@@ -375,7 +384,7 @@ mod config_operations {
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
-            .arg("--template=simple")
+            .arg("--template=default")
             .arg("--project=ShowTest")
             .assert()
             .success();

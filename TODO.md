@@ -25,10 +25,7 @@ Chores:
 - Check if any of the auto features are applied to MPC as well.
 - Config validation may need an update
 - Add option to add project in config page
-
-Bugs:
-- The global configs file saves a lot of values that are defaults on project creation.
-- In general we should only save values (in all files) that are not defaults, or explicitely set through either a parameter or an input in the UI. Otherwise UI components should show what the defaults are when empty.
+- Add option to print effective config (after resolution & precedence) to CLI and to see it in the UI
 
 # Implementation Roadmap
 
