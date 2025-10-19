@@ -76,5 +76,6 @@ export function useConfigScope() {
         inspectData,
         lastLoadedAt,
         reload,
+        refreshProjects,
     }
 }

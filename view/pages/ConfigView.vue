@@ -10,7 +10,8 @@
           <option value="">Global defaults</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
-  <button class="btn" type="button" @click="handleReload" :disabled="loading">Reload</button>
+        <button class="btn" type="button" @click="openCreateDialog" :disabled="loading">New project</button>
+        <button class="btn" type="button" @click="handleReload" :disabled="loading">Reload</button>
         <button class="btn secondary" type="button" @click="helpOpen = true">Help</button>
       </div>
     </header>
@@ -221,6 +222,55 @@
 
     </div>
 
+    <div v-if="createOpen" class="dialog-backdrop" @click.self="closeCreateDialog">
+      <div class="dialog-card card" role="dialog" aria-modal="true">
+        <header class="dialog-header">
+          <div>
+            <h2>Create a project</h2>
+            <p class="muted">New projects inherit the global defaults shown below.</p>
+          </div>
+          <button class="btn secondary" type="button" @click="closeCreateDialog" :disabled="creatingProject">Cancel</button>
+        </header>
+        <form class="dialog-form" @submit.prevent="submitCreateProject">
+          <div class="field-grid">
+            <div class="field">
+              <label class="field-label">Project name</label>
+              <UiInput v-model="createName" maxlength="100" placeholder="Marketing website" />
+              <p v-if="createErrors.name" class="field-error">{{ createErrors.name }}</p>
+            </div>
+            <div class="field">
+              <label class="field-label">Project prefix</label>
+              <UiInput :modelValue="createPrefix" maxlength="20" @update:modelValue="handleCreatePrefixInput" placeholder="AUTO" />
+              <p class="field-hint">Uppercase letters, numbers, hyphen or underscore.</p>
+              <p v-if="createErrors.prefix" class="field-error">{{ createErrors.prefix }}</p>
+            </div>
+          </div>
+
+          <div v-if="createError" class="alert alert-error">{{ createError }}</div>
+
+          <section class="defaults-preview">
+            <h3>Inherited defaults</h3>
+            <p class="muted">These values will apply until you add project-specific overrides.</p>
+            <div class="defaults-grid">
+              <article v-for="section in defaultPreviewSections" :key="section.title" class="defaults-section">
+                <h4>{{ section.title }}</h4>
+                <ul>
+                  <li v-for="item in section.items" :key="item.label">
+                    <strong>{{ item.label }}:</strong> {{ item.value }}
+                  </li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <footer class="dialog-actions">
+            <button class="btn secondary" type="button" @click="closeCreateDialog" :disabled="creatingProject">Cancel</button>
+            <button class="btn" type="submit" :disabled="createDisabled">{{ creatingProject ? 'Creating…' : 'Create project' }}</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
     <div v-if="helpOpen" class="help-backdrop" @click.self="helpOpen = false">
       <div class="help-card card" role="dialog" aria-modal="true">
         <header class="help-header">
@@ -244,7 +294,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
 import ConfigBranchAliasSection from '../components/ConfigBranchAliasSection.vue'
@@ -260,12 +310,117 @@ import { showToast } from '../components/toast'
 import { useConfigForm } from '../composables/useConfigForm'
 import { useConfigScope } from '../composables/useConfigScope'
 import { formatProjectLabel } from '../utils/projectLabels'
+import { detectPrefixConflict, normalizePrefixInput, suggestUniquePrefix, validateProjectName, validateProjectPrefix } from '../utils/projectPrefix'
 
-const { projects, project, loading, error: loadError, inspectData, lastLoadedAt, reload } = useConfigScope()
+const { projects, project, loading, error: loadError, inspectData, lastLoadedAt, reload, refreshProjects } = useConfigScope()
 const saving = ref(false)
 const helpOpen = ref(false)
 const saveError = ref<string | null>(null)
 const error = computed(() => saveError.value ?? loadError.value)
+
+const createOpen = ref(false)
+const creatingProject = ref(false)
+const createName = ref('')
+const createPrefix = ref('')
+const createError = ref<string | null>(null)
+const createErrors = reactive<{ name: string | null; prefix: string | null }>({ name: null, prefix: null })
+const prefixEdited = ref(false)
+
+const trimmedCreateName = computed(() => createName.value.trim())
+const normalizedCreatePrefix = computed(() => normalizePrefixInput(createPrefix.value))
+
+watch(normalizedCreatePrefix, (value) => {
+  if (createPrefix.value !== value) {
+    createPrefix.value = value
+  }
+})
+
+function resetCreateDialog() {
+  createName.value = ''
+  createPrefix.value = ''
+  createErrors.name = null
+  createErrors.prefix = null
+  createError.value = null
+  prefixEdited.value = false
+}
+
+function openCreateDialog() {
+  resetCreateDialog()
+  const defaultPrefix = inspectData.value?.global_effective?.default_prefix ?? ''
+  if (defaultPrefix) {
+    createPrefix.value = normalizePrefixInput(defaultPrefix)
+  }
+  createOpen.value = true
+}
+
+function closeCreateDialog() {
+  if (creatingProject.value) return
+  createOpen.value = false
+  resetCreateDialog()
+}
+
+function handleCreatePrefixInput(value: string) {
+  const normalized = normalizePrefixInput(value)
+  if (normalized !== createPrefix.value) {
+    createPrefix.value = normalized
+  }
+  prefixEdited.value = true
+  createErrors.prefix = null
+}
+
+watch(createName, (value) => {
+  if (!createOpen.value) return
+  createErrors.name = null
+  if (prefixEdited.value) return
+  const trimmed = value.trim()
+  if (!trimmed) {
+    createPrefix.value = ''
+    createErrors.prefix = null
+    return
+  }
+  createPrefix.value = suggestUniquePrefix(trimmed, projects.value)
+  createErrors.prefix = null
+})
+
+const createDisabled = computed(() => {
+  if (creatingProject.value) return true
+  if (!trimmedCreateName.value) return true
+  if (!normalizedCreatePrefix.value) return true
+  if (createErrors.name || createErrors.prefix) return true
+  return false
+})
+
+async function submitCreateProject() {
+  createError.value = null
+  const nameError = validateProjectName(trimmedCreateName.value, projects.value)
+  createErrors.name = nameError
+
+  const prefixValue = normalizedCreatePrefix.value
+  let prefixError = validateProjectPrefix(prefixValue)
+  if (!prefixError) {
+    prefixError = detectPrefixConflict(prefixValue, projects.value)
+  }
+  createErrors.prefix = prefixError
+
+  if (createErrors.name || createErrors.prefix) {
+    return
+  }
+
+  creatingProject.value = true
+  try {
+    const created = await api.createProject({ name: trimmedCreateName.value, prefix: prefixValue })
+    showToast(`Created project ${created.name}`)
+    createOpen.value = false
+    resetCreateDialog()
+    await refreshProjects()
+    project.value = created.prefix
+    await reload(created.prefix)
+  } catch (err: any) {
+    createError.value = err?.message ?? String(err)
+  } finally {
+    creatingProject.value = false
+  }
+}
 
 const {
   form,
@@ -306,6 +461,85 @@ const {
   resetForm,
   buildPayload,
 } = useConfigForm({ project, projects, inspectData, saving })
+
+function formatValue(value: string | null | undefined): string {
+  if (value === undefined || value === null) return '—'
+  const trimmed = String(value).trim()
+  return trimmed.length ? trimmed : '—'
+}
+
+function formatList(values: string[] | null | undefined): string {
+  if (!values || values.length === 0) return '—'
+  if (values.includes('*')) return 'All (*)'
+  if (values.length > 6) {
+    const preview = values.slice(0, 6).join(', ')
+    const remaining = values.length - 6
+    return `${preview}, +${remaining} more`
+  }
+  return values.join(', ')
+}
+
+function formatBool(value: boolean | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  return value ? 'Enabled' : 'Disabled'
+}
+
+const defaultPreviewSections = computed(() => {
+  const global = inspectData.value?.global_effective
+  if (!global) return [] as Array<{ title: string; items: Array<{ label: string; value: string }> }>
+  const aliasCounts = {
+    type: Object.keys(global.branch_type_aliases ?? {}).length,
+    status: Object.keys(global.branch_status_aliases ?? {}).length,
+    priority: Object.keys(global.branch_priority_aliases ?? {}).length,
+  }
+  const aliasTotal = aliasCounts.type + aliasCounts.status + aliasCounts.priority
+
+  return [
+    {
+      title: 'Workflow defaults',
+      items: [
+        { label: 'Project prefix', value: formatValue(global.default_prefix) },
+        { label: 'Default priority', value: formatValue(global.default_priority) },
+        { label: 'Default status', value: formatValue(global.default_status) },
+      ],
+    },
+    {
+      title: 'People & taxonomy',
+      items: [
+        { label: 'Default reporter', value: formatValue(global.default_reporter) },
+        { label: 'Default assignee', value: formatValue(global.default_assignee) },
+        { label: 'Default tags', value: formatList(global.default_tags) },
+        { label: 'Custom fields', value: formatList(global.custom_fields) },
+      ],
+    },
+    {
+      title: 'Workflow pools',
+      items: [
+        { label: 'Issue states', value: formatList(global.issue_states) },
+        { label: 'Issue types', value: formatList(global.issue_types) },
+        { label: 'Issue priorities', value: formatList(global.issue_priorities) },
+      ],
+    },
+    {
+      title: 'Automation',
+      items: [
+        { label: 'Auto set reporter', value: formatBool(global.auto_set_reporter) },
+        { label: 'Auto assign on status', value: formatBool(global.auto_assign_on_status) },
+        { label: 'Auto codeowners assign', value: formatBool(global.auto_codeowners_assign) },
+        { label: 'Auto tags from path', value: formatBool(global.auto_tags_from_path) },
+      ],
+    },
+    {
+      title: 'Scanning & aliases',
+      items: [
+        { label: 'Scan signal words', value: formatList(global.scan_signal_words) },
+        { label: 'Mentions detection', value: formatBool(global.scan_enable_mentions) },
+        { label: 'Strip attributes', value: formatBool(global.scan_strip_attributes) },
+        { label: 'Branch aliases', value: `${aliasTotal} total mappings` },
+      ],
+    },
+  ]
+})
 
 const helpSections = [
   {
@@ -588,6 +822,87 @@ watch(
 .form-actions__meta {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.65);
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 64px 16px;
+  z-index: 1300;
+}
+
+.dialog-card {
+  width: min(720px, 100%);
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.defaults-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  background: color-mix(in oklab, var(--color-surface) 92%, transparent);
+}
+
+.defaults-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.defaults-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.defaults-section h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.defaults-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.defaults-section strong {
+  font-weight: 600;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .help-backdrop {

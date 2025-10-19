@@ -1,7 +1,9 @@
+use crate::api_types::ProjectDTO;
 use crate::config::manager::ConfigManager;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
+use std::collections::BTreeMap;
 
 pub struct ConfigService;
 
@@ -397,6 +399,83 @@ impl ConfigService {
             "project_exists": project_exists,
             "project_raw": project_raw_val,
         }))
+    }
+
+    /// Create a new project configuration with optional overrides.
+    pub fn create_project(
+        resolver: &TasksDirectoryResolver,
+        name: &str,
+        explicit_prefix: Option<&str>,
+        values: Option<&BTreeMap<String, String>>,
+    ) -> LoTaRResult<ProjectDTO> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Project name is required".to_string(),
+            ));
+        }
+
+        let tasks_dir = &resolver.path;
+
+        // Ensure the project name does not collide with existing prefixes or names.
+        for (prefix, _) in crate::utils::filesystem::list_visible_subdirs(tasks_dir) {
+            if prefix.eq_ignore_ascii_case(trimmed) {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Project name '{}' conflicts with existing prefix '{}'. Choose a different name.",
+                    trimmed, prefix
+                )));
+            }
+
+            if let Ok(cfg) =
+                crate::config::persistence::load_project_config_from_dir(&prefix, tasks_dir)
+            {
+                if cfg.project_name.eq_ignore_ascii_case(trimmed) {
+                    return Err(LoTaRError::ValidationError(format!(
+                        "Project '{}' already exists.",
+                        cfg.project_name
+                    )));
+                }
+            }
+        }
+
+        let prefix = if let Some(raw) = explicit_prefix {
+            let normalized = raw.trim().to_uppercase();
+            if normalized.is_empty() {
+                return Err(LoTaRError::ValidationError(
+                    "Project prefix cannot be empty".into(),
+                ));
+            }
+            crate::config::operations::validate_field_value("default_prefix", &normalized)
+                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+            crate::utils::project::validate_explicit_prefix(
+                &normalized,
+                trimmed,
+                tasks_dir.as_path(),
+            )
+            .map_err(LoTaRError::ValidationError)?;
+            normalized
+        } else {
+            crate::utils::project::generate_unique_project_prefix(trimmed, tasks_dir.as_path())
+                .map_err(LoTaRError::ValidationError)?
+        };
+
+        let project_dir = crate::utils::paths::project_dir(tasks_dir, &prefix);
+        if project_dir.exists() {
+            return Err(LoTaRError::ValidationError(format!(
+                "Project prefix '{}' already exists.",
+                prefix
+            )));
+        }
+
+        let mut updates = values.cloned().unwrap_or_default();
+        updates.insert("project_name".to_string(), trimmed.to_string());
+
+        Self::set(resolver, &updates, false, Some(&prefix))?;
+
+        Ok(ProjectDTO {
+            name: trimmed.to_string(),
+            prefix,
+        })
     }
 
     /// Set one or more fields with validation; returns true if updated

@@ -769,6 +769,57 @@ pub fn initialize(api_server: &mut ApiServer) {
         }
     });
 
+    // POST /api/projects/create
+    api_server.register_handler("POST", "/api/projects/create", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let name = body
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default();
+        if name.is_empty() {
+            return bad_request("Project name is required".into());
+        }
+
+        let prefix = body
+            .get("prefix")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        let values_map = body.get("values").and_then(|v| v.as_object()).map(|obj| {
+            let mut map = std::collections::BTreeMap::new();
+            for (k, v) in obj {
+                let value = v
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| v.to_string());
+                map.insert(k.clone(), value);
+            }
+            map
+        });
+
+        match ConfigService::create_project(
+            &resolver,
+            &name,
+            prefix.as_deref(),
+            values_map.as_ref(),
+        ) {
+            Ok(project) => {
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_config_updated(actor.as_deref());
+                ok_json(201, json!({"data": project}))
+            }
+            Err(e) => bad_request(e.to_string()),
+        }
+    });
+
     // GET /api/projects/list
     api_server.register_handler("GET", "/api/projects/list", |_req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {

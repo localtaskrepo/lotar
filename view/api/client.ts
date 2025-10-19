@@ -2,6 +2,7 @@ import type {
   ActivityFeedItem,
   ApiEnvelope,
   ConfigInspectResult,
+  ProjectCreateRequest,
   ProjectDTO,
   ProjectStatsDTO,
   ReferenceSnippet,
@@ -69,6 +70,7 @@ export const api = {
 
   // Projects
   listProjects(): Promise<ProjectDTO[]> { return get('/api/projects/list') },
+  createProject(payload: ProjectCreateRequest): Promise<ProjectDTO> { return post('/api/projects/create', payload) },
   projectStats(project: string): Promise<ProjectStatsDTO> { return get('/api/projects/stats', { project }) },
 
   // Config

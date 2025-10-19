@@ -24,7 +24,6 @@ Chores:
 - Test release workflow
 - Check if any of the auto features are applied to MPC as well.
 - Config validation may need an update
-- Add option to add project in config page
 
 # Implementation Roadmap
 

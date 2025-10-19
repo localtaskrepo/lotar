@@ -135,6 +135,11 @@ export interface TaskListFilter {
 }
 
 export interface ProjectDTO { name: string; prefix: string }
+export interface ProjectCreateRequest {
+  name: string
+  prefix?: string
+  values?: Record<string, string>
+}
 export interface ProjectStatsDTO {
   name: string
   open_count: number
