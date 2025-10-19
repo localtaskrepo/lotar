@@ -38,6 +38,10 @@ export async function initGitRepository(
     await runGitCommand(cwd, ['config', 'user.name', name], options);
     await runGitCommand(cwd, ['config', 'user.email', email], options);
 
+    // Ensure smoke repositories don't inherit host commit-signing requirements.
+    await runGitCommand(cwd, ['config', 'commit.gpgsign', 'false'], options);
+    await runGitCommand(cwd, ['config', 'tag.gpgSign', 'false'], options);
+
     await runGitCommand(cwd, ['add', '.'], options);
 
     const hasCommit = await runGitCommand(cwd, ['rev-parse', '--verify', 'HEAD'], {

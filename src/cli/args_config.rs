@@ -19,6 +19,14 @@ pub struct ConfigShowArgs {
     /// Show project-specific configuration
     #[arg(long)]
     pub project: Option<String>,
+
+    /// Explain where each value comes from (env, home, global, project, default)
+    #[arg(long)]
+    pub explain: bool,
+
+    /// Print the complete effective configuration in canonical YAML (or JSON when requested)
+    #[arg(long)]
+    pub full: bool,
 }
 
 #[derive(Args)]

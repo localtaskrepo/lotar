@@ -14,11 +14,12 @@ lotar config <ACTION> [OPTIONS]
 Display current configuration.
 
 ```bash
-lotar config show [--project=PROJECT] [--explain]
+lotar config show [--project=PROJECT] [--explain] [--full]
 ```
 Options:
 - `--explain` — Annotate where values come from (env, home, global, project, default).
  - When `--format=json` is used, an additional structured explanation object is emitted with a `sources` map per key.
+- `--full` — Emit the entire effective configuration (canonical YAML by default, JSON payload when `--format=json`).
 
 ### init
 Initialize project configuration from template with advanced options.
@@ -67,6 +68,9 @@ lotar config show
 
 # Show project-specific configuration
 lotar config show --project=backend
+
+# Show the full effective configuration in canonical YAML
+lotar config show --full
 
 # Show configuration with custom tasks directory
 lotar config show --tasks-dir=/custom/path

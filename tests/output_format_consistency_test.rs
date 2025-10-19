@@ -320,10 +320,11 @@ fn test_config_show_all_formats() {
                             !output.trim().is_empty(),
                             "Table format should not be empty"
                         );
+                        let lower = output.to_ascii_lowercase();
                         assert!(
-                            output.contains("Configuration")
-                                || output.contains("Settings")
-                                || output.contains("Project"),
+                            lower.contains("configuration")
+                                || lower.contains("settings")
+                                || lower.contains("project"),
                             "Table format should contain configuration information: {output}"
                         );
                     }

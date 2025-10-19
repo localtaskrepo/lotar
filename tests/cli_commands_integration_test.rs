@@ -311,7 +311,10 @@ mod output_formatting {
             String::from_utf8_lossy(&show_output.stderr)
         );
         let show_stdout = String::from_utf8_lossy(&show_output.stdout);
-        assert!(show_stdout.contains("Configuration for project: EXM"));
+        assert!(
+            show_stdout.contains("Project configuration (EXM) – canonical YAML:"),
+            "project config show should include canonical heading\n{show_stdout}"
+        );
 
         // Config validate should also show prefix-only label
         let validate_output = Command::cargo_bin("lotar")

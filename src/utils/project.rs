@@ -232,6 +232,8 @@ pub fn format_project_label(prefix: &str, display_name: Option<&str>) -> String 
     if !trimmed_name.is_empty() {
         if trimmed_prefix.is_empty() {
             trimmed_name.to_string()
+        } else if trimmed_name.eq_ignore_ascii_case(trimmed_prefix) {
+            trimmed_prefix.to_string()
         } else {
             format!("{} ({})", trimmed_name, trimmed_prefix)
         }

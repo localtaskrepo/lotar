@@ -211,7 +211,7 @@ mod environment_variable_consistency {
             assert!(
                 output_str
                     .lines()
-                    .any(|line| line.trim().starts_with("Tasks directory:")
+                    .any(|line| line.contains("Tasks directory:")
                         && line.contains(&*env_tasks_dir.to_string_lossy())),
                 "Config should show environment-specified tasks directory"
             );
@@ -407,8 +407,7 @@ mod environment_variable_consistency {
             assert!(
                 output_str
                     .lines()
-                    .any(|line| line.trim().starts_with("Tasks directory:")
-                        && line.contains("rel_tasks")),
+                    .any(|line| line.contains("Tasks directory:") && line.contains("rel_tasks")),
                 "Config should show resolved path containing rel_tasks: {output_str}"
             );
 

@@ -9,16 +9,28 @@ use crate::utils::project::resolve_project_input;
 use crate::utils::project::validate_explicit_prefix;
 use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
-use std::fmt::Display;
+use std::collections::HashMap;
 use std::fs;
+use std::io::IsTerminal;
 
-fn format_value_list<T: Display>(values: &[T]) -> String {
-    let joined = values
-        .iter()
-        .map(|v| v.to_string())
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!("[{}]", joined)
+struct YamlRenderOptions<'a> {
+    include_defaults: bool,
+    include_comments: bool,
+    colorize_comments: bool,
+    allowed_sources: Option<&'a [&'a str]>,
+}
+
+impl<'a> YamlRenderOptions<'a> {
+    fn allows(&self, source: Option<&String>) -> bool {
+        let label = source.map(|s| s.as_str()).unwrap_or("default");
+        if !self.include_defaults && label == "default" {
+            return false;
+        }
+        if let Some(allowed) = self.allowed_sources {
+            return allowed.contains(&label);
+        }
+        true
+    }
 }
 
 /// Handler for config commands
@@ -35,9 +47,11 @@ impl CommandHandler for ConfigHandler {
         renderer: &OutputRenderer,
     ) -> Self::Result {
         match args {
-            ConfigAction::Show(ConfigShowArgs { project, explain }) => {
-                Self::handle_config_show(resolver, renderer, project, explain)
-            }
+            ConfigAction::Show(ConfigShowArgs {
+                project,
+                explain,
+                full,
+            }) => Self::handle_config_show(resolver, renderer, project, explain, full),
             ConfigAction::Set(crate::cli::ConfigSetArgs {
                 field,
                 value,
@@ -86,6 +100,1217 @@ impl CommandHandler for ConfigHandler {
 }
 
 impl ConfigHandler {
+    fn emit_config_yaml(
+        renderer: &OutputRenderer,
+        scope: &str,
+        label: Option<&str>,
+        resolved: &crate::config::types::ResolvedConfig,
+        sources: &HashMap<String, String>,
+        options: &YamlRenderOptions,
+    ) {
+        if matches!(renderer.format, crate::output::OutputFormat::Json) {
+            let sources_payload: HashMap<String, String> = if options.include_defaults {
+                sources.clone()
+            } else {
+                sources
+                    .iter()
+                    .filter(|(_, label)| options.allows(Some(*label)))
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            };
+            let mut payload = serde_json::json!({
+                "status": "success",
+                "scope": scope,
+                "include_defaults": options.include_defaults,
+                "config": resolved,
+                "sources": sources_payload,
+            });
+            if let Some(lbl) = label.filter(|s| !s.is_empty()) {
+                payload["label"] = serde_json::Value::String(lbl.to_string());
+            }
+            renderer.emit_raw_stdout(&payload.to_string());
+            return;
+        }
+
+        let scope_title = match scope {
+            "global" => "Global",
+            "project" => "Project",
+            other => other,
+        };
+
+        let heading = match (options.include_defaults, label.filter(|s| !s.is_empty())) {
+            (true, Some(lbl)) => {
+                format!("Effective {scope_title} configuration ({lbl}) – canonical YAML:")
+            }
+            (true, None) => format!("Effective {scope_title} configuration – canonical YAML:"),
+            (false, Some(lbl)) => format!("{scope_title} configuration ({lbl}) – canonical YAML:"),
+            (false, None) => format!("{scope_title} configuration – canonical YAML:"),
+        };
+        renderer.emit_info(&heading);
+        let yaml = Self::render_resolved_config_yaml(resolved, sources, options);
+        renderer.emit_raw_stdout(yaml.trim_end());
+    }
+
+    fn render_resolved_config_yaml(
+        resolved: &crate::config::types::ResolvedConfig,
+        sources: &HashMap<String, String>,
+        options: &YamlRenderOptions,
+    ) -> String {
+        let mut sections: Vec<String> = Vec::new();
+
+        // Server section
+        let mut server_body = String::new();
+        if Self::write_scalar_line(
+            &mut server_body,
+            2,
+            "port",
+            &Self::yaml_scalar(&resolved.server_port),
+            sources.get("server.port"),
+            options,
+        ) {
+            sections.push(format!("server:\n{}", server_body));
+        }
+
+        // Default section
+        let mut default_body = String::new();
+        let mut default_written = false;
+        if !resolved.default_prefix.is_empty() {
+            default_written |= Self::write_scalar_line(
+                &mut default_body,
+                2,
+                "project",
+                &Self::yaml_scalar(&resolved.default_prefix),
+                sources.get("default.project"),
+                options,
+            );
+        }
+        if let Some(assignee) = &resolved.default_assignee {
+            default_written |= Self::write_scalar_line(
+                &mut default_body,
+                2,
+                "assignee",
+                &Self::yaml_scalar(assignee),
+                sources.get("default.assignee"),
+                options,
+            );
+        }
+        if let Some(reporter) = &resolved.default_reporter {
+            default_written |= Self::write_scalar_line(
+                &mut default_body,
+                2,
+                "reporter",
+                &Self::yaml_scalar(reporter),
+                sources.get("default.reporter"),
+                options,
+            );
+        }
+        default_written |= Self::write_sequence(
+            &mut default_body,
+            2,
+            "tags",
+            &resolved.default_tags,
+            sources.get("default.tags"),
+            options,
+        );
+        default_written |= Self::write_scalar_line(
+            &mut default_body,
+            2,
+            "priority",
+            &Self::yaml_scalar(&resolved.default_priority),
+            sources.get("default.priority"),
+            options,
+        );
+        if let Some(status) = &resolved.default_status {
+            default_written |= Self::write_scalar_line(
+                &mut default_body,
+                2,
+                "status",
+                &Self::yaml_scalar(status),
+                sources.get("default.status"),
+                options,
+            );
+        }
+        if default_written {
+            sections.push(format!("default:\n{}", default_body));
+        }
+
+        // Issue section
+        let mut issue_body = String::new();
+        let mut issue_written = false;
+        issue_written |= Self::write_sequence(
+            &mut issue_body,
+            2,
+            "states",
+            &resolved.issue_states.values,
+            sources.get("issue.states"),
+            options,
+        );
+        issue_written |= Self::write_sequence(
+            &mut issue_body,
+            2,
+            "types",
+            &resolved.issue_types.values,
+            sources.get("issue.types"),
+            options,
+        );
+        issue_written |= Self::write_sequence(
+            &mut issue_body,
+            2,
+            "priorities",
+            &resolved.issue_priorities.values,
+            sources.get("issue.priorities"),
+            options,
+        );
+        issue_written |= Self::write_sequence(
+            &mut issue_body,
+            2,
+            "tags",
+            &resolved.tags.values,
+            sources.get("issue.tags"),
+            options,
+        );
+        if issue_written {
+            sections.push(format!("issue:\n{}", issue_body));
+        }
+
+        // Custom fields section
+        let mut custom_body = String::new();
+        if Self::write_sequence(
+            &mut custom_body,
+            2,
+            "fields",
+            &resolved.custom_fields.values,
+            sources.get("custom.fields"),
+            options,
+        ) {
+            sections.push(format!("custom:\n{}", custom_body));
+        }
+
+        // Scan section
+        let mut scan_body = String::new();
+        let mut scan_written = false;
+        scan_written |= Self::write_sequence(
+            &mut scan_body,
+            2,
+            "signal-words",
+            &resolved.scan_signal_words,
+            sources.get("scan.signal-words"),
+            options,
+        );
+        if let Some(patterns) = &resolved.scan_ticket_patterns {
+            scan_written |= Self::write_sequence(
+                &mut scan_body,
+                2,
+                "ticket-patterns",
+                patterns,
+                sources.get("scan.ticket-patterns"),
+                options,
+            );
+        } else {
+            scan_written |= Self::write_scalar_line(
+                &mut scan_body,
+                2,
+                "ticket-patterns",
+                "null",
+                sources.get("scan.ticket-patterns"),
+                options,
+            );
+        }
+        scan_written |= Self::write_scalar_line(
+            &mut scan_body,
+            2,
+            "enable-ticket-words",
+            &Self::yaml_scalar(&resolved.scan_enable_ticket_words),
+            sources.get("scan.enable-ticket-words"),
+            options,
+        );
+        scan_written |= Self::write_scalar_line(
+            &mut scan_body,
+            2,
+            "enable-mentions",
+            &Self::yaml_scalar(&resolved.scan_enable_mentions),
+            sources.get("scan.enable-mentions"),
+            options,
+        );
+        scan_written |= Self::write_scalar_line(
+            &mut scan_body,
+            2,
+            "strip-attributes",
+            &Self::yaml_scalar(&resolved.scan_strip_attributes),
+            sources.get("scan.strip-attributes"),
+            options,
+        );
+        if scan_written {
+            sections.push(format!("scan:\n{}", scan_body));
+        }
+
+        // Automation section
+        let mut auto_body = String::new();
+        let mut auto_written = false;
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "set-reporter",
+            &Self::yaml_scalar(&resolved.auto_set_reporter),
+            sources.get("auto.set-reporter"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "assign-on-status",
+            &Self::yaml_scalar(&resolved.auto_assign_on_status),
+            sources.get("auto.assign-on-status"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "codeowners-assign",
+            &Self::yaml_scalar(&resolved.auto_codeowners_assign),
+            sources.get("auto.codeowners-assign"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "tags-from-path",
+            &Self::yaml_scalar(&resolved.auto_tags_from_path),
+            sources.get("auto.tags-from-path"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "branch-infer-type",
+            &Self::yaml_scalar(&resolved.auto_branch_infer_type),
+            sources.get("auto.branch-infer-type"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "branch-infer-status",
+            &Self::yaml_scalar(&resolved.auto_branch_infer_status),
+            sources.get("auto.branch-infer-status"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "branch-infer-priority",
+            &Self::yaml_scalar(&resolved.auto_branch_infer_priority),
+            sources.get("auto.branch-infer-priority"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "identity",
+            &Self::yaml_scalar(&resolved.auto_identity),
+            sources.get("auto.identity"),
+            options,
+        );
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "identity-git",
+            &Self::yaml_scalar(&resolved.auto_identity_git),
+            sources.get("auto.identity-git"),
+            options,
+        );
+        if auto_written {
+            sections.push(format!("auto:\n{}", auto_body));
+        }
+
+        // Branch section
+        let mut branch_body = String::new();
+        let mut branch_written = false;
+        if !resolved.branch_type_aliases.is_empty() {
+            let mut entries: Vec<_> = resolved.branch_type_aliases.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let formatted: Vec<(String, String)> = entries
+                .into_iter()
+                .map(|(k, v)| (k.clone(), Self::yaml_scalar(v)))
+                .collect();
+            branch_written |= Self::write_mapping_entries(
+                &mut branch_body,
+                2,
+                "type-aliases",
+                &formatted,
+                sources.get("branch.type-aliases"),
+                options,
+            );
+        }
+        if !resolved.branch_status_aliases.is_empty() {
+            let mut entries: Vec<_> = resolved.branch_status_aliases.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let formatted: Vec<(String, String)> = entries
+                .into_iter()
+                .map(|(k, v)| (k.clone(), Self::yaml_scalar(v)))
+                .collect();
+            branch_written |= Self::write_mapping_entries(
+                &mut branch_body,
+                2,
+                "status-aliases",
+                &formatted,
+                sources.get("branch.status-aliases"),
+                options,
+            );
+        }
+        if !resolved.branch_priority_aliases.is_empty() {
+            let mut entries: Vec<_> = resolved.branch_priority_aliases.iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let formatted: Vec<(String, String)> = entries
+                .into_iter()
+                .map(|(k, v)| (k.clone(), Self::yaml_scalar(v)))
+                .collect();
+            branch_written |= Self::write_mapping_entries(
+                &mut branch_body,
+                2,
+                "priority-aliases",
+                &formatted,
+                sources.get("branch.priority-aliases"),
+                options,
+            );
+        }
+        if branch_written {
+            sections.push(format!("branch:\n{}", branch_body));
+        }
+
+        let mut buf = String::from("---\n");
+        for (idx, section) in sections.iter().enumerate() {
+            if idx > 0 {
+                buf.push('\n');
+            }
+            buf.push_str(section);
+        }
+
+        buf
+    }
+
+    fn yaml_scalar<T: serde::Serialize>(value: &T) -> String {
+        match serde_yaml::to_string(value) {
+            Ok(mut text) => {
+                if let Some(stripped) = text.strip_prefix("---\n") {
+                    text = stripped.to_string();
+                }
+                if let Some(stripped) = text.strip_suffix("\n...") {
+                    text = stripped.to_string();
+                }
+                text.trim().to_string()
+            }
+            Err(_) => "\"<invalid>\"".to_string(),
+        }
+    }
+
+    fn yaml_comment(source: Option<&String>, options: &YamlRenderOptions) -> String {
+        if !options.include_comments {
+            return String::new();
+        }
+
+        let Some(source) = source.filter(|s| !s.is_empty()) else {
+            return String::new();
+        };
+
+        if !options.colorize_comments {
+            return format!(" # ({source})");
+        }
+
+        const COMMENT_COLOR: &str = "\u{001b}[38;5;110m";
+        const RESET: &str = "\u{001b}[0m";
+        format!(" {COMMENT_COLOR}# ({source}){RESET}")
+    }
+
+    fn write_scalar_line(
+        buf: &mut String,
+        indent: usize,
+        key: &str,
+        value: &str,
+        source: Option<&String>,
+        options: &YamlRenderOptions,
+    ) -> bool {
+        if !options.allows(source) {
+            return false;
+        }
+        let indent_str = " ".repeat(indent);
+        let comment = Self::yaml_comment(source, options);
+        buf.push_str(&format!("{indent_str}{key}: {value}{comment}\n"));
+        true
+    }
+
+    fn write_sequence<T: serde::Serialize>(
+        buf: &mut String,
+        indent: usize,
+        key: &str,
+        values: &[T],
+        source: Option<&String>,
+        options: &YamlRenderOptions,
+    ) -> bool {
+        if !options.allows(source) {
+            return false;
+        }
+        let indent_str = " ".repeat(indent);
+        let comment = Self::yaml_comment(source, options);
+        if values.is_empty() {
+            buf.push_str(&format!("{indent_str}{key}: []{comment}\n"));
+            return true;
+        }
+        buf.push_str(&format!("{indent_str}{key}:{comment}\n"));
+        let item_indent = " ".repeat(indent + 2);
+        for value in values {
+            let formatted = Self::yaml_scalar(value);
+            buf.push_str(&format!("{item_indent}- {formatted}\n"));
+        }
+        true
+    }
+
+    fn write_mapping_entries(
+        buf: &mut String,
+        indent: usize,
+        key: &str,
+        entries: &[(String, String)],
+        source: Option<&String>,
+        options: &YamlRenderOptions,
+    ) -> bool {
+        if entries.is_empty() || !options.allows(source) {
+            return false;
+        }
+        let indent_str = " ".repeat(indent);
+        let comment = Self::yaml_comment(source, options);
+        buf.push_str(&format!("{indent_str}{key}:{comment}\n"));
+        let entry_indent = " ".repeat(indent + 2);
+        for (name, value) in entries {
+            buf.push_str(&format!("{entry_indent}{name}: {value}\n"));
+        }
+        true
+    }
+
+    fn env_source_for_key(
+        resolved: &crate::config::types::ResolvedConfig,
+        key: &str,
+    ) -> Option<&'static str> {
+        match key {
+            "server_port" => std::env::var("LOTAR_PORT")
+                .ok()
+                .and_then(|p| p.parse::<u16>().ok())
+                .filter(|p| *p == resolved.server_port)
+                .map(|_| "env"),
+            "default_project" => std::env::var("LOTAR_PROJECT")
+                .ok()
+                .map(|proj| generate_project_prefix(&proj))
+                .filter(|p| p == &resolved.default_prefix)
+                .map(|_| "env"),
+            "default_assignee" => std::env::var("LOTAR_DEFAULT_ASSIGNEE")
+                .ok()
+                .filter(|v| resolved.default_assignee.as_deref() == Some(v.as_str()))
+                .map(|_| "env"),
+            "default_reporter" => std::env::var("LOTAR_DEFAULT_REPORTER")
+                .ok()
+                .filter(|v| resolved.default_reporter.as_deref() == Some(v.as_str()))
+                .map(|_| "env"),
+            _ => None,
+        }
+    }
+
+    fn source_label_for_global(
+        resolved: &crate::config::types::ResolvedConfig,
+        global_cfg: &Option<crate::config::types::GlobalConfig>,
+        home_cfg: &Option<crate::config::types::GlobalConfig>,
+        key: &str,
+    ) -> &'static str {
+        if let Some("env") = Self::env_source_for_key(resolved, key) {
+            return "env";
+        }
+
+        let defaults = crate::config::types::GlobalConfig::default();
+        let default_server_port = defaults.server_port;
+        let default_prefix = defaults.default_prefix.clone();
+        let default_assignee = defaults.default_assignee.clone();
+        let default_reporter = defaults.default_reporter.clone();
+        let default_priority = defaults.default_priority.clone();
+        let default_status = defaults.default_status.clone();
+        let default_issue_states = defaults.issue_states.values.clone();
+        let default_issue_types = defaults.issue_types.values.clone();
+        let default_issue_priorities = defaults.issue_priorities.values.clone();
+        let default_issue_tags = defaults.tags.values.clone();
+        let default_default_tags = defaults.default_tags.clone();
+        let default_custom_fields = defaults.custom_fields.values.clone();
+        let default_scan_signal_words = defaults.scan_signal_words.clone();
+        let default_scan_ticket_patterns = defaults.scan_ticket_patterns.clone();
+        let default_scan_enable_ticket_words = defaults.scan_enable_ticket_words;
+        let default_scan_enable_mentions = defaults.scan_enable_mentions;
+        let default_scan_strip_attributes = defaults.scan_strip_attributes;
+        let default_auto_set_reporter = defaults.auto_set_reporter;
+        let default_auto_assign_on_status = defaults.auto_assign_on_status;
+        let default_auto_codeowners_assign = defaults.auto_codeowners_assign;
+        let default_auto_tags_from_path = defaults.auto_tags_from_path;
+        let default_auto_branch_infer_type = defaults.auto_branch_infer_type;
+        let default_auto_branch_infer_status = defaults.auto_branch_infer_status;
+        let default_auto_branch_infer_priority = defaults.auto_branch_infer_priority;
+        let default_auto_identity = defaults.auto_identity;
+        let default_auto_identity_git = defaults.auto_identity_git;
+        let default_branch_type_aliases = defaults.branch_type_aliases.clone();
+        let default_branch_status_aliases = defaults.branch_status_aliases.clone();
+        let default_branch_priority_aliases = defaults.branch_priority_aliases.clone();
+
+        let home = home_cfg.as_ref();
+        let global = global_cfg.as_ref();
+
+        match key {
+            "server_port" => {
+                if home.is_some_and(|home| home.server_port == resolved.server_port) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.server_port == resolved.server_port
+                        && glob.server_port != default_server_port
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "default_project" => {
+                if home.is_some_and(|home| home.default_prefix == resolved.default_prefix) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.default_prefix == resolved.default_prefix
+                        && glob.default_prefix != default_prefix
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "default_assignee" => {
+                if home.is_some_and(|home| home.default_assignee == resolved.default_assignee) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.default_assignee == resolved.default_assignee
+                        && glob.default_assignee != default_assignee
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "default_reporter" => {
+                if home.is_some_and(|home| home.default_reporter == resolved.default_reporter) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.default_reporter == resolved.default_reporter
+                        && glob.default_reporter != default_reporter
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "default_priority" => {
+                if home.is_some_and(|home| home.default_priority == resolved.default_priority) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.default_priority == resolved.default_priority
+                        && glob.default_priority != default_priority
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "default_status" => {
+                if home.is_some_and(|home| home.default_status == resolved.default_status) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.default_status == resolved.default_status
+                        && glob.default_status != default_status
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "issue_states" => {
+                if home.is_some_and(|home| home.issue_states.values == resolved.issue_states.values)
+                {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.issue_states.values == resolved.issue_states.values
+                        && glob.issue_states.values.as_slice() != default_issue_states.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "issue_types" => {
+                if home.is_some_and(|home| home.issue_types.values == resolved.issue_types.values) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.issue_types.values == resolved.issue_types.values
+                        && glob.issue_types.values.as_slice() != default_issue_types.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "issue_priorities" => {
+                if home.is_some_and(|home| {
+                    home.issue_priorities.values == resolved.issue_priorities.values
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.issue_priorities.values == resolved.issue_priorities.values
+                        && glob.issue_priorities.values.as_slice()
+                            != default_issue_priorities.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "default_tags" => {
+                if home.is_some_and(|home| home.default_tags == resolved.default_tags) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.default_tags == resolved.default_tags
+                        && glob.default_tags.as_slice() != default_default_tags.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "custom_fields" => {
+                if home
+                    .is_some_and(|home| home.custom_fields.values == resolved.custom_fields.values)
+                {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.custom_fields.values == resolved.custom_fields.values
+                        && glob.custom_fields.values.as_slice() != default_custom_fields.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "issue_tags" => {
+                if home.is_some_and(|home| home.tags.values == resolved.tags.values) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.tags.values == resolved.tags.values
+                        && glob.tags.values.as_slice() != default_issue_tags.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "scan_signal_words" => {
+                if home.is_some_and(|home| home.scan_signal_words == resolved.scan_signal_words) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.scan_signal_words == resolved.scan_signal_words
+                        && glob.scan_signal_words.as_slice() != default_scan_signal_words.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "scan_ticket_patterns" => {
+                if home
+                    .and_then(|home| home.scan_ticket_patterns.as_ref())
+                    .is_some_and(|patterns| {
+                        Some(patterns) == resolved.scan_ticket_patterns.as_ref()
+                    })
+                {
+                    return "home";
+                }
+                if global
+                    .and_then(|glob| glob.scan_ticket_patterns.as_ref())
+                    .is_some_and(|patterns| {
+                        Some(patterns) == resolved.scan_ticket_patterns.as_ref()
+                            && Some(patterns) != default_scan_ticket_patterns.as_ref()
+                    })
+                {
+                    return "global";
+                }
+                "default"
+            }
+            "scan_enable_ticket_words" => {
+                if home.is_some_and(|home| {
+                    home.scan_enable_ticket_words == resolved.scan_enable_ticket_words
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.scan_enable_ticket_words == resolved.scan_enable_ticket_words
+                        && glob.scan_enable_ticket_words != default_scan_enable_ticket_words
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "scan_enable_mentions" => {
+                if home
+                    .is_some_and(|home| home.scan_enable_mentions == resolved.scan_enable_mentions)
+                {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.scan_enable_mentions == resolved.scan_enable_mentions
+                        && glob.scan_enable_mentions != default_scan_enable_mentions
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "scan_strip_attributes" => {
+                if home.is_some_and(|home| {
+                    home.scan_strip_attributes == resolved.scan_strip_attributes
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.scan_strip_attributes == resolved.scan_strip_attributes
+                        && glob.scan_strip_attributes != default_scan_strip_attributes
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_set_reporter" => {
+                if home.is_some_and(|home| home.auto_set_reporter == resolved.auto_set_reporter) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_set_reporter == resolved.auto_set_reporter
+                        && glob.auto_set_reporter != default_auto_set_reporter
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_assign_on_status" => {
+                if home.is_some_and(|home| {
+                    home.auto_assign_on_status == resolved.auto_assign_on_status
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_assign_on_status == resolved.auto_assign_on_status
+                        && glob.auto_assign_on_status != default_auto_assign_on_status
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_codeowners_assign" => {
+                if home.is_some_and(|home| {
+                    home.auto_codeowners_assign == resolved.auto_codeowners_assign
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_codeowners_assign == resolved.auto_codeowners_assign
+                        && glob.auto_codeowners_assign != default_auto_codeowners_assign
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_tags_from_path" => {
+                if home.is_some_and(|home| home.auto_tags_from_path == resolved.auto_tags_from_path)
+                {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_tags_from_path == resolved.auto_tags_from_path
+                        && glob.auto_tags_from_path != default_auto_tags_from_path
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_branch_infer_type" => {
+                if home.is_some_and(|home| {
+                    home.auto_branch_infer_type == resolved.auto_branch_infer_type
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_branch_infer_type == resolved.auto_branch_infer_type
+                        && glob.auto_branch_infer_type != default_auto_branch_infer_type
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_branch_infer_status" => {
+                if home.is_some_and(|home| {
+                    home.auto_branch_infer_status == resolved.auto_branch_infer_status
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_branch_infer_status == resolved.auto_branch_infer_status
+                        && glob.auto_branch_infer_status != default_auto_branch_infer_status
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_branch_infer_priority" => {
+                if home.is_some_and(|home| {
+                    home.auto_branch_infer_priority == resolved.auto_branch_infer_priority
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_branch_infer_priority == resolved.auto_branch_infer_priority
+                        && glob.auto_branch_infer_priority != default_auto_branch_infer_priority
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_identity" => {
+                if home.is_some_and(|home| home.auto_identity == resolved.auto_identity) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_identity == resolved.auto_identity
+                        && glob.auto_identity != default_auto_identity
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_identity_git" => {
+                if home.is_some_and(|home| home.auto_identity_git == resolved.auto_identity_git) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_identity_git == resolved.auto_identity_git
+                        && glob.auto_identity_git != default_auto_identity_git
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "branch_type_aliases" => {
+                if home.is_some_and(|home| home.branch_type_aliases == resolved.branch_type_aliases)
+                {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.branch_type_aliases == resolved.branch_type_aliases
+                        && glob.branch_type_aliases != default_branch_type_aliases
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "branch_status_aliases" => {
+                if home.is_some_and(|home| {
+                    home.branch_status_aliases == resolved.branch_status_aliases
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.branch_status_aliases == resolved.branch_status_aliases
+                        && glob.branch_status_aliases != default_branch_status_aliases
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "branch_priority_aliases" => {
+                if home.is_some_and(|home| {
+                    home.branch_priority_aliases == resolved.branch_priority_aliases
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.branch_priority_aliases == resolved.branch_priority_aliases
+                        && glob.branch_priority_aliases != default_branch_priority_aliases
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            _ => "default",
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn source_label_for_project(
+        key: &str,
+        resolved_project: &crate::config::types::ResolvedConfig,
+        base_config: &crate::config::types::ResolvedConfig,
+        project_cfg: Option<&crate::config::types::ProjectConfig>,
+        global_cfg: &Option<crate::config::types::GlobalConfig>,
+        home_cfg: &Option<crate::config::types::GlobalConfig>,
+    ) -> String {
+        match key {
+            "default_project" => "project".to_string(),
+            "default_assignee" => {
+                if project_cfg
+                    .and_then(|pc| pc.default_assignee.as_ref())
+                    .is_some()
+                    || resolved_project.default_assignee != base_config.default_assignee
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "default_reporter" => {
+                if project_cfg
+                    .and_then(|pc| pc.default_reporter.as_ref())
+                    .is_some()
+                    || resolved_project.default_reporter != base_config.default_reporter
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "default_priority" => {
+                if project_cfg
+                    .and_then(|pc| pc.default_priority.as_ref())
+                    .is_some()
+                    || resolved_project.default_priority != base_config.default_priority
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "default_status" => {
+                if project_cfg
+                    .and_then(|pc| pc.default_status.as_ref())
+                    .is_some()
+                    || resolved_project.default_status != base_config.default_status
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "default_tags" => {
+                if project_cfg
+                    .and_then(|pc| pc.default_tags.as_ref())
+                    .is_some()
+                    || resolved_project.default_tags != base_config.default_tags
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "issue_states" => {
+                if project_cfg
+                    .and_then(|pc| pc.issue_states.as_ref())
+                    .is_some()
+                    || resolved_project.issue_states.values != base_config.issue_states.values
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "issue_types" => {
+                if project_cfg.and_then(|pc| pc.issue_types.as_ref()).is_some()
+                    || resolved_project.issue_types.values != base_config.issue_types.values
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "issue_priorities" => {
+                if project_cfg
+                    .and_then(|pc| pc.issue_priorities.as_ref())
+                    .is_some()
+                    || resolved_project.issue_priorities.values
+                        != base_config.issue_priorities.values
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "issue_tags" => {
+                if project_cfg
+                    .and_then(|pc| pc.tags.as_ref())
+                    .map(|tags| tags.values == resolved_project.tags.values)
+                    .unwrap_or(false)
+                    || resolved_project.tags.values != base_config.tags.values
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "custom_fields" => {
+                if project_cfg
+                    .and_then(|pc| pc.custom_fields.as_ref())
+                    .map(|fields| fields.values == resolved_project.custom_fields.values)
+                    .unwrap_or(false)
+                    || resolved_project.custom_fields.values != base_config.custom_fields.values
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "scan_signal_words" => {
+                if project_cfg
+                    .and_then(|pc| pc.scan_signal_words.as_ref())
+                    .is_some()
+                    || resolved_project.scan_signal_words != base_config.scan_signal_words
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "scan_ticket_patterns" => {
+                if project_cfg
+                    .and_then(|pc| pc.scan_ticket_patterns.as_ref())
+                    .is_some()
+                    || resolved_project.scan_ticket_patterns != base_config.scan_ticket_patterns
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "scan_enable_ticket_words" => {
+                if project_cfg
+                    .and_then(|pc| pc.scan_enable_ticket_words)
+                    .is_some()
+                    || resolved_project.scan_enable_ticket_words
+                        != base_config.scan_enable_ticket_words
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "scan_enable_mentions" => {
+                if project_cfg.and_then(|pc| pc.scan_enable_mentions).is_some()
+                    || resolved_project.scan_enable_mentions != base_config.scan_enable_mentions
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "scan_strip_attributes" => {
+                if project_cfg
+                    .and_then(|pc| pc.scan_strip_attributes)
+                    .is_some()
+                    || resolved_project.scan_strip_attributes != base_config.scan_strip_attributes
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "auto_set_reporter" => {
+                if project_cfg.and_then(|pc| pc.auto_set_reporter).is_some()
+                    || resolved_project.auto_set_reporter != base_config.auto_set_reporter
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "auto_assign_on_status" => {
+                if project_cfg
+                    .and_then(|pc| pc.auto_assign_on_status)
+                    .is_some()
+                    || resolved_project.auto_assign_on_status != base_config.auto_assign_on_status
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "auto_codeowners_assign"
+            | "auto_tags_from_path"
+            | "auto_branch_infer_type"
+            | "auto_branch_infer_status"
+            | "auto_branch_infer_priority"
+            | "auto_identity"
+            | "auto_identity_git" => {
+                Self::source_label_for_global(base_config, global_cfg, home_cfg, key).to_string()
+            }
+            "branch_type_aliases" => {
+                if project_cfg
+                    .and_then(|pc| pc.branch_type_aliases.as_ref())
+                    .is_some()
+                    || resolved_project.branch_type_aliases != base_config.branch_type_aliases
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "branch_status_aliases" => {
+                if project_cfg
+                    .and_then(|pc| pc.branch_status_aliases.as_ref())
+                    .is_some()
+                    || resolved_project.branch_status_aliases != base_config.branch_status_aliases
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "branch_priority_aliases" => {
+                if project_cfg
+                    .and_then(|pc| pc.branch_priority_aliases.as_ref())
+                    .is_some()
+                    || resolved_project.branch_priority_aliases
+                        != base_config.branch_priority_aliases
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "server_port" => {
+                Self::source_label_for_global(base_config, global_cfg, home_cfg, key).to_string()
+            }
+            _ => Self::source_label_for_global(base_config, global_cfg, home_cfg, key).to_string(),
+        }
+    }
     fn handle_config_normalize(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -171,6 +1396,7 @@ impl ConfigHandler {
         renderer: &OutputRenderer,
         project: Option<String>,
         explain: bool,
+        full: bool,
     ) -> Result<(), String> {
         // Git-like behavior: adopt the parent tasks root if found (read-only is fine to inherit)
         let effective_read_root = resolver.path.clone();
@@ -179,182 +1405,20 @@ impl ConfigHandler {
             ConfigManager::new_manager_with_tasks_dir_readonly(&effective_read_root)
                 .map_err(|e| format!("Failed to load config: {}", e))?;
 
-        // Small helpers to determine provenance for selected fields
-        fn env_source_for_key(
-            resolved: &crate::config::types::ResolvedConfig,
-            key: &str,
-        ) -> Option<&'static str> {
-            match key {
-                "server_port" => std::env::var("LOTAR_PORT")
-                    .ok()
-                    .and_then(|p| p.parse::<u16>().ok())
-                    .filter(|p| *p == resolved.server_port)
-                    .map(|_| "env"),
-                "default_project" => std::env::var("LOTAR_PROJECT")
-                    .ok()
-                    .map(|proj| generate_project_prefix(&proj))
-                    .filter(|p| p == &resolved.default_prefix)
-                    .map(|_| "env"),
-                "default_assignee" => std::env::var("LOTAR_DEFAULT_ASSIGNEE")
-                    .ok()
-                    .filter(|v| resolved.default_assignee.as_deref() == Some(v.as_str()))
-                    .map(|_| "env"),
-                "default_reporter" => std::env::var("LOTAR_DEFAULT_REPORTER")
-                    .ok()
-                    .filter(|v| resolved.default_reporter.as_deref() == Some(v.as_str()))
-                    .map(|_| "env"),
-                _ => None,
-            }
-        }
+        let colorize_comments =
+            std::env::var("NO_COLOR").is_err() && std::io::stdout().is_terminal();
 
-        fn source_label_for_global(
-            resolved: &crate::config::types::ResolvedConfig,
-            global_cfg: &Option<crate::config::types::GlobalConfig>,
-            home_cfg: &Option<crate::config::types::GlobalConfig>,
-            key: &str,
-        ) -> &'static str {
-            if let Some("env") = env_source_for_key(resolved, key) {
-                return "env";
+        if !matches!(renderer.format, crate::output::OutputFormat::Json) {
+            let mut message = format!("Tasks directory: {}", effective_read_root.display());
+            if effective_read_root.is_relative() {
+                if let Ok(resolved) = std::fs::canonicalize(&effective_read_root) {
+                    message.push_str(&format!(" (resolved: {})", resolved.display()));
+                }
             }
-            // compare against home then global, else default
-            match key {
-                "server_port" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.server_port == resolved.server_port)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.server_port == resolved.server_port)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "default_project" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.default_prefix == resolved.default_prefix)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.default_prefix == resolved.default_prefix)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "default_assignee" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.default_assignee == resolved.default_assignee)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.default_assignee == resolved.default_assignee)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "default_reporter" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.default_reporter == resolved.default_reporter)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.default_reporter == resolved.default_reporter)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "default_priority" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.default_priority == resolved.default_priority)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.default_priority == resolved.default_priority)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "default_status" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.default_status == resolved.default_status)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.default_status == resolved.default_status)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "issue_states" => {
-                    if home_cfg.as_ref().is_some_and(|home| {
-                        home.issue_states.values == resolved.issue_states.values
-                    }) {
-                        return "home";
-                    }
-                    if global_cfg.as_ref().is_some_and(|glob| {
-                        glob.issue_states.values == resolved.issue_states.values
-                    }) {
-                        return "global";
-                    }
-                    "default"
-                }
-                "issue_types" => {
-                    if home_cfg
-                        .as_ref()
-                        .is_some_and(|home| home.issue_types.values == resolved.issue_types.values)
-                    {
-                        return "home";
-                    }
-                    if global_cfg
-                        .as_ref()
-                        .is_some_and(|glob| glob.issue_types.values == resolved.issue_types.values)
-                    {
-                        return "global";
-                    }
-                    "default"
-                }
-                "issue_priorities" => {
-                    if home_cfg.as_ref().is_some_and(|home| {
-                        home.issue_priorities.values == resolved.issue_priorities.values
-                    }) {
-                        return "home";
-                    }
-                    if global_cfg.as_ref().is_some_and(|glob| {
-                        glob.issue_priorities.values == resolved.issue_priorities.values
-                    }) {
-                        return "global";
-                    }
-                    "default"
-                }
-                _ => "default",
-            }
+            renderer.emit_info(&message);
         }
 
         if let Some(project_name) = project {
-            // Show project-specific config
             let project_prefix = resolve_project_input(&project_name, resolver.path.as_path());
             let resolved_project = config_manager
                 .get_project_config(&project_prefix)
@@ -372,250 +1436,162 @@ impl ConfigHandler {
                     if name.is_empty() { None } else { Some(name) }
                 }),
             );
+            let global_cfg =
+                crate::config::persistence::load_global_config(Some(&effective_read_root)).ok();
+            let home_cfg = crate::config::persistence::load_home_config().ok();
+            let base_config = config_manager.get_resolved_config().clone();
+            let project_sources = Self::build_project_source_labels(
+                &resolved_project,
+                &base_config,
+                project_cfg_raw.as_ref(),
+                &global_cfg,
+                &home_cfg,
+            );
 
-            renderer.emit_info(&format!("Configuration for project: {}", project_label));
+            const PROJECT_ONLY_SOURCES: &[&str] = &["project"];
+            let options = YamlRenderOptions {
+                include_defaults: full,
+                include_comments: explain,
+                colorize_comments,
+                allowed_sources: if full {
+                    None
+                } else {
+                    Some(PROJECT_ONLY_SOURCES)
+                },
+            };
 
-            // Project Settings section (no server settings for project config)
-            renderer.emit_info("Project Settings:");
-            renderer.emit_raw_stdout(&format!(
-                "  Tasks directory: {}",
-                effective_read_root.display()
-            ));
-            renderer.emit_raw_stdout("  Task file extension: yml");
-            renderer.emit_raw_stdout(&format!(
-                "  Project prefix: {}",
-                resolved_project.default_prefix
-            ));
-
-            if let Some(assignee) = &resolved_project.default_assignee {
-                renderer.emit_raw_stdout(&format!("  Default assignee: {}", assignee));
-            }
-            renderer.emit_raw_stdout(&format!(
-                "  Default Priority: {}",
-                resolved_project.default_priority
-            ));
-
-            // Show default status if configured
-            if let Some(status) = &resolved_project.default_status {
-                renderer.emit_raw_stdout(&format!("  Default Status: {}", status));
-            }
-            renderer.emit_raw_stdout("");
-
-            // Issue Types, States, and Priorities
-            renderer.emit_raw_stdout(&format!(
-                "Issue States: {}",
-                format_value_list(&resolved_project.issue_states.values)
-            ));
-            renderer.emit_raw_stdout(&format!(
-                "Issue Types: {}",
-                format_value_list(&resolved_project.issue_types.values)
-            ));
-            renderer.emit_raw_stdout(&format!(
-                "Issue Priorities: {}",
-                format_value_list(&resolved_project.issue_priorities.values)
-            ));
-
-            if explain {
-                renderer.emit_info("Value sources:");
-                let base = config_manager.get_resolved_config();
-
-                // Compare against base (global+home+env merged) to infer project overrides
-                if resolved_project.default_assignee != base.default_assignee {
-                    renderer.emit_raw_stdout("  default_assignee: project");
-                }
-                if resolved_project.default_reporter != base.default_reporter {
-                    renderer.emit_raw_stdout("  default_reporter: project");
-                }
-                if resolved_project.default_priority != base.default_priority {
-                    renderer.emit_raw_stdout("  default_priority: project");
-                }
-                if resolved_project.default_status != base.default_status {
-                    renderer.emit_raw_stdout("  default_status: project");
-                }
-                if resolved_project.issue_states.values != base.issue_states.values {
-                    renderer.emit_raw_stdout("  issue_states: project");
-                }
-                if resolved_project.issue_types.values != base.issue_types.values {
-                    renderer.emit_raw_stdout("  issue_types: project");
-                }
-                if resolved_project.issue_priorities.values != base.issue_priorities.values {
-                    renderer.emit_raw_stdout("  issue_priorities: project");
-                }
-
-                // If JSON format, emit a structured explanation block
-                if matches!(renderer.format, crate::output::OutputFormat::Json) {
-                    // Determine per-field source using project config file presence
-                    let global_cfg =
-                        crate::config::persistence::load_global_config(Some(&effective_read_root))
-                            .ok();
-                    let home_cfg = crate::config::persistence::load_home_config().ok();
-
-                    let src = |key: &str| -> &'static str {
-                        // Project file explicit setting wins
-                        match (key, &project_cfg_raw) {
-                            ("default_assignee", Some(pc)) if pc.default_assignee.is_some() => {
-                                "project"
-                            }
-                            ("default_reporter", Some(pc)) if pc.default_reporter.is_some() => {
-                                "project"
-                            }
-                            ("default_priority", Some(pc)) if pc.default_priority.is_some() => {
-                                "project"
-                            }
-                            ("default_status", Some(pc)) if pc.default_status.is_some() => {
-                                "project"
-                            }
-                            ("issue_states", Some(pc)) if pc.issue_states.is_some() => "project",
-                            ("issue_types", Some(pc)) if pc.issue_types.is_some() => "project",
-                            ("issue_priorities", Some(pc)) if pc.issue_priorities.is_some() => {
-                                "project"
-                            }
-                            _ => source_label_for_global(
-                                &resolved_project,
-                                &global_cfg,
-                                &home_cfg,
-                                key,
-                            ),
-                        }
-                    };
-
-                    let explanation = serde_json::json!({
-                        "status": "success",
-                        "scope": "project",
-                        "project": project_name,
-                        "project_prefix": project_prefix,
-                        "project_label": project_label,
-                        "config": resolved_project,
-                        "sources": {
-                            "default_assignee": src("default_assignee"),
-                            "default_reporter": src("default_reporter"),
-                            "default_priority": src("default_priority"),
-                            "default_status": src("default_status"),
-                            "issue_states": src("issue_states"),
-                            "issue_types": src("issue_types"),
-                            "issue_priorities": src("issue_priorities")
-                        }
-                    });
-                    renderer.emit_raw_stdout(&explanation.to_string());
-                }
-            }
+            Self::emit_config_yaml(
+                renderer,
+                "project",
+                Some(project_label.as_str()),
+                &resolved_project,
+                &project_sources,
+                &options,
+            );
         } else {
             let resolved_config = config_manager.get_resolved_config();
-            renderer.emit_info(&format!(
-                "Configuration for project: {}",
-                if resolved_config.default_prefix.is_empty() {
-                    "(none set - will auto-detect on first task creation)"
-                } else {
-                    &resolved_config.default_prefix
-                }
-            ));
-            renderer.emit_info("Project Settings:");
-            renderer.emit_raw_stdout(&format!(
-                "  Tasks directory: {}",
-                effective_read_root.display()
-            ));
-            renderer.emit_raw_stdout("  Task file extension: yml");
-            renderer.emit_raw_stdout(&format!(
-                "  Project prefix: {}",
-                resolved_config.default_prefix
-            ));
-            renderer.emit_raw_stdout(&format!("  Port: {}", resolved_config.server_port));
-            renderer.emit_raw_stdout(&format!(
-                "  Default Project: {}",
-                if resolved_config.default_prefix.is_empty() {
-                    "(none set - will auto-detect on first task creation)"
-                } else {
-                    &resolved_config.default_prefix
-                }
-            ));
+            let global_cfg =
+                crate::config::persistence::load_global_config(Some(&effective_read_root)).ok();
+            let home_cfg = crate::config::persistence::load_home_config().ok();
+            let sources = Self::build_global_source_labels(resolved_config, &global_cfg, &home_cfg);
 
-            if explain {
-                renderer.emit_info("Value sources:");
-                let global_cfg =
-                    crate::config::persistence::load_global_config(Some(&effective_read_root)).ok();
-                let home_cfg = crate::config::persistence::load_home_config().ok();
+            const GLOBAL_SOURCES: &[&str] = &["env", "home", "global"];
+            let options = YamlRenderOptions {
+                include_defaults: full,
+                include_comments: explain,
+                colorize_comments,
+                allowed_sources: if full { None } else { Some(GLOBAL_SOURCES) },
+            };
 
-                let sp =
-                    source_label_for_global(resolved_config, &global_cfg, &home_cfg, "server_port");
-                let dp = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "default_project",
-                );
-                let da = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "default_assignee",
-                );
-                let dr = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "default_reporter",
-                );
-                let pri = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "default_priority",
-                );
-                let ds = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "default_status",
-                );
-                let iss = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "issue_states",
-                );
-                let ity =
-                    source_label_for_global(resolved_config, &global_cfg, &home_cfg, "issue_types");
-                let ipr = source_label_for_global(
-                    resolved_config,
-                    &global_cfg,
-                    &home_cfg,
-                    "issue_priorities",
-                );
-
-                renderer.emit_raw_stdout(&format!("  server_port: {}", sp));
-                renderer.emit_raw_stdout(&format!("  default_project: {}", dp));
-                renderer.emit_raw_stdout(&format!("  default_assignee: {}", da));
-                renderer.emit_raw_stdout(&format!("  default_reporter: {}", dr));
-                renderer.emit_raw_stdout(&format!("  default_priority: {}", pri));
-                renderer.emit_raw_stdout(&format!("  default_status: {}", ds));
-                renderer.emit_raw_stdout(&format!("  issue_states: {}", iss));
-                renderer.emit_raw_stdout(&format!("  issue_types: {}", ity));
-                renderer.emit_raw_stdout(&format!("  issue_priorities: {}", ipr));
-
-                // JSON structured explanation if requested in JSON format
-                if matches!(renderer.format, crate::output::OutputFormat::Json) {
-                    let explanation = serde_json::json!({
-                        "status": "success",
-                        "scope": "global",
-                        "config": resolved_config,
-                        "sources": {
-                            "server_port": sp,
-                            "default_project": dp,
-                            "default_assignee": da,
-                            "default_reporter": dr,
-                            "default_priority": pri,
-                            "default_status": ds,
-                            "issue_states": iss,
-                            "issue_types": ity,
-                            "issue_priorities": ipr
-                        }
-                    });
-                    renderer.emit_raw_stdout(&explanation.to_string());
-                }
-            }
+            Self::emit_config_yaml(
+                renderer,
+                "global",
+                None,
+                resolved_config,
+                &sources,
+                &options,
+            );
         }
 
         Ok(())
+    }
+
+    fn build_global_source_labels(
+        resolved: &crate::config::types::ResolvedConfig,
+        global_cfg: &Option<crate::config::types::GlobalConfig>,
+        home_cfg: &Option<crate::config::types::GlobalConfig>,
+    ) -> HashMap<String, String> {
+        let mut labels = HashMap::new();
+        let mut insert = |path: &str, key: &str| {
+            let label = Self::source_label_for_global(resolved, global_cfg, home_cfg, key);
+            labels.insert(path.to_string(), label.to_string());
+        };
+
+        insert("server.port", "server_port");
+        insert("default.project", "default_project");
+        insert("default.assignee", "default_assignee");
+        insert("default.reporter", "default_reporter");
+        insert("default.tags", "default_tags");
+        insert("default.priority", "default_priority");
+        insert("default.status", "default_status");
+        insert("issue.states", "issue_states");
+        insert("issue.types", "issue_types");
+        insert("issue.priorities", "issue_priorities");
+        insert("issue.tags", "issue_tags");
+        insert("custom.fields", "custom_fields");
+        insert("scan.signal-words", "scan_signal_words");
+        insert("scan.ticket-patterns", "scan_ticket_patterns");
+        insert("scan.enable-ticket-words", "scan_enable_ticket_words");
+        insert("scan.enable-mentions", "scan_enable_mentions");
+        insert("scan.strip-attributes", "scan_strip_attributes");
+        insert("auto.set-reporter", "auto_set_reporter");
+        insert("auto.assign-on-status", "auto_assign_on_status");
+        insert("auto.codeowners-assign", "auto_codeowners_assign");
+        insert("auto.tags-from-path", "auto_tags_from_path");
+        insert("auto.branch-infer-type", "auto_branch_infer_type");
+        insert("auto.branch-infer-status", "auto_branch_infer_status");
+        insert("auto.branch-infer-priority", "auto_branch_infer_priority");
+        insert("auto.identity", "auto_identity");
+        insert("auto.identity-git", "auto_identity_git");
+        insert("branch.type-aliases", "branch_type_aliases");
+        insert("branch.status-aliases", "branch_status_aliases");
+        insert("branch.priority-aliases", "branch_priority_aliases");
+
+        labels
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn build_project_source_labels(
+        resolved_project: &crate::config::types::ResolvedConfig,
+        base_config: &crate::config::types::ResolvedConfig,
+        project_cfg: Option<&crate::config::types::ProjectConfig>,
+        global_cfg: &Option<crate::config::types::GlobalConfig>,
+        home_cfg: &Option<crate::config::types::GlobalConfig>,
+    ) -> HashMap<String, String> {
+        let mut labels = HashMap::new();
+        let mut insert = |path: &str, key: &str| {
+            let label = Self::source_label_for_project(
+                key,
+                resolved_project,
+                base_config,
+                project_cfg,
+                global_cfg,
+                home_cfg,
+            );
+            labels.insert(path.to_string(), label);
+        };
+
+        insert("server.port", "server_port");
+        insert("default.project", "default_project");
+        insert("default.assignee", "default_assignee");
+        insert("default.reporter", "default_reporter");
+        insert("default.tags", "default_tags");
+        insert("default.priority", "default_priority");
+        insert("default.status", "default_status");
+        insert("issue.states", "issue_states");
+        insert("issue.types", "issue_types");
+        insert("issue.priorities", "issue_priorities");
+        insert("issue.tags", "issue_tags");
+        insert("custom.fields", "custom_fields");
+        insert("scan.signal-words", "scan_signal_words");
+        insert("scan.ticket-patterns", "scan_ticket_patterns");
+        insert("scan.enable-ticket-words", "scan_enable_ticket_words");
+        insert("scan.enable-mentions", "scan_enable_mentions");
+        insert("scan.strip-attributes", "scan_strip_attributes");
+        insert("auto.set-reporter", "auto_set_reporter");
+        insert("auto.assign-on-status", "auto_assign_on_status");
+        insert("auto.codeowners-assign", "auto_codeowners_assign");
+        insert("auto.tags-from-path", "auto_tags_from_path");
+        insert("auto.branch-infer-type", "auto_branch_infer_type");
+        insert("auto.branch-infer-status", "auto_branch_infer_status");
+        insert("auto.branch-infer-priority", "auto_branch_infer_priority");
+        insert("auto.identity", "auto_identity");
+        insert("auto.identity-git", "auto_identity_git");
+        insert("branch.type-aliases", "branch_type_aliases");
+        insert("branch.status-aliases", "branch_status_aliases");
+        insert("branch.priority-aliases", "branch_priority_aliases");
+
+        labels
     }
 
     #[allow(clippy::too_many_arguments)]

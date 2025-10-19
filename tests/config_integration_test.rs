@@ -13,6 +13,7 @@ use std::fs;
 
 mod common;
 use common::TestFixtures;
+use common::env_mutex::EnvVarGuard;
 
 // =============================================================================
 // Global Configuration
@@ -35,15 +36,20 @@ mod global_config {
 
         // Run config show command, which should NOT create any files (read-only operation)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let output = cmd
+            .current_dir(temp_dir)
             .arg("config")
             .arg("show")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Configuration for project:"))
-            .stdout(predicate::str::contains(
-                "(none set - will auto-detect on first task creation)",
-            ));
+            .get_output()
+            .stdout
+            .clone();
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("Global configuration – canonical YAML:"),
+            "config show should render global heading\n{stdout}"
+        );
 
         // Verify no files were created by the read-only operation
         assert!(
@@ -109,12 +115,205 @@ mod global_config {
 
         // Test config show displays the updated value
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let output = cmd
+            .current_dir(temp_dir)
             .arg("config")
             .arg("show")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Port: 9000"));
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("server:\n  port: 9000"),
+            "global config show should surface overridden port in YAML\n{stdout}"
+        );
+    }
+
+    #[test]
+    fn test_config_show_highlights_env_overrides_without_explain() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        let _guard = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env.reporter@example.com");
+
+        let output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("show")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("Global configuration – canonical YAML:"),
+            "config show should emit canonical heading\n{stdout}"
+        );
+        assert!(
+            stdout.contains("reporter: env.reporter@example.com"),
+            "env override should appear in output\n{stdout}"
+        );
+        assert!(
+            !stdout.contains("# (env)"),
+            "non-explain output should omit inline source comments\n{stdout}"
+        );
+    }
+
+    #[test]
+    fn test_config_show_full_outputs_effective_yaml() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        // Prime a project prefix so the YAML includes it
+        let mut add_cmd = Command::cargo_bin("lotar").unwrap();
+        add_cmd
+            .current_dir(temp_dir)
+            .arg("task")
+            .arg("add")
+            .arg("Prime prefix")
+            .assert()
+            .success();
+
+        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let output = cmd
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("show")
+            .arg("--full")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(stdout.contains("Effective Global configuration – canonical YAML:"));
+        assert!(
+            stdout.contains("  port: 8080"),
+            "server port should appear in canonical YAML\n{stdout}"
+        );
+        assert!(
+            stdout.contains("codeowners-assign: true"),
+            "automation toggles should surface in canonical YAML\n{stdout}"
+        );
+        assert!(
+            !stdout.contains("# ("),
+            "--full output should omit inline provenance without --explain\n{stdout}"
+        );
+
+        let (_, yaml_block) = stdout
+            .split_once("canonical YAML:\n")
+            .expect("full config should include canonical YAML block");
+        let doc: serde_json::Value =
+            serde_yaml::from_str(yaml_block).expect("canonical YAML should deserialize");
+        assert!(
+            !yaml_block.contains("# ("),
+            "full canonical YAML should omit provenance comments without --explain\n{yaml_block}"
+        );
+
+        let states = doc["issue"]["states"].as_array().expect("states array");
+        let states_as_str: Vec<&str> = states.iter().filter_map(|v| v.as_str()).collect();
+        assert_eq!(states_as_str, vec!["Todo", "InProgress", "Done"]);
+
+        assert_eq!(doc["auto"]["identity"], serde_json::Value::Bool(true));
+        let custom_fields = doc["custom"]["fields"]
+            .as_array()
+            .expect("custom fields array");
+        assert!(custom_fields.iter().any(|v| v.as_str() == Some("*")));
+    }
+
+    #[test]
+    fn test_config_show_full_with_explain_structures_output() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        // Ensure predictable defaults
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("task")
+            .arg("add")
+            .arg("Seed default project")
+            .assert()
+            .success();
+
+        let output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("show")
+            .arg("--full")
+            .arg("--explain")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("Effective Global configuration – canonical YAML:"),
+            "combined output should include canonical heading\n{stdout}"
+        );
+
+        let (_, yaml_block) = stdout
+            .split_once("canonical YAML:\n")
+            .expect("combined output should include canonical YAML block");
+        assert!(
+            yaml_block.starts_with("---\n"),
+            "YAML block should begin with document separator when explain is active"
+        );
+
+        let yaml_body = yaml_block.trim_start_matches("---\n");
+        serde_yaml::from_str::<serde_json::Value>(yaml_body)
+            .expect("YAML block should remain parseable");
+        assert!(
+            yaml_block.contains("codeowners-assign: true # (default)"),
+            "explain output should reuse canonical YAML comments\n{yaml_block}"
+        );
+    }
+
+    #[test]
+    fn test_config_show_full_marks_global_when_overridden() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        // Toggle automation flag to ensure provenance flips to global
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("auto_assign_on_status")
+            .arg("false")
+            .arg("--global")
+            .assert()
+            .success();
+
+        let output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("show")
+            .arg("--full")
+            .arg("--explain")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("assign-on-status: false # (global)"),
+            "global overrides should be marked accordingly in canonical YAML\n{stdout}"
+        );
     }
 }
 
@@ -227,6 +426,73 @@ mod project_config {
 
         let short_dir = temp_dir.join(".tasks").join("ABC");
         assert!(short_dir.exists());
+    }
+
+    #[test]
+    fn test_project_show_full_explain_includes_sources() {
+        let test_fixtures = TestFixtures::new();
+        let temp_dir = test_fixtures.temp_dir.path();
+
+        // Set a global default priority to observe in project explain output
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("default_priority")
+            .arg("High")
+            .arg("--global")
+            .assert()
+            .success();
+
+        // Initialize project and set a project-specific override
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("init")
+            .arg("--project=SourceProject")
+            .assert()
+            .success();
+
+        Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("set")
+            .arg("default_assignee")
+            .arg("project.assignee@example.com")
+            .arg("--project=SourceProject")
+            .assert()
+            .success();
+
+        let output = Command::cargo_bin("lotar")
+            .unwrap()
+            .current_dir(temp_dir)
+            .arg("config")
+            .arg("show")
+            .arg("--project=SourceProject")
+            .arg("--full")
+            .arg("--explain")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("Project configuration (SourceProject"),
+            "project show should include heading with label\n{stdout}"
+        );
+        assert!(
+            stdout.contains("assignee: project.assignee@example.com # (project)"),
+            "project overrides should be labeled with project provenance\n{stdout}"
+        );
+        assert!(
+            stdout.contains("priority: High # (global)"),
+            "inherited global values should retain provenance in project explain\n{stdout}"
+        );
     }
 }
 
@@ -398,11 +664,11 @@ mod config_operations {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "Configuration for project: ShowTest",
+                "Project configuration (ShowTest (SHOW)) – canonical YAML:",
             ))
-            .stdout(predicate::str::contains("Project Settings:"))
-            .stdout(predicate::str::contains("Project prefix:"))
-            .stdout(predicate::str::contains("Default Priority:"));
+            .stdout(predicate::str::contains("canonical YAML:"))
+            .stdout(predicate::str::contains("---"))
+            .stdout(predicate::str::contains("issue:"));
     }
 }
 
@@ -430,7 +696,9 @@ mod custom_tasks_directory {
             .arg("show")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Tasks directory: custom-tasks"));
+            .stdout(predicate::str::contains(
+                "Global configuration – canonical YAML:",
+            ));
 
         // Verify the custom directory was created
         assert!(custom_tasks_dir.exists());
@@ -515,8 +783,10 @@ mod custom_tasks_directory {
             .arg("show")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Port: 7777"))
-            .stdout(predicate::str::contains("Default Project: parent-project"));
+            .stdout(predicate::str::contains("server:\n  port: 7777"))
+            .stdout(predicate::str::contains(
+                "default:\n  project: parent-project",
+            ));
     }
 
     #[test]
@@ -619,15 +889,30 @@ mod inheritance {
 
         // Show config should display project settings (not server settings)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
-        cmd.current_dir(temp_dir)
+        let output = cmd
+            .current_dir(temp_dir)
             .arg("config")
             .arg("show")
             .arg("--project=InheritanceTest")
             .assert()
             .success()
-            // With canonicalization, a provided project name is displayed as its prefix
-            .stdout(predicate::str::contains("Project prefix: INHE"))
-            .stdout(predicate::str::contains("Default Priority: HIGH")); // Project-specific
+            .get_output()
+            .stdout
+            .clone();
+
+        let stdout = String::from_utf8_lossy(&output);
+        assert!(
+            stdout.contains("Project configuration (InheritanceTest"),
+            "project show should include canonical heading with display name\n{stdout}"
+        );
+        assert!(
+            stdout.contains("priority: HIGH"),
+            "project override should surface in YAML\n{stdout}"
+        );
+        assert!(
+            !stdout.contains("server:"),
+            "project-scoped show should omit unrelated server settings\n{stdout}"
+        );
     }
 }
 
