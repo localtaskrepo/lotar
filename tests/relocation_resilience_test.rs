@@ -5,6 +5,14 @@ use std::fs;
 mod common;
 use common::TestFixtures;
 
+fn assert_yaml_contains(anchor_list: &str, needle: &str) {
+    let normalized = anchor_list.replace('\\', "/");
+    assert!(
+        normalized.contains(needle),
+        "expected YAML to include `{needle}` but was: {normalized}"
+    );
+}
+
 fn project_and_task_paths(root: &std::path::Path) -> (String, std::path::PathBuf) {
     let tasks_dir = root.join(".tasks");
     let mut projects = std::fs::read_dir(&tasks_dir)
@@ -58,10 +66,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
         yaml.contains("references:"),
         "expected references section in YAML after scan"
     );
-    assert!(
-        yaml.contains("code: main.rs#L1"),
-        "expected initial anchor main.rs#L1 in task YAML: {yaml}"
-    );
+    assert_yaml_contains(&yaml, "code: main.rs#L1");
 
     // Move the comment down by inserting a blank line on top -> line becomes 2
     fs::write(&src_path, format!("\n// TODO {id}: do thing\n")).unwrap();
@@ -71,10 +76,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
     scan2.current_dir(root).arg("scan").assert().success();
 
     let yaml2 = fs::read_to_string(&task_file).unwrap();
-    assert!(
-        yaml2.contains("code: main.rs#L2"),
-        "expected new anchor main.rs#L2 in task YAML after move: {yaml2}"
-    );
+    assert_yaml_contains(&yaml2, "code: main.rs#L2");
 }
 
 #[test]
@@ -98,7 +100,7 @@ fn scan_adds_reference_when_file_is_renamed() {
     let mut scan = Command::cargo_bin("lotar").unwrap();
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
-    assert!(yaml.contains("code: a.rs#L1"));
+    assert_yaml_contains(&yaml, "code: a.rs#L1");
 
     // Rename file; keep the same TODO line
     let src2 = root.join("src").join("b.rs");
@@ -109,5 +111,5 @@ fn scan_adds_reference_when_file_is_renamed() {
     let mut scan2 = Command::cargo_bin("lotar").unwrap();
     scan2.current_dir(root).arg("scan").assert().success();
     let yaml2 = fs::read_to_string(&task_file).unwrap();
-    assert!(yaml2.contains("code: src/b.rs#L1"));
+    assert_yaml_contains(&yaml2, "code: src/b.rs#L1");
 }

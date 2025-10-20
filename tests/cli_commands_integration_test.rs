@@ -1451,6 +1451,7 @@ issue.priorities: [Low, Medium, High]
         write_minimal_config(&tasks_dir, "default.reporter: alice@example.com\n");
 
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+        let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp.path())
@@ -1470,6 +1471,7 @@ issue.priorities: [Low, Medium, High]
         write_minimal_config(&tasks_dir, "default.reporter: carol\n");
 
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+        let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
         let mut cmd = Command::cargo_bin("lotar").unwrap();
         cmd.current_dir(temp.path())
@@ -1490,6 +1492,7 @@ issue.priorities: [Low, Medium, High]
         write_minimal_config(&tasks_dir, "default.reporter: dave\n");
 
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+        let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
         // Compact JSON (no extra fields)
         let mut cmd = Command::cargo_bin("lotar").unwrap();
@@ -1520,6 +1523,7 @@ issue.priorities: [Low, Medium, High]
         write_minimal_config(&tasks_dir, "default.reporter: bob\n");
 
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+        let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
         // Create a task via service to get a known ID
         let mut storage = Storage::new(tasks_dir.clone());

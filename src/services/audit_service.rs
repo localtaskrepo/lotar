@@ -1,6 +1,7 @@
 use chrono::{DateTime, Datelike, Duration, Utc};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -154,6 +155,21 @@ fn to_feed_history_entry(entry: TaskChangeLogEntry) -> ActivityFeedHistoryEntry 
 }
 
 impl AuditService {
+    fn git_path_str(path: &Path) -> String {
+        #[cfg(windows)]
+        {
+            path.to_string_lossy().replace('\\', "/")
+        }
+        #[cfg(not(windows))]
+        {
+            path.to_string_lossy().to_string()
+        }
+    }
+
+    fn git_path_arg(path: &Path) -> OsString {
+        OsString::from(Self::git_path_str(path))
+    }
+
     /// List commits touching a specific file (relative to repo root)
     pub fn list_commits_for_file(
         repo_root: &Path,
@@ -165,7 +181,7 @@ impl AuditService {
         cmd.arg("--no-merges");
         cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s");
         cmd.arg("--");
-        cmd.arg(file_rel);
+        cmd.arg(Self::git_path_arg(file_rel));
 
         let output = cmd
             .output()
@@ -253,7 +269,7 @@ impl AuditService {
         let mut cmd = Command::new("git");
         cmd.arg("-C").arg(repo_root);
         cmd.arg("ls-files");
-        cmd.arg(tasks_rel);
+        cmd.arg(Self::git_path_arg(tasks_rel));
         match cmd.output() {
             Ok(output) if output.status.success() => !output.stdout.is_empty(),
             _ => false,
@@ -304,7 +320,7 @@ impl AuditService {
         cmd.arg("--");
         if let Some(filters) = path_filters {
             for filter in filters {
-                cmd.arg(filter);
+                cmd.arg(Self::git_path_arg(&filter));
             }
         }
 
@@ -814,7 +830,7 @@ impl AuditService {
 
     /// Show file contents at a specific commit (binary-safe as String lossily)
     pub fn show_file_at(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
-        let spec = format!("{}:{}", commit, file_rel.to_string_lossy());
+        let spec = format!("{}:{}", commit, Self::git_path_str(file_rel));
         let output = Command::new("git")
             .arg("-C")
             .arg(repo_root)
@@ -844,7 +860,7 @@ impl AuditService {
             .arg("show")
             .arg(commit)
             .arg("--")
-            .arg(file_rel)
+            .arg(Self::git_path_arg(file_rel))
             .output()
             .map_err(|e| format!("Failed to run git: {}", e))?;
         if !output.status.success() {
@@ -882,7 +898,7 @@ impl AuditService {
         cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
         // Limit to tasks directory changes
         cmd.arg("--");
-        cmd.arg(tasks_rel);
+        cmd.arg(Self::git_path_arg(tasks_rel));
 
         let output = cmd
             .output()
@@ -1015,7 +1031,7 @@ impl AuditService {
         if let Some(project) = project_filter {
             cmd.arg(tasks_rel.join(project));
         } else {
-            cmd.arg(tasks_rel);
+            cmd.arg(Self::git_path_arg(tasks_rel));
         }
 
         let output = cmd
@@ -1097,7 +1113,7 @@ impl AuditService {
         if let Some(project) = project_filter {
             cmd.arg(tasks_rel.join(project));
         } else {
-            cmd.arg(tasks_rel);
+            cmd.arg(Self::git_path_arg(tasks_rel));
         }
 
         let output = cmd

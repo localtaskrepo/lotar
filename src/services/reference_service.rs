@@ -62,9 +62,8 @@ impl ReferenceService {
 
         let path_display = resolved
             .strip_prefix(&repo_root_canonical)
-            .unwrap_or(&resolved)
-            .display()
-            .to_string();
+            .unwrap_or(&resolved);
+        let path_display = Self::normalize_path_for_display(path_display);
 
         let has_more_before = start_line_inclusive > 1;
         let has_more_after = end_line_inclusive < total_lines;
@@ -140,12 +139,18 @@ impl ReferenceService {
         }
         Ok(canonical)
     }
+
+    fn normalize_path_for_display(path: &Path) -> String {
+        let raw = path.to_string_lossy();
+        raw.replace('\\', "/")
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+    use std::path::Path;
 
     #[test]
     fn snippet_for_code_returns_expected_context() {
@@ -203,5 +208,12 @@ mod tests {
             .expect_err("expected failure for missing file");
 
         assert!(err.contains("not found"));
+    }
+
+    #[test]
+    fn normalize_path_for_display_converts_backslashes() {
+        let path = Path::new("src\\example.rs");
+        let normalized = ReferenceService::normalize_path_for_display(path);
+        assert_eq!(normalized, "src/example.rs");
     }
 }

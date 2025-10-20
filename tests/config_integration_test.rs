@@ -324,6 +324,10 @@ mod global_config {
 mod project_config {
     use super::*;
 
+    fn path_contains(fragment: &'static str) -> impl Predicate<str> {
+        predicate::function(move |s: &str| s.replace('\\', "/").contains(fragment))
+    }
+
     #[test]
     fn test_project_config_creation_with_prefix() {
         let test_fixtures = TestFixtures::new();
@@ -341,7 +345,7 @@ mod project_config {
                 "Initializing configuration with template 'default'",
             ))
             .stdout(predicate::str::contains("✅ Configuration initialized at:"))
-            .stdout(predicate::str::contains(".tasks/MYVE/config.yml"));
+            .stdout(path_contains(".tasks/MYVE/config.yml"));
 
         // Verify the project folder was created with the correct prefix
         let project_dir = temp_dir.join(".tasks").join("MYVE");
@@ -376,7 +380,7 @@ mod project_config {
             .assert()
             .success()
             .stdout(predicate::str::contains("✅ Configuration initialized at:"))
-            .stdout(predicate::str::contains(".tasks/TEST/config.yml"));
+            .stdout(path_contains(".tasks/TEST/config.yml"));
 
         // Verify the project folder was created with the same name
         let project_dir = temp_dir.join(".tasks").join("TEST");
@@ -396,7 +400,7 @@ mod project_config {
             .arg("--project=my-awesome-project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(".tasks/MAP/config.yml"));
+            .stdout(path_contains(".tasks/MAP/config.yml"));
 
         let hyphen_dir = temp_dir.join(".tasks").join("MAP");
         assert!(hyphen_dir.exists());
@@ -409,7 +413,7 @@ mod project_config {
             .arg("--project=my_cool_project")
             .assert()
             .success()
-            .stdout(predicate::str::contains(".tasks/MCP/config.yml"));
+            .stdout(path_contains(".tasks/MCP/config.yml"));
 
         let underscore_dir = temp_dir.join(".tasks").join("MCP");
         assert!(underscore_dir.exists());
@@ -422,7 +426,7 @@ mod project_config {
             .arg("--project=ABC")
             .assert()
             .success()
-            .stdout(predicate::str::contains(".tasks/ABC/config.yml"));
+            .stdout(path_contains(".tasks/ABC/config.yml"));
 
         let short_dir = temp_dir.join(".tasks").join("ABC");
         assert!(short_dir.exists());

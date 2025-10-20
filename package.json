@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && cargo build --release",
+    "build:web": "vite build",
     "test": "npm run test:rust && npm run test:ui",
     "test:rust": "cargo nextest run --release",
     "test:ui": "vitest run --config view/vitest.config.ts",

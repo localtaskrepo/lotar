@@ -105,8 +105,9 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
         .assert()
         .success();
     let yaml = fs::read_to_string(&task_file).unwrap();
-    assert!(yaml.contains("code: a.rs#L1"));
-    assert!(yaml.contains("code: nested/b.rs#L1"));
+    let yaml_norm = yaml.replace('\\', "/");
+    assert!(yaml_norm.contains("code: a.rs#L1"));
+    assert!(yaml_norm.contains("code: nested/b.rs#L1"));
 
     // Now run with --reanchor: only the newest occurrence should remain
     Command::cargo_bin("lotar")
@@ -115,7 +116,7 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
         .args(["scan", "--reanchor"])
         .assert()
         .success();
-    let yaml2 = fs::read_to_string(&task_file).unwrap();
+    let yaml2 = fs::read_to_string(&task_file).unwrap().replace('\\', "/");
     // We only assert that at most one anchor remains. It should be for whichever scan processed last
     let count = yaml2.matches("code:").count();
     assert!(
