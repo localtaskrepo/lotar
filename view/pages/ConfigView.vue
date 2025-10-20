@@ -19,6 +19,19 @@
     <div v-if="error" class="alert alert-error">{{ error }}</div>
     <div v-else-if="loading" class="alert alert-info">Loading configuration…</div>
 
+    <div v-if="!loading && saveWarnings.length" class="alert alert-warning">
+      <p class="alert-title">Configuration saved with warnings:</p>
+      <ul>
+        <li v-for="(warning, idx) in saveWarnings" :key="`warn-${idx}`">{{ warning }}</li>
+      </ul>
+    </div>
+    <div v-if="!loading && saveInfoMessages.length" class="alert alert-info subtle">
+      <p class="alert-title">Additional notes:</p>
+      <ul>
+        <li v-for="(info, idx) in saveInfoMessages" :key="`info-${idx}`">{{ info }}</li>
+      </ul>
+    </div>
+
     <div v-if="inspectData" class="config-body">
       <div class="config-main">
         <ConfigServerSection
@@ -316,6 +329,8 @@ const { projects, project, loading, error: loadError, inspectData, lastLoadedAt,
 const saving = ref(false)
 const helpOpen = ref(false)
 const saveError = ref<string | null>(null)
+const saveWarnings = ref<string[]>([])
+const saveInfoMessages = ref<string[]>([])
 const error = computed(() => saveError.value ?? loadError.value)
 
 const createOpen = ref(false)
@@ -581,6 +596,8 @@ const serverPortSourceClass = computed(() => provenanceClass(serverPortSource.va
 
 async function handleReload() {
   saveError.value = null
+  saveWarnings.value = []
+  saveInfoMessages.value = []
   await reload()
 }
 
@@ -595,13 +612,30 @@ async function save() {
     return
   }
   saving.value = true
+  saveError.value = null
+  saveWarnings.value = []
+  saveInfoMessages.value = []
   try {
-    await api.setConfig({ values: payload, project: isGlobal.value ? undefined : project.value, global: isGlobal.value })
-    showToast('Configuration saved')
+    const result = await api.setConfig({ values: payload, project: isGlobal.value ? undefined : project.value, global: isGlobal.value })
+    saveWarnings.value = result.warnings || []
+    saveInfoMessages.value = result.info || []
+
+    if (result.errors && result.errors.length) {
+      throw new Error(result.errors.join('\n'))
+    }
+
+    if (saveWarnings.value.length) {
+      showToast('Configuration saved with warnings', 'Config saved')
+    } else {
+      showToast('Configuration saved')
+    }
+
     await reload()
     saveError.value = null
   } catch (err: any) {
     saveError.value = err?.message ?? String(err)
+    saveWarnings.value = []
+    saveInfoMessages.value = []
   } finally {
     saving.value = false
   }
@@ -670,6 +704,21 @@ watch(
 .alert-info {
   background: rgba(0, 162, 255, 0.12);
   border: 1px solid rgba(0, 162, 255, 0.35);
+}
+
+.alert-info.subtle {
+  background: rgba(0, 162, 255, 0.08);
+  border-style: dashed;
+}
+
+.alert-warning {
+  background: rgba(255, 199, 0, 0.14);
+  border: 1px solid rgba(255, 199, 0, 0.45);
+}
+
+.alert-title {
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
 .config-body {

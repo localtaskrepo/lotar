@@ -1,9 +1,15 @@
 use crate::api_types::ProjectDTO;
 use crate::config::manager::ConfigManager;
+use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
 use serde_yaml;
 use std::collections::BTreeMap;
+
+pub struct ConfigSetOutcome {
+    pub updated: bool,
+    pub validation: ValidationResult,
+}
 
 pub struct ConfigService;
 
@@ -470,7 +476,7 @@ impl ConfigService {
         let mut updates = values.cloned().unwrap_or_default();
         updates.insert("project_name".to_string(), trimmed.to_string());
 
-        Self::set(resolver, &updates, false, Some(&prefix))?;
+        let _ = Self::set(resolver, &updates, false, Some(&prefix))?;
 
         Ok(ProjectDTO {
             name: trimmed.to_string(),
@@ -478,13 +484,13 @@ impl ConfigService {
         })
     }
 
-    /// Set one or more fields with validation; returns true if updated
+    /// Set one or more fields with validation; returns aggregate result information
     pub fn set(
         resolver: &TasksDirectoryResolver,
         values: &std::collections::BTreeMap<String, String>,
         global: bool,
         project: Option<&str>,
-    ) -> LoTaRResult<bool> {
+    ) -> LoTaRResult<ConfigSetOutcome> {
         let mgr = ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path).map_err(
             |e| LoTaRError::ValidationError(format!("Failed to init config manager: {}", e)),
         )?;
@@ -509,6 +515,9 @@ impl ConfigService {
                     .unwrap_or_else(|| mgr.get_resolved_config().default_prefix.clone()),
             )
         };
+
+        let mut combined = ValidationResult::new();
+        let mut updated = false;
 
         // When setting project fields, avoid storing duplicates of global values.
         if let Some(proj) = target_project.as_deref() {
@@ -562,8 +571,11 @@ impl ConfigService {
 
                 // Empty means clear the override for project scope (where applicable)
                 if v_trim.is_empty() {
-                    // best-effort clear; ignore errors for non-clearable fields
-                    let _ = crate::config::operations::clear_project_field(&resolver.path, proj, k);
+                    crate::config::operations::clear_project_field(&resolver.path, proj, k)
+                        .map_err(|e| {
+                            LoTaRError::ValidationError(format!("Failed to clear '{}': {}", k, e))
+                        })?;
+                    updated = true;
                     continue;
                 }
 
@@ -644,7 +656,8 @@ impl ConfigService {
                     }
                     "default_tags" => {
                         let gv: String = join(&g.default_tags);
-                        join(&csv(v)) == gv
+                        let lv = csv(v);
+                        join(&lv) == gv
                     }
                     "auto_set_reporter" => parse_bool(v_trim) == Some(g.auto_set_reporter),
                     "auto_assign_on_status" => parse_bool(v_trim) == Some(g.auto_assign_on_status),
@@ -695,23 +708,39 @@ impl ConfigService {
                 };
 
                 if is_equal_to_global {
-                    // Clear override instead of writing duplicate
-                    let _ = crate::config::operations::clear_project_field(&resolver.path, proj, k);
+                    crate::config::operations::clear_project_field(&resolver.path, proj, k)
+                        .map_err(|e| {
+                            LoTaRError::ValidationError(format!("Failed to clear '{}': {}", k, e))
+                        })?;
+                    updated = true;
                 } else {
-                    ConfigManager::update_config_field(&resolver.path, k, v, Some(proj)).map_err(
-                        |e| LoTaRError::ValidationError(format!("Failed to update '{}': {}", k, e)),
-                    )?;
+                    let validation =
+                        ConfigManager::update_config_field(&resolver.path, k, v, Some(proj))
+                            .map_err(|e| {
+                                LoTaRError::ValidationError(format!(
+                                    "Failed to update '{}': {}",
+                                    k, e
+                                ))
+                            })?;
+                    combined.merge(validation);
+                    updated = true;
                 }
             }
         } else {
             // Global scope: apply updates directly
             for (k, v) in values {
-                ConfigManager::update_config_field(&resolver.path, k, v, None).map_err(|e| {
-                    LoTaRError::ValidationError(format!("Failed to update '{}': {}", k, e))
-                })?;
+                let validation = ConfigManager::update_config_field(&resolver.path, k, v, None)
+                    .map_err(|e| {
+                        LoTaRError::ValidationError(format!("Failed to update '{}': {}", k, e))
+                    })?;
+                combined.merge(validation);
+                updated = true;
             }
         }
 
-        Ok(true)
+        Ok(ConfigSetOutcome {
+            updated,
+            validation: combined,
+        })
     }
 }

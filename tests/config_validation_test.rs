@@ -261,18 +261,72 @@ fn test_global_config_validation_invalid_defaults() {
     };
 
     let result = validator.validate_global_config(&config);
-    assert!(result.has_errors());
+    assert!(!result.has_errors());
+    assert!(result.has_warnings());
 
-    let error_messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
+    let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
     assert!(
-        error_messages
+        warning_messages
             .iter()
             .any(|msg| msg.contains("Default priority 'Medium' not found"))
     );
     assert!(
-        error_messages
+        warning_messages
             .iter()
             .any(|msg| msg.contains("Default status 'Done' not found"))
+    );
+}
+
+#[test]
+fn test_global_config_duplicate_entries_warning() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let config = GlobalConfig {
+        server_port: 8080,
+        default_prefix: "TEST".to_string(),
+        issue_states: ConfigurableField {
+            values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
+        },
+        issue_types: ConfigurableField {
+            values: vec![TaskType::from("Feature"), TaskType::from("feature")],
+        },
+        issue_priorities: ConfigurableField {
+            values: vec![Priority::from("Low"), Priority::from("Medium")],
+        },
+        tags: StringConfigField::new_wildcard(),
+        default_assignee: None,
+        default_reporter: None,
+        default_tags: vec!["tag".to_string(), "Tag".to_string()],
+        auto_set_reporter: true,
+        auto_assign_on_status: true,
+        default_priority: Priority::from("Medium"),
+        default_status: Some(TaskStatus::from("Todo")),
+        custom_fields: StringConfigField::new_wildcard(),
+        scan_signal_words: vec!["TODO".to_string(), "todo".to_string()],
+        scan_ticket_patterns: Some(vec!["PROJ-[0-9]+".to_string(), "proj-[0-9]+".to_string()]),
+        scan_enable_ticket_words: false,
+        scan_enable_mentions: true,
+        scan_strip_attributes: true,
+        auto_identity: true,
+        auto_identity_git: true,
+        auto_codeowners_assign: true,
+        auto_tags_from_path: true,
+        auto_branch_infer_type: true,
+        auto_branch_infer_status: true,
+        auto_branch_infer_priority: true,
+        branch_type_aliases: std::collections::HashMap::new(),
+        branch_status_aliases: std::collections::HashMap::new(),
+        branch_priority_aliases: std::collections::HashMap::new(),
+    };
+
+    let result = validator.validate_global_config(&config);
+    assert!(result.has_warnings());
+    let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
+    assert!(
+        warning_messages
+            .iter()
+            .any(|msg| msg.contains("Duplicate value 'todo'"))
     );
 }
 
@@ -325,6 +379,104 @@ fn test_project_config_validation_valid() {
 }
 
 #[test]
+fn test_project_config_duplicate_overrides_warning() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let config = ProjectConfig {
+        project_name: "Demo".to_string(),
+        issue_states: Some(ConfigurableField {
+            values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
+        }),
+        issue_types: Some(ConfigurableField {
+            values: vec![TaskType::from("Feature"), TaskType::from("feature")],
+        }),
+        issue_priorities: Some(ConfigurableField {
+            values: vec![Priority::from("Low"), Priority::from("low")],
+        }),
+        tags: Some(StringConfigField {
+            values: vec!["UI".to_string(), "ui".to_string()],
+        }),
+        default_assignee: None,
+        default_reporter: None,
+        default_tags: Some(vec!["tag".to_string(), "TAG".to_string()]),
+        default_priority: Some(Priority::from("Low")),
+        default_status: Some(TaskStatus::from("Todo")),
+        custom_fields: Some(StringConfigField {
+            values: vec!["field".to_string(), "Field".to_string()],
+        }),
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
+        scan_signal_words: Some(vec!["TODO".to_string(), "todo".to_string()]),
+        scan_ticket_patterns: Some(vec!["PROJ-[0-9]+".to_string(), "proj-[0-9]+".to_string()]),
+        scan_strip_attributes: None,
+        scan_enable_mentions: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
+    };
+
+    let result = validator.validate_project_config(&config);
+    assert!(result.has_warnings());
+    let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
+    assert!(
+        warning_messages
+            .iter()
+            .any(|msg| msg.contains("Duplicate value 'todo'"))
+    );
+}
+
+#[test]
+fn test_project_config_empty_override_errors() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let config = ProjectConfig {
+        project_name: "Demo".to_string(),
+        issue_states: Some(ConfigurableField { values: vec![] }),
+        issue_types: Some(ConfigurableField { values: vec![] }),
+        issue_priorities: Some(ConfigurableField { values: vec![] }),
+        tags: None,
+        default_assignee: None,
+        default_reporter: None,
+        default_tags: None,
+        default_priority: None,
+        default_status: None,
+        custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
+        scan_signal_words: None,
+        scan_ticket_patterns: None,
+        scan_strip_attributes: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
+        scan_enable_mentions: None,
+    };
+
+    let result = validator.validate_project_config(&config);
+    assert!(result.has_errors());
+    let messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
+    assert!(
+        messages
+            .iter()
+            .any(|msg| msg.contains("Issue states override cannot be empty"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|msg| msg.contains("Issue types override cannot be empty"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|msg| msg.contains("Issue priorities override cannot be empty"))
+    );
+}
+
+#[test]
 fn test_project_config_validation_empty_project_name() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
@@ -359,6 +511,46 @@ fn test_project_config_validation_empty_project_name() {
     let error_messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
     assert!(
         error_messages
+            .iter()
+            .any(|msg| msg.contains("Project name cannot be empty"))
+    );
+}
+
+#[test]
+fn test_project_config_validation_whitespace_project_name() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let config = ProjectConfig {
+        project_name: "   ".to_string(),
+        issue_states: None,
+        issue_types: None,
+        issue_priorities: None,
+        tags: None,
+        default_assignee: None,
+        default_reporter: None,
+        default_tags: None,
+        default_priority: None,
+        default_status: None,
+        custom_fields: None,
+        auto_set_reporter: None,
+        auto_assign_on_status: None,
+        scan_signal_words: None,
+        scan_ticket_patterns: None,
+        scan_strip_attributes: None,
+        scan_enable_mentions: None,
+        branch_type_aliases: None,
+        branch_status_aliases: None,
+        branch_priority_aliases: None,
+        scan_enable_ticket_words: None,
+    };
+
+    let result = validator.validate_project_config(&config);
+    assert!(result.has_errors());
+
+    let messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
+    assert!(
+        messages
             .iter()
             .any(|msg| msg.contains("Project name cannot be empty"))
     );
@@ -439,16 +631,17 @@ fn test_project_config_validation_invalid_defaults() {
     };
 
     let result = validator.validate_project_config(&config);
-    assert!(result.has_errors());
+    assert!(!result.has_errors());
+    assert!(result.has_warnings());
 
-    let error_messages: Vec<&str> = result.errors.iter().map(|e| e.message.as_str()).collect();
+    let warning_messages: Vec<&str> = result.warnings.iter().map(|w| w.message.as_str()).collect();
     assert!(
-        error_messages
+        warning_messages
             .iter()
             .any(|msg| msg.contains("Default priority 'Medium' not found"))
     );
     assert!(
-        error_messages
+        warning_messages
             .iter()
             .any(|msg| msg.contains("Default status 'Done' not found"))
     );
@@ -466,7 +659,7 @@ fn test_project_config_validation_invalid_email_format() {
         issue_priorities: None,
         tags: None,
         default_assignee: Some("invalid-email".to_string()), // Invalid email format
-        default_reporter: None,
+        default_reporter: Some("invalid-reporter".to_string()),
         default_tags: None,
         default_priority: None,
         default_status: None,
@@ -490,7 +683,12 @@ fn test_project_config_validation_invalid_email_format() {
     assert!(
         warning_messages
             .iter()
-            .any(|msg| msg.contains("doesn't look like an email"))
+            .any(|msg| msg.contains("Assignee format doesn't look like an email"))
+    );
+    assert!(
+        warning_messages
+            .iter()
+            .any(|msg| msg.contains("Reporter format doesn't look like an email"))
     );
 }
 
@@ -514,6 +712,10 @@ fn test_prefix_format_validation() {
 
     // Test invalid characters (should error)
     let result = validator.validate_prefix_format("ABC@123");
+    assert!(result.has_errors());
+
+    // Test prefix exceeding max length (should error)
+    let result = validator.validate_prefix_format("THIS_PREFIX_IS_MUCH_TOO_LONG");
     assert!(result.has_errors());
 }
 

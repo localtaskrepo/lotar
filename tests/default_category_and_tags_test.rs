@@ -117,7 +117,7 @@ fn normalize_canonical_includes_custom_fields_global() {
 
     std::fs::write(
         tasks.join("config.yml"),
-    "server.port: 8080\ndefault.project: TEST\nissue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low]\ncustom.fields: [product]\ndefault.tags: [team, backend]\n",
+    "server.port: 8080\ndefault.project: TEST\nissue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low, Medium]\ncustom.fields: [product]\ndefault.tags: [team, backend]\n",
     )
     .unwrap();
 
@@ -144,7 +144,7 @@ fn normalize_project_canonical_includes_custom_fields() {
 
     std::fs::write(
         tasks.join("config.yml"),
-        "issue_states: [Todo]\nissue_types: [Feature]\nissue_priorities: [Low]\n",
+        "issue_states: [Todo]\nissue_types: [Feature]\nissue_priorities: [Low, Medium]\n",
     )
     .unwrap();
 

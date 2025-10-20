@@ -759,11 +759,41 @@ pub fn initialize(api_server: &mut ApiServer) {
             .unwrap_or(false);
         let project = body.get("project").and_then(|v| v.as_str());
         match ConfigService::set(&resolver, &map, global, project) {
-            Ok(_) => {
+            Ok(outcome) => {
                 let actor =
                     crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
                 crate::api_events::emit_config_updated(actor.as_deref());
-                ok_json(200, json!({"data": {"updated": true}}))
+
+                let warnings: Vec<String> = outcome
+                    .validation
+                    .warnings
+                    .iter()
+                    .map(|w| w.to_string())
+                    .collect();
+                let info: Vec<String> = outcome
+                    .validation
+                    .info
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect();
+                let errors: Vec<String> = outcome
+                    .validation
+                    .errors
+                    .iter()
+                    .map(|err| err.to_string())
+                    .collect();
+
+                ok_json(
+                    200,
+                    json!({
+                        "data": {
+                            "updated": outcome.updated,
+                            "warnings": warnings,
+                            "info": info,
+                            "errors": errors,
+                        }
+                    }),
+                )
             }
             Err(e) => bad_request(e.to_string()),
         }

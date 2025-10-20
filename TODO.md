@@ -23,7 +23,6 @@ Chores:
 - Check if we're Windows compatible
 - Test release workflow
 - Check if any of the auto features are applied to MPC as well.
-- Config validation may need an update
 
 # Implementation Roadmap
 

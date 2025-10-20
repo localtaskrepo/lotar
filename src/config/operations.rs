@@ -1,4 +1,6 @@
 use crate::config::types::*;
+use crate::config::validation::ConfigValidator;
+use crate::config::validation::errors::ValidationResult;
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::utils::project::generate_project_prefix;
 use serde::de::DeserializeOwned;
@@ -175,7 +177,9 @@ pub fn update_config_field(
     field: &str,
     value: &str,
     project_prefix: Option<&str>,
-) -> Result<(), ConfigError> {
+) -> Result<ValidationResult, ConfigError> {
+    let validator = ConfigValidator::new(tasks_dir);
+
     if let Some(project) = project_prefix {
         // Update project config
         let mut project_config =
@@ -183,16 +187,46 @@ pub fn update_config_field(
                 .unwrap_or_else(|_| ProjectConfig::new(project.to_string()));
 
         apply_field_to_project_config(&mut project_config, field, value)?;
+
+        let validation = validator.validate_project_config(&project_config);
+        if validation.has_errors() {
+            let summary = validation
+                .errors
+                .iter()
+                .map(|err| err.to_string())
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(ConfigError::ParseError(format!(
+                "Validation failed for project field '{}':\n{}",
+                field, summary
+            )));
+        }
+
         save_project_config(tasks_dir, project, &project_config)?;
+        Ok(validation)
     } else {
         // Update global config
         let mut global_config =
             crate::config::persistence::load_global_config(Some(tasks_dir)).unwrap_or_default();
         apply_field_to_global_config(&mut global_config, field, value)?;
-        save_global_config(tasks_dir, &global_config)?;
-    }
 
-    Ok(())
+        let validation = validator.validate_global_config(&global_config);
+        if validation.has_errors() {
+            let summary = validation
+                .errors
+                .iter()
+                .map(|err| err.to_string())
+                .collect::<Vec<_>>()
+                .join("\n");
+            return Err(ConfigError::ParseError(format!(
+                "Validation failed for global field '{}':\n{}",
+                field, summary
+            )));
+        }
+
+        save_global_config(tasks_dir, &global_config)?;
+        Ok(validation)
+    }
 }
 
 /// Apply a field update to GlobalConfig
@@ -584,9 +618,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
             let port = value
                 .parse::<u16>()
                 .map_err(|_| ConfigError::ParseError(format!("Invalid port number: {}", value)))?;
-            if port < 1024 {
+            if port == 0 {
                 return Err(ConfigError::ParseError(
-                    "Port number must be 1024 or higher".to_string(),
+                    "Port number must be between 1 and 65535".to_string(),
                 ));
             }
         }

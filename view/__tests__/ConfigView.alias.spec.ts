@@ -145,7 +145,7 @@ describe('ConfigView branch alias handling', () => {
             ; (api.listProjects as any).mockResolvedValue([
                 { name: 'App', prefix: 'APP' },
             ])
-            ; (api.setConfig as any).mockResolvedValue({ updated: true })
+            ; (api.setConfig as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
     })
 
     afterEach(() => {

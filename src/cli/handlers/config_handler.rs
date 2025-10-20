@@ -1694,14 +1694,18 @@ impl ConfigHandler {
             }
         };
 
+        let mut validation_warnings: Vec<String> = Vec::new();
+
         // Update the configuration
-        ConfigManager::update_config_field(
+        let validation = ConfigManager::update_config_field(
             &resolver.path,
             &field,
             &value,
             project_prefix.as_deref(),
         )
         .map_err(|e| format!("Failed to update config: {}", e))?;
+
+        validation_warnings.extend(validation.warnings.iter().map(|w| w.to_string()));
 
         // Show helpful information about project-specific config
         if project_prefix.is_some() {
@@ -1713,6 +1717,13 @@ impl ConfigHandler {
             }
         }
         renderer.emit_success(&format!("Successfully updated {}", field));
+
+        if !validation_warnings.is_empty() {
+            renderer.emit_warning("Validation warnings detected after applying the change:");
+            for warning in validation_warnings {
+                renderer.emit_warning(&warning);
+            }
+        }
         Ok(())
     }
 

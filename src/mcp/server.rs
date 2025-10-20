@@ -960,12 +960,30 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
             match crate::services::config_service::ConfigService::set(
                 &resolver, &map, global, project,
             ) {
-                Ok(_) => ok(
-                    req.id,
-                    json!({
-                        "content": [ { "type": "text", "text": "Configuration updated" } ]
-                    }),
-                ),
+                Ok(outcome) => {
+                    let mut lines = vec!["Configuration updated".to_string()];
+
+                    if !outcome.validation.warnings.is_empty() {
+                        lines.push("Warnings:".to_string());
+                        for warning in &outcome.validation.warnings {
+                            lines.push(format!("- {}", warning));
+                        }
+                    }
+
+                    if !outcome.validation.info.is_empty() {
+                        lines.push("Info:".to_string());
+                        for info in &outcome.validation.info {
+                            lines.push(format!("- {}", info));
+                        }
+                    }
+
+                    ok(
+                        req.id,
+                        json!({
+                            "content": [ { "type": "text", "text": lines.join("\n") } ]
+                        }),
+                    )
+                }
                 Err(e) => err(
                     req.id,
                     -32002,

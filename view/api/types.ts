@@ -249,3 +249,10 @@ export interface ConfigInspectResult {
   project_exists: boolean
   sources: Record<string, ConfigSource>
 }
+
+export interface ConfigSetResponse {
+  updated: boolean
+  warnings: string[]
+  info: string[]
+  errors: string[]
+}

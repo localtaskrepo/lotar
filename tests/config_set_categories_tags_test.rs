@@ -91,7 +91,7 @@ fn config_set_project_custom_fields_and_tags() {
     // Minimal global so project parsing works
     std::fs::write(
         tasks_dir.join("config.yml"),
-        "issue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low]\n",
+        "issue.states: [Todo]\nissue.types: [Feature]\nissue.priorities: [Low, Medium]\n",
     )
     .unwrap();
 

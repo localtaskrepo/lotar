@@ -2,6 +2,7 @@ import type {
   ActivityFeedItem,
   ApiEnvelope,
   ConfigInspectResult,
+  ConfigSetResponse,
   ProjectCreateRequest,
   ProjectDTO,
   ProjectStatsDTO,
@@ -76,7 +77,7 @@ export const api = {
   // Config
   showConfig(project?: string): Promise<any> { return get('/api/config/show', { project }) },
   inspectConfig(project?: string): Promise<ConfigInspectResult> { return get('/api/config/inspect', { project }) },
-  setConfig(payload: { values: Record<string, string>; project?: string; global?: boolean }): Promise<{ updated: boolean }> {
+  setConfig(payload: { values: Record<string, string>; project?: string; global?: boolean }): Promise<ConfigSetResponse> {
     const body: Record<string, unknown> = { values: payload.values }
     if (payload.project) body.project = payload.project
     if (payload.global) body.global = true

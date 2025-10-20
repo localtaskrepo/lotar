@@ -1,4 +1,5 @@
 use crate::config::types::*;
+use crate::config::validation::errors::ValidationResult;
 use crate::utils::project::generate_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -136,7 +137,7 @@ impl ConfigManager {
         field: &str,
         value: &str,
         project_prefix: Option<&str>,
-    ) -> Result<(), ConfigError> {
+    ) -> Result<ValidationResult, ConfigError> {
         crate::config::operations::update_config_field(tasks_dir, field, value, project_prefix)
     }
 

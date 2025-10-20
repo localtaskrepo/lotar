@@ -101,3 +101,29 @@ fn project_alias_can_be_cleared_with_empty_payload() {
     let cleared = load_project_config_from_dir("LIB", &tasks_dir).expect("project config");
     assert!(cleared.branch_status_aliases.is_none());
 }
+
+#[test]
+fn config_set_returns_warnings_when_validator_flags_issues() {
+    let tmp = TempDir::new().unwrap();
+    let tasks_dir = ensure_tasks_dir(tmp.path());
+    let resolver = resolver_for(&tasks_dir);
+
+    let mut values = BTreeMap::new();
+    values.insert("server_port".to_string(), "80".to_string());
+
+    let outcome = ConfigService::set(&resolver, &values, true, None).expect("set server port");
+
+    assert!(outcome.updated, "expected update flag to be true");
+    assert!(
+        outcome.validation.has_warnings(),
+        "expected validator to report warnings"
+    );
+    assert!(
+        outcome
+            .validation
+            .warnings
+            .iter()
+            .any(|w| w.message.contains("may require elevated privileges")),
+        "expected server_port warning message"
+    );
+}

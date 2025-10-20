@@ -1,11 +1,15 @@
 use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig};
 use crate::config::validation::conflicts::PrefixConflictDetector;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
+use std::collections::HashSet;
 use std::path::Path;
 
 pub struct ConfigValidator {
     tasks_dir: std::path::PathBuf,
 }
+
+const MAX_PREFIX_LENGTH: usize = 20;
+const LONG_PREFIX_WARNING_THRESHOLD: usize = 12;
 
 impl ConfigValidator {
     pub fn new(tasks_dir: &Path) -> Self {
@@ -21,6 +25,69 @@ impl ConfigValidator {
         self.validate_project_name(&config.project_name, &mut result);
 
         // Note: Project prefix validation is done separately as it's not stored in ProjectConfig
+
+        if let Some(states) = &config.issue_states {
+            if states.values.is_empty() {
+                result.add_error(
+                    ValidationError::error(
+                        Some("issue_states".to_string()),
+                        "Issue states override cannot be empty".to_string(),
+                    )
+                    .with_fix(
+                        "Remove the override to inherit global statuses or add at least one state"
+                            .to_string(),
+                    ),
+                );
+            } else {
+                self.warn_on_duplicate_values(
+                    "issue_states",
+                    states.values.iter().map(|v| v.as_str()),
+                    &mut result,
+                );
+            }
+        }
+
+        if let Some(types) = &config.issue_types {
+            if types.values.is_empty() {
+                result.add_error(
+                    ValidationError::error(
+                        Some("issue_types".to_string()),
+                        "Issue types override cannot be empty".to_string(),
+                    )
+                    .with_fix(
+                        "Remove the override to inherit global types or add at least one type"
+                            .to_string(),
+                    ),
+                );
+            } else {
+                self.warn_on_duplicate_values(
+                    "issue_types",
+                    types.values.iter().map(|v| v.as_str()),
+                    &mut result,
+                );
+            }
+        }
+
+        if let Some(priorities) = &config.issue_priorities {
+            if priorities.values.is_empty() {
+                result.add_error(
+                    ValidationError::error(
+                        Some("issue_priorities".to_string()),
+                        "Issue priorities override cannot be empty".to_string(),
+                    )
+                    .with_fix(
+                        "Remove the override to inherit global priorities or add at least one priority"
+                            .to_string(),
+                    ),
+                );
+            } else {
+                self.warn_on_duplicate_values(
+                    "issue_priorities",
+                    priorities.values.iter().map(|v| v.as_str()),
+                    &mut result,
+                );
+            }
+        }
 
         // Validate that defaults exist in their respective lists
         self.validate_defaults_consistency(config, &mut result);
@@ -63,6 +130,42 @@ impl ConfigValidator {
             self.validate_prefix(&config.default_prefix, &mut result);
         }
 
+        self.warn_on_duplicate_values(
+            "issue_states",
+            config.issue_states.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.warn_on_duplicate_values(
+            "issue_types",
+            config.issue_types.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.warn_on_duplicate_values(
+            "issue_priorities",
+            config.issue_priorities.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.warn_on_duplicate_values(
+            "default_tags",
+            config.default_tags.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.warn_on_duplicate_values(
+            "scan_signal_words",
+            config.scan_signal_words.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.warn_on_duplicate_values(
+            "tags",
+            config.tags.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.warn_on_duplicate_values(
+            "custom_fields",
+            config.custom_fields.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+
         // Validate that lists are not empty
         if config.issue_states.values.is_empty() {
             result.add_error(
@@ -98,7 +201,7 @@ impl ConfigValidator {
         if let Some(default_status) = &config.default_status {
             if !config.issue_states.values.contains(default_status) {
                 result.add_error(
-                    ValidationError::error(
+                    ValidationError::warning(
                         Some("default_status".to_string()),
                         format!(
                             "Default status '{}' not found in issue_states list",
@@ -115,10 +218,11 @@ impl ConfigValidator {
         if !config
             .issue_priorities
             .values
-            .contains(&config.default_priority)
+            .iter()
+            .any(|priority| priority.eq_ignore_case(config.default_priority.as_str()))
         {
             result.add_error(
-                ValidationError::error(
+                ValidationError::warning(
                     Some("default_priority".to_string()),
                     format!(
                         "Default priority '{}' not found in issue_priorities list",
@@ -134,6 +238,11 @@ impl ConfigValidator {
 
         // Validate scan.ticket_patterns (if present)
         if let Some(patterns) = &config.scan_ticket_patterns {
+            self.warn_on_duplicate_values(
+                "scan.ticket_patterns",
+                patterns.iter().map(|v| v.as_str()),
+                &mut result,
+            );
             self.validate_ticket_patterns(patterns, &mut result);
         }
 
@@ -183,14 +292,15 @@ impl ConfigValidator {
     }
 
     fn validate_project_name(&self, name: &str, result: &mut ValidationResult) {
-        if name.is_empty() {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
             result.add_error(ValidationError::error(
                 Some("project_name".to_string()),
                 "Project name cannot be empty".to_string(),
             ));
         }
 
-        if name.len() > 100 {
+        if trimmed.len() > 100 {
             result.add_error(
                 ValidationError::warning(
                     Some("project_name".to_string()),
@@ -210,7 +320,25 @@ impl ConfigValidator {
             return;
         }
 
-        if prefix.len() > 10 {
+        if prefix.len() > MAX_PREFIX_LENGTH {
+            result.add_error(
+                ValidationError::error(
+                    Some("default_prefix".to_string()),
+                    format!(
+                        "Prefix is too long ({} characters); maximum supported length is {}",
+                        prefix.len(),
+                        MAX_PREFIX_LENGTH
+                    ),
+                )
+                .with_fix(format!(
+                    "Use a shorter prefix of at most {} characters",
+                    MAX_PREFIX_LENGTH
+                )),
+            );
+            return;
+        }
+
+        if prefix.len() > LONG_PREFIX_WARNING_THRESHOLD {
             result.add_error(
                 ValidationError::warning(
                     Some("default_prefix".to_string()),
@@ -241,7 +369,7 @@ impl ConfigValidator {
         {
             if !issue_states.values.contains(default_status) {
                 result.add_error(
-                    ValidationError::error(
+                    ValidationError::warning(
                         Some("default_status".to_string()),
                         format!(
                             "Default status '{}' not found in issue_states",
@@ -259,9 +387,13 @@ impl ConfigValidator {
         if let (Some(default_priority), Some(issue_priorities)) =
             (&config.default_priority, &config.issue_priorities)
         {
-            if !issue_priorities.values.contains(default_priority) {
+            if !issue_priorities
+                .values
+                .iter()
+                .any(|priority| priority.eq_ignore_case(default_priority.as_str()))
+            {
                 result.add_error(
-                    ValidationError::error(
+                    ValidationError::warning(
                         Some("default_priority".to_string()),
                         format!(
                             "Default priority '{}' not found in issue_priorities",
@@ -294,6 +426,50 @@ impl ConfigValidator {
                     .with_fix("Use email format (user@domain.com) or @username format".to_string()),
                 );
             }
+        }
+
+        if let Some(reporter) = &config.default_reporter {
+            if !reporter.is_empty() && !self.is_valid_email_or_username(reporter) {
+                result.add_error(
+                    ValidationError::warning(
+                        Some("default_reporter".to_string()),
+                        "Reporter format doesn't look like an email or @username".to_string(),
+                    )
+                    .with_fix("Use email format (user@domain.com) or @username format".to_string()),
+                );
+            }
+        }
+
+        if let Some(tags) = &config.default_tags {
+            self.warn_on_duplicate_values("default_tags", tags.iter().map(|v| v.as_str()), result);
+        }
+
+        if let Some(signal_words) = &config.scan_signal_words {
+            self.warn_on_duplicate_values(
+                "scan_signal_words",
+                signal_words.iter().map(|v| v.as_str()),
+                result,
+            );
+        }
+
+        if let Some(patterns) = &config.scan_ticket_patterns {
+            self.warn_on_duplicate_values(
+                "scan.ticket_patterns",
+                patterns.iter().map(|v| v.as_str()),
+                result,
+            );
+        }
+
+        if let Some(tags) = &config.tags {
+            self.warn_on_duplicate_values("tags", tags.values.iter().map(|v| v.as_str()), result);
+        }
+
+        if let Some(custom_fields) = &config.custom_fields {
+            self.warn_on_duplicate_values(
+                "custom_fields",
+                custom_fields.values.iter().map(|v| v.as_str()),
+                result,
+            );
         }
     }
 
@@ -342,7 +518,6 @@ impl ConfigValidator {
                         "Consider making patterns mutually exclusive or ordering them".to_string(),
                     ),
                 );
-                break; // one warning is enough to indicate ambiguity
             }
         }
     }
@@ -358,5 +533,29 @@ impl ConfigValidator {
 
         // Basic email validation
         value.contains('@') && value.contains('.') && value.len() > 5
+    }
+
+    fn warn_on_duplicate_values<'a, I>(&self, field: &str, values: I, result: &mut ValidationResult)
+    where
+        I: IntoIterator<Item = &'a str>,
+    {
+        let mut seen = HashSet::new();
+        for raw in values {
+            let value = raw.trim();
+            if value.is_empty() || value == "*" {
+                continue;
+            }
+            let key = value.to_ascii_lowercase();
+            if !seen.insert(key) {
+                result.add_error(
+                    ValidationError::warning(
+                        Some(field.to_string()),
+                        format!("Duplicate value '{}' found in {}", value, field),
+                    )
+                    .with_fix("Remove duplicate entries to avoid ambiguity".to_string()),
+                );
+                break;
+            }
+        }
     }
 }
