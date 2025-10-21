@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import TaskPanel from '../components/TaskPanel.vue'
 
@@ -263,6 +263,13 @@ vi.mock('../composables/useConfig', () => {
     }
 })
 
+let configDefaults: { reporter: string }
+
+beforeAll(async () => {
+    const module = await import('../composables/useConfig')
+    configDefaults = module.useConfig().defaults.value as { reporter: string }
+})
+
 const mountTaskPanel = async () => {
     const wrapper = mount(TaskPanel, {
         props: {
@@ -286,6 +293,7 @@ const mountTaskPanel = async () => {
 
 beforeEach(() => {
     apiFixtures.reset()
+    configDefaults.reporter = ''
 })
 
 afterEach(() => {
@@ -375,6 +383,31 @@ describe('TaskPanel integration safeguards', () => {
         await flushPromises()
 
         expect(apiFixtures.taskHistoryMock).toHaveBeenCalledTimes(1)
+
+        wrapper.unmount()
+    })
+
+    it('resolves @me reporter defaults to the current identity in create mode', async () => {
+        configDefaults.reporter = '@me'
+
+        const wrapper = mount(TaskPanel, {
+            props: {
+                open: true,
+                taskId: 'new',
+            },
+            global: {
+                stubs: {
+                    Teleport: true,
+                },
+            },
+            attachTo: document.body,
+        })
+
+        await flushPromises()
+        await nextTick()
+        await flushPromises()
+
+        expect((wrapper.vm as any).form.reporter).toBe('tester')
 
         wrapper.unmount()
     })

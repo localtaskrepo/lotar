@@ -15,13 +15,19 @@ pub struct Task {
     pub status: TaskStatus,
     #[serde(skip_serializing_if = "Priority::is_empty", default)]
     pub priority: Priority,
-    #[serde(skip_serializing_if = "TaskType::is_empty", default)]
+    #[serde(
+        rename = "type",
+        alias = "task_type",
+        skip_serializing_if = "TaskType::is_empty",
+        default
+    )]
     pub task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub reporter: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub assignee: Option<String>,
     pub created: String,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
     pub modified: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub due_date: Option<String>,
@@ -66,8 +72,8 @@ impl Task {
             task_type: TaskType::default(),
             reporter: None,
             assignee: None,
-            created: now.clone(),
-            modified: now,
+            created: now,
+            modified: String::new(),
             due_date: None,
             effort: None,
             acceptance_criteria: vec![],

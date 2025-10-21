@@ -10,7 +10,7 @@ fn write_task(dir: &Path, proj: &str, id: &str, title: &str) {
     fs::create_dir_all(&tasks).unwrap();
     let path = tasks.join(format!("{id}.yml"));
     let content = format!(
-        "title: {title}\nstatus: Todo\npriority: Medium\ntask_type: Feature\ncreated: 2024-01-01T00:00:00Z\nmodified: 2024-01-01T00:00:00Z\n"
+        "title: {title}\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2024-01-01T00:00:00Z\nmodified: 2024-01-01T00:00:00Z\n"
     );
     fs::write(path, content).unwrap();
 }

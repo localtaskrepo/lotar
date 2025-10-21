@@ -5,7 +5,7 @@ fn structured_diff_detects_title_change_when_yaml_parses() {
 title: Old Title
 status: Todo
 priority: Medium
-task_type: Feature
+type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
@@ -13,7 +13,7 @@ modified: 2025-08-01T10:00:00Z
 title: New Title
 status: Todo
 priority: Medium
-task_type: Feature
+type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-02T10:00:00Z
 "#;
@@ -30,7 +30,7 @@ fn structured_diff_handles_uppercase_enum_values() {
 title: Keep Title
 status: TODO
 priority: Medium
-task_type: Feature
+type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
@@ -38,7 +38,7 @@ modified: 2025-08-01T10:00:00Z
 title: Keep Title
 status: TODO
 priority: Medium
-task_type: Feature
+type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-02T10:00:00Z
 "#;

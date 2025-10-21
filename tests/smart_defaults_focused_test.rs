@@ -117,6 +117,43 @@ mod assignment {
     }
 
     #[test]
+    fn reporter_default_me_alias_resolves_to_identity() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        let _tasks_guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+        let _user_guard = EnvVarGuard::set("USER", "alias-user");
+        let _username_guard = EnvVarGuard::set("USERNAME", "alias-user");
+        let _default_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
+
+        std::fs::write(
+            paths::global_config_path(&tasks_dir),
+            "default.project: TEST\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\ndefault.reporter: \"@me\"\n",
+        )
+        .unwrap();
+
+        lotar::utils::identity::invalidate_identity_cache(Some(&tasks_dir));
+
+        let mut storage = Storage::new(tasks_dir.clone());
+        let req = TaskCreate {
+            title: "Alias reporter".to_string(),
+            project: Some("TEST".to_string()),
+            priority: None,
+            task_type: None,
+            reporter: None,
+            assignee: None,
+            due_date: None,
+            effort: None,
+            description: None,
+            tags: vec![],
+            relationships: None,
+            custom_fields: None,
+        };
+        let created = TaskService::create(&mut storage, req).expect("service create");
+        assert_eq!(created.reporter.as_deref(), Some("alias-user"));
+    }
+
+    #[test]
     fn assignee_auto_set_on_status_change_when_empty() {
         let tmp = tempfile::tempdir().unwrap();
         let tasks_dir = tmp.path().join(".tasks");

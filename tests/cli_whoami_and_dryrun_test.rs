@@ -9,6 +9,7 @@ use lotar::api_types::TaskCreate;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::utils::paths;
+use serde_yaml::Value;
 
 fn write_minimal_config(tasks_dir: &std::path::Path, extra: &str) {
     // Provide minimal, valid lists so CLI validation passes where needed
@@ -204,6 +205,35 @@ fn add_dry_run_explain_creates_no_task_files() {
     );
 
     // restored by _guard drop
+}
+
+#[test]
+fn add_sets_reporter_via_me_alias_default() {
+    let temp = TempDir::new().unwrap();
+    let tasks_dir = temp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+
+    // Ensure default reporter is @me so identity resolution is required
+    write_minimal_config(&tasks_dir, "default.reporter: \"@me\"\n");
+
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    let _guard_user = EnvVarGuard::set("USER", "alias-user");
+    let _guard_username = EnvVarGuard::set("USERNAME", "alias-user");
+    let _guard_env_default = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
+
+    lotar::utils::identity::invalidate_identity_cache(Some(&tasks_dir));
+
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(temp.path())
+        .args(["add", "Alias reporter task", "--project=TEST"])
+        .assert()
+        .success();
+
+    let task_path = tasks_dir.join("TEST").join("1.yml");
+    let contents = std::fs::read_to_string(task_path).unwrap();
+    let parsed: Value = serde_yaml::from_str(&contents).unwrap();
+    assert_eq!(parsed["reporter"].as_str(), Some("alias-user"));
 }
 
 fn count_task_yaml_files(tasks_dir: &std::path::Path) -> usize {

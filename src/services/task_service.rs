@@ -50,9 +50,14 @@ impl TaskService {
             .or_else(|| config.effective_default_priority())
             .unwrap_or_else(|| Priority::from("Medium"));
 
-        let resolved_type = task_type
+        let mut resolved_type = task_type
+            .clone()
             .or_else(|| config.effective_default_task_type())
             .unwrap_or_else(|| TaskType::from("Feature"));
+
+        if task_type.is_none() {
+            resolved_type.ensure_leading_uppercase();
+        }
 
         let mut t = Task::new(storage.root_path.clone(), title, resolved_priority.clone());
         t.priority = resolved_priority;
@@ -74,11 +79,14 @@ impl TaskService {
             Some(rep)
         } else if auto {
             // Prefer configured default_reporter, then fall back
-            if let Some(rep) = config
-                .default_reporter
-                .clone()
-                .filter(|s| !s.trim().is_empty())
-            {
+            if let Some(rep) = config.default_reporter.clone().and_then(|s| {
+                let trimmed = s.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    resolve_me_alias(trimmed, Some(&storage.root_path))
+                }
+            }) {
                 Some(rep)
             } else {
                 resolve_current_user(Some(&storage.root_path))
@@ -111,17 +119,6 @@ impl TaskService {
         }
 
         Self::ensure_task_defaults(&mut t, &config);
-
-        let history_actor = resolve_current_user(Some(&storage.root_path));
-        t.history.push(TaskChangeLogEntry {
-            at: chrono::Utc::now().to_rfc3339(),
-            actor: history_actor.clone(),
-            changes: vec![TaskChange {
-                field: "created".into(),
-                old: None,
-                new: Some(t.title.clone()),
-            }],
-        });
 
         let id = storage.add(&t, &project, None);
         Ok(Self::to_dto(&id, t))
@@ -339,6 +336,11 @@ impl TaskService {
     }
 
     fn to_dto(id: &str, task: Task) -> TaskDTO {
+        let modified = if task.modified.is_empty() {
+            task.created.clone()
+        } else {
+            task.modified.clone()
+        };
         TaskDTO {
             id: id.to_string(),
             title: task.title,
@@ -348,7 +350,7 @@ impl TaskService {
             reporter: task.reporter,
             assignee: task.assignee,
             created: task.created,
-            modified: task.modified,
+            modified,
             due_date: task.due_date,
             effort: task.effort,
             subtitle: task.subtitle,
@@ -388,7 +390,8 @@ impl TaskService {
         }
 
         if task.task_type.is_empty() {
-            if let Some(default_type) = config.effective_default_task_type() {
+            if let Some(mut default_type) = config.effective_default_task_type() {
+                default_type.ensure_leading_uppercase();
                 task.task_type = default_type;
             }
         }

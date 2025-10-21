@@ -183,6 +183,18 @@ impl TaskType {
             candidate, labels
         ))
     }
+
+    pub fn ensure_leading_uppercase(&mut self) {
+        if self.0.is_empty() {
+            return;
+        }
+        let mut chars = self.0.chars();
+        if let Some(first) = chars.next() {
+            let mut normalized = first.to_uppercase().collect::<String>();
+            normalized.push_str(chars.as_str());
+            self.0 = normalized;
+        }
+    }
 }
 
 impl fmt::Display for TaskType {

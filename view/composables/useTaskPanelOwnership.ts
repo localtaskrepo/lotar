@@ -261,8 +261,18 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     api
         .whoami()
         .then((value) => {
-            if (typeof value === 'string' && value.trim()) {
-                whoami.value = value.trim()
+            const identity = typeof value === 'string' ? value.trim() : ''
+            if (!identity) {
+                return
+            }
+            whoami.value = identity
+            const reporterResolved = applyWhoamiShortcut('reporter', options.form.reporter)
+            const assigneeResolved = applyWhoamiShortcut('assignee', options.form.assignee)
+            if (!reporterResolved) {
+                syncReporterControl()
+            }
+            if (!assigneeResolved) {
+                syncAssigneeControl()
             }
         })
         .catch(() => { })

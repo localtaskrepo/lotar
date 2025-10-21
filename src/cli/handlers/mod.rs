@@ -395,6 +395,24 @@ impl CommandHandler for AddHandler {
         task.description = args.description;
         task.tags = validated_tags;
 
+        // Determine reporter using config defaults and identity detection when enabled
+        task.reporter = if config.auto_set_reporter {
+            let from_config = config.default_reporter.as_deref().and_then(|raw| {
+                let trimmed = raw.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    crate::utils::identity::resolve_me_alias(trimmed, Some(resolver.path.as_path()))
+                }
+            });
+
+            from_config.or_else(|| {
+                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
+            })
+        } else {
+            None
+        };
+
         // Handle arbitrary fields with validation
         for (key, value) in args.fields {
             // Validate the custom field name and value

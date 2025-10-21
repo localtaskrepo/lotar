@@ -92,26 +92,27 @@ pub fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
     // Config default_reporter (global/project merged)
     if let Some(root) = tasks_root {
         if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(Some(root)) {
-            if let Some(rep) = cfg.default_reporter.and_then(|s| {
-                let t = s.trim().to_string();
-                if t.is_empty() { None } else { Some(t) }
-            }) {
-                // Cache and return
-                if let Ok(mut guard) = identity_cache().write() {
-                    guard.insert(key, Some(rep.clone()));
+            if let Some(rep_raw) = cfg.default_reporter {
+                let trimmed = rep_raw.trim();
+                if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+                    let rep = trimmed.to_string();
+                    if let Ok(mut guard) = identity_cache().write() {
+                        guard.insert(key.clone(), Some(rep.clone()));
+                    }
+                    return Some(rep);
                 }
-                return Some(rep);
             }
         }
     } else if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(None) {
-        if let Some(rep) = cfg.default_reporter.and_then(|s| {
-            let t = s.trim().to_string();
-            if t.is_empty() { None } else { Some(t) }
-        }) {
-            if let Ok(mut guard) = identity_cache().write() {
-                guard.insert(key, Some(rep.clone()));
+        if let Some(rep_raw) = cfg.default_reporter {
+            let trimmed = rep_raw.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+                let rep = trimmed.to_string();
+                if let Ok(mut guard) = identity_cache().write() {
+                    guard.insert(key.clone(), Some(rep.clone()));
+                }
+                return Some(rep);
             }
-            return Some(rep);
         }
     }
 

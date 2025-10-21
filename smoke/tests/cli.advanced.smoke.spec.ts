@@ -99,7 +99,7 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
                         'title: Timeline',
                         `status: ${status}`,
                         'priority: Medium',
-                        'task_type: Feature',
+                        'type: Feature',
                         'assignee: ',
                         'reporter: ',
                         'created: 2025-08-01T10:00:00Z',
