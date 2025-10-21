@@ -92,81 +92,6 @@ impl CommandHandler for AddHandler {
         renderer.log_debug("add: arguments validated and normalized");
 
         // Process and validate arguments
-        // Optionally infer type from current git branch when flags/type not provided
-        fn branch_and_token() -> Option<(String, String)> {
-            let cwd = std::env::current_dir().ok()?;
-            let root = crate::utils::git::find_repo_root(&cwd)?;
-            let branch = crate::utils::git::read_current_branch(&root)?;
-            let branch_lower = branch.to_lowercase();
-            let first_segment = branch_lower
-                .split('/')
-                .next()
-                .unwrap_or(&branch_lower)
-                .to_string();
-            Some((branch_lower, first_segment))
-        }
-
-        fn infer_type_from_branch_with_config(
-            config: &ResolvedConfig,
-            validator: &CliValidator,
-        ) -> Option<TaskType> {
-            let (branch_lower, first_segment) = branch_and_token()?;
-
-            // Split first segment on common delimiters to get a primary token
-            let primary_token = first_segment
-                .split(['-', '_'])
-                .next()
-                .unwrap_or(&first_segment)
-                .to_string();
-
-            // 1) Consult configurable alias map: exact match on first segment, then primary token
-            for key in [&first_segment, &primary_token] {
-                if let Some(tt) = config.branch_type_aliases.get(key) {
-                    if validator.validate_task_type(&tt.to_string()).is_ok() {
-                        return Some(tt.clone());
-                    }
-                }
-            }
-
-            // 1b) Consult alias map by prefix: alias key + '-' or '_' or '/' at start of branch
-            for (k, tt) in &config.branch_type_aliases {
-                let k = k.as_str();
-                if (branch_lower.starts_with(&format!("{k}-"))
-                    || branch_lower.starts_with(&format!("{k}_"))
-                    || branch_lower.starts_with(&format!("{k}/")))
-                    && validator.validate_task_type(&tt.to_string()).is_ok()
-                {
-                    return Some(tt.clone());
-                }
-            }
-
-            //    Exact match on tokens, or prefix with common delimiters
-            for t in &config.issue_types.values {
-                let name = t.to_string(); // lowercased by Display
-                if (first_segment == name
-                    || primary_token == name
-                    || branch_lower.starts_with(&format!("{name}-"))
-                    || branch_lower.starts_with(&format!("{name}_"))
-                    || branch_lower.starts_with(&format!("{name}/")))
-                    && validator.validate_task_type(&name).is_ok()
-                {
-                    return Some(t.clone());
-                }
-            }
-
-            // 3) Fallback to conventional prefixes
-            let inferred = match primary_token.as_str() {
-                "feat" | "feature" => Some("Feature"),
-                "fix" | "bugfix" | "hotfix" => Some("Bug"),
-                "chore" | "docs" | "refactor" | "test" | "perf" => Some("Chore"),
-                _ => None,
-            }?;
-            validator
-                .validate_task_type(inferred)
-                .ok()
-                .or_else(|| validator.validate_task_type("Feature").ok())
-        }
-
         let validated_type = if args.bug {
             validator
                 .validate_task_type("Bug")
@@ -181,28 +106,15 @@ impl CommandHandler for AddHandler {
                     .validate_task_type(&task_type)
                     .map_err(|e| format!("Task type validation failed: {}", e))?,
                 None => {
-                    if config.auto_branch_infer_type {
-                        if let Some(t) = infer_type_from_branch_with_config(&config, &validator) {
-                            t
-                        } else if let Ok(f) = validator.validate_task_type("Feature") {
-                            // No inference; choose Feature if allowed or first configured type
-                            f
-                        } else if let Some(first) = config.issue_types.values.first() {
-                            first.clone()
-                        } else {
-                            TaskType::from("Feature")
-                        }
+                    if let Some(t) = crate::utils::task_intel::infer_task_type_from_branch(&config)
+                    {
+                        t
+                    } else if let Ok(f) = validator.validate_task_type("Feature") {
+                        f
+                    } else if let Some(first) = config.issue_types.values.first() {
+                        first.clone()
                     } else {
-                        // No branch inference: do NOT consult branch or alias maps at all.
-                        // Prefer "Feature" if allowed by project; otherwise pick the first
-                        // project-configured type.
-                        if let Ok(f) = validator.validate_task_type("Feature") {
-                            f
-                        } else if let Some(first) = config.issue_types.values.first() {
-                            first.clone()
-                        } else {
-                            TaskType::from("Feature")
-                        }
+                        TaskType::from("Feature")
                     }
                 }
             }
@@ -224,48 +136,8 @@ impl CommandHandler for AddHandler {
                 Some(priority) => validator
                     .validate_priority(&priority)
                     .map_err(|e| format!("Priority validation failed: {}", e))?,
-                None => {
-                    // try branch-based priority inference
-                    if config.auto_branch_infer_priority {
-                        if let Some((branch_lower, first_segment)) = branch_and_token() {
-                            let tok = first_segment;
-                            // Exact token match first
-                            if let Some(p) = config.branch_priority_aliases.get(&tok) {
-                                if let Ok(v) = validator.validate_priority(&p.to_string()) {
-                                    v
-                                } else {
-                                    Self::get_default_priority(&config)
-                                }
-                            } else {
-                                // Prefix match against alias keys with common delimiters
-                                let mut matched: Option<Priority> = None;
-                                for (k, v) in &config.branch_priority_aliases {
-                                    let k = k.as_str();
-                                    if branch_lower.starts_with(&format!("{k}-"))
-                                        || branch_lower.starts_with(&format!("{k}_"))
-                                        || branch_lower.starts_with(&format!("{k}/"))
-                                    {
-                                        matched = Some(v.clone());
-                                        break;
-                                    }
-                                }
-                                if let Some(p) = matched {
-                                    if let Ok(v) = validator.validate_priority(&p.to_string()) {
-                                        v
-                                    } else {
-                                        Self::get_default_priority(&config)
-                                    }
-                                } else {
-                                    Self::get_default_priority(&config)
-                                }
-                            }
-                        } else {
-                            Self::get_default_priority(&config)
-                        }
-                    } else {
-                        Self::get_default_priority(&config)
-                    }
-                }
+                None => crate::utils::task_intel::infer_priority_from_branch(&config)
+                    .unwrap_or_else(|| Self::get_default_priority(&config)),
             }
         };
 
@@ -305,17 +177,20 @@ impl CommandHandler for AddHandler {
 
         // Validate tags
         let mut validated_tags = Vec::new();
-        let mut base_tags = if args.tags.is_empty() {
-            config.default_tags.clone()
+        let base_tags = if args.tags.is_empty() {
+            let mut defaults = config.default_tags.clone();
+            if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config) {
+                if !defaults
+                    .iter()
+                    .any(|existing| existing.eq_ignore_ascii_case(&label))
+                {
+                    defaults.push(label);
+                }
+            }
+            defaults
         } else {
             vec![]
         };
-        // If still empty, try deriving a path label for monorepos (packages/foo -> foo)
-        if args.tags.is_empty() && base_tags.is_empty() && config.auto_tags_from_path {
-            if let Some(label) = crate::utils::workspace_labels::derive_label_from_cwd() {
-                base_tags.push(label);
-            }
-        }
         for tag in args.tags.iter().chain(base_tags.iter()) {
             let validated_tag = validator
                 .validate_tag(tag)
@@ -328,44 +203,19 @@ impl CommandHandler for AddHandler {
         renderer.log_debug("add: task object constructed");
 
         // Status: inferred via branch alias if enabled; otherwise smart default
-        task.status = if config.auto_branch_infer_status {
-            if let Some((branch_lower, first_segment)) = branch_and_token() {
-                // Exact token match first
-                if let Some(s) = config.branch_status_aliases.get(&first_segment) {
-                    if validator.validate_status(&s.to_string()).is_ok() {
-                        s.clone()
-                    } else {
-                        Self::get_default_status(&config)
-                    }
+        task.status = crate::utils::task_intel::infer_status_from_branch(&config)
+            .and_then(|status| {
+                if validator
+                    .validate_status(status.as_str())
+                    .map(|_| ())
+                    .is_ok()
+                {
+                    Some(status)
                 } else {
-                    // Prefix match against alias keys with common delimiters
-                    let mut matched: Option<TaskStatus> = None;
-                    for (k, v) in &config.branch_status_aliases {
-                        let k = k.as_str();
-                        if branch_lower.starts_with(&format!("{k}-"))
-                            || branch_lower.starts_with(&format!("{k}_"))
-                            || branch_lower.starts_with(&format!("{k}/"))
-                        {
-                            matched = Some(v.clone());
-                            break;
-                        }
-                    }
-                    if let Some(s) = matched {
-                        if validator.validate_status(&s.to_string()).is_ok() {
-                            s
-                        } else {
-                            Self::get_default_status(&config)
-                        }
-                    } else {
-                        Self::get_default_status(&config)
-                    }
+                    None
                 }
-            } else {
-                Self::get_default_status(&config)
-            }
-        } else {
-            Self::get_default_status(&config)
-        };
+            })
+            .unwrap_or_else(|| Self::get_default_status(&config));
 
         // Set validated properties
         task.task_type = validated_type;

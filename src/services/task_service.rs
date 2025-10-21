@@ -47,11 +47,13 @@ impl TaskService {
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
 
         let resolved_priority = priority
+            .or_else(|| crate::utils::task_intel::infer_priority_from_branch(&config))
             .or_else(|| config.effective_default_priority())
             .unwrap_or_else(|| Priority::from("Medium"));
 
         let mut resolved_type = task_type
             .clone()
+            .or_else(|| crate::utils::task_intel::infer_task_type_from_branch(&config))
             .or_else(|| config.effective_default_task_type())
             .unwrap_or_else(|| TaskType::from("Feature"));
 
@@ -63,8 +65,8 @@ impl TaskService {
         t.priority = resolved_priority;
         t.task_type = resolved_type;
         // reporter: explicit or auto-detect (configurable)
-        t.status = config
-            .effective_default_status()
+        t.status = crate::utils::task_intel::infer_status_from_branch(&config)
+            .or_else(|| config.effective_default_status())
             .unwrap_or_else(|| TaskStatus::from("Todo"));
         let auto = config.auto_set_reporter;
         let explicit_reporter = reporter.as_ref().and_then(|rep| {
@@ -95,14 +97,26 @@ impl TaskService {
             None
         };
         // Normalize assignee with @me alias if provided
-        t.assignee = assignee.as_ref().and_then(|a| {
-            let trimmed = a.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path))
-            }
-        });
+        t.assignee = assignee
+            .as_ref()
+            .and_then(|a| {
+                let trimmed = a.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    resolve_me_alias(trimmed, Some(&storage.root_path))
+                }
+            })
+            .or_else(|| {
+                config.default_assignee.as_ref().and_then(|raw| {
+                    let trimmed = raw.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        resolve_me_alias(trimmed, Some(&storage.root_path))
+                    }
+                })
+            });
         t.due_date = due_date;
         // Normalize effort on write
         t.effort = effort.map(|e| match crate::utils::effort::parse_effort(&e) {
@@ -110,7 +124,21 @@ impl TaskService {
             Err(_) => e,
         });
         t.description = description;
-        t.tags = normalize_tags(tags);
+        let mut normalized_tags = normalize_tags(tags);
+        if normalized_tags.is_empty() {
+            if !config.default_tags.is_empty() {
+                normalized_tags.extend(config.default_tags.clone());
+            }
+            if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config) {
+                if !normalized_tags
+                    .iter()
+                    .any(|existing| existing.eq_ignore_ascii_case(&label))
+                {
+                    normalized_tags.push(label);
+                }
+            }
+        }
+        t.tags = normalize_tags(normalized_tags);
         if let Some(rel) = relationships {
             t.relationships = rel;
         }

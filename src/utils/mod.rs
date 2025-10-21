@@ -10,6 +10,7 @@ pub mod identity_detectors;
 pub mod paths;
 pub mod project;
 pub mod tags;
+pub mod task_intel;
 pub mod time;
 pub mod workspace_labels;
 

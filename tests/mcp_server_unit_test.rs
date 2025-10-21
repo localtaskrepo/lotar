@@ -1,6 +1,23 @@
 mod common;
 use crate::common::env_mutex::EnvVarGuard;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+struct CwdGuard(PathBuf);
+
+impl CwdGuard {
+    fn enter(target: &Path) -> std::io::Result<Self> {
+        let original = std::env::current_dir()?;
+        std::env::set_current_dir(target)?;
+        Ok(CwdGuard(original))
+    }
+}
+
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.0);
+    }
+}
 
 #[test]
 fn mcp_tools_list_includes_underscore_names() {
@@ -345,6 +362,225 @@ fn mcp_task_list_includes_custom_fields() {
         .collect::<Vec<_>>();
     seen.sort();
     assert_eq!(seen, vec!["Docs".to_string(), "Platform".to_string()]);
+}
+
+#[test]
+fn mcp_task_create_and_list_resolve_me_aliases() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+    let _guard_user = EnvVarGuard::set("USER", "mcp-user");
+
+    lotar::utils::identity::invalidate_identity_cache(Some(tasks_dir.as_path()));
+    lotar::utils::identity::invalidate_identity_explain_cache();
+
+    let create_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 27,
+        "method": "tools/call",
+        "params": {
+            "name": "task_create",
+            "arguments": {
+                "title": "Alias parity",
+                "project": "MCP",
+                "assignee": "@me",
+                "reporter": "@me"
+            }
+        }
+    });
+    let create_line = serde_json::to_string(&create_req).unwrap();
+    let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
+    let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
+    assert!(
+        create_resp.get("error").is_none(),
+        "task_create failed: {create_resp}"
+    );
+    let create_content = create_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!create_content.is_empty());
+    let create_text = create_content[0]
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let created_task: serde_json::Value = serde_json::from_str(create_text).unwrap();
+    let created_id = created_task
+        .get("id")
+        .and_then(|v| v.as_str())
+        .expect("task id present")
+        .to_string();
+    assert_eq!(
+        created_task.get("assignee").and_then(|v| v.as_str()),
+        Some("mcp-user")
+    );
+    assert_eq!(
+        created_task.get("reporter").and_then(|v| v.as_str()),
+        Some("mcp-user")
+    );
+
+    let list_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 28,
+        "method": "task/list",
+        "params": {"project": "MCP", "assignee": "@me"}
+    });
+    let list_line = serde_json::to_string(&list_req).unwrap();
+    let list_resp_line = lotar::mcp::server::handle_json_line(&list_line);
+    let list_resp: serde_json::Value = serde_json::from_str(&list_resp_line).unwrap();
+    assert!(
+        list_resp.get("error").is_none(),
+        "task/list failed: {list_resp}"
+    );
+    let list_content = list_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!list_content.is_empty());
+    let list_text = list_content[0]
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let tasks_json: serde_json::Value = serde_json::from_str(list_text).unwrap();
+    let tasks = tasks_json.as_array().cloned().unwrap_or_default();
+    assert_eq!(tasks.len(), 1, "expected single task filtered by @me");
+    assert_eq!(
+        tasks[0]
+            .get("id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        Some(created_id)
+    );
+}
+
+#[test]
+fn mcp_task_create_honors_default_assignee() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    std::fs::write(
+        tasks_dir.join("config.yml"),
+        "default.project: MCP\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\ndefault.assignee: default-user@example.com\n",
+    )
+    .unwrap();
+
+    let create_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 29,
+        "method": "tools/call",
+        "params": {
+            "name": "task_create",
+            "arguments": {
+                "title": "Default assignee",
+                "project": "MCP"
+            }
+        }
+    });
+    let create_line = serde_json::to_string(&create_req).unwrap();
+    let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
+    let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
+    assert!(
+        create_resp.get("error").is_none(),
+        "task_create failed: {create_resp}"
+    );
+    let content = create_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!content.is_empty());
+    let text = content[0]
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(
+        task_json.get("assignee").and_then(|v| v.as_str()),
+        Some("default-user@example.com")
+    );
+
+    let task_id = task_json
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+    let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
+    let storage = lotar::Storage::new(resolver.path.clone());
+    let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None)
+        .expect("stored task");
+    assert_eq!(stored.assignee.as_deref(), Some("default-user@example.com"));
+}
+
+#[test]
+fn mcp_task_create_infers_branch_defaults() {
+    let tmp = tempfile::tempdir().unwrap();
+    let repo_root = tmp.path();
+    let tasks_dir = repo_root.join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let git_dir = repo_root.join(".git");
+    std::fs::create_dir_all(&git_dir).unwrap();
+    std::fs::write(git_dir.join("HEAD"), "ref: refs/heads/feat/new-ui\n").unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    std::fs::write(
+        tasks_dir.join("config.yml"),
+        "default.project: MCP\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\nauto.branch_infer_priority: true\nauto.branch_infer_status: true\nauto.branch_infer_type: true\nbranch.priority_aliases:\n  feat: High\nbranch.status_aliases:\n  feat: InProgress\n",
+    )
+    .unwrap();
+
+    let _cwd = CwdGuard::enter(repo_root).unwrap();
+
+    let create_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 30,
+        "method": "tools/call",
+        "params": {
+            "name": "task_create",
+            "arguments": {
+                "title": "Branch inferred",
+                "project": "MCP"
+            }
+        }
+    });
+    let create_line = serde_json::to_string(&create_req).unwrap();
+    let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
+    let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
+    assert!(
+        create_resp.get("error").is_none(),
+        "task_create failed: {create_resp}"
+    );
+    let content = create_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!content.is_empty());
+    let text = content[0]
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    assert_eq!(
+        task_json.get("priority").and_then(|v| v.as_str()),
+        Some("High")
+    );
+    assert_eq!(
+        task_json.get("status").and_then(|v| v.as_str()),
+        Some("InProgress")
+    );
+    assert_eq!(
+        task_json.get("task_type").and_then(|v| v.as_str()),
+        Some("Feature")
+    );
 }
 
 // Merged from mcp_smoke_test.rs: basic storage smoke via MCP-shaped flow

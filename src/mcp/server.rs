@@ -505,7 +505,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 "tools": [
                     {
                         "name": "task_create",
-                        "description": "Create a new task. Note: priority and type are project-configured strings; call config/show for allowed values.",
+                        "description": "Create and persist a task. Any missing priority/type/status fall back to project defaults. reporter/assignee accept '@me'. relationships should follow the TaskRelationships shape (e.g. blocks/relates). Returns the saved task JSON with defaults applied.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -514,10 +514,12 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                                 "project": {"type": ["string", "null"]},
                                 "priority": {"type": ["string", "null"]},
                                 "type": {"type": ["string", "null"]},
+                                "reporter": {"type": ["string", "null"]},
                                 "assignee": {"type": ["string", "null"]},
                                 "due_date": {"type": ["string", "null"]},
                                 "effort": {"type": ["string", "null"]},
                                 "tags": {"type": "array", "items": {"type": "string"}},
+                                "relationships": {"type": ["object", "null"]},
                                 "custom_fields": {"type": "object"}
                             },
                             "required": ["title"],
@@ -526,7 +528,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "task_get",
-                        "description": "Get a task by id",
+                        "description": "Fetch a task DTO by id (optionally override project prefix). Returns the canonical persisted representation.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -539,7 +541,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "task_update",
-                        "description": "Update a task by id. Note: status, priority, and type are project-configured strings; call config/show for allowed values.",
+                        "description": "Patch an existing task. Provide fields inside patch; omitted properties stay unchanged. Strings are validated against project config, and reporter/assignee accept '@me'. relationships replaces the full relationship map.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -552,10 +554,12 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                                         "status": {"type": ["string", "null"]},
                                         "priority": {"type": ["string", "null"]},
                                         "type": {"type": ["string", "null"]},
+                                        "reporter": {"type": ["string", "null"]},
                                         "assignee": {"type": ["string", "null"]},
                                         "due_date": {"type": ["string", "null"]},
                                         "effort": {"type": ["string", "null"]},
                                         "tags": {"type": "array", "items": {"type": "string"}},
+                                        "relationships": {"type": ["object", "null"]},
                                         "custom_fields": {"type": "object"}
                                     },
                                     "additionalProperties": false
@@ -567,7 +571,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "task_delete",
-                        "description": "Delete a task by id",
+                        "description": "Delete a task by id (optional project override). Returns a text payload indicating deleted=true/false.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -580,7 +584,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "task_list",
-            "description": "List tasks with optional filters. Note: status, priority, and type are project-configured strings; call config/show for allowed values.",
+            "description": "List tasks using optional filters. status/priority/type accept a single string or array and are validated via project config. assignee accepts '@me'. tag filters a single tag (repeat the tool to combine). search performs a text match across id/title/description/tags.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -597,12 +601,12 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "project_list",
-                        "description": "List projects",
+                        "description": "List known projects and their prefixes for the current workspace root.",
                         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
                     },
                     {
                         "name": "project_stats",
-                        "description": "Get project statistics",
+                        "description": "Return aggregate counts for a project (open/done, recent modified timestamp, top tags).",
                         "inputSchema": {
                             "type": "object",
                             "properties": {"name": {"type": "string"}},
@@ -612,7 +616,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "config_show",
-                        "description": "Show effective configuration",
+                        "description": "Show the resolved configuration (global or project scope) so callers can discover allowed enum values.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -624,7 +628,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     },
                     {
                         "name": "config_set",
-                        "description": "Set configuration values",
+                        "description": "Update configuration strings at the selected scope. Returns validation warnings/info alongside the outcome.",
                         "inputSchema": {
                             "type": "object",
                             "properties": {
@@ -1295,11 +1299,30 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 tags,
                 text_query,
             };
-            let storage = crate::storage::manager::Storage::new(resolver.path);
-            let tasks = crate::services::task_service::TaskService::list(&storage, &filter)
+            let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+            let mut tasks = crate::services::task_service::TaskService::list(&storage, &filter)
                 .into_iter()
                 .map(|(_, t)| t)
                 .collect::<Vec<_>>();
+
+            if let Some(raw) = req.params.get("assignee").and_then(|v| v.as_str()) {
+                let trimmed = raw.trim();
+                if !trimmed.is_empty() {
+                    let target = if trimmed.eq_ignore_ascii_case("@me") {
+                        crate::utils::identity::resolve_current_user(Some(
+                            storage.root_path.as_path(),
+                        ))
+                    } else {
+                        Some(trimmed.to_string())
+                    };
+                    match target {
+                        Some(user) => {
+                            tasks.retain(|task| task.assignee.as_deref() == Some(user.as_str()));
+                        }
+                        None => tasks.clear(),
+                    }
+                }
+            }
             ok(
                 req.id,
                 json!({

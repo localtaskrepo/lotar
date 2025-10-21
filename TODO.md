@@ -23,12 +23,6 @@ Chores:
 - Test release workflow
 - Check if any of the auto features are applied to MPC as well.
 
-Bugs:
-- We're creating history entries when creating a new task. We record duplicate information that is not needed.
-- "modified" property is set at creation to equal "created". Also not needed
-- Issues have "task_type" property, should just be "type"
-- Default types ("feature") are lower case, but priority and status are upper case
-
 ## Backlog
 - [ ] Include README and LICENSE in archives
 - [ ] Universal macOS binary via lipo (optional)

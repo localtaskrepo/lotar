@@ -41,7 +41,7 @@ const apiFixtures = vi.hoisted(() => {
                 ],
             },
         ],
-    custom_fields: { product: 'Core' },
+        custom_fields: { product: 'Core' },
     }
 
     const baseCommits = [
