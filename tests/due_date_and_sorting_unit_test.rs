@@ -60,6 +60,8 @@ fn cfg() -> ResolvedConfig {
         branch_type_aliases: std::collections::HashMap::new(),
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
+        sprint_defaults: Default::default(),
+        sprint_notifications: Default::default(),
     }
 }
 

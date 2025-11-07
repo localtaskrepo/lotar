@@ -1532,16 +1532,7 @@ issue.priorities: [Low, Medium, High]
             TaskCreate {
                 title: "Preview status change".to_string(),
                 project: Some("TEST".to_string()),
-                priority: None,
-                task_type: None,
-                reporter: None,
-                assignee: None,
-                due_date: None,
-                effort: None,
-                description: None,
-                tags: vec![],
-                relationships: None,
-                custom_fields: None,
+                ..TaskCreate::default()
             },
         )
         .expect("create task");

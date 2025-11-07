@@ -14,3 +14,14 @@ fn help_list_available() {
     let result = help.list_available_help();
     assert!(result.is_ok());
 }
+
+#[test]
+fn help_alias_resolution() {
+    let help = HelpSystem::new(OutputFormat::Text, false);
+    let sprint = help.show_command_help("sprint");
+    assert!(
+        sprint
+            .expect("sprint help should resolve")
+            .contains("lotar sprint")
+    );
+}

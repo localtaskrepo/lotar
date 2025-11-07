@@ -195,16 +195,8 @@ fn mcp_task_update_overwrites_custom_fields() {
         lotar::api_types::TaskCreate {
             title: "Update product".into(),
             project: Some("MCP".into()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some(custom_fields),
+            ..lotar::api_types::TaskCreate::default()
         },
     )
     .expect("create initial task");
@@ -286,16 +278,8 @@ fn mcp_task_list_includes_custom_fields() {
         lotar::api_types::TaskCreate {
             title: "Platform task".into(),
             project: Some("MCP".into()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some(product_a),
+            ..lotar::api_types::TaskCreate::default()
         },
     )
     .expect("create platform task");
@@ -305,16 +289,8 @@ fn mcp_task_list_includes_custom_fields() {
         lotar::api_types::TaskCreate {
             title: "Docs task".into(),
             project: Some("MCP".into()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some(product_b),
+            ..lotar::api_types::TaskCreate::default()
         },
     )
     .expect("create docs task");
@@ -456,6 +432,308 @@ fn mcp_task_create_and_list_resolve_me_aliases() {
             .map(|s| s.to_string()),
         Some(created_id)
     );
+}
+
+#[test]
+fn mcp_sprint_tools_assign_and_backlog() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    std::fs::write(
+        lotar::utils::paths::global_config_path(&tasks_dir),
+        "default.project: MCP\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug]\nissue.priorities: [Low, Medium, High]\n",
+    )
+    .unwrap();
+
+    let mut storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let mut sprint = lotar::storage::sprint::Sprint::default();
+    sprint.plan = Some(lotar::storage::sprint::SprintPlan {
+        label: Some("Iteration".into()),
+        ..Default::default()
+    });
+    sprint.actual = Some(lotar::storage::sprint::SprintActual {
+        started_at: Some(chrono::Utc::now().to_rfc3339()),
+        ..Default::default()
+    });
+    let created =
+        lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None)
+            .expect("create sprint");
+    let sprint_id = created.record.id;
+
+    let task_a = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "MCP Sprint A".into(),
+            project: Some("MCP".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("task a");
+    let task_b = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "MCP Sprint B".into(),
+            project: Some("MCP".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("task b");
+    let task_c = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "MCP Backlog".into(),
+            project: Some("MCP".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("task c");
+    drop(storage);
+
+    let add_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 101,
+        "method": "tools/call",
+        "params": {
+            "name": "sprint_add",
+            "arguments": {
+                "sprint": sprint_id,
+                "tasks": [task_a.id.clone(), task_b.id.clone()]
+            }
+        }
+    });
+    let add_line = serde_json::to_string(&add_req).unwrap();
+    let add_resp_line = lotar::mcp::server::handle_json_line(&add_line);
+    let add_resp: serde_json::Value = serde_json::from_str(&add_resp_line).unwrap();
+    assert!(
+        add_resp.get("error").is_none(),
+        "sprint_add failed: {add_resp:?}"
+    );
+    let add_payload = add_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    let modified = add_payload
+        .get("modified")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(modified.len(), 2);
+
+    let backlog_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 102,
+        "method": "tools/call",
+        "params": {
+            "name": "sprint_backlog",
+            "arguments": {"project": "MCP"}
+        }
+    });
+    let backlog_line = serde_json::to_string(&backlog_req).unwrap();
+    let backlog_resp_line = lotar::mcp::server::handle_json_line(&backlog_line);
+    let backlog_resp: serde_json::Value = serde_json::from_str(&backlog_resp_line).unwrap();
+    assert!(
+        backlog_resp.get("error").is_none(),
+        "sprint_backlog failed: {backlog_resp:?}"
+    );
+    let backlog_payload = backlog_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    let backlog_tasks = backlog_payload
+        .get("tasks")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(backlog_tasks.len(), 1);
+    assert_eq!(
+        backlog_tasks[0].get("id").and_then(|v| v.as_str()),
+        Some(task_c.id.as_str())
+    );
+
+    let remove_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 103,
+        "method": "tools/call",
+        "params": {
+            "name": "sprint_remove",
+            "arguments": {
+                "sprint": sprint_id,
+                "tasks": [task_a.id.clone()]
+            }
+        }
+    });
+    let remove_line = serde_json::to_string(&remove_req).unwrap();
+    let remove_resp_line = lotar::mcp::server::handle_json_line(&remove_line);
+    let remove_resp: serde_json::Value = serde_json::from_str(&remove_resp_line).unwrap();
+    assert!(
+        remove_resp.get("error").is_none(),
+        "sprint_remove failed: {remove_resp:?}"
+    );
+
+    let storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let task_a_post = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
+        .expect("task a post remove");
+    let task_b_post = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None)
+        .expect("task b post add");
+    assert!(task_a_post.sprints.is_empty());
+    assert_eq!(task_b_post.sprints, vec![sprint_id]);
+}
+
+#[test]
+fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
+    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let ghost = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "Ghost sprint member".into(),
+            project: Some("MCP".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("create ghost task");
+    let project_prefix = ghost.id.split('-').next().unwrap_or_default().to_string();
+    let mut ghost_record = storage
+        .get(&ghost.id, project_prefix.clone())
+        .expect("ghost record on disk");
+    ghost_record.sprints = vec![42];
+    storage.edit(&ghost.id, &ghost_record);
+    drop(storage);
+
+    let backlog_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 140,
+        "method": "tools/call",
+        "params": {"name": "sprint_backlog", "arguments": {}}
+    });
+    let backlog_line = serde_json::to_string(&backlog_req).unwrap();
+    let backlog_resp_line = lotar::mcp::server::handle_json_line(&backlog_line);
+    let backlog_resp: serde_json::Value = serde_json::from_str(&backlog_resp_line).unwrap();
+    assert!(
+        backlog_resp.get("error").is_none(),
+        "sprint_backlog failed: {backlog_resp:?}"
+    );
+    let backlog_payload = backlog_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    let missing_initial = backlog_payload
+        .get("missing_sprints")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        missing_initial
+            .iter()
+            .map(|v| v.as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![42]
+    );
+    let integrity_initial = backlog_payload
+        .get("integrity")
+        .and_then(|v| v.as_object())
+        .expect("integrity diagnostics present");
+    let integrity_missing = integrity_initial
+        .get("missing_sprints")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        integrity_missing
+            .iter()
+            .map(|v| v.as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![42]
+    );
+    assert_eq!(
+        integrity_initial
+            .get("tasks_with_missing")
+            .and_then(|v| v.as_u64()),
+        Some(1)
+    );
+    assert!(integrity_initial.get("auto_cleanup").is_none());
+
+    let storage = lotar::Storage::new(tasks_dir.clone());
+    let ghost_before = storage
+        .get(&ghost.id, project_prefix.clone())
+        .expect("ghost before cleanup");
+    assert_eq!(ghost_before.sprints, vec![42]);
+    drop(storage);
+
+    let cleanup_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 141,
+        "method": "tools/call",
+        "params": {"name": "sprint_backlog", "arguments": {"cleanup_missing": true}}
+    });
+    let cleanup_line = serde_json::to_string(&cleanup_req).unwrap();
+    let cleanup_resp_line = lotar::mcp::server::handle_json_line(&cleanup_line);
+    let cleanup_resp: serde_json::Value = serde_json::from_str(&cleanup_resp_line).unwrap();
+    assert!(
+        cleanup_resp.get("error").is_none(),
+        "sprint_backlog cleanup failed: {cleanup_resp:?}"
+    );
+    let cleanup_payload = cleanup_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    let missing_after = cleanup_payload
+        .get("missing_sprints")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(missing_after.is_empty());
+    let cleanup_integrity = cleanup_payload
+        .get("integrity")
+        .and_then(|v| v.as_object())
+        .expect("cleanup integrity diagnostics present");
+    let auto_cleanup = cleanup_integrity
+        .get("auto_cleanup")
+        .and_then(|v| v.as_object())
+        .expect("auto cleanup summary present");
+    assert_eq!(
+        auto_cleanup
+            .get("removed_references")
+            .and_then(|v| v.as_u64()),
+        Some(1)
+    );
+    assert_eq!(
+        auto_cleanup.get("updated_tasks").and_then(|v| v.as_u64()),
+        Some(1)
+    );
+
+    let storage = lotar::Storage::new(tasks_dir);
+    let ghost_after = storage
+        .get(&ghost.id, project_prefix)
+        .expect("ghost after cleanup");
+    assert!(ghost_after.sprints.is_empty());
 }
 
 #[test]
@@ -724,16 +1002,7 @@ fn mcp_task_update_resolves_me_in_patch() {
         lotar::api_types::TaskCreate {
             title: "Update @me patch".into(),
             project: Some("MCP".into()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..lotar::api_types::TaskCreate::default()
         },
     )
     .expect("create initial task");

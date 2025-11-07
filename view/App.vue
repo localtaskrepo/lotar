@@ -4,6 +4,7 @@
       <div class="brand">LoTaR</div>
       <nav class="nav">
         <a href="/" @click.prevent="go('/')">Tasks</a>
+        <a href="/sprints" @click.prevent="go('/sprints')">Sprints</a>
         <a href="/boards" @click.prevent="go('/boards')">Boards</a>
         <a href="/calendar" @click.prevent="go('/calendar')">Calendar</a>
         <a href="/insights" @click.prevent="go('/insights')">Insights</a>

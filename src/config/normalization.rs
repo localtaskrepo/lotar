@@ -308,6 +308,39 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         cfg.scan_strip_attributes = v;
     }
 
+    // sprints.defaults
+    if let Some(value) =
+        get_path(&data, &["sprints", "defaults", "capacity_points"]).and_then(cast::<u32>)
+    {
+        cfg.sprints.defaults.capacity_points = Some(value);
+    }
+    if let Some(value) =
+        get_path(&data, &["sprints", "defaults", "capacity_hours"]).and_then(cast::<u32>)
+    {
+        cfg.sprints.defaults.capacity_hours = Some(value);
+    }
+    if let Some(value) =
+        get_path(&data, &["sprints", "defaults", "length"]).and_then(cast::<String>)
+    {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            cfg.sprints.defaults.length = Some(trimmed);
+        }
+    }
+    if let Some(value) =
+        get_path(&data, &["sprints", "defaults", "overdue_after"]).and_then(cast::<String>)
+    {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            cfg.sprints.defaults.overdue_after = Some(trimmed);
+        }
+    }
+    if let Some(enabled) =
+        get_path(&data, &["sprints", "notifications", "enabled"]).and_then(cast::<bool>)
+    {
+        cfg.sprints.notifications.enabled = enabled;
+    }
+
     // Back-compat: allow flat keys at root for scan toggles
     if let Some(v) = get_path(&data, &["scan_enable_ticket_words"]).and_then(cast::<bool>) {
         cfg.scan_enable_ticket_words = v;
@@ -608,6 +641,44 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
     if !scan.is_empty() {
         root.insert(Y::String("scan".into()), Y::Mapping(scan));
+    }
+
+    // sprints
+    let mut sprints = serde_yaml::Mapping::new();
+    let mut sprint_defaults = serde_yaml::Mapping::new();
+    if let Some(points) = cfg.sprints.defaults.capacity_points {
+        sprint_defaults.insert(
+            Y::String("capacity_points".into()),
+            Y::Number(points.into()),
+        );
+    }
+    if let Some(hours) = cfg.sprints.defaults.capacity_hours {
+        sprint_defaults.insert(Y::String("capacity_hours".into()), Y::Number(hours.into()));
+    }
+    if let Some(length) = &cfg.sprints.defaults.length {
+        sprint_defaults.insert(Y::String("length".into()), Y::String(length.clone()));
+    }
+    if let Some(overdue) = &cfg.sprints.defaults.overdue_after {
+        sprint_defaults.insert(
+            Y::String("overdue_after".into()),
+            Y::String(overdue.clone()),
+        );
+    }
+    if !sprint_defaults.is_empty() {
+        sprints.insert(Y::String("defaults".into()), Y::Mapping(sprint_defaults));
+    }
+
+    if cfg.sprints.notifications.enabled != defaults.sprints.notifications.enabled {
+        let mut notifications = serde_yaml::Mapping::new();
+        notifications.insert(
+            Y::String("enabled".into()),
+            Y::Bool(cfg.sprints.notifications.enabled),
+        );
+        sprints.insert(Y::String("notifications".into()), Y::Mapping(notifications));
+    }
+
+    if !sprints.is_empty() {
+        root.insert(Y::String("sprints".into()), Y::Mapping(sprints));
     }
 
     // auto

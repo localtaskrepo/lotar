@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { formatTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
 import type { TaskTouch } from './useActivity'
@@ -11,8 +11,15 @@ export interface TaskTableProps {
     selectedIds?: string[]
     projectKey?: string
     bulk?: boolean
-    bulkAssignee?: string
     touches?: Record<string, TaskTouch>
+    sprintLookup?: Record<number, { label: string; state?: string }>
+    sprintOptions?: Array<{ value: string; label: string }>
+    sprintSelection?: string
+    allowClosedSprint?: boolean
+    hasSprints?: boolean
+    hasMissingSprints?: boolean
+    missingSprintMessage?: string
+    sprintsLoading?: boolean
 }
 
 export interface TaskTableEmit {
@@ -22,13 +29,19 @@ export interface TaskTableEmit {
     (event: 'set-status', payload: { id: string; status: string }): void
     (event: 'assign', id: string): void
     (event: 'unassign', id: string): void
+    (event: 'sprint-add', id: string): void
+    (event: 'sprint-remove', id: string): void
     (event: 'update:selectedIds', value: string[]): void
     (event: 'update:bulk', value: boolean): void
-    (event: 'update:bulkAssignee', value: string): void
-    (event: 'update:bulk-assignee', value: string): void
     (event: 'bulk-assign'): void
     (event: 'bulk-unassign'): void
     (event: 'add'): void
+    (event: 'update:sprint-selection', value: string): void
+    (event: 'update:allow-closed-sprint', value: boolean): void
+    (event: 'bulk-sprint-add'): void
+    (event: 'bulk-sprint-remove'): void
+    (event: 'bulk-delete'): void
+    (event: 'open-sprint-backlog'): void
 }
 
 type ColKey =
@@ -41,6 +54,7 @@ type ColKey =
     | 'assignee'
     | 'effort'
     | 'tags'
+    | 'sprints'
     | 'due_date'
     | 'modified'
 
@@ -54,6 +68,7 @@ const allColumns: ColKey[] = [
     'assignee',
     'effort',
     'tags',
+    'sprints',
     'due_date',
     'modified',
 ]
@@ -66,6 +81,7 @@ const defaultColumns: ColKey[] = [
     'reporter',
     'assignee',
     'tags',
+    'sprints',
     'due_date',
     'modified',
 ]
@@ -112,6 +128,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
             assignee: 'Assignee',
             effort: 'Effort',
             tags: 'Tags',
+            sprints: 'Sprints',
             due_date: 'Due',
             modified: 'Updated',
         }
@@ -193,12 +210,20 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         })(),
     )
 
+    function setSort(key: ColKey, dir: 'asc' | 'desc') {
+        if (sort.key === key && sort.dir === dir) {
+            return
+        }
+        sort.key = key
+        sort.dir = dir
+    }
+
     function onSort(key: ColKey) {
         if (sort.key === key) {
-            sort.dir = sort.dir === 'asc' ? 'desc' : 'asc'
+            const nextDir = sort.dir === 'asc' ? 'desc' : 'asc'
+            setSort(key, nextDir)
         } else {
-            sort.key = key
-            sort.dir = 'asc'
+            setSort(key, 'asc')
         }
     }
 
@@ -240,6 +265,11 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
             if (av == null && bv == null) return 0
             if (av == null) return -1 * dir
             if (bv == null) return 1 * dir
+            if (key === 'sprints') {
+                const toKey = (value: unknown) =>
+                    Array.isArray(value) && value.length > 0 ? value.join(',') : ''
+                return toKey(av).localeCompare(toKey(bv)) * dir
+            }
             if (key === 'due_date' || key === 'modified') {
                 const at = parseTaskDateToMillis(av as any) ?? 0
                 const bt = parseTaskDateToMillis(bv as any) ?? 0
@@ -253,15 +283,23 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     const touchesMap = computed(() => props.touches ?? ({} as Record<string, TaskTouch>))
 
     const selected = ref<string[]>(props.selectedIds ? [...props.selectedIds] : [])
+    const suppressSelectedEmit = ref(false)
 
     watch(
         () => props.selectedIds,
         (value) => {
+            suppressSelectedEmit.value = true
             selected.value = value ? [...value] : []
+            nextTick(() => {
+                suppressSelectedEmit.value = false
+            })
         },
     )
 
-    watch(selected, (value) => emit('update:selectedIds', value))
+    watch(selected, (value) => {
+        if (suppressSelectedEmit.value) return
+        emit('update:selectedIds', value)
+    })
 
     const visibleIds = computed(() => sorted.value.map((task) => task.id))
     const allSelected = computed(() => visibleIds.value.length > 0 && visibleIds.value.every((id) => selected.value.includes(id)))
@@ -299,7 +337,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         const checked = (event.target as HTMLInputElement).checked
         const visible = visibleIds.value
         if (checked) {
-            selected.value = [...new Set([...selected.value, ...visible])]
+            selected.value = [...visible]
         } else {
             const drop = new Set(visible)
             selected.value = selected.value.filter((id) => !drop.has(id))
@@ -308,12 +346,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     function onToggleBulk(event: Event) {
         emit('update:bulk', (event.target as HTMLInputElement).checked)
-    }
-
-    function onBulkAssignee(event: Event) {
-        const value = (event.target as HTMLInputElement).value
-        emit('update:bulkAssignee', value)
-        emit('update:bulk-assignee', value)
     }
 
     const tagsEditing = ref<Record<string, boolean>>({})
@@ -454,7 +486,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         toggleOne,
         toggleAll,
         onToggleBulk,
-        onBulkAssignee,
         tagsEditing,
         tagsDrafts,
         isEditingTags,
@@ -467,5 +498,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         relativeTime,
         touchBadge,
         isOverdue,
+        setSort,
     }
 }

@@ -31,14 +31,8 @@ fn service_filters_blank_tags_on_create_and_update() {
         project: Some("TEST".to_string()),
         priority: Some(Priority::from("Medium")),
         task_type: Some(TaskType::from("Feature")),
-        reporter: None,
-        assignee: None,
-        due_date: None,
-        effort: None,
-        description: None,
         tags: vec!["api".into(), " ".into(), "backend ".into(), "".into()],
-        relationships: None,
-        custom_fields: None,
+        ..TaskCreate::default()
     };
 
     let created = TaskService::create(&mut storage, req).expect("create task");

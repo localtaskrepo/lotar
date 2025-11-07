@@ -11,7 +11,8 @@ use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
-    AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, StatsHandler, TaskHandler,
+    AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, SprintHandler,
+    StatsHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
 use lotar::cli::{Cli, Commands, TaskAction};
@@ -49,6 +50,7 @@ fn is_valid_command(command: &str) -> bool {
             | "serve"
             | "whoami"
             | "stats"
+            | "sprint"
             | "changelog"
             | "mcp"
     )
@@ -420,6 +422,20 @@ fn main() {
                 }
             }
         }
+        Commands::Sprint(args) => {
+            renderer.log_info("BEGIN SPRINT");
+            match SprintHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END SPRINT status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END SPRINT status=err");
+                    Err(e)
+                }
+            }
+        }
         Commands::Changelog { since, global } => {
             renderer.log_info("BEGIN CHANGELOG");
             // Inline small implementation to avoid a new handler file
@@ -616,6 +632,7 @@ fn main() {
                             relationships: lotar::types::TaskRelationships::default(),
                             comments: vec![],
                             references: vec![],
+                            sprints: vec![],
                             history: vec![],
                             subtitle: None,
                             description: None,

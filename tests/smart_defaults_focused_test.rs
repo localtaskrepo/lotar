@@ -42,14 +42,7 @@ mod assignment {
             project: Some("TEST".to_string()),
             priority: Some(Priority::from("High")),
             task_type: Some(TaskType::from("Feature")),
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
         assert_eq!(created.reporter.as_deref(), Some("alice@example.com"));
@@ -72,16 +65,7 @@ mod assignment {
         let req = TaskCreate {
             title: "No reporter".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
         assert!(
@@ -101,16 +85,7 @@ mod assignment {
         let req = TaskCreate {
             title: "File reporter".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
         let _ = created.reporter; // may be Some or None; ensure no crash
@@ -138,16 +113,7 @@ mod assignment {
         let req = TaskCreate {
             title: "Alias reporter".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
         assert_eq!(created.reporter.as_deref(), Some("alias-user"));
@@ -175,16 +141,7 @@ mod assignment {
         let create = TaskCreate {
             title: "Needs assignee".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, create).unwrap();
         assert!(created.assignee.is_none(), "assignee should start None");
@@ -218,16 +175,7 @@ mod assignment {
         let create = TaskCreate {
             title: "No auto assign".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, create).unwrap();
         assert!(created.assignee.is_none());
@@ -267,16 +215,8 @@ mod assignment {
             TaskCreate {
                 title: "Preset assignee".into(),
                 project: Some("AAA".into()),
-                priority: None,
-                task_type: None,
-                reporter: None,
                 assignee: Some("sam".into()),
-                due_date: None,
-                effort: None,
-                description: None,
-                tags: vec![],
-                relationships: None,
-                custom_fields: None,
+                ..TaskCreate::default()
             },
         )
         .unwrap();
@@ -307,16 +247,7 @@ mod assignment {
         let req = TaskCreate {
             title: "Env reporter".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("create");
         assert_eq!(

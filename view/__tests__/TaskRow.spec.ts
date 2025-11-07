@@ -4,7 +4,8 @@ import TaskRow from '../components/TaskRow.vue'
 
 const baseTask = {
   id: 'PRJ-1', title: 'Alpha', status: 'open', priority: 'low', task_type: 'task',
-  created: '', modified: '', tags: ['one'], relationships: {}, comments: [], custom_fields: {}
+  created: '', modified: '', tags: ['one'], relationships: {}, comments: [], custom_fields: {},
+  references: [], sprints: [], history: []
 }
 
 describe('TaskRow inline edits', () => {

@@ -37,6 +37,13 @@ lotar scan ./src
 - **Task Types**: Feature, Bug, Epic, Spike, Chore
 - **Formatted IDs**: PROJ-1, PROJ-2 format with 4-character prefixes
 
+### Sprint Management
+- **Lifecycle Control**: Create, update, start, close, review, and reopen sprints directly from the CLI, REST API, MCP tools, and web UI.
+- **Canonical Storage**: Sprint definitions live in `.tasks/@sprints/<number>.yml` with clearly separated `plan` and `actual` sections plus optional history entries.
+- **Single Membership**: Tasks own a `sprints: []` field; helpers (`sprint add/move/remove/backlog`) enforce one active sprint per task unless `--force` is used.
+- **Integrity & Cleanup**: Commands warn about overdue starts/closes, detect missing sprint files, and clean up dangling memberships with `--cleanup-missing` or `sprint cleanup-refs`.
+- **Analytics Suite**: Built-in `sprint summary`, `sprint stats`, `sprint burndown`, `sprint calendar`, and `sprint velocity` surface progress, capacity, and scheduling data in both text and JSON formats.
+
 ### Storage & Organization
 - **YAML Format**: Human-readable `.yml` files
 - **Project Isolation**: Each project gets its own directory

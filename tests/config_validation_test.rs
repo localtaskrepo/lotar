@@ -60,6 +60,7 @@ fn test_global_config_validation_valid() {
         branch_type_aliases: std::collections::HashMap::new(),
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
+        sprints: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -114,6 +115,7 @@ fn test_global_config_validation_privileged_port_warning() {
         branch_type_aliases: std::collections::HashMap::new(),
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
+        sprints: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -185,6 +187,7 @@ fn test_global_config_validation_empty_lists_error() {
         branch_type_aliases: std::collections::HashMap::new(),
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
+        sprints: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -258,6 +261,7 @@ fn test_global_config_validation_invalid_defaults() {
         branch_type_aliases: std::collections::HashMap::new(),
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
+        sprints: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -318,6 +322,7 @@ fn test_global_config_duplicate_entries_warning() {
         branch_type_aliases: std::collections::HashMap::new(),
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
+        sprints: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);

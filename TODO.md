@@ -17,11 +17,17 @@ Features:
   - GitHook to update lotar tasks when linked github issues change
   - Configurable per-project settings for github integration (e.g. repo, auth token, field mappings)
   - UI elements in web interface to manage github links and sync actions
+- Update Web UI "Boards" to filter out issues that have been in status X for N days (setting in the UI)
+- Allow CLI list/search to filter by age older than N days
+- Check openapi.json is still up to date.
+- Allow ticket files to be stored in neseted folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
+- Option to disable history and to rely completely on git for any historic lookups
+- New issues property and search: blocked (Do we need that or can custom fields cover this?)
+- Add option to choose which screen open by default (e.g. tasks, sprints, calendar, etc.)
 
 Chores:
-- Tickets without ticket type (using default type) do not store that information in the file on disk
 - Test release workflow
-- Check if any of the auto features are applied to MPC as well.
+- parameter order is not flexible (e.g. lotar --format json sprint list works, but lotar sprint list --format json does not).
 
 ## Backlog
 - [ ] Include README and LICENSE in archives

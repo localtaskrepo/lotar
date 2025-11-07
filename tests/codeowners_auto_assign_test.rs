@@ -53,15 +53,6 @@ fn codeowners_assigns_owner_on_first_status_change() {
         TaskCreate {
             title: "Codeowners assign".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -80,6 +71,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
                 }
                 map
             }),
+            ..TaskCreate::default()
         },
     )
     .expect("create task");
@@ -125,15 +117,6 @@ fn codeowners_disabled_falls_back_to_identity() {
         TaskCreate {
             title: "Disabled codeowners".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -152,6 +135,7 @@ fn codeowners_disabled_falls_back_to_identity() {
                 }
                 map
             }),
+            ..TaskCreate::default()
         },
     )
     .expect("create task");
@@ -192,15 +176,6 @@ fn codeowners_default_multiple_owners_picks_first() {
         TaskCreate {
             title: "Multi owners".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -219,6 +194,7 @@ fn codeowners_default_multiple_owners_picks_first() {
                 }
                 map
             }),
+            ..TaskCreate::default()
         },
     )
     .expect("create task");
@@ -263,15 +239,6 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
         TaskCreate {
             title: "No match".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
             custom_fields: Some({
                 let mut map = std::collections::HashMap::new();
                 #[cfg(not(feature = "schema"))]
@@ -290,6 +257,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
                 }
                 map
             }),
+            ..TaskCreate::default()
         },
     )
     .expect("create task");

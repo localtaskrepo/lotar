@@ -38,6 +38,13 @@ pub struct TaskDTO {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub references: Vec<crate::types::ReferenceEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub sprints: Vec<u32>,
+    #[serde(
+        skip_serializing_if = "crate::api_types::btreemap_u32_is_empty",
+        default
+    )]
+    pub sprint_order: BTreeMap<u32, u32>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub history: Vec<crate::types::TaskChangeLogEntry>,
     #[serde(skip_serializing_if = "crate::api_types::map_is_empty", default)]
     pub custom_fields: crate::types::CustomFields,
@@ -50,7 +57,11 @@ pub fn map_is_empty(map: &crate::types::CustomFields) -> bool {
     as_hash.is_empty()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+pub fn btreemap_u32_is_empty(map: &BTreeMap<u32, u32>) -> bool {
+    map.is_empty()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskCreate {
     pub title: String,
@@ -66,6 +77,8 @@ pub struct TaskCreate {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub relationships: Option<crate::types::TaskRelationships>,
     pub custom_fields: Option<crate::types::CustomFields>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub sprints: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -83,6 +96,8 @@ pub struct TaskUpdate {
     pub tags: Option<Vec<String>>, // replace whole list
     pub relationships: Option<crate::types::TaskRelationships>,
     pub custom_fields: Option<crate::types::CustomFields>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sprints: Option<Vec<u32>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -94,6 +109,269 @@ pub struct TaskListFilter {
     pub project: Option<String>,
     pub tags: Vec<String>,
     pub text_query: Option<String>,
+    pub sprints: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(untagged)]
+pub enum SprintSelector {
+    Id(u32),
+    Keyword(String),
+}
+
+impl SprintSelector {
+    pub fn as_reference(&self) -> String {
+        match self {
+            SprintSelector::Id(id) => id.to_string(),
+            SprintSelector::Keyword(value) => value.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintAssignmentRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sprint: Option<SprintSelector>,
+    #[serde(default)]
+    pub tasks: Vec<String>,
+    #[serde(default)]
+    pub allow_closed: bool,
+    #[serde(default)]
+    pub cleanup_missing: bool,
+    #[serde(default)]
+    pub force_single: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintCreateRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub goal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_length: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub starts_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capacity_hours: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overdue_after: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub skip_defaults: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintCreateResponse {
+    pub status: String,
+    pub sprint: SprintListItem,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub applied_defaults: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintUpdateRequest {
+    pub sprint: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub goal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_length: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ends_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub starts_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capacity_points: Option<Option<u32>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capacity_hours: Option<Option<u32>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub overdue_after: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub actual_started_at: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub actual_closed_at: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintUpdateResponse {
+    pub status: String,
+    pub sprint: SprintListItem,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintReassignment {
+    pub task_id: String,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub previous: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintAssignmentResponse {
+    pub status: String,
+    pub action: String,
+    pub sprint_id: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sprint_label: Option<String>,
+    pub modified: Vec<String>,
+    pub unchanged: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub replaced: Vec<SprintReassignment>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub messages: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity: Option<SprintIntegrityDiagnostics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintDeleteRequest {
+    pub sprint: u32,
+    #[serde(default)]
+    pub cleanup_missing: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintDeleteResponse {
+    pub status: String,
+    pub deleted: bool,
+    pub sprint_id: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sprint_label: Option<String>,
+    pub removed_references: usize,
+    pub updated_tasks: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity: Option<SprintIntegrityDiagnostics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintIntegrityDiagnostics {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub missing_sprints: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tasks_with_missing: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_cleanup: Option<SprintCleanupSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintCleanupSummary {
+    pub removed_references: usize,
+    pub updated_tasks: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub removed_by_sprint: Vec<SprintCleanupMetric>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub remaining_missing: Vec<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintCleanupMetric {
+    pub sprint_id: u32,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintBacklogItem {
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub priority: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub assignee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub due_date: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintBacklogResponse {
+    pub status: String,
+    pub count: usize,
+    pub truncated: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub tasks: Vec<SprintBacklogItem>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub missing_sprints: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity: Option<SprintIntegrityDiagnostics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintListItem {
+    pub id: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub display_name: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub created: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub modified: Option<String>,
+    pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub planned_start: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub planned_end: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub actual_start: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub actual_end: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub computed_end: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub goal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub plan_length: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub overdue_after: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capacity_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capacity_hours: Option<u32>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SprintListResponse {
+    pub status: String,
+    pub count: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub sprints: Vec<SprintListItem>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub missing_sprints: Vec<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub integrity: Option<SprintIntegrityDiagnostics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

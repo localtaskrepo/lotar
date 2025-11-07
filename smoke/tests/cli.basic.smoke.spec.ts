@@ -1,3 +1,5 @@
+import fs from 'fs-extra';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { SmokeWorkspace } from '../helpers/workspace.js';
@@ -69,6 +71,41 @@ describe.concurrent('CLI smoke harness', () => {
             expect(config).toContain('default:\n  project:');
             expect(config).not.toContain('server:');
             expect(config).not.toContain('issue:');
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('deletes sprints via the CLI and cleans task memberships', async () => {
+        const workspace = await SmokeWorkspace.create();
+
+        try {
+            const first = await workspace.addTask('CLI Sprint Delete Task A');
+            const second = await workspace.addTask('CLI Sprint Delete Task B');
+
+            await workspace.runLotar(['sprint', 'create', '--label', 'CLI Delete Smoke Sprint']);
+            await workspace.runLotar(['sprint', 'add', first.id, second.id, '--sprint', '1']);
+
+            const result = await workspace.runLotar([
+                'sprint',
+                'delete',
+                '1',
+                '--force',
+                '--cleanup-missing',
+            ]);
+
+            expect(result.stdout).toContain('Deleted');
+            const sprintPath = path.join(workspace.tasksDir, '@sprints', '1.yml');
+            expect(await fs.pathExists(sprintPath)).toBe(false);
+
+            const firstYaml = parse(await workspace.readTaskYaml(first.id)) as Record<string, any>;
+            const secondYaml = parse(await workspace.readTaskYaml(second.id)) as Record<string, any>;
+
+            const firstMembership = Array.isArray(firstYaml.sprints) ? firstYaml.sprints : [];
+            const secondMembership = Array.isArray(secondYaml.sprints) ? secondYaml.sprints : [];
+
+            expect(firstMembership).not.toContain(1);
+            expect(secondMembership).not.toContain(1);
         } finally {
             await workspace.dispose();
         }

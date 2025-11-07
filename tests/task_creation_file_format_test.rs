@@ -11,16 +11,7 @@ fn new_task_file_omits_modified_and_history() {
     let request = TaskCreate {
         title: "Fresh Task".to_string(),
         project: Some("TEST".to_string()),
-        priority: None,
-        task_type: None,
-        reporter: None,
-        assignee: None,
-        due_date: None,
-        effort: None,
-        description: None,
-        tags: vec![],
-        relationships: None,
-        custom_fields: None,
+        ..TaskCreate::default()
     };
 
     let created = TaskService::create(&mut storage, request).expect("task creation succeeds");

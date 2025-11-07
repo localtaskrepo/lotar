@@ -156,6 +156,9 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.scan_enable_mentions != defaults.scan_enable_mentions {
         base.scan_enable_mentions = override_config.scan_enable_mentions;
     }
+    if override_config.sprints != defaults.sprints {
+        base.sprints = override_config.sprints;
+    }
     if !override_config.branch_type_aliases.is_empty() {
         base.branch_type_aliases = override_config.branch_type_aliases;
     }
@@ -252,6 +255,10 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.scan_enable_mentions != defaults.scan_enable_mentions {
         resolved.scan_enable_mentions = override_config.scan_enable_mentions;
+    }
+    if override_config.sprints != defaults.sprints {
+        resolved.sprint_defaults = override_config.sprints.defaults;
+        resolved.sprint_notifications = override_config.sprints.notifications;
     }
     if !override_config.branch_type_aliases.is_empty() {
         resolved.branch_type_aliases = override_config.branch_type_aliases;
@@ -414,6 +421,8 @@ impl ResolvedConfig {
             scan_ticket_patterns: global.scan_ticket_patterns,
             scan_enable_ticket_words: global.scan_enable_ticket_words,
             scan_enable_mentions: global.scan_enable_mentions,
+            sprint_defaults: global.sprints.defaults,
+            sprint_notifications: global.sprints.notifications,
             auto_identity: global.auto_identity,
             auto_identity_git: global.auto_identity_git,
             branch_type_aliases: global.branch_type_aliases,

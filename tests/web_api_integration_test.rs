@@ -1,3 +1,4 @@
+use chrono::Utc;
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
 use serde_json::{Value, json};
@@ -259,6 +260,166 @@ fn rest_create_and_update_supports_me_alias() {
     stop_server_on(port);
 
     // Env restored by guards
+}
+
+#[test]
+fn api_sprint_assignment_and_backlog() {
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+
+    // Minimal config to support task writes
+    std::fs::write(
+        lotar::utils::paths::global_config_path(&tasks_dir),
+        "default.project: API\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug]\nissue.priorities: [Low, Medium, High]\n",
+    )
+    .unwrap();
+
+    let mut storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let mut sprint = lotar::storage::sprint::Sprint::default();
+    sprint.plan = Some(lotar::storage::sprint::SprintPlan {
+        label: Some("Iteration 1".into()),
+        ..Default::default()
+    });
+    sprint.actual = Some(lotar::storage::sprint::SprintActual {
+        started_at: Some(Utc::now().to_rfc3339()),
+        ..Default::default()
+    });
+    let created =
+        lotar::services::sprint_service::SprintService::create(&mut storage, sprint, None)
+            .expect("create sprint");
+    let sprint_id = created.record.id;
+
+    let task_a = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "Sprint API A".into(),
+            project: Some("API".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("task a");
+    let task_b = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "Sprint API B".into(),
+            project: Some("API".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("task b");
+    let task_c = lotar::services::task_service::TaskService::create(
+        &mut storage,
+        lotar::api_types::TaskCreate {
+            title: "Sprint API Backlog".into(),
+            project: Some("API".into()),
+            ..lotar::api_types::TaskCreate::default()
+        },
+    )
+    .expect("task c");
+    drop(storage);
+
+    let mut api = ApiServer::new();
+    routes::initialize(&mut api);
+
+    let list_req = mk_req("GET", "/api/sprints/list", &[], json!({}));
+    let list_resp = api.handle_request(&list_req);
+    assert_eq!(list_resp.status, 200, "list should succeed");
+    let list_json: serde_json::Value = serde_json::from_slice(&list_resp.body).unwrap();
+    let list_data = list_json.get("data").expect("list data");
+    assert_eq!(
+        list_data.get("count").and_then(|v| v.as_u64()),
+        Some(1),
+        "should report one sprint"
+    );
+    let sprints = list_data
+        .get("sprints")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(sprints.len(), 1, "expected single sprint in list");
+    let sprint_entry = &sprints[0];
+    assert_eq!(
+        sprint_entry.get("id").and_then(|v| v.as_u64()),
+        Some(sprint_id as u64)
+    );
+    assert_eq!(
+        sprint_entry.get("display_name").and_then(|v| v.as_str()),
+        Some("Iteration 1")
+    );
+    assert_eq!(
+        sprint_entry.get("state").and_then(|v| v.as_str()),
+        Some("active")
+    );
+
+    let add_body = json!({
+        "sprint": sprint_id,
+        "tasks": [task_a.id.clone(), task_b.id.clone()]
+    });
+    let add_req = mk_req("POST", "/api/sprints/add", &[], add_body);
+    let add_resp = api.handle_request(&add_req);
+    assert_eq!(add_resp.status, 200);
+    let add_json: serde_json::Value = serde_json::from_slice(&add_resp.body).unwrap();
+    let add_data = add_json.get("data").unwrap();
+    let modified = add_data
+        .get("modified")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(modified.len(), 2);
+
+    let storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let assigned_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
+        .expect("task a assigned");
+    assert_eq!(assigned_a.sprints, vec![sprint_id]);
+    let assigned_b = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None)
+        .expect("task b assigned");
+    assert_eq!(assigned_b.sprints, vec![sprint_id]);
+    drop(storage);
+
+    let backlog_req = mk_req(
+        "GET",
+        "/api/sprints/backlog",
+        &[("project", "API")],
+        json!({}),
+    );
+    let backlog_resp = api.handle_request(&backlog_req);
+    assert_eq!(backlog_resp.status, 200);
+    let backlog_json: serde_json::Value = serde_json::from_slice(&backlog_resp.body).unwrap();
+    let backlog_tasks = backlog_json
+        .get("data")
+        .and_then(|d| d.get("tasks"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(backlog_tasks.len(), 1);
+    assert_eq!(
+        backlog_tasks[0].get("id").and_then(|v| v.as_str()),
+        Some(task_c.id.as_str())
+    );
+
+    let remove_body = json!({
+        "sprint": sprint_id,
+        "tasks": [task_a.id.clone()]
+    });
+    let remove_req = mk_req("POST", "/api/sprints/remove", &[], remove_body);
+    let remove_resp = api.handle_request(&remove_req);
+    assert_eq!(remove_resp.status, 200);
+    let remove_json: serde_json::Value = serde_json::from_slice(&remove_resp.body).unwrap();
+    let removed = remove_json
+        .get("data")
+        .and_then(|d| d.get("modified"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(removed, vec![serde_json::Value::String(task_a.id.clone())]);
+
+    let storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let updated_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
+        .expect("task a after remove");
+    assert!(updated_a.sprints.is_empty());
 }
 
 fn open_sse(port: u16, query: &str) -> (TcpStream, Vec<u8>) {

@@ -1,34 +1,284 @@
 use crate::LoTaRError;
 use crate::api_server::{ApiServer, HttpRequest, HttpResponse};
+use crate::config::resolution;
+use crate::services::sprint_assignment;
+use crate::services::sprint_integrity;
+use crate::services::sprint_metrics::SprintBurndownMetric;
+use crate::services::sprint_reports::{compute_sprint_burndown, compute_sprint_summary};
+use crate::services::sprint_velocity::{
+    DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
+};
 use crate::services::{
     config_service::ConfigService, project_service::ProjectService,
-    reference_service::ReferenceService, task_service::TaskService,
+    reference_service::ReferenceService, sprint_service::SprintService, task_service::TaskService,
 };
+use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
 use crate::workspace::TasksDirectoryResolver;
+use crate::{
+    api_types::{
+        SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
+        SprintBacklogResponse, SprintCleanupMetric, SprintCleanupSummary, SprintCreateRequest,
+        SprintCreateResponse, SprintDeleteRequest, SprintDeleteResponse,
+        SprintIntegrityDiagnostics, SprintListItem, SprintListResponse, SprintUpdateRequest,
+        SprintUpdateResponse,
+    },
+    types::TaskStatus,
+};
+use chrono::Utc;
 use serde_json::json;
 
-fn task_to_dto(id: &str, task: &crate::storage::task::Task) -> crate::api_types::TaskDTO {
-    crate::api_types::TaskDTO {
-        id: id.to_string(),
-        title: task.title.clone(),
-        status: task.status.clone(),
-        priority: task.priority.clone(),
-        task_type: task.task_type.clone(),
-        reporter: task.reporter.clone(),
-        assignee: task.assignee.clone(),
-        created: task.created.clone(),
-        modified: task.modified.clone(),
-        due_date: task.due_date.clone(),
-        effort: task.effort.clone(),
-        subtitle: task.subtitle.clone(),
-        description: task.description.clone(),
-        tags: task.tags.clone(),
-        relationships: task.relationships.clone(),
-        comments: task.comments.clone(),
-        references: task.references.clone(),
-        history: task.history.clone(),
-        custom_fields: task.custom_fields.clone(),
+fn make_cleanup_summary(outcome: &sprint_integrity::SprintCleanupOutcome) -> SprintCleanupSummary {
+    SprintCleanupSummary {
+        removed_references: outcome.removed_references,
+        updated_tasks: outcome.updated_tasks,
+        removed_by_sprint: outcome
+            .removed_by_sprint
+            .iter()
+            .map(|metric| SprintCleanupMetric {
+                sprint_id: metric.sprint_id,
+                count: metric.count,
+            })
+            .collect(),
+        remaining_missing: outcome.remaining_missing.clone(),
     }
+}
+
+fn make_integrity_payload(
+    baseline: &sprint_integrity::MissingSprintReport,
+    current: &sprint_integrity::MissingSprintReport,
+    cleanup: Option<&sprint_integrity::SprintCleanupOutcome>,
+) -> Option<SprintIntegrityDiagnostics> {
+    if baseline.missing_sprints.is_empty() && cleanup.is_none() {
+        return None;
+    }
+
+    Some(SprintIntegrityDiagnostics {
+        missing_sprints: current.missing_sprints.clone(),
+        tasks_with_missing: if baseline.tasks_with_missing > 0 {
+            Some(baseline.tasks_with_missing)
+        } else {
+            None
+        },
+        auto_cleanup: cleanup.map(make_cleanup_summary),
+    })
+}
+
+fn sprint_record_to_list_item(
+    record: &crate::services::sprint_service::SprintRecord,
+    reference: chrono::DateTime<Utc>,
+) -> SprintListItem {
+    let lifecycle = crate::services::sprint_status::derive_status(&record.sprint, reference);
+    let plan = record.sprint.plan.as_ref();
+    let capacity = plan.and_then(|plan| plan.capacity.as_ref());
+    SprintListItem {
+        id: record.id,
+        label: record
+            .sprint
+            .plan
+            .as_ref()
+            .and_then(|plan| plan.label.clone()),
+        display_name: sprint_assignment::sprint_display_name(record),
+        created: record.sprint.created.clone(),
+        modified: record.sprint.modified.clone(),
+        state: lifecycle.state.as_str().to_string(),
+        planned_start: lifecycle.planned_start.map(|dt| dt.to_rfc3339()),
+        planned_end: lifecycle.planned_end.map(|dt| dt.to_rfc3339()),
+        actual_start: lifecycle.actual_start.map(|dt| dt.to_rfc3339()),
+        actual_end: lifecycle.actual_end.map(|dt| dt.to_rfc3339()),
+        computed_end: lifecycle.computed_end.map(|dt| dt.to_rfc3339()),
+        goal: plan.and_then(|plan| plan.goal.clone()),
+        plan_length: plan.and_then(|plan| plan.length.clone()),
+        overdue_after: plan.and_then(|plan| plan.overdue_after.clone()),
+        notes: plan.and_then(|plan| plan.notes.clone()),
+        capacity_points: capacity.and_then(|capacity| capacity.points),
+        capacity_hours: capacity.and_then(|capacity| capacity.hours),
+        warnings: lifecycle
+            .warnings
+            .iter()
+            .map(|warning| warning.message())
+            .collect(),
+    }
+}
+
+fn sprint_from_create_request(payload: &SprintCreateRequest) -> Sprint {
+    let mut plan = SprintPlan::default();
+
+    if let Some(label) = clean_opt_string(payload.label.clone()) {
+        plan.label = Some(label);
+    }
+    if let Some(goal) = clean_opt_string(payload.goal.clone()) {
+        plan.goal = Some(goal);
+    }
+    if let Some(length) = clean_opt_string(payload.plan_length.clone()) {
+        plan.length = Some(length);
+    }
+    if let Some(ends_at) = clean_opt_string(payload.ends_at.clone()) {
+        plan.ends_at = Some(ends_at);
+    }
+    if let Some(starts_at) = clean_opt_string(payload.starts_at.clone()) {
+        plan.starts_at = Some(starts_at);
+    }
+    if let Some(points) = payload.capacity_points {
+        plan.capacity
+            .get_or_insert_with(SprintCapacity::default)
+            .points = Some(points);
+    }
+    if let Some(hours) = payload.capacity_hours {
+        plan.capacity
+            .get_or_insert_with(SprintCapacity::default)
+            .hours = Some(hours);
+    }
+    if let Some(overdue_after) = clean_opt_string(payload.overdue_after.clone()) {
+        plan.overdue_after = Some(overdue_after);
+    }
+    if let Some(notes) = payload
+        .notes
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+    {
+        plan.notes = Some(notes);
+    }
+
+    let mut sprint = Sprint::default();
+    if plan_has_values(&plan) {
+        sprint.plan = Some(plan);
+    }
+    sprint
+}
+
+fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
+    if let Some(label) = payload.label.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.label = clean_opt_string(Some(label));
+    }
+    if let Some(goal) = payload.goal.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.goal = clean_opt_string(Some(goal));
+    }
+    if let Some(length) = payload.plan_length.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.length = clean_opt_string(Some(length));
+    }
+    if let Some(ends_at) = payload.ends_at.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.ends_at = clean_opt_string(Some(ends_at));
+    }
+    if let Some(starts_at) = payload.starts_at.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.starts_at = clean_opt_string(Some(starts_at));
+    }
+    if let Some(overdue_after) = payload.overdue_after.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.overdue_after = clean_opt_string(Some(overdue_after));
+    }
+    if let Some(notes) = payload.notes.clone() {
+        let plan = target.plan.get_or_insert_with(SprintPlan::default);
+        plan.notes = clean_opt_string(Some(notes));
+    }
+    if let Some(capacity_points) = payload.capacity_points {
+        match capacity_points {
+            Some(value) => {
+                let plan = target.plan.get_or_insert_with(SprintPlan::default);
+                plan.capacity
+                    .get_or_insert_with(SprintCapacity::default)
+                    .points = Some(value);
+            }
+            None => {
+                if let Some(plan) = target.plan.as_mut() {
+                    if let Some(capacity) = plan.capacity.as_mut() {
+                        capacity.points = None;
+                        if capacity.points.is_none() && capacity.hours.is_none() {
+                            plan.capacity = None;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if let Some(capacity_hours) = payload.capacity_hours {
+        match capacity_hours {
+            Some(value) => {
+                let plan = target.plan.get_or_insert_with(SprintPlan::default);
+                plan.capacity
+                    .get_or_insert_with(SprintCapacity::default)
+                    .hours = Some(value);
+            }
+            None => {
+                if let Some(plan) = target.plan.as_mut() {
+                    if let Some(capacity) = plan.capacity.as_mut() {
+                        capacity.hours = None;
+                        if capacity.points.is_none() && capacity.hours.is_none() {
+                            plan.capacity = None;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(actual_started_at) = payload.actual_started_at.clone() {
+        match actual_started_at {
+            Some(value) => {
+                let actual = target.actual.get_or_insert_with(SprintActual::default);
+                actual.started_at = clean_opt_string(Some(value));
+            }
+            None => {
+                if let Some(actual) = target.actual.as_mut() {
+                    actual.started_at = None;
+                }
+            }
+        }
+    }
+
+    if let Some(actual_closed_at) = payload.actual_closed_at.clone() {
+        match actual_closed_at {
+            Some(value) => {
+                let actual = target.actual.get_or_insert_with(SprintActual::default);
+                actual.closed_at = clean_opt_string(Some(value));
+            }
+            None => {
+                if let Some(actual) = target.actual.as_mut() {
+                    actual.closed_at = None;
+                }
+            }
+        }
+    }
+
+    let should_clear_actual = matches!(
+        target.actual.as_ref(),
+        Some(actual) if actual.started_at.is_none() && actual.closed_at.is_none()
+    );
+    if should_clear_actual {
+        target.actual = None;
+    }
+
+    if let Some(plan) = target.plan.as_ref() {
+        if !plan_has_values(plan) {
+            target.plan = None;
+        }
+    }
+}
+
+fn plan_has_values(plan: &SprintPlan) -> bool {
+    plan.label.is_some()
+        || plan.goal.is_some()
+        || plan.length.is_some()
+        || plan.ends_at.is_some()
+        || plan.starts_at.is_some()
+        || plan.capacity.is_some()
+        || plan.overdue_after.is_some()
+        || plan.notes.is_some()
+}
+
+fn clean_opt_string(input: Option<String>) -> Option<String> {
+    input.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
 }
 
 pub fn initialize(api_server: &mut ApiServer) {
@@ -80,7 +330,6 @@ pub fn initialize(api_server: &mut ApiServer) {
                 },
                 None => None,
             },
-            reporter: None,
             assignee: add.assignee,
             due_date: add.due,
             effort: add.effort,
@@ -101,13 +350,21 @@ pub fn initialize(api_server: &mut ApiServer) {
                 },
                 None => None,
             },
-            custom_fields: if add.fields.is_empty() { None } else {
+            custom_fields: if add.fields.is_empty() {
+                None
+            } else {
                 let mut m = std::collections::HashMap::new();
                 for (k, v) in add.fields.into_iter() {
                     m.insert(k, crate::types::custom_value_string(v));
                 }
                 Some(m)
             },
+            sprints: body
+                .get("sprints")
+                .cloned()
+                .and_then(|value| serde_json::from_value::<Vec<u32>>(value).ok())
+                .unwrap_or_default(),
+            ..crate::api_types::TaskCreate::default()
         };
     match TaskService::create(&mut storage, req_create) {
             Ok(task) => {
@@ -174,6 +431,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_default(),
             text_query: req.query.get("q").cloned(),
+            sprints: vec![],
         };
         let tasks = TaskService::list(&storage, &filter);
         // API parity: accept additional query keys (built-ins or declared custom fields)
@@ -280,6 +538,854 @@ pub fn initialize(api_server: &mut ApiServer) {
         )
     });
 
+    // GET /api/sprints/list
+    api_server.register_handler("GET", "/api/sprints/list", |_req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
+            Some(storage) => storage,
+            None => {
+                let payload = SprintListResponse {
+                    status: "ok".to_string(),
+                    count: 0,
+                    sprints: Vec::new(),
+                    missing_sprints: Vec::new(),
+                    integrity: None,
+                };
+                return ok_json(200, json!({"data": payload}));
+            }
+        };
+        let records = match SprintService::list(&storage) {
+            Ok(records) => records,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to load sprints: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let now = Utc::now();
+        let sprints: Vec<SprintListItem> = records
+            .iter()
+            .map(|record| sprint_record_to_list_item(record, now))
+            .collect();
+
+        let integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        let payload = SprintListResponse {
+            status: "ok".to_string(),
+            count: sprints.len(),
+            sprints,
+            missing_sprints: integrity_report.missing_sprints.clone(),
+            integrity: make_integrity_payload(&integrity_report, &integrity_report, None),
+        };
+
+        ok_json(200, json!({"data": payload}))
+    });
+
+    // POST /api/sprints/create
+    api_server.register_handler("POST", "/api/sprints/create", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+
+        let body: SprintCreateRequest = match serde_json::from_slice(&req.body) {
+            Ok(payload) => payload,
+            Err(err) => return bad_request(format!("Invalid body: {}", err)),
+        };
+
+        let resolved_config =
+            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+                Ok(config) => config,
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load config: {}", err)
+                        }
+                    }));
+                }
+            };
+
+        let sprint = sprint_from_create_request(&body);
+        let defaults = if body.skip_defaults {
+            None
+        } else {
+            Some(&resolved_config.sprint_defaults)
+        };
+
+        let outcome = match SprintService::create(&mut storage, sprint, defaults) {
+            Ok(outcome) => outcome,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to create sprint: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let response = SprintCreateResponse {
+            status: "ok".to_string(),
+            sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+            warnings: outcome
+                .warnings
+                .iter()
+                .map(|warning| warning.message().to_string())
+                .collect(),
+            applied_defaults: outcome.applied_defaults.clone(),
+        };
+
+        ok_json(200, json!({"data": response}))
+    });
+
+    // POST /api/sprints/add
+    api_server.register_handler("POST", "/api/sprints/add", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut records = match SprintService::list(&storage) {
+            Ok(records) => records,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to load sprints: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let body: SprintAssignmentRequest = match serde_json::from_slice(&req.body) {
+            Ok(payload) => payload,
+            Err(err) => return bad_request(format!("Invalid body: {}", err)),
+        };
+
+        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        let baseline_report = integrity_report.clone();
+        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
+
+        if body.cleanup_missing && !integrity_report.missing_sprints.is_empty() {
+            match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
+                Ok(outcome) => {
+                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+                    cleanup_outcome = Some(outcome);
+                }
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to clean up sprint references: {}", err)
+                        }
+                    }));
+                }
+            }
+        }
+
+        let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
+        let outcome = match sprint_assignment::assign_tasks(
+            &mut storage,
+            &records,
+            &body.tasks,
+            sprint_reference.as_deref(),
+            body.allow_closed,
+            body.force_single,
+        ) {
+            Ok(outcome) => outcome,
+            Err(msg) => return bad_request(msg),
+        };
+
+        let messages: Vec<String> = outcome
+            .replaced
+            .iter()
+            .filter_map(|info| info.describe())
+            .collect();
+        let replaced_payload: Vec<crate::api_types::SprintReassignment> = outcome
+            .replaced
+            .iter()
+            .map(|info| crate::api_types::SprintReassignment {
+                task_id: info.task_id.clone(),
+                previous: info.previous.clone(),
+            })
+            .collect();
+
+        let response = SprintAssignmentResponse {
+            status: "ok".to_string(),
+            action: outcome.action.as_str().to_string(),
+            sprint_id: outcome.sprint_id,
+            sprint_label: outcome.sprint_label,
+            modified: outcome.modified,
+            unchanged: outcome.unchanged,
+            replaced: replaced_payload,
+            messages,
+            integrity: make_integrity_payload(
+                &baseline_report,
+                &integrity_report,
+                cleanup_outcome.as_ref(),
+            ),
+        };
+
+        ok_json(200, json!({"data": response}))
+    });
+
+    // POST /api/sprints/remove
+    api_server.register_handler("POST", "/api/sprints/remove", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut records = match SprintService::list(&storage) {
+            Ok(records) => records,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to load sprints: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let body: SprintAssignmentRequest = match serde_json::from_slice(&req.body) {
+            Ok(payload) => payload,
+            Err(err) => return bad_request(format!("Invalid body: {}", err)),
+        };
+
+        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        let baseline_report = integrity_report.clone();
+        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
+
+        if body.cleanup_missing && !integrity_report.missing_sprints.is_empty() {
+            match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
+                Ok(outcome) => {
+                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+                    cleanup_outcome = Some(outcome);
+                }
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to clean up sprint references: {}", err)
+                        }
+                    }));
+                }
+            }
+        }
+
+        let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
+        let outcome = match sprint_assignment::remove_tasks(
+            &mut storage,
+            &records,
+            &body.tasks,
+            sprint_reference.as_deref(),
+        ) {
+            Ok(outcome) => outcome,
+            Err(msg) => return bad_request(msg),
+        };
+
+        let messages: Vec<String> = outcome
+            .replaced
+            .iter()
+            .filter_map(|info| info.describe())
+            .collect();
+        let replaced_payload: Vec<crate::api_types::SprintReassignment> = outcome
+            .replaced
+            .iter()
+            .map(|info| crate::api_types::SprintReassignment {
+                task_id: info.task_id.clone(),
+                previous: info.previous.clone(),
+            })
+            .collect();
+
+        let response = SprintAssignmentResponse {
+            status: "ok".to_string(),
+            action: outcome.action.as_str().to_string(),
+            sprint_id: outcome.sprint_id,
+            sprint_label: outcome.sprint_label,
+            modified: outcome.modified,
+            unchanged: outcome.unchanged,
+            replaced: replaced_payload,
+            messages,
+            integrity: make_integrity_payload(
+                &baseline_report,
+                &integrity_report,
+                cleanup_outcome.as_ref(),
+            ),
+        };
+
+        ok_json(200, json!({"data": response}))
+    });
+
+    // POST /api/sprints/delete
+    api_server.register_handler("POST", "/api/sprints/delete", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+
+        let body: SprintDeleteRequest = match serde_json::from_slice(&req.body) {
+            Ok(payload) => payload,
+            Err(err) => return bad_request(format!("Invalid body: {}", err)),
+        };
+
+        let sprint_id = body.sprint;
+        let existing = match SprintService::get(&storage, sprint_id) {
+            Ok(record) => record,
+            Err(LoTaRError::SprintNotFound(_)) => {
+                return not_found(format!("Sprint #{} not found", sprint_id));
+            }
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to load sprint: {}", err)
+                    }
+                }));
+            }
+        };
+
+        match SprintService::delete(&mut storage, sprint_id) {
+            Ok(true) => {}
+            Ok(false) => return not_found(format!("Sprint #{} not found", sprint_id)),
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to delete sprint: {}", err)
+                    }
+                }));
+            }
+        }
+
+        let mut records = match SprintService::list(&storage) {
+            Ok(records) => records,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to reload sprints: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        let baseline_report = integrity_report.clone();
+        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
+
+        if body.cleanup_missing {
+            match sprint_integrity::cleanup_missing_sprint_refs(
+                &mut storage,
+                &mut records,
+                Some(sprint_id),
+            ) {
+                Ok(outcome) => {
+                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+                    cleanup_outcome = Some(outcome);
+                }
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!(
+                                "Failed to clean up sprint references: {}",
+                                err
+                            )
+                        }
+                    }));
+                }
+            }
+        }
+
+        let response = SprintDeleteResponse {
+            status: "ok".to_string(),
+            deleted: true,
+            sprint_id,
+            sprint_label: existing
+                .sprint
+                .plan
+                .as_ref()
+                .and_then(|plan| plan.label.clone()),
+            removed_references: cleanup_outcome
+                .as_ref()
+                .map(|outcome| outcome.removed_references)
+                .unwrap_or(0),
+            updated_tasks: cleanup_outcome
+                .as_ref()
+                .map(|outcome| outcome.updated_tasks)
+                .unwrap_or(0),
+            integrity: make_integrity_payload(
+                &baseline_report,
+                &integrity_report,
+                cleanup_outcome.as_ref(),
+            ),
+        };
+
+        ok_json(200, json!({"data": response}))
+    });
+
+    // GET /api/sprints/backlog
+    api_server.register_handler("GET", "/api/sprints/backlog", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let mut storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
+            Some(storage) => storage,
+            None => {
+                let payload = SprintBacklogResponse {
+                    status: "ok".to_string(),
+                    count: 0,
+                    truncated: false,
+                    tasks: Vec::new(),
+                    missing_sprints: Vec::new(),
+                    integrity: None,
+                };
+                return ok_json(200, json!({"data": payload}));
+            }
+        };
+
+        let limit = req
+            .query
+            .get("limit")
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(20);
+        if limit == 0 {
+            return bad_request("--limit must be greater than zero".to_string());
+        }
+
+        let statuses: Vec<TaskStatus> = req
+            .query
+            .get("status")
+            .map(|value| {
+                value
+                    .split(',')
+                    .map(|token| token.trim())
+                    .filter(|token| !token.is_empty())
+                    .map(TaskStatus::from)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let tags: Vec<String> = req
+            .query
+            .get("tag")
+            .or_else(|| req.query.get("tags"))
+            .map(|value| {
+                value
+                    .split(',')
+                    .map(|token| token.trim())
+                    .filter(|token| !token.is_empty())
+                    .map(|token| token.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let cleanup_missing = req
+            .query
+            .get("cleanup_missing")
+            .map(|value| {
+                let lowered = value.to_ascii_lowercase();
+                matches!(lowered.as_str(), "1" | "true" | "yes")
+            })
+            .unwrap_or(false);
+
+        let mut records = match SprintService::list(&storage) {
+            Ok(records) => records,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to load sprints: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let mut integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        let baseline_report = integrity_report.clone();
+        let mut cleanup_outcome: Option<sprint_integrity::SprintCleanupOutcome> = None;
+
+        if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
+            match sprint_integrity::cleanup_missing_sprint_refs(&mut storage, &mut records, None) {
+                Ok(outcome) => {
+                    integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
+                    cleanup_outcome = Some(outcome);
+                }
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to clean up sprint references: {}", err)
+                        }
+                    }));
+                }
+            }
+        }
+
+        let options = sprint_assignment::SprintBacklogOptions {
+            project: req.query.get("project").cloned(),
+            tags,
+            statuses,
+            assignee: req.query.get("assignee").cloned(),
+            limit,
+        };
+
+        let result = match sprint_assignment::fetch_backlog(&storage, options) {
+            Ok(result) => result,
+            Err(msg) => return bad_request(msg),
+        };
+
+        let tasks: Vec<SprintBacklogItem> = result
+            .entries
+            .into_iter()
+            .map(|entry| SprintBacklogItem {
+                id: entry.id,
+                title: entry.title,
+                status: entry.status,
+                priority: entry.priority,
+                assignee: entry.assignee,
+                due_date: entry.due_date,
+                tags: entry.tags,
+            })
+            .collect();
+
+        let payload = SprintBacklogResponse {
+            status: "ok".to_string(),
+            count: tasks.len(),
+            truncated: result.truncated,
+            tasks,
+            missing_sprints: integrity_report.missing_sprints.clone(),
+            integrity: make_integrity_payload(
+                &baseline_report,
+                &integrity_report,
+                cleanup_outcome.as_ref(),
+            ),
+        };
+
+        ok_json(200, json!({"data": payload}))
+    });
+
+    // GET /api/sprints/summary
+    api_server.register_handler("GET", "/api/sprints/summary", |req: &HttpRequest| {
+        let sprint_id = match req
+            .query
+            .get("sprint")
+            .and_then(|value| value.parse::<u32>().ok())
+        {
+            Some(id) if id > 0 => id,
+            _ => {
+                return bad_request(
+                    "Query parameter 'sprint' must be a positive integer".to_string(),
+                );
+            }
+        };
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": e,
+                    }
+                }));
+            }
+        };
+
+        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+
+        let record = match SprintService::get(&storage, sprint_id) {
+            Ok(record) => record,
+            Err(err) => {
+                return match err {
+                    LoTaRError::SprintNotFound(_) => {
+                        bad_request(format!("Sprint {} not found", sprint_id))
+                    }
+                    other => internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load sprint: {}", other),
+                        }
+                    })),
+                };
+            }
+        };
+
+        let resolved_config =
+            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+                Ok(cfg) => cfg,
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load config: {}", err),
+                        }
+                    }));
+                }
+            };
+
+        let summary = compute_sprint_summary(&storage, &record, &resolved_config, Utc::now());
+        ok_json(200, json!({"data": summary.payload}))
+    });
+
+    // GET /api/sprints/burndown
+    api_server.register_handler("GET", "/api/sprints/burndown", |req: &HttpRequest| {
+        let sprint_id = match req
+            .query
+            .get("sprint")
+            .and_then(|value| value.parse::<u32>().ok())
+        {
+            Some(id) if id > 0 => id,
+            _ => {
+                return bad_request(
+                    "Query parameter 'sprint' must be a positive integer".to_string(),
+                );
+            }
+        };
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": e,
+                    }
+                }));
+            }
+        };
+
+        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+
+        let record = match SprintService::get(&storage, sprint_id) {
+            Ok(record) => record,
+            Err(err) => {
+                return match err {
+                    LoTaRError::SprintNotFound(_) => {
+                        bad_request(format!("Sprint {} not found", sprint_id))
+                    }
+                    other => internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load sprint: {}", other),
+                        }
+                    })),
+                };
+            }
+        };
+
+        let resolved_config =
+            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+                Ok(cfg) => cfg,
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load config: {}", err),
+                        }
+                    }));
+                }
+            };
+
+        let context = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now())
+        {
+            Ok(ctx) => ctx,
+            Err(msg) => return bad_request(msg),
+        };
+
+        ok_json(200, json!({"data": context.payload}))
+    });
+
+    // POST /api/sprints/update
+    api_server.register_handler("POST", "/api/sprints/update", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+
+        let body: SprintUpdateRequest = match serde_json::from_slice(&req.body) {
+            Ok(payload) => payload,
+            Err(err) => return bad_request(format!("Invalid body: {}", err)),
+        };
+
+        if body.sprint == 0 {
+            return bad_request("Sprint identifier must be provided".to_string());
+        }
+
+        let existing = match SprintService::get(&storage, body.sprint) {
+            Ok(record) => record,
+            Err(err) => {
+                return match err {
+                    LoTaRError::SprintNotFound(_) => {
+                        bad_request(format!("Sprint {} not found", body.sprint))
+                    }
+                    other => internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load sprint: {}", other)
+                        }
+                    })),
+                };
+            }
+        };
+
+        let mut sprint = existing.sprint.clone();
+        apply_update_to_sprint(&mut sprint, &body);
+
+        let outcome = match SprintService::update(&mut storage, body.sprint, sprint) {
+            Ok(outcome) => outcome,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to update sprint: {}", err)
+                    }
+                }));
+            }
+        };
+
+        let payload = SprintUpdateResponse {
+            status: "ok".to_string(),
+            sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+            warnings: outcome
+                .warnings
+                .iter()
+                .map(|warning| warning.message().to_string())
+                .collect(),
+        };
+
+        ok_json(200, json!({"data": payload}))
+    });
+
+    // GET /api/sprints/velocity
+    api_server.register_handler("GET", "/api/sprints/velocity", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let include_active = req
+            .query
+            .get("include_active")
+            .map(|value| {
+                let lowered = value.to_ascii_lowercase();
+                matches!(lowered.as_str(), "1" | "true" | "yes")
+            })
+            .unwrap_or(false);
+
+        let limit = req
+            .query
+            .get("limit")
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(DEFAULT_VELOCITY_WINDOW);
+        if limit == 0 {
+            return bad_request("--limit must be greater than zero".to_string());
+        }
+
+        let metric = match req.query.get("metric") {
+            Some(value) => {
+                let lowered = value.to_ascii_lowercase();
+                match lowered.as_str() {
+                    "tasks" => SprintBurndownMetric::Tasks,
+                    "points" => SprintBurndownMetric::Points,
+                    "hours" => SprintBurndownMetric::Hours,
+                    _ => {
+                        return bad_request(format!(
+                            "Unsupported metric '{}'. Use tasks, points, or hours.",
+                            value
+                        ));
+                    }
+                }
+            }
+            None => SprintBurndownMetric::Points,
+        };
+
+        let storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
+            Some(storage) => storage,
+            None => {
+                let empty = VelocityComputation {
+                    metric,
+                    entries: Vec::new(),
+                    total_matching: 0,
+                    truncated: false,
+                    skipped_incomplete: false,
+                    average_velocity: None,
+                    average_completion_ratio: None,
+                };
+                let payload = empty.to_payload(include_active);
+                return ok_json(200, json!({"data": payload}));
+            }
+        };
+
+        let records = match SprintService::list(&storage) {
+            Ok(records) => records,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": format!("Failed to load sprints: {}", err)
+                    }
+                }));
+            }
+        };
+
+        if records.is_empty() {
+            let empty = VelocityComputation {
+                metric,
+                entries: Vec::new(),
+                total_matching: 0,
+                truncated: false,
+                skipped_incomplete: false,
+                average_velocity: None,
+                average_completion_ratio: None,
+            };
+            let payload = empty.to_payload(include_active);
+            return ok_json(200, json!({"data": payload}));
+        }
+
+        let resolved_config =
+            match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+                Ok(config) => config,
+                Err(err) => {
+                    return internal(json!({
+                        "error": {
+                            "code": "INTERNAL",
+                            "message": format!("Failed to load config: {}", err)
+                        }
+                    }));
+                }
+            };
+
+        let options = VelocityOptions {
+            limit,
+            include_active,
+            metric,
+        };
+
+        let computation =
+            compute_velocity(&storage, records, &resolved_config, options, Utc::now());
+        let payload = computation.to_payload(include_active);
+
+        ok_json(200, json!({"data": payload}))
+    });
+
     // GET /api/tasks/export -> CSV of tasks using same filters as list
     api_server.register_handler("GET", "/api/tasks/export", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
@@ -332,6 +1438,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_default(),
             text_query: req.query.get("q").cloned(),
+            sprints: vec![],
         };
         let tasks = TaskService::list(&storage, &filter);
 
@@ -520,6 +1627,10 @@ pub fn initialize(api_server: &mut ApiServer) {
                 for (k, v) in edit.fields.into_iter() { m.insert(k, crate::types::custom_value_string(v)); }
                 Some(m)
             },
+            sprints: body
+                .get("sprints")
+                .cloned()
+                .and_then(|v| serde_json::from_value::<Vec<u32>>(v).ok()),
         };
         match TaskService::update(&mut storage, &edit.id, patch) {
             Ok(task) => {
@@ -571,6 +1682,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             tags: None,
             relationships: None,
             custom_fields: None,
+            sprints: None,
         };
         match TaskService::update(&mut storage, &id, patch) {
             Ok(task) => {
@@ -623,7 +1735,14 @@ pub fn initialize(api_server: &mut ApiServer) {
         });
         task.modified = chrono::Utc::now().to_rfc3339();
         storage.edit(&id, &task);
-        let dto = task_to_dto(&id, &task);
+        let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+            Ok(dto) => dto,
+            Err(err) => {
+                return internal(
+                    json!({"error": {"code": "INTERNAL", "message": err.to_string()}}),
+                );
+            }
+        };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_task_updated(&dto, actor.as_deref());
         ok_json(200, json!({"data": dto}))
@@ -663,7 +1782,14 @@ pub fn initialize(api_server: &mut ApiServer) {
         }
         let previous = task.comments[index].text.clone();
         if previous == trimmed {
-            let dto = task_to_dto(&id, &task);
+            let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+                Ok(dto) => dto,
+                Err(err) => {
+                    return internal(
+                        json!({"error": {"code": "INTERNAL", "message": err.to_string()}}),
+                    );
+                }
+            };
             return ok_json(200, json!({"data": dto}));
         }
         let new_text = trimmed.to_string();
@@ -680,7 +1806,14 @@ pub fn initialize(api_server: &mut ApiServer) {
         });
         task.modified = now;
         storage.edit(&id, &task);
-        let dto = task_to_dto(&id, &task);
+        let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+            Ok(dto) => dto,
+            Err(err) => {
+                return internal(
+                    json!({"error": {"code": "INTERNAL", "message": err.to_string()}}),
+                );
+            }
+        };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_task_updated(&dto, actor.as_deref());
         ok_json(200, json!({"data": dto}))

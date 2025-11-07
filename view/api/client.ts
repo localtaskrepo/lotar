@@ -7,6 +7,19 @@ import type {
   ProjectDTO,
   ProjectStatsDTO,
   ReferenceSnippet,
+  SprintAssignmentRequest,
+  SprintAssignmentResponse,
+  SprintBacklogResponse,
+  SprintBurndownResponse,
+  SprintCreateRequest,
+  SprintCreateResponse,
+  SprintDeleteRequest,
+  SprintDeleteResponse,
+  SprintListResponse,
+  SprintSummaryReportResponse,
+  SprintUpdateRequest,
+  SprintUpdateResponse,
+  SprintVelocityResponse,
   TaskCreate,
   TaskDTO,
   TaskListFilter,
@@ -29,20 +42,53 @@ function qs(params: Record<string, any> = {}): string {
   return s ? `?${s}` : ''
 }
 
+async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Response): Promise<T> {
+  const raw = await res.text()
+  let payload: ApiEnvelope<T> | { error?: { message?: string }; data?: T } | null = null
+  if (raw) {
+    try {
+      payload = JSON.parse(raw)
+    } catch {
+      payload = null
+    }
+  }
+
+  if (!res.ok) {
+    const message =
+      (payload as any)?.error?.message ||
+      (payload as any)?.message ||
+      raw?.trim() ||
+      `${res.status}`
+    throw new Error(`${method} ${path} failed: ${message}`)
+  }
+
+  if (!payload) {
+    throw new Error(`${method} ${path} failed: Empty response`)
+  }
+
+  if ((payload as any).error) {
+    throw new Error((payload as any).error.message || `${method} ${path} failed`)
+  }
+
+  if (!('data' in (payload as ApiEnvelope<T>))) {
+    return (payload as any) as T
+  }
+
+  return (payload as ApiEnvelope<T>).data
+}
+
 async function get<T>(path: string, params?: Record<string, any>): Promise<T> {
-  const res = await fetch(`${BASE}${path}${qs(params)}`, { headers: { 'Accept': 'application/json' } })
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`)
-  const env = await res.json() as ApiEnvelope<T>
-  if ((env as any).error) throw new Error((env as any).error.message)
-  return env.data
+  const res = await fetch(`${BASE}${path}${qs(params)}`, { headers: { Accept: 'application/json' } })
+  return parseEnvelope('GET', path, res)
 }
 
 async function post<T>(path: string, body: any): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(body) })
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`)
-  const env = await res.json() as ApiEnvelope<T>
-  if ((env as any).error) throw new Error((env as any).error.message)
-  return env.data
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+  return parseEnvelope('POST', path, res)
 }
 
 export const api = {
@@ -108,6 +154,29 @@ export const api = {
       q: (filter as any).text_query || (filter as any).q,
     }
     return fetch(`/api/tasks/export${qs(params)}`, { headers: { 'Accept': 'text/csv' } })
+  },
+
+  // Sprints
+  sprintList(): Promise<SprintListResponse> { return get('/api/sprints/list') },
+  sprintCreate(payload: SprintCreateRequest): Promise<SprintCreateResponse> { return post('/api/sprints/create', payload) },
+  sprintUpdate(payload: SprintUpdateRequest): Promise<SprintUpdateResponse> { return post('/api/sprints/update', payload) },
+  sprintDelete(payload: SprintDeleteRequest): Promise<SprintDeleteResponse> { return post('/api/sprints/delete', payload) },
+  sprintAdd(payload: SprintAssignmentRequest): Promise<SprintAssignmentResponse> { return post('/api/sprints/add', payload) },
+  sprintRemove(payload: SprintAssignmentRequest): Promise<SprintAssignmentResponse> { return post('/api/sprints/remove', payload) },
+  sprintSummary(sprint: number): Promise<SprintSummaryReportResponse> { return get('/api/sprints/summary', { sprint }) },
+  sprintBurndown(sprint: number): Promise<SprintBurndownResponse> { return get('/api/sprints/burndown', { sprint }) },
+  sprintVelocity(params: { limit?: number; include_active?: boolean; metric?: 'tasks' | 'points' | 'hours' } = {}): Promise<SprintVelocityResponse> {
+    return get('/api/sprints/velocity', params)
+  },
+  sprintBacklog(params: { project?: string; tags?: string[]; status?: string[]; assignee?: string; limit?: number; cleanup_missing?: boolean } = {}): Promise<SprintBacklogResponse> {
+    const query: Record<string, unknown> = {}
+    if (params.project) query.project = params.project
+    if (params.tags?.length) query.tags = params.tags
+    if (params.status?.length) query.status = params.status
+    if (params.assignee) query.assignee = params.assignee
+    if (typeof params.limit === 'number') query.limit = params.limit
+    if (typeof params.cleanup_missing === 'boolean' && params.cleanup_missing) query.cleanup_missing = 'true'
+    return get('/api/sprints/backlog', query)
   },
 }
 

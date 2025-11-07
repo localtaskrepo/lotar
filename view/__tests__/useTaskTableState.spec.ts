@@ -26,7 +26,6 @@ describe('useTaskTableState', () => {
                 selectedIds: { type: Array, default: () => [] },
                 projectKey: { type: String, default: 'ACME' },
                 bulk: { type: Boolean, default: false },
-                bulkAssignee: { type: String, default: '' },
                 statuses: { type: Array, default: () => ['open', 'done'] },
             },
             setup(componentProps) {

@@ -1,8 +1,25 @@
 import fs from 'fs-extra';
+import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
 import { SmokeWorkspace } from '../helpers/workspace.js';
+
+const stdoutText = (value: unknown): string => {
+    if (typeof value === 'string') {
+        return value;
+    }
+
+    if (value instanceof Uint8Array) {
+        return Buffer.from(value).toString('utf8');
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((entry) => stdoutText(entry)).join('');
+    }
+
+    return value === undefined || value === null ? '' : String(value);
+};
 
 interface TimeInStatusResponse {
     status: string;
@@ -28,11 +45,12 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             const detached = await workspace.addTask('Detached head task');
 
             const list = await workspace.runLotar(['list']);
-            expect(list.stdout).toContain(initial.id);
-            expect(list.stdout).toContain(detached.id);
+            const listOutput = stdoutText(list.stdout);
+            expect(listOutput).toContain(initial.id);
+            expect(listOutput).toContain(detached.id);
 
             const status = await workspace.runGit(['status', '--short']);
-            expect(status.stdout).toContain(path.basename(detached.filePath));
+            expect(stdoutText(status.stdout)).toContain(path.basename(detached.filePath));
         } finally {
             await workspace.dispose();
         }
@@ -51,8 +69,9 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             await fs.writeFile(created.filePath, stringify(payload));
 
             const list = await workspace.runLotar(['list']);
-            expect(list.stdout).toContain('Edited without commit');
-            expect(list.stdout).not.toContain('Original title smoke task');
+            const listOutput = stdoutText(list.stdout);
+            expect(listOutput).toContain('Edited without commit');
+            expect(listOutput).not.toContain('Original title smoke task');
         } finally {
             await workspace.dispose();
         }
@@ -66,7 +85,7 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             await workspace.runGit(['branch', '-m', 'trunk']);
 
             const head = await workspace.runGit(['rev-parse', '--abbrev-ref', 'HEAD']);
-            expect(head.stdout.trim()).toBe('trunk');
+            expect(stdoutText(head.stdout).trim()).toBe('trunk');
 
             const trunkTask = await workspace.addTask('Trunk branch default task');
             await workspace.commitAll('record trunk baseline');
@@ -76,8 +95,9 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             await workspace.commitAll('record feature task');
 
             const list = await workspace.runLotar(['list']);
-            expect(list.stdout).toContain(trunkTask.id);
-            expect(list.stdout).toContain(featureTask.id);
+            const listOutput = stdoutText(list.stdout);
+            expect(listOutput).toContain(trunkTask.id);
+            expect(listOutput).toContain(featureTask.id);
         } finally {
             await workspace.dispose();
         }
@@ -147,7 +167,7 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
                 '--global',
             ]);
 
-            const payload = JSON.parse(stats.stdout) as TimeInStatusResponse;
+            const payload = JSON.parse(stdoutText(stats.stdout)) as TimeInStatusResponse;
             expect(payload.status).toBe('ok');
             const entry = payload.items.find((item) => item.id === 'TEST-1');
             expect(entry).toBeDefined();
@@ -180,8 +200,9 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             await workspace.commitAll('record nested task');
 
             const nestedList = await workspace.runLotarIn(nestedDir, ['list']);
-            expect(nestedList.stdout).toContain(rootTask.id);
-            expect(nestedList.stdout).toContain(nestedTask.id);
+            const nestedOutput = stdoutText(nestedList.stdout);
+            expect(nestedOutput).toContain(rootTask.id);
+            expect(nestedOutput).toContain(nestedTask.id);
         } finally {
             await workspace.dispose();
         }
@@ -211,8 +232,145 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             expect(merge.exitCode).not.toBe(0);
 
             const list = await workspace.runLotar(['list']);
-            expect(list.stderr).toContain('No tasks found');
-            expect(list.stdout.trim()).toBe('');
+            expect(stdoutText(list.stderr)).toContain('No tasks found');
+            expect(stdoutText(list.stdout).trim()).toBe('');
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('normalizes sprint files and reports required changes', async () => {
+        const workspace = await SmokeWorkspace.create();
+
+        try {
+            await workspace.runLotar(['sprint', 'create', '--label', 'Normalize Smoke Sprint']);
+
+            const sprintPath = path.join(workspace.tasksDir, '@sprints', '1.yml');
+            const source = await fs.readFile(sprintPath, 'utf8');
+            const payload = parse(source) as Record<string, any>;
+            payload.plan = payload.plan ?? {};
+            payload.plan.label = ' Normalize Smoke Sprint ';
+            payload.plan.ends_at = '2030-01-15T10:00:00Z ';
+            payload.plan.length = ' 2w ';
+            await fs.writeFile(sprintPath, stringify(payload));
+
+            const check = await workspace.runLotar(['sprint', 'normalize', '--check'], {
+                acceptExitCodes: [1],
+            });
+            expect(check.exitCode).toBe(1);
+            const checkOutput = stdoutText(check.stderr);
+            expect(checkOutput).toContain('Sprint #1 requires normalization (run with --write to update).');
+            expect(checkOutput).toContain(
+                'Sprint #1 canonicalization notice: plan.length was ignored because plan.ends_at was provided.',
+            );
+
+            const write = await workspace.runLotar(['sprint', 'normalize', '--write']);
+            const writeOutput = stdoutText(write.stdout);
+            expect(writeOutput).toContain('Normalized sprint #1.');
+            expect(writeOutput).toContain(
+                'Sprint #1 canonicalization notice: plan.length was ignored because plan.ends_at was provided.',
+            );
+
+            const normalized = parse(await fs.readFile(sprintPath, 'utf8')) as Record<string, any>;
+            expect(normalized.plan?.label).toBe('Normalize Smoke Sprint');
+            expect(normalized.plan?.ends_at).toBe('2030-01-15T10:00:00Z');
+            expect(normalized.plan?.length).toBeUndefined();
+
+            const verify = await workspace.runLotar(['sprint', 'normalize', '--check']);
+            expect(verify.exitCode).toBe(0);
+            expect(stdoutText(verify.stdout)).toContain('Sprint #1 already canonical.');
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('summarizes sprint stats with effort and capacity details', async () => {
+        const workspace = await SmokeWorkspace.create();
+
+        try {
+            await workspace.write(
+                '.tasks/config.yml',
+                [
+                    'default.project: TEST',
+                    'issue.states: [Todo, InProgress, Done]',
+                    'issue.types: [Feature]',
+                    'issue.priorities: [Medium]',
+                    '',
+                ].join('\n'),
+            );
+
+            await workspace.runLotar([
+                'sprint',
+                'create',
+                '--label',
+                'Smoke Stats',
+                '--length',
+                '1w',
+                '--capacity-points',
+                '20',
+                '--capacity-hours',
+                '60',
+            ]);
+            await workspace.runLotar([
+                'sprint',
+                'start',
+                '1',
+                '--at',
+                '2025-02-01T09:00:00Z',
+            ]);
+            await workspace.runLotar([
+                'sprint',
+                'close',
+                '1',
+                '--at',
+                '2025-02-08T09:00:00Z',
+            ]);
+
+            const first = await workspace.addTask('Stats hours done');
+            const firstYaml = parse(await workspace.readTaskYaml(first.id)) as Record<string, any>;
+            firstYaml.status = 'Done';
+            firstYaml.effort = '8h';
+            await fs.writeFile(first.filePath, stringify(firstYaml));
+
+            const second = await workspace.addTask('Stats hours remaining');
+            const secondYaml = parse(await workspace.readTaskYaml(second.id)) as Record<string, any>;
+            secondYaml.status = 'InProgress';
+            secondYaml.effort = '4h';
+            await fs.writeFile(second.filePath, stringify(secondYaml));
+
+            const third = await workspace.addTask('Stats points done');
+            const thirdYaml = parse(await workspace.readTaskYaml(third.id)) as Record<string, any>;
+            thirdYaml.status = 'Done';
+            thirdYaml.effort = '3pt';
+            await fs.writeFile(third.filePath, stringify(thirdYaml));
+
+            const fourth = await workspace.addTask('Stats points todo');
+            const fourthYaml = parse(await workspace.readTaskYaml(fourth.id)) as Record<string, any>;
+            fourthYaml.status = 'Todo';
+            fourthYaml.effort = '5pt';
+            await fs.writeFile(fourth.filePath, stringify(fourthYaml));
+
+            await workspace.runLotar([
+                'sprint',
+                'add',
+                first.id,
+                second.id,
+                third.id,
+                fourth.id,
+                '--sprint',
+                '1',
+                '--allow-closed',
+            ]);
+
+            const stats = await workspace.runLotar(['sprint', 'stats', '1']);
+            const output = stdoutText(stats.stdout);
+            expect(output).toContain('Sprint stats for #1 (Smoke Stats).');
+            expect(output).toContain('Tasks: 4 committed');
+            expect(output).toContain('Points: 8 committed');
+            expect(output).toContain('Hours: 12 committed');
+            expect(output).toContain('Capacity: 20 planned');
+            expect(output).toContain('Capacity: 60 planned');
+            expect(output).toContain('Timeline:');
         } finally {
             await workspace.dispose();
         }
@@ -249,7 +407,7 @@ describe.concurrent('CLI advanced smoke scenarios', () => {
             } satisfies Record<string, string>;
 
             const whoami = await workspace.runLotar(['whoami'], { env });
-            expect(whoami.stdout).toContain('env-reporter@example.com');
+            expect(stdoutText(whoami.stdout)).toContain('env-reporter@example.com');
 
             const created = await workspace.addTask('Env override smoke task', {
                 env,

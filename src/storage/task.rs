@@ -41,12 +41,13 @@ pub struct Task {
     pub relationships: TaskRelationships,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub comments: Vec<TaskComment>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub history: Vec<crate::types::TaskChangeLogEntry>,
-
     // General references attached to the task (code locations, links, etc.)
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub references: Vec<ReferenceEntry>,
+
+    // Sprint memberships (numeric identifiers, derived from sprint filenames)
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub sprints: Vec<u32>,
 
     // Legacy fields (keeping for backward compatibility)
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -59,6 +60,9 @@ pub struct Task {
     // Team-specific custom fields (generic UI treatment based on type)
     #[serde(skip_serializing_if = "std::collections::HashMap::is_empty", default)]
     pub custom_fields: CustomFields,
+
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub history: Vec<crate::types::TaskChangeLogEntry>,
 }
 
 impl Task {
@@ -79,12 +83,13 @@ impl Task {
             acceptance_criteria: vec![],
             relationships: TaskRelationships::default(),
             comments: vec![],
-            history: vec![],
             references: vec![],
+            sprints: vec![],
             subtitle: None,
             description: None,
             tags: vec![],
             custom_fields: HashMap::new(),
+            history: vec![],
         }
     }
 }

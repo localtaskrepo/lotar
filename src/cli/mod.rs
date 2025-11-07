@@ -5,9 +5,9 @@ use clap::{Parser, Subcommand};
 pub mod args;
 pub use args::{
     AddArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
-    ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, StatsArgs,
-    TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs,
-    parse_key_value,
+    ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, SprintAction,
+    SprintArgs, SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs, TaskAction,
+    TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
 };
 pub mod preprocess;
 
@@ -140,6 +140,9 @@ pub enum Commands {
 
     /// Statistics and analytics (read-only)
     Stats(StatsArgs),
+
+    /// Sprint storage management (create/list/show commands)
+    Sprint(SprintArgs),
 
     /// Show task changes (default: vs HEAD working tree; optionally vs a ref)
     Changelog {

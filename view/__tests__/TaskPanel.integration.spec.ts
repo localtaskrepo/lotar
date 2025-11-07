@@ -16,6 +16,7 @@ const apiFixtures = vi.hoisted(() => {
         effort: '',
         description: '',
         tags: [] as string[],
+        sprints: [101, 999] as number[],
         relationships: {
             depends_on: ['DEMO-101'],
             blocks: [],
@@ -75,6 +76,7 @@ const apiFixtures = vi.hoisted(() => {
                 patch.custom_fields !== undefined
                     ? clone(patch.custom_fields)
                     : clone(state.task.custom_fields),
+            sprints: patch.sprints !== undefined ? [...patch.sprints] : state.task.sprints,
         }
         return clone(state.task)
     })
@@ -116,6 +118,25 @@ const apiFixtures = vi.hoisted(() => {
         default_assignee: '',
         default_tags: [],
     }))
+    const sprintListMock = vi.fn(async () => ({
+        status: 'ok',
+        count: 2,
+        sprints: [
+            {
+                id: 101,
+                label: 'Sprint 101',
+                display_name: 'Sprint 101',
+                state: 'active',
+                planned_start: null,
+                planned_end: null,
+                actual_start: null,
+                actual_end: null,
+                computed_end: null,
+                warnings: [],
+            },
+        ],
+        missing_sprints: [999],
+    }))
 
     const reset = () => {
         state.task = clone(baseTask)
@@ -129,6 +150,7 @@ const apiFixtures = vi.hoisted(() => {
         listTasksMock.mockReset()
         listProjectsMock.mockReset()
         showConfigMock.mockReset()
+        sprintListMock.mockReset()
 
         getTaskMock.mockImplementation(async () => {
             state.task = clone(baseTask)
@@ -140,6 +162,7 @@ const apiFixtures = vi.hoisted(() => {
                 ...patch,
                 tags: patch.tags !== undefined ? [...patch.tags] : state.task.tags,
                 relationships: patch.relationships !== undefined ? clone(patch.relationships) : state.task.relationships,
+                sprints: patch.sprints !== undefined ? [...patch.sprints] : state.task.sprints,
             }
             return clone(state.task)
         })
@@ -180,6 +203,25 @@ const apiFixtures = vi.hoisted(() => {
             default_assignee: '',
             default_tags: [],
         }))
+        sprintListMock.mockImplementation(async () => ({
+            status: 'ok',
+            count: 2,
+            sprints: [
+                {
+                    id: 101,
+                    label: 'Sprint 101',
+                    display_name: 'Sprint 101',
+                    state: 'active',
+                    planned_start: null,
+                    planned_end: null,
+                    actual_start: null,
+                    actual_end: null,
+                    computed_end: null,
+                    warnings: [],
+                },
+            ],
+            missing_sprints: [999],
+        }))
     }
 
     reset()
@@ -198,6 +240,7 @@ const apiFixtures = vi.hoisted(() => {
         listTasksMock,
         listProjectsMock,
         showConfigMock,
+        sprintListMock,
         reset,
     }
 })
@@ -216,6 +259,7 @@ vi.mock('../api/client', () => ({
         listTasks: apiFixtures.listTasksMock,
         listProjects: apiFixtures.listProjectsMock,
         showConfig: apiFixtures.showConfigMock,
+        sprintList: apiFixtures.sprintListMock,
     },
 }))
 
@@ -383,6 +427,27 @@ describe('TaskPanel integration safeguards', () => {
         await flushPromises()
 
         expect(apiFixtures.taskHistoryMock).toHaveBeenCalledTimes(1)
+
+        wrapper.unmount()
+    })
+
+    it('renders sprint assignments with missing indicators', async () => {
+        const wrapper = await mountTaskPanel()
+        await flushPromises()
+
+        const sprintGroup = wrapper.findAll('legend').find((legend) => legend.text() === 'Sprints')
+        expect(sprintGroup).toBeTruthy()
+
+        const sprintChips = wrapper.findAll('.task-panel__sprint-chip')
+        expect(sprintChips.length).toBe(2)
+        expect(sprintChips[0].text()).toContain('#101')
+        expect(sprintChips[0].classes()).toContain('task-panel__sprint-chip--active')
+        expect(sprintChips[1].text()).toContain('#999')
+        expect(sprintChips[1].classes()).toContain('task-panel__sprint-chip--missing')
+
+        const warning = wrapper.find('.task-panel__sprint-warning')
+        expect(warning.exists()).toBe(true)
+        expect(warning.text()).toContain('#999')
 
         wrapper.unmount()
     })

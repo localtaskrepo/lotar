@@ -56,3 +56,61 @@ export function isDateWithinRange(value: string | null | undefined, start: Date,
     if (!parsed) return false
     return parsed >= start && parsed <= end
 }
+
+export function safeTimestamp(value?: string | null): number | null {
+    if (!value) return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const parsed = Date.parse(trimmed)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function pad2(value: number): string {
+    return String(value).padStart(2, '0')
+}
+
+export function toDateInputValue(value?: string | null): string {
+    if (!value) return ''
+    const parsed = parseTaskDate(value)
+    if (!parsed) {
+        return value.trim()
+    }
+    return toDateKey(parsed)
+}
+
+export function fromDateInputValue(value: unknown): string | null {
+    if (value === null || value === undefined) return null
+    const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
+    if (!trimmed) return null
+    if (DATE_ONLY_REGEX.test(trimmed)) {
+        return trimmed
+    }
+    const parsed = parseTaskDate(trimmed)
+    if (!parsed) {
+        return trimmed
+    }
+    return toDateKey(parsed)
+}
+
+export function toDateTimeInputValue(value?: string | null): string {
+    if (!value) return ''
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+    const timestamp = safeTimestamp(trimmed)
+    if (timestamp === null) {
+        return trimmed
+    }
+    const date = new Date(timestamp)
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+}
+
+export function fromDateTimeInputValue(value: unknown): string | null {
+    if (value === null || value === undefined) return null
+    const trimmed = typeof value === 'string' ? value.trim() : String(value).trim()
+    if (!trimmed) return null
+    const parsed = Date.parse(trimmed)
+    if (!Number.isFinite(parsed)) {
+        return trimmed
+    }
+    return new Date(parsed).toISOString()
+}

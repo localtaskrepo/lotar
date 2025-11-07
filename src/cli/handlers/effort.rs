@@ -200,6 +200,7 @@ impl CommandHandler for EffortHandler {
                 tags: None,
                 relationships: None,
                 custom_fields: None,
+                sprints: None,
             };
             let updated = TaskService::update(&mut storage, &full_task_id, patch)
                 .map_err(|e| e.to_string())?;

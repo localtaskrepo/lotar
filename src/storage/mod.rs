@@ -6,12 +6,14 @@
 // - search: Search and filtering functionality
 // - manager: High-level storage coordination and project management
 // - filter: Task filtering utilities
+// - sprint: Sprint entity definition and helpers
 
 pub mod backend;
 pub mod filter;
 pub mod manager;
 pub mod operations;
 pub mod search;
+pub mod sprint;
 pub mod task;
 
 // Re-export commonly used types and operations for convenience

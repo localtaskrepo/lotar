@@ -18,6 +18,7 @@ pub mod effort;
 pub mod priority;
 pub mod scan_handler;
 pub mod serve_handler;
+pub mod sprint;
 pub mod stats_handler;
 pub mod status;
 pub mod task;
@@ -26,6 +27,7 @@ pub mod task;
 pub use config_handler::ConfigHandler;
 pub use scan_handler::ScanHandler;
 pub use serve_handler::ServeHandler;
+pub use sprint::SprintHandler;
 pub use stats_handler::StatsHandler;
 pub use task::TaskHandler;
 // effort handler re-export not strictly needed, used via module path in task

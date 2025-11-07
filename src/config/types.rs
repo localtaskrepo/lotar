@@ -9,6 +9,38 @@ pub struct ProjectTemplate {
     pub config: ProjectConfig,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct SprintDefaultsConfig {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capacity_points: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub capacity_hours: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub length: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub overdue_after: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SprintNotificationsConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for SprintNotificationsConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct SprintConfig {
+    #[serde(default)]
+    pub defaults: SprintDefaultsConfig,
+    #[serde(default)]
+    pub notifications: SprintNotificationsConfig,
+}
+
 #[derive(Debug, Clone)]
 pub struct ConfigurableField<T> {
     pub values: Vec<T>,
@@ -221,6 +253,9 @@ pub struct GlobalConfig {
     #[serde(default = "default_true")]
     pub scan_enable_mentions: bool,
 
+    #[serde(default)]
+    pub sprints: SprintConfig,
+
     // Scan mutation policy
     #[serde(default = "default_true")]
     pub scan_strip_attributes: bool,
@@ -264,6 +299,9 @@ pub struct ResolvedConfig {
     pub scan_ticket_patterns: Option<Vec<String>>, // effective patterns if configured
     pub scan_enable_ticket_words: bool,
     pub scan_enable_mentions: bool,
+
+    pub sprint_defaults: SprintDefaultsConfig,
+    pub sprint_notifications: SprintNotificationsConfig,
 
     // Automation toggles (effective)
     pub auto_identity: bool,
@@ -427,6 +465,7 @@ impl Default for GlobalConfig {
             scan_ticket_patterns: None,
             scan_enable_ticket_words: true,
             scan_enable_mentions: true,
+            sprints: SprintConfig::default(),
             // scan mutation policy
             scan_strip_attributes: true,
             branch_type_aliases: HashMap::new(),

@@ -40,27 +40,153 @@
         :selected-ids="selectedIds"
         :project-key="filter.project || (tasks[0]?.id?.split('-')[0] || '')"
         :touches="activityTouches"
+        :sprint-lookup="sprintLookup"
+        :has-sprints="hasSprints"
+        :sprints-loading="sprintsLoading"
         v-model:bulk="bulk"
-        v-model:bulk-assignee="bulkAssignee"
-        @bulk-assign="bulkAssign"
+        @bulk-assign="openBulkAssign"
         @bulk-unassign="bulkUnassign"
-  @add="openCreate"
-        @update:selected-ids="(v: string[]) => selectedIds = v"
+        @bulk-sprint-add="openBulkSprintAdd"
+        @bulk-sprint-remove="openBulkSprintRemove"
+        @bulk-delete="openBulkDelete"
+        @add="openCreate"
+  @update:selected-ids="setSelectedIds"
         @open="view"
-        @delete="removeTask"
+        @delete="openSingleDelete"
         @update-title="onUpdateTitle"
         @update-tags="onUpdateTags"
         @set-status="onQuickStatus"
-        @assign="assignOne"
+        @assign="openSingleAssign"
         @unassign="unassignOne"
+        @sprint-add="openSingleSprintAdd"
+        @sprint-remove="openSingleSprintRemove"
+        @open-sprint-backlog="openSprintBacklog"
       />
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="assignDialogOpen"
+        class="tasks-modal__overlay"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="assignDialogTitle"
+        @click.self="closeAssignDialog"
+      >
+        <UiCard class="tasks-modal__card">
+          <form class="col tasks-modal__form" @submit.prevent="submitAssignDialog">
+            <header class="row tasks-modal__header">
+              <div class="col" style="gap: 4px;">
+                <h2>{{ assignDialogTitle }}</h2>
+                <p class="muted tasks-modal__hint">Use <code>@me</code> to assign the tasks to yourself.</p>
+              </div>
+              <button class="btn ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</button>
+            </header>
+            <label class="col" style="gap: 4px;">
+              <span class="muted">Assignee</span>
+              <input
+                ref="assignInputRef"
+                class="input"
+                v-model="assignInputValue"
+                placeholder="username or @me"
+                autocomplete="off"
+              />
+            </label>
+            <div class="row" style="gap: 8px; flex-wrap: wrap;">
+              <button class="btn" type="button" @click="useAssignShortcut('@me')">Use @me</button>
+            </div>
+            <footer class="row tasks-modal__footer">
+              <button class="btn primary" type="submit" :disabled="assignDialogSubmitting || !assignInputValue.trim()">
+                {{ assignDialogSubmitting ? 'Assigning…' : assignDialogTitle }}
+              </button>
+              <button class="btn ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</button>
+            </footer>
+          </form>
+        </UiCard>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="sprintDialogOpen"
+        class="tasks-modal__overlay"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="sprintDialogTitle"
+        @click.self="closeSprintDialog"
+      >
+        <UiCard class="tasks-modal__card">
+          <form class="col tasks-modal__form" @submit.prevent="submitSprintDialog">
+            <header class="row tasks-modal__header">
+              <div class="col" style="gap: 4px;">
+                <h2>{{ sprintDialogTitle }}</h2>
+                <p class="muted tasks-modal__hint">
+                  Choose the sprint target for the selected task{{ sprintDialogIds.length === 1 ? '' : 's' }}.
+                </p>
+              </div>
+              <button class="btn ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</button>
+            </header>
+            <label class="col" style="gap: 4px;">
+              <span class="muted">Sprint</span>
+              <select class="input" v-model="sprintDialogSelection" :disabled="!sprintOptions.length">
+                <option v-for="opt in sprintOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+              </select>
+            </label>
+            <p v-if="!sprintOptions.length" class="muted tasks-modal__hint">No sprints available yet. Create one first.</p>
+            <label v-if="sprintDialogMode === 'add'" class="row tasks-modal__checkbox">
+              <input type="checkbox" v-model="sprintDialogKeepExisting" />
+              Keep existing sprint memberships
+            </label>
+            <label v-if="sprintDialogMode === 'add'" class="row tasks-modal__checkbox">
+              <input type="checkbox" v-model="sprintDialogAllowClosed" />
+              Allow assigning to closed sprints
+            </label>
+            <footer class="row tasks-modal__footer">
+              <button class="btn primary" type="submit" :disabled="sprintDialogSubmitting || !sprintOptions.length">
+                {{ sprintDialogSubmitting ? (sprintDialogMode === 'add' ? 'Assigning…' : 'Removing…') : (sprintDialogMode === 'add' ? 'Assign to sprint' : 'Remove from sprint') }}
+              </button>
+              <button class="btn ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</button>
+            </footer>
+          </form>
+        </UiCard>
+      </div>
+    </Teleport>
+
+    <Teleport to="body">
+      <div
+        v-if="deleteDialogOpen"
+        class="tasks-modal__overlay"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="deleteDialogTitle"
+        @click.self="closeDeleteDialog"
+      >
+        <UiCard class="tasks-modal__card">
+          <div class="col tasks-modal__form">
+            <header class="row tasks-modal__header">
+              <div class="col" style="gap: 4px;">
+                <h2>{{ deleteDialogTitle }}</h2>
+                <p class="muted tasks-modal__hint">This cannot be undone.</p>
+              </div>
+              <button class="btn ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</button>
+            </header>
+            <p>Are you sure you want to delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?</p>
+            <footer class="row tasks-modal__footer">
+              <button class="btn danger" type="button" :disabled="deleteDialogSubmitting" @click="submitDeleteDialog">
+                {{ deleteDialogSubmitting ? 'Deleting…' : 'Delete' }}
+              </button>
+              <button class="btn ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</button>
+            </footer>
+          </div>
+        </UiCard>
+      </div>
+    </Teleport>
 
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
@@ -68,11 +194,13 @@ import FilterBar from '../components/FilterBar.vue'
 import SmartListChips from '../components/SmartListChips.vue'
 import TaskTable from '../components/TaskTable.vue'
 import { showToast } from '../components/toast'
+import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useActivity } from '../composables/useActivity'
 import { useConfig } from '../composables/useConfig'
 import { useProjects } from '../composables/useProjects'
+import { useSprints } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTasks } from '../composables/useTasks'
@@ -90,6 +218,55 @@ const route = useRoute()
 const { statuses, priorities, types, refresh: refreshConfig } = useConfig()
 const statusOptions = computed(() => [...(statuses.value || [])])
 const priorityOptions = computed(() => [...(priorities.value || [])])
+
+const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
+const sprintLookup = computed<Record<number, { label: string; state?: string }>>(() => {
+  const lookup: Record<number, { label: string; state?: string }> = {}
+  for (const sprint of sprints.value) {
+    const base = sprint.display_name || sprint.label || `Sprint ${sprint.id}`
+    lookup[sprint.id] = {
+      label: `#${sprint.id} ${base}`.trim(),
+      state: sprint.state,
+    }
+  }
+  return lookup
+})
+const sprintSelection = ref('active')
+const allowClosedSprint = ref(false)
+const sprintOptions = computed(() => {
+  const options: Array<{ value: string; label: string }> = []
+  const activeList = activeSprints.value
+  const activeLabel = (() => {
+    if (!activeList.length) return 'Auto (requires an active sprint)'
+    if (activeList.length === 1) {
+      const sprint = activeList[0]
+      const name = sprint.label || sprint.display_name || `Sprint ${sprint.id}`
+      return `Auto (active: #${sprint.id} ${name})`
+    }
+    return 'Auto (multiple active sprints – specify one)'
+  })()
+  options.push({ value: 'active', label: activeLabel })
+  options.push({ value: 'next', label: 'Next sprint' })
+  options.push({ value: 'previous', label: 'Previous sprint' })
+  const sorted = [...sprints.value].sort((a, b) => a.id - b.id)
+  sorted.forEach((item) => {
+    const name = item.label || item.display_name || `Sprint ${item.id}`
+    const state = item.state.charAt(0).toUpperCase() + item.state.slice(1)
+    options.push({ value: String(item.id), label: `#${item.id} ${name} (${state})` })
+  })
+  return options
+})
+const hasSprints = computed(() => sprints.value.length > 0)
+
+watch(
+  () => sprintOptions.value,
+  (options) => {
+    if (!options.some((opt) => opt.value === sprintSelection.value)) {
+      sprintSelection.value = options[0]?.value ?? 'active'
+    }
+  },
+  { immediate: true },
+)
 
 const filter = ref<Record<string,string>>({})
 
@@ -234,8 +411,6 @@ async function retry(){ await applyFilter(filter.value, 'none') }
 
 const view = (id: string) => openTask(id)
 
-async function removeTask(id: string){ await remove(id); showToast('Task deleted') }
-
 async function onUpdateTitle(payload: { id: string; title: string }){
   const { id, title } = payload
   const before = tasks.value.find(t => t.id === id)?.title || ''
@@ -276,29 +451,384 @@ async function onQuickStatus(payload: { id: string; status: string }){
   }
 }
 
-// Bulk selection & quick assign/unassign
+// Selection and bulk dialogs
 const bulk = ref(false)
 const selectedIds = ref<string[]>([])
-const bulkAssignee = ref('')
-async function assignOne(id: string){
-  try {
-    const value = (bulkAssignee.value || '@me')
-    const updated = await api.updateTask(id, { assignee: value })
-    const idx = tasks.value.findIndex(t => t.id === id)
-    if (idx >= 0) tasks.value[idx] = updated
-    showToast('Assigned')
-  } catch (e:any) { showToast(e.message || 'Failed to assign') }
+
+function setSelectedIds(value: string[]) {
+  selectedIds.value = Array.isArray(value) ? [...value] : []
 }
-async function unassignOne(id: string){
+
+const ASSIGNEE_STORAGE_KEY = 'lotar.tasks.assign.last'
+const lastAssignee = ref('@me')
+if (typeof window !== 'undefined') {
   try {
-    const updated = await api.updateTask(id, { assignee: '' as any })
-    const idx = tasks.value.findIndex(t => t.id === id)
-    if (idx >= 0) tasks.value[idx] = updated
-    showToast('Unassigned')
-  } catch (e:any) { showToast(e.message || 'Failed to unassign') }
+    const stored = window.localStorage.getItem(ASSIGNEE_STORAGE_KEY)
+    if (stored) lastAssignee.value = stored
+  } catch {
+    // ignore storage errors
+  }
 }
-async function bulkAssign(){ const ids = [...selectedIds.value]; await Promise.all(ids.map(id => assignOne(id))); showToast(`Assigned ${ids.length} task(s)`) }
-async function bulkUnassign(){ const ids = [...selectedIds.value]; await Promise.all(ids.map(id => unassignOne(id))); showToast(`Unassigned ${ids.length} task(s)`)}
+
+const assignDialogOpen = ref(false)
+const assignDialogSubmitting = ref(false)
+const assignDialogIds = ref<string[]>([])
+const assignDialogMode = ref<'single' | 'bulk'>('bulk')
+const assignInputValue = ref('')
+const assignInputRef = ref<HTMLInputElement | null>(null)
+
+const assignDialogCount = computed(() => assignDialogIds.value.length)
+const assignDialogTitle = computed(() =>
+  assignDialogMode.value === 'single'
+    ? 'Assign task'
+    : `Assign ${assignDialogCount.value} task${assignDialogCount.value === 1 ? '' : 's'}`,
+)
+
+function openAssignDialog(ids: string[], mode: 'single' | 'bulk') {
+  const unique = Array.from(new Set(ids))
+  if (!unique.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  assignDialogIds.value = unique
+  assignDialogMode.value = mode
+  assignInputValue.value = lastAssignee.value || '@me'
+  assignDialogOpen.value = true
+  nextTick(() => {
+    assignInputRef.value?.focus()
+    assignInputRef.value?.select()
+  })
+}
+
+function closeAssignDialog(force?: boolean | Event) {
+  const forced = force === true
+  if (assignDialogSubmitting.value && !forced) return
+  assignDialogOpen.value = false
+  assignDialogIds.value = []
+}
+
+function useAssignShortcut(value: string) {
+  assignInputValue.value = value
+  nextTick(() => assignInputRef.value?.focus())
+}
+
+async function applyAssignment(ids: string[], assignee: string) {
+  const unique = Array.from(new Set(ids))
+  const failures: Array<{ id: string; error: unknown }> = []
+  let success = 0
+  for (const id of unique) {
+    try {
+      const updated = await api.updateTask(id, { assignee })
+      const idx = tasks.value.findIndex((t) => t.id === id)
+      if (idx >= 0) tasks.value[idx] = updated
+      success += 1
+    } catch (error) {
+      failures.push({ id, error })
+    }
+  }
+  return { success, failures }
+}
+
+async function submitAssignDialog() {
+  if (assignDialogSubmitting.value) return
+  const input = (assignInputValue.value || '').trim()
+  if (!input) {
+    showToast('Enter an assignee or use @me')
+    return
+  }
+  assignDialogSubmitting.value = true
+  try {
+    const { success, failures } = await applyAssignment(assignDialogIds.value, input)
+    if (success) {
+      const message =
+        assignDialogMode.value === 'single'
+          ? `Task assigned to ${input}`
+          : `Assigned ${success} task${success === 1 ? '' : 's'} to ${input}`
+      showToast(message)
+    }
+    if (failures.length) {
+      showToast(`Failed to assign ${failures.length} task${failures.length === 1 ? '' : 's'}`)
+      console.error('Assignment errors', failures)
+    }
+    lastAssignee.value = input
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(ASSIGNEE_STORAGE_KEY, input)
+      } catch {
+        // ignore
+      }
+    }
+  closeAssignDialog(true)
+  } finally {
+    assignDialogSubmitting.value = false
+  }
+}
+
+function openSingleAssign(id: string) {
+  openAssignDialog([id], 'single')
+}
+
+function openBulkAssign() {
+  openAssignDialog(selectedIds.value, 'bulk')
+}
+
+async function unassignTasks(ids: string[]) {
+  const unique = Array.from(new Set(ids))
+  const failures: Array<{ id: string; error: unknown }> = []
+  let success = 0
+  for (const id of unique) {
+    try {
+      const updated = await api.updateTask(id, { assignee: '' as any })
+      const idx = tasks.value.findIndex((t) => t.id === id)
+      if (idx >= 0) tasks.value[idx] = updated
+      success += 1
+    } catch (error) {
+      failures.push({ id, error })
+    }
+  }
+  if (success) {
+    showToast(`Unassigned ${success} task${success === 1 ? '' : 's'}`)
+  }
+  if (failures.length) {
+    showToast(`Failed to unassign ${failures.length} task${failures.length === 1 ? '' : 's'}`)
+    console.error('Unassign errors', failures)
+  }
+}
+
+async function unassignOne(id: string) {
+  await unassignTasks([id])
+}
+
+async function bulkUnassign() {
+  if (!selectedIds.value.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  await unassignTasks(selectedIds.value)
+}
+
+function parseSprintToken(token: string): number | string | undefined {
+  const trimmed = (token || '').trim()
+  if (!trimmed || trimmed === 'active' || trimmed === 'auto') return undefined
+  if (trimmed === 'next') return 'next'
+  if (trimmed === 'previous' || trimmed === 'prev') return 'previous'
+  const numeric = Number(trimmed)
+  if (Number.isInteger(numeric) && numeric > 0) return numeric
+  return trimmed
+}
+
+async function performSprintAction(
+  taskIds: string[],
+  mode: 'add' | 'remove',
+  options: { sprint?: string; allowClosed?: boolean; keepExisting?: boolean } = {},
+) {
+  if (!taskIds.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  const payload: any = { tasks: taskIds }
+  const token = options.sprint ?? sprintSelection.value
+  const sprintRef = parseSprintToken(token)
+  if (sprintRef !== undefined) payload.sprint = sprintRef
+  if (mode === 'add' && (options.allowClosed ?? allowClosedSprint.value)) payload.allow_closed = true
+  payload.cleanup_missing = true
+  const keepExisting = options.keepExisting ?? false
+  if (mode === 'add' && !keepExisting) payload.force_single = true
+  try {
+    const response = mode === 'add' ? await api.sprintAdd(payload) : await api.sprintRemove(payload)
+    const changed = response.modified.length
+    const sprintName = response.sprint_label || `Sprint #${response.sprint_id}`
+    if (changed > 0) {
+      const verb = mode === 'add' ? 'Added' : 'Removed'
+      showToast(`${verb} ${changed} task(s) ${mode === 'add' ? 'to' : 'from'} ${sprintName}`)
+    } else {
+      showToast(mode === 'add' ? 'No tasks assigned' : 'No tasks removed')
+    }
+    const messages = Array.isArray(response.messages) ? response.messages : []
+    if (messages.length) {
+      messages.forEach((message) => showToast(message))
+    } else if (mode === 'add' && Array.isArray(response.replaced) && response.replaced.length) {
+      response.replaced.forEach((entry) => {
+        if (!entry?.previous?.length) return
+        const prev = entry.previous.map((id) => `#${id}`).join(', ')
+        showToast(`${entry.task_id} moved from ${prev}`)
+      })
+    }
+    const autoCleanup = response.integrity?.auto_cleanup
+    if (autoCleanup?.removed_references) {
+      showToast(`Automatically cleaned ${autoCleanup.removed_references} dangling sprint reference(s).`)
+    }
+    if (response.integrity?.missing_sprints && response.integrity.missing_sprints.length) {
+      showToast(`Still spotting missing sprint IDs: ${response.integrity.missing_sprints.map((id) => `#${id}`).join(', ')}`)
+    }
+    await refreshSprints(true)
+    await applyFilter(filter.value, 'none')
+  } catch (e:any) {
+    showToast(e.message || (mode === 'add' ? 'Failed to assign to sprint' : 'Failed to remove from sprint'))
+  }
+}
+
+const sprintDialogOpen = ref(false)
+const sprintDialogSubmitting = ref(false)
+const sprintDialogIds = ref<string[]>([])
+const sprintDialogMode = ref<'add' | 'remove'>('add')
+const sprintDialogSelection = ref('active')
+const sprintDialogAllowClosed = ref(false)
+const sprintDialogKeepExisting = ref(false)
+
+watch(
+  () => sprintSelection.value,
+  (value) => {
+    sprintDialogSelection.value = value
+  },
+  { immediate: true },
+)
+
+watch(
+  () => allowClosedSprint.value,
+  (value) => {
+    sprintDialogAllowClosed.value = value
+  },
+  { immediate: true },
+)
+
+const sprintDialogTitle = computed(() =>
+  sprintDialogMode.value === 'add'
+    ? `Add ${sprintDialogIds.value.length} task${sprintDialogIds.value.length === 1 ? '' : 's'} to sprint`
+    : `Remove ${sprintDialogIds.value.length} task${sprintDialogIds.value.length === 1 ? '' : 's'} from sprint`,
+)
+
+function openSprintDialog(ids: string[], mode: 'add' | 'remove') {
+  const unique = Array.from(new Set(ids))
+  if (!unique.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  sprintDialogIds.value = unique
+  sprintDialogMode.value = mode
+  sprintDialogSelection.value = sprintSelection.value
+  sprintDialogAllowClosed.value = allowClosedSprint.value
+  sprintDialogKeepExisting.value = false
+  sprintDialogOpen.value = true
+}
+
+function closeSprintDialog(force?: boolean | Event) {
+  const forced = force === true
+  if (sprintDialogSubmitting.value && !forced) return
+  sprintDialogOpen.value = false
+  sprintDialogIds.value = []
+  sprintDialogKeepExisting.value = false
+}
+
+async function submitSprintDialog() {
+  if (sprintDialogSubmitting.value) return
+  if (!sprintOptions.value.length) {
+    showToast('No sprints available yet')
+    return
+  }
+  sprintDialogSubmitting.value = true
+  try {
+    await performSprintAction(sprintDialogIds.value, sprintDialogMode.value, {
+      sprint: sprintDialogSelection.value,
+      allowClosed: sprintDialogAllowClosed.value,
+      keepExisting: sprintDialogKeepExisting.value,
+    })
+    sprintSelection.value = sprintDialogSelection.value
+    allowClosedSprint.value = sprintDialogAllowClosed.value
+  closeSprintDialog(true)
+  } finally {
+    sprintDialogSubmitting.value = false
+  }
+}
+
+function openSingleSprintAdd(id: string) {
+  openSprintDialog([id], 'add')
+}
+
+function openSingleSprintRemove(id: string) {
+  openSprintDialog([id], 'remove')
+}
+
+function openBulkSprintAdd() {
+  openSprintDialog(selectedIds.value, 'add')
+}
+
+function openBulkSprintRemove() {
+  openSprintDialog(selectedIds.value, 'remove')
+}
+
+function openSprintBacklog(){ router.push({ path: '/sprints', hash: '#backlog' }) }
+
+const deleteDialogOpen = ref(false)
+const deleteDialogSubmitting = ref(false)
+const deleteDialogIds = ref<string[]>([])
+const deleteDialogMode = ref<'single' | 'bulk'>('single')
+
+const deleteDialogTitle = computed(() =>
+  deleteDialogMode.value === 'single'
+    ? 'Delete task'
+    : `Delete ${deleteDialogIds.value.length} selected task${deleteDialogIds.value.length === 1 ? '' : 's'}`,
+)
+
+function openDeleteDialog(ids: string[], mode: 'single' | 'bulk') {
+  const unique = Array.from(new Set(ids))
+  if (!unique.length) {
+    showToast('Select at least one task first')
+    return
+  }
+  deleteDialogIds.value = unique
+  deleteDialogMode.value = mode
+  deleteDialogOpen.value = true
+}
+
+function closeDeleteDialog(force?: boolean | Event) {
+  const forced = force === true
+  if (deleteDialogSubmitting.value && !forced) return
+  deleteDialogOpen.value = false
+  deleteDialogIds.value = []
+}
+
+async function deleteTasks(ids: string[]) {
+  const unique = Array.from(new Set(ids))
+  const failures: Array<{ id: string; error: unknown }> = []
+  let success = 0
+  for (const id of unique) {
+    try {
+      await remove(id)
+      success += 1
+      selectedIds.value = selectedIds.value.filter((value) => value !== id)
+    } catch (error) {
+      failures.push({ id, error })
+    }
+  }
+  return { success, failures }
+}
+
+async function submitDeleteDialog() {
+  if (deleteDialogSubmitting.value) return
+  deleteDialogSubmitting.value = true
+  try {
+    const { success, failures } = await deleteTasks(deleteDialogIds.value)
+    if (success) {
+      showToast(`Deleted ${success} task${success === 1 ? '' : 's'}`)
+    }
+    if (failures.length) {
+      showToast(`Failed to delete ${failures.length} task${failures.length === 1 ? '' : 's'}`)
+      console.error('Delete errors', failures)
+    }
+  closeDeleteDialog(true)
+  } finally {
+    deleteDialogSubmitting.value = false
+  }
+}
+
+function openSingleDelete(id: string) {
+  openDeleteDialog([id], 'single')
+}
+
+function openBulkDelete() {
+  openDeleteDialog(selectedIds.value, 'bulk')
+}
 
 const { refresh: refreshProjects } = useProjects()
 
@@ -383,6 +913,7 @@ function registerSseHandlers() {
 onMounted(async () => {
   filter.value = Object.fromEntries(Object.entries(route.query).map(([k,v]) => [k, String(v)]))
   await refreshProjects()
+  await refreshSprints(true)
   await applyFilter(filter.value, 'replace')
   sse = useSse('/api/events', { kinds: 'task_created,task_updated,task_deleted' })
   registerSseHandlers()
@@ -440,4 +971,45 @@ const handleTaskUpdated = (task: TaskDTO) => {
 </script>
 
 <style scoped>
+.tasks-modal__overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in oklab, var(--color-bg, #0f172a) 20%, transparent);
+  z-index: 1000;
+}
+
+.tasks-modal__card {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.tasks-modal__form {
+  gap: 16px;
+}
+
+.tasks-modal__header {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tasks-modal__footer {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tasks-modal__hint {
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.tasks-modal__checkbox {
+  gap: 8px;
+  align-items: center;
+}
 </style>

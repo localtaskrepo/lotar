@@ -3,6 +3,7 @@ pub mod config;
 pub mod index;
 pub mod scan;
 pub mod serve;
+pub mod sprint;
 pub mod stats;
 pub mod task;
 
@@ -15,6 +16,10 @@ pub use config::{
 pub use index::{IndexAction, IndexArgs};
 pub use scan::ScanArgs;
 pub use serve::ServeArgs;
+pub use sprint::{
+    SprintAction, SprintArgs, SprintCloseArgs, SprintCreateArgs, SprintListArgs, SprintShowArgs,
+    SprintStartArgs, SprintUpdateArgs,
+};
 pub use stats::{StatsAction, StatsArgs};
 pub use task::{
     AddArgs, SortField, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs,

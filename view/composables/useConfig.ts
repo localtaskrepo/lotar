@@ -13,6 +13,13 @@ type ConfigDefaults = {
   customFields: Record<string, string>
 }
 
+type SprintDefaults = {
+  length: string
+  overdue_after: string
+  capacity_points: number | null
+  capacity_hours: number | null
+}
+
 function sanitizeStringList(list: string[]): string[] {
   return list
     .map((item) => item.trim())
@@ -49,6 +56,13 @@ export function useConfig() {
     customFields: {},
   })
 
+  const sprintDefaults = reactive<SprintDefaults>({
+    length: '',
+    overdue_after: '',
+    capacity_points: null,
+    capacity_hours: null,
+  })
+
   const statuses = ref<string[]>([])
   const priorities = ref<string[]>([])
   const types = ref<string[]>([])
@@ -80,6 +94,10 @@ export function useConfig() {
     defaults.assignee = ''
     defaults.tags = []
     defaults.customFields = {}
+    sprintDefaults.length = ''
+    sprintDefaults.overdue_after = ''
+    sprintDefaults.capacity_points = null
+    sprintDefaults.capacity_hours = null
   }
 
   function applyConfig(config: any) {
@@ -115,6 +133,16 @@ export function useConfig() {
       ? sanitizeStringList(defaultTags.map((t: any) => String(t)))
       : []
     defaults.customFields = {}
+
+    const sprintDefaultsConfig = config?.sprints?.defaults ?? {}
+    sprintDefaults.length = typeof sprintDefaultsConfig.length === 'string' ? sprintDefaultsConfig.length : ''
+    sprintDefaults.overdue_after = typeof sprintDefaultsConfig.overdue_after === 'string' ? sprintDefaultsConfig.overdue_after : ''
+    sprintDefaults.capacity_points = typeof sprintDefaultsConfig.capacity_points === 'number'
+      ? sprintDefaultsConfig.capacity_points
+      : null
+    sprintDefaults.capacity_hours = typeof sprintDefaultsConfig.capacity_hours === 'number'
+      ? sprintDefaultsConfig.capacity_hours
+      : null
   }
 
   watch(
@@ -145,6 +173,7 @@ export function useConfig() {
     customFields: customFieldKeys,
     tags,
     defaults: computed(() => defaults),
+    sprintDefaults: computed(() => sprintDefaults),
     refresh,
   }
 }

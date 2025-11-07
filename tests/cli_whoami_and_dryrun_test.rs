@@ -129,16 +129,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
         TaskCreate {
             title: "Preview status change".to_string(),
             project: Some("TEST".to_string()),
-            priority: None,
-            task_type: None,
-            reporter: None,
-            assignee: None,
-            due_date: None,
-            effort: None,
-            description: None,
-            tags: vec![],
-            relationships: None,
-            custom_fields: None,
+            ..TaskCreate::default()
         },
     )
     .expect("create task");

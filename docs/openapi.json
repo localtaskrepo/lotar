@@ -439,6 +439,178 @@
         }
       }
     },
+    "/api/tasks/suggest": {
+      "get": {
+        "summary": "Suggest tasks by text query",
+        "description": "Returns a lightweight list of matching tasks for quick lookups. Results are limited to a maximum of 50 items (default 20).",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Query text to match against task id and title."
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter suggestions to a specific project prefix."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "description": "Maximum number of suggestions to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTaskSuggestions"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/history": {
+      "get": {
+        "summary": "List recent commits for a task",
+        "description": "Shows the git commit history impacting the YAML backing the requested task, truncated by the optional limit parameter.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical task identifier (e.g., TEST-123)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
+            },
+            "description": "Maximum number of commits to include."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeTaskHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/references/snippet": {
+      "get": {
+        "summary": "Fetch a code snippet for a reference",
+        "description": "Resolves the referenced file and returns a highlighted snippet of the surrounding lines.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Reference token in the form path#Lstart-Lend."
+          },
+          {
+            "name": "context",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 20,
+              "default": 6
+            },
+            "description": "Number of context lines to include before and after when before/after are not specified."
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "description": "Override number of lines to include before the highlight."
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "description": "Override number of lines to include after the highlight."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReferenceSnippet"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/tasks/delete": {
       "post": {
         "summary": "Delete a task by id",
@@ -459,6 +631,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeDeleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/projects/create": {
+      "post": {
+        "summary": "Create a new project configuration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeProject"
                 }
               }
             }
@@ -598,6 +803,457 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeUpdated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/add": {
+      "post": {
+        "summary": "Assign tasks to a sprint",
+        "description": "Assigns the provided task IDs to the selected sprint. Enforces single-sprint membership unless force_single is set. Returns reassignment details including explanatory messages for replaced memberships.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintAssignmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintAssignment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/remove": {
+      "post": {
+        "summary": "Remove tasks from a sprint",
+        "description": "Detaches the provided task IDs from the selected sprint. Returns the same reassignment payload as the assignment endpoint including any cleanup diagnostics.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintAssignmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintAssignment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/summary": {
+      "get": {
+        "summary": "Get sprint summary analytics",
+        "description": "Returns lifecycle, completion, and timeline metrics for the selected sprint.",
+        "parameters": [
+          {
+            "name": "sprint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Sprint identifier (positive integer)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintSummaryReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/burndown": {
+      "get": {
+        "summary": "Get sprint burndown series",
+        "description": "Returns burndown totals and remaining work series for tasks, points, and hours.",
+        "parameters": [
+          {
+            "name": "sprint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Sprint identifier (positive integer)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintBurndown"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/velocity": {
+      "get": {
+        "summary": "Get sprint velocity trends",
+        "description": "Aggregates recent sprints with committed vs completed totals and rolling averages.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 8,
+              "minimum": 1
+            },
+            "description": "Maximum number of sprints to include (defaults to 8)."
+          },
+          {
+            "name": "include_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "description": "When true, include active/overdue sprints in the computation."
+          },
+          {
+            "name": "metric",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "tasks",
+                "points",
+                "hours"
+              ],
+              "default": "points"
+            },
+            "description": "Velocity metric to use (tasks, points, or hours)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintVelocity"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/activity/feed": {
+      "get": {
+        "summary": "List recent activity feed entries",
+        "description": "Aggregates git commits touching task files into enriched feed items, including per-task change breakdowns.",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Earliest commit timestamp (RFC3339). Defaults to 30 days ago."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Latest commit timestamp (RFC3339). Defaults to now."
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter activity to a single project prefix."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "default": 200
+            },
+            "description": "Maximum number of feed items to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeActivityFeed"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/activity/series": {
+      "get": {
+        "summary": "Activity aggregations over time",
+        "description": "Summarizes activity grouped by author, day, week, or project within the specified window.",
+        "parameters": [
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "author",
+                "day",
+                "week",
+                "project"
+              ],
+              "default": "day"
+            },
+            "description": "Aggregation grouping for the series."
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeActivitySeries"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/activity/authors": {
+      "get": {
+        "summary": "Top authors within a period",
+        "description": "Returns contribution counts per author based on commits touching task files.",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeActivityAuthors"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/activity/changed_tasks": {
+      "get": {
+        "summary": "Tasks changed during a period",
+        "description": "Lists tasks with change counts and most recent commit touching them within the given window.",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "author",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by commit author name or email substring."
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeActivityChangedTasks"
                 }
               }
             }
@@ -755,6 +1411,32 @@
               "$ref": "#/components/schemas/TaskComment"
             }
           },
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferenceEntry"
+            }
+          },
+          "sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "sprint_order": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChangeLogEntry"
+            }
+          },
           "custom_fields": {
             "type": "object",
             "additionalProperties": true
@@ -767,11 +1449,7 @@
           "priority",
           "task_type",
           "created",
-          "modified",
-          "tags",
-          "relationships",
-          "comments",
-          "custom_fields"
+          "modified"
         ]
       },
       "TaskCreate": {
@@ -821,10 +1499,22 @@
             },
             "default": []
           },
+          "relationships": {
+            "$ref": "#/components/schemas/TaskRelationships",
+            "nullable": true
+          },
           "custom_fields": {
             "type": "object",
             "additionalProperties": true,
             "nullable": true
+          },
+          "sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "default": []
           }
         },
         "required": [
@@ -880,9 +1570,21 @@
             },
             "nullable": true
           },
+          "relationships": {
+            "$ref": "#/components/schemas/TaskRelationships",
+            "nullable": true
+          },
           "custom_fields": {
             "type": "object",
             "additionalProperties": true,
+            "nullable": true
+          },
+          "sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
             "nullable": true
           }
         }
@@ -910,6 +1612,10 @@
             "$ref": "#/components/schemas/TaskType",
             "nullable": true
           },
+          "reporter": {
+            "type": "string",
+            "nullable": true
+          },
           "assignee": {
             "type": "string",
             "nullable": true
@@ -933,9 +1639,21 @@
             },
             "nullable": true
           },
+          "relationships": {
+            "$ref": "#/components/schemas/TaskRelationships",
+            "nullable": true
+          },
           "custom_fields": {
             "type": "object",
             "additionalProperties": true,
+            "nullable": true
+          },
+          "sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
             "nullable": true
           }
         },
@@ -1022,9 +1740,6 @@
       "TaskComment": {
         "type": "object",
         "properties": {
-          "author": {
-            "type": "string"
-          },
           "date": {
             "type": "string"
           },
@@ -1033,9 +1748,129 @@
           }
         },
         "required": [
-          "author",
           "date",
           "text"
+        ]
+      },
+      "TaskChange": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "old": {
+            "type": "string",
+            "nullable": true
+          },
+          "new": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "field"
+        ]
+      },
+      "TaskChangeLogEntry": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskChange"
+            }
+          }
+        },
+        "required": [
+          "at",
+          "changes"
+        ]
+      },
+      "ReferenceEntry": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "nullable": true
+          },
+          "link": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ReferenceSnippetLineDTO": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "text"
+        ]
+      },
+      "ReferenceSnippetDTO": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "start_line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "end_line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "highlight_start": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "highlight_end": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReferenceSnippetLineDTO"
+            }
+          },
+          "has_more_before": {
+            "type": "boolean"
+          },
+          "has_more_after": {
+            "type": "boolean"
+          },
+          "total_lines": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "path",
+          "start_line",
+          "end_line",
+          "highlight_start",
+          "highlight_end",
+          "lines",
+          "has_more_before",
+          "has_more_after",
+          "total_lines"
         ]
       },
       "TaskStatus": {
@@ -1065,6 +1900,1467 @@
           "epic",
           "spike",
           "chore"
+        ]
+      },
+      "ConfigSetRequest": {
+        "type": "object",
+        "properties": {
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "global": {
+            "type": "boolean",
+            "default": false
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SprintSelector": {
+        "description": "Sprint reference by numeric identifier or keyword (e.g., next, active).",
+        "oneOf": [
+          {
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "type": "string"
+          }
+        ]
+      },
+      "SprintAssignmentRequest": {
+        "type": "object",
+        "properties": {
+          "sprint": {
+            "$ref": "#/components/schemas/SprintSelector"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allow_closed": {
+            "type": "boolean",
+            "default": false
+          },
+          "cleanup_missing": {
+            "type": "boolean",
+            "default": false
+          },
+          "force_single": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "tasks"
+        ]
+      },
+      "SprintReassignment": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "previous": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "required": [
+          "task_id"
+        ]
+      },
+      "SprintCleanupMetric": {
+        "type": "object",
+        "properties": {
+          "sprint_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "sprint_id",
+          "count"
+        ]
+      },
+      "SprintCleanupSummary": {
+        "type": "object",
+        "properties": {
+          "removed_references": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_tasks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "removed_by_sprint": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintCleanupMetric"
+            }
+          },
+          "remaining_missing": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "required": [
+          "removed_references",
+          "updated_tasks"
+        ]
+      },
+      "SprintListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "created": {
+            "type": "string",
+            "nullable": true
+          },
+          "modified": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "type": "string"
+          },
+          "planned_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "planned_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "computed_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "plan_length": {
+            "type": "string",
+            "nullable": true
+          },
+          "overdue_after": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "capacity_points": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "capacity_hours": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "state"
+        ]
+      },
+      "SprintListResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sprints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintListItem"
+            }
+          },
+          "missing_sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/SprintIntegrityDiagnostics",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ]
+      },
+      "SprintCreateRequest": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "plan_length": {
+            "type": "string",
+            "nullable": true
+          },
+          "ends_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "starts_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "capacity_points": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "capacity_hours": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "overdue_after": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "skip_defaults": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "SprintCreateResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "sprint": {
+            "$ref": "#/components/schemas/SprintListItem"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "applied_defaults": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sprint"
+        ]
+      },
+      "SprintDeleteRequest": {
+        "type": "object",
+        "properties": {
+          "sprint": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cleanup_missing": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "sprint"
+        ]
+      },
+      "SprintDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "sprint_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sprint_label": {
+            "type": "string",
+            "nullable": true
+          },
+          "removed_references": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_tasks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/SprintIntegrityDiagnostics",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "deleted",
+          "sprint_id",
+          "removed_references",
+          "updated_tasks"
+        ]
+      },
+      "SprintBacklogItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "assignee": {
+            "type": "string",
+            "nullable": true
+          },
+          "due_date": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority"
+        ]
+      },
+      "SprintBacklogResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintBacklogItem"
+            }
+          },
+          "missing_sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/SprintIntegrityDiagnostics",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "count",
+          "truncated"
+        ]
+      },
+      "SprintUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "sprint": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "plan_length": {
+            "type": "string",
+            "nullable": true
+          },
+          "ends_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "starts_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "capacity_points": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "capacity_hours": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "overdue_after": {
+            "type": "string",
+            "nullable": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_started_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_closed_at": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "sprint"
+        ]
+      },
+      "SprintUpdateResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "sprint": {
+            "$ref": "#/components/schemas/SprintListItem"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sprint"
+        ]
+      },
+      "SprintStatusWarningPayload": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ]
+      },
+      "SprintReviewLifecyclePayload": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "planned_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "planned_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "computed_end": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "state"
+        ]
+      },
+      "SprintSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "starts_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "ends_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "computed_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "has_warnings": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "has_warnings"
+        ]
+      },
+      "SprintDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "starts_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "ends_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "computed_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "has_warnings": {
+            "type": "boolean"
+          },
+          "status_warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintStatusWarningPayload"
+            }
+          },
+          "sprint": {
+            "type": "object",
+            "description": "Full sprint record, including plan and actual sections.",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "has_warnings",
+          "sprint"
+        ]
+      },
+      "SprintReviewTask": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "assignee": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status"
+        ]
+      },
+      "SprintStatsCountsPayload": {
+        "type": "object",
+        "properties": {
+          "committed": {
+            "type": "number"
+          },
+          "done": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number"
+          },
+          "completion_ratio": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "committed",
+          "done",
+          "remaining",
+          "completion_ratio"
+        ]
+      },
+      "SprintStatsEffortPayload": {
+        "type": "object",
+        "properties": {
+          "committed": {
+            "type": "number"
+          },
+          "done": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number"
+          },
+          "completion_ratio": {
+            "type": "number"
+          },
+          "capacity": {
+            "type": "number",
+            "nullable": true
+          },
+          "capacity_commitment_ratio": {
+            "type": "number",
+            "nullable": true
+          },
+          "capacity_consumed_ratio": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "committed",
+          "done",
+          "remaining",
+          "completion_ratio"
+        ]
+      },
+      "SprintSummaryReportMetrics": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "$ref": "#/components/schemas/SprintStatsCountsPayload"
+          },
+          "hours": {
+            "$ref": "#/components/schemas/SprintStatsEffortPayload",
+            "nullable": true
+          },
+          "points": {
+            "$ref": "#/components/schemas/SprintStatsEffortPayload",
+            "nullable": true
+          },
+          "blocked": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "required": [
+          "tasks"
+        ]
+      },
+      "SprintStatsTimelinePayload": {
+        "type": "object",
+        "properties": {
+          "planned_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "planned_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "computed_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "planned_duration_days": {
+            "type": "number",
+            "nullable": true
+          },
+          "actual_duration_days": {
+            "type": "number",
+            "nullable": true
+          },
+          "elapsed_days": {
+            "type": "number",
+            "nullable": true
+          },
+          "remaining_days": {
+            "type": "number",
+            "nullable": true
+          },
+          "overdue_days": {
+            "type": "number",
+            "nullable": true
+          }
+        }
+      },
+      "SprintSummaryReportResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "sprint": {
+            "$ref": "#/components/schemas/SprintDetail"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/SprintReviewLifecyclePayload"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SprintSummaryReportMetrics"
+          },
+          "timeline": {
+            "$ref": "#/components/schemas/SprintStatsTimelinePayload"
+          },
+          "blocked_tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintReviewTask"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sprint",
+          "lifecycle",
+          "metrics",
+          "timeline"
+        ]
+      },
+      "SprintBurndownTotalsPayload": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "points": {
+            "type": "number",
+            "nullable": true
+          },
+          "hours": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "tasks"
+        ]
+      },
+      "SprintBurndownPointPayload": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "remaining_tasks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ideal_tasks": {
+            "type": "number"
+          },
+          "remaining_points": {
+            "type": "number",
+            "nullable": true
+          },
+          "ideal_points": {
+            "type": "number",
+            "nullable": true
+          },
+          "remaining_hours": {
+            "type": "number",
+            "nullable": true
+          },
+          "ideal_hours": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "date",
+          "remaining_tasks",
+          "ideal_tasks"
+        ]
+      },
+      "SprintBurndownResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "sprint": {
+            "$ref": "#/components/schemas/SprintDetail"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/SprintReviewLifecyclePayload"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SprintBurndownTotalsPayload"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintBurndownPointPayload"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "sprint",
+          "lifecycle",
+          "totals"
+        ]
+      },
+      "SprintVelocityEntryPayload": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/SprintSummary"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/SprintReviewLifecyclePayload"
+          },
+          "start": {
+            "type": "string",
+            "nullable": true
+          },
+          "end": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_start": {
+            "type": "string",
+            "nullable": true
+          },
+          "actual_end": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_days": {
+            "type": "number",
+            "nullable": true
+          },
+          "window": {
+            "type": "string",
+            "nullable": true
+          },
+          "committed": {
+            "type": "number"
+          },
+          "completed": {
+            "type": "number"
+          },
+          "completion_ratio": {
+            "type": "number",
+            "nullable": true
+          },
+          "capacity": {
+            "type": "number",
+            "nullable": true
+          },
+          "capacity_commitment_ratio": {
+            "type": "number",
+            "nullable": true
+          },
+          "capacity_consumed_ratio": {
+            "type": "number",
+            "nullable": true
+          },
+          "relative": {
+            "type": "string"
+          },
+          "status_warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintStatusWarningPayload"
+            }
+          }
+        },
+        "required": [
+          "summary",
+          "lifecycle",
+          "committed",
+          "completed",
+          "relative"
+        ]
+      },
+      "SprintVelocityResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "metric": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "include_active": {
+            "type": "boolean",
+            "default": false
+          },
+          "skipped_incomplete": {
+            "type": "boolean",
+            "default": false
+          },
+          "average_velocity": {
+            "type": "number",
+            "nullable": true
+          },
+          "average_completion_ratio": {
+            "type": "number",
+            "nullable": true
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintVelocityEntryPayload"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "metric",
+          "count",
+          "truncated"
+        ]
+      },
+      "SprintIntegrityDiagnostics": {
+        "type": "object",
+        "properties": {
+          "missing_sprints": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "tasks_with_missing": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "auto_cleanup": {
+            "$ref": "#/components/schemas/SprintCleanupSummary"
+          }
+        }
+      },
+      "SprintAssignmentResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "sprint_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sprint_label": {
+            "type": "string",
+            "nullable": true
+          },
+          "modified": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unchanged": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "replaced": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SprintReassignment"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "integrity": {
+            "$ref": "#/components/schemas/SprintIntegrityDiagnostics",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "action",
+          "sprint_id",
+          "modified",
+          "unchanged"
+        ]
+      },
+      "TaskSuggestionItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ]
+      },
+      "FileCommitEvent": {
+        "type": "object",
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commit",
+          "author",
+          "email",
+          "date",
+          "message"
+        ]
+      },
+      "ActivityFeedChange": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "old": {
+            "type": "string",
+            "nullable": true
+          },
+          "new": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "field",
+          "kind"
+        ]
+      },
+      "ActivityFeedHistoryEntry": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "actor": {
+            "type": "string",
+            "nullable": true
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityFeedChange"
+            }
+          }
+        },
+        "required": [
+          "at",
+          "changes"
+        ]
+      },
+      "ActivityFeedItem": {
+        "type": "object",
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "author": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "task_title": {
+            "type": "string",
+            "nullable": true
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityFeedHistoryEntry"
+            }
+          }
+        },
+        "required": [
+          "commit",
+          "author",
+          "email",
+          "date",
+          "message",
+          "task_id",
+          "history"
+        ]
+      },
+      "ActivityItem": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "last_date": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "key",
+          "count",
+          "last_date"
+        ]
+      },
+      "AuthorActivity": {
+        "type": "object",
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "commits": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "last_date": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "author",
+          "email",
+          "commits",
+          "last_date"
+        ]
+      },
+      "ChangedTaskSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "last_commit": {
+            "type": "string"
+          },
+          "last_author": {
+            "type": "string"
+          },
+          "last_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "commits": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "id",
+          "project",
+          "file",
+          "last_commit",
+          "last_author",
+          "last_date",
+          "commits"
+        ]
+      },
+      "EnvelopeSprintAssignment": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintAssignmentResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintListResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintCreate": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintCreateResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintDelete": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintDeleteResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintBacklog": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintBacklogResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintUpdate": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintUpdateResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintSummaryReport": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintSummaryReportResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintBurndown": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintBurndownResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSprintVelocity": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SprintVelocityResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "ProjectCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "prefix": {
+            "type": "string",
+            "nullable": true
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "required": [
+          "name"
         ]
       },
       "ProjectDTO": {
@@ -1112,6 +3408,112 @@
           "open_count",
           "done_count",
           "tags_top"
+        ]
+      },
+      "EnvelopeProject": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProjectDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeReferenceSnippet": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReferenceSnippetDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeTaskSuggestions": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskSuggestionItem"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeTaskHistory": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FileCommitEvent"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeActivityFeed": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityFeedItem"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeActivitySeries": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActivityItem"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeActivityAuthors": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthorActivity"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeActivityChangedTasks": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangedTaskSummary"
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       },
       "EnvelopeTask": {

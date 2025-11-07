@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && cargo build --release",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "vue-tsc --project view/tsconfig.json --noEmit",
+    "lint:backend": "cargo clippy --all-targets --all-features -- -D warnings",
     "build:web": "vite build",
     "test": "npm run test:rust && npm run test:ui",
     "test:rust": "cargo nextest run --release",
@@ -45,6 +48,7 @@
     "typescript": "^5.9.3",
     "vite": "^7.1.10",
     "vitest": "^3.2.4",
+    "vue-tsc": "^2.2.8",
     "yaml": "^2.6.0"
   }
 }

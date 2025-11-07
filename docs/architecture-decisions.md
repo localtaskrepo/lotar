@@ -101,6 +101,66 @@ custom_fields:
     └── 1.yml
 ```
 
+## Sprint Storage Model
+
+Sprints are stored separately from project task files so lifecycle data stays canonical and easy to audit.
+
+### Directory Layout
+
+```
+.tasks/
+└── @sprints/
+    ├── 1.yml
+    ├── 2.yml
+    └── ...
+```
+
+- Sprint identifiers come from the filename (`<number>.yml`) and are not duplicated inside the YAML body.
+- Writers produce deterministic key ordering and drop empty values to keep Git diffs clean.
+- Sprint files never embed task identifiers. Tasks own a `sprints: []` array and CLI helpers (`sprint add | move | remove | backlog`) enforce the single-membership contract unless `--force` is explicitly supplied.
+
+### YAML Structure
+
+```yaml
+plan:
+  label: "Sprint 42"
+  goal: "Ship new onboarding flow"
+  starts_at: 2025-10-10T09:00:00-04:00
+  length: 2w
+  ends_at: 2025-10-24T17:00:00-04:00
+  capacity:
+    points: 40
+    hours: 320
+  overdue_after: 12h
+  notes: |
+    Kickoff on Monday. Focus on onboarding.
+actual:
+  started_at: 2025-10-13T09:00:00-04:00
+  closed_at: 2025-10-24T16:12:11-04:00
+history:
+  - at: 2025-10-12T14:22:00Z
+    actor: alice@example.com
+    changes:
+      - field: plan.goal
+        new: "Ship new onboarding flow"
+```
+
+### Derived Status Rules
+
+- **Pending** when `actual.started_at` is absent.
+- **Active** once started and before the computed end.
+- **Overdue** after the computed end while `actual.closed_at` remains unset.
+- **Complete** once `actual.closed_at` is recorded.
+
+End dates prefer `plan.ends_at`; otherwise the planner adds `plan.length` to the actual start. If both `length` and `ends_at` are supplied, tools keep `ends_at`, clear `length`, and emit a warning so the precedence change is obvious in command output.
+
+### Lifecycle & Integrity Helpers
+
+- `sprints.defaults.*` configuration keys pre-populate length, capacity, and overdue thresholds; callers may override them per sprint or per command.
+- `sprints.notifications.enabled` toggles lifecycle warnings (late start/close, future-start info). Commands also accept `--no-warn` to silence messages ad hoc.
+- `sprint cleanup-refs` and the `--cleanup-missing` flag remove task memberships that point at deleted sprint files, returning both structured integrity payloads and human-readable messages.
+- CLI, REST, MCP, and UI surfaces share the same integrity responses so automated workflows and interactive clients stay in sync when reassignments are forced or cleanup occurs.
+
 ## Architecture Decisions
 
 ### AD-001: YAML Over JSON

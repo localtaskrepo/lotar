@@ -1,13 +1,15 @@
 use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
-use crate::errors::{LoTaRError, LoTaRResult};
-use crate::storage::{manager::Storage, task::Task};
-use crate::utils::project::generate_project_prefix;
-use crate::utils::tags::normalize_tags;
-// ...existing code...
 use crate::config::types::{GlobalConfig, ResolvedConfig};
+use crate::errors::{LoTaRError, LoTaRResult};
+use crate::services::sprint_service::{SprintRecord, SprintService};
+use crate::storage::manager::Storage;
+use crate::storage::sprint::SprintTaskEntry;
+use crate::storage::task::Task;
 use crate::types::{Priority, TaskChange, TaskChangeLogEntry, TaskStatus, TaskType};
 use crate::utils::identity::{resolve_current_user, resolve_me_alias};
-use std::collections::HashMap;
+use crate::utils::project::generate_project_prefix;
+use crate::utils::tags::normalize_tags;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
 pub struct TaskService;
@@ -27,7 +29,9 @@ impl TaskService {
             tags,
             relationships,
             custom_fields,
+            sprints,
         } = req;
+        let normalized_sprints = Self::normalize_sprint_ids(&sprints);
 
         // Prefer explicit project if provided; otherwise, derive from repo folder name
         let project = project.unwrap_or_else(|| {
@@ -149,7 +153,11 @@ impl TaskService {
         Self::ensure_task_defaults(&mut t, &config);
 
         let id = storage.add(&t, &project, None);
-        Ok(Self::to_dto(&id, t))
+        if !normalized_sprints.is_empty() {
+            Self::replace_sprint_memberships(storage, &id, &normalized_sprints)?;
+        }
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        Ok(Self::to_dto(&id, t, Some(&sprint_lookup)))
     }
 
     pub fn get(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
@@ -160,7 +168,8 @@ impl TaskService {
             Some(mut t) => {
                 let config = Self::resolve_config_for_project(storage.root_path.as_path(), &p);
                 Self::ensure_task_defaults(&mut t, &config);
-                Ok(Self::to_dto(id, t))
+                let sprint_lookup = Self::load_sprint_lookup(storage);
+                Ok(Self::to_dto(id, t, Some(&sprint_lookup)))
             }
             None => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
@@ -307,6 +316,21 @@ impl TaskService {
             }
         }
 
+        if let Some(sprint_ids) = patch.sprints.clone() {
+            let normalized = Self::normalize_sprint_ids(&sprint_ids);
+            let desired_set: BTreeSet<u32> = normalized.iter().copied().collect();
+            let current_lookup = Self::load_sprint_lookup(storage);
+            let current_orders = current_lookup.get(id).cloned().unwrap_or_default();
+            let current_set: BTreeSet<u32> = current_orders.keys().copied().collect();
+
+            if current_set != desired_set {
+                Self::replace_sprint_memberships(storage, id, &normalized)?;
+                let old_display = Self::format_sprint_change(&current_set);
+                let new_display = Self::format_sprint_change(&desired_set);
+                record_change("sprints", old_display, new_display);
+            }
+        }
+
         let modified = chrono::Utc::now().to_rfc3339();
         t.modified = modified.clone();
 
@@ -321,8 +345,12 @@ impl TaskService {
 
         Self::ensure_task_defaults(&mut t, &config);
 
+        t.sprints.clear();
+
         storage.edit(id, &t);
-        Ok(Self::to_dto(id, t))
+
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        Ok(Self::to_dto(id, t, Some(&sprint_lookup)))
     }
 
     pub fn delete(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<bool> {
@@ -340,13 +368,30 @@ impl TaskService {
             project: filter.project.clone(),
             tags: filter.tags.clone(),
             text_query: filter.text_query.clone(),
+            sprints: Vec::new(),
         };
 
         let mut config_cache: HashMap<String, ResolvedConfig> = HashMap::new();
 
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        let requested_sprints: HashSet<u32> = filter.sprints.iter().copied().collect();
+
         storage
             .search(&storage_filter)
             .into_iter()
+            .filter(|(id, _)| {
+                if requested_sprints.is_empty() {
+                    return true;
+                }
+                sprint_lookup
+                    .get(id)
+                    .map(|orders| {
+                        orders
+                            .keys()
+                            .any(|sprint_id| requested_sprints.contains(sprint_id))
+                    })
+                    .unwrap_or(false)
+            })
             .map(|(id, mut t)| {
                 let project_prefix = id.split('-').next().unwrap_or("").to_string();
                 let config = config_cache
@@ -358,17 +403,26 @@ impl TaskService {
                         )
                     });
                 Self::ensure_task_defaults(&mut t, config);
-                (id.clone(), Self::to_dto(&id, t))
+                (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup)))
             })
             .collect()
     }
 
-    fn to_dto(id: &str, task: Task) -> TaskDTO {
+    fn to_dto(
+        id: &str,
+        task: Task,
+        sprint_lookup: Option<&HashMap<String, BTreeMap<u32, u32>>>,
+    ) -> TaskDTO {
         let modified = if task.modified.is_empty() {
             task.created.clone()
         } else {
             task.modified.clone()
         };
+        let sprint_order = sprint_lookup
+            .and_then(|lookup| lookup.get(id))
+            .cloned()
+            .unwrap_or_default();
+        let sprints: Vec<u32> = sprint_order.keys().copied().collect();
         TaskDTO {
             id: id.to_string(),
             title: task.title,
@@ -387,11 +441,123 @@ impl TaskService {
             relationships: task.relationships,
             comments: task.comments,
             references: task.references,
+            sprints,
+            sprint_order,
             history: task.history,
             custom_fields: task.custom_fields,
         }
     }
 
+    pub(crate) fn load_sprint_lookup(storage: &Storage) -> HashMap<String, BTreeMap<u32, u32>> {
+        let mut map: HashMap<String, BTreeMap<u32, u32>> = HashMap::new();
+        let records = match SprintService::list(storage) {
+            Ok(records) => records,
+            Err(_) => return map,
+        };
+
+        for record in records {
+            let sprint_id = record.id;
+            let mut fallback_order = 1u32;
+            for entry in record.sprint.tasks.iter() {
+                let task_id = entry.id.trim();
+                if task_id.is_empty() {
+                    continue;
+                }
+                let slot = map.entry(task_id.to_string()).or_default();
+                let order = entry.order.unwrap_or_else(|| {
+                    let value = fallback_order;
+                    fallback_order += 1;
+                    value
+                });
+                slot.insert(sprint_id, order);
+            }
+        }
+
+        map
+    }
+
+    fn format_sprint_change(values: &BTreeSet<u32>) -> Option<String> {
+        if values.is_empty() {
+            return None;
+        }
+        Some(
+            values
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+        )
+    }
+
+    pub(crate) fn normalize_sprint_ids(ids: &[u32]) -> Vec<u32> {
+        let normalized: BTreeSet<u32> = ids.iter().copied().filter(|id| *id > 0).collect();
+        normalized.into_iter().collect()
+    }
+
+    pub(crate) fn apply_memberships_to_records(
+        records: &mut [SprintRecord],
+        task_id: &str,
+        desired: &BTreeSet<u32>,
+    ) -> LoTaRResult<HashSet<u32>> {
+        let mut touched: HashSet<u32> = HashSet::new();
+        let mut found: BTreeSet<u32> = BTreeSet::new();
+
+        for record in records.iter_mut() {
+            let contains = record.sprint.tasks.iter().any(|entry| entry.id == task_id);
+            let should_have = desired.contains(&record.id);
+
+            if contains && !should_have {
+                record.sprint.tasks.retain(|entry| entry.id != task_id);
+                touched.insert(record.id);
+            }
+
+            if should_have {
+                found.insert(record.id);
+                if !contains {
+                    record.sprint.tasks.push(SprintTaskEntry {
+                        id: task_id.to_string(),
+                        order: None,
+                    });
+                    touched.insert(record.id);
+                }
+            }
+        }
+
+        if let Some(missing) = desired.iter().find(|id| !found.contains(id)) {
+            return Err(LoTaRError::SprintNotFound(*missing));
+        }
+
+        Ok(touched)
+    }
+
+    pub(crate) fn persist_sprint_records(
+        storage: &mut Storage,
+        records: &[SprintRecord],
+        touched: &HashSet<u32>,
+    ) -> LoTaRResult<()> {
+        for record in records {
+            if touched.contains(&record.id) {
+                SprintService::update(storage, record.id, record.sprint.clone())?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn replace_sprint_memberships(
+        storage: &mut Storage,
+        task_id: &str,
+        desired: &[u32],
+    ) -> LoTaRResult<()> {
+        let normalized = Self::normalize_sprint_ids(desired);
+        let desired_set: BTreeSet<u32> = normalized.iter().copied().collect();
+        let mut records = SprintService::list(storage)?;
+        let touched =
+            Self::apply_memberships_to_records(records.as_mut_slice(), task_id, &desired_set)?;
+        if touched.is_empty() {
+            return Ok(());
+        }
+        Self::persist_sprint_records(storage, &records, &touched)
+    }
     fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
         let base = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
             .unwrap_or_else(|_| ResolvedConfig::from_global(GlobalConfig::default()));

@@ -214,6 +214,10 @@ Automation (defaults inherited from global):
 - `default.priority` - Default task priority for all projects
 - `default.status` - Default task status for all projects
 - `custom.fields` - Default custom fields for all projects
+- `sprints.defaults.length` - Default planned sprint length (e.g., `2w`) applied when creating sprints without an explicit length.
+- `sprints.defaults.capacity_points` / `sprints.defaults.capacity_hours` - Default sprint capacity values used when not provided by the caller.
+- `sprints.defaults.overdue_after` - Default grace period (e.g., `12h`) before overdue warnings trigger.
+- `sprints.notifications.enabled` - Toggle lifecycle warnings for start/close operations (default: true). Accepts the same precedence chain as other config keys and can be overridden per project.
 - `scan.signal_words` - Default scanner keywords (default: `["TODO","FIXME","HACK","BUG","NOTE"]`)
 - `scan.ticket_patterns` - Regex patterns used globally for ticket detection
 - `scan.enable_ticket_words` - Promote task type words (e.g., "Feature") to signal words (default: false)

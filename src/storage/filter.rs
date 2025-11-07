@@ -9,4 +9,5 @@ pub struct TaskFilter {
     pub project: Option<String>,
     pub tags: Vec<String>,
     pub text_query: Option<String>,
+    pub sprints: Vec<u32>,
 }

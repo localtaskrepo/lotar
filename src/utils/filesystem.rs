@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// List visible (non-dot) subdirectories under a directory.
+/// List visible (non-dot, non-`@`) subdirectories under a directory.
 /// Returns tuples of (directory_name, full_path).
 pub fn list_visible_subdirs(dir: &Path) -> Vec<(String, PathBuf)> {
     let mut result = Vec::new();
@@ -11,9 +11,13 @@ pub fn list_visible_subdirs(dir: &Path) -> Vec<(String, PathBuf)> {
             let path = entry.path();
             if path.is_dir() {
                 if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if !name.starts_with('.') {
-                        result.push((name.to_string(), path));
+                    if name.starts_with('.')
+                        || name.contains('@')
+                        || name.eq_ignore_ascii_case("sprints")
+                    {
+                        continue;
                     }
+                    result.push((name.to_string(), path));
                 }
             }
         }

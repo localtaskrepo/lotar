@@ -64,6 +64,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
                 // ...existing code...
@@ -429,6 +430,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let mut tasks = crate::services::task_service::TaskService::list(&storage, &filter);
                 // Performance guardrail: cap tasks processed for aggregation
@@ -611,6 +613,12 @@ impl CommandHandler for StatsHandler {
                         let mut matched: Vec<(String, crate::api_types::TaskDTO)> = Vec::new();
                         // Enumerate project folders directly under tasks_abs_real
                         if let Ok(project_dirs) = fs::read_dir(&tasks_abs_real) {
+                            let fallback_storage =
+                                crate::storage::manager::Storage::new(tasks_abs_real.clone());
+                            let sprint_lookup =
+                                crate::services::task_service::TaskService::load_sprint_lookup(
+                                    &fallback_storage,
+                                );
                             for entry in project_dirs.flatten() {
                                 let p = entry.path();
                                 if !p.is_dir() {
@@ -688,6 +696,7 @@ impl CommandHandler for StatsHandler {
                                             relationships,
                                             comments,
                                             references,
+                                            sprints,
                                             history,
                                         ) = (|| {
                                             let content =
@@ -697,6 +706,12 @@ impl CommandHandler for StatsHandler {
                                                     &content,
                                                 )
                                             {
+                                                let sprints: Vec<u32> = sprint_lookup
+                                                    .get(&id)
+                                                    .map(|orders| {
+                                                        orders.keys().copied().collect::<Vec<u32>>()
+                                                    })
+                                                    .unwrap_or_default();
                                                 let dto = crate::api_types::TaskDTO {
                                                     id: id.clone(),
                                                     title: task.title,
@@ -715,6 +730,8 @@ impl CommandHandler for StatsHandler {
                                                     relationships: task.relationships,
                                                     comments: task.comments,
                                                     references: task.references,
+                                                    sprints,
+                                                    sprint_order: std::collections::BTreeMap::new(),
                                                     history: task.history,
                                                     custom_fields: task.custom_fields,
                                                 };
@@ -733,6 +750,7 @@ impl CommandHandler for StatsHandler {
                                                     dto.relationships,
                                                     dto.comments,
                                                     dto.references,
+                                                    dto.sprints,
                                                     dto.history,
                                                 );
                                             }
@@ -753,6 +771,12 @@ impl CommandHandler for StatsHandler {
                                                 Vec::new();
                                             let references: Vec<crate::types::ReferenceEntry> =
                                                 Vec::new();
+                                            let sprints: Vec<u32> = sprint_lookup
+                                                .get(&id)
+                                                .map(|orders| {
+                                                    orders.keys().copied().collect::<Vec<u32>>()
+                                                })
+                                                .unwrap_or_default();
                                             let history: Vec<crate::types::TaskChangeLogEntry> =
                                                 Vec::new();
                                             let custom_fields: crate::types::CustomFields =
@@ -839,6 +863,7 @@ impl CommandHandler for StatsHandler {
                                                 relationships,
                                                 comments,
                                                 references,
+                                                sprints,
                                                 history,
                                             )
                                         })();
@@ -860,6 +885,8 @@ impl CommandHandler for StatsHandler {
                                             relationships,
                                             comments,
                                             references,
+                                            sprints,
+                                            sprint_order: std::collections::BTreeMap::new(),
                                             history,
                                             custom_fields,
                                         };
@@ -1202,6 +1229,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
                 let mut rows: Vec<_> = tasks
@@ -1250,6 +1278,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
                 // Author attribute removed from TaskComment; we can't group by author without blame here.
@@ -1295,6 +1324,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
                 use std::collections::BTreeMap;
@@ -1349,6 +1379,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
                 use std::collections::BTreeMap;
@@ -2304,6 +2335,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
 
@@ -2373,6 +2405,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
 
@@ -2478,6 +2511,7 @@ impl CommandHandler for StatsHandler {
                     project: scope_project.clone(),
                     tags: Vec::new(),
                     text_query: None,
+                    sprints: Vec::new(),
                 };
                 let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
 

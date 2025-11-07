@@ -22,11 +22,20 @@
         <label class="row" style="gap:6px; align-items:center;">
           <input type="checkbox" :checked="bulk" @change="onToggleBulk($event)" /> Bulk select
         </label>
-        <input v-if="bulk" class="input" :value="bulkAssignee" @input="onBulkAssignee($event)" placeholder="Assign to (username or @me)" style="max-width:220px;"/>
-        <button v-if="bulk" class="btn" :disabled="!selected.length" @click="$emit('bulk-assign')">Assign</button>
-        <button v-if="bulk" class="btn" :disabled="!selected.length" @click="$emit('bulk-unassign')">Unassign</button>
-        <button class="btn primary" @click="$emit('add')">Add</button>
-        <div class="muted" v-if="sort.key">Sorted by {{ headerLabel(sort.key) }} ({{ sort.dir }})</div>
+        <span v-if="bulk" class="muted">Selected: {{ selected.length }}</span>
+        <div v-if="bulk" class="bulk-menu-wrapper">
+          <button class="btn" type="button" title="Bulk actions" :disabled="disableBulkActions" ref="bulkMenuButton" @click.stop="toggleBulkMenu">⋯</button>
+          <div v-if="showBulkMenu" class="menu-popover card bulk-actions-menu" ref="bulkMenuPopover">
+            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">Assign…</button>
+            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">Clear assignee</button>
+            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">Add to sprint…</button>
+            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">Remove from sprint…</button>
+            <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">Delete tasks…</button>
+            <div class="menu-separator" role="separator"></div>
+            <button class="menu-item" type="button" @click="openBacklog">Open sprint backlog</button>
+          </div>
+        </div>
+  <button class="btn primary" @click="$emit('add')">Add</button>
       </div>
     </div>
 
@@ -38,9 +47,41 @@
             <th v-if="selectable" style="width:28px;">
               <input aria-label="Select all" ref="selectAllRef" type="checkbox" :checked="allSelected" @change="toggleAll($event)" />
             </th>
-            <th v-for="col in visibleColumns" :key="col" @click="onSort(col)" :class="{ sortable: true, active: sort.key === col }" :aria-sort="sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'" role="button" tabindex="0" @keydown.enter.prevent="onSort(col)" @keydown.space.prevent="onSort(col)">
-              <span>{{ headerLabel(col) }}</span>
-              <span v-if="sort.key === col">{{ sort.dir === 'asc' ? '▲' : '▼' }}</span>
+            <th
+              v-for="col in visibleColumns"
+              :key="col"
+              :class="['sortable', { active: sort.key === col }]"
+              :aria-sort="sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'"
+            >
+              <button
+                class="header-button"
+                type="button"
+                @click="onSort(col)"
+                @keydown.enter.prevent="onSort(col)"
+                @keydown.space.prevent="onSort(col)"
+              >
+                {{ headerLabel(col) }}
+              </button>
+              <div class="sort-controls" role="group" aria-label="Sorting">
+                <button
+                  class="sort-control"
+                  type="button"
+                  aria-label="Sort ascending"
+                  :aria-pressed="sort.key === col && sort.dir === 'asc'"
+                  :class="{ 'sort-control--active': sort.key === col && sort.dir === 'asc' }"
+                  :disabled="sort.key === col && sort.dir === 'asc'"
+                  @click.stop="setSort(col, 'asc')"
+                >▲</button>
+                <button
+                  class="sort-control"
+                  type="button"
+                  aria-label="Sort descending"
+                  :aria-pressed="sort.key === col && sort.dir === 'desc'"
+                  :class="{ 'sort-control--active': sort.key === col && sort.dir === 'desc' }"
+                  :disabled="sort.key === col && sort.dir === 'desc'"
+                  @click.stop="setSort(col, 'desc')"
+                >▼</button>
+              </div>
             </th>
             <th style="width: 1%; white-space: nowrap;">Actions</th>
           </tr>
@@ -92,6 +133,19 @@
                   <input v-if="isEditingTags(t.id)" class="input" v-model="tagsDrafts[t.id]" placeholder="tag1, tag2" style="max-width: 240px;" @click.stop @keyup.enter.prevent="saveTags(t)" />
                 </div>
               </template>
+              <template v-else-if="col === 'sprints'">
+                <div class="row" style="gap:6px; flex-wrap: wrap; align-items:center;">
+                  <span
+                    v-for="sprintId in (t.sprints || [])"
+                    :key="`${t.id}-sprint-${sprintId}`"
+                    class="chip small"
+                    :class="sprintStateClass(sprintId)"
+                  >
+                    {{ sprintLabel(sprintId) }}
+                  </span>
+                  <span v-if="!(t.sprints && t.sprints.length)" class="muted">—</span>
+                </div>
+              </template>
               <template v-else-if="col === 'due_date'">
                 <span v-if="t.due_date" :class="{ overdue: isOverdue(t) }">{{ fmtDate(t.due_date) }}</span>
                 <span v-else class="muted">—</span>
@@ -109,9 +163,11 @@
               <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
                 <button class="menu-item" v-if="!isEditingTags(t.id)" @click="toggleTagsEdit(t.id); closeRowMenu(t.id)">Edit tags</button>
                 <button class="menu-item" v-else @click="saveTags(t); closeRowMenu(t.id)">Save tags</button>
-                <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">@assign</button>
-                <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">@clear</button>
-                <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">Delete</button>
+                <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">Assign…</button>
+                <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">Clear assignee</button>
+                <button class="menu-item" @click="$emit('sprint-add', t.id); closeRowMenu(t.id)">Add to sprint…</button>
+                <button class="menu-item" @click="$emit('sprint-remove', t.id); closeRowMenu(t.id)">Remove from sprint…</button>
+                <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">Delete…</button>
               </div>
             </td>
           </tr>
@@ -125,8 +181,9 @@
 </template>
 
 <script setup lang="ts">
-import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
-import UiCard from './UiCard.vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState'
+import UiCard from './UiCard.vue'
 
 const props = defineProps<TaskTableProps>()
 const emit = defineEmits<TaskTableEmit>()
@@ -158,7 +215,6 @@ const {
   toggleOne,
   toggleAll,
   onToggleBulk,
-  onBulkAssignee,
   tagsEditing,
   tagsDrafts,
   isEditingTags,
@@ -171,7 +227,127 @@ const {
   relativeTime,
   touchBadge,
   isOverdue,
+  setSort,
 } = useTaskTableState(props, emit)
+
+const sprintLookup = computed(() => props.sprintLookup ?? {})
+const hasSprintsLocal = computed(() => props.hasSprints ?? false)
+const sprintsLoadingLocal = computed(() => props.sprintsLoading ?? false)
+
+const showBulkMenu = ref(false)
+const bulkMenuButton = ref<HTMLElement | null>(null)
+const bulkMenuPopover = ref<HTMLElement | null>(null)
+const disableBulkActions = computed(() => !selected.value.length)
+const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoadingLocal.value || !hasSprintsLocal.value)
+
+function sprintLabel(id: number) {
+  const entry = sprintLookup.value[id]
+  if (entry?.label) return entry.label
+  return `#${id}`
+}
+
+function sprintStateClass(id: number) {
+  const state = sprintLookup.value[id]?.state?.toLowerCase()
+  if (!state) return 'sprint--unknown'
+  return `sprint--${state}`
+}
+
+function toggleBulkMenu() {
+  if (disableBulkActions.value) return
+  showBulkMenu.value = !showBulkMenu.value
+}
+
+function closeBulkMenu() {
+  showBulkMenu.value = false
+}
+
+type BulkMenuAction = 'assign' | 'unassign' | 'sprint-add' | 'sprint-remove' | 'delete'
+
+function handleBulkAction(action: BulkMenuAction) {
+  if (disableBulkActions.value) {
+    closeBulkMenu()
+    return
+  }
+  if ((action === 'sprint-add' || action === 'sprint-remove') && disableSprintActions.value) {
+    closeBulkMenu()
+    return
+  }
+  switch (action) {
+    case 'assign':
+      emit('bulk-assign')
+      break
+    case 'unassign':
+      emit('bulk-unassign')
+      break
+    case 'sprint-add':
+      emit('bulk-sprint-add')
+      break
+    case 'sprint-remove':
+      emit('bulk-sprint-remove')
+      break
+    case 'delete':
+      emit('bulk-delete')
+      break
+  }
+  closeBulkMenu()
+}
+
+function openBacklog() {
+  emit('open-sprint-backlog')
+  closeBulkMenu()
+}
+
+function handleOutsideClick(event: MouseEvent) {
+  if (!showBulkMenu.value) return
+  const target = event.target as Node | null
+  if (!target) return
+  if (bulkMenuButton.value && bulkMenuButton.value.contains(target)) return
+  if (bulkMenuPopover.value && bulkMenuPopover.value.contains(target)) return
+  closeBulkMenu()
+}
+
+function handleEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeBulkMenu()
+}
+
+watch(selected, (value) => {
+  if (!value.length) closeBulkMenu()
+})
+
+watch(
+  () => props.bulk,
+  (value) => {
+    if (!value) closeBulkMenu()
+  },
+)
+
+watch(sprintsLoadingLocal, (loadingNow) => {
+  if (loadingNow) closeBulkMenu()
+})
+
+watch(hasSprintsLocal, (hasSprints) => {
+  if (!hasSprints) closeBulkMenu()
+})
+
+watch(showBulkMenu, (open) => {
+  if (open && disableBulkActions.value) {
+    showBulkMenu.value = false
+  }
+})
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('click', handleOutsideClick)
+    window.addEventListener('keydown', handleEscape)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('click', handleOutsideClick)
+    window.removeEventListener('keydown', handleEscape)
+  }
+})
 </script>
 
 <style scoped>
@@ -211,17 +387,62 @@ thead th {
 }
 
 th.sortable {
+  cursor: default;
+}
+
+th.active {
+  color: var(--color-fg, var(--fg));
+}
+
+.header-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
 }
 
-th.sortable:focus-visible {
+.header-button:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring, 0 0 0 1px rgba(14,165,233,0.35), 0 0 0 4px rgba(14,165,233,0.2));
   border-radius: var(--radius-sm, 0.25rem);
 }
 
-th.active {
-  color: var(--color-fg, var(--fg));
+.sort-controls {
+  display: inline-flex;
+  margin-left: var(--space-1, 0.25rem);
+  border-radius: var(--radius-sm, 0.25rem);
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
+  overflow: hidden;
+}
+
+.sort-control {
+  border: none;
+  background: transparent;
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  cursor: pointer;
+  color: var(--color-muted, #6b7280);
+}
+
+.sort-control:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 75%, transparent);
+}
+
+.sort-control--active {
+  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
+  color: var(--color-accent, #0ea5e9);
+  font-weight: 600;
+}
+
+.sort-control:disabled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 .task-table__cell {
@@ -271,6 +492,27 @@ tbody tr.is-recent {
   padding: calc(var(--space-1, 0.25rem)) var(--space-2, 0.5rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
   border-radius: 999px;
+}
+
+.chip.sprint--active {
+  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
+  color: var(--color-accent, #0ea5e9);
+}
+
+.chip.sprint--overdue {
+  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
+  color: var(--color-danger, #ef4444);
+}
+
+.chip.sprint--complete {
+  background: color-mix(in oklab, var(--color-success, #16a34a) 18%, transparent);
+  color: var(--color-success, #166534);
+}
+
+.chip.sprint--pending,
+.chip.sprint--unknown {
+  background: color-mix(in oklab, var(--color-muted, #6b7280) 18%, transparent);
+  color: var(--color-muted, #6b7280);
 }
 
 .columns-popover {
@@ -324,6 +566,16 @@ tbody tr.is-recent {
   z-index: 10;
 }
 
+.bulk-menu-wrapper {
+  position: relative;
+}
+
+.bulk-actions-menu {
+  left: 0;
+  right: auto;
+  min-width: 220px;
+}
+
 .menu-item {
   background: transparent;
   border: none;
@@ -342,6 +594,12 @@ tbody tr.is-recent {
   color: var(--color-danger, #ef4444);
 }
 
+.menu-separator {
+  height: 1px;
+  margin: var(--space-2, 0.5rem) 0;
+  background: color-mix(in oklab, var(--color-border, #e2e8f0) 80%, transparent);
+}
+
 .task-table__title-text {
   display: block;
   width: 100%;
@@ -351,6 +609,8 @@ tbody tr.is-recent {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
 
 .session-touch {
   display: inline-flex;

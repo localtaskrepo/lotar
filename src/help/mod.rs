@@ -2,6 +2,7 @@ use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, DirEntry, include_dir};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
 use regex::Regex;
+use std::collections::HashMap;
 use std::io::IsTerminal;
 use std::sync::LazyLock;
 
@@ -14,6 +15,8 @@ static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| {
         env!("CARGO_PKG_VERSION")
     )
 });
+static HELP_ALIASES: LazyLock<HashMap<&'static str, &'static str>> =
+    LazyLock::new(|| HashMap::from([("sprint", "sprints")]));
 
 pub struct HelpSystem {
     renderer: OutputRenderer,
@@ -28,30 +31,17 @@ impl HelpSystem {
     }
 
     pub fn show_command_help(&self, command: &str) -> Result<String, String> {
-        let help_file = format!("{}.md", command);
-
-        if let Some(file) = self.find_help_file(&help_file) {
-            let content = file
-                .contents_utf8()
-                .ok_or_else(|| format!("Help file '{}' is not valid UTF-8", help_file))?;
-
-            match self.renderer.format {
-                OutputFormat::Json => Ok(serde_json::json!({
-                    "command": command,
-                    "help": content,
-                    "format": "markdown"
-                })
-                .to_string()),
-                _ => {
-                    // Render Markdown to ANSI/Plain text depending on TTY & NO_COLOR.
-                    let base_dir = format!("{}/docs/help", ROOT_DIR);
-                    let with_links = self.render_with_hyperlinks(content, &base_dir);
-                    Ok(self.render_markdown(&with_links))
-                }
-            }
-        } else {
-            Err(format!("No help available for command '{}'", command))
+        if let Some(file) = self.fetch_help_file(command) {
+            return self.render_help_file(command, command, file);
         }
+
+        if let Some(alias) = HELP_ALIASES.get(command)
+            && let Some(file) = self.fetch_help_file(alias)
+        {
+            return self.render_help_file(command, alias, file);
+        }
+
+        Err(format!("No help available for command '{}'", command))
     }
 
     pub fn show_global_help(&self) -> Result<String, String> {
@@ -90,6 +80,37 @@ impl HelpSystem {
 
     fn find_help_file(&self, filename: &str) -> Option<include_dir::File<'_>> {
         HELP_DIR.get_file(filename).cloned()
+    }
+
+    fn fetch_help_file(&self, topic: &str) -> Option<include_dir::File<'_>> {
+        let help_file = format!("{}.md", topic);
+        self.find_help_file(&help_file)
+    }
+
+    fn render_help_file(
+        &self,
+        command: &str,
+        topic: &str,
+        file: include_dir::File<'_>,
+    ) -> Result<String, String> {
+        let content = file
+            .contents_utf8()
+            .ok_or_else(|| format!("Help file '{}.md' is not valid UTF-8", topic))?;
+
+        match self.renderer.format {
+            OutputFormat::Json => Ok(serde_json::json!({
+                "command": command,
+                "help": content,
+                "format": "markdown"
+            })
+            .to_string()),
+            _ => {
+                // Render Markdown to ANSI/Plain text depending on TTY & NO_COLOR.
+                let base_dir = format!("{}/docs/help", ROOT_DIR);
+                let with_links = self.render_with_hyperlinks(content, &base_dir);
+                Ok(self.render_markdown(&with_links))
+            }
+        }
     }
 
     #[allow(dead_code)]

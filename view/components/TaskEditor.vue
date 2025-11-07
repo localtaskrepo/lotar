@@ -132,6 +132,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { ProjectDTO } from '../api/types'
+import { fromDateInputValue, toDateInputValue } from '../utils/date'
 import { formatProjectLabel } from '../utils/projectLabels'
 import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
@@ -151,8 +152,24 @@ const props = defineProps<{
 const emit = defineEmits<{ (e:'update:modelValue', v:any): void; (e:'save', v:any): void; (e:'cancel'): void }>()
 
 const form = reactive<any>({ ...props.modelValue })
-watch(() => props.modelValue, (v) => Object.assign(form, v || {}))
-watch(form, () => emit('update:modelValue', { ...form }), { deep: true })
+form.due_date = toDateInputValue(form.due_date)
+watch(
+  () => props.modelValue,
+  (value) => {
+    const next = { ...(value || {}) }
+    next.due_date = toDateInputValue((next as any).due_date)
+    Object.assign(form, next)
+  },
+)
+watch(
+  form,
+  () => {
+    const payload = { ...form }
+    payload.due_date = fromDateInputValue(form.due_date) ?? undefined
+    emit('update:modelValue', payload)
+  },
+  { deep: true },
+)
 
 const projects = computed(() => props.projects)
 const statuses = computed(() => props.statuses)

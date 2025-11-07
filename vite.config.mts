@@ -26,6 +26,7 @@ const baseConfig: UserConfig = {
     build: {
         outDir: resolve(__dirname, 'target/web'),
         emptyOutDir: true,
+        chunkSizeWarningLimit: 1500,
     },
     define: {
         'import.meta.env.VITE_CARGO_VERSION': JSON.stringify(CARGO_VERSION),

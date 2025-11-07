@@ -158,6 +158,16 @@ pub fn parse_since_until(
     Ok((start, end))
 }
 
+/// Parse a compact duration expression like `14d` or `2w` into a `Duration`.
+/// Returns `None` when the input is empty or cannot be interpreted.
+pub fn parse_duration_like(input: &str) -> Option<Duration> {
+    let raw = input.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    parse_unsigned_days_or_weeks(&raw.to_lowercase())
+}
+
 fn is_bare_offset(s: &str) -> bool {
     // e.g., "14d", "2w", "7 days", "3 weeks"
     if let Some(num) = s.strip_suffix('d').or_else(|| s.strip_suffix('w')) {

@@ -229,6 +229,15 @@ jobs:
         toolchain: 1.88.0
         components: rustfmt, clippy
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: npm
+
+    - name: Install npm dependencies
+      run: npm ci --prefer-offline
+
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
       with:
@@ -246,6 +255,9 @@ jobs:
 
     - name: Run tests (nextest, fast)
       run: cargo nextest run --all-features --failure-output=immediate-final --retries 0 --lib --bins --tests
+
+    - name: Run UI tests (Vitest)
+      run: npm run test:ui
 
   # Security audit (optimized with caching, runs in parallel)
   security:

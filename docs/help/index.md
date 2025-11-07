@@ -8,6 +8,7 @@ Centralized documentation topics for quick navigation.
 	- Tip: Use `lotar config normalize` to rewrite configs into canonical nested YAML
 	- Templates: [Templates Guide](./templates.md)
 - Tasks: [Add](./add.md) · [List](./list.md) · [Status](./status.md) · [Priority](./priority.md) · [Assignee](./assignee.md) · [Due Date](./due-date.md) · [Effort](./effort.md) · [Comment](./comment.md) · [History/Diff/At](./history.md) · [Changelog](./changelog.md)
+- Sprints: [Sprint Workflows](./sprints.md)
 - MCP: [MCP Server](./mcp.md)
 - Serve/API: [Serve](./serve.md)
 - Web UI Personalization: [Preferences](./preferences.md)

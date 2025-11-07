@@ -393,7 +393,7 @@ pub struct TaskComment {
     pub text: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskChange {
     pub field: String,
@@ -403,7 +403,7 @@ pub struct TaskChange {
     pub new: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskChangeLogEntry {
     pub at: String,

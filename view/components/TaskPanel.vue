@@ -55,6 +55,64 @@
               />
 
               <fieldset class="task-panel__group">
+                <legend>Sprints</legend>
+                <div v-if="sprintsLoading" class="task-panel__sprints-loading">
+                  <UiLoader size="sm">Loading sprint info…</UiLoader>
+                </div>
+                <div v-else class="task-panel__sprint-area">
+                  <div class="task-panel__sprint-tags">
+                    <template v-if="hasAssignedSprints">
+                      <span
+                        v-for="sprint in assignedSprints"
+                        :key="sprint.id"
+                        :class="[
+                          'task-panel__sprint-chip',
+                          `task-panel__sprint-chip--${sprint.state}`,
+                          { 'task-panel__sprint-chip--missing': sprint.missing },
+                        ]"
+                      >
+                        {{ sprint.label }}
+                        <button
+                          type="button"
+                          class="task-panel__sprint-chip-remove"
+                          :aria-label="`Remove ${sprint.label}`"
+                          :title="`Remove ${sprint.label}`"
+                          :disabled="removingSprintId === sprint.id"
+                          @click="removeSprintChip(sprint.id)"
+                        >
+                          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                            <path
+                              d="M12.8 4.21 11.59 3 8 6.59 4.41 3 3.2 4.21 6.79 7.8 3.2 11.39 4.41 12.6 8 9.01 11.59 12.6 12.8 11.39 9.21 7.8 12.8 4.21Z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        </button>
+                      </span>
+                    </template>
+                    <span v-else class="task-panel__sprint-empty muted">Not assigned to a sprint.</span>
+                    <button
+                      type="button"
+                      class="task-panel__sprint-add"
+                      :aria-label="hasSprints ? 'Assign to sprint' : 'No sprints available'"
+                      :title="hasSprints ? 'Assign to sprint' : 'No sprints available'"
+                      :disabled="sprintsLoading || !hasSprints"
+                      @click="openSprintDialog('add')"
+                    >
+                      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                        <path
+                          d="M7.25 3.25v3.5h-3.5v2h3.5v3.5h2v-3.5h3.5v-2h-3.5v-3.5h-2Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <p v-if="assignedSprintNotice" class="task-panel__sprint-warning">
+                    {{ assignedSprintNotice }}
+                  </p>
+                </div>
+              </fieldset>
+
+              <fieldset class="task-panel__group">
                 <legend>Details</legend>
                 <textarea
                   v-model="form.description"
@@ -198,13 +256,64 @@
       </div>
     </Transition>
   </Teleport>
+  <Teleport to="body">
+    <div
+      v-if="sprintDialogOpen"
+      class="task-panel-dialog__overlay"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="sprintDialogTitle"
+      @click.self="closeSprintDialog"
+    >
+      <UiCard class="task-panel-dialog__card">
+        <form class="task-panel-dialog__form" @submit.prevent="submitSprintDialog">
+          <header class="task-panel-dialog__header">
+            <h2>{{ sprintDialogTitle }}</h2>
+            <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">
+              Cancel
+            </UiButton>
+          </header>
+          <label class="task-panel-dialog__field">
+            <span class="muted">Sprint</span>
+            <select
+              class="input"
+              v-model="sprintDialogSelection"
+              :disabled="sprintDialogMode === 'add' && !sprintOptions.length"
+            >
+              <option v-for="option in sprintOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <p v-if="sprintDialogMode === 'add' && !sprintOptions.length" class="muted">No sprints available yet.</p>
+          <label v-if="sprintDialogMode === 'add'" class="task-panel-dialog__checkbox">
+            <input type="checkbox" v-model="sprintDialogAllowClosed" /> Allow assigning to closed sprints
+          </label>
+          <footer class="task-panel-dialog__footer">
+            <UiButton
+              variant="primary"
+              type="submit"
+              :disabled="sprintDialogSubmitting || (sprintDialogMode === 'add' && !sprintOptions.length)"
+            >
+              {{ sprintDialogSubmitting ? (sprintDialogMode === 'add' ? 'Assigning…' : 'Removing…') : sprintDialogTitle }}
+            </UiButton>
+            <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">
+              Cancel
+            </UiButton>
+          </footer>
+        </form>
+      </UiCard>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { Teleport, Transition } from 'vue'
-import type { TaskDTO } from '../api/types'
+import { Teleport, Transition, computed, ref, watch } from 'vue'
+import { api } from '../api/client'
+import type { SprintIntegrityDiagnostics, TaskDTO } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
 import UiButton from './UiButton.vue'
+import UiCard from './UiCard.vue'
 import UiLoader from './UiLoader.vue'
 import TaskPanelCommentsTab from './task-panel/TaskPanelCommentsTab.vue'
 import TaskPanelCommitsTab from './task-panel/TaskPanelCommitsTab.vue'
@@ -215,6 +324,7 @@ import TaskPanelReferencesTab from './task-panel/TaskPanelReferencesTab.vue'
 import TaskPanelRelationshipsTab from './task-panel/TaskPanelRelationshipsTab.vue'
 import TaskPanelSummarySection from './task-panel/TaskPanelSummarySection.vue'
 import TaskPanelTagEditor from './task-panel/TaskPanelTagEditor.vue'
+import { showToast } from './toast'
 
 const props = defineProps<{ open: boolean; taskId?: string | null; initialProject?: string | null }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'created', task: TaskDTO): void; (e: 'updated', task: TaskDTO): void }>()
@@ -257,6 +367,12 @@ const {
   commitHistory,
   commitsLoading,
   statusBadgeClass,
+  sprintsLoading,
+  assignedSprints,
+  hasAssignedSprints,
+  assignedSprintNotice,
+  sprintOptions,
+  hasSprints,
   relationDefs,
   relationships,
   relationSuggestions,
@@ -315,7 +431,192 @@ const {
   resetReporterSelection,
   resetAssigneeSelection,
   whoami,
+  refreshSprints,
 } = useTaskPanelState(props, emit)
+
+const sprintDialogOpen = ref(false)
+const sprintDialogSubmitting = ref(false)
+const sprintDialogMode = ref<'add' | 'remove'>('add')
+const sprintDialogSelection = ref('active')
+const sprintDialogAllowClosed = ref(false)
+const removingSprintId = ref<number | null>(null)
+
+function handleIntegrityFeedback(integrity?: SprintIntegrityDiagnostics | null) {
+  if (!integrity) return
+  const autoCleanup = integrity.auto_cleanup
+  if (autoCleanup?.removed_references) {
+    showToast(`Automatically cleaned ${autoCleanup.removed_references} dangling sprint reference${autoCleanup.removed_references === 1 ? '' : 's'}.`)
+  }
+  if (Array.isArray(integrity.missing_sprints) && integrity.missing_sprints.length) {
+    const ids = integrity.missing_sprints.map((id) => `#${id}`).join(', ')
+    showToast(`Missing sprint IDs still detected: ${ids}`)
+  }
+}
+
+watch(
+  sprintOptions,
+  (options) => {
+    if (!options.length) {
+      sprintDialogSelection.value = 'active'
+      return
+    }
+    if (!options.some((opt) => opt.value === sprintDialogSelection.value)) {
+      sprintDialogSelection.value = options[0].value
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.open,
+  (isOpen) => {
+    if (!isOpen && sprintDialogOpen.value) {
+      closeSprintDialog(true)
+    }
+    if (!isOpen && removingSprintId.value !== null) {
+      removingSprintId.value = null
+    }
+  },
+)
+
+const sprintDialogTitle = computed(() =>
+  sprintDialogMode.value === 'add'
+    ? 'Assign to sprint'
+    : 'Remove from sprint',
+)
+
+function openSprintDialog(mode: 'add' | 'remove') {
+  if (!hasSprints.value && mode === 'add') {
+    showToast('No sprints available yet')
+    return
+  }
+  if (!hasAssignedSprints.value && mode === 'remove') {
+    showToast('This task is not assigned to any sprint')
+    return
+  }
+  sprintDialogMode.value = mode
+  sprintDialogSelection.value = sprintOptions.value[0]?.value ?? 'active'
+  sprintDialogAllowClosed.value = false
+  sprintDialogOpen.value = true
+}
+
+function closeSprintDialog(force?: boolean | Event) {
+  const forced = force === true
+  if (sprintDialogSubmitting.value && !forced) return
+  sprintDialogOpen.value = false
+}
+
+async function refreshSprintDataAfterMutation() {
+  try {
+    await refreshSprints(true)
+  } catch (refreshError) {
+    console.warn('Failed to refresh sprints', refreshError)
+    showToast('Updated sprint list may be stale; refresh later.')
+  }
+  try {
+    await reloadTask()
+  } catch (reloadError) {
+    console.warn('Failed to reload task after sprint update', reloadError)
+    showToast('Task view may be out of date; refresh to confirm changes.')
+  }
+}
+
+function parseSprintToken(token: string): number | string | undefined {
+  const trimmed = (token || '').trim()
+  if (!trimmed || trimmed === 'active' || trimmed === 'auto') return undefined
+  if (trimmed === 'next') return 'next'
+  if (trimmed === 'previous' || trimmed === 'prev') return 'previous'
+  const numeric = Number(trimmed)
+  if (Number.isInteger(numeric) && numeric > 0) return numeric
+  return trimmed
+}
+
+async function submitSprintDialog() {
+  if (sprintDialogSubmitting.value) return
+  const taskId = form.id || props.taskId
+  if (!taskId || taskId === 'new') {
+    showToast('Save the task before managing sprints')
+    return
+  }
+  sprintDialogSubmitting.value = true
+  try {
+    const payload: Record<string, unknown> = {
+      tasks: [taskId],
+      cleanup_missing: true,
+    }
+    const sprintRef = parseSprintToken(sprintDialogSelection.value)
+    if (sprintRef !== undefined) payload.sprint = sprintRef
+    if (sprintDialogMode.value === 'add' && sprintDialogAllowClosed.value) {
+      payload.allow_closed = true
+    }
+    const response =
+      sprintDialogMode.value === 'add'
+        ? await api.sprintAdd(payload as any)
+        : await api.sprintRemove(payload as any)
+    const changed = response.modified.length
+    if (changed) {
+      const verb = sprintDialogMode.value === 'add' ? 'Assigned' : 'Removed'
+      const preposition = sprintDialogMode.value === 'add' ? 'to' : 'from'
+      const label = response.sprint_label || `Sprint #${response.sprint_id}`
+      showToast(`${verb} ${changed} task${changed === 1 ? '' : 's'} ${preposition} ${label}`)
+    } else {
+      showToast(sprintDialogMode.value === 'add' ? 'No changes applied' : 'No sprints removed')
+    }
+    const messages = Array.isArray(response.messages) ? response.messages : []
+    if (messages.length) {
+      messages.forEach((message) => showToast(message))
+    } else if (
+      sprintDialogMode.value === 'add' &&
+      Array.isArray(response.replaced) &&
+      response.replaced.length
+    ) {
+      response.replaced.forEach((entry) => {
+        if (!entry?.previous?.length) return
+        const prev = entry.previous.map((id) => `#${id}`).join(', ')
+        showToast(`${entry.task_id} moved from ${prev}`)
+      })
+    }
+    handleIntegrityFeedback(response.integrity)
+    await refreshSprintDataAfterMutation()
+    closeSprintDialog(true)
+  } catch (error: any) {
+    showToast(error?.message || (sprintDialogMode.value === 'add' ? 'Failed to assign sprint' : 'Failed to remove sprint'))
+  } finally {
+    sprintDialogSubmitting.value = false
+  }
+}
+
+async function removeSprintChip(sprintId: number) {
+  if (removingSprintId.value !== null) return
+  const taskId = form.id || props.taskId
+  if (!taskId || taskId === 'new') {
+    showToast('Save the task before managing sprints')
+    return
+  }
+  removingSprintId.value = sprintId
+  try {
+    const response = await api.sprintRemove({
+      tasks: [taskId],
+      sprint: sprintId,
+      cleanup_missing: true,
+    } as any)
+    const changed = response.modified.length
+    const label = response.sprint_label || `Sprint #${response.sprint_id || sprintId}`
+    if (changed) {
+      showToast(`Removed ${changed} task${changed === 1 ? '' : 's'} from ${label}`)
+    } else {
+      showToast('No sprints removed')
+    }
+    const messages = Array.isArray(response.messages) ? response.messages : []
+    messages.forEach((message) => showToast(message))
+    handleIntegrityFeedback(response.integrity)
+    await refreshSprintDataAfterMutation()
+  } catch (error: any) {
+    showToast(error?.message || 'Failed to remove sprint')
+  } finally {
+    removingSprintId.value = null
+  }
+}
 </script>
 
 <style>
@@ -396,6 +697,139 @@ const {
   overflow-y: auto;
   overflow-x: visible;
   padding: var(--space-4, 1rem);
+}
+
+.task-panel__sprints-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  color: var(--color-muted, #64748b);
+}
+
+.task-panel__sprint-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+  align-items: center;
+}
+
+.task-panel__sprint-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__sprint-empty {
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.task-panel__sprint-chip-remove {
+  margin-left: var(--space-1, 0.25rem);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.task-panel__sprint-chip-remove svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.task-panel__sprint-chip-remove:hover:not(:disabled),
+.task-panel__sprint-chip-remove:focus-visible {
+  color: var(--color-danger, #ef4444);
+}
+
+.task-panel__sprint-chip-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.task-panel__sprint-add {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--color-accent, #0ea5e9) 55%, transparent);
+  background: transparent;
+  color: var(--color-accent, #0ea5e9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.task-panel__sprint-add svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.task-panel__sprint-add:hover:not(:disabled),
+.task-panel__sprint-add:focus-visible {
+  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
+  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 70%, transparent);
+  color: var(--color-bg, #fff);
+}
+
+.task-panel__sprint-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.task-panel__sprint-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: calc(var(--space-1, 0.25rem)) var(--space-2, 0.5rem);
+  border-radius: 999px;
+  font-size: var(--text-xs, 0.75rem);
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
+  color: var(--color-muted, #6b7280);
+  border: 1px solid color-mix(in oklab, var(--color-border, #e2e8f0) 70%, transparent);
+}
+
+.task-panel__sprint-chip--active {
+  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
+  color: var(--color-accent, #0ea5e9);
+  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 55%, transparent);
+}
+
+.task-panel__sprint-chip--overdue {
+  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
+  color: var(--color-danger, #ef4444);
+  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 55%, transparent);
+}
+
+.task-panel__sprint-chip--complete {
+  background: color-mix(in oklab, var(--color-success, #16a34a) 18%, transparent);
+  color: var(--color-success, #166534);
+  border-color: color-mix(in oklab, var(--color-success, #16a34a) 55%, transparent);
+}
+
+.task-panel__sprint-chip--pending,
+.task-panel__sprint-chip--unknown {
+  background: color-mix(in oklab, var(--color-muted, #6b7280) 18%, transparent);
+  color: var(--color-muted, #6b7280);
+  border-color: color-mix(in oklab, var(--color-muted, #6b7280) 55%, transparent);
+}
+
+.task-panel__sprint-chip--missing {
+  background: color-mix(in oklab, var(--color-danger, #ef4444) 12%, transparent);
+  color: var(--color-danger, #ef4444);
+  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 55%, transparent);
+  border-style: dashed;
+}
+
+.task-panel__sprint-warning {
+  margin-top: var(--space-2, 0.5rem);
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--color-danger, #ef4444);
 }
 
 .task-panel__form {
@@ -543,6 +977,59 @@ const {
 
 .task-panel__activity {
   gap: var(--space-4, 1rem);
+}
+
+.task-panel-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5, 1.25rem);
+  background: color-mix(in oklab, var(--color-bg, #0f172a) 22%, transparent);
+  z-index: 1000;
+}
+
+.task-panel-dialog__card {
+  width: min(440px, 100%);
+  max-height: calc(100vh - var(--space-6, 1.5rem));
+  overflow-y: auto;
+}
+
+.task-panel-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.task-panel-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel-dialog__header h2 {
+  margin: 0;
+  font-size: var(--text-lg, 1.25rem);
+}
+
+.task-panel-dialog__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel-dialog__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel-dialog__footer {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
 }
 
 .task-panel__tabs {

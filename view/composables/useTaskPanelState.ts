@@ -2,9 +2,11 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { api } from '../api/client'
 import type { TaskDTO, TaskHistoryEntry } from '../api/types'
 import { showToast } from '../components/toast'
+import { fromDateInputValue, toDateInputValue } from '../utils/date'
 import { useConfig } from './useConfig'
 import { useProjects } from './useProjects'
 import { useReferencePreview } from './useReferencePreview'
+import { useSprints } from './useSprints'
 import { useTaskComments } from './useTaskComments'
 import { useTaskPanelOwnership } from './useTaskPanelOwnership'
 import { useTaskRelationships } from './useTaskRelationships'
@@ -31,10 +33,24 @@ interface CommitEntry {
     message: string
 }
 
+type SprintAssignmentSummary = {
+    id: number
+    label: string
+    state: string
+    missing: boolean
+}
+
 export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPanelEmit) {
     const mode = computed(() => (props.taskId && props.taskId !== 'new' ? 'edit' : 'create'))
 
     const { projects, refresh: refreshProjects } = useProjects()
+    const {
+        sprints: sprintList,
+        loading: sprintsLoading,
+        missingSprints,
+        active: activeSprints,
+        refresh: refreshSprints,
+    } = useSprints()
     const {
         statuses,
         priorities,
@@ -68,7 +84,10 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         effort: '',
         description: '',
         tags: [] as string[],
+        sprints: [] as number[],
     })
+
+    const taskSprintOrder = ref<Record<number, number>>({})
 
     const {
         hoveredReferenceCode,
@@ -108,6 +127,122 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     const customFields = reactive<Record<string, string>>({})
     const customFieldKeys = reactive<Record<string, string>>({})
     const newField = reactive({ key: '', value: '' })
+
+    const sprintLookup = computed<Record<number, { label: string; state: string }>>(() => {
+        const lookup: Record<number, { label: string; state: string }> = {}
+        for (const sprint of sprintList.value) {
+            const base = sprint.label || sprint.display_name || `Sprint ${sprint.id}`
+            lookup[sprint.id] = {
+                label: `#${sprint.id} ${base}`.trim(),
+                state: sprint.state || 'unknown',
+            }
+        }
+        return lookup
+    })
+
+    const assignedSprints = computed<SprintAssignmentSummary[]>(() => {
+        const rawMembership = Array.isArray(form.sprints) ? form.sprints : []
+        if (!rawMembership.length) return []
+
+        const membership: number[] = []
+        const membershipSet = new Set<number>()
+        for (const raw of rawMembership) {
+            const id = Number(raw)
+            if (!Number.isFinite(id) || id <= 0 || membershipSet.has(id)) continue
+            membershipSet.add(id)
+            membership.push(id)
+        }
+
+        const missing = new Set<number>()
+        for (const value of missingSprints.value || []) {
+            const id = Number(value)
+            if (Number.isFinite(id)) {
+                missing.add(id)
+            }
+        }
+
+        const orderedEntries: Array<{ id: number; order: number }> = []
+        const orderSource = taskSprintOrder.value || {}
+        Object.entries(orderSource).forEach(([rawId, rawOrder]) => {
+            const id = Number(rawId)
+            const order = Number(rawOrder)
+            if (!Number.isFinite(id) || id <= 0) return
+            if (!Number.isFinite(order)) {
+                orderedEntries.push({ id, order: Number.MAX_SAFE_INTEGER })
+                return
+            }
+            orderedEntries.push({ id, order })
+        })
+        orderedEntries.sort((a, b) => {
+            if (a.order !== b.order) return a.order - b.order
+            return a.id - b.id
+        })
+
+        const idOrder: number[] = []
+        const seen = new Set<number>()
+        for (const entry of orderedEntries) {
+            if (!membershipSet.has(entry.id) || seen.has(entry.id)) continue
+            idOrder.push(entry.id)
+            seen.add(entry.id)
+        }
+
+        if (seen.size !== membershipSet.size) {
+            const remainder = membership
+                .filter((id) => !seen.has(id))
+                .sort((a, b) => a - b)
+            idOrder.push(...remainder)
+        }
+
+        const result: SprintAssignmentSummary[] = []
+        for (const id of idOrder) {
+            const entry = sprintLookup.value[id]
+            const state = (entry?.state || 'unknown').toLowerCase()
+            const isMissing = !entry || missing.has(id)
+            const baseLabel = entry?.label ?? `#${id}`
+            result.push({
+                id,
+                label: isMissing ? `${baseLabel} (missing)` : baseLabel,
+                state,
+                missing: isMissing,
+            })
+        }
+        return result
+    })
+
+    const hasAssignedSprints = computed(() => assignedSprints.value.length > 0)
+
+    const assignedSprintNotice = computed(() => {
+        const missing = assignedSprints.value.filter((item) => item.missing)
+        if (!missing.length) return ''
+        const formatted = missing.map((item) => `#${item.id}`).join(', ')
+        return `Sprint metadata missing for ${formatted}.`
+    })
+
+    const sprintOptions = computed(() => {
+        const options: Array<{ value: string; label: string }> = []
+        const activeList = activeSprints.value ?? []
+        const activeLabel = (() => {
+            if (!activeList.length) return 'Auto (requires an active sprint)'
+            if (activeList.length === 1) {
+                const sprint = activeList[0]
+                const name = sprint.label || sprint.display_name || `Sprint ${sprint.id}`
+                return `Auto (active: #${sprint.id} ${name})`
+            }
+            return 'Auto (multiple active sprints – specify one)'
+        })()
+        options.push({ value: 'active', label: activeLabel })
+        options.push({ value: 'next', label: 'Next sprint' })
+        options.push({ value: 'previous', label: 'Previous sprint' })
+        const sorted = [...(sprintList.value ?? [])].sort((a, b) => a.id - b.id)
+        sorted.forEach((item) => {
+            const name = item.label || item.display_name || `Sprint ${item.id}`
+            const state = item.state.charAt(0).toUpperCase() + item.state.slice(1)
+            options.push({ value: String(item.id), label: `#${item.id} ${name} (${state})` })
+        })
+        return options
+    })
+
+    const hasSprints = computed(() => (sprintList.value?.length ?? 0) > 0)
 
     const activityTabs: Array<{ id: ActivityTab; label: string }> = [
         { id: 'comments', label: 'Comments' },
@@ -359,6 +494,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         form.effort = ''
         form.description = ''
         form.tags = []
+        form.sprints = []
+        taskSprintOrder.value = {}
         resetOwnership()
         activityTab.value = 'comments'
         resetCustomFields()
@@ -400,6 +537,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         if (!validate()) return
         submitting.value = true
         try {
+            const dueDateValue = fromDateInputValue(form.due_date)
             const payload = {
                 title: form.title.trim(),
                 project: form.project,
@@ -407,10 +545,11 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
                 task_type: form.task_type,
                 reporter: form.reporter || undefined,
                 assignee: form.assignee || undefined,
-                due_date: form.due_date || undefined,
+                due_date: dueDateValue ?? undefined,
                 effort: form.effort || undefined,
                 description: form.description || undefined,
                 tags: form.tags,
+                sprints: form.sprints.length ? [...form.sprints] : undefined,
                 relationships: buildRelationships(),
                 custom_fields: buildCustomFields(),
             }
@@ -459,9 +598,11 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             case 'assignee':
                 patch.assignee = (form.assignee ?? '').trim()
                 break
-            case 'due_date':
-                patch.due_date = form.due_date || undefined
+            case 'due_date': {
+                const dueDateValue = fromDateInputValue(form.due_date)
+                patch.due_date = dueDateValue ?? undefined
                 break
+            }
             case 'effort':
                 patch.effort = form.effort || undefined
                 break
@@ -474,6 +615,21 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
                 }
                 patch.description = form.description || undefined
                 break
+            case 'sprints': {
+                const normalize = (values: number[] | undefined | null) => {
+                    if (!Array.isArray(values)) return [] as number[]
+                    const unique = Array.from(new Set(values.map((value) => Number(value)).filter((value) => Number.isFinite(value))))
+                    unique.sort((a, b) => a - b)
+                    return unique
+                }
+                const current = normalize(task.sprints as any)
+                const next = normalize(form.sprints as any)
+                if (current.length === next.length && current.every((value, index) => value === next[index])) {
+                    return
+                }
+                patch.sprints = next
+                break
+            }
             default:
                 return
         }
@@ -513,10 +669,15 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         }
     }
 
-    async function reloadTask() {
+    async function reloadTask(): Promise<TaskDTO | undefined> {
         if (mode.value === 'edit' && task.id) {
-            await loadTask(task.id)
+            const updated = await loadTask(task.id)
+            if (updated) {
+                emit('updated', updated)
+            }
+            return updated
         }
+        return undefined
     }
 
     function formatDate(value: string) {
@@ -591,6 +752,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         form.tags = (defaults.value.tags || [])
             .map((tag: string) => tag.trim())
             .filter((tag: string) => tag.length > 0)
+        form.sprints = []
+        taskSprintOrder.value = {}
         mergeKnownTags(form.tags)
         ensureConfiguredCustomFields()
         const defaultCustomFields = defaults.value.customFields || {}
@@ -619,10 +782,56 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         form.task_type = data.task_type
         form.reporter = data.reporter || ''
         form.assignee = data.assignee || ''
-        form.due_date = data.due_date || ''
+        form.due_date = toDateInputValue(data.due_date)
         form.effort = data.effort || ''
         form.description = data.description || ''
         form.tags = [...(data.tags || [])]
+        const normalizedSprints: number[] = []
+        const orderPairs: Array<[number, number]> = []
+        const orderSource = data.sprint_order as Record<string, number> | undefined
+        if (orderSource && typeof orderSource === 'object') {
+            Object.entries(orderSource).forEach(([rawId, rawOrder]) => {
+                const id = Number(rawId)
+                if (!Number.isFinite(id) || id <= 0) return
+                const orderValue = Number(rawOrder)
+                const order = Number.isFinite(orderValue) ? orderValue : Number.MAX_SAFE_INTEGER
+                orderPairs.push([id, order])
+            })
+        }
+
+        orderPairs.sort((a, b) => {
+            if (a[1] !== b[1]) return a[1] - b[1]
+            return a[0] - b[0]
+        })
+
+        for (const [id] of orderPairs) {
+            if (!normalizedSprints.includes(id)) {
+                normalizedSprints.push(id)
+            }
+        }
+
+        if (!normalizedSprints.length && Array.isArray(data.sprints)) {
+            for (const value of data.sprints) {
+                const id = Number(value)
+                if (!Number.isFinite(id) || id <= 0) continue
+                if (!normalizedSprints.includes(id)) {
+                    normalizedSprints.push(id)
+                }
+            }
+        }
+
+        if (!orderPairs.length && normalizedSprints.length) {
+            normalizedSprints.forEach((id, index) => {
+                orderPairs.push([id, index + 1])
+            })
+        }
+
+        taskSprintOrder.value = orderPairs.reduce<Record<number, number>>((acc, [id, order]) => {
+            acc[id] = order
+            return acc
+        }, {})
+
+        form.sprints = normalizedSprints
         mergeKnownTags(form.tags)
         resetReferencePreviews()
         task.comments = Array.isArray(data.comments) ? data.comments.map((comment) => ({ ...comment })) : []
@@ -658,7 +867,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         nextTick(() => (suppressWatch.value = false))
     }
 
-    async function loadTask(id: string) {
+    async function loadTask(id: string): Promise<TaskDTO | undefined> {
         commitHistory.value = []
         try {
             const data = await api.getTask(id)
@@ -666,8 +875,10 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
             await refreshConfig(id.split('-')[0])
             applyTask(data)
             await loadCommitHistory(id)
+            return data
         } catch (error: any) {
             showToast(error?.message || 'Failed to load task')
+            return undefined
         } finally {
             loading.value = false
         }
@@ -831,6 +1042,12 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         changeLog,
         commitHistory,
         commitsLoading,
+        sprintsLoading,
+        assignedSprints,
+        hasAssignedSprints,
+        assignedSprintNotice,
+        sprintOptions,
+        hasSprints,
         statusBadgeClass,
         relationDefs,
         relationships,
@@ -848,6 +1065,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         addField,
         removeField,
         resetCustomFields,
+        sprintLookup,
+        refreshSprints,
         setTags,
         updateCustomFieldKey,
         updateCustomFieldValue,
