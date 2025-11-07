@@ -1,8 +1,6 @@
 Features:
 - Task relationship queries and graphs
-- Sprints
 - Shell completion with install command
-- Git Hooks (e.g. for scanner)
 - Project members property (for auto fill in web interface)
 - Allow env override for all config values that are in all other chains
 - Publish to docker hub, homebrew, npm?, ...

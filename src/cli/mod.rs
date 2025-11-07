@@ -5,9 +5,10 @@ use clap::{Parser, Subcommand};
 pub mod args;
 pub use args::{
     AddArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
-    ConfigValidateArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, SprintAction,
-    SprintArgs, SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs, TaskAction,
-    TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    ConfigValidateArgs, GitAction, GitHooksAction, GitHooksInstallArgs, IndexAction, IndexArgs,
+    ScanArgs, ServeArgs, SortField, SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs,
+    SprintShowArgs, StatsArgs, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs,
+    TaskSearchArgs, TaskStatusArgs, parse_key_value,
 };
 pub mod preprocess;
 
@@ -161,6 +162,12 @@ pub enum Commands {
         /// Explain resolution chain and sources
         #[arg(long)]
         explain: bool,
+    },
+
+    /// Git integration helpers (hooks, status checks)
+    Git {
+        #[command(subcommand)]
+        action: GitAction,
     },
 }
 

@@ -54,6 +54,7 @@ lotar add "Environment task"  # Uses environment-configured directory
 - **config** - Comprehensive project configuration with templates, validation, and dry-run
 - **scan** - Find TODO comments in code
 - **serve** - Start web interface
+- **git** - Manage repository integrations (hooks)
 - **mcp** - Run JSON-RPC server (tools for tasks/projects/config)
 - **whoami** - Show resolved current user identity (with --explain)
 

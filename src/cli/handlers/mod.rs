@@ -15,6 +15,7 @@ pub mod comment;
 pub mod config_handler;
 pub mod duedate;
 pub mod effort;
+pub mod git;
 pub mod priority;
 pub mod scan_handler;
 pub mod serve_handler;
@@ -25,6 +26,7 @@ pub mod task;
 
 // Re-export handlers for easy access
 pub use config_handler::ConfigHandler;
+pub use git::GitHandler;
 pub use scan_handler::ScanHandler;
 pub use serve_handler::ServeHandler;
 pub use sprint::SprintHandler;

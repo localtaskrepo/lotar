@@ -11,8 +11,8 @@ use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
-    AddHandler, CommandHandler, ConfigHandler, ScanHandler, ServeHandler, SprintHandler,
-    StatsHandler, TaskHandler,
+    AddHandler, CommandHandler, ConfigHandler, GitHandler, ScanHandler, ServeHandler,
+    SprintHandler, StatsHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
 use lotar::cli::{Cli, Commands, TaskAction};
@@ -53,6 +53,7 @@ fn is_valid_command(command: &str) -> bool {
             | "sprint"
             | "changelog"
             | "mcp"
+            | "git"
     )
 }
 
@@ -79,7 +80,6 @@ fn main() {
             return;
         }
     }
-
     // Handle subcommand help (e.g., "lotar help add")
     if args.len() >= 3 && args[1] == "help" {
         let command = &args[2];
@@ -895,6 +895,20 @@ fn main() {
                 renderer.emit_error("Could not resolve current user");
                 renderer.log_info("END WHOAMI status=err");
                 Err("no-identity".to_string())
+            }
+        }
+        Commands::Git { action } => {
+            renderer.log_info("BEGIN GIT");
+            match GitHandler::execute(action, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END GIT status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END GIT status=err");
+                    Err(e)
+                }
             }
         }
     };

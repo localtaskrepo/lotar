@@ -1,5 +1,6 @@
 pub mod common;
 pub mod config;
+pub mod git;
 pub mod index;
 pub mod scan;
 pub mod serve;
@@ -13,6 +14,7 @@ pub use config::{
     ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
     ConfigValidateArgs,
 };
+pub use git::{GitAction, GitHooksAction, GitHooksInstallArgs};
 pub use index::{IndexAction, IndexArgs};
 pub use scan::ScanArgs;
 pub use serve::ServeArgs;
