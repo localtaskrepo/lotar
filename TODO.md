@@ -1,5 +1,6 @@
 Features:
 - Shell completion with install command
+- Refactor, cleanup, and reduce size. Check for package updates.
 - lotar config validate/normalize needs to be revisited
 - Allow env override for all config values that are in all other chains
 - Publish to docker hub, homebrew, npm?, ...

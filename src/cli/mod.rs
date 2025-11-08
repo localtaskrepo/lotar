@@ -4,11 +4,12 @@ use clap::{Parser, Subcommand};
 // CLI argument modules consolidated under cli/args
 pub mod args;
 pub use args::{
-    AddArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
-    ConfigValidateArgs, GitAction, GitHooksAction, GitHooksInstallArgs, IndexAction, IndexArgs,
-    ScanArgs, ServeArgs, SortField, SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs,
-    SprintShowArgs, StatsArgs, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs,
-    TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    AddArgs, CompletionShell, CompletionsAction, CompletionsArgs, ConfigAction, ConfigInitArgs,
+    ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs, ConfigValidateArgs, GitAction,
+    GitHooksAction, GitHooksInstallArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField,
+    SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs,
+    TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs,
+    parse_key_value,
 };
 pub mod preprocess;
 
@@ -124,13 +125,13 @@ pub enum Commands {
     #[command(alias = "tasks")]
     Task {
         #[command(subcommand)]
-        action: TaskAction,
+        action: Option<TaskAction>,
     },
 
     /// Configuration management (existing functionality)
     Config {
         #[command(subcommand)]
-        action: ConfigAction,
+        action: Option<ConfigAction>,
     },
 
     /// Scan source files for TODO comments (existing)
@@ -167,8 +168,11 @@ pub enum Commands {
     /// Git integration helpers (hooks, status checks)
     Git {
         #[command(subcommand)]
-        action: GitAction,
+        action: Option<GitAction>,
     },
+
+    /// Shell completions support
+    Completions(CompletionsArgs),
 }
 
 // AddArgs moved to args_task

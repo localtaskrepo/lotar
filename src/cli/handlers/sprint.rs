@@ -5,7 +5,7 @@ use crate::cli::args::sprint::{
     SprintShowArgs, SprintStartArgs, SprintStatsArgs, SprintSummaryArgs, SprintUpdateArgs,
     SprintVelocityArgs,
 };
-use crate::cli::handlers::CommandHandler;
+use crate::cli::handlers::{CommandHandler, emit_subcommand_overview};
 use crate::config::types::ResolvedConfig;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_analytics::{SprintDetail, SprintSummary};
@@ -65,7 +65,12 @@ impl CommandHandler for SprintHandler {
         renderer: &OutputRenderer,
     ) -> Self::Result {
         let tasks_root = resolver.path.clone();
-        match args.action {
+        let Some(action) = args.action else {
+            emit_subcommand_overview(renderer, &["sprint"]);
+            return Ok(());
+        };
+
+        match action {
             SprintAction::Create(create_args) => {
                 handle_create(create_args, tasks_root.clone(), renderer)
             }

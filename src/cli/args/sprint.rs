@@ -4,7 +4,7 @@ use clap::{Args, Subcommand};
 #[derive(Args, Debug)]
 pub struct SprintArgs {
     #[command(subcommand)]
-    pub action: SprintAction,
+    pub action: Option<SprintAction>,
 }
 
 #[derive(Subcommand, Debug)]

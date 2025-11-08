@@ -1,4 +1,4 @@
-use crate::cli::handlers::CommandHandler;
+use crate::cli::handlers::{CommandHandler, emit_subcommand_overview};
 use crate::cli::{GitAction, GitHooksAction, GitHooksInstallArgs};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::utils::git::find_repo_root;
@@ -12,7 +12,7 @@ use std::process::Command;
 pub struct GitHandler;
 
 impl CommandHandler for GitHandler {
-    type Args = GitAction;
+    type Args = Option<GitAction>;
     type Result = Result<(), String>;
 
     fn execute(
@@ -21,12 +21,24 @@ impl CommandHandler for GitHandler {
         _resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
-        match args {
-            GitAction::Hooks { action } => match action {
-                GitHooksAction::Install(install_args) => {
-                    Self::handle_hooks_install(install_args, renderer)
+        let Some(action) = args else {
+            emit_subcommand_overview(renderer, &["git"]);
+            return Ok(());
+        };
+
+        match action {
+            GitAction::Hooks { action } => {
+                let Some(hook_action) = action else {
+                    emit_subcommand_overview(renderer, &["git", "hooks"]);
+                    return Ok(());
+                };
+
+                match hook_action {
+                    GitHooksAction::Install(install_args) => {
+                        Self::handle_hooks_install(install_args, renderer)
+                    }
                 }
-            },
+            }
         }
     }
 }

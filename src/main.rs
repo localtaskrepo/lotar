@@ -11,8 +11,8 @@ use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
-    AddHandler, CommandHandler, ConfigHandler, GitHandler, ScanHandler, ServeHandler,
-    SprintHandler, StatsHandler, TaskHandler,
+    AddHandler, CommandHandler, CompletionsHandler, ConfigHandler, GitHandler, ScanHandler,
+    ServeHandler, SprintHandler, StatsHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
 use lotar::cli::{Cli, Commands, TaskAction};
@@ -54,6 +54,7 @@ fn is_valid_command(command: &str) -> bool {
             | "changelog"
             | "mcp"
             | "git"
+            | "completions"
     )
 }
 
@@ -175,7 +176,12 @@ fn main() {
         Commands::List(args) => {
             renderer.log_info("BEGIN LIST");
             let task_action = TaskAction::List(args);
-            match TaskHandler::execute(task_action, cli.project.as_deref(), &resolver, &renderer) {
+            match TaskHandler::execute(
+                Some(task_action),
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
                 Ok(()) => {
                     renderer.log_info("END LIST status=ok");
                     Ok(())
@@ -907,6 +913,20 @@ fn main() {
                 Err(e) => {
                     renderer.emit_error(&e);
                     renderer.log_info("END GIT status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Completions(args) => {
+            renderer.log_info("BEGIN COMPLETIONS");
+            match CompletionsHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END COMPLETIONS status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END COMPLETIONS status=err");
                     Err(e)
                 }
             }

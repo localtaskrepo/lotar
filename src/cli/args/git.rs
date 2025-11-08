@@ -6,7 +6,7 @@ pub enum GitAction {
     /// Manage git hook integration bundled with the repository.
     Hooks {
         #[command(subcommand)]
-        action: GitHooksAction,
+        action: Option<GitHooksAction>,
     },
 }
 

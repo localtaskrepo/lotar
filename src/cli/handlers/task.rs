@@ -4,7 +4,7 @@ use crate::cli::handlers::relationships::{
     RelationshipsArgs as RelationshipsHandlerArgs, RelationshipsHandler,
 };
 use crate::cli::handlers::status::{StatusArgs as StatusHandlerArgs, StatusHandler};
-use crate::cli::handlers::{AddHandler, CommandHandler};
+use crate::cli::handlers::{AddHandler, CommandHandler, emit_subcommand_overview};
 use crate::cli::handlers::{
     assignee::{AssigneeArgs, AssigneeHandler},
     duedate::{DueDateArgs, DueDateHandler},
@@ -21,7 +21,7 @@ use std::collections::HashSet;
 pub struct TaskHandler;
 
 impl CommandHandler for TaskHandler {
-    type Args = TaskAction;
+    type Args = Option<TaskAction>;
     type Result = Result<(), String>;
 
     fn execute(
@@ -30,7 +30,12 @@ impl CommandHandler for TaskHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &crate::output::OutputRenderer,
     ) -> Self::Result {
-        match args {
+        let Some(action) = args else {
+            emit_subcommand_overview(renderer, &["task"]);
+            return Ok(());
+        };
+
+        match action {
             TaskAction::Effort(effort_args) => {
                 let args = crate::cli::handlers::effort::EffortArgs {
                     task_id: effort_args.id,

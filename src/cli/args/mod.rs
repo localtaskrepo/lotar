@@ -1,4 +1,5 @@
 pub mod common;
+pub mod completions;
 pub mod config;
 pub mod git;
 pub mod index;
@@ -10,6 +11,7 @@ pub mod task;
 
 // Re-exports for ergonomic imports from crate::cli::args
 pub use common::parse_key_value;
+pub use completions::{CompletionShell, CompletionsAction, CompletionsArgs};
 pub use config::{
     ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs,
     ConfigValidateArgs,

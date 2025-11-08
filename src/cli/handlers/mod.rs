@@ -7,12 +7,14 @@ use crate::storage::{manager::Storage, task::Task};
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::utils::project::{generate_project_prefix, resolve_project_input};
 use crate::workspace::TasksDirectoryResolver;
+use clap::CommandFactory;
 use serde_json;
 use std::collections::HashSet;
 use std::io::Write;
 
 pub mod assignee;
 pub mod comment;
+pub mod completions;
 pub mod config_handler;
 pub mod duedate;
 pub mod effort;
@@ -27,6 +29,7 @@ pub mod status;
 pub mod task;
 
 // Re-export handlers for easy access
+pub use completions::CompletionsHandler;
 pub use config_handler::ConfigHandler;
 pub use git::GitHandler;
 pub use scan_handler::ScanHandler;
@@ -35,6 +38,41 @@ pub use sprint::SprintHandler;
 pub use stats_handler::StatsHandler;
 pub use task::TaskHandler;
 // effort handler re-export not strictly needed, used via module path in task
+
+pub(crate) fn emit_subcommand_overview(renderer: &OutputRenderer, command_path: &[&str]) {
+    let display = command_path.join(" ");
+    match collect_subcommand_names(command_path) {
+        Some(names) if !names.is_empty() => {
+            renderer.emit_notice(&format!(
+                "Available {} subcommands: {}",
+                display,
+                names.join(", ")
+            ));
+        }
+        _ => {
+            renderer.emit_notice(&format!("No subcommands registered for {}.", display));
+        }
+    }
+    renderer.emit_info(&format!("Run `lotar help {}` for usage details.", display));
+}
+
+fn collect_subcommand_names(path: &[&str]) -> Option<Vec<String>> {
+    let mut command = crate::cli::Cli::command();
+
+    for segment in path {
+        let next = command
+            .get_subcommands()
+            .find(|sub| sub.get_name() == *segment)
+            .cloned()?;
+        command = next;
+    }
+
+    let names: Vec<String> = command
+        .get_subcommands()
+        .map(|sub| sub.get_name().to_string())
+        .collect();
+    Some(names)
+}
 
 /// Trait for command handlers
 pub trait CommandHandler {

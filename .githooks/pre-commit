@@ -87,26 +87,48 @@ fi
 # 4. Quick tests (nextest)
 echo "🧪 Running tests (nextest)..."
 if command -v cargo-nextest >/dev/null 2>&1; then
-    # Match CI flags for parity: all features, immediate failure output, no retries,
-    # and only lib/bin targets (doc tests are handled separately in pre-push)
-    if timeout 120 cargo nextest run --all-features >/dev/null 2>&1; then
+    tmp_nextest=$(mktemp -t lotar-nextest.XXXXXX)
+    trap 'rm -f "$tmp_nextest"' EXIT
+    if timeout 120 cargo nextest run --all-features --failure-output immediate --status-level fail >"$tmp_nextest" 2>&1; then
         echo "✅ Tests OK"
+        rm -f "$tmp_nextest"
+        trap - EXIT
     elif [ $? -eq 124 ]; then
         echo "❌ Tests timed out"
+        echo "--- cargo nextest output ---"
+        cat "$tmp_nextest"
+        rm -f "$tmp_nextest"
+        trap - EXIT
         exit 1
     else
         echo "❌ Tests failed"
+        echo "--- cargo nextest output ---"
+        cat "$tmp_nextest"
+        rm -f "$tmp_nextest"
+        trap - EXIT
         exit 1
     fi
 else
     echo "⚠️  cargo-nextest not installed; falling back to cargo test"
-    if timeout 120 cargo test --all-features >/dev/null 2>&1; then
+    tmp_cargotest=$(mktemp -t lotar-cargotest.XXXXXX)
+    trap 'rm -f "$tmp_cargotest"' EXIT
+    if timeout 120 cargo test --all-features >"$tmp_cargotest" 2>&1; then
         echo "✅ Tests OK"
+        rm -f "$tmp_cargotest"
+        trap - EXIT
     elif [ $? -eq 124 ]; then
         echo "❌ Tests timed out"
+        echo "--- cargo test output ---"
+        cat "$tmp_cargotest"
+        rm -f "$tmp_cargotest"
+        trap - EXIT
         exit 1
     else
         echo "❌ Tests failed"
+        echo "--- cargo test output ---"
+        cat "$tmp_cargotest"
+        rm -f "$tmp_cargotest"
+        trap - EXIT
         exit 1
     fi
 fi

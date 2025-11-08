@@ -1,4 +1,4 @@
-use crate::cli::handlers::CommandHandler;
+use crate::cli::handlers::{CommandHandler, emit_subcommand_overview};
 use crate::cli::{ConfigAction, ConfigNormalizeArgs, ConfigShowArgs, ConfigValidateArgs};
 use crate::config::ConfigManager;
 use crate::output::OutputRenderer;
@@ -37,7 +37,7 @@ impl<'a> YamlRenderOptions<'a> {
 pub struct ConfigHandler;
 
 impl CommandHandler for ConfigHandler {
-    type Args = ConfigAction;
+    type Args = Option<ConfigAction>;
     type Result = Result<(), String>;
 
     fn execute(
@@ -46,7 +46,12 @@ impl CommandHandler for ConfigHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
-        match args {
+        let Some(action) = args else {
+            emit_subcommand_overview(renderer, &["config"]);
+            return Ok(());
+        };
+
+        match action {
             ConfigAction::Show(ConfigShowArgs {
                 project,
                 explain,
