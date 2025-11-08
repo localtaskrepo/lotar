@@ -24,6 +24,6 @@ pub use sprint::{
 };
 pub use stats::{StatsAction, StatsArgs};
 pub use task::{
-    AddArgs, SortField, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs,
-    TaskStatusArgs,
+    AddArgs, RelationshipKind, SortField, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs,
+    TaskRelationshipsArgs, TaskSearchArgs, TaskStatusArgs,
 };

@@ -73,6 +73,14 @@ lotar task assignee <TASK_ID> [NEW_ASSIGNEE]
 lotar task due-date <TASK_ID> [NEW_DATE]
 ```
 
+### relationships
+Show parent, child, dependency, and related links for a task. Repeat `--kind` to focus on specific relationship types.
+
+```bash
+lotar task relationships <TASK_ID> [--kind <TYPE>...]
+# Valid kinds: depends-on, blocks, related, parent, children, fixes, duplicate-of
+```
+
 ### effort
 Change or view task effort (also available as a top-level command `lotar effort`).
 

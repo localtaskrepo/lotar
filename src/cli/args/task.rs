@@ -15,6 +15,43 @@ pub enum SortField {
     Status,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum, Deserialize)]
+pub enum RelationshipKind {
+    DependsOn,
+    Blocks,
+    Related,
+    Parent,
+    Children,
+    Fixes,
+    DuplicateOf,
+}
+
+impl RelationshipKind {
+    pub fn as_kebab(self) -> &'static str {
+        match self {
+            RelationshipKind::DependsOn => "depends-on",
+            RelationshipKind::Blocks => "blocks",
+            RelationshipKind::Related => "related",
+            RelationshipKind::Parent => "parent",
+            RelationshipKind::Children => "children",
+            RelationshipKind::Fixes => "fixes",
+            RelationshipKind::DuplicateOf => "duplicate-of",
+        }
+    }
+
+    pub fn as_snake(self) -> &'static str {
+        match self {
+            RelationshipKind::DependsOn => "depends_on",
+            RelationshipKind::Blocks => "blocks",
+            RelationshipKind::Related => "related",
+            RelationshipKind::Parent => "parent",
+            RelationshipKind::Children => "children",
+            RelationshipKind::Fixes => "fixes",
+            RelationshipKind::DuplicateOf => "duplicate_of",
+        }
+    }
+}
+
 // ...existing code...
 
 // Custom deserializer for fields: support {k:v}, ["k=v"], [["k","v"]]
@@ -200,6 +237,8 @@ pub enum TaskAction {
         /// New due date (YYYY-MM-DD or relative like 'tomorrow'). If omitted, shows current due date.
         due_date: Option<String>,
     },
+    /// Show relationships for a task
+    Relationships(TaskRelationshipsArgs),
     /// Delete a task
     Delete(TaskDeleteArgs),
 
@@ -258,6 +297,17 @@ pub enum TaskAction {
         #[arg(short = 'F', long = "file")]
         file: Option<String>,
     },
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskRelationshipsArgs {
+    /// Task ID (with or without project prefix)
+    pub id: String,
+
+    /// Filter by relationship kind (repeat to include multiple)
+    #[arg(long = "kind", value_enum)]
+    #[serde(default)]
+    pub kinds: Vec<RelationshipKind>,
 }
 
 #[derive(Args, Debug)]

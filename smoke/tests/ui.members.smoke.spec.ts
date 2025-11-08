@@ -225,8 +225,8 @@ describe('UI strict member smoke scenarios', () => {
             const members = Array.isArray(projectConfig?.members)
                 ? (projectConfig.members as string[])
                 : Array.isArray(projectConfig?.default?.members)
-                ? (projectConfig.default.members as string[])
-                : [];
+                    ? (projectConfig.default.members as string[])
+                    : [];
             expect(members).toContain('allowed@example.com');
             expect(members).toContain('ui-autopop@example.com');
         } finally {

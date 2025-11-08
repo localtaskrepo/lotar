@@ -18,6 +18,7 @@ pub mod duedate;
 pub mod effort;
 pub mod git;
 pub mod priority;
+pub mod relationships;
 pub mod scan_handler;
 pub mod serve_handler;
 pub mod sprint;

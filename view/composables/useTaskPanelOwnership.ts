@@ -125,8 +125,10 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     function syncAssigneeControl() {
         const value = options.form.assignee?.trim() || ''
         if (!value) {
-            assigneeMode.value = 'select'
-            assigneeCustom.value = ''
+            if (assigneeMode.value !== 'custom') {
+                assigneeMode.value = 'select'
+                assigneeCustom.value = ''
+            }
             return
         }
         if (orderedKnownUsers.value.includes(value)) {
@@ -141,8 +143,10 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
     function syncReporterControl() {
         const value = options.form.reporter?.trim() || ''
         if (!value) {
-            reporterMode.value = 'select'
-            reporterCustom.value = ''
+            if (reporterMode.value !== 'custom') {
+                reporterMode.value = 'select'
+                reporterCustom.value = ''
+            }
             return
         }
         if (orderedKnownUsers.value.includes(value)) {

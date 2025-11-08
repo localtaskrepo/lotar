@@ -1,5 +1,8 @@
 use crate::cli::handlers::comment::{CommentArgs, CommentHandler};
 use crate::cli::handlers::priority::{PriorityArgs, PriorityHandler};
+use crate::cli::handlers::relationships::{
+    RelationshipsArgs as RelationshipsHandlerArgs, RelationshipsHandler,
+};
 use crate::cli::handlers::status::{StatusArgs as StatusHandlerArgs, StatusHandler};
 use crate::cli::handlers::{AddHandler, CommandHandler};
 use crate::cli::handlers::{
@@ -492,6 +495,14 @@ impl CommandHandler for TaskHandler {
                     new_due_date: due_date,
                 };
                 DueDateHandler::execute(args, project, resolver, renderer)
+            }
+            TaskAction::Relationships(rel_args) => {
+                let handler_args = RelationshipsHandlerArgs {
+                    task_id: rel_args.id,
+                    kinds: rel_args.kinds,
+                    explicit_project: project.map(|s| s.to_string()),
+                };
+                RelationshipsHandler::execute(handler_args, project, resolver, renderer)
             }
             TaskAction::Delete(delete_args) => {
                 DeleteHandler::execute(delete_args, project, resolver, renderer)
