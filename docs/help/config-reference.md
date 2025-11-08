@@ -13,6 +13,8 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - default.priority: enum Priority
 - default.status: enum TaskStatus
 - default.tags: string[]
+- default.strict_members: boolean (default false)
+- members: string[]
 - issue.states: string[] (e.g., [Todo, InProgress, Done])
 - issue.types: string[] (feature, bug, epic, spike, chore)
 - issue.priorities: string[] (Low, Medium, High, Critical)
@@ -32,6 +34,7 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - auto.branch_infer_type: boolean (default true)
 - auto.branch_infer_status: boolean (default true)
 - auto.branch_infer_priority: boolean (default true)
+- auto.populate_members: boolean (default true)
 
 ## Home and Project keys
 Same shape as global; project values override global for that project. Use `project.name` for an optional human-readable label (the folder name remains the canonical identifier).

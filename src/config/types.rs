@@ -140,6 +140,12 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_reporter: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub members: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub strict_members: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_populate_members: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_tags: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub default_priority: Option<Priority>,
@@ -183,6 +189,9 @@ impl ProjectConfig {
             tags: None,
             default_assignee: None,
             default_reporter: None,
+            members: None,
+            strict_members: None,
+            auto_populate_members: None,
             default_tags: None,
             default_priority: None,
             default_status: None,
@@ -224,6 +233,12 @@ pub struct GlobalConfig {
     pub default_reporter: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub default_tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<String>,
+    #[serde(default)]
+    pub strict_members: bool,
+    #[serde(default = "default_true")]
+    pub auto_populate_members: bool,
     #[serde(default = "default_true")]
     pub auto_set_reporter: bool,
     #[serde(default = "default_true")]
@@ -287,6 +302,9 @@ pub struct ResolvedConfig {
     pub default_assignee: Option<String>,
     pub default_reporter: Option<String>,
     pub default_tags: Vec<String>,
+    pub members: Vec<String>,
+    pub strict_members: bool,
+    pub auto_populate_members: bool,
     pub auto_set_reporter: bool,
     pub auto_assign_on_status: bool,
     pub auto_codeowners_assign: bool,
@@ -451,6 +469,9 @@ impl Default for GlobalConfig {
             default_assignee: None,
             default_reporter: None,
             default_tags: Vec::new(),
+            members: Vec::new(),
+            strict_members: false,
+            auto_populate_members: true,
             auto_set_reporter: true,
             auto_assign_on_status: true,
             auto_codeowners_assign: true,

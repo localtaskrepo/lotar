@@ -99,22 +99,34 @@ pub fn generate_unique_project_prefix(
 
     // 3. Check if our generated prefix matches an existing prefix for a different project
     if existing_prefixes.contains(&generated_prefix) {
-        // Find which project uses this prefix
+        let mut conflict: Option<String> = None;
+
         for (existing_project_name, existing_prefix) in &existing_projects {
-            if existing_prefix == &generated_prefix && existing_project_name != project_name {
-                return Err(format!(
-                    "Cannot create project '{}' with prefix '{}': This prefix is already used by project '{}'. Choose a different project name or use explicit --prefix argument.",
-                    project_name, generated_prefix, existing_project_name
-                ));
+            if existing_prefix == &generated_prefix {
+                if existing_project_name.eq_ignore_ascii_case(project_name) {
+                    conflict = Some(format!(
+                        "Cannot create project '{}' with prefix '{}': This prefix is already in use. Choose a different project name or use explicit --prefix argument.",
+                        project_name, generated_prefix
+                    ));
+                    break;
+                }
+
+                if !existing_project_name.eq_ignore_ascii_case(&generated_prefix) {
+                    conflict = Some(format!(
+                        "Cannot create project '{}' with prefix '{}': This prefix is already used by project '{}'. Choose a different project name or use explicit --prefix argument.",
+                        project_name, generated_prefix, existing_project_name
+                    ));
+                    break;
+                }
+                // Placeholder config (project name equals prefix) – allow caller to reuse.
             }
         }
 
-        // If we reach here, the prefix exists but we couldn't find the project name
-        // This could happen if the config file is missing or malformed
-        return Err(format!(
-            "Cannot create project '{}' with prefix '{}': This prefix is already in use. Choose a different project name or use explicit --prefix argument.",
-            project_name, generated_prefix
-        ));
+        if let Some(message) = conflict {
+            return Err(message);
+        }
+
+        return Ok(generated_prefix);
     }
 
     // No conflicts detected

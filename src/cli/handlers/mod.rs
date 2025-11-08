@@ -8,6 +8,7 @@ use crate::types::{Priority, TaskStatus, TaskType};
 use crate::utils::project::{generate_project_prefix, resolve_project_input};
 use crate::workspace::TasksDirectoryResolver;
 use serde_json;
+use std::collections::HashSet;
 use std::io::Write;
 
 pub mod assignee;
@@ -82,7 +83,7 @@ impl CommandHandler for AddHandler {
         };
 
         // Get appropriate configuration (project-specific or global)
-        let config = match &effective_project {
+        let mut config = match &effective_project {
             Some(project_name) => project_resolver
                 .get_project_config(project_name)
                 .map_err(|e| format!("Failed to get project configuration: {}", e))?,
@@ -91,6 +92,8 @@ impl CommandHandler for AddHandler {
                 project_resolver.get_config().clone()
             }
         };
+
+        let autop_members_enabled = config.auto_populate_members;
 
         let validator = CliValidator::new(&config);
         renderer.log_debug("add: arguments validated and normalized");
@@ -147,13 +150,26 @@ impl CommandHandler for AddHandler {
 
         // Validate assignee if provided
         let validated_assignee = if let Some(ref assignee) = args.assignee {
-            Some(
-                validator
-                    .validate_assignee(assignee)
-                    .map_err(|e| format!("Assignee validation failed: {}", e))?,
-            )
+            let result = if autop_members_enabled {
+                validator.validate_assignee_allow_unknown(assignee)
+            } else {
+                validator.validate_assignee(assignee)
+            };
+            Some(result.map_err(|e| format!("Assignee validation failed: {}", e))?)
         } else {
             config.default_assignee.clone()
+        };
+
+        // Validate reporter if provided
+        let explicit_reporter = if let Some(ref reporter) = args.reporter {
+            let result = if autop_members_enabled {
+                validator.validate_reporter_allow_unknown(reporter)
+            } else {
+                validator.validate_reporter(reporter)
+            };
+            Some(result.map_err(|e| format!("Reporter validation failed: {}", e))?)
+        } else {
+            None
         };
 
         // Validate due date if provided
@@ -249,8 +265,10 @@ impl CommandHandler for AddHandler {
         task.description = args.description;
         task.tags = validated_tags;
 
-        // Determine reporter using config defaults and identity detection when enabled
-        task.reporter = if config.auto_set_reporter {
+        // Determine reporter using explicit argument first, then config defaults and identity detection
+        task.reporter = if let Some(reporter) = explicit_reporter {
+            crate::utils::identity::resolve_me_alias(&reporter, Some(resolver.path.as_path()))
+        } else if config.auto_set_reporter {
             let from_config = config.default_reporter.as_deref().and_then(|raw| {
                 let trimmed = raw.trim();
                 if trimmed.is_empty() {
@@ -281,20 +299,12 @@ impl CommandHandler for AddHandler {
             );
         }
 
-        // Save the task
-        // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
+        #[allow(clippy::drop_non_drop)]
+        drop(validator);
+
+        // Determine storage roots and project identifiers prior to any mutation of the config
         let write_root = resolver.path.clone();
 
-        let mut storage = if let Some(project_name) = effective_project.as_deref() {
-            // Use project context for smart global config creation
-            Storage::new_with_context(write_root, Some(project_name))
-        } else {
-            // Try to auto-detect project context for smart global config
-            let context = crate::project::detect_project_name();
-            Storage::new_with_context(write_root, context.as_deref())
-        };
-
-        // Use resolved project prefix, not the raw project name
         let detected_name = if project.is_none() {
             // Only detect project name if user didn't explicitly specify one
             crate::project::detect_project_name()
@@ -305,11 +315,11 @@ impl CommandHandler for AddHandler {
         let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
             // If we have an explicit project from command line, resolve it to its prefix
             let prefix = resolve_project_input(explicit_project, resolver.path.as_path());
-            (prefix, Some(explicit_project))
+            (prefix, Some(explicit_project.to_string()))
         } else if let Some(ref detected) = detected_name {
-            // Auto-detected project name - generate prefix but use original name for config
+            // Auto-detected project name - generate prefix but keep the human-readable name for config creation
             let prefix = generate_project_prefix(detected);
-            (prefix, Some(detected.as_str()))
+            (prefix, Some(detected.clone()))
         } else {
             // Fall back to effective project logic (from global config default)
             let prefix = if let Some(project) = effective_project.as_deref() {
@@ -320,6 +330,92 @@ impl CommandHandler for AddHandler {
             (prefix, None)
         };
 
+        if autop_members_enabled {
+            let mut pending: Vec<String> = Vec::new();
+            let mut seen: HashSet<String> = HashSet::new();
+
+            let mut consider = |value: Option<&String>| {
+                if let Some(raw) = value {
+                    let trimmed = raw.trim();
+                    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("@me") {
+                        return;
+                    }
+                    let lower = trimmed.to_ascii_lowercase();
+                    if !seen.insert(lower) {
+                        return;
+                    }
+                    if !config
+                        .members
+                        .iter()
+                        .any(|existing| existing.eq_ignore_ascii_case(trimmed))
+                    {
+                        pending.push(trimmed.to_string());
+                    }
+                }
+            };
+
+            consider(task.reporter.as_ref());
+            consider(task.assignee.as_ref());
+
+            if !pending.is_empty() {
+                if args.dry_run || project_for_storage.trim().is_empty() {
+                    let mut merged = config.members.clone();
+                    for candidate in pending.iter() {
+                        if !merged
+                            .iter()
+                            .any(|existing| existing.eq_ignore_ascii_case(candidate))
+                        {
+                            merged.push(candidate.clone());
+                        }
+                    }
+                    merged.sort_by_key(|a| a.to_ascii_lowercase());
+                    config.members = merged;
+                } else {
+                    match crate::config::operations::auto_populate_project_members(
+                        resolver.path.as_path(),
+                        &project_for_storage,
+                        &config.members,
+                        &pending,
+                    ) {
+                        Ok(Some(updated)) => {
+                            config.members = updated;
+                        }
+                        Ok(None) => {}
+                        Err(err) => {
+                            return Err(format!(
+                                "Failed to auto-populate project members: {}",
+                                err
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        let validator = CliValidator::new(&config);
+        validator
+            .ensure_task_membership(&task)
+            .map_err(|e| format!("Member validation failed: {}", e))?;
+
+        // Save the task
+        // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
+
+        let global_context = original_project_name
+            .as_deref()
+            .or(effective_project.as_deref())
+            .map(|name| name.trim())
+            .filter(|name| !name.is_empty());
+
+        let mut storage = if let Some(context) = global_context {
+            // Prefer the human-readable project name for smart default prefix generation
+            Storage::new_with_context(write_root, Some(context))
+        } else {
+            // Fall back to environment/project detection heuristics when no context is available
+            let context = crate::project::detect_project_name();
+            Storage::new_with_context(write_root, context.as_deref())
+        };
+
+        // Use resolved project prefix, not the raw project name
         if args.dry_run {
             // Preview without saving
             match renderer.format {
@@ -388,7 +484,11 @@ impl CommandHandler for AddHandler {
                 project_for_storage, original_project_name
             );
         }
-        let task_id = storage.add(&task, &project_for_storage, original_project_name);
+        let task_id = storage.add(
+            &task,
+            &project_for_storage,
+            original_project_name.as_deref(),
+        );
         renderer.log_info(&format!("add: created id={}", task_id));
 
         Ok(task_id)

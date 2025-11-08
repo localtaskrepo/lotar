@@ -15,7 +15,7 @@ lotar add "Task title" [OPTIONS]
 lotar add "Implement user authentication"
 
 # Feature with details
-lotar add "Add OAuth support" --type=feature -P high --assignee=john.doe
+lotar add "Add OAuth support" --type=feature -P high --reporter=lead@example.com --assignee=john.doe
 
 # Bug with due date
 lotar add "Fix login crash" --type=bug -P critical --due=tomorrow
@@ -36,6 +36,7 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 ### Core Properties
 - `--type <TYPE>` - Task type: feature, bug, epic, spike, chore
 - `--priority <PRIORITY>`, `-P <PRIORITY>` - Priority: low, medium, high, critical
+- `--reporter <REPORTER>`, `-R <REPORTER>` - Reporter identity (email or @username). Supports `@me` to resolve to your identity.
 - `--assignee <ASSIGNEE>` - Task assignee (email or @username). Supports `@me` to resolve to your identity.
 
 ### Scheduling
@@ -72,6 +73,8 @@ lotar add "Environment task" --project=myapp  # Uses environment directory
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity when not provided
 
 Reporter auto-set is driven by configuration: set `default_reporter` and ensure `auto.set_reporter: true` (default). The environment variable can provide a default reporter value.
+
+Providing `--reporter` overrides all defaults (including `LOTAR_DEFAULT_REPORTER`) after validation.
 
 Notes:
 - `@me` resolution order: config.default_reporter (merged with precedence) → git user.name/email → $USER/$USERNAME.

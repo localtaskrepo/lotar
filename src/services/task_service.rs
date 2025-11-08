@@ -48,7 +48,7 @@ impl TaskService {
             generate_project_prefix(&repo_name)
         });
 
-        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
+        let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
 
         let resolved_priority = priority
             .or_else(|| crate::utils::task_intel::infer_priority_from_branch(&config))
@@ -151,6 +151,9 @@ impl TaskService {
         }
 
         Self::ensure_task_defaults(&mut t, &config);
+        config =
+            Self::maybe_auto_populate_members(storage.root_path.as_path(), &project, &t, config)?;
+        Self::enforce_membership(&t, &config, &project)?;
 
         let id = storage.add(&t, &project, None);
         if !normalized_sprints.is_empty() {
@@ -182,7 +185,7 @@ impl TaskService {
             .get(id, derived.to_string())
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
         let mut t = existing.clone();
-        let config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
+        let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
         let mut changes: Vec<TaskChange> = Vec::new();
         let mut record_change = |field: &str, old: Option<String>, new: Option<String>| {
             if old != new {
@@ -344,6 +347,9 @@ impl TaskService {
         }
 
         Self::ensure_task_defaults(&mut t, &config);
+        config =
+            Self::maybe_auto_populate_members(storage.root_path.as_path(), derived, &t, config)?;
+        Self::enforce_membership(&t, &config, derived)?;
 
         t.sprints.clear();
 
@@ -494,6 +500,73 @@ impl TaskService {
         normalized.into_iter().collect()
     }
 
+    fn maybe_auto_populate_members(
+        tasks_root: &Path,
+        project: &str,
+        task: &Task,
+        mut config: ResolvedConfig,
+    ) -> LoTaRResult<ResolvedConfig> {
+        if project.trim().is_empty() || !config.auto_populate_members {
+            return Ok(config);
+        }
+
+        let mut candidates: Vec<String> = Vec::new();
+        if let Some(reporter) = task.reporter.as_deref() {
+            let trimmed = reporter.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+                candidates.push(trimmed.to_string());
+            }
+        }
+        if let Some(assignee) = task.assignee.as_deref() {
+            let trimmed = assignee.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+                candidates.push(trimmed.to_string());
+            }
+        }
+
+        if candidates.is_empty() {
+            return Ok(config);
+        }
+
+        let mut missing: Vec<String> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+
+        for candidate in candidates {
+            let lower = candidate.to_ascii_lowercase();
+            if !seen.insert(lower.clone()) {
+                continue;
+            }
+            let already_present = config
+                .members
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(&candidate));
+            if !already_present {
+                missing.push(candidate);
+            }
+        }
+
+        if missing.is_empty() {
+            return Ok(config);
+        }
+
+        match crate::config::operations::auto_populate_project_members(
+            tasks_root,
+            project,
+            &config.members,
+            &missing,
+        ) {
+            Ok(Some(updated)) => {
+                config.members = updated;
+                Ok(config)
+            }
+            Ok(None) => Ok(config),
+            Err(err) => Err(LoTaRError::ValidationError(format!(
+                "Failed to auto-populate members for project '{}': {}",
+                project, err
+            ))),
+        }
+    }
+
     pub(crate) fn apply_memberships_to_records(
         records: &mut [SprintRecord],
         task_id: &str,
@@ -592,5 +665,72 @@ impl TaskService {
         if task.tags.is_empty() && !config.default_tags.is_empty() {
             task.tags = config.default_tags.clone();
         }
+    }
+
+    fn enforce_membership(task: &Task, config: &ResolvedConfig, project: &str) -> LoTaRResult<()> {
+        if !config.strict_members {
+            return Ok(());
+        }
+
+        let allowed: Vec<String> = config
+            .members
+            .iter()
+            .map(|member| member.trim().to_string())
+            .filter(|member| !member.is_empty())
+            .collect();
+
+        if allowed.is_empty() {
+            return Err(LoTaRError::ValidationError(format!(
+                "Strict members are enabled for project '{}' but no members are configured. Add entries under members or disable strict_members.",
+                project
+            )));
+        }
+
+        if let Some(reporter) = task.reporter.as_deref() {
+            Self::enforce_member_value("Reporter", reporter, &allowed, project)?;
+        }
+
+        if let Some(assignee) = task.assignee.as_deref() {
+            Self::enforce_member_value("Assignee", assignee, &allowed, project)?;
+        }
+
+        Ok(())
+    }
+
+    fn enforce_member_value(
+        field_label: &str,
+        value: &str,
+        allowed: &[String],
+        project: &str,
+    ) -> LoTaRResult<()> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Ok(());
+        }
+
+        let normalized = trimmed.to_ascii_lowercase();
+        let permitted = allowed
+            .iter()
+            .any(|candidate| candidate.to_ascii_lowercase() == normalized);
+
+        if permitted {
+            return Ok(());
+        }
+
+        let preview_count = allowed.len();
+        let preview = if preview_count <= 10 {
+            allowed.join(", ")
+        } else {
+            format!(
+                "{} ... (+{} more)",
+                allowed[..10].join(", "),
+                preview_count - 10
+            )
+        };
+
+        Err(LoTaRError::ValidationError(format!(
+            "{} '{}' is not in configured members for project '{}'. Allowed members: {}.",
+            field_label, trimmed, project, preview
+        )))
     }
 }

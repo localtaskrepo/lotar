@@ -12,6 +12,7 @@ use crate::cli::{TaskAction, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs};
 use crate::storage::{TaskFilter, manager::Storage, task::Task};
 use crate::utils::project::resolve_project_input;
 use crate::workspace::TasksDirectoryResolver;
+use std::collections::HashSet;
 
 /// Handler for all task subcommands
 pub struct TaskHandler;
@@ -44,6 +45,7 @@ impl CommandHandler for TaskHandler {
                     title: add_args.title,
                     task_type: add_args.task_type,
                     priority: add_args.priority,
+                    reporter: add_args.reporter,
                     assignee: add_args.assignee,
                     effort: add_args.effort,
                     due: add_args.due,
@@ -574,7 +576,7 @@ impl CommandHandler for EditHandler {
         };
 
         // Get appropriate configuration (project-specific or global)
-        let config = match &effective_project {
+        let mut config = match &effective_project {
             Some(project_name) => project_resolver
                 .get_project_config(project_name)
                 .map_err(|e| format!("Failed to get project configuration: {}", e))?,
@@ -585,6 +587,7 @@ impl CommandHandler for EditHandler {
         };
 
         let validator = CliValidator::new(&config);
+        let autop_members_enabled = config.auto_populate_members;
 
         // Resolve project prefix for loading
         let project_prefix = if let Some(project) = project {
@@ -615,8 +618,42 @@ impl CommandHandler for EditHandler {
                 .map_err(|e| format!("Priority validation failed: {}", e))?;
         }
 
+        if let Some(reporter) = args.reporter {
+            let trimmed = reporter.trim();
+            if trimmed.is_empty() {
+                task.reporter = None;
+            } else {
+                let validation = if autop_members_enabled {
+                    validator.validate_reporter_allow_unknown(trimmed)
+                } else {
+                    validator.validate_reporter(trimmed)
+                };
+                let validated =
+                    validation.map_err(|e| format!("Reporter validation failed: {}", e))?;
+                task.reporter = crate::utils::identity::resolve_me_alias(
+                    &validated,
+                    Some(resolver.path.as_path()),
+                );
+            }
+        }
+
         if let Some(assignee) = args.assignee {
-            task.assignee = Some(assignee);
+            let trimmed = assignee.trim();
+            if trimmed.is_empty() {
+                task.assignee = None;
+            } else {
+                let validation = if autop_members_enabled {
+                    validator.validate_assignee_allow_unknown(trimmed)
+                } else {
+                    validator.validate_assignee(trimmed)
+                };
+                let validated =
+                    validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
+                task.assignee = crate::utils::identity::resolve_me_alias(
+                    &validated,
+                    Some(resolver.path.as_path()),
+                );
+            }
         }
 
         if let Some(effort) = args.effort {
@@ -656,6 +693,76 @@ impl CommandHandler for EditHandler {
             task.custom_fields
                 .insert(key, crate::types::custom_value_string(value));
         }
+
+        #[allow(clippy::drop_non_drop)]
+        drop(validator);
+
+        if autop_members_enabled {
+            let mut pending: Vec<String> = Vec::new();
+            let mut seen: HashSet<String> = HashSet::new();
+
+            let mut consider = |value: Option<&String>| {
+                if let Some(raw) = value {
+                    let trimmed = raw.trim();
+                    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("@me") {
+                        return;
+                    }
+                    let lower = trimmed.to_ascii_lowercase();
+                    if !seen.insert(lower) {
+                        return;
+                    }
+                    if !config
+                        .members
+                        .iter()
+                        .any(|existing| existing.eq_ignore_ascii_case(trimmed))
+                    {
+                        pending.push(trimmed.to_string());
+                    }
+                }
+            };
+
+            consider(task.reporter.as_ref());
+            consider(task.assignee.as_ref());
+
+            if !pending.is_empty() {
+                if args.dry_run || project_prefix.trim().is_empty() {
+                    let mut merged = config.members.clone();
+                    for candidate in pending.iter() {
+                        if !merged
+                            .iter()
+                            .any(|existing| existing.eq_ignore_ascii_case(candidate))
+                        {
+                            merged.push(candidate.clone());
+                        }
+                    }
+                    merged.sort_by_key(|a| a.to_ascii_lowercase());
+                    config.members = merged;
+                } else {
+                    match crate::config::operations::auto_populate_project_members(
+                        resolver.path.as_path(),
+                        &project_prefix,
+                        &config.members,
+                        &pending,
+                    ) {
+                        Ok(Some(updated)) => {
+                            config.members = updated;
+                        }
+                        Ok(None) => {}
+                        Err(err) => {
+                            return Err(format!(
+                                "Failed to auto-populate project members: {}",
+                                err
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        let validator = CliValidator::new(&config);
+        validator
+            .ensure_task_membership(&task)
+            .map_err(|e| format!("Member validation failed: {}", e))?;
 
         if args.dry_run {
             match renderer.format {

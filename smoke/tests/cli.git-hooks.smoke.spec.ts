@@ -1,6 +1,6 @@
 import fs from 'fs-extra';
-import path from 'node:path';
 import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 

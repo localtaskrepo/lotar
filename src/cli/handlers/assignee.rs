@@ -52,6 +52,7 @@ impl CommandHandler for AssigneeHandler {
         // Config for validation
         let config = project_resolver.get_config();
         let validator = CliValidator::new(config);
+        let autop_members_enabled = config.auto_populate_members;
 
         // Open storage (read-only for get, read-write for set)
         let mut storage = match Storage::try_open(resolver.path.clone()) {
@@ -88,9 +89,13 @@ impl CommandHandler for AssigneeHandler {
             // Set new assignee
             Some(new_val) => {
                 // Validate format (emails, @username, @me)
-                let validated = validator
-                    .validate_assignee(&new_val)
-                    .map_err(|e| format!("Assignee validation failed: {}", e))?;
+                let validation = if autop_members_enabled {
+                    validator.validate_assignee_allow_unknown(&new_val)
+                } else {
+                    validator.validate_assignee(&new_val)
+                };
+                let validated =
+                    validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
 
                 let old = task.assignee.clone();
                 // Persist via service so @me is resolved consistently

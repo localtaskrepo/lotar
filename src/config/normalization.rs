@@ -236,6 +236,22 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
             cfg.default_tags = list;
         }
     }
+    if let Some(v) = get_path(&data, &["members"])
+        .cloned()
+        .or_else(|| get_path(&data, &["default", "members"]).cloned())
+    {
+        if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v) {
+            let members: Vec<String> = list
+                .into_iter()
+                .map(|entry| entry.trim().to_string())
+                .filter(|entry| !entry.is_empty())
+                .collect();
+            cfg.members = members;
+        }
+    }
+    if let Some(v) = get_path(&data, &["default", "strict_members"]).and_then(cast::<bool>) {
+        cfg.strict_members = v;
+    }
     if let Some(v) = get_path(&data, &["default", "priority"]).and_then(cast) {
         cfg.default_priority = v;
     }
@@ -362,6 +378,9 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     if let Some(v) = get_path(&data, &["auto", "assign_on_status"]).and_then(cast::<bool>) {
         cfg.auto_assign_on_status = v;
     }
+    if let Some(v) = get_path(&data, &["auto", "populate_members"]).and_then(cast::<bool>) {
+        cfg.auto_populate_members = v;
+    }
     if let Some(v) = get_path(&data, &["auto", "codeowners_assign"]).and_then(cast::<bool>) {
         cfg.auto_codeowners_assign = v;
     }
@@ -431,6 +450,22 @@ pub fn parse_project_from_yaml_str(
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
         cfg.default_tags = serde_yaml::from_value(v).ok();
     }
+    if let Some(v) = get_path(&data, &["members"])
+        .cloned()
+        .or_else(|| get_path(&data, &["default", "members"]).cloned())
+    {
+        if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v) {
+            let members: Vec<String> = list
+                .into_iter()
+                .map(|entry| entry.trim().to_string())
+                .filter(|entry| !entry.is_empty())
+                .collect();
+            cfg.members = Some(members);
+        }
+    }
+    if let Some(v) = get_path(&data, &["default", "strict_members"]).and_then(cast::<bool>) {
+        cfg.strict_members = Some(v);
+    }
     if let Some(v) = get_path(&data, &["default", "assignee"]).and_then(cast::<String>) {
         cfg.default_assignee = Some(v);
     }
@@ -442,6 +477,16 @@ pub fn parse_project_from_yaml_str(
     }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
         cfg.default_tags = serde_yaml::from_value(v).ok();
+    }
+    // auto.*
+    if let Some(v) = get_path(&data, &["auto", "populate_members"]).and_then(cast::<bool>) {
+        cfg.auto_populate_members = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "set_reporter"]).and_then(cast::<bool>) {
+        cfg.auto_set_reporter = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "assign_on_status"]).and_then(cast::<bool>) {
+        cfg.auto_assign_on_status = Some(v);
     }
     // issue.*
     if let Some(v) = get_path(&data, &["issue", "states"]).cloned() {
@@ -542,6 +587,9 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if let Some(v) = &cfg.default_reporter {
         default.insert(Y::String("reporter".into()), Y::String(v.clone()));
     }
+    if cfg.strict_members {
+        default.insert(Y::String("strict_members".into()), Y::Bool(true));
+    }
     if !cfg.default_tags.is_empty() {
         default.insert(
             Y::String("tags".into()),
@@ -562,6 +610,13 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
     if !default.is_empty() {
         root.insert(Y::String("default".into()), Y::Mapping(default));
+    }
+
+    if !cfg.members.is_empty() {
+        root.insert(
+            Y::String("members".into()),
+            serde_yaml::to_value(&cfg.members).unwrap_or(Y::Null),
+        );
     }
 
     // issue
@@ -704,6 +759,12 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             Y::Bool(cfg.auto_assign_on_status),
         );
     }
+    if cfg.auto_populate_members != defaults.auto_populate_members {
+        auto.insert(
+            Y::String("populate_members".into()),
+            Y::Bool(cfg.auto_populate_members),
+        );
+    }
     if cfg.auto_codeowners_assign != defaults.auto_codeowners_assign {
         auto.insert(
             Y::String("codeowners_assign".into()),
@@ -796,6 +857,9 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     if let Some(v) = &cfg.default_reporter {
         default.insert(Y::String("reporter".into()), Y::String(v.clone()));
     }
+    if let Some(strict) = cfg.strict_members {
+        default.insert(Y::String("strict_members".into()), Y::Bool(strict));
+    }
     if let Some(tags) = &cfg.default_tags {
         if !tags.is_empty() {
             default.insert(
@@ -818,6 +882,13 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
     if !default.is_empty() {
         root.insert(Y::String("default".into()), Y::Mapping(default));
+    }
+
+    if let Some(members) = &cfg.members {
+        root.insert(
+            Y::String("members".into()),
+            serde_yaml::to_value(members).unwrap_or(Y::Null),
+        );
     }
 
     // issue
@@ -890,6 +961,12 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             Y::String("ticket_patterns".into()),
             serde_yaml::to_value(patterns).unwrap_or(Y::Null),
         );
+    }
+    if let Some(enabled) = cfg.scan_enable_ticket_words {
+        scan.insert(Y::String("enable_ticket_words".into()), Y::Bool(enabled));
+    }
+    if let Some(enabled) = cfg.scan_enable_mentions {
+        scan.insert(Y::String("enable_mentions".into()), Y::Bool(enabled));
     }
     if let Some(b) = &cfg.scan_strip_attributes {
         scan.insert(Y::String("strip_attributes".into()), Y::Bool(*b));

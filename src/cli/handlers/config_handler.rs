@@ -215,6 +215,14 @@ impl ConfigHandler {
         default_written |= Self::write_scalar_line(
             &mut default_body,
             2,
+            "strict-members",
+            &Self::yaml_scalar(&resolved.strict_members),
+            sources.get("default.strict-members"),
+            options,
+        );
+        default_written |= Self::write_scalar_line(
+            &mut default_body,
+            2,
             "priority",
             &Self::yaml_scalar(&resolved.default_priority),
             sources.get("default.priority"),
@@ -232,6 +240,19 @@ impl ConfigHandler {
         }
         if default_written {
             sections.push(format!("default:\n{}", default_body));
+        }
+
+        let mut members_body = String::new();
+        let members_written = Self::write_sequence(
+            &mut members_body,
+            0,
+            "members",
+            &resolved.members,
+            sources.get("members"),
+            options,
+        );
+        if members_written {
+            sections.push(members_body);
         }
 
         // Issue section
@@ -347,6 +368,14 @@ impl ConfigHandler {
         // Automation section
         let mut auto_body = String::new();
         let mut auto_written = false;
+        auto_written |= Self::write_scalar_line(
+            &mut auto_body,
+            2,
+            "populate-members",
+            &Self::yaml_scalar(&resolved.auto_populate_members),
+            sources.get("auto.populate-members"),
+            options,
+        );
         auto_written |= Self::write_scalar_line(
             &mut auto_body,
             2,
@@ -635,6 +664,8 @@ impl ConfigHandler {
         let default_issue_priorities = defaults.issue_priorities.values.clone();
         let default_issue_tags = defaults.tags.values.clone();
         let default_default_tags = defaults.default_tags.clone();
+        let default_members = defaults.members.clone();
+        let default_strict_members = defaults.strict_members;
         let default_custom_fields = defaults.custom_fields.values.clone();
         let default_scan_signal_words = defaults.scan_signal_words.clone();
         let default_scan_ticket_patterns = defaults.scan_ticket_patterns.clone();
@@ -648,6 +679,7 @@ impl ConfigHandler {
         let default_auto_branch_infer_type = defaults.auto_branch_infer_type;
         let default_auto_branch_infer_status = defaults.auto_branch_infer_status;
         let default_auto_branch_infer_priority = defaults.auto_branch_infer_priority;
+        let default_auto_populate_members = defaults.auto_populate_members;
         let default_auto_identity = defaults.auto_identity;
         let default_auto_identity_git = defaults.auto_identity_git;
         let default_branch_type_aliases = defaults.branch_type_aliases.clone();
@@ -777,6 +809,44 @@ impl ConfigHandler {
                 if global.is_some_and(|glob| {
                     glob.default_tags == resolved.default_tags
                         && glob.default_tags.as_slice() != default_default_tags.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "members" => {
+                if home.is_some_and(|home| home.members == resolved.members) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.members == resolved.members
+                        && glob.members.as_slice() != default_members.as_slice()
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "strict_members" => {
+                if home.is_some_and(|home| home.strict_members == resolved.strict_members) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.strict_members == resolved.strict_members
+                        && glob.strict_members != default_strict_members
+                }) {
+                    return "global";
+                }
+                "default"
+            }
+            "auto_populate_members" => {
+                if home.is_some_and(|home| {
+                    home.auto_populate_members == resolved.auto_populate_members
+                }) {
+                    return "home";
+                }
+                if global.is_some_and(|glob| {
+                    glob.auto_populate_members == resolved.auto_populate_members
+                        && glob.auto_populate_members != default_auto_populate_members
                 }) {
                     return "global";
                 }
@@ -1117,6 +1187,26 @@ impl ConfigHandler {
                         .to_string()
                 }
             }
+            "members" => {
+                if project_cfg.and_then(|pc| pc.members.as_ref()).is_some()
+                    || resolved_project.members != base_config.members
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "strict_members" => {
+                if project_cfg.and_then(|pc| pc.strict_members).is_some()
+                    || resolved_project.strict_members != base_config.strict_members
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
             "issue_states" => {
                 if project_cfg
                     .and_then(|pc| pc.issue_states.as_ref())
@@ -1230,6 +1320,18 @@ impl ConfigHandler {
                     .and_then(|pc| pc.scan_strip_attributes)
                     .is_some()
                     || resolved_project.scan_strip_attributes != base_config.scan_strip_attributes
+                {
+                    "project".to_string()
+                } else {
+                    Self::source_label_for_global(base_config, global_cfg, home_cfg, key)
+                        .to_string()
+                }
+            }
+            "auto_populate_members" => {
+                if project_cfg
+                    .and_then(|pc| pc.auto_populate_members)
+                    .is_some()
+                    || resolved_project.auto_populate_members != base_config.auto_populate_members
                 {
                     "project".to_string()
                 } else {
@@ -1512,6 +1614,8 @@ impl ConfigHandler {
         insert("default.assignee", "default_assignee");
         insert("default.reporter", "default_reporter");
         insert("default.tags", "default_tags");
+        insert("members", "members");
+        insert("default.strict-members", "strict_members");
         insert("default.priority", "default_priority");
         insert("default.status", "default_status");
         insert("issue.states", "issue_states");
@@ -1524,6 +1628,7 @@ impl ConfigHandler {
         insert("scan.enable-ticket-words", "scan_enable_ticket_words");
         insert("scan.enable-mentions", "scan_enable_mentions");
         insert("scan.strip-attributes", "scan_strip_attributes");
+        insert("auto.populate-members", "auto_populate_members");
         insert("auto.set-reporter", "auto_set_reporter");
         insert("auto.assign-on-status", "auto_assign_on_status");
         insert("auto.codeowners-assign", "auto_codeowners_assign");
@@ -1566,6 +1671,8 @@ impl ConfigHandler {
         insert("default.assignee", "default_assignee");
         insert("default.reporter", "default_reporter");
         insert("default.tags", "default_tags");
+        insert("members", "members");
+        insert("default.strict-members", "strict_members");
         insert("default.priority", "default_priority");
         insert("default.status", "default_status");
         insert("issue.states", "issue_states");
@@ -1578,6 +1685,7 @@ impl ConfigHandler {
         insert("scan.enable-ticket-words", "scan_enable_ticket_words");
         insert("scan.enable-mentions", "scan_enable_mentions");
         insert("scan.strip-attributes", "scan_strip_attributes");
+        insert("auto.populate-members", "auto_populate_members");
         insert("auto.set-reporter", "auto_set_reporter");
         insert("auto.assign-on-status", "auto_assign_on_status");
         insert("auto.codeowners-assign", "auto_codeowners_assign");

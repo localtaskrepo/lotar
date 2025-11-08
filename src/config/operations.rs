@@ -171,6 +171,57 @@ pub fn save_project_config(
     Ok(())
 }
 
+/// Ensure the provided members exist in the project's configuration, creating the project
+/// config if necessary. Returns the updated member list when changes were applied.
+pub fn auto_populate_project_members(
+    tasks_dir: &Path,
+    project_prefix: &str,
+    base_members: &[String],
+    new_members: &[String],
+) -> Result<Option<Vec<String>>, ConfigError> {
+    if new_members.is_empty() {
+        return Ok(None);
+    }
+
+    let mut project_config =
+        crate::config::persistence::load_project_config_from_dir(project_prefix, tasks_dir)?;
+
+    let mut effective: Vec<String> = if let Some(existing) = project_config.members.clone() {
+        existing
+    } else {
+        base_members
+            .iter()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .collect()
+    };
+
+    let mut changed = false;
+    for candidate in new_members {
+        let trimmed = candidate.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let already_present = effective
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(trimmed));
+        if !already_present {
+            effective.push(trimmed.to_string());
+            changed = true;
+        }
+    }
+
+    if !changed {
+        return Ok(None);
+    }
+
+    effective.sort_by_key(|a| a.to_ascii_lowercase());
+    project_config.members = Some(effective.clone());
+    save_project_config(tasks_dir, project_prefix, &project_config)?;
+
+    Ok(Some(effective))
+}
+
 /// Update a specific field in global or project configuration
 pub fn update_config_field(
     tasks_dir: &Path,
@@ -315,6 +366,15 @@ fn apply_field_to_global_config(
                 .collect();
             config.default_tags = tags;
         }
+        "members" => {
+            config.members = parse_simple_csv(value);
+        }
+        "strict_members" => {
+            config.strict_members = parse_bool_flag(value, field)?;
+        }
+        "auto_populate_members" => {
+            config.auto_populate_members = parse_bool_flag(value, field)?;
+        }
         "auto_set_reporter" => {
             config.auto_set_reporter = parse_bool_flag(value, field)?;
         }
@@ -437,6 +497,20 @@ fn apply_field_to_project_config(
                 .collect();
             config.default_tags = Some(values);
         }
+        "members" => {
+            let members = parse_simple_csv(value);
+            config.members = if members.is_empty() {
+                None
+            } else {
+                Some(members)
+            };
+        }
+        "strict_members" => {
+            config.strict_members = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_populate_members" => {
+            config.auto_populate_members = parse_optional_bool_flag(value, field)?;
+        }
         "issue_states" => {
             let states = parse_token_list::<TaskStatus>(value, "task status")?;
             config.issue_states = Some(ConfigurableField { values: states });
@@ -543,6 +617,9 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "default_assignee",
         "default_reporter",
         "default_tags",
+        "members",
+        "strict_members",
+        "auto_populate_members",
         "default_priority",
         "default_status",
         "tags",
@@ -573,6 +650,9 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "default_assignee",
         "default_reporter",
         "default_tags",
+        "members",
+        "strict_members",
+        "auto_populate_members",
         "default_priority",
         "default_status",
         "issue_states",
@@ -676,7 +756,24 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 }
             }
         }
+        "members" => {
+            for part in value.split(',') {
+                let token = part.trim();
+                if token.len() > 100 {
+                    return Err(ConfigError::ParseError(format!(
+                        "Member '{}' is too long (max 100 chars)",
+                        token
+                    )));
+                }
+            }
+        }
+        "strict_members" => {
+            if !value.trim().is_empty() {
+                parse_bool_flag(value, field)?;
+            }
+        }
         "auto_set_reporter"
+        | "auto_populate_members"
         | "auto_assign_on_status"
         | "auto_codeowners_assign"
         | "auto_tags_from_path"
@@ -751,6 +848,8 @@ pub fn clear_project_field(
         "default_status" => project_config.default_status = None,
         // List option fields
         "default_tags" => project_config.default_tags = None,
+        "members" => project_config.members = None,
+        "strict_members" => project_config.strict_members = None,
         // Enum list overrides
         "issue_states" => project_config.issue_states = None,
         "issue_types" => project_config.issue_types = None,

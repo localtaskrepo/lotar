@@ -111,6 +111,15 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if !override_config.default_tags.is_empty() {
         base.default_tags = override_config.default_tags;
     }
+    if !override_config.members.is_empty() {
+        base.members = override_config.members;
+    }
+    if override_config.strict_members != defaults.strict_members {
+        base.strict_members = override_config.strict_members;
+    }
+    if override_config.auto_populate_members != defaults.auto_populate_members {
+        base.auto_populate_members = override_config.auto_populate_members;
+    }
     if override_config.auto_set_reporter != defaults.auto_set_reporter {
         base.auto_set_reporter = override_config.auto_set_reporter;
     }
@@ -210,6 +219,15 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if !override_config.default_tags.is_empty() {
         resolved.default_tags = override_config.default_tags;
+    }
+    if !override_config.members.is_empty() {
+        resolved.members = override_config.members;
+    }
+    if override_config.strict_members != defaults.strict_members {
+        resolved.strict_members = override_config.strict_members;
+    }
+    if override_config.auto_populate_members != defaults.auto_populate_members {
+        resolved.auto_populate_members = override_config.auto_populate_members;
     }
     if override_config.auto_set_reporter != defaults.auto_set_reporter {
         resolved.auto_set_reporter = override_config.auto_set_reporter;
@@ -316,6 +334,15 @@ pub fn get_project_config(
     if let Some(reporter) = project_config.default_reporter {
         resolved.default_reporter = Some(reporter);
     }
+    if let Some(members) = project_config.members {
+        resolved.members = members;
+    }
+    if let Some(strict_members) = project_config.strict_members {
+        resolved.strict_members = strict_members;
+    }
+    if let Some(auto_populate) = project_config.auto_populate_members {
+        resolved.auto_populate_members = auto_populate;
+    }
     if let Some(auto) = project_config.auto_set_reporter {
         resolved.auto_set_reporter = auto;
     }
@@ -406,6 +433,9 @@ impl ResolvedConfig {
             default_assignee: global.default_assignee,
             default_reporter: global.default_reporter,
             default_tags: global.default_tags,
+            members: global.members,
+            strict_members: global.strict_members,
+            auto_populate_members: global.auto_populate_members,
             auto_set_reporter: global.auto_set_reporter,
             auto_assign_on_status: global.auto_assign_on_status,
             auto_codeowners_assign: global.auto_codeowners_assign,

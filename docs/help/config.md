@@ -193,9 +193,12 @@ lotar config init --project=new-service --copy-from=existing-service
 - `default.tags` - Default tags for new tasks (applied when no tags provided)
 - `default.priority` - Default task priority
 - `default.status` - Default task status
+- `members` - Allowed members when `default.strict_members` is true
+- `default.strict_members` - Enforce member list for reporter/assignee fields
 - `custom.fields` - Custom field definitions
     
 Automation (defaults inherited from global):
+- `auto.populate_members` - Automatically add new assignees/reporters to the project member list when strict members are enabled (default: true)
 - `auto.set_reporter` - If true, set reporter automatically on create/update when missing
 - `auto.assign_on_status` - If true, auto-assign assignee on first meaningful status change
     - First-change is defined as: when a task moves away from the default.status (or the first state if default unset) and the task currently has no assignee.
@@ -213,6 +216,8 @@ Automation (defaults inherited from global):
 - `default.tags` - Global default tags for new tasks
 - `default.priority` - Default task priority for all projects
 - `default.status` - Default task status for all projects
+- `members` - Global allowed members list (project overrides replace/extend)
+- `default.strict_members` - Enforce member list globally (projects can override)
 - `custom.fields` - Default custom fields for all projects
 - `sprints.defaults.length` - Default planned sprint length (e.g., `2w`) applied when creating sprints without an explicit length.
 - `sprints.defaults.capacity_points` / `sprints.defaults.capacity_hours` - Default sprint capacity values used when not provided by the caller.
@@ -233,6 +238,7 @@ Automation (defaults inherited from global):
     - `auto.branch_infer_type` - Infer task type from branch name prefixes like feat/, fix/, chore/ (default: true)
     - `auto.branch_infer_status` - Infer status from `branch.status_aliases` using the first branch token (default: true)
     - `auto.branch_infer_priority` - Infer priority from `branch.priority_aliases` using the first branch token (default: true)
+    - `auto.populate_members` - Append new assignees/reporters to the configured members list when strict members is enabled (default: true)
 
 Branch alias maps (global- and project-level):
 - `branch.type_aliases` - Map branch tokens to task types. Example: `{ feat: Feature, fix: Bug }`
@@ -240,6 +246,7 @@ Branch alias maps (global- and project-level):
 - `branch.priority_aliases` - Map branch tokens to priorities. Example: `{ hotfix: Critical }`
 
 Notes:
+- When `default.strict_members` is true, reporter and assignee must be listed in `members`. With `auto.populate_members` enabled (default), LoTaR automatically appends new identities to the project member list before validation.
 - Keys are matched case-insensitively (normalized to lowercase during parse/merge).
 - Project-level maps override/add to global maps. On conflict, project wins.
 - Aliases must map to values present in the project's `issue.*` lists; invalid entries are ignored at use time.

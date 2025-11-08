@@ -330,6 +330,12 @@ pub fn initialize(api_server: &mut ApiServer) {
                 },
                 None => None,
             },
+            reporter: body
+                .get("reporter")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string()),
             assignee: add.assignee,
             due_date: add.due,
             effort: add.effort,
@@ -364,7 +370,6 @@ pub fn initialize(api_server: &mut ApiServer) {
                 .cloned()
                 .and_then(|value| serde_json::from_value::<Vec<u32>>(value).ok())
                 .unwrap_or_default(),
-            ..crate::api_types::TaskCreate::default()
         };
     match TaskService::create(&mut storage, req_create) {
             Ok(task) => {

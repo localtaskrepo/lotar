@@ -1,4 +1,5 @@
 use crate::config::types::ResolvedConfig;
+use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
 use chrono::Datelike;
 
@@ -106,39 +107,24 @@ impl<'a> CliValidator<'a> {
         Ok((validated_name, field_value.to_string()))
     }
 
-    /// Validate assignee format (basic email validation)
+    /// Validate assignee format (basic email validation) and enforce configured members
     pub fn validate_assignee(&self, assignee: &str) -> Result<String, String> {
-        // Handle special cases
-        if assignee == "@me" {
-            // Allow @me alias; will be resolved at use sites
-            return Ok(assignee.to_string());
-        }
+        self.validate_member_value("Assignee", assignee, false)
+    }
 
-        if let Some(username) = assignee.strip_prefix('@') {
-            // Username format - validate it's a reasonable username
-            if !username.is_empty()
-                && username
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-            {
-                Ok(assignee.to_string())
-            } else {
-                Err("Invalid username format. Usernames can only contain letters, numbers, underscore, and dash.".to_string())
-            }
-        } else if assignee.contains('@') {
-            // Email format - basic validation
-            if assignee.matches('@').count() == 1
-                && assignee.contains('.')
-                && !assignee.starts_with('@')
-                && !assignee.ends_with('@')
-            {
-                Ok(assignee.to_string())
-            } else {
-                Err("Invalid email format".to_string())
-            }
-        } else {
-            Err("Assignee must be an email address or username starting with @".to_string())
-        }
+    /// Validate assignee but allow values not yet registered as members.
+    pub fn validate_assignee_allow_unknown(&self, assignee: &str) -> Result<String, String> {
+        self.validate_member_value("Assignee", assignee, true)
+    }
+
+    /// Validate reporter format (basic email validation) and enforce configured members
+    pub fn validate_reporter(&self, reporter: &str) -> Result<String, String> {
+        self.validate_member_value("Reporter", reporter, false)
+    }
+
+    /// Validate reporter but allow values not yet registered as members.
+    pub fn validate_reporter_allow_unknown(&self, reporter: &str) -> Result<String, String> {
+        self.validate_member_value("Reporter", reporter, true)
     }
 
     /// Parse and validate due date/time. Normalizes to RFC3339 (UTC) string.
@@ -229,6 +215,143 @@ impl<'a> CliValidator<'a> {
             Ok(_) => Ok(effort.to_string()),
             Err(_) => Err("Invalid effort format. Use a number followed by a valid unit (h, d, w, m, pt, points, etc.), e.g., 2h, 1.5d, 1w, 5pt, 3points".to_string()),
         }
+    }
+
+    pub fn ensure_task_membership(&self, task: &Task) -> Result<(), String> {
+        if !self.config.strict_members {
+            return Ok(());
+        }
+
+        let allowed = self.normalized_members();
+        if allowed.is_empty() {
+            return Err(Self::strict_members_misconfiguration_error());
+        }
+
+        self.enforce_member_value("Reporter", task.reporter.as_deref(), &allowed)?;
+        self.enforce_member_value("Assignee", task.assignee.as_deref(), &allowed)?;
+        Ok(())
+    }
+
+    fn enforce_member_for_value(&self, field_label: &str, value: &str) -> Result<(), String> {
+        if !self.config.strict_members {
+            return Ok(());
+        }
+
+        let allowed = self.normalized_members();
+        if allowed.is_empty() {
+            return Err(Self::strict_members_misconfiguration_error());
+        }
+
+        self.enforce_member_value(field_label, Some(value), &allowed)
+    }
+
+    fn validate_member_value(
+        &self,
+        field_label: &str,
+        raw_value: &str,
+        allow_unknown: bool,
+    ) -> Result<String, String> {
+        let normalized = raw_value.trim();
+
+        if normalized.is_empty() {
+            return Err(format!("{} cannot be empty or whitespace", field_label));
+        }
+
+        if normalized == "@me" {
+            return Ok(normalized.to_string());
+        }
+
+        if let Some(username) = normalized.strip_prefix('@') {
+            if username.is_empty()
+                || !username
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            {
+                return Err("Invalid username format. Usernames can only contain letters, numbers, underscore, and dash.".to_string());
+            }
+            if !allow_unknown {
+                self.enforce_member_for_value(field_label, normalized)?;
+            }
+            return Ok(normalized.to_string());
+        }
+
+        if normalized.contains('@')
+            && normalized.matches('@').count() == 1
+            && normalized.contains('.')
+            && !normalized.starts_with('@')
+            && !normalized.ends_with('@')
+        {
+            if !allow_unknown {
+                self.enforce_member_for_value(field_label, normalized)?;
+            }
+            return Ok(normalized.to_string());
+        }
+
+        Err(format!(
+            "{} must be an email address or username starting with @",
+            field_label
+        ))
+    }
+
+    fn enforce_member_value(
+        &self,
+        field_label: &str,
+        value: Option<&str>,
+        allowed: &[String],
+    ) -> Result<(), String> {
+        let Some(raw) = value else {
+            return Ok(());
+        };
+
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            return Ok(());
+        }
+
+        let normalized = trimmed.to_ascii_lowercase();
+        let permitted = allowed
+            .iter()
+            .any(|candidate| candidate.to_ascii_lowercase() == normalized);
+
+        if permitted {
+            return Ok(());
+        }
+
+        let preview = self.member_preview(allowed);
+        Err(format!(
+            "{} '{}' is not in configured members. Allowed members: {}.",
+            field_label, trimmed, preview
+        ))
+    }
+
+    fn normalized_members(&self) -> Vec<String> {
+        self.config
+            .members
+            .iter()
+            .map(|member| member.trim().to_string())
+            .filter(|member| !member.is_empty())
+            .collect()
+    }
+
+    fn member_preview(&self, allowed: &[String]) -> String {
+        if allowed.is_empty() {
+            return String::new();
+        }
+        if allowed.len() <= 10 {
+            allowed.join(", ")
+        } else {
+            let head = allowed
+                .iter()
+                .take(10)
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{} ... (+{} more)", head, allowed.len() - 10)
+        }
+    }
+
+    fn strict_members_misconfiguration_error() -> String {
+        "Strict members are enabled but no members are configured. Add entries under members or disable strict_members.".to_string()
     }
 }
 

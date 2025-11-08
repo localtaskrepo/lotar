@@ -20,25 +20,51 @@ impl StorageOperations {
         // Resolve target project path
         let project_path = root_path.join(project_prefix);
 
-        // Use original project name for config initialization, fall back to prefix
-        let config_project_name = original_project_name.unwrap_or(project_prefix);
-
         // Ensure project directory exists
         fs::create_dir_all(&project_path)?;
 
         // Create project config.yml if it doesn't exist and we have a project name
         let config_file_path = crate::utils::paths::project_config_path(root_path, project_prefix);
-        if !config_file_path.exists() && original_project_name.is_some() {
-            // Create a basic project config with the project name
-            let project_config = ProjectConfig::new(config_project_name.to_string());
-
-            // Save the project config
-            if let Err(e) =
-                ConfigManager::save_project_config(root_path, project_prefix, &project_config)
-            {
-                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                    .log_warn(&format!("Failed to create project config: {}", e));
-                // Continue execution - this is not a fatal error
+        if let Some(original_name) = original_project_name {
+            let normalized_name = original_name.trim();
+            if config_file_path.exists() {
+                match crate::config::persistence::load_project_config_from_dir(
+                    project_prefix,
+                    root_path,
+                ) {
+                    Ok(mut existing) => {
+                        let current_name = existing.project_name.trim();
+                        if current_name.is_empty()
+                            || current_name.eq_ignore_ascii_case(project_prefix)
+                        {
+                            existing.project_name = normalized_name.to_string();
+                            if let Err(e) = ConfigManager::save_project_config(
+                                root_path,
+                                project_prefix,
+                                &existing,
+                            ) {
+                                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
+                                    &format!(
+                                        "Failed to update project config with detected name: {}",
+                                        e
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                            .log_warn(&format!("Failed to load existing project config: {}", e));
+                    }
+                }
+            } else {
+                let project_config = ProjectConfig::new(normalized_name.to_string());
+                if let Err(e) =
+                    ConfigManager::save_project_config(root_path, project_prefix, &project_config)
+                {
+                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                        .log_warn(&format!("Failed to create project config: {}", e));
+                }
             }
         }
 

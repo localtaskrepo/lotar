@@ -104,6 +104,10 @@ pub struct AddArgs {
     #[arg(long)]
     pub priority: Option<String>,
 
+    /// Reporter (email or @username)
+    #[arg(long, short = 'R')]
+    pub reporter: Option<String>,
+
     /// Assignee (email or @username)
     #[arg(long, alias = "assign")]
     pub assignee: Option<String>,

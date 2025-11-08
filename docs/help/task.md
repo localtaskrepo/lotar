@@ -19,10 +19,11 @@ Create a new task with detailed options.
 
 ```bash
 lotar task add --title="Task title" [OPTIONS]
-# Short flags: -t type, -P priority, -a assignee, -d due, -i tag, -E effort, -D description, -F field
+# Short flags: -t type, -P priority, -R reporter, -a assignee, -d due, -i tag, -E effort, -D description, -F field
 ```
 Notes:
 - You can filter by current user with --assignee=@me or --mine.
+- `--reporter` and `-R` accept the same formats as `--assignee`, including `@me` resolution.
 
 ### list
 List tasks with advanced filtering options.

@@ -2608,6 +2608,21 @@ fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
     panic!("Could not find task with ID: {task_id}");
 }
 
+fn read_task_yaml(temp_dir: &TempDir, task_id: &str) -> serde_yaml::Value {
+    let (project, sequence) = task_id
+        .rsplit_once('-')
+        .unwrap_or_else(|| panic!("Unexpected task id format: {task_id}"));
+    let path = temp_dir
+        .path()
+        .join(".tasks")
+        .join(project)
+        .join(format!("{sequence}.yml"));
+    let contents = fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("Failed to read task file at {}", path.display()));
+    serde_yaml::from_str(&contents)
+        .unwrap_or_else(|_| panic!("Failed to parse YAML for task {task_id}"))
+}
+
 // =============================================================================
 // Phase 1.1 - Dual CLI Interface Testing
 // =============================================================================
@@ -2628,6 +2643,7 @@ mod dual_interface {
                 "add",
                 "Test task quick",
                 "--priority=high",
+                "--reporter=reporter@example.com",
                 "--assignee=test@example.com",
             ])
             .output()
@@ -2648,6 +2664,7 @@ mod dual_interface {
                 "add",
                 "Test task full",
                 "--priority=high",
+                "--reporter=reporter@example.com",
                 "--assignee=test@example.com",
             ])
             .output()
@@ -2668,13 +2685,27 @@ mod dual_interface {
         );
 
         // Get both tasks and compare their properties (excluding ID and creation time)
-        let task1_json = get_task_as_json(&temp_dir, &task_id1.unwrap());
-        let task2_json = get_task_as_json(&temp_dir, &task_id2.unwrap());
+        let task_id1 = task_id1.unwrap();
+        let task_id2 = task_id2.unwrap();
+
+        let task1_json = get_task_as_json(&temp_dir, &task_id1);
+        let task2_json = get_task_as_json(&temp_dir, &task_id2);
 
         // Both tasks should have the same structure and properties
         assert_eq!(task1_json["priority"], task2_json["priority"]);
         assert_eq!(task1_json["assignee"], task2_json["assignee"]);
         assert_eq!(task1_json["status"], task2_json["status"]); // Should both be "todo" by default
+
+        let task1_yaml = read_task_yaml(&temp_dir, &task_id1);
+        let task2_yaml = read_task_yaml(&temp_dir, &task_id2);
+        assert_eq!(
+            task1_yaml["reporter"],
+            serde_yaml::Value::String("reporter@example.com".to_string())
+        );
+        assert_eq!(
+            task2_yaml["reporter"],
+            serde_yaml::Value::String("reporter@example.com".to_string())
+        );
     }
 
     #[test]

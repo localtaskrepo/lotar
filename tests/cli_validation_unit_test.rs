@@ -1,6 +1,8 @@
 use lotar::cli::validation::CliValidator;
 use lotar::config::types::{ConfigurableField, ResolvedConfig, StringConfigField};
+use lotar::storage::task::Task;
 use lotar::types::{Priority, TaskStatus, TaskType};
+use std::path::PathBuf;
 
 fn cfg() -> ResolvedConfig {
     ResolvedConfig {
@@ -31,6 +33,9 @@ fn cfg() -> ResolvedConfig {
         default_assignee: None,
         default_reporter: None,
         default_tags: vec![],
+        members: vec![],
+        strict_members: false,
+        auto_populate_members: true,
         auto_set_reporter: true,
         auto_assign_on_status: true,
         auto_codeowners_assign: true,
@@ -90,6 +95,46 @@ fn validate_assignee_formats() {
 }
 
 #[test]
+fn validate_assignee_enforces_members_when_strict() {
+    let mut conf = cfg();
+    conf.strict_members = true;
+    conf.members = vec!["allowed@example.com".to_string()];
+    let validator = CliValidator::new(&conf);
+
+    assert!(validator.validate_assignee("allowed@example.com").is_ok());
+    let err = validator
+        .validate_assignee("someone@example.com")
+        .unwrap_err();
+    assert!(err.contains("not in configured members"));
+}
+
+#[test]
+fn validate_reporter_formats() {
+    let conf = cfg();
+    let validator = CliValidator::new(&conf);
+    assert!(validator.validate_reporter("@me").is_ok());
+    assert!(validator.validate_reporter("@john").is_ok());
+    assert!(validator.validate_reporter("john@example.com").is_ok());
+    assert!(validator.validate_reporter("not-an-email").is_err());
+    assert!(validator.validate_reporter("@").is_err());
+    assert!(validator.validate_reporter("john@").is_err());
+}
+
+#[test]
+fn validate_reporter_enforces_members_when_strict() {
+    let mut conf = cfg();
+    conf.strict_members = true;
+    conf.members = vec!["allowed@example.com".to_string()];
+    let validator = CliValidator::new(&conf);
+
+    assert!(validator.validate_reporter("allowed@example.com").is_ok());
+    let err = validator
+        .validate_reporter("someone@example.com")
+        .unwrap_err();
+    assert!(err.contains("not in configured members"));
+}
+
+#[test]
 fn validate_tags_trim_and_reject_empty() {
     let conf = cfg();
     let validator = CliValidator::new(&conf);
@@ -133,6 +178,59 @@ fn custom_field_collision_is_rejected() {
             "expected collision for {bad}"
         );
     }
+}
+
+#[test]
+fn ensure_task_membership_allows_listed_members() {
+    let mut conf = cfg();
+    conf.strict_members = true;
+    conf.members = vec![
+        "alice@example.com".to_string(),
+        "bob@example.com".to_string(),
+    ];
+    let validator = CliValidator::new(&conf);
+    let mut task = Task::new(
+        PathBuf::from("."),
+        "demo".to_string(),
+        Priority::from("Medium"),
+    );
+    task.reporter = Some("alice@example.com".to_string());
+    task.assignee = Some("bob@example.com".to_string());
+
+    assert!(validator.ensure_task_membership(&task).is_ok());
+}
+
+#[test]
+fn ensure_task_membership_rejects_unlisted_member() {
+    let mut conf = cfg();
+    conf.strict_members = true;
+    conf.members = vec!["alice@example.com".to_string()];
+    let validator = CliValidator::new(&conf);
+    let mut task = Task::new(
+        PathBuf::from("."),
+        "demo".to_string(),
+        Priority::from("Medium"),
+    );
+    task.reporter = Some("bob@example.com".to_string());
+
+    let err = validator.ensure_task_membership(&task).unwrap_err();
+    assert!(err.contains("Reporter 'bob@example.com'"));
+}
+
+#[test]
+fn ensure_task_membership_requires_configured_members() {
+    let mut conf = cfg();
+    conf.strict_members = true;
+    conf.members.clear();
+    let validator = CliValidator::new(&conf);
+    let task = Task::new(
+        PathBuf::from("."),
+        "demo".to_string(),
+        Priority::from("Medium"),
+    );
+
+    let err = validator.ensure_task_membership(&task).unwrap_err();
+    assert!(err.contains("Strict members are enabled"));
 }
 
 // Merged from types_priority_unit_test.rs
