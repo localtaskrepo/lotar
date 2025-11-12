@@ -1,271 +1,20 @@
 use crate::cli::handlers::CommandHandler;
-use crate::cli::project::ProjectResolver;
+use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::validation::CliValidator;
-use crate::output::OutputRenderer;
-use crate::storage::manager::Storage;
+use crate::config::types::ResolvedConfig;
+use crate::output::{OutputFormat, OutputRenderer};
+use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
+use serde_json::Value;
 
-/// Handler for status change commands
+const DRY_RUN_EXPLANATION: &str = "status validated against project config; auto-assign uses CODEOWNERS default when enabled, otherwise default_reporter→git user.name/email→system username.";
+
 pub struct StatusHandler;
 
-impl CommandHandler for StatusHandler {
-    type Args = StatusArgs;
-    type Result = Result<(), String>;
-
-    fn execute(
-        args: Self::Args,
-        project: Option<&str>,
-        resolver: &TasksDirectoryResolver,
-        renderer: &OutputRenderer,
-    ) -> Self::Result {
-        renderer.log_info(&format!(
-            "status: resolving project for task_id={} explicit_project={:?}",
-            args.task_id, project
-        ));
-        // Create project resolver
-        let mut project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
-
-        // Validate task ID format
-        project_resolver
-            .validate_task_id_format(&args.task_id)
-            .map_err(|e| format!("Invalid task ID: {}", e))?;
-
-        // Resolve project strictly: if task_id has a prefix and an explicit project is provided,
-        // enforce that they match, otherwise error. Always pass through the explicit project so
-        // ProjectResolver can validate consistency.
-        let final_effective_project = project.or(args.explicit_project.as_deref());
-
-        let mut resolved_project = project_resolver
-            .resolve_project(&args.task_id, final_effective_project)
-            .map_err(|e| format!("Could not resolve project: {}", e))?;
-
-        // Get full task ID with project prefix
-        let mut full_task_id = project_resolver
-            .get_full_task_id(&args.task_id, final_effective_project)
-            .map_err(|e| format!("Could not determine full task ID: {}", e))?;
-
-        // Load the task
-        // Try to open existing storage without creating directories
-        let mut storage = match Storage::try_open(resolver.path.clone()) {
-            Some(storage) => storage,
-            None => {
-                return Err("No tasks found. Use 'lotar add' to create tasks first.".to_string());
-            }
-        };
-        renderer.log_debug(&format!(
-            "status: loading task full_id={} project={}",
-            full_task_id, resolved_project
-        ));
-        let numeric_only = args.task_id.chars().all(|c| c.is_ascii_digit());
-        let mut task = match storage.get(&full_task_id, resolved_project.clone()) {
-            Some(task) => task,
-            None if numeric_only => {
-                if let Some((actual_id, task)) = storage.find_task_by_numeric_id(&args.task_id) {
-                    renderer.log_debug(&format!(
-                        "status: fallback resolved numeric id={} -> {}",
-                        args.task_id, actual_id
-                    ));
-                    if let Some(prefix) = actual_id.split('-').next() {
-                        resolved_project = prefix.to_string();
-                    }
-                    full_task_id = actual_id;
-                    task
-                } else {
-                    return Err(format!("Task '{}' not found", full_task_id));
-                }
-            }
-            None => return Err(format!("Task '{}' not found", full_task_id)),
-        };
-
-        // Now that we have resolved the project, get the appropriate config
-        let mut effective_config = project_resolver.get_config().clone();
-        if let Ok(project_specific) = project_resolver.get_project_config(&resolved_project) {
-            effective_config = project_specific;
-        }
-        let validator = CliValidator::new(&effective_config);
-
-        match args.new_status {
-            // Get current status
-            None => {
-                match renderer.format {
-                    crate::output::OutputFormat::Json => {
-                        renderer.emit_raw_stdout(
-                            &serde_json::json!({
-                                "status": "success",
-                                "task_id": full_task_id,
-                                "status_value": task.status.to_string()
-                            })
-                            .to_string(),
-                        );
-                    }
-                    _ => {
-                        renderer.emit_success(&format!(
-                            "Task {} status: {}",
-                            full_task_id, task.status
-                        ));
-                    }
-                }
-                Ok(())
-            }
-            // Set new status
-            Some(new_status) => {
-                // Validate the new status against project configuration
-                renderer.log_debug(&format!(
-                    "status: validating new_status candidate='{}'",
-                    new_status
-                ));
-                let validated_status = validator
-                    .validate_status(&new_status)
-                    .map_err(|e| format!("Status validation failed: {}", e))?;
-
-                let old_status = task.status.clone();
-
-                // Check if status is actually changing
-                if old_status == validated_status {
-                    renderer.log_info("status: no-op (old == new)");
-                    #[cfg(not(test))]
-                    {
-                        renderer.emit_warning(&format!(
-                            "Task {} already has status '{}'",
-                            full_task_id, validated_status
-                        ));
-                        // Emit a small stdout notice so --format=table/json/markdown flows have output
-                        // Notice prints in JSON mode too (info is suppressed there)
-                        renderer.emit_notice(&format!("Task {} status unchanged", full_task_id));
-                    }
-                    return Ok(());
-                }
-
-                // Prepare preview message if dry-run
-                if args.dry_run {
-                    // First-change semantics: only if moving away from project default
-                    let cfg = &effective_config;
-                    let project_default_status = cfg
-                        .default_status
-                        .clone()
-                        .unwrap_or_else(|| cfg.issue_states.values[0].clone());
-                    let would_assign = task.assignee.is_none()
-                        && cfg.auto_assign_on_status
-                        && task.status == project_default_status
-                        && task.status != validated_status;
-                    let resolved_assignee = if would_assign {
-                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
-                    } else {
-                        None
-                    };
-
-                    match renderer.format {
-                        crate::output::OutputFormat::Json => {
-                            let mut obj = serde_json::json!({
-                                "status": "preview",
-                                "action": "status_change",
-                                "task_id": full_task_id,
-                                "old_status": old_status,
-                                "new_status": validated_status,
-                            });
-                            if let Some(me) = resolved_assignee.clone() {
-                                obj["would_set_assignee"] = serde_json::Value::String(me);
-                            }
-                            if args.explain {
-                                obj["explain"] = serde_json::Value::String("status validated against project config; auto-assign uses default_reporter→git user.name/email→system username.".to_string());
-                            }
-                            renderer.emit_raw_stdout(&obj.to_string());
-                        }
-                        _ => {
-                            let mut preview = format!(
-                                "DRY RUN: Would change {} status from {} to {}",
-                                full_task_id, old_status, validated_status
-                            );
-                            if let Some(me) = resolved_assignee {
-                                preview.push_str(&format!("; would set assignee = {}", me));
-                            }
-                            renderer.emit_info(&preview);
-                            if args.explain {
-                                renderer.emit_info("Explanation: status validated against project config; auto-assign uses default_reporter→git user.name/email→system username.");
-                            }
-                        }
-                    }
-                    return Ok(());
-                }
-
-                task.status = validated_status.clone();
-                // Auto-assign assignee if none is set (configurable)
-                if task.assignee.is_none() && effective_config.auto_assign_on_status {
-                    let cfg = &effective_config;
-                    let project_default_status = cfg
-                        .default_status
-                        .clone()
-                        .unwrap_or_else(|| cfg.issue_states.values[0].clone());
-                    if old_status == project_default_status && old_status != validated_status {
-                        // Try CODEOWNERS first (if enabled), then fall back to identity
-                        let mut assigned = false;
-                        if cfg.auto_codeowners_assign {
-                            let owner_from_codeowners = (|| {
-                                let repo_root =
-                                    crate::utils::codeowners::repo_root_from_tasks_root(
-                                        &resolver.path,
-                                    )?;
-                                let codeowners =
-                                    crate::utils::codeowners::CodeOwners::load_from_repo(
-                                        &repo_root,
-                                    )?;
-                                codeowners.default_owner()
-                            })();
-
-                            if let Some(owner) = owner_from_codeowners {
-                                task.assignee = Some(owner);
-                                assigned = true;
-                            }
-                        }
-
-                        if !assigned {
-                            if let Some(me) = crate::utils::identity::resolve_current_user(Some(
-                                resolver.path.as_path(),
-                            )) {
-                                task.assignee = Some(me);
-                            }
-                        }
-                    }
-                }
-
-                // Save the updated task
-                renderer.log_debug("status: persisting change to storage");
-                storage.edit(&full_task_id, &task);
-
-                match renderer.format {
-                    crate::output::OutputFormat::Json => {
-                        let mut obj = serde_json::json!({
-                            "status": "success",
-                            "message": format!("Task {} status changed from {} to {}", full_task_id, old_status, validated_status),
-                            "task_id": full_task_id,
-                            "old_status": old_status,
-                            "new_status": validated_status,
-                        });
-                        if let Some(assignee) = &task.assignee {
-                            obj["assignee"] = serde_json::Value::String(assignee.clone());
-                        }
-                        renderer.emit_raw_stdout(&obj.to_string());
-                    }
-                    _ => {
-                        renderer.emit_success(&format!(
-                            "Task {} status changed from {} to {}",
-                            full_task_id, old_status, validated_status
-                        ));
-                    }
-                }
-                renderer.log_info("status: updated successfully");
-
-                Ok(())
-            }
-        }
-    }
-}
-
-/// Arguments for status command (get or set)
 pub struct StatusArgs {
     pub task_id: String,
-    pub new_status: Option<String>, // None = get status, Some = set status
+    pub new_status: Option<String>,
     pub explicit_project: Option<String>,
     pub dry_run: bool,
     pub explain: bool,
@@ -287,4 +36,240 @@ impl StatusArgs {
     }
 }
 
-// inline tests moved to tests/cli_status_unit_test.rs
+impl CommandHandler for StatusHandler {
+    type Args = StatusArgs;
+    type Result = Result<(), String>;
+
+    fn execute(
+        args: Self::Args,
+        project: Option<&str>,
+        resolver: &TasksDirectoryResolver,
+        renderer: &OutputRenderer,
+    ) -> Self::Result {
+        let StatusArgs {
+            task_id,
+            new_status,
+            explicit_project,
+            dry_run,
+            explain,
+        } = args;
+
+        let project_hint = explicit_project.as_deref().or(project);
+
+        renderer.log_info(&format!(
+            "status: begin task_id={} explicit_project={:?}",
+            task_id, project_hint
+        ));
+
+        let mut ctx = if new_status.is_some() {
+            TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?
+        } else {
+            TaskCommandContext::new_read_only(resolver, project_hint, Some(task_id.as_str()))?
+        };
+
+        let LoadedTask { full_id, task, .. } = load_task(&mut ctx, &task_id, project_hint)?;
+
+        if let Some(candidate) = new_status {
+            return handle_set_status(
+                candidate, dry_run, explain, full_id, task, &mut ctx, renderer,
+            );
+        }
+
+        render_current_status(renderer, &full_id, &task.status);
+        Ok(())
+    }
+}
+
+fn handle_set_status(
+    candidate: String,
+    dry_run: bool,
+    explain: bool,
+    full_id: String,
+    mut task: crate::storage::task::Task,
+    ctx: &mut TaskCommandContext,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    let validator = CliValidator::new(&ctx.config);
+    renderer.log_debug(&format!("status: validating new_status='{}'", candidate));
+    let validated_status = validator
+        .validate_status(&candidate)
+        .map_err(|e| format!("Status validation failed: {}", e))?;
+
+    let old_status = task.status.clone();
+    if old_status == validated_status {
+        renderer.log_info("status: no-op (old == new)");
+        renderer.emit_warning(&format!(
+            "Task {} already has status '{}'",
+            full_id, validated_status
+        ));
+        renderer.emit_notice(&format!("Task {} status unchanged", full_id));
+        return Ok(());
+    }
+
+    let was_unassigned = task.assignee.is_none();
+    let should_assign =
+        should_auto_assign(&ctx.config, &old_status, &validated_status, was_unassigned);
+    let mut resolved_assignee = if should_assign {
+        resolve_auto_assign_candidate(ctx, &ctx.config)
+    } else {
+        None
+    };
+
+    if dry_run {
+        render_dry_run_preview(
+            renderer,
+            &full_id,
+            &old_status,
+            &validated_status,
+            resolved_assignee.as_deref(),
+            explain,
+        );
+        return Ok(());
+    }
+
+    task.status = validated_status.clone();
+    if let Some(assignee) = resolved_assignee.take() {
+        task.assignee = Some(assignee);
+    }
+
+    renderer.log_debug("status: persisting change to storage");
+    ctx.storage.edit(&full_id, &task);
+    renderer.log_info("status: updated successfully");
+
+    render_status_success(
+        renderer,
+        &full_id,
+        &old_status,
+        &validated_status,
+        task.assignee.as_deref(),
+    );
+    Ok(())
+}
+
+fn render_current_status(renderer: &OutputRenderer, task_id: &str, status: &TaskStatus) {
+    match renderer.format {
+        OutputFormat::Json => {
+            let payload = serde_json::json!({
+                "status": "success",
+                "task_id": task_id,
+                "status_value": status.to_string(),
+            });
+            renderer.emit_raw_stdout(&payload.to_string());
+        }
+        _ => renderer.emit_success(&format!("Task {} status: {}", task_id, status)),
+    }
+}
+
+fn render_dry_run_preview(
+    renderer: &OutputRenderer,
+    task_id: &str,
+    old_status: &TaskStatus,
+    new_status: &TaskStatus,
+    assignee: Option<&str>,
+    explain: bool,
+) {
+    match renderer.format {
+        OutputFormat::Json => {
+            let mut payload = serde_json::json!({
+                "status": "preview",
+                "action": "status_change",
+                "task_id": task_id,
+                "old_status": old_status.to_string(),
+                "new_status": new_status.to_string(),
+            });
+            if let Some(candidate) = assignee {
+                payload["would_set_assignee"] = Value::String(candidate.to_string());
+            }
+            if explain {
+                payload["explain"] = Value::String(DRY_RUN_EXPLANATION.to_string());
+            }
+            renderer.emit_raw_stdout(&payload.to_string());
+        }
+        _ => {
+            let mut message = format!(
+                "DRY RUN: Would change {} status from {} to {}",
+                task_id, old_status, new_status
+            );
+            if let Some(candidate) = assignee {
+                message.push_str(&format!("; would set assignee = {}", candidate));
+            }
+            renderer.emit_info(&message);
+            if explain {
+                renderer.emit_info(&format!("Explanation: {}", DRY_RUN_EXPLANATION));
+            }
+        }
+    }
+}
+
+fn render_status_success(
+    renderer: &OutputRenderer,
+    task_id: &str,
+    old_status: &TaskStatus,
+    new_status: &TaskStatus,
+    assignee: Option<&str>,
+) {
+    match renderer.format {
+        OutputFormat::Json => {
+            let mut payload = serde_json::json!({
+                "status": "success",
+                "message": format!(
+                    "Task {} status changed from {} to {}",
+                    task_id, old_status, new_status
+                ),
+                "task_id": task_id,
+                "old_status": old_status.to_string(),
+                "new_status": new_status.to_string(),
+            });
+            if let Some(value) = assignee {
+                payload["assignee"] = Value::String(value.to_string());
+            }
+            renderer.emit_raw_stdout(&payload.to_string());
+        }
+        _ => {
+            renderer.emit_success(&format!(
+                "Task {} status changed from {} to {}",
+                task_id, old_status, new_status
+            ));
+        }
+    }
+}
+
+fn should_auto_assign(
+    config: &ResolvedConfig,
+    old_status: &TaskStatus,
+    new_status: &TaskStatus,
+    was_unassigned: bool,
+) -> bool {
+    if !config.auto_assign_on_status || !was_unassigned {
+        return false;
+    }
+    if old_status == new_status {
+        return false;
+    }
+    config
+        .effective_default_status()
+        .as_ref()
+        .map(|default| default == old_status)
+        .unwrap_or(false)
+}
+
+fn resolve_auto_assign_candidate(
+    ctx: &TaskCommandContext,
+    config: &ResolvedConfig,
+) -> Option<String> {
+    if config.auto_codeowners_assign {
+        if let Some(repo_root) =
+            crate::utils::codeowners::repo_root_from_tasks_root(&ctx.tasks_dir.path)
+        {
+            if let Some(codeowners) =
+                crate::utils::codeowners::CodeOwners::load_from_repo(&repo_root)
+            {
+                if let Some(owner) = codeowners.default_owner() {
+                    return Some(owner);
+                }
+            }
+        }
+    }
+
+    crate::utils::identity::resolve_current_user(Some(ctx.tasks_dir.path.as_path()))
+}

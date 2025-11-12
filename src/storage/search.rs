@@ -1,9 +1,10 @@
 use crate::storage::TaskFilter;
+use crate::storage::locator::StorageLocator;
 use crate::storage::task::Task;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Search and filtering functionality for task storage
 pub struct StorageSearch;
@@ -35,27 +36,9 @@ impl StorageSearch {
 
         // If we have a specific project filter, search only that project
         if let Some(project) = &filter.project {
-            // Try to find the project folder (could be the project name itself or a mapped prefix)
-            let mut candidate_roots: Vec<PathBuf> = vec![root_path.to_path_buf()];
-
-            // Fallback: when running from a workspace parent without a local .tasks, also
-            // scan immediate child directories for their own .tasks roots (monorepo layout).
-            if let Some(parent) = root_path.parent() {
-                for entry in crate::utils::filesystem::list_visible_subdirs(parent) {
-                    let (_, dir_path) = entry;
-                    let child_tasks = dir_path.join(".tasks");
-                    if child_tasks.exists() && child_tasks.is_dir() {
-                        candidate_roots.push(child_tasks);
-                    }
-                }
-            }
-
-            // Deduplicate candidate roots
-            candidate_roots.sort();
-            candidate_roots.dedup();
-
-            for candidate_root in candidate_roots.into_iter() {
-                let project_folders = Self::get_project_folders_for_name(&candidate_root, project);
+            for candidate_root in StorageLocator::candidate_task_roots(root_path) {
+                let project_folders =
+                    StorageLocator::project_folders_for_name(&candidate_root, project);
                 for project_folder in project_folders {
                     let project_path = candidate_root.join(&project_folder);
                     let files = crate::utils::filesystem::list_files_with_ext(&project_path, "yml");
@@ -219,18 +202,6 @@ impl StorageSearch {
         // Deterministic order
         results.sort_by(|a, b| a.0.cmp(&b.0));
         results
-    }
-
-    /// Helper method to get potential project folders for a given project name
-    pub fn get_project_folders_for_name(root_path: &Path, project_name: &str) -> Vec<String> {
-        let mut folders = Vec::new();
-
-        // Only add the project if the directory actually exists
-        if root_path.join(project_name).exists() {
-            folders.push(project_name.to_string());
-        }
-
-        folders
     }
 
     /// Helper method to check if a task matches all filter criteria

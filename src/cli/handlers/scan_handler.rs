@@ -1,12 +1,35 @@
 use crate::cli::ScanArgs;
 use crate::cli::handlers::AddHandler;
 use crate::cli::handlers::CommandHandler;
+use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::OutputRenderer;
 use crate::project;
 use crate::scanner;
 use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
 // feature-aware custom fields manipulation helpers are implemented below
+
+fn edit_task_with_context<F>(
+    resolver: &TasksDirectoryResolver,
+    task_id: &str,
+    project_hint: Option<&str>,
+    mutator: F,
+) -> Result<(), String>
+where
+    F: FnOnce(&mut crate::storage::task::Task) -> bool,
+{
+    let mut ctx = TaskCommandContext::new(resolver, project_hint, Some(task_id))?;
+    let LoadedTask {
+        full_id, mut task, ..
+    } = load_task(&mut ctx, task_id, project_hint)?;
+    let changed = mutator(&mut task);
+    if changed {
+        task.modified = chrono::Utc::now().to_rfc3339();
+        ctx.storage.edit(&full_id, &task);
+    }
+    Ok(())
+}
 
 /// Handler for scan command
 pub struct ScanHandler;
@@ -277,45 +300,66 @@ impl CommandHandler for ScanHandler {
 
                             // If not dry-run, persist a reverse link in the created task (bi-directional reference)
                             if !args.dry_run {
-                                if let Some(project_prefix) = crate::storage::operations::StorageOperations::get_project_for_task(&task_id) {
-                                        if let Some(mut storage) = crate::storage::manager::Storage::try_open(_resolver.path.clone()) {
-                                            if let Some(mut task) = storage.get(&task_id, project_prefix.clone()) {
-                                                // Store repo-relative or path string with #L<line> anchor
-                                                // Build a repo-relative (or cwd-relative) code anchor
-                                                let rel = crate::utils::paths::repo_relative_display(&entry.file_path);
-                                                let code_ref = format!("{}#L{}", rel, entry.line_number);
-                                                // If exact anchor already exists, skip; otherwise prune stale anchors for the same file path
-                                                let has_exact = task
-                                                    .references
-                                                    .iter()
-                                                    .any(|r| r.code.as_deref() == Some(&code_ref));
-                                                if args.reanchor {
-                                                    // Aggressively prune anchors across all files, keep only this anchor
-                                                    task.references.retain(|r| r.code.as_deref() == Some(&code_ref));
-                                                    if !has_exact {
-                                                        task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
-                                                    }
-                                                } else if !has_exact {
-                                                    // Remove older anchors that point to the same file (different line)
-                                                    let file_key = rel.clone();
-                                                    task.references.retain(|r| {
-                                                        if let Some(code) = &r.code {
-                                                            // Split on "#L" to compare only the file path portion
-                                                            let (file_part, _) = code.split_once("#L").unwrap_or((code.as_str(), ""));
-                                                            // Keep if different file, or exactly the same new anchor
-                                                            if file_part == file_key && code != &code_ref {
-                                                                return false; // prune stale same-file anchor
-                                                            }
-                                                        }
-                                                        true
-                                                    });
-                                                    task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
-                                                }
-                                                task.modified = chrono::Utc::now().to_rfc3339();
-                                                storage.edit(&task_id, &task);
+                                let rel =
+                                    crate::utils::paths::repo_relative_display(&entry.file_path);
+                                let line_number = entry.line_number;
+                                let reanchor = args.reanchor;
+                                if let Err(err) =
+                                    edit_task_with_context(_resolver, &task_id, None, |task| {
+                                        let code_ref = format!("{}#L{}", rel, line_number);
+                                        let has_exact = task
+                                            .references
+                                            .iter()
+                                            .any(|r| r.code.as_deref() == Some(code_ref.as_str()));
+
+                                        if reanchor {
+                                            let before_len = task.references.len();
+                                            task.references.retain(|r| {
+                                                r.code.as_deref() == Some(code_ref.as_str())
+                                            });
+                                            let mut changed = before_len != task.references.len();
+                                            if !has_exact {
+                                                task.references.push(
+                                                    crate::types::ReferenceEntry {
+                                                        code: Some(code_ref),
+                                                        link: None,
+                                                    },
+                                                );
+                                                changed = true;
                                             }
+                                            return changed;
                                         }
-                                    }
+
+                                        if has_exact {
+                                            return false;
+                                        }
+
+                                        let file_key = rel.as_str();
+                                        task.references.retain(|r| {
+                                            if let Some(code) = &r.code {
+                                                if let Some((file_part, _)) = code.split_once("#L")
+                                                {
+                                                    if file_part == file_key
+                                                        && code != code_ref.as_str()
+                                                    {
+                                                        return false;
+                                                    }
+                                                }
+                                            }
+                                            true
+                                        });
+                                        task.references.push(crate::types::ReferenceEntry {
+                                            code: Some(code_ref),
+                                            link: None,
+                                        });
+                                        true
+                                    })
+                                {
+                                    renderer.log_debug(&format!(
+                                        "scan: unable to update references for {}: {}",
+                                        task_id, err
+                                    ));
+                                }
                             }
 
                             // Insert (KEY) after signal word; optionally strip bracket attributes
@@ -385,41 +429,65 @@ impl CommandHandler for ScanHandler {
                             // Movement/relocation resilience: if an existing key is present, ensure
                             // the corresponding task has a code reference for this file+line.
                             if let Some(task_id) = existing_key {
-                                if let Some(project_prefix) = crate::storage::operations::StorageOperations::get_project_for_task(&task_id) {
-                                    if let Some(mut storage) = crate::storage::manager::Storage::try_open(_resolver.path.clone()) {
-                                        if let Some(mut task) = storage.get(&task_id, project_prefix.clone()) {
-                                            let rel = crate::utils::paths::repo_relative_display(&entry.file_path);
-                                            let code_ref = format!("{}#L{}", rel, entry.line_number);
-                                            // If exact anchor already exists, skip; otherwise prune stale anchors for the same file path
-                                            let has_exact = task
-                                                .references
-                                                .iter()
-                                                .any(|r| r.code.as_deref() == Some(&code_ref));
-                                            if args.reanchor {
-                                                // Keep only this anchor across files
-                                                task.references.retain(|r| r.code.as_deref() == Some(&code_ref));
-                                                if !has_exact {
-                                                    task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
-                                                }
-                                                task.modified = chrono::Utc::now().to_rfc3339();
-                                                storage.edit(&task_id, &task);
-                                            } else if !has_exact {
-                                                let file_key = rel.clone();
-                                                task.references.retain(|r| {
-                                                    if let Some(code) = &r.code {
-                                                        let (file_part, _) = code.split_once("#L").unwrap_or((code.as_str(), ""));
-                                                        if file_part == file_key && code != &code_ref {
-                                                            return false;
-                                                        }
-                                                    }
-                                                    true
-                                                });
-                                                task.references.push(crate::types::ReferenceEntry { code: Some(code_ref), link: None });
-                                                task.modified = chrono::Utc::now().to_rfc3339();
-                                                storage.edit(&task_id, &task);
+                                let rel =
+                                    crate::utils::paths::repo_relative_display(&entry.file_path);
+                                let line_number = entry.line_number;
+                                let reanchor = args.reanchor;
+                                if let Err(err) =
+                                    edit_task_with_context(_resolver, &task_id, None, |task| {
+                                        let code_ref = format!("{}#L{}", rel, line_number);
+                                        let has_exact = task
+                                            .references
+                                            .iter()
+                                            .any(|r| r.code.as_deref() == Some(code_ref.as_str()));
+
+                                        if reanchor {
+                                            let before_len = task.references.len();
+                                            task.references.retain(|r| {
+                                                r.code.as_deref() == Some(code_ref.as_str())
+                                            });
+                                            let mut changed = before_len != task.references.len();
+                                            if !has_exact {
+                                                task.references.push(
+                                                    crate::types::ReferenceEntry {
+                                                        code: Some(code_ref),
+                                                        link: None,
+                                                    },
+                                                );
+                                                changed = true;
                                             }
+                                            return changed;
                                         }
-                                    }
+
+                                        if has_exact {
+                                            return false;
+                                        }
+
+                                        let file_key = rel.as_str();
+                                        task.references.retain(|r| {
+                                            if let Some(code) = &r.code {
+                                                if let Some((file_part, _)) = code.split_once("#L")
+                                                {
+                                                    if file_part == file_key
+                                                        && code != code_ref.as_str()
+                                                    {
+                                                        return false;
+                                                    }
+                                                }
+                                            }
+                                            true
+                                        });
+                                        task.references.push(crate::types::ReferenceEntry {
+                                            code: Some(code_ref),
+                                            link: None,
+                                        });
+                                        true
+                                    })
+                                {
+                                    renderer.log_debug(&format!(
+                                        "scan: unable to refresh anchor for {}: {}",
+                                        task_id, err
+                                    ));
                                 }
                             }
                         }
@@ -660,14 +728,14 @@ impl ScanHandler {
         window_hint: Option<usize>,
     ) -> Result<(), String> {
         let window = window_hint.unwrap_or(7);
-        let mut storage = match crate::storage::manager::Storage::try_open(_resolver.path.clone()) {
-            Some(s) => s,
-            None => return Ok(()),
+        let mut ctx = match TaskCommandContext::new_read_only(_resolver, None, None) {
+            Ok(ctx) => ctx,
+            Err(_) => return Ok(()),
         };
 
         // Load all tasks (all projects)
         let filter = crate::storage::TaskFilter::default();
-        let mut tasks = storage.search(&filter);
+        let mut tasks = ctx.storage.search(&filter);
         if tasks.is_empty() {
             return Ok(());
         }
@@ -808,7 +876,7 @@ impl ScanHandler {
 
             if changed {
                 task.modified = chrono::Utc::now().to_rfc3339();
-                crate::storage::manager::Storage::edit(&mut storage, &task_id, &task);
+                ctx.storage.edit(&task_id, &task);
                 updates += 1;
             }
         }

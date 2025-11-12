@@ -1,8 +1,8 @@
 use crate::cli::args::task::RelationshipKind;
 use crate::cli::handlers::CommandHandler;
-use crate::cli::project::ProjectResolver;
+use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::{OutputFormat, OutputRenderer};
-use crate::storage::manager::Storage;
 use crate::types::TaskRelationships;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::{Map as JsonMap, Value as JsonValue};
@@ -25,51 +25,18 @@ impl CommandHandler for RelationshipsHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
-        let mut project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+        let project_hint = args.explicit_project.as_deref().or(project);
 
-        project_resolver
-            .validate_task_id_format(&args.task_id)
-            .map_err(|e| format!("Invalid task ID: {}", e))?;
-
-        let final_effective_project = project.or(args.explicit_project.as_deref());
-
-        let mut resolved_project = project_resolver
-            .resolve_project(&args.task_id, final_effective_project)
-            .map_err(|e| format!("Could not resolve project: {}", e))?;
-
-        let mut full_task_id = project_resolver
-            .get_full_task_id(&args.task_id, final_effective_project)
-            .map_err(|e| format!("Could not determine full task ID: {}", e))?;
-
-        let storage = Storage::try_open(resolver.path.clone())
-            .ok_or_else(|| "No tasks found. Use 'lotar add' to create tasks first.".to_string())?;
-
-        let numeric_only = args.task_id.chars().all(|c| c.is_ascii_digit());
-        let task = match storage.get(&full_task_id, resolved_project.clone()) {
-            Some(task) => task,
-            None if numeric_only => {
-                if let Some((actual_id, task)) = storage.find_task_by_numeric_id(&args.task_id) {
-                    if let Some(prefix) = actual_id.split('-').next() {
-                        resolved_project = prefix.to_string();
-                    }
-                    full_task_id = actual_id;
-                    task
-                } else {
-                    return Err(format!("Task '{}' not found", full_task_id));
-                }
-            }
-            None => return Err(format!("Task '{}' not found", full_task_id)),
-        };
+        let mut ctx =
+            TaskCommandContext::new_read_only(resolver, project_hint, Some(&args.task_id))?;
+        let LoadedTask {
+            full_id,
+            project_prefix,
+            task,
+        } = load_task(&mut ctx, &args.task_id, project_hint)?;
 
         let filtered = filter_relationships(&task.relationships, &args.kinds);
-        render_relationships(
-            renderer,
-            &full_task_id,
-            &resolved_project,
-            &args.kinds,
-            &filtered,
-        );
+        render_relationships(renderer, &full_id, &project_prefix, &args.kinds, &filtered);
         Ok(())
     }
 }

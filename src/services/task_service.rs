@@ -510,41 +510,7 @@ impl TaskService {
             return Ok(config);
         }
 
-        let mut candidates: Vec<String> = Vec::new();
-        if let Some(reporter) = task.reporter.as_deref() {
-            let trimmed = reporter.trim();
-            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
-                candidates.push(trimmed.to_string());
-            }
-        }
-        if let Some(assignee) = task.assignee.as_deref() {
-            let trimmed = assignee.trim();
-            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
-                candidates.push(trimmed.to_string());
-            }
-        }
-
-        if candidates.is_empty() {
-            return Ok(config);
-        }
-
-        let mut missing: Vec<String> = Vec::new();
-        let mut seen: HashSet<String> = HashSet::new();
-
-        for candidate in candidates {
-            let lower = candidate.to_ascii_lowercase();
-            if !seen.insert(lower.clone()) {
-                continue;
-            }
-            let already_present = config
-                .members
-                .iter()
-                .any(|existing| existing.eq_ignore_ascii_case(&candidate));
-            if !already_present {
-                missing.push(candidate);
-            }
-        }
-
+        let missing = Self::missing_members_for_task(task, &config);
         if missing.is_empty() {
             return Ok(config);
         }
@@ -616,6 +582,49 @@ impl TaskService {
         Ok(())
     }
 
+    pub(crate) fn missing_members_for_task(task: &Task, config: &ResolvedConfig) -> Vec<String> {
+        if !config.auto_populate_members {
+            return Vec::new();
+        }
+
+        let mut candidates: Vec<String> = Vec::new();
+        if let Some(reporter) = task.reporter.as_deref() {
+            let trimmed = reporter.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+                candidates.push(trimmed.to_string());
+            }
+        }
+        if let Some(assignee) = task.assignee.as_deref() {
+            let trimmed = assignee.trim();
+            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+                candidates.push(trimmed.to_string());
+            }
+        }
+
+        if candidates.is_empty() {
+            return Vec::new();
+        }
+
+        let mut missing: Vec<String> = Vec::new();
+        let mut seen: HashSet<String> = HashSet::new();
+
+        for candidate in candidates {
+            let lower = candidate.to_ascii_lowercase();
+            if !seen.insert(lower.clone()) {
+                continue;
+            }
+            let already_present = config
+                .members
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(&candidate));
+            if !already_present {
+                missing.push(candidate);
+            }
+        }
+
+        missing
+    }
+
     pub(crate) fn replace_sprint_memberships(
         storage: &mut Storage,
         task_id: &str,
@@ -667,7 +676,11 @@ impl TaskService {
         }
     }
 
-    fn enforce_membership(task: &Task, config: &ResolvedConfig, project: &str) -> LoTaRResult<()> {
+    pub(crate) fn enforce_membership(
+        task: &Task,
+        config: &ResolvedConfig,
+        project: &str,
+    ) -> LoTaRResult<()> {
         if !config.strict_members {
             return Ok(());
         }

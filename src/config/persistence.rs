@@ -1,6 +1,5 @@
+use crate::config::env_overrides::{self, EnvOverrideReport};
 use crate::config::types::*;
-use crate::utils::project::generate_project_prefix;
-use std::env;
 use std::fs;
 use std::path::Path;
 
@@ -128,27 +127,8 @@ fn load_config_file(path: &Path) -> Result<GlobalConfig, ConfigError> {
 }
 
 /// Apply environment variable overrides to configuration
-pub fn apply_env_overrides(config: &mut GlobalConfig) {
-    if let Ok(port) = env::var("LOTAR_PORT") {
-        if let Ok(port_num) = port.parse::<u16>() {
-            config.server_port = port_num;
-        }
-    }
-
-    if let Ok(project) = env::var("LOTAR_PROJECT") {
-        // Convert project name to prefix for storage
-        config.default_prefix = generate_project_prefix(&project);
-    }
-
-    if let Ok(assignee) = env::var("LOTAR_DEFAULT_ASSIGNEE") {
-        config.default_assignee = Some(assignee);
-    }
-
-    if let Ok(reporter) = env::var("LOTAR_DEFAULT_REPORTER") {
-        config.default_reporter = Some(reporter);
-    }
-
-    // Note: auto_set_reporter and auto_assign_on_status are not overridden by env vars
+pub fn apply_env_overrides(config: &mut GlobalConfig) -> EnvOverrideReport {
+    env_overrides::apply_env_overrides(config)
 }
 
 /// Create default global configuration file

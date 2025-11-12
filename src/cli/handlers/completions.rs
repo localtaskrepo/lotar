@@ -1,4 +1,3 @@
-use clap::CommandFactory;
 use clap_complete::{generate, generate_to};
 use std::fs::{self, File};
 use std::io::{self, Write};
@@ -151,7 +150,7 @@ fn ensure_parent_exists(path: &Path) -> io::Result<()> {
 }
 
 fn write_completion(shell: CompletionShell, target: Option<&Path>) -> io::Result<Option<PathBuf>> {
-    let mut cmd = crate::cli::Cli::command();
+    let mut cmd = crate::cli::base_command();
     let binary_name = cmd.get_name().to_string();
     let clap_shell = shell.as_clap_shell();
 
@@ -181,7 +180,7 @@ fn write_completion(shell: CompletionShell, target: Option<&Path>) -> io::Result
 }
 
 fn render_completion(shell: CompletionShell) -> Result<String, String> {
-    let mut cmd = crate::cli::Cli::command();
+    let mut cmd = crate::cli::base_command();
     let mut buffer = Vec::new();
     let clap_shell = shell.as_clap_shell();
     let binary_name = cmd.get_name().to_string();

@@ -1,9 +1,14 @@
 use crate::cli::handlers::CommandHandler;
-use crate::cli::project::ProjectResolver;
+use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
+use crate::cli::handlers::task::render::{
+    PropertyCurrent, PropertyNoop, PropertySuccess, render_property_current, render_property_noop,
+    render_property_success,
+};
 use crate::cli::validation::CliValidator;
 use crate::output::OutputRenderer;
-use crate::storage::manager::Storage;
-use crate::utils::project::resolve_project_input;
+use crate::storage::task::Task;
+use crate::types::Priority;
 use crate::workspace::TasksDirectoryResolver;
 
 /// Handler for priority change commands
@@ -19,133 +24,115 @@ impl CommandHandler for PriorityHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Self::Result {
-        // Create project resolver
-        let mut project_resolver = ProjectResolver::new(resolver)
-            .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+        let PriorityArgs {
+            task_id,
+            new_priority,
+            explicit_project,
+        } = args;
 
-        // Validate task ID format
-        project_resolver
-            .validate_task_id_format(&args.task_id)
-            .map_err(|e| format!("Invalid task ID: {}", e))?;
+        let project_hint = explicit_project.as_deref().or(project);
 
-        // Resolve project strictly: always honor explicit project if provided and validate
-        // against any prefix in the task_id. This will error on mismatches.
-        let final_effective_project = project.or(args.explicit_project.as_deref());
+        renderer.log_info(&format!(
+            "priority: begin task_id={} explicit_project={:?}",
+            task_id, project_hint
+        ));
 
-        // Load project configuration for validation
-        let resolved_project = project_resolver
-            .resolve_project("", final_effective_project)
-            .map_err(|e| format!("Could not resolve project: {}", e))?;
-        // Determine full task id (handles numeric IDs by prefixing with project)
-        let full_task_id = project_resolver
-            .get_full_task_id(&args.task_id, final_effective_project)
-            .map_err(|e| format!("Could not determine full task ID: {}", e))?;
-        let config = project_resolver.get_config();
-        let project_config = if !resolved_project.is_empty() {
-            project_resolver
-                .get_project_config(&resolved_project)
-                .map_err(|e| format!("Failed to get project configuration: {}", e))?
+        let mut ctx = if new_priority.is_some() {
+            TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?
         } else {
-            config.clone()
-        };
-        let project_validator = CliValidator::new(&project_config);
-
-        // Try to open existing storage
-        let mut storage = match Storage::try_open(resolver.path.clone()) {
-            Some(storage) => storage,
-            None => return Err("No tasks found. Use 'lotar add' to create tasks first.".into()),
-        };
-        let project_prefix = if let Some(project) = final_effective_project {
-            resolve_project_input(project, resolver.path.as_path())
-        } else {
-            crate::project::get_effective_project_name(resolver)
+            TaskCommandContext::new_read_only(resolver, project_hint, Some(task_id.as_str()))?
         };
 
-        match args.new_priority {
-            Some(new_priority) => {
-                // SET operation
-                let validated_priority = project_validator
-                    .validate_priority(&new_priority)
-                    .map_err(|e| format!("Priority validation failed: {}", e))?;
+        let LoadedTask { full_id, task, .. } = load_task(&mut ctx, &task_id, project_hint)?;
 
-                let mut task = storage
-                    .get(&full_task_id, project_prefix.clone())
-                    .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
-
-                let old_priority = task.priority;
-                if old_priority == validated_priority {
-                    match renderer.format {
-                        crate::output::OutputFormat::Json => {
-                            let obj = serde_json::json!({
-                                "status": "success",
-                                "message": format!("Task {} priority unchanged", full_task_id),
-                                "task_id": full_task_id,
-                                "priority": validated_priority.to_string()
-                            });
-                            renderer.emit_raw_stdout(&obj.to_string());
-                        }
-                        _ => {
-                            renderer.emit_warning(&format!(
-                                "Task {} priority is already {}",
-                                full_task_id, validated_priority
-                            ));
-                        }
-                    }
-                    return Ok(());
-                }
-
-                task.priority = validated_priority;
-                storage.edit(&full_task_id, &task);
-
-                match renderer.format {
-                    crate::output::OutputFormat::Json => {
-                        let obj = serde_json::json!({
-                            "status": "success",
-                            "message": format!(
-                                "Task {} priority changed from {} to {}",
-                                full_task_id, old_priority, task.priority
-                            ),
-                            "task_id": full_task_id,
-                            "old_priority": old_priority.to_string(),
-                            "new_priority": task.priority.to_string()
-                        });
-                        renderer.emit_raw_stdout(&obj.to_string());
-                    }
-                    _ => {
-                        renderer.emit_success(&format!(
-                            "Task {} priority changed from {} to {}",
-                            full_task_id, old_priority, task.priority
-                        ));
-                    }
-                }
-                Ok(())
-            }
+        match new_priority {
+            Some(candidate) => handle_set_priority(candidate, full_id, task, &mut ctx, renderer),
             None => {
-                // GET operation
-                let task = storage
-                    .get(&full_task_id, project_prefix.clone())
-                    .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
-
-                match renderer.format {
-                    crate::output::OutputFormat::Json => {
-                        let obj = serde_json::json!({
-                            "status": "success",
-                            "task_id": full_task_id,
-                            "priority": task.priority.to_string()
-                        });
-                        renderer.emit_raw_stdout(&obj.to_string());
-                    }
-                    _ => {
-                        renderer.emit_success(&format!(
-                            "Task {} priority: {}",
-                            full_task_id, task.priority
-                        ));
-                    }
-                }
+                render_current_priority(renderer, &full_id, &task.priority);
                 Ok(())
             }
         }
     }
+}
+
+fn handle_set_priority(
+    candidate: String,
+    full_id: String,
+    mut task: Task,
+    ctx: &mut TaskCommandContext,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    let validator = CliValidator::new(&ctx.config);
+    renderer.log_debug(&format!(
+        "priority: validating new_priority='{}'",
+        candidate
+    ));
+
+    let validated_priority = validator
+        .validate_priority(&candidate)
+        .map_err(|e| format!("Priority validation failed: {}", e))?;
+
+    let old_priority = task.priority.clone();
+    if old_priority == validated_priority {
+        render_noop_priority(renderer, &full_id, &validated_priority);
+        return Ok(());
+    }
+
+    task.priority = validated_priority.clone();
+
+    renderer.log_debug("priority: persisting change to storage");
+    ctx.storage.edit(&full_id, &task);
+    renderer.log_info("priority: updated successfully");
+
+    render_priority_success(renderer, &full_id, &old_priority, &validated_priority);
+    Ok(())
+}
+
+fn render_current_priority(renderer: &OutputRenderer, task_id: &str, priority: &Priority) {
+    let value = priority.to_string();
+    let current = PropertyCurrent::new(
+        task_id,
+        "priority",
+        Some(value.clone()),
+        format!("Task {} priority: {}", task_id, value),
+    );
+    render_property_current(renderer, current);
+}
+
+fn render_noop_priority(renderer: &OutputRenderer, task_id: &str, priority: &Priority) {
+    let value = priority.to_string();
+    let noop = PropertyNoop::new(
+        task_id,
+        "priority",
+        Some(value.clone()),
+        format!("Task {} priority unchanged", task_id),
+        format!("Task {} priority is already {}", task_id, value),
+    );
+    render_property_noop(renderer, noop);
+}
+
+fn render_priority_success(
+    renderer: &OutputRenderer,
+    task_id: &str,
+    old_priority: &Priority,
+    new_priority: &Priority,
+) {
+    let old_value = old_priority.to_string();
+    let new_value = new_priority.to_string();
+    let message = format!(
+        "Task {} priority changed from {} to {}",
+        task_id, old_value, new_value
+    );
+    let success = PropertySuccess::new(
+        task_id,
+        "old_priority",
+        "new_priority",
+        Some(old_value.clone()),
+        Some(new_value.clone()),
+        message.clone(),
+        message,
+    );
+    render_property_success(renderer, success);
 }
 
 /// Arguments for priority command

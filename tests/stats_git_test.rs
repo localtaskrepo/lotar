@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use chrono::{Duration, SecondsFormat, Utc};
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -411,18 +412,29 @@ fn stats_changed_and_churn_and_authors() {
     let root = temp.path();
     init_repo(&temp);
 
+    let now = Utc::now();
+    let ts = |days| (now - Duration::days(days)).to_rfc3339_opts(SecondsFormat::Secs, true);
+    let created_one = ts(60);
+    let edit_one = ts(45);
+    let created_two = ts(30);
+    let edit_one_again = ts(15);
+
     // tasks directory and sample tasks
     write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
     write_file(
         root,
         ".tasks/TEST/1.yml",
-        "title: One\nstatus: TODO\npriority: MEDIUM\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
+        &format!(
+            "title: One\nstatus: TODO\npriority: MEDIUM\ncreated: {created}\nmodified: {modified}\n",
+            created = created_one.clone(),
+            modified = created_one.clone(),
+        ),
     );
     add_and_commit(
         root,
         ".tasks/TEST/1.yml",
         ("Alice", "alice@example.com"),
-        "2025-08-01T10:00:00Z",
+        &created_one,
         "add 1",
     );
 
@@ -430,13 +442,17 @@ fn stats_changed_and_churn_and_authors() {
     write_file(
         root,
         ".tasks/TEST/1.yml",
-        "title: One edited\nstatus: IN_PROGRESS\npriority: MEDIUM\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-10T09:00:00Z\n",
+        &format!(
+            "title: One edited\nstatus: IN_PROGRESS\npriority: MEDIUM\ncreated: {created}\nmodified: {modified}\n",
+            created = created_one.clone(),
+            modified = edit_one.clone(),
+        ),
     );
     add_and_commit(
         root,
         ".tasks/TEST/1.yml",
         ("Bob", "bob@example.com"),
-        "2025-08-10T09:00:00Z",
+        &edit_one,
         "edit 1",
     );
 
@@ -444,13 +460,17 @@ fn stats_changed_and_churn_and_authors() {
     write_file(
         root,
         ".tasks/TEST/2.yml",
-        "title: Two\nstatus: TODO\npriority: LOW\ncreated: 2025-08-15T11:00:00Z\nmodified: 2025-08-15T11:00:00Z\n",
+        &format!(
+            "title: Two\nstatus: TODO\npriority: LOW\ncreated: {created}\nmodified: {modified}\n",
+            created = created_two.clone(),
+            modified = created_two.clone(),
+        ),
     );
     add_and_commit(
         root,
         ".tasks/TEST/2.yml",
         ("Alice", "alice@example.com"),
-        "2025-08-15T11:00:00Z",
+        &created_two,
         "add 2",
     );
 
@@ -458,13 +478,17 @@ fn stats_changed_and_churn_and_authors() {
     write_file(
         root,
         ".tasks/TEST/1.yml",
-        "title: One edited again\nstatus: IN_PROGRESS\npriority: MEDIUM\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-16T12:00:00Z\n",
+        &format!(
+            "title: One edited again\nstatus: IN_PROGRESS\npriority: MEDIUM\ncreated: {created}\nmodified: {modified}\n",
+            created = created_one.clone(),
+            modified = edit_one_again.clone(),
+        ),
     );
     add_and_commit(
         root,
         ".tasks/TEST/1.yml",
         ("Alice", "alice@example.com"),
-        "2025-08-16T12:00:00Z",
+        &edit_one_again,
         "edit 1 again",
     );
 

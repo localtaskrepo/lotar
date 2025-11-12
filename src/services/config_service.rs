@@ -1,5 +1,9 @@
 use crate::api_types::ProjectDTO;
 use crate::config::manager::ConfigManager;
+use crate::config::source_labels::{
+    CONFIG_SOURCE_ENTRIES, build_global_source_labels, build_project_source_labels,
+    collapse_label_to_scope,
+};
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
@@ -42,358 +46,84 @@ impl ConfigService {
         project_prefix: Option<&str>,
     ) -> LoTaRResult<serde_json::Value> {
         use crate::config::persistence;
-        use crate::config::types::{GlobalConfig, ProjectConfig};
+        use crate::config::types::GlobalConfig;
         use crate::utils::paths;
 
         let mgr = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
             .map_err(|e| LoTaRError::ValidationError(format!("Failed to load config: {}", e)))?;
 
-        // Effective config for requested scope
-        let effective_val = if let Some(prefix) = project_prefix {
-            let project_cfg = mgr.get_project_config(prefix).map_err(|e| {
+        let resolved_global = mgr.get_resolved_config().clone();
+
+        let global_path = paths::global_config_path(&resolver.path);
+        let has_global_file = global_path.exists();
+        let global_cfg = persistence::load_global_config(Some(&resolver.path)).ok();
+        let home_cfg = persistence::load_home_config().ok();
+        let global_raw: GlobalConfig = global_cfg.clone().unwrap_or_default();
+
+        let mut project_exists = false;
+        let mut project_raw_val = serde_json::json!({});
+
+        let (effective_val, sources_by_path) = if let Some(prefix) = project_prefix {
+            let resolved_project = mgr.get_project_config(prefix).map_err(|e| {
                 LoTaRError::ValidationError(format!(
                     "Failed to load project config for '{}': {}",
                     prefix, e
                 ))
             })?;
-            serde_json::to_value(project_cfg)
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?
-        } else {
-            serde_json::to_value(mgr.get_resolved_config())
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?
-        };
+            let effective_val = serde_json::to_value(&resolved_project)
+                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
 
-        // Raw global (file or default) and existence flag
-        let global_path = paths::global_config_path(&resolver.path);
-        let has_global_file = global_path.exists();
-        let global_raw: GlobalConfig =
-            persistence::load_global_config(Some(&resolver.path)).unwrap_or_default();
-
-        // Raw project if requested
-        let mut project_exists = false;
-        let project_raw_val = if let Some(prefix) = project_prefix {
-            match persistence::load_project_config_from_dir(prefix, &resolver.path) {
-                Ok(pc) => {
-                    project_exists = true;
-                    serde_json::to_value(pc).unwrap_or(serde_json::json!({}))
-                }
-                Err(_) => serde_json::json!({}),
+            let project_cfg =
+                persistence::load_project_config_from_dir(prefix, &resolver.path).ok();
+            if let Some(cfg) = project_cfg.as_ref() {
+                project_exists = true;
+                project_raw_val = serde_json::to_value(cfg).unwrap_or(serde_json::json!({}));
             }
+
+            let sources = build_project_source_labels(
+                &resolved_project,
+                &resolved_global,
+                project_cfg.as_ref(),
+                &global_cfg,
+                &home_cfg,
+            );
+
+            (effective_val, sources)
         } else {
-            serde_json::json!({})
+            let effective_val = serde_json::to_value(&resolved_global)
+                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            let sources = build_global_source_labels(&resolved_global, &global_cfg, &home_cfg);
+            (effective_val, sources)
         };
 
-        // Compute simple provenance per field
         let mut sources = serde_json::Map::new();
         let is_project_scope = project_prefix.is_some();
 
-        // Helper to mark a field source
-        let mut mark = |field: &str, src: &str| {
-            sources.insert(
-                field.to_string(),
-                serde_json::Value::String(src.to_string()),
-            );
-        };
-
-        if is_project_scope {
-            // Parse project_raw to detect explicit overrides
-            let project_raw: ProjectConfig = serde_json::from_value(project_raw_val.clone())
-                .unwrap_or(ProjectConfig::new(project_prefix.unwrap_or("").to_string()));
-            // Fields that are Option in ProjectConfig indicate overrides if Some
-            if project_raw.issue_states.is_some() {
-                mark("issue_states", "project");
-            } else {
-                mark(
-                    "issue_states",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.issue_types.is_some() {
-                mark("issue_types", "project");
-            } else {
-                mark(
-                    "issue_types",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.issue_priorities.is_some() {
-                mark("issue_priorities", "project");
-            } else {
-                mark(
-                    "issue_priorities",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.tags.is_some() {
-                mark("tags", "project");
-            } else {
-                mark(
-                    "tags",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.custom_fields.is_some() {
-                mark("custom_fields", "project");
-            } else {
-                mark(
-                    "custom_fields",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.default_assignee.is_some() {
-                mark("default_assignee", "project");
-            } else {
-                mark(
-                    "default_assignee",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.default_reporter.is_some() {
-                mark("default_reporter", "project");
-            } else {
-                mark(
-                    "default_reporter",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.default_tags.is_some() {
-                mark("default_tags", "project");
-            } else {
-                mark(
-                    "default_tags",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.default_priority.is_some() {
-                mark("default_priority", "project");
-            } else {
-                mark(
-                    "default_priority",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.default_status.is_some() {
-                mark("default_status", "project");
-            } else {
-                mark(
-                    "default_status",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.auto_set_reporter.is_some() {
-                mark("auto_set_reporter", "project");
-            } else {
-                mark(
-                    "auto_set_reporter",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.auto_assign_on_status.is_some() {
-                mark("auto_assign_on_status", "project");
-            } else {
-                mark(
-                    "auto_assign_on_status",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.scan_signal_words.is_some() {
-                mark("scan_signal_words", "project");
-            } else {
-                mark(
-                    "scan_signal_words",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.scan_ticket_patterns.is_some() {
-                mark("scan_ticket_patterns", "project");
-            } else {
-                mark(
-                    "scan_ticket_patterns",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.scan_enable_ticket_words.is_some() {
-                mark("scan_enable_ticket_words", "project");
-            } else {
-                mark(
-                    "scan_enable_ticket_words",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.scan_enable_mentions.is_some() {
-                mark("scan_enable_mentions", "project");
-            } else {
-                mark(
-                    "scan_enable_mentions",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.scan_strip_attributes.is_some() {
-                mark("scan_strip_attributes", "project");
-            } else {
-                mark(
-                    "scan_strip_attributes",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.branch_type_aliases.is_some() {
-                mark("branch_type_aliases", "project");
-            } else {
-                mark(
-                    "branch_type_aliases",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.branch_status_aliases.is_some() {
-                mark("branch_status_aliases", "project");
-            } else {
-                mark(
-                    "branch_status_aliases",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            if project_raw.branch_priority_aliases.is_some() {
-                mark("branch_priority_aliases", "project");
-            } else {
-                mark(
-                    "branch_priority_aliases",
-                    if has_global_file {
-                        "global"
-                    } else {
-                        "built_in"
-                    },
-                );
-            }
-            // Fields only in global
-            mark(
-                "default_prefix",
-                if has_global_file {
+        for entry in CONFIG_SOURCE_ENTRIES {
+            if is_project_scope && entry.inspect_key == "default_prefix" {
+                let scope = if has_global_file {
                     "global"
                 } else {
                     "built_in"
-                },
-            );
-        } else {
-            // Global scope: everything comes from global or built-in
-            let global_or_default = if has_global_file {
-                "global"
-            } else {
-                "built_in"
-            };
-            for field in [
-                "server_port",
-                "default_prefix",
-                "default_assignee",
-                "default_reporter",
-                "default_tags",
-                "default_priority",
-                "default_status",
-                "tags",
-                "custom_fields",
-                "issue_states",
-                "issue_types",
-                "issue_priorities",
-                "auto_set_reporter",
-                "auto_assign_on_status",
-                "auto_codeowners_assign",
-                "auto_tags_from_path",
-                "auto_branch_infer_type",
-                "auto_branch_infer_status",
-                "auto_branch_infer_priority",
-                "auto_identity",
-                "auto_identity_git",
-                "scan_signal_words",
-                "scan_ticket_patterns",
-                "scan_enable_ticket_words",
-                "scan_enable_mentions",
-                "scan_strip_attributes",
-                "branch_type_aliases",
-                "branch_status_aliases",
-                "branch_priority_aliases",
-            ] {
-                mark(field, global_or_default);
+                };
+                sources.insert(
+                    entry.inspect_key.to_string(),
+                    serde_json::Value::String(scope.to_string()),
+                );
+                continue;
+            }
+
+            if let Some(label) = sources_by_path.get(entry.path) {
+                let collapsed = collapse_label_to_scope(label);
+                sources.insert(
+                    entry.inspect_key.to_string(),
+                    serde_json::Value::String(collapsed.to_string()),
+                );
             }
         }
 
-        // Global effective and raw for reference in UIs
         let global_effective_val =
-            serde_json::to_value(mgr.get_resolved_config()).unwrap_or(serde_json::json!({}));
+            serde_json::to_value(&resolved_global).unwrap_or(serde_json::json!({}));
         let global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
 
         Ok(serde_json::json!({

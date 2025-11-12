@@ -14,11 +14,14 @@
 //! - `resolution`: Configuration merging and resolution logic
 //! - `validation`: Configuration validation system
 
+pub mod bootstrap;
+pub mod env_overrides;
 pub mod manager;
 pub mod normalization;
 pub mod operations;
 pub mod persistence;
 pub mod resolution;
+pub mod source_labels;
 pub mod types;
 pub mod validation;
 

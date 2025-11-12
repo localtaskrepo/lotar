@@ -236,12 +236,14 @@ fn main() {
                 }
             }
         }
-        Commands::DueDate { id, due_date } => {
+        Commands::DueDate {
+            id,
+            due_date,
+            dry_run,
+            explain,
+        } => {
             renderer.log_info("BEGIN DUEDATE");
-            let args = DueDateArgs {
-                task_id: id,
-                new_due_date: due_date,
-            };
+            let args = DueDateArgs::new(id, due_date, cli.project.clone(), dry_run, explain);
             match DueDateHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END DUEDATE status=ok");
@@ -262,13 +264,14 @@ fn main() {
             explain,
         } => {
             renderer.log_info("BEGIN EFFORT");
-            let args = lotar::cli::handlers::effort::EffortArgs {
-                task_id: id,
-                new_effort: effort,
+            let args = lotar::cli::handlers::effort::EffortArgs::new(
+                id,
+                effort,
                 clear,
+                cli.project.clone(),
                 dry_run,
                 explain,
-            };
+            );
             match lotar::cli::handlers::effort::EffortHandler::execute(
                 args,
                 cli.project.as_deref(),
@@ -286,12 +289,14 @@ fn main() {
                 }
             }
         }
-        Commands::Assignee { id, assignee } => {
+        Commands::Assignee {
+            id,
+            assignee,
+            dry_run,
+            explain,
+        } => {
             renderer.log_info("BEGIN ASSIGNEE");
-            let args = AssigneeArgs {
-                task_id: id,
-                new_assignee: assignee,
-            };
+            let args = AssigneeArgs::new(id, assignee, cli.project.clone(), dry_run, explain);
             match AssigneeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END ASSIGNEE status=ok");
@@ -309,6 +314,8 @@ fn main() {
             text,
             message,
             file,
+            dry_run,
+            explain,
         } => {
             renderer.log_info("BEGIN COMMENT");
             // Resolve comment content from args: file > message > text > stdin
@@ -338,14 +345,12 @@ fn main() {
                     String::new()
                 }
             };
-            let args = CommentArgs {
-                task_id: id,
-                text: if resolved_text.trim().is_empty() {
-                    None
-                } else {
-                    Some(resolved_text)
-                },
+            let text_value = if resolved_text.trim().is_empty() {
+                None
+            } else {
+                Some(resolved_text)
             };
+            let args = CommentArgs::new(id, text_value, None, dry_run, explain);
             match CommentHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {
                     renderer.log_info("END COMMENT status=ok");

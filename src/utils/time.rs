@@ -135,7 +135,12 @@ pub fn parse_since_until(
             if is_bare_offset(&lower) {
                 // Interpret bare offsets for convenience: "14d" => now - 14 days
                 if let Some(off) = parse_unsigned_days_or_weeks(&lower) {
-                    now - off
+                    let base = now - off;
+                    // Snap bare offsets to the start of the resulting UTC day so whole-day ranges include early activity
+                    base.date_naive()
+                        .and_hms_opt(0, 0, 0)
+                        .map(|naive| chrono::DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc))
+                        .unwrap_or(base)
                 } else {
                     return Err(format!("Invalid --since offset: '{}'", s));
                 }

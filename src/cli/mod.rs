@@ -1,5 +1,6 @@
 use crate::output::{LogLevel, OutputFormat};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use std::sync::LazyLock;
 
 // CLI argument modules consolidated under cli/args
 pub mod args;
@@ -79,6 +80,12 @@ pub enum Commands {
         id: String,
         /// New assignee. If omitted, shows current assignee.
         assignee: Option<String>,
+        /// Preview the change without saving
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+        /// Explain validation and normalization decisions
+        #[arg(long, short = 'e')]
+        explain: bool,
     },
 
     /// Change task due date
@@ -87,6 +94,12 @@ pub enum Commands {
         id: String,
         /// New due date (YYYY-MM-DD or relative like 'tomorrow'). If omitted, shows current due date.
         due_date: Option<String>,
+        /// Preview the change without saving
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+        /// Explain parsing and normalization
+        #[arg(long, short = 'e')]
+        explain: bool,
     },
 
     /// Change or view task effort estimate
@@ -119,6 +132,12 @@ pub enum Commands {
         /// Read comment text from file
         #[arg(short = 'F', long = "file")]
         file: Option<String>,
+        /// Preview the comment without saving
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+        /// Explain how comments are persisted
+        #[arg(long, short = 'e')]
+        explain: bool,
     },
 
     /// Full task management (existing functionality)
@@ -186,3 +205,11 @@ pub enum Commands {
 pub mod handlers;
 pub mod project;
 pub mod validation;
+
+static CLI_TEMPLATE: LazyLock<clap::Command> = LazyLock::new(Cli::command);
+
+/// Return a fresh clone of the base clap command used across runtime features.
+#[inline]
+pub fn base_command() -> clap::Command {
+    CLI_TEMPLATE.clone()
+}

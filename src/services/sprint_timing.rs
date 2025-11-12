@@ -178,7 +178,7 @@ pub fn format_calendar_relative(
                 if start_dt > now {
                     format!("starts in {}", format_duration(start_dt - now))
                 } else {
-                    format!("start overdue by {}", format_duration(now - start_dt))
+                    format!("starts overdue by {}", format_duration(now - start_dt))
                 }
             } else {
                 "start date tbd".to_string()

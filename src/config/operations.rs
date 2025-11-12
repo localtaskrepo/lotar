@@ -281,7 +281,7 @@ pub fn update_config_field(
 }
 
 /// Apply a field update to GlobalConfig
-fn apply_field_to_global_config(
+pub fn apply_field_to_global_config(
     config: &mut GlobalConfig,
     field: &str,
     value: &str,
@@ -433,6 +433,53 @@ fn apply_field_to_global_config(
         "branch_priority_aliases" => {
             let map = parse_alias_map::<Priority>(value, "branch priority alias")?;
             config.branch_priority_aliases = map;
+        }
+        "sprints_defaults_capacity_points" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.sprints.defaults.capacity_points = None;
+            } else {
+                let parsed = trimmed.parse::<u32>().map_err(|err| {
+                    ConfigError::ParseError(format!(
+                        "Invalid sprint capacity points '{}': {}",
+                        value, err
+                    ))
+                })?;
+                config.sprints.defaults.capacity_points = Some(parsed);
+            }
+        }
+        "sprints_defaults_capacity_hours" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.sprints.defaults.capacity_hours = None;
+            } else {
+                let parsed = trimmed.parse::<u32>().map_err(|err| {
+                    ConfigError::ParseError(format!(
+                        "Invalid sprint capacity hours '{}': {}",
+                        value, err
+                    ))
+                })?;
+                config.sprints.defaults.capacity_hours = Some(parsed);
+            }
+        }
+        "sprints_defaults_length" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.sprints.defaults.length = None;
+            } else {
+                config.sprints.defaults.length = Some(trimmed.to_string());
+            }
+        }
+        "sprints_defaults_overdue_after" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.sprints.defaults.overdue_after = None;
+            } else {
+                config.sprints.defaults.overdue_after = Some(trimmed.to_string());
+            }
+        }
+        "sprints_notifications_enabled" => {
+            config.sprints.notifications.enabled = parse_bool_flag(value, field)?;
         }
         _ => {
             return Err(ConfigError::ParseError(format!(
@@ -644,6 +691,11 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "branch_type_aliases",
         "branch_status_aliases",
         "branch_priority_aliases",
+        "sprints_defaults_capacity_points",
+        "sprints_defaults_capacity_hours",
+        "sprints_defaults_length",
+        "sprints_defaults_overdue_after",
+        "sprints_notifications_enabled",
     ];
     let valid_project_fields = vec![
         "project_name",
@@ -823,6 +875,25 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         }
         "issue_priorities" => {
             parse_token_list::<Priority>(value, "priority")?;
+        }
+        "sprints_defaults_capacity_points" | "sprints_defaults_capacity_hours" => {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                trimmed.parse::<u32>().map_err(|err| {
+                    ConfigError::ParseError(format!(
+                        "Invalid sprint capacity value '{}': {}",
+                        value, err
+                    ))
+                })?;
+            }
+        }
+        "sprints_defaults_length" | "sprints_defaults_overdue_after" => {
+            // No additional validation beyond trimming; empty clears the override
+        }
+        "sprints_notifications_enabled" => {
+            if !value.trim().is_empty() {
+                parse_bool_flag(value, field)?;
+            }
         }
         _ => {} // Other fields don't need specific validation
     }

@@ -296,6 +296,12 @@ pub enum TaskAction {
         /// Read comment text from file
         #[arg(short = 'F', long = "file")]
         file: Option<String>,
+        /// Preview the comment without saving
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+        /// Explain how comments are persisted
+        #[arg(long, short = 'e')]
+        explain: bool,
     },
 }
 

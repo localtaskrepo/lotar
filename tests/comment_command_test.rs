@@ -124,3 +124,46 @@ fn comment_requires_text() {
         .stdout(predicate::str::contains("\"action\":\"task.comment.list\""))
         .stdout(predicate::str::contains("\"comments\":0"));
 }
+
+#[test]
+fn comment_dry_run_preview_includes_explain() {
+    let tf = TestFixtures::new();
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(tf.get_temp_path())
+        .args(["add", "Task for dry-run comment"])
+        .assert()
+        .success();
+
+    let id_output = Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(tf.get_temp_path())
+        .args(["list", "--format", "json"])
+        .output()
+        .unwrap();
+    let body = String::from_utf8_lossy(&id_output.stdout);
+    let id = regex::Regex::new(r#"id"\s*:\s*"([A-Z0-9]+-\d+)"#)
+        .unwrap()
+        .captures(&body)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .expect("Expected an ID in list JSON output");
+
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(tf.get_temp_path())
+        .args([
+            "--format",
+            "json",
+            "comment",
+            &id,
+            "--dry-run",
+            "--explain",
+            "preview from test",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"status\":\"preview\""))
+        .stdout(predicate::str::contains("\"explain\":"))
+        .stdout(predicate::str::contains("\"comments\":1"));
+}

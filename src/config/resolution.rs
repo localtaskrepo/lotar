@@ -23,14 +23,8 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
         .to_string_lossy()
         .to_string();
     // Include relevant env overrides in the cache key so runtime env changes create a new entry
-    let env_port = std::env::var("LOTAR_PORT").unwrap_or_default();
-    let env_proj = std::env::var("LOTAR_PROJECT").unwrap_or_default();
-    let env_def_assignee = std::env::var("LOTAR_DEFAULT_ASSIGNEE").unwrap_or_default();
-    let env_def_reporter = std::env::var("LOTAR_DEFAULT_REPORTER").unwrap_or_default();
-    format!(
-        "{}|PORT={}|PROJ={}|DEF_ASG={}|DEF_REP={}",
-        root_str, env_port, env_proj, env_def_assignee, env_def_reporter
-    )
+    let env_signature = crate::config::env_overrides::env_signature();
+    format!("{}|ENV={}", root_str, env_signature)
 }
 
 /// Load and merge all configurations with proper priority order
@@ -66,7 +60,8 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
     }
 
     // 1. Environment variables (highest priority)
-    crate::config::persistence::apply_env_overrides(&mut config);
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    merge_global_config(&mut config, env_snapshot.global);
 
     let resolved = ResolvedConfig::from_global(config);
     if let Ok(mut guard) = config_cache().write() {
@@ -402,9 +397,8 @@ pub fn get_project_config(
     }
 
     // 4) Overlay environment variables (highest of config sources)
-    let mut env_cfg = GlobalConfig::default();
-    crate::config::persistence::apply_env_overrides(&mut env_cfg);
-    overlay_global_into_resolved(&mut resolved, env_cfg);
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    overlay_global_into_resolved(&mut resolved, env_snapshot.global);
 
     // Preserve any already-resolved fields from the provided resolved_config that
     // are not impacted by project/home/env precedence (e.g., server_port from

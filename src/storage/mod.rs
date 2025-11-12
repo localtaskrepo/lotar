@@ -10,6 +10,7 @@
 
 pub mod backend;
 pub mod filter;
+pub mod locator;
 pub mod manager;
 pub mod operations;
 pub mod search;
