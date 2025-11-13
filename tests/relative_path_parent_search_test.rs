@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod common;
+
 use lotar::help::HelpSystem;
 use lotar::output::OutputFormat;
 use lotar::workspace::TasksDirectoryResolver;
@@ -23,7 +24,7 @@ fn test_relative_path_finds_parent_directory() {
     fs::create_dir_all(&sub_dir).unwrap();
 
     // From the subdirectory, test that LOTAR_TASKS_DIR=.tasks finds the parent
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(&sub_dir)
         .env("LOTAR_TASKS_DIR", ".tasks")
         .arg("config")
@@ -49,7 +50,7 @@ fn test_relative_path_creates_new_when_no_parent_exists() {
     fs::create_dir_all(&sub_dir).unwrap();
 
     // From the subdirectory, test that LOTAR_TASKS_DIR=.tasks creates new directory
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(&sub_dir)
         .env("LOTAR_TASKS_DIR", ".tasks")
         .arg("config")
@@ -78,7 +79,7 @@ fn test_complex_relative_path_no_parent_search() {
     fs::create_dir_all(&sub_dir).unwrap();
 
     // From the subdirectory, test complex relative path doesn't trigger parent search
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(&sub_dir)
         .env("LOTAR_TASKS_DIR", "../other/tasks")
         .arg("config")

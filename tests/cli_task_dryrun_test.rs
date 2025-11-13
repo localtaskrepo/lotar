@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 
 mod common;
@@ -10,7 +9,7 @@ fn edit_dry_run_previews_without_write() {
     let temp = tf.temp_dir.path();
 
     // Create a task first and extract ID from output
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let add_out = cmd
         .current_dir(temp)
         .arg("task")
@@ -29,7 +28,7 @@ fn edit_dry_run_previews_without_write() {
         .expect("expected created task id in output");
 
     // Dry-run edit change priority
-    let mut edit = Command::cargo_bin("lotar").unwrap();
+    let mut edit = crate::common::lotar_cmd().unwrap();
     edit.current_dir(temp)
         .arg("task")
         .arg("edit")
@@ -48,7 +47,7 @@ fn delete_dry_run_previews_without_delete() {
     let temp = tf.temp_dir.path();
 
     // Create a task first and extract ID from output
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let add_out = cmd
         .current_dir(temp)
         .arg("task")
@@ -67,7 +66,7 @@ fn delete_dry_run_previews_without_delete() {
         .expect("expected created task id in output");
 
     // Dry-run delete
-    let mut del = Command::cargo_bin("lotar").unwrap();
+    let mut del = crate::common::lotar_cmd().unwrap();
     del.current_dir(temp)
         .arg("task")
         .arg("delete")
@@ -78,7 +77,7 @@ fn delete_dry_run_previews_without_delete() {
         .stdout(predicate::str::contains("DRY RUN: Would delete task"));
 
     // Verify the task still exists by attempting to delete for real (should succeed)
-    let mut del2 = Command::cargo_bin("lotar").unwrap();
+    let mut del2 = crate::common::lotar_cmd().unwrap();
     del2.current_dir(temp)
         .arg("task")
         .arg("delete")

@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use std::fs;
 
 mod common;
@@ -28,7 +27,7 @@ fn scan_does_not_add_reference_when_mentions_disabled() {
     let root = tf.temp_dir.path();
 
     // Initialize config via CLI to ensure tasks root exists
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["config", "show"])
@@ -36,7 +35,7 @@ fn scan_does_not_add_reference_when_mentions_disabled() {
         .success();
     // Disable mentions at project level: we need the actual detected project prefix directory
     // Resolve it by creating a project via CLI add first (creates .tasks/<PREFIX>)
-    let mut add_tmp = Command::cargo_bin("lotar").unwrap();
+    let mut add_tmp = crate::common::lotar_cmd().unwrap();
     add_tmp
         .current_dir(root)
         .arg("add")
@@ -51,7 +50,7 @@ fn scan_does_not_add_reference_when_mentions_disabled() {
     fs::remove_file(task_file_tmp).unwrap();
 
     // Create a task
-    let mut add = Command::cargo_bin("lotar").unwrap();
+    let mut add = crate::common::lotar_cmd().unwrap();
     add.current_dir(root)
         .arg("add")
         .arg("Task")
@@ -66,7 +65,7 @@ fn scan_does_not_add_reference_when_mentions_disabled() {
     fs::write(&src, format!("// TODO {id}: mention\n")).unwrap();
 
     // Run scan; mentions disabled should not add references section
-    let mut scan = Command::cargo_bin("lotar").unwrap();
+    let mut scan = crate::common::lotar_cmd().unwrap();
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
     assert!(
@@ -81,7 +80,7 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
     let root = tf.temp_dir.path();
 
     // Create a task
-    let mut add = Command::cargo_bin("lotar").unwrap();
+    let mut add = crate::common::lotar_cmd().unwrap();
     add.current_dir(root)
         .arg("add")
         .arg("Task")
@@ -98,7 +97,7 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
     fs::write(&b, format!("// TODO {id}: B\n")).unwrap();
 
     // First scan without --reanchor: both anchors should persist (latest per file only)
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .arg("scan")
@@ -110,7 +109,7 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
     assert!(yaml_norm.contains("code: nested/b.rs#L1"));
 
     // Now run with --reanchor: only the newest occurrence should remain
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["scan", "--reanchor"])

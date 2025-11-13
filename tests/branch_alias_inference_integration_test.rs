@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod common;
+
 use tempfile::TempDir;
 
 fn write_global_with_aliases(tasks_dir: &std::path::Path, body: &str) {
@@ -35,7 +36,7 @@ branch:
     write_global_with_aliases(&tasks, cfg);
     init_fake_git(root, "wip/doing-work");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
@@ -75,7 +76,7 @@ branch:
     write_global_with_aliases(&tasks, cfg);
     init_fake_git(root, "hotfix/urgent-fix");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
@@ -116,7 +117,7 @@ branch:
     write_global_with_aliases(&tasks, cfg);
     init_fake_git(root, "wip/something");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
@@ -161,7 +162,7 @@ branch:
     std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();
     init_fake_git(root, "feat/new");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())

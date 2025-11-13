@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use lotar::Storage;
 use serde_json::Value as JsonValue;
 use std::path::Path;
@@ -7,7 +6,7 @@ mod common;
 use common::TestFixtures;
 
 fn create_task(work_dir: &Path, title: &str) -> String {
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .expect("lotar binary not found")
         .env("LOTAR_TEST_SILENT", "1")
         .current_dir(work_dir)
@@ -69,7 +68,7 @@ fn relationships_command_displays_all_relationships() {
         .edit(&child_one, &child_task)
         .expect("failed to persist child task relationships");
 
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .expect("lotar binary not found")
         .env("LOTAR_TEST_SILENT", "1")
         .current_dir(work_dir)
@@ -131,7 +130,7 @@ fn relationships_command_supports_json_filters() {
         .edit(&child_id, &child_task)
         .expect("failed to persist child task relationships");
 
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .expect("lotar binary not found")
         .env("LOTAR_TEST_SILENT", "1")
         .current_dir(work_dir)

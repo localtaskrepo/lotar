@@ -6,7 +6,6 @@
 //! - Project scanning and filtering
 //! - Smart project management features
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 
@@ -35,7 +34,7 @@ mod project_detection {
         fs::write(temp_dir.join("src/main.rs"), "fn main() {}").unwrap();
 
         // Test project detection (scan command shows scanning output, not project info)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -76,7 +75,7 @@ mod project_detection {
         .unwrap();
 
         // Test scan works with multiple project files
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -101,7 +100,7 @@ mod project_detection {
         fs::write(node_dir.join("package.json"), r#"{"name": "node-app"}"#).unwrap();
 
         // Test basic scanning without filtering (scan command doesn't have --filter)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -109,7 +108,7 @@ mod project_detection {
             .stdout(predicate::str::contains("Scanning"));
 
         // Test basic scanning again
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -138,7 +137,7 @@ mod structure_validation {
         .unwrap();
 
         // Scan should work regardless of project completeness
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -180,7 +179,7 @@ mod structure_validation {
         fs::create_dir_all(project2_dir.join("src")).unwrap();
 
         // Test that scan works with nested project structure
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -214,7 +213,7 @@ mod structure_validation {
         fs::write(temp_dir.join("README.md"), "# Test Project").unwrap();
 
         // Test scan with verbose output
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .arg("--verbose")
@@ -255,7 +254,7 @@ mod multi_project_workspace {
         fs::create_dir_all(backend_dir.join("src")).unwrap();
 
         // Initialize configuration for multiple projects
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -263,7 +262,7 @@ mod multi_project_workspace {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -272,7 +271,7 @@ mod multi_project_workspace {
             .success();
 
         // Add tasks to different projects
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Frontend Task")
@@ -280,7 +279,7 @@ mod multi_project_workspace {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Backend Task")
@@ -289,7 +288,7 @@ mod multi_project_workspace {
             .success();
 
         // List tasks from all projects
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .assert()
@@ -298,7 +297,7 @@ mod multi_project_workspace {
             .stdout(predicate::str::contains("Backend Task"));
 
         // List tasks from specific project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Frontend")
@@ -332,7 +331,7 @@ mod multi_project_workspace {
         fs::create_dir_all(project_b_dir.join("src")).unwrap();
 
         // Initialize projects in their respective directories
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&project_a_dir)
             .arg("config")
             .arg("init")
@@ -340,7 +339,7 @@ mod multi_project_workspace {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&project_b_dir)
             .arg("config")
             .arg("init")
@@ -349,7 +348,7 @@ mod multi_project_workspace {
             .success();
 
         // Work from project-a directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&project_a_dir)
             .arg("add")
             .arg("Task from A")
@@ -358,7 +357,7 @@ mod multi_project_workspace {
             .success();
 
         // Work from project-b directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&project_b_dir)
             .arg("add")
             .arg("Task from B")
@@ -367,7 +366,7 @@ mod multi_project_workspace {
             .success();
 
         // Verify tasks are correctly associated
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Alpha")
@@ -376,7 +375,7 @@ mod multi_project_workspace {
             .stdout(predicate::str::contains("Task from A"))
             .stdout(predicate::str::contains("Task from B").not());
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Beta")
@@ -408,7 +407,7 @@ mod smart_features {
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         // Add a task without specifying project - should auto-detect
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Auto-detected task")
@@ -417,7 +416,7 @@ mod smart_features {
             .stdout(predicate::str::contains("Created task:").or(predicate::str::contains("Task")));
 
         // Verify task was created and can be listed
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .assert()
@@ -455,7 +454,7 @@ mod smart_features {
         .unwrap();
 
         // Test basic scanning (scan command doesn't support filtering)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -463,7 +462,7 @@ mod smart_features {
             .stdout(predicate::str::contains("Scanning"));
 
         // Test basic scanning again
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -485,7 +484,7 @@ mod smart_features {
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         // Initialize and add some tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -494,7 +493,7 @@ mod smart_features {
             .success();
 
         // Add tasks with different states
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let first_task_output = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -506,7 +505,7 @@ mod smart_features {
             .stdout
             .clone();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let second_task_output = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -534,7 +533,7 @@ mod smart_features {
             .expect("Should find second task ID in output");
 
         // Set the second task state to InProgress
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg(second_task_id)
@@ -543,7 +542,7 @@ mod smart_features {
             .success();
 
         // Test status command - check overall status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=StatusTest")
@@ -582,7 +581,7 @@ mod integration {
         fs::write(temp_dir.join("README.md"), "# Workflow Test Project").unwrap();
 
         // Step 2: Initialize project configuration
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -592,7 +591,7 @@ mod integration {
             .success();
 
         // Step 3: Scan and verify it works
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -600,7 +599,7 @@ mod integration {
             .stdout(predicate::str::contains("Scanning"));
 
         // Step 4: Add tasks for different workflow stages
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let first_task_output = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -613,7 +612,7 @@ mod integration {
             .stdout
             .clone();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Write tests")
@@ -631,7 +630,7 @@ mod integration {
             .expect("Should find first task ID in output");
 
         // Step 5: List and verify tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=WorkflowTest")
@@ -641,7 +640,7 @@ mod integration {
             .stdout(predicate::str::contains("Write tests"));
 
         // Step 6: Check project status using list command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=WorkflowTest")
@@ -651,7 +650,7 @@ mod integration {
             .stdout(predicate::str::contains("Write tests"));
 
         // Step 7: Modify task state
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg(first_task_id)
@@ -660,7 +659,7 @@ mod integration {
             .success();
 
         // Step 8: Verify status update using list command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=WorkflowTest")
@@ -693,7 +692,7 @@ mod integration {
         fs::create_dir_all(project2_dir.join("src")).unwrap();
 
         // Initialize both projects in their respective directories
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&project1_dir)
             .arg("config")
             .arg("init")
@@ -701,7 +700,7 @@ mod integration {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&project2_dir)
             .arg("config")
             .arg("init")
@@ -710,7 +709,7 @@ mod integration {
             .success();
 
         // Add tasks to each project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Project 1 Task")
@@ -718,7 +717,7 @@ mod integration {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Project 2 Task")
@@ -727,7 +726,7 @@ mod integration {
             .success();
 
         // Verify isolation - each project should only see its own tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=WebApp")
@@ -736,7 +735,7 @@ mod integration {
             .stdout(predicate::str::contains("Project 1 Task"))
             .stdout(predicate::str::contains("Project 2 Task").not());
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=RustCrate")
@@ -775,7 +774,7 @@ mod relative_path_search {
         fs::create_dir_all(&sub_dir).unwrap();
 
         // From the subdirectory, test that LOTAR_TASKS_DIR=.tasks finds the parent
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&sub_dir)
             .env("LOTAR_TASKS_DIR", ".tasks")
             .arg("config")
@@ -801,7 +800,7 @@ mod relative_path_search {
         fs::create_dir_all(&sub_dir).unwrap();
 
         // From the subdirectory, test that LOTAR_TASKS_DIR=.tasks creates new directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&sub_dir)
             .env("LOTAR_TASKS_DIR", ".tasks")
             .arg("config")
@@ -830,7 +829,7 @@ mod relative_path_search {
         fs::create_dir_all(&sub_dir).unwrap();
 
         // From the subdirectory, test complex relative path doesn't trigger parent search
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&sub_dir)
             .env("LOTAR_TASKS_DIR", "../other/tasks")
             .arg("config")

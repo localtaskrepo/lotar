@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -14,7 +13,7 @@ fn config_set_global_custom_fields_and_tags() {
     let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "categories", "Feat,Bug,Chore", "--global"])
@@ -25,14 +24,14 @@ fn config_set_global_custom_fields_and_tags() {
                 .and(predicate::str::contains("'categories'")),
         );
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "tags", "team,backend,ui", "--global"])
         .assert()
         .success();
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args([
@@ -45,7 +44,7 @@ fn config_set_global_custom_fields_and_tags() {
         .assert()
         .success();
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "default_tags", "team,ui", "--global"])
@@ -53,7 +52,7 @@ fn config_set_global_custom_fields_and_tags() {
         .success();
 
     // Normalize and check canonical output contains the values
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "normalize", "--global"]) // no write: print
@@ -104,7 +103,7 @@ fn config_set_project_custom_fields_and_tags() {
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
     // Use global default_project to enable project set without explicit --project
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "default_project", "TEST", "--global"])
@@ -112,7 +111,7 @@ fn config_set_project_custom_fields_and_tags() {
         .success();
 
     // Now set project-scoped fields (no --global)
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "categories", "Feat,Bugfix"])
@@ -123,21 +122,21 @@ fn config_set_project_custom_fields_and_tags() {
                 .and(predicate::str::contains("'categories'")),
         );
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "tags", "team,backend"])
         .assert()
         .success();
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "custom_fields", "product,feature"])
         .assert()
         .success();
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "set", "default_tags", "team"])
@@ -145,7 +144,7 @@ fn config_set_project_custom_fields_and_tags() {
         .success();
 
     // Normalize project and verify
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "normalize", "--project", "TEST", "--write"]) // write so we can read file back

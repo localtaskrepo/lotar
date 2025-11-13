@@ -17,14 +17,14 @@ fn effort_is_normalized_on_add_and_edit() {
 
     // Create a task with a variety of effort spellings that should normalize to hours
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "A", "--effort", "1 hr 30 min"],
     )
     .success();
 
     // List as JSON and verify the stored effort is canonical (1.50h)
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -41,13 +41,13 @@ fn effort_is_normalized_on_add_and_edit() {
     // Now edit with a different shape and confirm it re-normalizes
     let id = tasks[0]["id"].as_str().unwrap();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "edit", id, "--effort", "2 days"],
     )
     .success();
 
-    let out2 = Command::cargo_bin("lotar")
+    let out2 = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

@@ -2,7 +2,6 @@
 
 mod common;
 
-use assert_cmd::Command;
 use common::TestFixtures;
 use predicates::prelude::*;
 
@@ -26,7 +25,7 @@ fn test_current_filtering_capabilities() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create diverse test tasks
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Bug task")
@@ -35,7 +34,7 @@ fn test_current_filtering_capabilities() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Feature task")
@@ -44,7 +43,7 @@ fn test_current_filtering_capabilities() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Chore task")
@@ -54,7 +53,7 @@ fn test_current_filtering_capabilities() {
         .success();
 
     // Change one task status
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("status")
         .arg("2")
@@ -63,7 +62,7 @@ fn test_current_filtering_capabilities() {
         .success();
 
     // Test single status filter (WORKS)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -92,7 +91,7 @@ fn test_current_filtering_capabilities() {
     }
 
     // Test single priority filter (UNCLEAR - needs verification)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -104,7 +103,7 @@ fn test_current_filtering_capabilities() {
     let _priority_result = result.try_success().is_ok();
 
     // Test high priority flag (DOCUMENTED but may not work)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -122,7 +121,7 @@ fn test_documentation_vs_implementation_gaps() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a test task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Test task")
@@ -130,7 +129,7 @@ fn test_documentation_vs_implementation_gaps() {
         .success();
 
     // Test 1: Multiple status filters (DOCUMENTED but fails)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -142,7 +141,7 @@ fn test_documentation_vs_implementation_gaps() {
     if let Ok(_) = result.try_success() {}
 
     // Test 2: Type filtering
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -153,7 +152,7 @@ fn test_documentation_vs_implementation_gaps() {
     if let Ok(_) = result.try_success() {}
 
     // Test 3: --bugs shortcut (DOCUMENTED)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -164,7 +163,7 @@ fn test_documentation_vs_implementation_gaps() {
     if let Ok(_) = result.try_success() {}
 
     // Test 4: --assignee filter (DOCUMENTED)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -175,7 +174,7 @@ fn test_documentation_vs_implementation_gaps() {
     if let Ok(_) = result.try_success() {}
 
     // Test 5: Sorting (DOCUMENTED)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -186,7 +185,7 @@ fn test_documentation_vs_implementation_gaps() {
     if let Ok(_) = result.try_success() {}
 
     // Test 6: Grouping (DOCUMENTED)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -202,7 +201,7 @@ fn test_single_type_filtering() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create tasks with different types
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Feature task")
@@ -210,7 +209,7 @@ fn test_single_type_filtering() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Bug task")
@@ -218,7 +217,7 @@ fn test_single_type_filtering() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Chore task")
@@ -227,7 +226,7 @@ fn test_single_type_filtering() {
         .success();
 
     // Test single type filter for bugs
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -264,7 +263,7 @@ fn test_multiple_type_filters_architecture() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create tasks with different types
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Feature task")
@@ -272,7 +271,7 @@ fn test_multiple_type_filters_architecture() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Bug task")
@@ -281,7 +280,7 @@ fn test_multiple_type_filters_architecture() {
         .success();
 
     // Test multiple type filters (may not be implemented)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -308,7 +307,7 @@ fn test_search_command_vs_list_command() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create tasks for comparison
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Search test task")
@@ -318,7 +317,7 @@ fn test_search_command_vs_list_command() {
         .success();
 
     // Test list command with filters
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let list_result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -331,7 +330,7 @@ fn test_search_command_vs_list_command() {
     }
 
     // Test task search command (full interface)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let search_result = cmd
         .current_dir(temp_dir)
         .arg("task")
@@ -348,7 +347,7 @@ fn test_advanced_filter_combinations() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create diverse tasks
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("High priority bug")
@@ -358,7 +357,7 @@ fn test_advanced_filter_combinations() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Medium priority feature")
@@ -380,7 +379,7 @@ fn test_advanced_filter_combinations() {
     ];
 
     for (filter_arg, _description) in test_cases {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let args: Vec<&str> = filter_arg.split_whitespace().collect();
         let mut cmd_with_args = cmd.current_dir(temp_dir).arg("list");
 
@@ -402,7 +401,7 @@ fn test_search_performance_and_limits() {
     // Create multiple tasks to test performance and limits
 
     for i in 1..=5 {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg(format!("Performance test task {i}"))
@@ -412,7 +411,7 @@ fn test_search_performance_and_limits() {
     }
 
     // Test limit parameter
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -434,7 +433,7 @@ fn test_search_performance_and_limits() {
     }
 
     // Test with no limit (default)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -459,7 +458,7 @@ fn test_implementation_status_summary() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a test task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Summary test task")
@@ -482,7 +481,7 @@ fn test_implementation_status_summary() {
     ];
 
     for (_name, cmd_name, args) in core_features {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let mut cmd_with_args = cmd.current_dir(temp_dir).arg(cmd_name);
 
         for arg in args {
@@ -511,7 +510,7 @@ fn test_implementation_status_summary() {
     ];
 
     for (_name, cmd_name, args) in missing_features {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let mut cmd_with_args = cmd.current_dir(temp_dir).arg(cmd_name);
 
         for arg in args {
@@ -531,7 +530,7 @@ mod tag_filtering_tests {
         let fixtures = TestFixtures::new();
         let temp_dir = fixtures.temp_dir.path();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Backend task")
@@ -541,7 +540,7 @@ mod tag_filtering_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Frontend task")
@@ -550,7 +549,7 @@ mod tag_filtering_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Database task")
@@ -559,7 +558,7 @@ mod tag_filtering_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -586,7 +585,7 @@ mod tag_filtering_tests {
                 .contains(&serde_json::Value::String("urgent".to_string()))
         );
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -615,7 +614,7 @@ mod tag_filtering_tests {
         assert!(task_titles.contains(&"Backend task".to_string()));
         assert!(task_titles.contains(&"Frontend task".to_string()));
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -643,7 +642,7 @@ mod tag_filtering_tests {
         let fixtures = TestFixtures::new();
         let temp_dir = fixtures.temp_dir.path();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Complete task")
@@ -659,7 +658,7 @@ mod tag_filtering_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -718,7 +717,7 @@ mod tag_filtering_tests {
         let fixtures = TestFixtures::new();
         let temp_dir = fixtures.temp_dir.path();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task")
@@ -726,7 +725,7 @@ mod tag_filtering_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--tag=test")

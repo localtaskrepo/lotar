@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use serde_json::Value;
 mod common;
 
@@ -7,14 +6,14 @@ fn stats_effort_respects_unit_flag() {
     let temp = crate::common::temp_dir();
 
     // Two tasks: 8h (1 day) and 2d (16h, 2 days)
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
         .args(["task", "add", "T1", "--effort", "8h"]) // 1 day
         .assert()
         .success();
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -23,7 +22,7 @@ fn stats_effort_respects_unit_flag() {
         .success();
 
     // Group by assignee (empty) and request days
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -46,7 +45,7 @@ fn stats_effort_respects_unit_flag() {
     assert_eq!(row["hours"].as_f64().unwrap(), 24.0);
 
     // Now request weeks
-    let out2 = Command::cargo_bin("lotar")
+    let out2 = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

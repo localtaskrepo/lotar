@@ -5,7 +5,6 @@
 //! - `lotar status TASK_ID` → shows current status
 //! - `lotar status TASK_ID NEW_STATUS` → changes status
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 
 mod common;
@@ -21,7 +20,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task first using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -31,7 +30,7 @@ mod status_command_pattern {
             .success();
 
         // Get the status (should be Todo by default)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -47,7 +46,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task first using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -57,7 +56,7 @@ mod status_command_pattern {
             .success();
 
         // Set the status to in_progress
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -76,7 +75,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -86,7 +85,7 @@ mod status_command_pattern {
             .success();
 
         // Set status to done
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -96,7 +95,7 @@ mod status_command_pattern {
             .success();
 
         // Verify the status was changed
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -112,7 +111,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -122,7 +121,7 @@ mod status_command_pattern {
             .success();
 
         // Use status command to get status (testing that it works without alias)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -138,7 +137,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -148,7 +147,7 @@ mod status_command_pattern {
             .success();
 
         // Use status command to set status (testing that it works without alias)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -167,7 +166,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task for same status warning")
@@ -175,7 +174,7 @@ mod status_command_pattern {
             .success();
 
         // Try to set status to the same value (Todo)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -191,7 +190,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task for invalid status")
@@ -199,7 +198,7 @@ mod status_command_pattern {
             .success();
 
         // Try to set an invalid status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -215,7 +214,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Try to get status of non-existent task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("999")
@@ -230,7 +229,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task (will get auto-generated prefix)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -250,7 +249,7 @@ mod status_command_pattern {
             .expect("Should find task ID in output");
 
         // Use full task ID to get status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg(task_id)
@@ -265,7 +264,7 @@ mod status_command_pattern {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test dual interface")
@@ -273,7 +272,7 @@ mod status_command_pattern {
             .success();
 
         // Set status using quick command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -282,7 +281,7 @@ mod status_command_pattern {
             .success();
 
         // Set status using full command (should still work)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("status")
@@ -292,7 +291,7 @@ mod status_command_pattern {
             .success();
 
         // Verify final status with quick command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")

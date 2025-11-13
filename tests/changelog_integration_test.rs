@@ -39,13 +39,11 @@ fn init_repo(root: &Path) {
 }
 
 mod smoke {
-    use super::*;
-
     #[test]
     fn changelog_outside_git_no_crash() {
         let temp = crate::common::temp_dir();
         // No git repo here; command should not crash
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["changelog"])
@@ -91,7 +89,7 @@ mod range {
             .success();
 
         // run changelog for HEAD~1..HEAD (implicitly via since ref)
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
             .args(["changelog", "HEAD~1", "--global"])
@@ -134,7 +132,7 @@ mod range_json {
             .assert()
             .success();
 
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
             .args(["--format", "json", "changelog", "HEAD~1", "--global"])
@@ -180,7 +178,7 @@ mod working_tree {
         write_task(root, "TEST", "1", "changed");
 
         // run changelog default (working)
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
             .args(["--format", "json", "changelog", "--global"])
@@ -234,7 +232,7 @@ mod working_tree {
         let path1 = root.join(".tasks/TEST/1.yml");
         fs::remove_file(&path1).unwrap();
 
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(root)
             .args(["--format", "json", "changelog", "--global"])

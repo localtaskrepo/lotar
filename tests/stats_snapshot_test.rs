@@ -16,7 +16,7 @@ fn stats_tags_and_custom_field_snapshot() {
     let temp = crate::common::temp_dir();
 
     // Create tasks with tags and custom fields
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -30,7 +30,7 @@ fn stats_tags_and_custom_field_snapshot() {
         ],
     ) // ID 1
     .success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -45,14 +45,14 @@ fn stats_tags_and_custom_field_snapshot() {
     .success();
 
     // Tags: infra=2, build=1
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["stats", "tags", "--global"]) // project scope not required here
         .success()
         .stdout(predicate::str::contains("infra"))
         .stdout(predicate::str::contains("build"));
 
     // Also verify JSON output shape for tags
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -63,7 +63,7 @@ fn stats_tags_and_custom_field_snapshot() {
     .stdout(predicate::str::contains("infra"));
 
     // Custom field values: bug=1, feature=1
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -74,7 +74,7 @@ fn stats_tags_and_custom_field_snapshot() {
     .stdout(predicate::str::contains("feature"));
 
     // And JSON for custom field distribution
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -96,7 +96,7 @@ fn stats_tags_and_custom_field_snapshot() {
     .stdout(predicate::str::contains("bug"));
 
     // Custom keys should include product
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -112,14 +112,14 @@ fn stats_distribution_snapshot() {
     let temp = crate::common::temp_dir();
 
     // Add some tasks with tags and custom fields to populate fields
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
         &["task", "add", "D1", "--tag=ui", "--field=product=feature"],
     )
     .success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -128,7 +128,7 @@ fn stats_distribution_snapshot() {
     .success();
 
     // By status (all default to TODO)
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -149,7 +149,7 @@ fn stats_distribution_snapshot() {
     .stdout(predicate::str::contains("\"Todo\""));
 
     // By tag should include our tags
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -176,23 +176,23 @@ fn stats_due_buckets_snapshot() {
     let later = fmt(today + Duration::days(40));
 
     // Create tasks with different due dates
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
         &["task", "add", "Overdue", "--due", &overdue],
     )
     .success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "Today", "--due", &today_s]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "Week", "--due", &week]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "Month", "--due", &month]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "Later", "--due", &later]).success();
 
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["stats", "due", "--global"]) // default buckets
         .success()
         .stdout(predicate::str::contains("overdue"))
@@ -216,15 +216,15 @@ fn stats_due_overdue_threshold_snapshot() {
     let future_1 = fmt(today + Duration::days(1));
 
     // Create tasks with due dates: 1d overdue, 10d overdue, 1d future
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "A", "--due", &overdue_1]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "B", "--due", &overdue_10]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "C", "--due", &future_1]).success();
 
     // Overdue only with 0d threshold should count both overdue tasks
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -245,7 +245,7 @@ fn stats_due_overdue_threshold_snapshot() {
     .stdout(predicate::str::contains("overdue"));
 
     // Overdue only with 7d threshold should count only the 10d overdue
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(
         &mut c,
         &temp,
@@ -269,7 +269,6 @@ fn stats_due_overdue_threshold_snapshot() {
 // =============================================================================
 
 mod effort_unit {
-    use assert_cmd::Command;
     use serde_json::Value;
 
     #[test]
@@ -277,14 +276,14 @@ mod effort_unit {
         let temp = crate::common::temp_dir();
 
         // Two tasks: 8h (1 day) and 2d (16h, 2 days)
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
             .args(["task", "add", "T1", "--effort", "8h"]) // 1 day
             .assert()
             .success();
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -293,7 +292,7 @@ mod effort_unit {
             .success();
 
         // Group by assignee (empty) and request days
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -317,7 +316,7 @@ mod effort_unit {
         assert_eq!(row["hours"].as_f64().unwrap(), 24.0);
 
         // Now request weeks
-        let out2 = Command::cargo_bin("lotar")
+        let out2 = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -337,7 +336,6 @@ mod effort_unit {
 }
 
 mod effort_points_auto_filters {
-    use assert_cmd::Command;
     use serde_json::Value;
 
     #[test]
@@ -346,7 +344,7 @@ mod effort_points_auto_filters {
 
         // Create three tasks with mixed effort and attributes
         // T1: hours, assignee @me, tag x
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -365,7 +363,7 @@ mod effort_points_auto_filters {
             .success();
 
         // T2: points, assignee @me, tag y
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -384,7 +382,7 @@ mod effort_points_auto_filters {
             .success();
 
         // T3: hours, assignee @me, tag x
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -403,7 +401,7 @@ mod effort_points_auto_filters {
             .success();
 
         // Points mode grouped by assignee
-        let out_points = Command::cargo_bin("lotar")
+        let out_points = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -429,7 +427,7 @@ mod effort_points_auto_filters {
         assert!(seen_user);
 
         // Auto mode grouped by tag with filter where assignee=@me, to only include T2 and T3
-        let out_auto = Command::cargo_bin("lotar")
+        let out_auto = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -492,13 +490,13 @@ mod effort_comments_custom {
 
         // Create a few tasks with effort and custom fields
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "A", "--effort", "2d", "--field", "team=eng"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &[
                 "task", "add", "B", "--effort", "5h", "--assign", "@bob", "--field", "team=eng",
@@ -506,7 +504,7 @@ mod effort_comments_custom {
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &[
                 "task",
@@ -523,7 +521,7 @@ mod effort_comments_custom {
         .success();
 
         // Effort by assignee
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -538,7 +536,7 @@ mod effort_comments_custom {
         assert_eq!(v["action"], "stats.effort");
 
         // Comments top (should be zero counts)
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -551,7 +549,7 @@ mod effort_comments_custom {
         assert_eq!(v["action"], "stats.comments.top");
 
         // Custom keys
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -564,7 +562,7 @@ mod effort_comments_custom {
         assert_eq!(v["action"], "stats.custom.keys");
 
         // Custom field distribution
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")

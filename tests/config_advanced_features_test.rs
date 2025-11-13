@@ -3,7 +3,6 @@
 mod common;
 
 use crate::common::cargo_bin_silent;
-use assert_cmd::Command;
 use common::TestFixtures;
 use std::fs;
 
@@ -111,7 +110,7 @@ fn test_config_force_flag() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create initial config
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("init")
@@ -120,7 +119,7 @@ fn test_config_force_flag() {
         .success();
 
     // Test --force flag with potentially conflicting operation
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -142,7 +141,7 @@ fn test_config_force_flag() {
     }
 
     // Test force flag with invalid values
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -168,7 +167,7 @@ fn test_config_copy_from_functionality() {
     let source_dir = temp_dir.join("source_project");
     fs::create_dir_all(&source_dir).unwrap();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(&source_dir)
         .arg("config")
         .arg("init")
@@ -177,7 +176,7 @@ fn test_config_copy_from_functionality() {
         .success();
 
     // Set default project to a valid prefix so project-scoped set works
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(&source_dir)
         .args(["config", "set", "default_project", "DEMO", "--global"])
@@ -185,7 +184,7 @@ fn test_config_copy_from_functionality() {
         .success();
 
     // Now project-scoped set should create DEMO project config and succeed
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(&source_dir)
         .args(["config", "set", "project_name", "source-project"])
@@ -197,7 +196,7 @@ fn test_config_copy_from_functionality() {
     fs::create_dir_all(&target_dir).unwrap();
 
     // Test copy-from functionality
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(&target_dir)
         .arg("config")
@@ -228,7 +227,7 @@ fn test_config_validation_and_conflicts() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create initial config
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("init")
@@ -237,7 +236,7 @@ fn test_config_validation_and_conflicts() {
         .success();
 
     // Test invalid config values
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -250,7 +249,7 @@ fn test_config_validation_and_conflicts() {
     let _validation_result = result.try_success().is_ok();
 
     // Test unknown fields
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -264,14 +263,14 @@ fn test_config_validation_and_conflicts() {
 
     // Test project name vs prefix conflict detection
     // Ensure default project is set so project-scoped set works
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
         .args(["config", "set", "default_project", "DEMO", "--global"])
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("set")
@@ -280,7 +279,7 @@ fn test_config_validation_and_conflicts() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -302,7 +301,7 @@ fn test_config_global_vs_project_precedence() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create project config
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("init")
@@ -311,14 +310,14 @@ fn test_config_global_vs_project_precedence() {
         .success();
 
     // Set project-specific value - first set default project to a valid prefix
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
         .args(["config", "set", "default_project", "DEMO", "--global"])
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("config")
         .arg("set")
@@ -328,7 +327,7 @@ fn test_config_global_vs_project_precedence() {
         .success();
 
     // Test config show displays project values
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -374,7 +373,7 @@ fn test_config_template_validation() {
     let valid_templates = vec!["default", "agile", "kanban", "simple"];
 
     for template in valid_templates {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("config")
@@ -388,7 +387,7 @@ fn test_config_template_validation() {
     }
 
     // Test invalid template
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -409,7 +408,7 @@ fn test_config_advanced_features_summary() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test basic config functionality as baseline
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("config")
@@ -421,7 +420,7 @@ fn test_config_advanced_features_summary() {
     let _config_init_works = result.try_success().is_ok();
 
     // Test config help
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd.current_dir(temp_dir).arg("help").arg("config").assert();
 
     if let Ok(assert_result) = result.try_success() {

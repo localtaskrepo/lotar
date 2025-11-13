@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 mod common;
@@ -272,7 +271,7 @@ impl TestEnvironment {
 
     /// Helper to check task priority via list command
     fn assert_task_priority(&self, project: &str, expected_priority: &str) {
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(self.path())
             .arg("list")
@@ -284,7 +283,7 @@ impl TestEnvironment {
 
     /// Helper to check task status via list command
     fn assert_task_status(&self, project: &str, expected_status: &str) {
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(self.path())
             .arg("list")
@@ -296,7 +295,7 @@ impl TestEnvironment {
 
     /// Helper to create task and expect warnings
     fn create_task_with_warning(&self, project: &str, title: &str, expected_warning: &str) {
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(self.path())
             .arg("add")
@@ -309,7 +308,7 @@ impl TestEnvironment {
 
     /// Helper to create task without warnings
     fn create_task(&self, project: &str, title: &str) {
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(self.path())
             .arg("add")
@@ -321,7 +320,7 @@ impl TestEnvironment {
 
     /// Helper to initialize project
     fn init_project(&self, project: &str) {
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(self.path())
             .arg("config")
@@ -333,7 +332,7 @@ impl TestEnvironment {
 
     /// Helper to set config value
     fn set_config(&self, project: &str, key: &str, value: &str) {
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(self.path())
             .arg("config")
@@ -534,7 +533,7 @@ mod combined_scenarios {
         env.set_config("precedence", "issue_states", "TODO,IN_PROGRESS,DONE");
 
         // Set global default_status to value not present in project list
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(env.path())
             .args(["config", "set", "default_status", "BLOCKED", "--global"])
@@ -597,7 +596,7 @@ mod edge_cases {
         }
 
         // All tasks should have consistent defaults
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(env.path())
             .arg("list")
@@ -624,7 +623,7 @@ mod default_status_tests {
         let temp_dir = test_fixtures.temp_dir.path();
         let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -632,7 +631,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -642,7 +641,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test default status")
@@ -650,7 +649,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -666,7 +665,7 @@ mod default_status_tests {
         let temp_dir = test_fixtures.temp_dir.path();
         let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -674,7 +673,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -684,7 +683,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -694,7 +693,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test explicit default")
@@ -702,7 +701,7 @@ mod default_status_tests {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -718,14 +717,14 @@ mod default_status_tests {
         let temp_dir = test_fixtures.temp_dir.path();
         let _ignore_env = EnvVarGuard::set("LOTAR_IGNORE_ENV_TASKS_DIR", "1");
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test fallback default")
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")

@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use chrono::Local;
 use serde_json::Value;
 
@@ -16,7 +15,7 @@ fn parse_shortcuts_and_offsets() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task so ID 1 exists
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Task for due-date parsing")
@@ -24,7 +23,7 @@ fn parse_shortcuts_and_offsets() {
         .success();
 
     // today
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -40,7 +39,7 @@ fn parse_shortcuts_and_offsets() {
     assert_eq!(v["new_due_date"], Value::String(ymd_string(0)));
 
     // in 3 days
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -56,7 +55,7 @@ fn parse_shortcuts_and_offsets() {
     assert_eq!(v["new_due_date"], Value::String(ymd_string(3)));
 
     // +2w
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -72,7 +71,7 @@ fn parse_shortcuts_and_offsets() {
     assert_eq!(v["new_due_date"], Value::String(ymd_string(14)));
 
     // next business day
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -92,7 +91,7 @@ fn parse_shortcuts_and_offsets() {
     assert!(parsed >= today);
 
     // +2bd
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -116,7 +115,7 @@ fn parse_weekday_phrases() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task so ID 1 exists
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Task for weekday phrases")
@@ -124,7 +123,7 @@ fn parse_weekday_phrases() {
         .success();
 
     for phrase in ["this friday", "by fri", "fri", "next week monday"] {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let out = cmd
             .current_dir(temp_dir)
             .arg("due-date")
@@ -150,7 +149,7 @@ fn parse_rfc3339_and_local_datetime() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task so ID 1 exists
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Task for datetime parsing")
@@ -158,7 +157,7 @@ fn parse_rfc3339_and_local_datetime() {
         .success();
 
     // RFC3339 with Z
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -176,7 +175,7 @@ fn parse_rfc3339_and_local_datetime() {
     assert!(s.contains('T') && (s.ends_with('Z') || s.contains('+') || s.contains('-')));
 
     // Local datetime
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .arg("due-date")
@@ -199,7 +198,7 @@ fn list_overdue_and_due_soon_filters() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create tasks with due dates
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Past due task")
@@ -207,7 +206,7 @@ fn list_overdue_and_due_soon_filters() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Due this week")
@@ -216,7 +215,7 @@ fn list_overdue_and_due_soon_filters() {
         .success();
 
     // Overdue should find the first task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")
@@ -230,7 +229,7 @@ fn list_overdue_and_due_soon_filters() {
     assert!(tasks.iter().any(|t| t["title"] == "Past due task"));
 
     // Due soon should find the second task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("list")

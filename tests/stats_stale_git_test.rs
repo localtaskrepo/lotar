@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod common;
+
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -87,7 +88,7 @@ fn stats_stale_threshold() {
     );
 
     // Threshold 7000d should include the old task but not the new
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")

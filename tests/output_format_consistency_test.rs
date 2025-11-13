@@ -1,6 +1,5 @@
 mod common;
 
-use assert_cmd::Command;
 use common::TestFixtures;
 
 /// Phase 1.2 - Output Format Consistency Testing
@@ -13,7 +12,7 @@ fn test_list_command_all_formats() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Setup test data - create a few tasks to list
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Test task 1")
@@ -22,7 +21,7 @@ fn test_list_command_all_formats() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Test task 2")
@@ -35,7 +34,7 @@ fn test_list_command_all_formats() {
     let formats = ["text", "table", "json", "markdown"];
 
     for format in &formats {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("list")

@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use std::fs;
 
 mod common;
@@ -28,7 +27,7 @@ fn reanchor_runs_even_when_no_todos_found() {
     let root = tf.temp_dir.path();
 
     // Create task
-    let mut add = Command::cargo_bin("lotar").unwrap();
+    let mut add = crate::common::lotar_cmd().unwrap();
     add.current_dir(root)
         .arg("add")
         .arg("Task")
@@ -40,7 +39,7 @@ fn reanchor_runs_even_when_no_todos_found() {
     // Initial TODO with key on line 1
     let src = root.join("file.rs");
     fs::write(&src, format!("// TODO {id}: do it\n")).unwrap();
-    let mut scan = Command::cargo_bin("lotar").unwrap();
+    let mut scan = crate::common::lotar_cmd().unwrap();
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
     assert!(
@@ -52,7 +51,7 @@ fn reanchor_runs_even_when_no_todos_found() {
     fs::write(&src, format!("\n// do it ({id})\n")).unwrap();
 
     // Scan again; should find no TODOs but still re-anchor the reference automatically
-    let mut scan2 = Command::cargo_bin("lotar").unwrap();
+    let mut scan2 = crate::common::lotar_cmd().unwrap();
     scan2.current_dir(root).arg("scan").assert().success();
 
     let yaml2 = fs::read_to_string(&task_file).unwrap();

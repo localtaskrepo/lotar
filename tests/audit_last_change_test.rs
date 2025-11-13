@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -46,7 +45,7 @@ fn audit_list_last_change_per_task_smoke() {
     run_git(root, &["commit", "-m", "add 2"], &[]);
 
     // Call via stats stale over 0d threshold to include all, asserting both IDs appear
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([

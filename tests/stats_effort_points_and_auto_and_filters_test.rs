@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use serde_json::Value;
 mod common;
 
@@ -8,7 +7,7 @@ fn stats_effort_points_and_auto_and_filters() {
 
     // Create three tasks with mixed effort and attributes
     // T1: hours, assignee @me, tag x
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -27,7 +26,7 @@ fn stats_effort_points_and_auto_and_filters() {
         .success();
 
     // T2: points, assignee @me, tag y
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -46,7 +45,7 @@ fn stats_effort_points_and_auto_and_filters() {
         .success();
 
     // T3: hours, assignee @me, tag x
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -65,7 +64,7 @@ fn stats_effort_points_and_auto_and_filters() {
         .success();
 
     // Points mode grouped by assignee
-    let out_points = Command::cargo_bin("lotar")
+    let out_points = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -91,7 +90,7 @@ fn stats_effort_points_and_auto_and_filters() {
     assert!(seen_user);
 
     // Auto mode grouped by tag with filter where assignee=@me, to only include T2 and T3
-    let out_auto = Command::cargo_bin("lotar")
+    let out_auto = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

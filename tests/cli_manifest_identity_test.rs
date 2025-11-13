@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -41,7 +40,7 @@ fn whoami_uses_project_manifest_author_when_no_default_reporter() {
 
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["whoami"]) // text mode

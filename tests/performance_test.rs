@@ -6,7 +6,6 @@
 //! - Memory usage optimization
 //! - Experimental features testing
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 use std::time::Instant;
@@ -28,7 +27,7 @@ mod cli_performance {
 
         // Measure help command performance
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir).arg("help").assert().success();
         let help_duration = start.elapsed();
 
@@ -40,7 +39,7 @@ mod cli_performance {
 
         // Measure config show performance (read-only operation)
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("show")
@@ -61,7 +60,7 @@ mod cli_performance {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project first
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -72,7 +71,7 @@ mod cli_performance {
         // Measure task creation performance
         let start = Instant::now();
         for i in 0..10 {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
@@ -91,7 +90,7 @@ mod cli_performance {
 
         // Measure list performance
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=PerfTest")
@@ -156,7 +155,7 @@ mod cli_performance {
 
         // Measure scan performance
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -185,7 +184,7 @@ mod large_datasets {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -198,7 +197,7 @@ mod large_datasets {
         let start = Instant::now();
 
         for i in 0..task_count {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
@@ -215,7 +214,7 @@ mod large_datasets {
 
         // Measure list performance with many tasks
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=LargeDataset")
@@ -242,7 +241,7 @@ mod large_datasets {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -262,7 +261,7 @@ mod large_datasets {
                 Task {i} requires careful consideration of performance implications."
             );
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
@@ -281,7 +280,7 @@ mod large_datasets {
 
         // Measure search performance with complex data
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=ComplexData")
@@ -325,7 +324,7 @@ mod large_datasets {
 
         // Measure scanning performance
         let start = Instant::now();
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -356,7 +355,7 @@ mod memory_optimization {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a project with substantial data
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -368,7 +367,7 @@ mod memory_optimization {
         for batch in 0..5 {
             for i in 0..10 {
                 let task_id = batch * 10 + i;
-                let mut cmd = Command::cargo_bin("lotar").unwrap();
+                let mut cmd = crate::common::lotar_cmd().unwrap();
                 cmd.current_dir(temp_dir)
                     .arg("task")
                     .arg("add")
@@ -379,7 +378,7 @@ mod memory_optimization {
             }
 
             // Periodically list tasks to ensure memory usage remains reasonable
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("list")
                 .arg("--project=MemoryTest")
@@ -388,7 +387,7 @@ mod memory_optimization {
         }
 
         // Final verification - all operations should complete successfully
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=MemoryTest")
@@ -403,7 +402,7 @@ mod memory_optimization {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -415,7 +414,7 @@ mod memory_optimization {
         let start = Instant::now();
 
         // Add task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -425,7 +424,7 @@ mod memory_optimization {
             .success();
 
         // Immediately list
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=ConcurrentTest")
@@ -433,7 +432,7 @@ mod memory_optimization {
             .success();
 
         // Add another task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -443,7 +442,7 @@ mod memory_optimization {
             .success();
 
         // Check list again
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=ConcurrentTest")
@@ -451,7 +450,7 @@ mod memory_optimization {
             .success();
 
         // Modify task status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("CONC-1")
@@ -460,7 +459,7 @@ mod memory_optimization {
             .success();
 
         // Final list
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=ConcurrentTest")
@@ -491,7 +490,7 @@ mod experimental_features {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test experimental flags and options that might be added
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("help")
             .assert()
@@ -499,7 +498,7 @@ mod experimental_features {
             .stdout(predicate::str::contains("Commands"));
 
         // Test edge cases in command parsing
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("show")
@@ -515,7 +514,7 @@ mod experimental_features {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -526,7 +525,7 @@ mod experimental_features {
         // Stress test: Create, list, modify, list cycle
         for cycle in 0..5 {
             // Create task
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
@@ -536,7 +535,7 @@ mod experimental_features {
                 .success();
 
             // List tasks
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("list")
                 .arg("--project=StressTest")
@@ -545,7 +544,7 @@ mod experimental_features {
 
             // Modify task if it's not the first one
             if cycle > 0 {
-                let mut cmd = Command::cargo_bin("lotar").unwrap();
+                let mut cmd = crate::common::lotar_cmd().unwrap();
                 cmd.current_dir(temp_dir)
                     .arg("status")
                     .arg(format!("STRE-{cycle}"))
@@ -555,7 +554,7 @@ mod experimental_features {
             }
 
             // List tasks again to verify
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("list")
                 .arg("--project=StressTest")
@@ -564,7 +563,7 @@ mod experimental_features {
         }
 
         // Final verification
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=StressTest")
@@ -581,7 +580,7 @@ mod experimental_features {
         let start = Instant::now();
 
         // Invalid project name - this should succeed but find no tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=NonExistentProject")
@@ -590,7 +589,7 @@ mod experimental_features {
             .stderr(predicate::str::contains("No tasks found"));
 
         // Invalid task ID with status command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("INVALID-999")
@@ -599,7 +598,7 @@ mod experimental_features {
             .failure();
 
         // Invalid template
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -608,7 +607,7 @@ mod experimental_features {
             .failure();
 
         // Valid operation after errors
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir).arg("help").assert().success();
 
         let error_recovery_duration = start.elapsed();
@@ -627,7 +626,7 @@ mod experimental_features {
 
         // Test with very long project names
         let long_project_name = "A".repeat(100);
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -636,7 +635,7 @@ mod experimental_features {
             .success(); // Should handle long names gracefully
 
         // Test with special characters in project names
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -645,7 +644,7 @@ mod experimental_features {
             .success();
 
         // Test with minimal input
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -654,7 +653,7 @@ mod experimental_features {
             .success();
 
         // All boundary tests should complete quickly
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("show")
@@ -678,7 +677,7 @@ mod integration_performance {
         let start = Instant::now();
 
         // Step 1: Project initialization
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -691,12 +690,12 @@ mod integration_performance {
         fs::create_dir_all(temp_dir.join("src")).unwrap();
 
         // Step 3: Scan project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir).arg("scan").assert().success();
 
         // Step 4: Add multiple tasks
         for i in 0..10 {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("task")
                 .arg("add")
@@ -708,7 +707,7 @@ mod integration_performance {
 
         // Step 5: Modify tasks
         for i in 1..=5 {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("status")
                 .arg(format!("FULL-{i}"))
@@ -719,7 +718,7 @@ mod integration_performance {
 
         // Step 6: Complete tasks
         for i in 1..=3 {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("status")
                 .arg(format!("FULL-{i}"))
@@ -729,7 +728,7 @@ mod integration_performance {
         }
 
         // Step 7: Final status check
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=FullWorkflow")

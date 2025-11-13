@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use chrono::{Duration, SecondsFormat, Utc};
 use serde_json::Value;
 use std::process::Command as ProcCommand;
@@ -113,7 +112,7 @@ fn stats_time_in_status_basic_window() {
     );
 
     // Query time-in-status in a window up to 2025-08-18T00:00Z (global scope)
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -217,7 +216,7 @@ fn stats_time_in_status_single_task() {
     );
 
     // Query per-ticket time-in-status
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -367,7 +366,7 @@ fn stats_effort_with_transitions_window_filters_tasks() {
     );
 
     // Query: window that includes 2025-08-12 only, transitions to IN_PROGRESS
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -493,7 +492,7 @@ fn stats_changed_and_churn_and_authors() {
     );
 
     // stats changed (global to avoid project scope mismatch)
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -515,7 +514,7 @@ fn stats_changed_and_churn_and_authors() {
 
     // stats churn: TEST-1 should have the most commits (>=2 commits)
     // Use a 90-day window to ensure both commits land inside the range regardless of test execution time
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -531,7 +530,7 @@ fn stats_changed_and_churn_and_authors() {
     assert!(items[0]["commits"].as_u64().unwrap() >= 2);
 
     // stats authors: both Alice and Bob present; Alice has >= 2 commits
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -550,7 +549,7 @@ fn stats_changed_and_churn_and_authors() {
     assert!(names.contains(&"Bob".to_string()));
 
     // stats activity by day
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([
@@ -574,7 +573,7 @@ fn stats_changed_and_churn_and_authors() {
     assert!(items[0]["key"].as_str().unwrap().contains('-'));
 
     // stats activity by project
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args([

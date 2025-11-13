@@ -3,7 +3,6 @@
 mod common;
 
 use crate::common::cargo_bin_silent;
-use assert_cmd::Command;
 use common::TestFixtures;
 use std::time::Duration;
 
@@ -165,7 +164,7 @@ fn test_serve_command_error_conditions() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test with non-existent tasks directory (but from a valid working directory)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -176,7 +175,7 @@ fn test_serve_command_error_conditions() {
     if let Ok(_) = result.try_success() {}
 
     // Test serve with format option (may not make sense)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -193,7 +192,7 @@ fn test_serve_command_with_project_data() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create diverse test data
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Web UI Test Task")
@@ -203,7 +202,7 @@ fn test_serve_command_with_project_data() {
         .assert()
         .success();
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("API Test Task")
@@ -213,7 +212,7 @@ fn test_serve_command_with_project_data() {
         .success();
 
     // Change one task status
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("status")
         .arg("2")
@@ -222,7 +221,7 @@ fn test_serve_command_with_project_data() {
         .success();
 
     // Test serve with actual project data
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -232,7 +231,7 @@ fn test_serve_command_with_project_data() {
     if let Ok(_) = result.try_success() {}
 
     // Test serve with specific project
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd
         .current_dir(temp_dir)
         .arg("serve")
@@ -249,7 +248,7 @@ fn test_serve_implementation_summary() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create test task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .arg("add")
         .arg("Summary test task")
@@ -257,7 +256,7 @@ fn test_serve_implementation_summary() {
         .success();
 
     // Test basic serve existence
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd.current_dir(temp_dir).arg("help").assert();
 
     if let Ok(assert_result) = result.try_success() {
@@ -266,7 +265,7 @@ fn test_serve_implementation_summary() {
     }
 
     // Test serve help specifically
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let result = cmd.current_dir(temp_dir).arg("help").arg("serve").assert();
 
     if let Ok(assert_result) = result.try_success() {

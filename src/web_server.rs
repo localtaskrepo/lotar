@@ -1,7 +1,8 @@
 use crate::api_server::{self, HttpRequest};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, include_dir};
-use notify::{Config as NotifyConfig, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::EventKind;
+use notify::{Config as NotifyConfig, RecursiveMode, Watcher, recommended_watcher};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
@@ -488,15 +489,29 @@ fn start_tasks_watcher() {
     }
     // Spawn a detached thread that owns the watcher
     std::thread::spawn(move || {
-        // Channel for notify events
+        // Channel for notify events forwarded from the watcher callback
         let (tx, rx) = std::sync::mpsc::channel();
-        let mut watcher = match RecommendedWatcher::new(tx, NotifyConfig::default()) {
+
+        let mut watcher = match recommended_watcher({
+            let tx = tx.clone();
+            move |res| {
+                let _ = tx.send(res);
+            }
+        }) {
             Ok(w) => w,
             Err(_) => return,
         };
+
+        if watcher.configure(NotifyConfig::default()).is_err() {
+            return;
+        }
+
         if watcher.watch(&tasks_dir, RecursiveMode::Recursive).is_err() {
             return;
         }
+
+        drop(tx);
+
         // Simple loop: for any modify/create/remove, emit project_changed events.
         while let Ok(res) = rx.recv() {
             let Ok(event) = res else {

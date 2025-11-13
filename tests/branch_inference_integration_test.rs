@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use tempfile::TempDir;
 
 mod common;
@@ -38,7 +37,7 @@ fn infers_feature_on_feat_branch() {
     write_global(&tasks);
     init_fake_git(root, "feat/api-endpoint");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
@@ -66,7 +65,7 @@ fn infers_bug_on_fix_branch() {
     write_global(&tasks);
     init_fake_git(root, "fix/login-crash");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
@@ -109,7 +108,7 @@ issue.types: [Feature]
 "#;
     std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())

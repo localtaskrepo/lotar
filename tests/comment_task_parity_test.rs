@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 
 mod common;
@@ -8,7 +7,7 @@ use common::TestFixtures;
 fn task_comment_parity_list_on_empty() {
     let tf = TestFixtures::new();
     // create a task
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["add", "Task for task comment parity"])
@@ -16,7 +15,7 @@ fn task_comment_parity_list_on_empty() {
         .success();
 
     // get id via JSON list
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["list", "--format", "json"]) // json
@@ -31,7 +30,7 @@ fn task_comment_parity_list_on_empty() {
         .expect("Expected an ID in list JSON output");
 
     // lotar task comment with no text should list existing comments
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["--format", "json", "task", "comment", &id])

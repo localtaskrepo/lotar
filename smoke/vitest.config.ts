@@ -25,7 +25,13 @@ function createLocalStorageFile(prefix: string) {
 }
 
 const localStorageFile = createLocalStorageFile('lotar-vitest-smoke-');
-const threadExecArgv = localStorageFile ? [`--localstorage-file=${localStorageFile}`] : [];
+
+if (localStorageFile) {
+    const flag = `--localstorage-file=${localStorageFile}`;
+    if (!process.execArgv.includes(flag)) {
+        process.execArgv.push(flag);
+    }
+}
 
 export default defineConfig({
     test: {
@@ -41,11 +47,6 @@ export default defineConfig({
             LOTAR_TEST_SILENT: '1',
         },
         reporters: 'default',
-        poolOptions: {
-            threads: {
-                execArgv: threadExecArgv,
-            },
-        },
     },
     resolve: {
         alias: {

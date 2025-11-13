@@ -1,5 +1,4 @@
-use assert_cmd::prelude::*;
-use std::process::Command;
+use assert_cmd::Command;
 use tempfile::TempDir;
 
 mod common;
@@ -16,14 +15,14 @@ fn comment_shortcut_adds_comment() {
     let temp = crate::common::temp_dir();
     // Create a task
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "A"],
     )
     .success();
 
     // Resolve created ID by listing
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["--format", "json", "list"]) // get first id
@@ -37,7 +36,7 @@ fn comment_shortcut_adds_comment() {
     let id = v["tasks"][0]["id"].as_str().unwrap().to_string();
 
     // Add a comment
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["--format", "json", "comment", &id, "First comment"])

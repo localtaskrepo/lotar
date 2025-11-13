@@ -1,5 +1,3 @@
-use assert_cmd::Command;
-
 mod common;
 use common::TestFixtures;
 use common::env_mutex::EnvVarGuard;
@@ -12,7 +10,7 @@ fn config_show_explain_includes_sources() {
     // Set an env default to observe in explain output
     let _guard = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env.reporter@example.com");
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let output = cmd
         .current_dir(temp_dir)
         .arg("config")

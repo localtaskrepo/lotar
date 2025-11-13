@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -87,7 +86,7 @@ fn task_history_diff_at() {
     );
 
     // History JSON
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "history", "TEST-1", "-L", "5"])
@@ -100,7 +99,7 @@ fn task_history_diff_at() {
     assert!(items.len() >= 2);
 
     // Diff JSON (latest)
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "diff", "TEST-1"])
@@ -113,7 +112,7 @@ fn task_history_diff_at() {
     // At JSON (first commit)
     // Extract last item commit (oldest) from history
     let first_commit = items.last().unwrap()["commit"].as_str().unwrap();
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "at", "TEST-1", first_commit])

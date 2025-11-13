@@ -25,7 +25,13 @@ function createLocalStorageFile(prefix: string) {
 }
 
 const localStorageFile = createLocalStorageFile('lotar-vitest-');
-const threadExecArgv = localStorageFile ? [`--localstorage-file=${localStorageFile}`] : [];
+
+if (localStorageFile) {
+    const flag = `--localstorage-file=${localStorageFile}`;
+    if (!process.execArgv.includes(flag)) {
+        process.execArgv.push(flag);
+    }
+}
 
 export default mergeConfig(
     baseConfig,
@@ -37,11 +43,6 @@ export default mergeConfig(
             environment: 'jsdom',
             globals: true,
             setupFiles: ['__tests__/vitest.setup.ts'],
-            poolOptions: {
-                threads: {
-                    execArgv: threadExecArgv,
-                },
-            },
         },
     }),
 );

@@ -1,6 +1,5 @@
 //! JSON envelope tests for property commands (assignee, due date, priority, delete)
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use serde_json::Value;
 
@@ -13,7 +12,7 @@ fn test_assignee_get_set_json() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let assert_result = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -28,7 +27,7 @@ fn test_assignee_get_set_json() {
     assert!(created.contains("Created task:"));
 
     // GET current assignee (expect null)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let output = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -45,7 +44,7 @@ fn test_assignee_get_set_json() {
     assert!(json["assignee"].is_null());
 
     // SET new assignee
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let output = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -75,7 +74,7 @@ fn test_duedate_get_set_json() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
         .args(["add", "DueDate JSON task", "--project=test-project"])
@@ -84,7 +83,7 @@ fn test_duedate_get_set_json() {
         .stdout(predicate::str::contains("Created task:"));
 
     // GET current due date (expect null)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let output = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -100,7 +99,7 @@ fn test_duedate_get_set_json() {
     assert!(json["due_date"].is_null());
 
     // SET new due date
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let output = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -130,7 +129,7 @@ fn test_priority_unchanged_json() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task (default priority applies)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
         .args(["add", "Priority JSON task", "--project=test-project"])
@@ -139,7 +138,7 @@ fn test_priority_unchanged_json() {
         .stdout(predicate::str::contains("Created task:"));
 
     // Set the same priority to trigger unchanged path
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -176,7 +175,7 @@ fn test_task_delete_success_json() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Create a task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
         .args(["add", "Delete JSON task", "--project=test-project"])
@@ -185,7 +184,7 @@ fn test_task_delete_success_json() {
         .stdout(predicate::str::contains("Created task:"));
 
     // Delete with --yes and JSON format
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -215,7 +214,7 @@ fn test_task_delete_success_json() {
     assert_eq!(json["task_id"], "1");
 
     // Optional: verify list is empty
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let out = cmd
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")

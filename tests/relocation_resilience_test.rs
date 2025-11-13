@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 
@@ -37,7 +36,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
     let root = tf.temp_dir.path();
 
     // Create an initial task via CLI add (id will be <PROJECT>-1)
-    let mut add = Command::cargo_bin("lotar").unwrap();
+    let mut add = crate::common::lotar_cmd().unwrap();
     add.current_dir(root)
         .arg("add")
         .arg("First task for reanchor")
@@ -54,7 +53,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
     fs::write(&src_path, format!("// TODO {id}: do thing\n")).unwrap();
 
     // Run scan; should not create a new task, but should append a code reference to 1.yml
-    let mut scan = Command::cargo_bin("lotar").unwrap();
+    let mut scan = crate::common::lotar_cmd().unwrap();
     scan.current_dir(root)
         .arg("scan")
         .assert()
@@ -72,7 +71,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
     fs::write(&src_path, format!("\n// TODO {id}: do thing\n")).unwrap();
 
     // Scan again; should add a second anchor for the new line
-    let mut scan2 = Command::cargo_bin("lotar").unwrap();
+    let mut scan2 = crate::common::lotar_cmd().unwrap();
     scan2.current_dir(root).arg("scan").assert().success();
 
     let yaml2 = fs::read_to_string(&task_file).unwrap();
@@ -85,7 +84,7 @@ fn scan_adds_reference_when_file_is_renamed() {
     let root = tf.temp_dir.path();
 
     // Create a task
-    let mut add = Command::cargo_bin("lotar").unwrap();
+    let mut add = crate::common::lotar_cmd().unwrap();
     add.current_dir(root)
         .arg("add")
         .arg("Task")
@@ -97,7 +96,7 @@ fn scan_adds_reference_when_file_is_renamed() {
     // Create file and scan once for baseline anchor
     let src1 = root.join("a.rs");
     fs::write(&src1, format!("// TODO {id}: alpha\n")).unwrap();
-    let mut scan = Command::cargo_bin("lotar").unwrap();
+    let mut scan = crate::common::lotar_cmd().unwrap();
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
     assert_yaml_contains(&yaml, "code: a.rs#L1");
@@ -108,7 +107,7 @@ fn scan_adds_reference_when_file_is_renamed() {
     fs::rename(&src1, &src2).unwrap();
 
     // Scan again; should add a new anchor for the new path
-    let mut scan2 = Command::cargo_bin("lotar").unwrap();
+    let mut scan2 = crate::common::lotar_cmd().unwrap();
     scan2.current_dir(root).arg("scan").assert().success();
     let yaml2 = fs::read_to_string(&task_file).unwrap();
     assert_yaml_contains(&yaml2, "code: src/b.rs#L1");

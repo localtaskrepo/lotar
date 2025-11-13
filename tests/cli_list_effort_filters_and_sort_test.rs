@@ -1,6 +1,5 @@
-use assert_cmd::prelude::*;
+use assert_cmd::Command;
 use serde_json::Value;
-use std::process::Command;
 use tempfile::TempDir;
 
 mod common;
@@ -18,26 +17,26 @@ fn list_sort_by_effort_time_only_asc_and_desc() {
 
     // Create three tasks with time efforts: 30m (0.50h), 2h (2.00h), 1d (8.00h)
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "A", "--effort", "30m"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "B", "--effort", "2h"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "C", "--effort", "1d"],
     )
     .success();
 
     // Ascending
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -58,7 +57,7 @@ fn list_sort_by_effort_time_only_asc_and_desc() {
     );
 
     // Descending
-    let out2 = Command::cargo_bin("lotar")
+    let out2 = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -92,26 +91,26 @@ fn list_effort_min_max_time_window() {
 
     // Time efforts: 0.50h, 2.00h, 8.00h
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "A", "--effort", "30m"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "B", "--effort", "2h"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "C", "--effort", "1d"],
     )
     .success();
 
     // Filter [1h, 1d] inclusive; expect 2.00h and 8.00h
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -148,26 +147,26 @@ fn list_effort_min_points_excludes_time() {
 
     // Mixed: time and points
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "T1", "--effort", "2h"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "P3", "--effort", "3pt"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "P5", "--effort", "5"],
     )
     .success(); // bare number => points
 
     // Points filter: --effort-min 4 (points). Should include only P5; time tasks excluded by kind.
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

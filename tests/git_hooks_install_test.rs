@@ -1,3 +1,5 @@
+mod common;
+
 use predicates::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -41,7 +43,7 @@ fn installs_git_hooks_and_sets_config() {
         .expect("failed to run git init");
     assert!(status.success(), "git init failed");
 
-    let mut cmd = assert_cmd::Command::cargo_bin("lotar").expect("binary not built");
+    let mut cmd = crate::common::lotar_cmd().expect("binary not built");
     cmd.current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
         .args(["git", "hooks", "install"])
@@ -59,7 +61,7 @@ fn installs_git_hooks_and_sets_config() {
     assert_eq!(value, ".githooks");
 
     // Second run should be a no-op and still succeed.
-    let mut second = assert_cmd::Command::cargo_bin("lotar").expect("binary not built");
+    let mut second = crate::common::lotar_cmd().expect("binary not built");
     second
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

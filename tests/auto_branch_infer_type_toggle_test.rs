@@ -1,4 +1,5 @@
-use assert_cmd::Command;
+mod common;
+
 use tempfile::TempDir;
 
 fn write_global(tasks_dir: &std::path::Path, enable: bool) {
@@ -39,7 +40,7 @@ fn disables_branch_infer_when_flag_off() {
     )
     .unwrap();
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
@@ -68,7 +69,7 @@ fn enables_branch_infer_when_flag_on() {
     write_global(&tasks, true);
     init_fake_git(root, "fix/example");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())

@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::process::Command as ProcCommand;
@@ -92,7 +91,7 @@ fn task_diff_fields_reports_structured_changes() {
     );
 
     // JSON structured fields diff on latest
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "diff", "TEST-2", "--fields"])
@@ -101,7 +100,7 @@ fn task_diff_fields_reports_structured_changes() {
     assert!(out.status.success());
     eprintln!("STDOUT: {}", String::from_utf8_lossy(&out.stdout));
     // Debug: fetch history and snapshots first for visibility
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "history", "TEST-2", "-L", "5"])
@@ -112,14 +111,14 @@ fn task_diff_fields_reports_structured_changes() {
     let items = hv["items"].as_array().unwrap();
     let newest = items.first().unwrap()["commit"].as_str().unwrap();
     let oldest = items.last().unwrap()["commit"].as_str().unwrap();
-    let out_new = Command::cargo_bin("lotar")
+    let out_new = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "at", "TEST-2", newest])
         .output()
         .unwrap();
     eprintln!("AT newest: {}", String::from_utf8_lossy(&out_new.stdout));
-    let out_old = Command::cargo_bin("lotar")
+    let out_old = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "at", "TEST-2", oldest])
@@ -130,7 +129,7 @@ fn task_diff_fields_reports_structured_changes() {
     // Now parse the diff and do sanity checks
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["status"], "ok");
-    let diff_out = Command::cargo_bin("lotar")
+    let diff_out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["--format", "json", "task", "diff", "TEST-2", "--fields"])
@@ -175,7 +174,7 @@ fn task_diff_fields_text_output_is_human_readable() {
         "edit 2",
     );
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
         .args(["task", "diff", "TEST-2", "--fields"])

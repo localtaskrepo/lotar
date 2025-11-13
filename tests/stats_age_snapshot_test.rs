@@ -1,3 +1,5 @@
+mod common;
+
 use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -14,15 +16,15 @@ fn stats_age_day_distribution_snapshot() {
     let temp = TempDir::new().unwrap();
 
     // Create a few tasks; their created timestamps will be "now"
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "A"]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "B"]).success();
-    let mut c = Command::cargo_bin("lotar").unwrap();
+    let mut c = crate::common::lotar_cmd().unwrap();
     run(&mut c, &temp, &["task", "add", "C"]).success();
 
     // Query age distribution by day in JSON to assert exact shape
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

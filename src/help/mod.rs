@@ -1,6 +1,6 @@
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, DirEntry, include_dir};
-use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
+use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::collections::HashMap;
 use std::io::IsTerminal;
@@ -213,7 +213,7 @@ impl HelpSystem {
 
         for event in parser {
             match event {
-                Event::Start(Tag::Heading(level, _, _)) => {
+                Event::Start(Tag::Heading { level, .. }) => {
                     // Ensure a blank line before headings (except at very start)
                     if !out.is_empty() && !out.ends_with("\n\n") {
                         if !out.ends_with('\n') {
@@ -232,7 +232,7 @@ impl HelpSystem {
                     // Store marker by pushing post at End
                     STYLE_STACK.with(|s| s.borrow_mut().push(post.to_string()));
                 }
-                Event::End(Tag::Heading(_, _, _)) => {
+                Event::End(TagEnd::Heading(_)) => {
                     if let Some(post) = STYLE_STACK.with(|s| s.borrow_mut().pop()) {
                         out.push_str(&post);
                     } else {
@@ -246,7 +246,7 @@ impl HelpSystem {
                 Event::Start(Tag::List(_)) => {
                     list_level += 1;
                 }
-                Event::End(Tag::List(_)) => {
+                Event::End(TagEnd::List(_)) => {
                     list_level = list_level.saturating_sub(1);
                 }
                 Event::Start(Tag::Item) => {
@@ -256,14 +256,14 @@ impl HelpSystem {
                     out.push_str(&"  ".repeat(list_level.saturating_sub(1)));
                     out.push_str("• ");
                 }
-                Event::End(Tag::Item) => {}
+                Event::End(TagEnd::Item) => {}
                 Event::Start(Tag::CodeBlock(_)) => {
                     in_code_block = true;
                     if !out.ends_with('\n') {
                         out.push('\n');
                     }
                 }
-                Event::End(Tag::CodeBlock(_)) => {
+                Event::End(TagEnd::CodeBlock) => {
                     in_code_block = false;
                     if !out.ends_with('\n') {
                         out.push('\n');
@@ -273,12 +273,12 @@ impl HelpSystem {
                         out.push('\n');
                     }
                 }
-                Event::Start(Tag::BlockQuote) => {
+                Event::Start(Tag::BlockQuote(_)) => {
                     if !out.ends_with('\n') {
                         out.push('\n');
                     }
                 }
-                Event::End(Tag::BlockQuote) => {
+                Event::End(TagEnd::BlockQuote(_)) => {
                     if !out.ends_with('\n') {
                         out.push('\n');
                     }
@@ -321,7 +321,7 @@ impl HelpSystem {
                 Event::Html(html) => {
                     out.push_str(&html);
                 }
-                Event::Start(Tag::Paragraph) | Event::End(Tag::Paragraph) => {
+                Event::Start(Tag::Paragraph) | Event::End(TagEnd::Paragraph) => {
                     if !out.ends_with('\n') {
                         out.push('\n');
                     }

@@ -1,3 +1,5 @@
+mod common;
+
 use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -15,13 +17,13 @@ fn stats_effort_and_comments_and_custom_snapshot() {
 
     // Create a few tasks with effort and custom fields
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &["task", "add", "A", "--effort", "2d", "--field", "team=eng"],
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &[
             "task", "add", "B", "--effort", "5h", "--assign", "@bob", "--field", "team=eng",
@@ -29,7 +31,7 @@ fn stats_effort_and_comments_and_custom_snapshot() {
     )
     .success();
     run(
-        &mut Command::cargo_bin("lotar").unwrap(),
+        &mut crate::common::lotar_cmd().unwrap(),
         &temp,
         &[
             "task",
@@ -46,7 +48,7 @@ fn stats_effort_and_comments_and_custom_snapshot() {
     .success();
 
     // Effort by assignee
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -61,7 +63,7 @@ fn stats_effort_and_comments_and_custom_snapshot() {
     assert_eq!(v["action"], "stats.effort");
 
     // Comments top (should be zero counts)
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -74,7 +76,7 @@ fn stats_effort_and_comments_and_custom_snapshot() {
     assert_eq!(v["action"], "stats.comments.top");
 
     // Custom keys
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")
@@ -87,7 +89,7 @@ fn stats_effort_and_comments_and_custom_snapshot() {
     assert_eq!(v["action"], "stats.custom.keys");
 
     // Custom field distribution
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .env("LOTAR_TEST_SILENT", "1")

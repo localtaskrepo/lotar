@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -36,7 +35,7 @@ fn add_with_assignee_me_resolves_identity() {
     let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Create a task with @me
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
         .args([
             "add",
@@ -52,7 +51,7 @@ fn add_with_assignee_me_resolves_identity() {
         ));
 
     // Ensure list --assignee=@me filters to the same task
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["list", "--assignee=@me", "--format=json"])

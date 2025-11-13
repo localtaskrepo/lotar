@@ -5,7 +5,6 @@
 //! - Project discovery and analysis
 //! - Basic scanning functionality
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 
@@ -172,7 +171,7 @@ mod project_discovery {
         .unwrap();
 
         // Test scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -194,7 +193,7 @@ mod project_discovery {
         .unwrap();
 
         // Test scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -220,7 +219,7 @@ mod project_discovery {
         .unwrap();
 
         // Test scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -251,7 +250,7 @@ mod project_discovery {
         fs::write(temp_dir.join("main.py"), "# TODO: Python TODO").unwrap();
 
         // Test scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -279,7 +278,7 @@ mod system_integration {
         fs::write(temp_dir.join("test.rs"), "// TODO: custom dir test").unwrap();
 
         // Test scan with custom tasks directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("--tasks-dir=custom-tasks")
             .arg("scan")
@@ -310,7 +309,7 @@ mod system_integration {
         fs::write(temp_dir.join("tests/test.rs"), "// TODO: add more tests").unwrap();
 
         // Test verbose scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .arg("--detailed")
@@ -332,7 +331,7 @@ mod system_integration {
         .unwrap();
 
         // Test scan
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("scan")
             .assert()
@@ -347,7 +346,6 @@ mod system_integration {
 
 mod bidir_references {
     use crate::common::TestFixtures;
-    use assert_cmd::Command;
     use predicates::prelude::*;
     use std::fs;
 
@@ -364,7 +362,7 @@ mod bidir_references {
         let canon_str = canon_path.display().to_string();
 
         // Run scan (apply-by-default)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(root)
             .arg("scan")
             .assert()

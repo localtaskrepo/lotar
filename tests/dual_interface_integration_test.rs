@@ -3,7 +3,6 @@
 //! This module tests that both quick commands (lotar add) and full subcommands
 //! (lotar task add) work correctly and produce identical results.
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use serde_json::Value;
 
@@ -20,7 +19,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test 1: Quick interface - lotar add
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -41,7 +40,7 @@ mod dual_interface_tests {
             .expect("quick add output should contain task id");
 
         // Test 2: Full subcommand interface - lotar task add
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("task")
@@ -78,7 +77,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test quick interface with all supported options
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Quick task with all options")
@@ -91,7 +90,7 @@ mod dual_interface_tests {
             .stdout(predicate::str::contains("Created task:"));
 
         // Test full subcommand interface with equivalent options
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -111,7 +110,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test that both interfaces reject invalid priority with same error
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Quick task with invalid priority")
@@ -121,7 +120,7 @@ mod dual_interface_tests {
             .failure()
             .stderr(predicate::str::contains("Priority validation failed"));
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -139,7 +138,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a test task first
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task for listing")
@@ -148,14 +147,14 @@ mod dual_interface_tests {
             .success();
 
         // Test quick list interface
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd.current_dir(temp_dir).arg("list").assert().success();
         let quick_output = assert_result.get_output();
 
         let quick_list = String::from_utf8_lossy(&quick_output.stdout);
 
         // Test full subcommand list interface
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("task")
@@ -181,7 +180,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a test task first
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("JSON format test task")
@@ -192,7 +191,7 @@ mod dual_interface_tests {
             .success();
 
         // Test quick list interface with JSON format
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -206,7 +205,7 @@ mod dual_interface_tests {
             serde_json::from_str(&quick_json).expect("Quick interface should produce valid JSON");
 
         // Test full subcommand list interface with JSON format
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let assert_result = cmd
             .current_dir(temp_dir)
             .arg("task")
@@ -238,7 +237,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create a test task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Property test task")
@@ -247,7 +246,7 @@ mod dual_interface_tests {
             .success();
 
         // Test status GET operation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -257,7 +256,7 @@ mod dual_interface_tests {
             .stdout(predicate::str::contains("status: Todo"));
 
         // Test status SET operation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -268,7 +267,7 @@ mod dual_interface_tests {
             .stdout(predicate::str::contains("status changed from Todo to Done"));
 
         // Test status command GET operation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -278,7 +277,7 @@ mod dual_interface_tests {
             .stdout(predicate::str::contains("status: Done"));
 
         // Test priority GET operation (if priority command is working)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let priority_result = cmd
             .current_dir(temp_dir)
             .arg("priority")
@@ -297,7 +296,7 @@ mod dual_interface_tests {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test case-insensitive validation in add command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Case insensitive test")
@@ -309,7 +308,7 @@ mod dual_interface_tests {
             .stdout(predicate::str::contains("Created task:"));
 
         // Create another task for status testing
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Status validation test")
@@ -318,7 +317,7 @@ mod dual_interface_tests {
             .success();
 
         // Test case-insensitive status validation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("2")

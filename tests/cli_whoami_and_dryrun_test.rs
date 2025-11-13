@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -41,7 +40,7 @@ fn whoami_uses_config_default_reporter() {
 
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
         .args(["whoami"]) // text mode
         .assert()
@@ -64,7 +63,7 @@ fn whoami_explain_text_includes_source_and_confidence() {
 
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
         .args(["whoami", "--explain"]) // text mode
         .assert()
@@ -89,7 +88,7 @@ fn whoami_json_compact_and_explain_fields() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Compact JSON (no extra fields)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
         .args(["whoami", "--format=json"]) // json mode
         .assert()
@@ -97,7 +96,7 @@ fn whoami_json_compact_and_explain_fields() {
         .stdout(predicate::str::contains("{\"user\":\"dave\"}"));
 
     // Explain JSON includes source/confidence/details
-    let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+    let mut cmd2 = crate::common::lotar_cmd().unwrap();
     cmd2.current_dir(temp.path())
         .args(["whoami", "--format=json", "--explain"]) // json + explain
         .assert()
@@ -135,7 +134,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
     .expect("create task");
 
     // Dry-run with explain should preview change and show auto-assign effect
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
         .args(["status", &created.id, "Done", "--dry-run", "--explain"])
         .assert()
@@ -146,7 +145,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
         .stdout(predicate::str::contains("Explanation:"));
 
     // Verify status wasn't changed (get path prints current status)
-    let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+    let mut cmd2 = crate::common::lotar_cmd().unwrap();
     cmd2.current_dir(temp.path())
         .args(["status", &created.id])
         .assert()
@@ -174,7 +173,7 @@ fn add_dry_run_explain_creates_no_task_files() {
     let before_count = count_task_yaml_files(&tasks_dir);
 
     // Run add in dry-run mode
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(temp.path())
         .args([
             "add",
@@ -214,7 +213,7 @@ fn add_sets_reporter_via_me_alias_default() {
 
     lotar::utils::identity::invalidate_identity_cache(Some(&tasks_dir));
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["add", "Alias reporter task", "--project=TEST"])

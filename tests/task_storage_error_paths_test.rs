@@ -1,6 +1,5 @@
 #![cfg(unix)]
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 
 mod common;
@@ -11,7 +10,7 @@ fn status_update_reports_storage_failure() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    let add_output = Command::cargo_bin("lotar")
+    let add_output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -38,7 +37,7 @@ fn status_update_reports_storage_failure() {
     perms.set_readonly(true);
     std::fs::set_permissions(&task_file, perms).expect("set read-only");
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -60,7 +59,7 @@ fn task_delete_reports_storage_failure() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    let add_output = Command::cargo_bin("lotar")
+    let add_output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")
@@ -82,7 +81,7 @@ fn task_delete_reports_storage_failure() {
     perms.set_readonly(true);
     std::fs::set_permissions(&project_dir, perms).expect("set dir read-only");
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
         .env("LOTAR_TEST_SILENT", "1")

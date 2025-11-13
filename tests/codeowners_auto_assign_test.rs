@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use tempfile::TempDir;
 
 mod common;
@@ -77,7 +76,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
     .expect("create task");
 
     // Move status via CLI to trigger handler with CODEOWNERS logic
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(repo_root)
         .args(["status", &created.id, "IN_PROGRESS"]) // first change away from default
         .assert()
@@ -140,7 +139,7 @@ fn codeowners_disabled_falls_back_to_identity() {
     )
     .expect("create task");
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(repo_root)
         .args(["status", &created.id, "IN_PROGRESS"]) // first change
         .assert()
@@ -199,7 +198,7 @@ fn codeowners_default_multiple_owners_picks_first() {
     )
     .expect("create task");
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(repo_root)
         .args(["status", &created.id, "IN_PROGRESS"]) // first change
         .assert()
@@ -262,7 +261,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
     )
     .expect("create task");
 
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(repo_root)
         .args(["status", &created.id, "IN_PROGRESS"]) // first change
         .assert()

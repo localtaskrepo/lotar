@@ -7,7 +7,6 @@
 //! - Custom tasks directory handling
 //! - Environment variables and command-line overrides
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 
@@ -35,7 +34,7 @@ mod global_config {
         assert!(!tasks_dir.exists());
 
         // Run config show command, which should NOT create any files (read-only operation)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("config")
@@ -58,7 +57,7 @@ mod global_config {
         );
 
         // Now test that write operations DO create config files when needed
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -97,7 +96,7 @@ mod global_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Set global server port
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -114,7 +113,7 @@ mod global_config {
         assert!(global_config_content.contains("port: 9000"));
 
         // Test config show displays the updated value
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("config")
@@ -139,7 +138,7 @@ mod global_config {
 
         let _guard = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env.reporter@example.com");
 
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -171,7 +170,7 @@ mod global_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Prime a project prefix so the YAML includes it
-        let mut add_cmd = Command::cargo_bin("lotar").unwrap();
+        let mut add_cmd = crate::common::lotar_cmd().unwrap();
         add_cmd
             .current_dir(temp_dir)
             .arg("task")
@@ -180,7 +179,7 @@ mod global_config {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("config")
@@ -234,7 +233,7 @@ mod global_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Ensure predictable defaults
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("task")
@@ -243,7 +242,7 @@ mod global_config {
             .assert()
             .success();
 
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -285,7 +284,7 @@ mod global_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Toggle automation flag to ensure provenance flips to global
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -296,7 +295,7 @@ mod global_config {
             .assert()
             .success();
 
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -334,7 +333,7 @@ mod project_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize a project with a long name to test prefix generation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -372,7 +371,7 @@ mod project_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test with a 4-character project name (should remain the same)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -393,7 +392,7 @@ mod project_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test hyphenated project name
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -406,7 +405,7 @@ mod project_config {
         assert!(hyphen_dir.exists());
 
         // Test underscored project name
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -419,7 +418,7 @@ mod project_config {
         assert!(underscore_dir.exists());
 
         // Test short project name (should remain unchanged)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -438,7 +437,7 @@ mod project_config {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Set a global default priority to observe in project explain output
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -450,7 +449,7 @@ mod project_config {
             .success();
 
         // Initialize project and set a project-specific override
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -459,7 +458,7 @@ mod project_config {
             .assert()
             .success();
 
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -470,7 +469,7 @@ mod project_config {
             .assert()
             .success();
 
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp_dir)
             .arg("config")
@@ -513,7 +512,7 @@ mod templates {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test default template
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -535,7 +534,7 @@ mod templates {
         assert!(config_content.contains("Done"));
 
         // Test agile template
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -561,7 +560,7 @@ mod templates {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // List available templates
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("templates")
@@ -589,7 +588,7 @@ mod config_operations {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // First initialize a project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -598,7 +597,7 @@ mod config_operations {
             .success();
 
         // Ensure default project is set for project-scoped operations
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -608,7 +607,7 @@ mod config_operations {
             .success();
 
         // Set issue states
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -622,7 +621,7 @@ mod config_operations {
             ));
 
         // Set default priority
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -650,7 +649,7 @@ mod config_operations {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize a project with custom settings
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -660,7 +659,7 @@ mod config_operations {
             .success();
 
         // Show the configuration
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("show")
@@ -693,7 +692,7 @@ mod custom_tasks_directory {
         assert!(!custom_tasks_dir.exists());
 
         // Test that using --tasks-dir with non-existent directory automatically creates it
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("--tasks-dir=custom-tasks")
             .arg("config")
@@ -708,7 +707,7 @@ mod custom_tasks_directory {
         assert!(custom_tasks_dir.exists());
 
         // Test config set command with custom directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("--tasks-dir=custom-tasks")
             .arg("config")
@@ -739,7 +738,7 @@ mod custom_tasks_directory {
         fs::create_dir_all(&env_tasks_dir).unwrap();
 
         // Test with LOTAR_TASKS_DIR environment variable
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .env("LOTAR_TASKS_DIR", env_tasks_dir.to_str().unwrap())
             .arg("config")
@@ -781,7 +780,7 @@ mod custom_tasks_directory {
         fs::create_dir_all(&sub_dir).unwrap();
 
         // Test from subdirectory - should find parent .tasks directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&sub_dir)
             .arg("config")
             .arg("show")
@@ -803,7 +802,7 @@ mod custom_tasks_directory {
         fs::create_dir_all(&custom_tasks_dir).unwrap();
 
         // Test task creation with custom directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("--tasks-dir=project-tasks")
             .arg("task")
@@ -852,7 +851,7 @@ mod inheritance {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create global config first
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -862,7 +861,7 @@ mod inheritance {
             .success();
 
         // Set a default project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -872,7 +871,7 @@ mod inheritance {
             .success();
 
         // Create a project config
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -881,7 +880,7 @@ mod inheritance {
             .success();
 
         // Set project-specific configuration
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("set")
@@ -892,7 +891,7 @@ mod inheritance {
             .success();
 
         // Show config should display project settings (not server settings)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("config")
@@ -933,7 +932,7 @@ mod error_handling {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test invalid template
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -950,7 +949,7 @@ mod error_handling {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test config help
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("help")
             .arg("config")

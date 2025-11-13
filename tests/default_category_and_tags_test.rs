@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::TempDir;
 
@@ -28,7 +27,7 @@ fn add_applies_default_tags_and_custom_field_flag() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
     let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args([
@@ -71,7 +70,7 @@ fn add_explicit_tags_override_defaults() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
     let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args([
@@ -121,7 +120,7 @@ fn normalize_canonical_includes_custom_fields_global() {
     )
     .unwrap();
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "normalize"])
@@ -159,7 +158,7 @@ fn normalize_project_canonical_includes_custom_fields() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks.to_string_lossy().as_ref());
     let _guard_silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
         .args(["config", "normalize", "--project", "TEST", "--write"])

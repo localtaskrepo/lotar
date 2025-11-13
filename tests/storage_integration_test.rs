@@ -6,7 +6,6 @@
 //! - Data validation and serialization
 //! - File system operations
 
-use assert_cmd::Command;
 use predicates::prelude::*;
 
 mod common;
@@ -25,7 +24,7 @@ mod crud_operations {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -34,7 +33,7 @@ mod crud_operations {
             .success();
 
         // Create a task using modern syntax
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task creation")
@@ -46,7 +45,7 @@ mod crud_operations {
             .stdout(predicate::str::contains("Created task:"));
 
         // Verify task exists
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=CrudTest")
@@ -61,7 +60,7 @@ mod crud_operations {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project and create task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -69,7 +68,7 @@ mod crud_operations {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Retrievable task")
@@ -79,7 +78,7 @@ mod crud_operations {
             .success();
 
         // Retrieve task details using list command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=RetrievalTest")
@@ -95,7 +94,7 @@ mod crud_operations {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -104,7 +103,7 @@ mod crud_operations {
             .success();
 
         // Create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Original task")
@@ -115,7 +114,7 @@ mod crud_operations {
             .success();
 
         // Update task status (task ID should be UPDA-1 based on project prefix)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("UPDA-1")
@@ -125,7 +124,7 @@ mod crud_operations {
             .success();
 
         // Verify update
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=UpdateTest")
@@ -140,7 +139,7 @@ mod crud_operations {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project and create task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -148,7 +147,7 @@ mod crud_operations {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Task to complete")
@@ -157,7 +156,7 @@ mod crud_operations {
             .success();
 
         // Mark task as completed (task ID should be COMP-1 based on project prefix)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("COMP-1")
@@ -167,7 +166,7 @@ mod crud_operations {
             .success();
 
         // Verify task is marked as complete
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=CompleteTest")
@@ -190,7 +189,7 @@ mod multi_project {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize two projects with distinct names to avoid conflicts
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -198,7 +197,7 @@ mod multi_project {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -207,7 +206,7 @@ mod multi_project {
             .success();
 
         // Add tasks to each project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Task in Alpha")
@@ -215,7 +214,7 @@ mod multi_project {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Task in Beta")
@@ -224,7 +223,7 @@ mod multi_project {
             .success();
 
         // Verify project isolation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Alpha")
@@ -233,7 +232,7 @@ mod multi_project {
             .stdout(predicate::str::contains("Task in Alpha"))
             .stdout(predicate::str::contains("Task in Beta").not());
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Beta")
@@ -249,7 +248,7 @@ mod multi_project {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize projects with completely distinct names
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -257,7 +256,7 @@ mod multi_project {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -267,7 +266,7 @@ mod multi_project {
 
         // Add tasks to both projects
         for i in 1..=3 {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg(format!("Gamma Task {i}"))
@@ -275,7 +274,7 @@ mod multi_project {
                 .assert()
                 .success();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg(format!("Delta Task {i}"))
@@ -285,7 +284,7 @@ mod multi_project {
         }
 
         // List all tasks across projects
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .assert()
@@ -294,7 +293,7 @@ mod multi_project {
             .stdout(predicate::str::contains("Delta Task"));
 
         // Verify individual project listings
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Gamma")
@@ -304,7 +303,7 @@ mod multi_project {
             .stdout(predicate::str::contains("Gamma Task 2"))
             .stdout(predicate::str::contains("Gamma Task 3"));
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=Delta")
@@ -329,7 +328,7 @@ mod validation_and_serialization {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -338,7 +337,7 @@ mod validation_and_serialization {
             .success();
 
         // Test valid task creation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Valid task")
@@ -349,7 +348,7 @@ mod validation_and_serialization {
             .success();
 
         // Test task creation with special characters
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Task with special chars: @#$%^&*()")
@@ -359,7 +358,7 @@ mod validation_and_serialization {
             .success();
 
         // Verify both tasks exist and display correctly
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=ValidationTest")
@@ -375,7 +374,7 @@ mod validation_and_serialization {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Initialize project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
             .arg("init")
@@ -384,7 +383,7 @@ mod validation_and_serialization {
             .success();
 
         // Create task with complex data
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Complex serialization test")
@@ -395,7 +394,7 @@ mod validation_and_serialization {
             .success();
 
         // Verify task is properly serialized and can be read back
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .arg("--project=SerializationTest")

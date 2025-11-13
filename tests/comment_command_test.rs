@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 
 mod common;
@@ -8,7 +7,7 @@ use common::TestFixtures;
 fn comment_positional_text_adds_comment() {
     let tf = TestFixtures::new();
     // create a task
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(tf.get_temp_path())
         .args(["add", "Test task for comments"])
         .assert()
@@ -16,7 +15,7 @@ fn comment_positional_text_adds_comment() {
         .stdout(predicate::str::contains("Created task:"));
 
     // list to get ID
-    let output = Command::cargo_bin("lotar")
+    let output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["list"]) // default text output
@@ -32,7 +31,7 @@ fn comment_positional_text_adds_comment() {
         .expect("Expected an ID in list output");
 
     // add comment
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(tf.get_temp_path())
         .args(["comment", &id, "hello world"])
         .assert()
@@ -40,7 +39,7 @@ fn comment_positional_text_adds_comment() {
         .stdout(predicate::str::contains("Comment added to"));
 
     // verify via JSON second run
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["-f", "json", "comment", &id, "again"]) // ensure json output
@@ -56,7 +55,7 @@ fn comment_positional_text_adds_comment() {
 fn comment_message_flag_adds_comment() {
     let tf = TestFixtures::new();
     // create a task
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["add", "Task for -m"])
@@ -64,7 +63,7 @@ fn comment_message_flag_adds_comment() {
         .success();
 
     // get id (use JSON for stability)
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["list", "--format", "json"]) // json
@@ -79,7 +78,7 @@ fn comment_message_flag_adds_comment() {
         .expect("Expected an ID in list JSON output");
 
     // add comment with -m
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["comment", &id, "-m", "via flag message"])
@@ -91,7 +90,7 @@ fn comment_message_flag_adds_comment() {
 fn comment_requires_text() {
     let tf = TestFixtures::new();
     // create a task
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["add", "Task for empty check"])
@@ -99,7 +98,7 @@ fn comment_requires_text() {
         .success();
 
     // get id via JSON list
-    let out = Command::cargo_bin("lotar")
+    let out = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["list", "--format", "json"]) // json
@@ -115,7 +114,7 @@ fn comment_requires_text() {
 
     // run with no text
     // With no text, it should list existing comments (success) and show 0 initially
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["--format", "json", "comment", &id])
@@ -128,14 +127,14 @@ fn comment_requires_text() {
 #[test]
 fn comment_dry_run_preview_includes_explain() {
     let tf = TestFixtures::new();
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["add", "Task for dry-run comment"])
         .assert()
         .success();
 
-    let id_output = Command::cargo_bin("lotar")
+    let id_output = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args(["list", "--format", "json"])
@@ -149,7 +148,7 @@ fn comment_dry_run_preview_includes_explain() {
         .map(|m| m.as_str().to_string())
         .expect("Expected an ID in list JSON output");
 
-    Command::cargo_bin("lotar")
+    crate::common::lotar_cmd()
         .unwrap()
         .current_dir(tf.get_temp_path())
         .args([

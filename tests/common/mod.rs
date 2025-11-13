@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use assert_cmd::cargo::{CargoError, cargo_bin_cmd};
 use ctor::ctor;
 use lotar::types::Priority;
 use lotar::{Storage, Task};
@@ -16,6 +17,11 @@ pub mod env_mutex;
 pub struct TestFixtures {
     pub temp_dir: TempDir,
     pub tasks_root: PathBuf,
+}
+
+#[allow(dead_code)]
+pub fn lotar_cmd() -> Result<Command, CargoError> {
+    Ok(cargo_bin_cmd!("lotar"))
 }
 
 #[ctor]
@@ -75,8 +81,6 @@ impl TestFixtures {
     /// Run a lotar command with the given arguments and return the output
     #[allow(dead_code)] // Used by output format consistency tests
     pub fn run_command(&self, args: &[&str]) -> Result<String, Box<dyn std::error::Error>> {
-        use assert_cmd::Command;
-
         // Create a basic Cargo.toml if it doesn't exist for project detection
         let cargo_toml_path = self.temp_dir.path().join("Cargo.toml");
         if !cargo_toml_path.exists() {
@@ -94,7 +98,8 @@ impl TestFixtures {
             )?;
         }
 
-        let output = Command::cargo_bin("lotar")?
+        let mut cmd = lotar_cmd().map_err(|e| -> Box<dyn std::error::Error> { Box::new(e) })?;
+        let output = cmd
             .env("LOTAR_TEST_SILENT", "1")
             .args(args)
             .current_dir(self.temp_dir.path())
@@ -213,7 +218,7 @@ pub mod utils {
 #[allow(dead_code)]
 pub fn cargo_bin_silent() -> Command {
     // Spawn lotar with LOTAR_TEST_SILENT=1 to suppress non-essential warnings in tests
-    let mut cmd = Command::cargo_bin("lotar").expect("binary 'lotar' not found");
+    let mut cmd = lotar_cmd().expect("binary 'lotar' not found");
     cmd.env("LOTAR_TEST_SILENT", "1");
     cmd
 }

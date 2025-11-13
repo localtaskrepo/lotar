@@ -24,7 +24,7 @@ mod basic_commands {
 
     #[test]
     fn test_help_command() {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.arg("help")
             .assert()
             .success()
@@ -33,13 +33,13 @@ mod basic_commands {
 
     #[test]
     fn test_invalid_command() {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.arg("invalid_command").assert().failure();
     }
 
     #[test]
     fn test_no_command() {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.assert()
             .failure()
             .stderr(predicate::str::contains("Usage"));
@@ -47,7 +47,7 @@ mod basic_commands {
 
     #[test]
     fn test_version_command() {
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.arg("--version")
             .assert()
             .success()
@@ -67,7 +67,7 @@ mod task_management {
     fn test_task_add_basic() {
         let temp_dir = TempDir::new().unwrap();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "Test Task"])
             .assert()
@@ -79,7 +79,7 @@ mod task_management {
     fn test_task_add_missing_title() {
         let temp_dir = TempDir::new().unwrap();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add"])
             .assert()
@@ -92,7 +92,7 @@ mod task_management {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test adding task with tags (correct syntax: --tag, not --tags)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -114,7 +114,7 @@ mod task_management {
         );
 
         // First create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("List Test Task")
@@ -122,7 +122,7 @@ mod task_management {
             .success();
 
         // List tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("list")
             .assert()
@@ -140,7 +140,7 @@ mod task_management {
         );
 
         // First create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Status update test")
@@ -148,7 +148,7 @@ mod task_management {
             .success();
 
         // Update task status using correct syntax
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -169,7 +169,7 @@ mod project_management {
     fn test_task_add_with_full_project_name() {
         let temp_dir = TempDir::new().unwrap();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args([
                 "task",
@@ -187,7 +187,7 @@ mod project_management {
         let temp_dir = TempDir::new().unwrap();
 
         // Create task with full project name
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args([
                 "task",
@@ -199,7 +199,7 @@ mod project_management {
             .success();
 
         // List using prefix (should resolve to same project)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "list", "--project=FC"])
             .assert()
@@ -212,14 +212,14 @@ mod project_management {
         let temp_dir = TempDir::new().unwrap();
 
         // Create task with uppercase project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "Case Test Task", "--project=FRONTEND"])
             .assert()
             .success();
 
         // List using lowercase
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "list", "--project=frontend"])
             .assert()
@@ -241,7 +241,7 @@ mod output_formatting {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test JSON output format (note: this may not be implemented yet)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -259,7 +259,7 @@ mod output_formatting {
     fn test_verbose_output() {
         let temp_dir = TempDir::new().unwrap();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["--verbose", "task", "add", "Verbose Test Task"])
             .assert()
@@ -271,7 +271,7 @@ mod output_formatting {
         let temp = TempDir::new().unwrap();
 
         // Initialize project with a display name
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args([
@@ -291,7 +291,7 @@ mod output_formatting {
             .expect("failed to overwrite project config");
 
         // Add a task with explicit project prefix
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["task", "add", "Test Task", "--project", "EXM"])
@@ -299,7 +299,7 @@ mod output_formatting {
             .success();
 
         // Config show should display the prefix-only label
-        let show_output = Command::cargo_bin("lotar")
+        let show_output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["config", "show", "--project", "EXM"])
@@ -317,7 +317,7 @@ mod output_formatting {
         );
 
         // Config validate should also show prefix-only label
-        let validate_output = Command::cargo_bin("lotar")
+        let validate_output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["config", "validate", "--project", "EXM"])
@@ -332,7 +332,7 @@ mod output_formatting {
         assert!(validate_stdout.contains("Validating project configuration for 'EXM'"));
 
         // Ensure task add success output uses prefix when name missing
-        let add_output = Command::cargo_bin("lotar")
+        let add_output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["task", "add", "Another Task", "--project", "EXM"])
@@ -357,7 +357,7 @@ mod error_handling {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test using invalid task ID with edit command (which should fail gracefully)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("edit")
@@ -373,14 +373,14 @@ mod error_handling {
         let temp_dir = TempDir::new().unwrap();
 
         // Create a task first
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "Status Error Test"])
             .assert()
             .success();
 
         // Try to set invalid status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["status", "TEST-1", "invalid_status"])
             .assert()
@@ -392,14 +392,14 @@ mod error_handling {
         let temp_dir = TempDir::new().unwrap();
 
         // Create a task under default project (TEST)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "Mismatch Test Task", "--project=FOO"])
             .assert()
             .success();
 
         // Try to set status with wrong explicit project -> should error due to mismatch
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["status", "FOO-1", "done", "--project=BAR"]) // BAR doesn't match FOO
             .assert()
@@ -412,7 +412,7 @@ mod error_handling {
         let temp_dir = TempDir::new().unwrap();
 
         // Add with multiple fields set
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args([
                 "task",
@@ -426,7 +426,7 @@ mod error_handling {
             .success();
 
         // Discover created task id via list json
-        let list_out = Command::cargo_bin("lotar")
+        let list_out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["--format=json", "list"])
@@ -437,7 +437,7 @@ mod error_handling {
         let task_id = list_json["tasks"][0]["id"].as_str().unwrap().to_string();
 
         // Edit only title
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "edit", &task_id, "--title=Renamed"])
             .assert()
@@ -475,7 +475,6 @@ mod error_handling {
 // =============================================================================
 
 mod list_alias {
-    use super::*;
     use serde_json::Value;
     use tempfile::TempDir;
 
@@ -484,7 +483,7 @@ mod list_alias {
         let temp = TempDir::new().unwrap();
 
         // Create a task to ensure list returns something
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["task", "add", "Hello world"])
@@ -492,7 +491,7 @@ mod list_alias {
             .success();
 
         // Use alias `ls`
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["--format", "json", "ls"])
@@ -527,26 +526,26 @@ mod list_effort {
 
         // Create three tasks with time efforts: 30m (0.50h), 2h (2.00h), 1d (8.00h)
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "A", "--effort", "30m"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "B", "--effort", "2h"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "C", "--effort", "1d"],
         )
         .success();
 
         // Ascending
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -567,7 +566,7 @@ mod list_effort {
         );
 
         // Descending
-        let out2 = Command::cargo_bin("lotar")
+        let out2 = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -601,26 +600,26 @@ mod list_effort {
 
         // Time efforts: 0.50h, 2.00h, 8.00h
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "A", "--effort", "30m"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "B", "--effort", "2h"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "C", "--effort", "1d"],
         )
         .success();
 
         // Filter [1h, 1d] inclusive; expect 2.00h and 8.00h
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -657,26 +656,26 @@ mod list_effort {
 
         // Mixed: time and points
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "T1", "--effort", "2h"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "P3", "--effort", "3pt"],
         )
         .success();
         run(
-            &mut Command::cargo_bin("lotar").unwrap(),
+            &mut crate::common::lotar_cmd().unwrap(),
             &temp,
             &["task", "add", "P5", "--effort", "5"],
         )
         .success(); // bare number => points
 
         // Points filter: --effort-min 4 (points). Should include only P5; time tasks excluded by kind.
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .env("LOTAR_TEST_SILENT", "1")
@@ -717,7 +716,7 @@ mod status_patterns {
         );
 
         // Create a task first using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -727,7 +726,7 @@ mod status_patterns {
             .success();
 
         // Get the status (should be TODO by default)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -747,7 +746,7 @@ mod status_patterns {
         );
 
         // Create a task first using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -757,7 +756,7 @@ mod status_patterns {
             .success();
 
         // Set the status to in_progress
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -780,7 +779,7 @@ mod status_patterns {
         );
 
         // Create a task using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -790,7 +789,7 @@ mod status_patterns {
             .success();
 
         // Set status to done
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -800,7 +799,7 @@ mod status_patterns {
             .success();
 
         // Verify the status was changed
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -820,7 +819,7 @@ mod status_patterns {
         );
 
         // Create a task using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -830,7 +829,7 @@ mod status_patterns {
             .success();
 
         // Use status command to get status (testing that it works without alias)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -850,7 +849,7 @@ mod status_patterns {
         );
 
         // Create a task using the new CLI with explicit project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -860,7 +859,7 @@ mod status_patterns {
             .success();
 
         // Use status command to set status (testing that it works without alias)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -883,7 +882,7 @@ mod status_patterns {
         );
 
         // Create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task for same status warning")
@@ -891,7 +890,7 @@ mod status_patterns {
             .success();
 
         // Try to set status to the same value (TODO)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -911,7 +910,7 @@ mod status_patterns {
         );
 
         // Create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task for invalid status")
@@ -919,7 +918,7 @@ mod status_patterns {
             .success();
 
         // Try to set an invalid status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -939,7 +938,7 @@ mod status_patterns {
         );
 
         // Try to get status of non-existent task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("999")
@@ -958,7 +957,7 @@ mod status_patterns {
         );
 
         // Create a task (will get auto-generated prefix)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -978,7 +977,7 @@ mod status_patterns {
             .expect("Should find task ID in output");
 
         // Use full task ID to get status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg(task_id)
@@ -997,7 +996,7 @@ mod status_patterns {
         );
 
         // Create a task with explicit project to make numeric ID resolution unambiguous
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -1007,7 +1006,7 @@ mod status_patterns {
             .success();
 
         // Set status using quick command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -1017,7 +1016,7 @@ mod status_patterns {
             .success();
 
         // Set status using full command (should still work)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("status")
@@ -1028,7 +1027,7 @@ mod status_patterns {
             .success();
 
         // Verify final status with quick command
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("1")
@@ -1052,7 +1051,7 @@ mod dry_run {
         let temp = tf.temp_dir.path();
 
         // Create a task first and extract ID from output
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let add_out = cmd
             .current_dir(temp)
             .arg("task")
@@ -1071,7 +1070,7 @@ mod dry_run {
             .expect("expected created task id in output");
 
         // Dry-run edit change priority
-        let mut edit = Command::cargo_bin("lotar").unwrap();
+        let mut edit = crate::common::lotar_cmd().unwrap();
         edit.current_dir(temp)
             .arg("task")
             .arg("edit")
@@ -1090,7 +1089,7 @@ mod dry_run {
         let temp = tf.temp_dir.path();
 
         // Create a task first and extract ID from output
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let add_out = cmd
             .current_dir(temp)
             .arg("task")
@@ -1109,7 +1108,7 @@ mod dry_run {
             .expect("expected created task id in output");
 
         // Dry-run delete
-        let mut del = Command::cargo_bin("lotar").unwrap();
+        let mut del = crate::common::lotar_cmd().unwrap();
         del.current_dir(temp)
             .arg("task")
             .arg("delete")
@@ -1120,7 +1119,7 @@ mod dry_run {
             .stdout(predicate::str::contains("DRY RUN: Would delete task"));
 
         // Verify the task still exists by attempting to delete for real (should succeed)
-        let mut del2 = Command::cargo_bin("lotar").unwrap();
+        let mut del2 = crate::common::lotar_cmd().unwrap();
         del2.current_dir(temp)
             .arg("task")
             .arg("delete")
@@ -1300,7 +1299,7 @@ mod serve {
         );
 
         // Create diverse test data
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -1312,7 +1311,7 @@ mod serve {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("task")
             .arg("add")
@@ -1324,7 +1323,7 @@ mod serve {
             .success();
 
         // Change one task status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("2")
@@ -1334,7 +1333,7 @@ mod serve {
             .success();
 
         // Test serve with actual project data
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("serve")
@@ -1344,7 +1343,7 @@ mod serve {
         let _ = result.try_success();
 
         // Test serve with specific project
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("serve")
@@ -1361,7 +1360,7 @@ mod serve {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create test task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Summary test task")
@@ -1369,7 +1368,7 @@ mod serve {
             .success();
 
         // Test basic serve existence
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd.current_dir(temp_dir).arg("help").assert();
 
         if let Ok(assert_result) = result.try_success() {
@@ -1378,7 +1377,7 @@ mod serve {
         }
 
         // Test serve help specifically
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd.current_dir(temp_dir).arg("help").arg("serve").assert();
 
         if let Ok(assert_result) = result.try_success() {
@@ -1430,7 +1429,7 @@ issue.priorities: [Low, Medium, High]
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
         let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp.path())
             .args(["whoami"]) // text mode
             .assert()
@@ -1450,7 +1449,7 @@ issue.priorities: [Low, Medium, High]
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
         let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp.path())
             .args(["whoami", "--explain"]) // text mode
             .assert()
@@ -1472,7 +1471,7 @@ issue.priorities: [Low, Medium, High]
         let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
         // Compact JSON (no extra fields)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp.path())
             .args(["whoami", "--format=json"]) // json mode
             .assert()
@@ -1480,7 +1479,7 @@ issue.priorities: [Low, Medium, High]
             .stdout(predicate::str::contains("{\"user\":\"dave\"}"));
 
         // Explain JSON includes source/confidence/details
-        let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+        let mut cmd2 = crate::common::lotar_cmd().unwrap();
         cmd2.current_dir(temp.path())
             .args(["whoami", "--format=json", "--explain"]) // json + explain
             .assert()
@@ -1515,7 +1514,7 @@ issue.priorities: [Low, Medium, High]
         .expect("create task");
 
         // Dry-run with explain should preview change and show auto-assign effect
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp.path())
             .args(["status", &created.id, "Done", "--dry-run", "--explain"])
             .assert()
@@ -1524,7 +1523,7 @@ issue.priorities: [Low, Medium, High]
             .stdout(predicate::str::contains("Explanation:"));
 
         // Verify status wasn't changed (get path prints current status)
-        let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+        let mut cmd2 = crate::common::lotar_cmd().unwrap();
         cmd2.current_dir(temp.path())
             .args(["status", &created.id])
             .assert()
@@ -1548,7 +1547,7 @@ issue.priorities: [Low, Medium, High]
         let before_count = count_task_yaml_files(&tasks_dir);
 
         // Run add in dry-run mode
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp.path())
             .args([
                 "add",
@@ -1608,14 +1607,14 @@ mod comments {
     fn comment_positional_text_adds_comment() {
         let tf = TestFixtures::new();
         // create a task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(tf.get_temp_path())
             .args(["add", "Test task for comments"])
             .assert()
             .success();
 
         // list to get ID
-        let output = Command::cargo_bin("lotar")
+        let output = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["list"]) // default text output
@@ -1631,14 +1630,14 @@ mod comments {
             .expect("Expected an ID in list output");
 
         // add comment
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(tf.get_temp_path())
             .args(["comment", &id, "hello world"])
             .assert()
             .success();
 
         // verify via JSON second run
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["-f", "json", "comment", &id, "again"]) // ensure json output
@@ -1654,7 +1653,7 @@ mod comments {
     fn comment_message_flag_adds_comment() {
         let tf = TestFixtures::new();
         // create a task
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["add", "Task for -m"])
@@ -1662,7 +1661,7 @@ mod comments {
             .success();
 
         // get id (use JSON for stability)
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["list", "--format", "json"]) // json
@@ -1677,7 +1676,7 @@ mod comments {
             .expect("Expected an ID in list JSON output");
 
         // add comment with -m
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["comment", &id, "-m", "via flag message"])
@@ -1689,7 +1688,7 @@ mod comments {
     fn comment_requires_text() {
         let tf = TestFixtures::new();
         // create a task
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["add", "Task for empty check"])
@@ -1697,7 +1696,7 @@ mod comments {
             .success();
 
         // get id via JSON list
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["list", "--format", "json"]) // json
@@ -1712,7 +1711,7 @@ mod comments {
             .expect("Expected an ID in list JSON output");
 
         // run with no text -> should list existing comments (success) and show 0 initially
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["--format", "json", "comment", &id])
@@ -1727,7 +1726,7 @@ mod comments {
         use tempfile::TempDir;
         let temp = TempDir::new().unwrap();
         // Create a task
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["task", "add", "A"])
@@ -1735,7 +1734,7 @@ mod comments {
             .success();
 
         // Resolve created ID by listing
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["--format", "json", "list"]) // get first id
@@ -1749,7 +1748,7 @@ mod comments {
         let id = v["tasks"][0]["id"].as_str().unwrap().to_string();
 
         // Add a comment
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(temp.path())
             .args(["--format", "json", "comment", &id, "First comment"])
@@ -1769,7 +1768,7 @@ mod comments {
     fn task_comment_parity_list_on_empty() {
         let tf = TestFixtures::new();
         // create a task
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["add", "Task for task comment parity"])
@@ -1777,7 +1776,7 @@ mod comments {
             .success();
 
         // get id via JSON list
-        let out = Command::cargo_bin("lotar")
+        let out = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["list", "--format", "json"]) // json
@@ -1792,7 +1791,7 @@ mod comments {
             .expect("Expected an ID in list JSON output");
 
         // lotar task comment with no text should list existing comments
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(tf.get_temp_path())
             .args(["--format", "json", "task", "comment", &id])
@@ -1831,7 +1830,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create diverse test tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Bug task")
@@ -1840,7 +1839,7 @@ mod list_features {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Feature task")
@@ -1849,7 +1848,7 @@ mod list_features {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Chore task")
@@ -1859,7 +1858,7 @@ mod list_features {
             .success();
 
         // Change one task status
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("status")
             .arg("2")
@@ -1868,7 +1867,7 @@ mod list_features {
             .success();
 
         // Test single status filter (WORKS)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1897,7 +1896,7 @@ mod list_features {
         }
 
         // Test single priority filter (UNCLEAR - needs verification)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1909,7 +1908,7 @@ mod list_features {
         let _priority_result = result.try_success().is_ok();
 
         // Test high priority flag (DOCUMENTED but may not work)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1927,7 +1926,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create a test task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Test task")
@@ -1935,7 +1934,7 @@ mod list_features {
             .success();
 
         // Test 1: Multiple status filters (DOCUMENTED but fails)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1947,7 +1946,7 @@ mod list_features {
         if let Ok(_) = result.try_success() {}
 
         // Test 2: Type filtering
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1958,7 +1957,7 @@ mod list_features {
         if let Ok(_) = result.try_success() {}
 
         // Test 3: --bugs shortcut (DOCUMENTED)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1969,7 +1968,7 @@ mod list_features {
         if let Ok(_) = result.try_success() {}
 
         // Test 4: --assignee filter (DOCUMENTED)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1980,7 +1979,7 @@ mod list_features {
         if let Ok(_) = result.try_success() {}
 
         // Test 5: Sorting (DOCUMENTED)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -1991,7 +1990,7 @@ mod list_features {
         if let Ok(_) = result.try_success() {}
 
         // Test 6: Grouping (DOCUMENTED)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -2007,7 +2006,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create tasks with different types
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Feature task")
@@ -2015,7 +2014,7 @@ mod list_features {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Bug task")
@@ -2023,7 +2022,7 @@ mod list_features {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Chore task")
@@ -2032,7 +2031,7 @@ mod list_features {
             .success();
 
         // Test single type filter for bugs
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -2069,7 +2068,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create tasks with different types
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Feature task")
@@ -2077,7 +2076,7 @@ mod list_features {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Bug task")
@@ -2086,7 +2085,7 @@ mod list_features {
             .success();
 
         // Test multiple type filters (may not be implemented)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -2113,7 +2112,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create tasks for comparison
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Search test task")
@@ -2123,7 +2122,7 @@ mod list_features {
             .success();
 
         // Test list command with filters
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let list_result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -2136,7 +2135,7 @@ mod list_features {
         }
 
         // Test task search command (full interface)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let search_result = cmd
             .current_dir(temp_dir)
             .arg("task")
@@ -2153,7 +2152,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create diverse tasks
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("High priority bug")
@@ -2163,7 +2162,7 @@ mod list_features {
             .assert()
             .success();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Medium priority feature")
@@ -2185,7 +2184,7 @@ mod list_features {
         ];
 
         for (filter_arg, _description) in test_cases {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let args: Vec<&str> = filter_arg.split_whitespace().collect();
             let mut cmd_with_args = cmd.current_dir(temp_dir).arg("list");
 
@@ -2207,7 +2206,7 @@ mod list_features {
         // Create multiple tasks to test performance and limits
 
         for i in 1..=5 {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg(format!("Performance test task {i}"))
@@ -2217,7 +2216,7 @@ mod list_features {
         }
 
         // Test limit parameter
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -2239,7 +2238,7 @@ mod list_features {
         }
 
         // Test with no limit (default)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let result = cmd
             .current_dir(temp_dir)
             .arg("list")
@@ -2264,7 +2263,7 @@ mod list_features {
         let temp_dir = fixtures.temp_dir.path();
 
         // Create a test task
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("add")
             .arg("Summary test task")
@@ -2287,7 +2286,7 @@ mod list_features {
         ];
 
         for (_name, cmd_name, args) in core_features {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let mut cmd_with_args = cmd.current_dir(temp_dir).arg(cmd_name);
 
             for arg in args {
@@ -2316,7 +2315,7 @@ mod list_features {
         ];
 
         for (_name, cmd_name, args) in missing_features {
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let mut cmd_with_args = cmd.current_dir(temp_dir).arg(cmd_name);
 
             for arg in args {
@@ -2336,7 +2335,7 @@ mod list_features {
             let fixtures = TestFixtures::new();
             let temp_dir = fixtures.temp_dir.path();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg("Backend task")
@@ -2346,7 +2345,7 @@ mod list_features {
                 .assert()
                 .success();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg("Frontend task")
@@ -2355,7 +2354,7 @@ mod list_features {
                 .assert()
                 .success();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg("Database task")
@@ -2364,7 +2363,7 @@ mod list_features {
                 .assert()
                 .success();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let output = cmd
                 .current_dir(temp_dir)
                 .arg("list")
@@ -2395,7 +2394,7 @@ mod list_features {
                     .contains(&serde_json::Value::String("urgent".to_string()))
             );
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let output = cmd
                 .current_dir(temp_dir)
                 .arg("list")
@@ -2428,7 +2427,7 @@ mod list_features {
             assert!(task_titles.contains(&"Backend task".to_string()));
             assert!(task_titles.contains(&"Frontend task".to_string()));
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let output = cmd
                 .current_dir(temp_dir)
                 .arg("list")
@@ -2460,7 +2459,7 @@ mod list_features {
             let fixtures = TestFixtures::new();
             let temp_dir = fixtures.temp_dir.path();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg("Complete task")
@@ -2476,7 +2475,7 @@ mod list_features {
                 .assert()
                 .success();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             let output = cmd
                 .current_dir(temp_dir)
                 .arg("list")
@@ -2535,7 +2534,7 @@ mod list_features {
             let fixtures = TestFixtures::new();
             let temp_dir = fixtures.temp_dir.path();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("add")
                 .arg("Test task")
@@ -2543,7 +2542,7 @@ mod list_features {
                 .assert()
                 .success();
 
-            let mut cmd = Command::cargo_bin("lotar").unwrap();
+            let mut cmd = crate::common::lotar_cmd().unwrap();
             cmd.current_dir(temp_dir)
                 .arg("list")
                 .arg("--tag=test")
@@ -2556,7 +2555,7 @@ mod list_features {
 }
 
 fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     let output = cmd
         .current_dir(temp_dir)
         .args(["--format=json", "list"])
@@ -2613,7 +2612,7 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Test quick interface: lotar add
-        let mut cmd1 = Command::cargo_bin("lotar").unwrap();
+        let mut cmd1 = crate::common::lotar_cmd().unwrap();
         let output1 = cmd1
             .current_dir(&temp_dir)
             .args([
@@ -2633,7 +2632,7 @@ mod dual_interface {
         let task_id1 = extract_task_id_from_output(&stdout1);
 
         // Test full interface: lotar task add
-        let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+        let mut cmd2 = crate::common::lotar_cmd().unwrap();
         let output2 = cmd2
             .current_dir(&temp_dir)
             .args([
@@ -2716,14 +2715,14 @@ mod dual_interface {
 
         for (quick_args, full_args, _description) in test_cases.iter() {
             // Test quick interface
-            let mut cmd1 = Command::cargo_bin("lotar").unwrap();
+            let mut cmd1 = crate::common::lotar_cmd().unwrap();
             cmd1.current_dir(&temp_dir)
                 .args(quick_args)
                 .assert()
                 .success();
 
             // Test full interface
-            let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+            let mut cmd2 = crate::common::lotar_cmd().unwrap();
             cmd2.current_dir(&temp_dir)
                 .args(full_args)
                 .assert()
@@ -2738,7 +2737,7 @@ mod dual_interface {
         // Test that both interfaces produce consistent output formats
 
         // Quick interface with JSON output
-        let mut cmd1 = Command::cargo_bin("lotar").unwrap();
+        let mut cmd1 = crate::common::lotar_cmd().unwrap();
         let output1 = cmd1
             .current_dir(&temp_dir)
             .args(["--format", "json", "add", "Output test quick"])
@@ -2750,7 +2749,7 @@ mod dual_interface {
             .expect("Quick interface should produce valid JSON");
 
         // Full interface with JSON output
-        let mut cmd2 = Command::cargo_bin("lotar").unwrap();
+        let mut cmd2 = crate::common::lotar_cmd().unwrap();
         let output2 = cmd2
             .current_dir(&temp_dir)
             .args(["--format", "json", "task", "add", "Output test full"])
@@ -2799,7 +2798,7 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that enhanced add output shows all set properties
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(&temp_dir)
             .args([
@@ -2842,14 +2841,14 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test tasks
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["add", "Task 1", "--priority=high", "--type=feature"])
             .assert()
             .success();
 
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["add", "Task 2", "--priority=low", "--type=bug"])
@@ -2857,7 +2856,7 @@ mod dual_interface {
             .success();
 
         // Test basic list commands
-        let quick_list = Command::cargo_bin("lotar")
+        let quick_list = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["list"])
@@ -2867,7 +2866,7 @@ mod dual_interface {
             .stdout
             .clone();
 
-        let full_list = Command::cargo_bin("lotar")
+        let full_list = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["task", "list"])
@@ -2888,7 +2887,7 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test tasks with different properties
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args([
@@ -2900,7 +2899,7 @@ mod dual_interface {
             .assert()
             .success();
 
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["add", "Low Priority Bug", "--priority=low", "--type=bug"])
@@ -2908,7 +2907,7 @@ mod dual_interface {
             .success();
 
         // Test filtered lists
-        let quick_filtered = Command::cargo_bin("lotar")
+        let quick_filtered = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["list", "--priority=high"])
@@ -2918,7 +2917,7 @@ mod dual_interface {
             .stdout
             .clone();
 
-        let full_filtered = Command::cargo_bin("lotar")
+        let full_filtered = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["task", "list", "--priority=high"])
@@ -2950,7 +2949,7 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create test task
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["add", "JSON Test Task", "--priority=medium"])
@@ -2958,7 +2957,7 @@ mod dual_interface {
             .success();
 
         // Test JSON output
-        let quick_json = Command::cargo_bin("lotar")
+        let quick_json = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["list", "--format=json"])
@@ -2968,7 +2967,7 @@ mod dual_interface {
             .stdout
             .clone();
 
-        let full_json = Command::cargo_bin("lotar")
+        let full_json = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["task", "list", "--format=json"])
@@ -3004,14 +3003,14 @@ mod dual_interface {
         let temp_dir = TempDir::new().unwrap();
 
         // Create tasks with different priorities
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["add", "Low Priority Task", "--priority=low"])
             .assert()
             .success();
 
-        Command::cargo_bin("lotar")
+        crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["add", "High Priority Task", "--priority=high"])
@@ -3019,7 +3018,7 @@ mod dual_interface {
             .success();
 
         // Test sorted lists
-        let quick_sorted = Command::cargo_bin("lotar")
+        let quick_sorted = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["list", "--sort-by=priority"])
@@ -3029,7 +3028,7 @@ mod dual_interface {
             .stdout
             .clone();
 
-        let full_sorted = Command::cargo_bin("lotar")
+        let full_sorted = crate::common::lotar_cmd()
             .unwrap()
             .current_dir(&temp_dir)
             .args(["task", "list", "--sort-by=priority"])
@@ -3058,7 +3057,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // Create a task to trigger directory creation
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "Directory Test"])
             .assert()
@@ -3073,7 +3072,7 @@ mod file_structure {
     fn test_project_directory_creation() {
         let temp_dir = TempDir::new().unwrap();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args([
                 "task",
@@ -3108,7 +3107,7 @@ mod file_structure {
     fn test_task_files_creation() {
         let temp_dir = TempDir::new().unwrap();
 
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "File Creation Test"])
             .assert()
@@ -3151,7 +3150,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that write operations (like add) DO create global config
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "Test global config creation"])
             .assert()
@@ -3191,7 +3190,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // Test that read-only operations don't create .tasks directory
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["status", "TEST-001"])
             .assert()
@@ -3204,7 +3203,7 @@ mod file_structure {
         );
 
         // Test other read-only operations
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["priority", "TEST-001"])
             .assert()
@@ -3216,7 +3215,7 @@ mod file_structure {
         );
 
         // Test task subcommand read operations
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "priority", "TEST-001"])
             .assert()
@@ -3233,7 +3232,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // Add a task (write operation)
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "Test config creation"])
             .assert()
@@ -3280,7 +3279,7 @@ mod file_structure {
         // Test that both quick and full interfaces behave the same way
 
         // First, test quick interface
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "Quick interface test"])
             .assert()
@@ -3297,7 +3296,7 @@ mod file_structure {
         fs::remove_dir_all(&tasks_dir).unwrap();
 
         // Test full interface
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["task", "add", "Full interface test"])
             .assert()
@@ -3317,7 +3316,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // Test with explicit project - should set smart default_prefix
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "Test smart prefix", "--project=myawesomeproject"])
             .assert()
@@ -3345,7 +3344,7 @@ mod file_structure {
         let temp_dir = TempDir::new().unwrap();
 
         // First, create a task to establish .tasks directory and global config
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "First task"])
             .assert()
@@ -3362,7 +3361,7 @@ mod file_structure {
         assert!(!global_config.exists(), "Global config should be deleted");
 
         // Add another task - global config should be regenerated
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "Second task"])
             .assert()
@@ -3380,7 +3379,7 @@ mod file_structure {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Create task using quick interface
-        let mut cmd = Command::cargo_bin("lotar").unwrap();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
         let output = cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -3429,7 +3428,7 @@ mod file_structure {
         let temp_dir = test_fixtures.temp_dir.path();
 
         // Test with text output
-        let mut quick_cmd = Command::cargo_bin("lotar").unwrap();
+        let mut quick_cmd = crate::common::lotar_cmd().unwrap();
         let quick_output = quick_cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -3438,7 +3437,7 @@ mod file_structure {
             .output()
             .expect("Failed to execute quick add command");
 
-        let mut full_cmd = Command::cargo_bin("lotar").unwrap();
+        let mut full_cmd = crate::common::lotar_cmd().unwrap();
         let full_output = full_cmd
             .current_dir(temp_dir)
             .arg("task")
@@ -3465,7 +3464,7 @@ mod file_structure {
         assert!(full_upper.contains("PRIORITY: HIGH"));
 
         // Test with JSON output
-        let mut quick_json_cmd = Command::cargo_bin("lotar").unwrap();
+        let mut quick_json_cmd = crate::common::lotar_cmd().unwrap();
         let quick_json_output = quick_json_cmd
             .current_dir(temp_dir)
             .arg("add")
@@ -3475,7 +3474,7 @@ mod file_structure {
             .output()
             .expect("Failed to execute quick add JSON command");
 
-        let mut full_json_cmd = Command::cargo_bin("lotar").unwrap();
+        let mut full_json_cmd = crate::common::lotar_cmd().unwrap();
         let full_json_output = full_json_cmd
             .current_dir(temp_dir)
             .arg("--format=json")

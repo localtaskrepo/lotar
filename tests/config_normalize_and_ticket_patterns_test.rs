@@ -1,12 +1,10 @@
-use assert_cmd::prelude::*;
 use predicates::prelude::*;
 use std::fs;
-use std::process::Command;
 mod common;
 
 // Helper to run lotar with args in a given cwd
 fn run_lotar(cwd: &std::path::Path, args: &[&str]) -> assert_cmd::assert::Assert {
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(cwd);
     cmd.args(args);
     cmd.assert()

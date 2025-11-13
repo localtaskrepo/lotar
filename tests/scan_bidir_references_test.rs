@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 
@@ -18,7 +17,7 @@ fn scan_creates_task_with_source_reference() {
     let canon_str = canon_path.display().to_string();
 
     // Run scan (apply-by-default)
-    let mut cmd = Command::cargo_bin("lotar").unwrap();
+    let mut cmd = crate::common::lotar_cmd().unwrap();
     cmd.current_dir(root)
         .arg("scan")
         .assert()

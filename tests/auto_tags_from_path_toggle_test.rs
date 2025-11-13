@@ -1,4 +1,3 @@
-use assert_cmd::Command;
 use tempfile::TempDir;
 
 mod common;
@@ -38,7 +37,7 @@ fn disables_path_tag_when_flag_off() {
     let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Dry-run JSON to inspect derived tags
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(&pkg_api)
         .args([
@@ -75,7 +74,7 @@ fn enables_path_tag_when_flag_on() {
     let _silent = EnvVarGuard::set("LOTAR_TEST_SILENT", "1");
     let _tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    let assert = Command::cargo_bin("lotar")
+    let assert = crate::common::lotar_cmd()
         .unwrap()
         .current_dir(&pkg_api)
         .args([
