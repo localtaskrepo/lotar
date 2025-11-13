@@ -31,10 +31,10 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
 pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig, ConfigError> {
     // Fast path: return from cache if available
     let key = cache_key_for(tasks_dir);
-    if let Ok(guard) = config_cache().read() {
-        if let Some(cached) = guard.get(&key) {
-            return Ok(cached.clone());
-        }
+    if let Ok(guard) = config_cache().read()
+        && let Some(cached) = guard.get(&key)
+    {
+        return Ok(cached.clone());
     }
 
     // Start with built-in defaults
@@ -370,24 +370,23 @@ pub fn get_project_config(
         resolved.scan_strip_attributes = strip;
     }
     // Overlay project-level branch alias maps (if provided)
-    if let Some(m) = project_config.branch_type_aliases {
-        if !m.is_empty() {
-            // normalize keys to lowercase at use-time to be safe
-            resolved.branch_type_aliases =
-                m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
-        }
+    if let Some(m) = project_config.branch_type_aliases
+        && !m.is_empty()
+    {
+        // normalize keys to lowercase at use-time to be safe
+        resolved.branch_type_aliases = m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
-    if let Some(m) = project_config.branch_status_aliases {
-        if !m.is_empty() {
-            resolved.branch_status_aliases =
-                m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
-        }
+    if let Some(m) = project_config.branch_status_aliases
+        && !m.is_empty()
+    {
+        resolved.branch_status_aliases =
+            m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
-    if let Some(m) = project_config.branch_priority_aliases {
-        if !m.is_empty() {
-            resolved.branch_priority_aliases =
-                m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
-        }
+    if let Some(m) = project_config.branch_priority_aliases
+        && !m.is_empty()
+    {
+        resolved.branch_priority_aliases =
+            m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
     // Smart toggles are currently only global/home/env scoped; project-level toggles could be added later
 

@@ -115,7 +115,7 @@ pub(crate) fn handle_backlog(
                 let assignee = truncate(entry.assignee.as_deref().unwrap_or("-"), 14);
                 let priority = truncate(&entry.priority, 10);
                 let due = truncate(entry.due_date.as_deref().unwrap_or("-"), 16);
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "{:<10} {:<30} {:<12} {:<14} {:<10} {}",
                     truncate(&entry.id, 10),
                     title,

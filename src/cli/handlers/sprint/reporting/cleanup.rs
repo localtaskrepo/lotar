@@ -26,15 +26,14 @@ pub(crate) fn handle_cleanup_refs(
     )
     .map_err(|err| err.to_string())?;
 
-    if let Some(id) = cleanup_args.sprint_id {
-        if records.iter().any(|record| record.id == id)
-            && !matches!(renderer.format, OutputFormat::Json)
-        {
-            renderer.emit_warning(&format!(
-                "Sprint #{} still exists; removing references per request.",
-                id
-            ));
-        }
+    if let Some(id) = cleanup_args.sprint_id
+        && records.iter().any(|record| record.id == id)
+        && !matches!(renderer.format, OutputFormat::Json)
+    {
+        renderer.emit_warning(format_args!(
+            "Sprint #{} still exists; removing references per request.",
+            id
+        ));
     }
 
     let cleanup_payload = cleanup_summary_payload(&outcome);
@@ -64,12 +63,12 @@ pub(crate) fn handle_cleanup_refs(
                     renderer.emit_success("No sprint references required cleanup.");
                 }
             } else {
-                renderer.emit_success(&format!(
+                renderer.emit_success(format_args!(
                     "Removed {} sprint reference(s) across {} task(s).",
                     outcome.removed_references, outcome.updated_tasks
                 ));
                 for metric in &cleanup_payload.removed_by_sprint {
-                    renderer.emit_info(&format!(
+                    renderer.emit_info(format_args!(
                         "Sprint #{}: removed {} reference(s).",
                         metric.sprint_id, metric.count
                     ));
@@ -77,7 +76,7 @@ pub(crate) fn handle_cleanup_refs(
 
                 if cleanup_args.sprint_id.is_none() && !outcome.remaining_missing.is_empty() {
                     let formatted = format_missing_ids(&outcome.remaining_missing);
-                    renderer.emit_warning(&format!(
+                    renderer.emit_warning(format_args!(
                         "Additional missing sprint IDs still referenced: {}",
                         formatted
                     ));

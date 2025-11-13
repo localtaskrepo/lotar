@@ -184,12 +184,12 @@ fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
                     .points = Some(value);
             }
             None => {
-                if let Some(plan) = target.plan.as_mut() {
-                    if let Some(capacity) = plan.capacity.as_mut() {
-                        capacity.points = None;
-                        if capacity.points.is_none() && capacity.hours.is_none() {
-                            plan.capacity = None;
-                        }
+                if let Some(plan) = target.plan.as_mut()
+                    && let Some(capacity) = plan.capacity.as_mut()
+                {
+                    capacity.points = None;
+                    if capacity.points.is_none() && capacity.hours.is_none() {
+                        plan.capacity = None;
                     }
                 }
             }
@@ -204,12 +204,12 @@ fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
                     .hours = Some(value);
             }
             None => {
-                if let Some(plan) = target.plan.as_mut() {
-                    if let Some(capacity) = plan.capacity.as_mut() {
-                        capacity.hours = None;
-                        if capacity.points.is_none() && capacity.hours.is_none() {
-                            plan.capacity = None;
-                        }
+                if let Some(plan) = target.plan.as_mut()
+                    && let Some(capacity) = plan.capacity.as_mut()
+                {
+                    capacity.hours = None;
+                    if capacity.points.is_none() && capacity.hours.is_none() {
+                        plan.capacity = None;
                     }
                 }
             }
@@ -252,10 +252,10 @@ fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
         target.actual = None;
     }
 
-    if let Some(plan) = target.plan.as_ref() {
-        if !plan_has_values(plan) {
-            target.plan = None;
-        }
+    if let Some(plan) = target.plan.as_ref()
+        && !plan_has_values(plan)
+    {
+        target.plan = None;
     }
 }
 
@@ -2075,12 +2075,11 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        if let Some(limit_s) = req.query.get("limit") {
-            if let Ok(limit) = limit_s.parse::<usize>() {
-                if commits.len() > limit {
-                    commits.truncate(limit);
-                }
-            }
+        if let Some(limit_s) = req.query.get("limit")
+            && let Ok(limit) = limit_s.parse::<usize>()
+            && commits.len() > limit
+        {
+            commits.truncate(limit);
         }
         ok_json(200, json!({"data": commits}))
     });

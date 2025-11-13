@@ -52,14 +52,14 @@ pub(crate) fn emit_cleanup_summary(
     context: &str,
 ) {
     if outcome.removed_references == 0 {
-        renderer.emit_info(&format!(
+        renderer.emit_info(format_args!(
             "No missing sprint references were removed while {}.",
             context
         ));
         return;
     }
 
-    renderer.emit_info(&format!(
+    renderer.emit_info(format_args!(
         "Removed {} missing sprint reference(s) while {}.",
         outcome.removed_references, context
     ));
@@ -67,13 +67,16 @@ pub(crate) fn emit_cleanup_summary(
     if !outcome.removed_by_sprint.is_empty() {
         renderer.emit_info("Removed references by sprint:");
         for entry in &outcome.removed_by_sprint {
-            renderer.emit_info(&format!("  - Sprint #{}: {}", entry.sprint_id, entry.count));
+            renderer.emit_info(format_args!(
+                "  - Sprint #{}: {}",
+                entry.sprint_id, entry.count
+            ));
         }
     }
 
     if !outcome.remaining_missing.is_empty() {
         let formatted = format_missing_ids(&outcome.remaining_missing);
-        renderer.emit_warning(&format!(
+        renderer.emit_warning(format_args!(
             "Remaining missing sprint references detected: {}.",
             formatted
         ));
@@ -90,13 +93,13 @@ pub(crate) fn emit_missing_report(
     }
 
     let formatted = format_missing_ids(&report.missing_sprints);
-    renderer.emit_warning(&format!(
+    renderer.emit_warning(format_args!(
         "Missing sprint references detected while {}: {}.",
         context, formatted
     ));
 
     if report.tasks_with_missing > 0 {
-        renderer.emit_info(&format!(
+        renderer.emit_info(format_args!(
             "{} task(s) currently reference missing sprints.",
             report.tasks_with_missing
         ));

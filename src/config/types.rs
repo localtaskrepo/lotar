@@ -341,10 +341,10 @@ impl ResolvedConfig {
             return None;
         }
 
-        if let Some(explicit) = &self.default_status {
-            if self.issue_states.values.contains(explicit) {
-                return Some(explicit.clone());
-            }
+        if let Some(explicit) = &self.default_status
+            && self.issue_states.values.contains(explicit)
+        {
+            return Some(explicit.clone());
         }
 
         Some(self.issue_states.values[0].clone())

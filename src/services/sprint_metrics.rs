@@ -117,20 +117,20 @@ pub fn compute_velocity_totals(
             totals.done_tasks += 1;
         }
 
-        if let Some(effort_str) = task.effort.as_ref() {
-            if let Ok(parsed) = effort::parse_effort(effort_str) {
-                match parsed.kind {
-                    EffortKind::Points(points) => {
-                        totals.total_points += points;
-                        if is_done {
-                            totals.done_points += points;
-                        }
+        if let Some(effort_str) = task.effort.as_ref()
+            && let Ok(parsed) = effort::parse_effort(effort_str)
+        {
+            match parsed.kind {
+                EffortKind::Points(points) => {
+                    totals.total_points += points;
+                    if is_done {
+                        totals.done_points += points;
                     }
-                    EffortKind::TimeHours(hours) => {
-                        totals.total_hours += hours;
-                        if is_done {
-                            totals.done_hours += hours;
-                        }
+                }
+                EffortKind::TimeHours(hours) => {
+                    totals.total_hours += hours;
+                    if is_done {
+                        totals.done_hours += hours;
                     }
                 }
             }

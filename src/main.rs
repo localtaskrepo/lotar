@@ -1,6 +1,3 @@
-// Allow uninlined format args since it's mostly a style preference
-#![allow(clippy::uninlined_format_args)]
-
 use clap::Parser;
 use std::env;
 use std::str::FromStr;
@@ -77,7 +74,7 @@ fn main() {
             // version is user-facing
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
-            renderer.emit_raw_stdout(&format!("lotar {}", env!("CARGO_PKG_VERSION")));
+            renderer.emit_raw_stdout(format_args!("lotar {}", env!("CARGO_PKG_VERSION")));
             return;
         }
     }
@@ -122,7 +119,7 @@ fn main() {
         Err(e) => {
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
-            renderer.emit_raw_stderr(&e.to_string());
+            renderer.emit_raw_stderr(e.to_string());
             std::process::exit(1);
         }
     };
@@ -133,7 +130,7 @@ fn main() {
         Err(error) => {
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
-            renderer.emit_error(&format!("Error resolving tasks directory: {}", error));
+            renderer.emit_error(format_args!("Error resolving tasks directory: {}", error));
             std::process::exit(1);
         }
     };
@@ -804,7 +801,7 @@ fn main() {
                                 })
                                 .collect();
                             renderer.emit_raw_stdout(
-                                &serde_json::json!({
+                                serde_json::json!({
                                     "status": "ok",
                                     "action": "changelog",
                                     "mode": if since.is_some() { "range" } else { "working" },
@@ -833,7 +830,7 @@ fn main() {
                                         };
                                         parts.push(s);
                                     }
-                                    renderer.emit_raw_stdout(&format!(
+                                    renderer.emit_raw_stdout(format_args!(
                                         "{}  {}",
                                         it.id,
                                         parts.join("; ")
@@ -877,7 +874,7 @@ fn main() {
                         ))
                         .ok();
                         renderer.emit_raw_stdout(
-                            &serde_json::json!({
+                            serde_json::json!({
                                 "user": info.user,
                                 "source": info.source.to_string(),
                                 "confidence": info.confidence,
@@ -889,7 +886,7 @@ fn main() {
                         );
                     } else {
                         renderer.emit_raw_stdout(
-                            &serde_json::json!({
+                            serde_json::json!({
                                 "user": info.user
                             })
                             .to_string(),
@@ -901,7 +898,8 @@ fn main() {
                         let mut msg =
                             format!("source: {}, confidence: {}", info.source, info.confidence);
                         if let Some(d) = info.details {
-                            msg.push_str(&format!(", details: {}", d));
+                            msg.push_str(", details: ");
+                            msg.push_str(&d);
                         }
                         renderer.emit_info(&msg);
                         let cfg = lotar::config::resolution::load_and_merge_configs(Some(
@@ -992,7 +990,7 @@ fn show_command_help(command: &str) {
         Err(e) => {
             let renderer =
                 output::OutputRenderer::new(output::OutputFormat::Text, output::LogLevel::Warn);
-            renderer.emit_error(&format!("Error showing help for '{}': {}", command, e));
+            renderer.emit_error(format_args!("Error showing help for '{}': {}", command, e));
             renderer.emit_info("Try 'lotar help' for available commands.");
             std::process::exit(1);
         }

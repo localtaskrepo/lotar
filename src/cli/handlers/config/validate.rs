@@ -51,7 +51,7 @@ impl ConfigHandler {
                 &project_name,
                 project_display_name.as_deref(),
             );
-            renderer.emit_info(&format!(
+            renderer.emit_info(format_args!(
                 "Validating project configuration for '{}'",
                 project_label
             ));
@@ -85,7 +85,7 @@ impl ConfigHandler {
                                 }
                             }
                             Err(e) => {
-                                renderer.emit_error(&format!(
+                                renderer.emit_error(format_args!(
                                     "Could not parse project config YAML: {}",
                                     e
                                 ));
@@ -94,12 +94,13 @@ impl ConfigHandler {
                         }
                     }
                     Err(e) => {
-                        renderer.emit_error(&format!("Could not read project config file: {}", e));
+                        renderer
+                            .emit_error(format_args!("Could not read project config file: {}", e));
                         has_errors = true;
                     }
                 }
             } else {
-                renderer.emit_error(&format!(
+                renderer.emit_error(format_args!(
                     "Project config file not found: {}",
                     project_config_path.display()
                 ));
@@ -108,22 +109,22 @@ impl ConfigHandler {
         }
 
         for (scope, result) in all_results {
-            renderer.emit_info(&format!("{} Validation Results:", scope));
+            renderer.emit_info(format_args!("{} Validation Results:", scope));
 
             for error in &result.errors {
                 if errors_only && error.severity != ValidationSeverity::Error {
                     continue;
                 }
-                renderer.emit_raw_stdout(&format!("{}", error));
+                renderer.emit_raw_stdout(format_args!("{}", error));
             }
 
             if !errors_only {
                 for warning in &result.warnings {
-                    renderer.emit_raw_stdout(&format!("{}", warning));
+                    renderer.emit_raw_stdout(format_args!("{}", warning));
                 }
 
                 for info in &result.info {
-                    renderer.emit_raw_stdout(&format!("{}", info));
+                    renderer.emit_raw_stdout(format_args!("{}", info));
                 }
             }
         }

@@ -427,7 +427,10 @@ fn test_search_performance_and_limits() {
                 serde_json::from_str(&output).expect("Should return valid JSON");
 
             if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
-                if tasks.len() <= 3 {}
+                assert!(
+                    tasks.len() <= 3,
+                    "list --limit=3 should cap results to three tasks"
+                );
             }
         }
     }
@@ -447,7 +450,13 @@ fn test_search_performance_and_limits() {
             let json: serde_json::Value =
                 serde_json::from_str(&output).expect("Should return valid JSON");
 
-            if let Some(_tasks) = json.get("tasks").and_then(|t| t.as_array()) {}
+            if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
+                assert_eq!(
+                    tasks.len(),
+                    5,
+                    "list without --limit should return all created tasks"
+                );
+            }
         }
     }
 }

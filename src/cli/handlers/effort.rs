@@ -67,7 +67,7 @@ impl CommandHandler for EffortHandler {
         } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "effort: begin task_id={} explicit_project={:?}",
             task_id, project_hint
         ));

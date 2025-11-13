@@ -2,6 +2,7 @@ use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
 use clap::ValueEnum;
 use serde::Serialize;
+use std::fmt::{self, Write as FmtWrite};
 use std::io::{self, Write};
 
 mod json;
@@ -114,15 +115,15 @@ impl Outputable for Task {
         );
 
         if let Some(assignee) = &self.assignee {
-            output.push_str(&format!(" - 👤 {}", assignee));
+            let _ = write!(output, " - 👤 {}", assignee);
         }
 
         if let Some(due_date) = &self.due_date {
-            output.push_str(&format!(" - 📅 {}", due_date));
+            let _ = write!(output, " - 📅 {}", due_date);
         }
 
         if !self.tags.is_empty() {
-            output.push_str(&format!(" - 🏷️  {}", self.tags.join(", ")));
+            let _ = write!(output, " - 🏷️  {}", self.tags.join(", "));
         }
 
         output
@@ -231,30 +232,34 @@ impl OutputRenderer {
         }
     }
 
-    pub fn render_success(&self, message: &str) -> String {
+    pub fn render_success(&self, message: impl fmt::Display) -> String {
+        let message = message.to_string();
         match self.format {
-            OutputFormat::Json => Self::json_status_message("success", message),
+            OutputFormat::Json => Self::json_status_message("success", &message),
             _ => format!("✅ {}", message),
         }
     }
 
-    pub fn render_error(&self, message: &str) -> String {
+    pub fn render_error(&self, message: impl fmt::Display) -> String {
+        let message = message.to_string();
         match self.format {
-            OutputFormat::Json => Self::json_status_message("error", message),
+            OutputFormat::Json => Self::json_status_message("error", &message),
             _ => format!("❌ {}", message),
         }
     }
 
-    pub fn render_warning(&self, message: &str) -> String {
+    pub fn render_warning(&self, message: impl fmt::Display) -> String {
+        let message = message.to_string();
         match self.format {
-            OutputFormat::Json => Self::json_status_message("warning", message),
+            OutputFormat::Json => Self::json_status_message("warning", &message),
             _ => format!("⚠️  {}", message),
         }
     }
 
-    pub fn render_info(&self, message: &str) -> String {
+    pub fn render_info(&self, message: impl fmt::Display) -> String {
+        let message = message.to_string();
         match self.format {
-            OutputFormat::Json => Self::json_status_message("info", message),
+            OutputFormat::Json => Self::json_status_message("info", &message),
             _ => format!("ℹ️  {}", message),
         }
     }
@@ -262,22 +267,22 @@ impl OutputRenderer {
     // Emitters: user-facing output, not gated by log level.
     // Respect stream hygiene: info/success -> stdout (except JSON mode where info headers are unwanted),
     // warnings/errors -> stderr.
-    pub fn emit_success(&self, message: &str) {
+    pub fn emit_success(&self, message: impl fmt::Display) {
         let out = self.render_success(message);
         let _ = writeln!(io::stdout(), "{}", out);
     }
 
-    pub fn emit_error(&self, message: &str) {
+    pub fn emit_error(&self, message: impl fmt::Display) {
         let out = self.render_error(message);
         let _ = writeln!(io::stderr(), "{}", out);
     }
 
-    pub fn emit_warning(&self, message: &str) {
+    pub fn emit_warning(&self, message: impl fmt::Display) {
         let out = self.render_warning(message);
         let _ = writeln!(io::stderr(), "{}", out);
     }
 
-    pub fn emit_info(&self, message: &str) {
+    pub fn emit_info(&self, message: impl fmt::Display) {
         // Suppress info banners in JSON format to keep stdout pure JSON
         if matches!(self.format, OutputFormat::Json) {
             return;
@@ -287,16 +292,16 @@ impl OutputRenderer {
     }
 
     // Emit info even in JSON mode (used when a command would otherwise emit nothing)
-    pub fn emit_notice(&self, message: &str) {
+    pub fn emit_notice(&self, message: impl fmt::Display) {
         let out = self.render_info(message);
         let _ = writeln!(io::stdout(), "{}", out);
     }
 
-    pub fn emit_raw_stdout(&self, message: &str) {
+    pub fn emit_raw_stdout(&self, message: impl fmt::Display) {
         let _ = writeln!(io::stdout(), "{}", message);
     }
 
-    pub fn emit_raw_stderr(&self, message: &str) {
+    pub fn emit_raw_stderr(&self, message: impl fmt::Display) {
         let _ = writeln!(io::stderr(), "{}", message);
     }
 
@@ -335,13 +340,13 @@ impl OutputRenderer {
 
 // Thin logging helpers: gated by log level and routed to stderr to avoid corrupting stdout payloads.
 impl OutputRenderer {
-    pub fn log_error(&self, message: &str) {
+    pub fn log_error(&self, message: impl fmt::Display) {
         if self.log_level.allows(LogLevel::Error) {
             let _ = writeln!(io::stderr(), "{}", self.render_error(message));
         }
     }
 
-    pub fn log_warn(&self, message: &str) {
+    pub fn log_warn(&self, message: impl fmt::Display) {
         // Auto-silence warnings only when explicitly requested by LOTAR_TEST_SILENT=1
         let test_silent = std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1";
         if test_silent {
@@ -352,20 +357,20 @@ impl OutputRenderer {
         }
     }
 
-    pub fn log_info(&self, message: &str) {
+    pub fn log_info(&self, message: impl fmt::Display) {
         if self.log_level.allows(LogLevel::Info) {
             // Always route to stderr to keep stdout pure in all formats
             let _ = writeln!(io::stderr(), "{}", self.render_info(message));
         }
     }
 
-    pub fn log_debug(&self, message: &str) {
+    pub fn log_debug(&self, message: impl fmt::Display) {
         if self.log_level.allows(LogLevel::Debug) {
             let _ = writeln!(io::stderr(), "🐞 {}", message);
         }
     }
 
-    pub fn log_trace(&self, message: &str) {
+    pub fn log_trace(&self, message: impl fmt::Display) {
         if self.log_level.allows(LogLevel::Trace) {
             let _ = writeln!(io::stderr(), "🔎 {}", message);
         }

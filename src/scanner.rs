@@ -209,17 +209,17 @@ impl Scanner {
         enable_words: bool,
     ) -> Self {
         self.enable_ticket_words = enable_words;
-        if let Some(list) = patterns {
-            if !list.is_empty() {
-                let mut compiled: Vec<Regex> = Vec::new();
-                for p in list {
-                    if let Ok(re) = Regex::new(p) {
-                        compiled.push(re);
-                    }
+        if let Some(list) = patterns
+            && !list.is_empty()
+        {
+            let mut compiled: Vec<Regex> = Vec::new();
+            for p in list {
+                if let Ok(re) = Regex::new(p) {
+                    compiled.push(re);
                 }
-                if !compiled.is_empty() {
-                    self.custom_ticket_key_regexes = Some(compiled);
-                }
+            }
+            if !compiled.is_empty() {
+                self.custom_ticket_key_regexes = Some(compiled);
             }
         }
         self
@@ -274,23 +274,23 @@ impl Scanner {
         let mut files = Vec::new();
 
         // If modified_only is enabled and we are inside a git repo, restrict to modified/renamed files
-        if self.modified_only {
-            if let Some(repo_root) = crate::utils::git::find_repo_root(dir_path) {
-                let modified = Self::git_modified_files(&repo_root);
-                for p in modified {
-                    // Keep only files under dir_path and supported extensions
-                    let abs = repo_root.join(&p);
-                    if abs.starts_with(dir_path) {
-                        if let Some(ext) = abs.extension().and_then(|e| e.to_str()) {
-                            let ext_lc = ext.to_ascii_lowercase();
-                            if Self::is_supported_ext(&ext_lc) {
-                                files.push(abs);
-                            }
-                        }
+        if self.modified_only
+            && let Some(repo_root) = crate::utils::git::find_repo_root(dir_path)
+        {
+            let modified = Self::git_modified_files(&repo_root);
+            for p in modified {
+                // Keep only files under dir_path and supported extensions
+                let abs = repo_root.join(&p);
+                if abs.starts_with(dir_path)
+                    && let Some(ext) = abs.extension().and_then(|e| e.to_str())
+                {
+                    let ext_lc = ext.to_ascii_lowercase();
+                    if Self::is_supported_ext(&ext_lc) {
+                        files.push(abs);
                     }
                 }
-                return files;
             }
+            return files;
         }
 
         // Build walker that honors .lotarignore (root and nested) with fallback to .gitignore
@@ -333,15 +333,15 @@ impl Scanner {
                     if !Self::is_supported_ext(&ext_lc) {
                         continue;
                     }
-                    if let Some(ref excludes) = self.exclude_ext {
-                        if excludes.iter().any(|e| e == &ext_lc) {
-                            continue;
-                        }
+                    if let Some(ref excludes) = self.exclude_ext
+                        && excludes.iter().any(|e| e == &ext_lc)
+                    {
+                        continue;
                     }
-                    if let Some(ref includes) = self.include_ext {
-                        if !includes.iter().any(|e| e == &ext_lc) {
-                            continue;
-                        }
+                    if let Some(ref includes) = self.include_ext
+                        && !includes.iter().any(|e| e == &ext_lc)
+                    {
+                        continue;
                     }
                     files.push(path);
                 }
@@ -398,71 +398,58 @@ impl Scanner {
     }
 
     fn scan_file(&self, file_path: &Path, references: &mut Vec<Reference>) {
-        if let Ok(file_contents) = fs::read_to_string(file_path) {
-            if let Some(extension) = file_path.extension() {
-                if let Some(ext_str) = extension.to_str() {
-                    let ext_str = ext_str.to_ascii_lowercase();
+        if let Ok(file_contents) = fs::read_to_string(file_path)
+            && let Some(extension) = file_path.extension()
+            && let Some(ext_str) = extension.to_str()
+        {
+            let ext_str = ext_str.to_ascii_lowercase();
 
-                    // Determine comment syntaxes
-                    let single_line = Self::get_comment_token(&ext_str);
-                    let (block_open, block_close) = Self::block_tokens_for(&ext_str);
+            // Determine comment syntaxes
+            let single_line = Self::get_comment_token(&ext_str);
+            let (block_open, block_close) = Self::block_tokens_for(&ext_str);
 
-                    // Process each line to find TODOs in comments
-                    let mut in_block = false;
-                    let mut block_start_line: usize = 0;
+            // Process each line to find TODOs in comments
+            let mut in_block = false;
+            let mut block_start_line: usize = 0;
 
-                    for (line_number, raw_line) in file_contents.lines().enumerate() {
-                        let mut line = raw_line;
+            for (line_number, raw_line) in file_contents.lines().enumerate() {
+                let mut line = raw_line;
 
-                        // Handle block comment state transitions if supported
-                        if let (Some(open), Some(close)) = (&block_open, &block_close) {
-                            if !in_block {
-                                if let Some(open_idx) = line.find(open) {
-                                    in_block = true;
-                                    block_start_line = line_number + 1; // 1-based
-                                    // Consider the remainder after the opener for same-line checks
-                                    line = &line[open_idx + open.len()..];
-                                }
-                            }
+                // Handle block comment state transitions if supported
+                if let (Some(open), Some(close)) = (&block_open, &block_close) {
+                    if !in_block && let Some(open_idx) = line.find(open) {
+                        in_block = true;
+                        block_start_line = line_number + 1; // 1-based
+                        // Consider the remainder after the opener for same-line checks
+                        line = &line[open_idx + open.len()..];
+                    }
 
-                            if in_block {
-                                // If the closer appears on this line, truncate to the part before closer
-                                if let Some(close_idx) = line.find(close) {
-                                    let before = &line[..close_idx];
-                                    // Process the content within the block on this line
-                                    self.process_comment_line(
-                                        file_path,
-                                        references,
-                                        block_start_line, // report first line for block start
-                                        before,
-                                    );
-                                    in_block = false;
-                                    continue; // move to next line
-                                } else {
-                                    // Entire line is within block; process as-is
-                                    self.process_comment_line(
-                                        file_path,
-                                        references,
-                                        line_number + 1,
-                                        line,
-                                    );
-                                    continue;
-                                }
-                            }
-                        }
-
-                        // Single-line comments (if defined for this extension)
-                        if let Some(start_comment) = single_line {
-                            if raw_line.contains(start_comment) {
-                                self.process_comment_line(
-                                    file_path,
-                                    references,
-                                    line_number + 1,
-                                    raw_line,
-                                );
-                            }
+                    if in_block {
+                        // If the closer appears on this line, truncate to the part before closer
+                        if let Some(close_idx) = line.find(close) {
+                            let before = &line[..close_idx];
+                            // Process the content within the block on this line
+                            self.process_comment_line(
+                                file_path,
+                                references,
+                                block_start_line, // report first line for block start
+                                before,
+                            );
+                            in_block = false;
+                            continue; // move to next line
+                        } else {
+                            // Entire line is within block; process as-is
+                            self.process_comment_line(file_path, references, line_number + 1, line);
+                            continue;
                         }
                     }
+                }
+
+                // Single-line comments (if defined for this extension)
+                if let Some(start_comment) = single_line
+                    && raw_line.contains(start_comment)
+                {
+                    self.process_comment_line(file_path, references, line_number + 1, raw_line);
                 }
             }
         }
@@ -515,10 +502,10 @@ impl Scanner {
         };
 
         // Fallback: if uuid is still empty (e.g., bare key without signal words), try any configured ticket patterns
-        if uuid.is_empty() {
-            if let Some(k) = self.extract_ticket_key_from_line(trimmed) {
-                uuid = k;
-            }
+        if uuid.is_empty()
+            && let Some(k) = self.extract_ticket_key_from_line(trimmed)
+        {
+            uuid = k;
         }
 
         let reference = Reference {
@@ -634,10 +621,10 @@ impl Scanner {
         }
         if let Some(list) = &self.custom_ticket_key_regexes {
             for re in list {
-                if let Some(c) = re.captures(line) {
-                    if let Some(m) = c.get(1) {
-                        return Some(m.as_str().to_string());
-                    }
+                if let Some(c) = re.captures(line)
+                    && let Some(m) = c.get(1)
+                {
+                    return Some(m.as_str().to_string());
                 }
             }
         }

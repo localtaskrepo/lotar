@@ -16,10 +16,10 @@ pub(crate) fn handle_calendar(
     tasks_root: PathBuf,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    if let Some(limit) = calendar_args.limit {
-        if limit == 0 {
-            return Err("--limit must be greater than zero".to_string());
-        }
+    if let Some(limit) = calendar_args.limit
+        && limit == 0
+    {
+        return Err("--limit must be greater than zero".to_string());
     }
 
     let storage = Storage::try_open(tasks_root)
@@ -36,10 +36,10 @@ pub(crate) fn handle_calendar(
     match renderer.format {
         OutputFormat::Json => {
             let mut value = serde_json::to_value(&context.payload).unwrap_or_default();
-            if let Some(obj) = value.as_object_mut() {
-                if obj.get("skipped_complete").and_then(|flag| flag.as_bool()) == Some(false) {
-                    obj.remove("skipped_complete");
-                }
+            if let Some(obj) = value.as_object_mut()
+                && obj.get("skipped_complete").and_then(|flag| flag.as_bool()) == Some(false)
+            {
+                obj.remove("skipped_complete");
             }
             renderer.emit_json(&value);
         }
@@ -79,7 +79,7 @@ fn render_calendar_text(
             entry.summary.status.clone()
         };
         let window = format_calendar_window(entry.start, entry.end, entry.duration);
-        renderer.emit_raw_stdout(&format!(
+        renderer.emit_raw_stdout(format_args!(
             "#{:>3} {:<20} {:<10} {:<30} {}",
             entry.id,
             truncate(&label, 20),
@@ -101,7 +101,7 @@ fn render_calendar_text(
     for entry in &context.entries {
         if entry.summary.has_warnings && !entry.warnings.is_empty() {
             for warning in &entry.warnings {
-                renderer.emit_warning(&format!("Sprint #{}: {}", entry.id, warning.message));
+                renderer.emit_warning(format_args!("Sprint #{}: {}", entry.id, warning.message));
             }
         }
     }

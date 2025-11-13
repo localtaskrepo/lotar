@@ -58,7 +58,7 @@ impl CommandHandler for DeleteHandler {
                     renderer.emit_json(&obj);
                 }
                 _ => {
-                    renderer.emit_info(&format!(
+                    renderer.emit_info(format_args!(
                         "DRY RUN: Would delete task '{}' from project {}",
                         id, project_prefix
                     ));
@@ -83,7 +83,7 @@ impl CommandHandler for DeleteHandler {
                     renderer.emit_json(&obj);
                 }
                 _ => {
-                    renderer.emit_success(&format!("Task '{}' deleted successfully", id));
+                    renderer.emit_success(format_args!("Task '{}' deleted successfully", id));
                 }
             }
             Ok(())

@@ -9,16 +9,16 @@ pub fn list_visible_subdirs(dir: &Path) -> Vec<(String, PathBuf)> {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with('.')
-                        || name.contains('@')
-                        || name.eq_ignore_ascii_case("sprints")
-                    {
-                        continue;
-                    }
-                    result.push((name.to_string(), path));
+            if path.is_dir()
+                && let Some(name) = path.file_name().and_then(|n| n.to_str())
+            {
+                if name.starts_with('.')
+                    || name.contains('@')
+                    || name.eq_ignore_ascii_case("sprints")
+                {
+                    continue;
                 }
+                result.push((name.to_string(), path));
             }
         }
     }
@@ -43,12 +43,11 @@ pub fn list_files_with_ext(dir: &Path, ext: &str) -> Vec<PathBuf> {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(e) = path.extension().and_then(|s| s.to_str()) {
-                    if e.to_ascii_lowercase() == ext_lc {
-                        result.push(path);
-                    }
-                }
+            if path.is_file()
+                && let Some(e) = path.extension().and_then(|s| s.to_str())
+                && e.to_ascii_lowercase() == ext_lc
+            {
+                result.push(path);
             }
         }
     }

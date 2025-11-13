@@ -36,16 +36,16 @@ fn determine_smart_default_prefix(
     root_path: &Path,
     project_context: Option<&str>,
 ) -> Option<String> {
-    if let Some(project_name) = project_context {
-        if let Ok(prefix) = generate_unique_project_prefix(project_name, root_path) {
-            return Some(prefix);
-        }
+    if let Some(project_name) = project_context
+        && let Ok(prefix) = generate_unique_project_prefix(project_name, root_path)
+    {
+        return Some(prefix);
     }
 
-    if let Some(auto_detected) = crate::project::detect_project_name() {
-        if let Ok(prefix) = generate_unique_project_prefix(&auto_detected, root_path) {
-            return Some(prefix);
-        }
+    if let Some(auto_detected) = crate::project::detect_project_name()
+        && let Ok(prefix) = generate_unique_project_prefix(&auto_detected, root_path)
+    {
+        return Some(prefix);
     }
 
     crate::utils::filesystem::list_visible_subdirs(root_path)

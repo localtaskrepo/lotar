@@ -42,7 +42,7 @@ impl CommandHandler for CompletionsHandler {
                         let generated_path = write_completion(shell, Some(&path))
                             .map_err(|err| format!("Failed to write completion: {}", err))?;
                         if let Some(path) = generated_path.clone() {
-                            renderer.emit_success(&format!(
+                            renderer.emit_success(format_args!(
                                 "Generated {shell} completion at {}",
                                 path.display()
                             ));
@@ -87,20 +87,20 @@ impl CommandHandler for CompletionsHandler {
                         continue;
                     };
 
-                    if let Some(parent) = target.parent() {
-                        if let Err(err) = fs::create_dir_all(parent) {
-                            warnings.push(format!(
-                                "Could not create directory {} for {shell}: {}",
-                                parent.display(),
-                                err
-                            ));
-                            continue;
-                        }
+                    if let Some(parent) = target.parent()
+                        && let Err(err) = fs::create_dir_all(parent)
+                    {
+                        warnings.push(format!(
+                            "Could not create directory {} for {shell}: {}",
+                            parent.display(),
+                            err
+                        ));
+                        continue;
                     }
 
                     match write_completion(shell, Some(&target)) {
                         Ok(Some(actual)) => {
-                            renderer.emit_success(&format!(
+                            renderer.emit_success(format_args!(
                                 "Installed {shell} completion at {}",
                                 actual.display()
                             ));
@@ -160,10 +160,10 @@ fn write_completion(shell: CompletionShell, target: Option<&Path>) -> io::Result
             Ok(Some(generated))
         }
         Some(path) => {
-            if let Some(parent) = path.parent() {
-                if !parent.as_os_str().is_empty() {
-                    fs::create_dir_all(parent)?;
-                }
+            if let Some(parent) = path.parent()
+                && !parent.as_os_str().is_empty()
+            {
+                fs::create_dir_all(parent)?;
             }
             let mut file = File::create(path)?;
             generate(clap_shell, &mut cmd, &binary_name, &mut file);

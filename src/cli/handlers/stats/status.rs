@@ -178,13 +178,13 @@ pub(crate) fn run_status(
         }
         cursor = end;
     }
-    if cursor < until_dt {
-        if let Some(ref s) = current_status {
-            let key = s.to_string();
-            let diff = until_dt.signed_duration_since(cursor);
-            let secs = diff.num_seconds().max(0);
-            *durations.entry(key).or_insert(0) += secs;
-        }
+    if cursor < until_dt
+        && let Some(ref s) = current_status
+    {
+        let key = s.to_string();
+        let diff = until_dt.signed_duration_since(cursor);
+        let secs = diff.num_seconds().max(0);
+        *durations.entry(key).or_insert(0) += secs;
     }
 
     let total_seconds: i64 = durations.values().sum();
@@ -224,9 +224,10 @@ pub(crate) fn run_status(
                     let st = it["status"].as_str().unwrap_or("?");
                     let hrs = it["hours"].as_f64().unwrap_or(0.0);
                     let pct = it["percent"].as_f64().unwrap_or(0.0) * 100.0;
-                    renderer.emit_raw_stdout(&format!("  {:>12}: {:.2}h ({:.1}%)", st, hrs, pct));
+                    renderer
+                        .emit_raw_stdout(format_args!("  {:>12}: {:.2}h ({:.1}%)", st, hrs, pct));
                 }
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "  {:>12}: {:.2}h",
                     "Total",
                     (total_seconds as f64) / 3600.0
@@ -316,20 +317,19 @@ pub(crate) fn run_time_in_status(
                     let p = entry.path();
                     if p.is_dir() {
                         stack.push(p);
-                    } else if p.extension().and_then(|e| e.to_str()) == Some("yml") {
-                        if let Some(stem) = p.file_stem().and_then(|s| s.to_str()) {
-                            if let Ok(num) = stem.parse::<u64>() {
-                                let project = p
-                                    .parent()
-                                    .and_then(|q| q.file_name())
-                                    .and_then(|s| s.to_str())
-                                    .unwrap_or("");
-                                let id = format!("{}-{}", project, num);
-                                // Compute path relative to repo root for git show
-                                if let Ok(rel) = p.strip_prefix(&repo_root) {
-                                    task_files.push((id, rel.to_path_buf()));
-                                }
-                            }
+                    } else if p.extension().and_then(|e| e.to_str()) == Some("yml")
+                        && let Some(stem) = p.file_stem().and_then(|s| s.to_str())
+                        && let Ok(num) = stem.parse::<u64>()
+                    {
+                        let project = p
+                            .parent()
+                            .and_then(|q| q.file_name())
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("");
+                        let id = format!("{}-{}", project, num);
+                        // Compute path relative to repo root for git show
+                        if let Ok(rel) = p.strip_prefix(&repo_root) {
+                            task_files.push((id, rel.to_path_buf()));
                         }
                     }
                 }
@@ -372,16 +372,16 @@ pub(crate) fn run_time_in_status(
             if let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(content) {
                 return Some(task.status);
             }
-            if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content) {
-                if let Some(s) = val.get("status").and_then(|v| match v {
+            if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content)
+                && let Some(s) = val.get("status").and_then(|v| match v {
                     serde_yaml::Value::String(s) => Some(s.clone()),
                     _ => None,
-                }) {
-                    if let Some(ts) = parse_status_str_tolerant(&s) {
-                        return Some(ts);
-                    }
-                    return s.parse::<crate::types::TaskStatus>().ok();
+                })
+            {
+                if let Some(ts) = parse_status_str_tolerant(&s) {
+                    return Some(ts);
                 }
+                return s.parse::<crate::types::TaskStatus>().ok();
             }
             None
         }
@@ -448,13 +448,13 @@ pub(crate) fn run_time_in_status(
             cursor = end;
         }
         // Tail from last cursor to until
-        if cursor < until_dt {
-            if let Some(s) = current_status {
-                let key = s.to_string();
-                let diff = until_dt.signed_duration_since(cursor);
-                let secs = diff.num_seconds().max(0);
-                *durations.entry(key).or_insert(0) += secs;
-            }
+        if cursor < until_dt
+            && let Some(s) = current_status
+        {
+            let key = s.to_string();
+            let diff = until_dt.signed_duration_since(cursor);
+            let secs = diff.num_seconds().max(0);
+            *durations.entry(key).or_insert(0) += secs;
         }
 
         // Skip empty
@@ -528,13 +528,13 @@ pub(crate) fn run_time_in_status(
                             let st = it["status"].as_str().unwrap_or("?");
                             let hrs = it["hours"].as_f64().unwrap_or(0.0);
                             let pct = it["percent"].as_f64().unwrap_or(0.0) * 100.0;
-                            renderer.emit_raw_stdout(&format!(
+                            renderer.emit_raw_stdout(format_args!(
                                 "  {:>12}: {:.2}h ({:.1}%)",
                                 st, hrs, pct
                             ));
                         }
                         let tot = row["total_hours"].as_f64().unwrap_or(0.0);
-                        renderer.emit_raw_stdout(&format!("  {:>12}: {:.2}h", "Total", tot));
+                        renderer.emit_raw_stdout(format_args!("  {:>12}: {:.2}h", "Total", tot));
                     }
                 }
             }

@@ -1,5 +1,5 @@
 Features:
-- Reduce size. Check for package updates.
+- Reduce size
 - lotar config validate/normalize needs to be revisited
 - Allow env override for all config values that are in all other chains
 - Publish to docker hub, homebrew, npm?, ...

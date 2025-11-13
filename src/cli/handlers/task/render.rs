@@ -245,16 +245,16 @@ pub fn render_property_current(renderer: &OutputRenderer, payload: PropertyCurre
             renderer.emit_json(&payload);
         }
         _ => {
-            if let Some(explain_ref) = explain.as_ref() {
-                if explain_ref.placement == ExplainPlacement::Before {
-                    explain_ref.level.emit(renderer, &explain_ref.message);
-                }
+            if let Some(explain_ref) = explain.as_ref()
+                && explain_ref.placement == ExplainPlacement::Before
+            {
+                explain_ref.level.emit(renderer, &explain_ref.message);
             }
             text_level.emit(renderer, &text_message);
-            if let Some(explain_ref) = explain.as_ref() {
-                if explain_ref.placement == ExplainPlacement::After {
-                    explain_ref.level.emit(renderer, &explain_ref.message);
-                }
+            if let Some(explain_ref) = explain.as_ref()
+                && explain_ref.placement == ExplainPlacement::After
+            {
+                explain_ref.level.emit(renderer, &explain_ref.message);
             }
         }
     }
@@ -336,16 +336,16 @@ pub fn render_property_preview(renderer: &OutputRenderer, payload: PropertyPrevi
             renderer.emit_json(&payload);
         }
         _ => {
-            if let Some(explain_ref) = explain.as_ref() {
-                if explain_ref.placement == ExplainPlacement::Before {
-                    explain_ref.level.emit(renderer, &explain_ref.message);
-                }
+            if let Some(explain_ref) = explain.as_ref()
+                && explain_ref.placement == ExplainPlacement::Before
+            {
+                explain_ref.level.emit(renderer, &explain_ref.message);
             }
             text_level.emit(renderer, &text_message);
-            if let Some(explain_ref) = explain.as_ref() {
-                if explain_ref.placement == ExplainPlacement::After {
-                    explain_ref.level.emit(renderer, &explain_ref.message);
-                }
+            if let Some(explain_ref) = explain.as_ref()
+                && explain_ref.placement == ExplainPlacement::After
+            {
+                explain_ref.level.emit(renderer, &explain_ref.message);
             }
         }
     }

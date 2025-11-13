@@ -110,7 +110,7 @@ pub(crate) fn run_changed(
                 renderer.emit_success("No tickets changed in the selected window.");
             } else {
                 for i in &limited {
-                    renderer.emit_raw_stdout(&format!(
+                    renderer.emit_raw_stdout(format_args!(
                         "{}  {}  {}  {}  {}",
                         i.last_date.to_rfc3339(),
                         i.id,
@@ -187,10 +187,10 @@ pub(crate) fn run_churn(
     };
 
     // If an inferred project path doesn't exist locally, widen to global to be forgiving in new repos/tests
-    if let Some(ref p) = scope_project {
-        if !tasks_abs.join(p).exists() {
-            scope_project = None;
-        }
+    if let Some(ref p) = scope_project
+        && !tasks_abs.join(p).exists()
+    {
+        scope_project = None;
     }
 
     let mut items = crate::services::audit_service::AuditService::list_changed_tasks(
@@ -242,7 +242,7 @@ pub(crate) fn run_churn(
                 renderer.emit_success("No churn detected in the selected window.");
             } else {
                 for i in &limited {
-                    renderer.emit_raw_stdout(&format!(
+                    renderer.emit_raw_stdout(format_args!(
                         "{:>4}  {}  {}  {}",
                         i.commits,
                         i.id,

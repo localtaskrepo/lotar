@@ -1435,7 +1435,7 @@ fn sprint_backlog_lists_unassigned_tasks() {
     let assigned_id = storage
         .add(&assigned_task, "TEST", Some("Test Project"))
         .expect("failed to add assigned task");
-    append_sprint_tasks(&mut storage, 1, &[assigned_id.clone()]);
+    append_sprint_tasks(&mut storage, 1, std::slice::from_ref(&assigned_id));
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);

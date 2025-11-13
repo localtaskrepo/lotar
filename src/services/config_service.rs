@@ -164,13 +164,12 @@ impl ConfigService {
 
             if let Ok(cfg) =
                 crate::config::persistence::load_project_config_from_dir(&prefix, tasks_dir)
+                && cfg.project_name.eq_ignore_ascii_case(trimmed)
             {
-                if cfg.project_name.eq_ignore_ascii_case(trimmed) {
-                    return Err(LoTaRError::ValidationError(format!(
-                        "Project '{}' already exists.",
-                        cfg.project_name
-                    )));
-                }
+                return Err(LoTaRError::ValidationError(format!(
+                    "Project '{}' already exists.",
+                    cfg.project_name
+                )));
             }
         }
 

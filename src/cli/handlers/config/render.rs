@@ -2,6 +2,7 @@ use crate::config::types::{ResolvedConfig, SprintNotificationsConfig};
 use crate::output::{OutputFormat, OutputRenderer};
 use serde::Serialize;
 use std::collections::HashMap;
+use std::fmt::Write;
 
 pub(super) struct YamlRenderOptions<'a> {
     pub(super) include_defaults: bool,
@@ -498,7 +499,7 @@ fn write_scalar_line(
     }
     let indent_str = " ".repeat(indent);
     let comment = yaml_comment(source, options);
-    buf.push_str(&format!("{indent_str}{key}: {value}{comment}\n"));
+    let _ = writeln!(buf, "{indent_str}{key}: {value}{comment}");
     true
 }
 
@@ -516,14 +517,14 @@ fn write_sequence<T: Serialize>(
     let indent_str = " ".repeat(indent);
     let comment = yaml_comment(source, options);
     if values.is_empty() {
-        buf.push_str(&format!("{indent_str}{key}: []{comment}\n"));
+        let _ = writeln!(buf, "{indent_str}{key}: []{comment}");
         return true;
     }
-    buf.push_str(&format!("{indent_str}{key}:{comment}\n"));
+    let _ = writeln!(buf, "{indent_str}{key}:{comment}");
     let item_indent = " ".repeat(indent + 2);
     for value in values {
         let formatted = yaml_scalar(value);
-        buf.push_str(&format!("{item_indent}- {formatted}\n"));
+        let _ = writeln!(buf, "{item_indent}- {formatted}");
     }
     true
 }
@@ -541,10 +542,10 @@ fn write_mapping_entries(
     }
     let indent_str = " ".repeat(indent);
     let comment = yaml_comment(source, options);
-    buf.push_str(&format!("{indent_str}{key}:{comment}\n"));
+    let _ = writeln!(buf, "{indent_str}{key}:{comment}");
     let entry_indent = " ".repeat(indent + 2);
     for (name, value) in entries {
-        buf.push_str(&format!("{entry_indent}{name}: {value}\n"));
+        let _ = writeln!(buf, "{entry_indent}{name}: {value}");
     }
     true
 }

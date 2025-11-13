@@ -16,19 +16,18 @@ impl StorageSearch {
         {
             use std::fs::OpenOptions;
             use std::io::Write;
-            if std::env::var("LOTAR_DEBUG").is_ok() {
-                if let Ok(mut f) = OpenOptions::new()
+            if std::env::var("LOTAR_DEBUG").is_ok()
+                && let Ok(mut f) = OpenOptions::new()
                     .create(true)
                     .append(true)
                     .open("/tmp/lotar_search_debug.log")
-                {
-                    let _ = writeln!(
-                        f,
-                        "[SEARCH] root={} project={:?}",
-                        root_path.display(),
-                        filter.project
-                    );
-                }
+            {
+                let _ = writeln!(
+                    f,
+                    "[SEARCH] root={} project={:?}",
+                    root_path.display(),
+                    filter.project
+                );
             }
         }
 
@@ -84,15 +83,14 @@ impl StorageSearch {
             {
                 use std::fs::OpenOptions;
                 use std::io::Write;
-                if std::env::var("LOTAR_DEBUG").is_ok() {
-                    if let Ok(mut f) = OpenOptions::new()
+                if std::env::var("LOTAR_DEBUG").is_ok()
+                    && let Ok(mut f) = OpenOptions::new()
                         .create(true)
                         .append(true)
                         .open("/tmp/lotar_search_debug.log")
-                    {
-                        let names: Vec<String> = subdirs.iter().map(|(n, _)| n.clone()).collect();
-                        let _ = writeln!(f, "[SUBDIRS] {:?}", names);
-                    }
+                {
+                    let names: Vec<String> = subdirs.iter().map(|(n, _)| n.clone()).collect();
+                    let _ = writeln!(f, "[SUBDIRS] {:?}", names);
                 }
             }
             let all_files: Vec<(String, std::path::PathBuf)> = subdirs
@@ -102,20 +100,19 @@ impl StorageSearch {
                     {
                         use std::fs::OpenOptions;
                         use std::io::Write;
-                        if std::env::var("LOTAR_DEBUG").is_ok() {
-                            if let Ok(mut f) = OpenOptions::new()
+                        if std::env::var("LOTAR_DEBUG").is_ok()
+                            && let Ok(mut f) = OpenOptions::new()
                                 .create(true)
                                 .append(true)
                                 .open("/tmp/lotar_search_debug.log")
-                            {
-                                let _ = writeln!(
-                                    f,
-                                    "[FILES] project={} count={} dir={}",
-                                    project_folder,
-                                    files.len(),
-                                    dir_path.display()
-                                );
-                            }
+                        {
+                            let _ = writeln!(
+                                f,
+                                "[FILES] project={} count={} dir={}",
+                                project_folder,
+                                files.len(),
+                                dir_path.display()
+                            );
                         }
                     }
                     files.into_iter().map(move |p| (project_folder.clone(), p))

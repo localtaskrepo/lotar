@@ -139,7 +139,7 @@ impl CommandHandler for EditHandler {
         ctx.storage
             .edit(&full_id, &task)
             .map_err(TaskStorageAction::Update.map_err(&full_id))?;
-        renderer.emit_success(&format!("Task '{}' updated successfully", id));
+        renderer.emit_success(format_args!("Task '{}' updated successfully", id));
         Ok(())
     }
 }

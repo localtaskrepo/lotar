@@ -231,23 +231,22 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     if let Some(v) = get_path(&data, &["default", "reporter"]).and_then(cast::<String>) {
         cfg.default_reporter = Some(v);
     }
-    if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.default_tags = list;
-        }
+    if let Some(v) = get_path(&data, &["default", "tags"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.default_tags = list;
     }
     if let Some(v) = get_path(&data, &["members"])
         .cloned()
         .or_else(|| get_path(&data, &["default", "members"]).cloned())
+        && let Ok(list) = serde_yaml::from_value::<Vec<String>>(v)
     {
-        if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v) {
-            let members: Vec<String> = list
-                .into_iter()
-                .map(|entry| entry.trim().to_string())
-                .filter(|entry| !entry.is_empty())
-                .collect();
-            cfg.members = members;
-        }
+        let members: Vec<String> = list
+            .into_iter()
+            .map(|entry| entry.trim().to_string())
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        cfg.members = members;
     }
     if let Some(v) = get_path(&data, &["default", "strict_members"]).and_then(cast::<bool>) {
         cfg.strict_members = v;
@@ -268,48 +267,48 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
             cfg.issue_states = cf;
         }
     }
-    if let Some(v) = get_path(&data, &["issue", "types"]).cloned() {
-        if let Some(cf) = parse_issue_types_tolerant(v) {
-            cfg.issue_types = cf;
-        }
+    if let Some(v) = get_path(&data, &["issue", "types"]).cloned()
+        && let Some(cf) = parse_issue_types_tolerant(v)
+    {
+        cfg.issue_types = cf;
     }
-    if let Some(v) = get_path(&data, &["issue", "priorities"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.issue_priorities.values = list;
-        }
+    if let Some(v) = get_path(&data, &["issue", "priorities"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.issue_priorities.values = list;
     }
 
     // taxonomy.* (legacy) — will be overridden by issue.* if present
-    if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.tags = StringConfigField { values: list };
-        }
+    if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.tags = StringConfigField { values: list };
     }
     // issue.tags (preferred canonical)
-    if let Some(v) = get_path(&data, &["issue", "tags"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.tags = StringConfigField { values: list };
-        }
+    if let Some(v) = get_path(&data, &["issue", "tags"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.tags = StringConfigField { values: list };
     }
 
     // custom.fields
-    if let Some(v) = get_path(&data, &["custom", "fields"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.custom_fields = StringConfigField { values: list };
-        }
+    if let Some(v) = get_path(&data, &["custom", "fields"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.custom_fields = StringConfigField { values: list };
     }
 
     // scan.signal_words
-    if let Some(v) = get_path(&data, &["scan", "signal_words"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.scan_signal_words = list;
-        }
+    if let Some(v) = get_path(&data, &["scan", "signal_words"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.scan_signal_words = list;
     }
     // scan.ticket_patterns
-    if let Some(v) = get_path(&data, &["scan", "ticket_patterns"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.scan_ticket_patterns = Some(list);
-        }
+    if let Some(v) = get_path(&data, &["scan", "ticket_patterns"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.scan_ticket_patterns = Some(list);
     }
     // scan.enable_ticket_words
     if let Some(v) = get_path(&data, &["scan", "enable_ticket_words"]).and_then(cast::<bool>) {
@@ -398,20 +397,20 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     }
 
     // branch.* alias maps (global)
-    if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
-        if let Some(map) = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant) {
-            cfg.branch_type_aliases = map;
-        }
+    if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned()
+        && let Some(map) = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant)
+    {
+        cfg.branch_type_aliases = map;
     }
-    if let Some(v) = get_path(&data, &["branch", "status_aliases"]).cloned() {
-        if let Some(map) = parse_alias_map_tolerant::<TaskStatus>(v, parse_task_status_tolerant) {
-            cfg.branch_status_aliases = map;
-        }
+    if let Some(v) = get_path(&data, &["branch", "status_aliases"]).cloned()
+        && let Some(map) = parse_alias_map_tolerant::<TaskStatus>(v, parse_task_status_tolerant)
+    {
+        cfg.branch_status_aliases = map;
     }
-    if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned() {
-        if let Some(map) = parse_alias_map_tolerant::<Priority>(v, parse_priority_tolerant) {
-            cfg.branch_priority_aliases = map;
-        }
+    if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned()
+        && let Some(map) = parse_alias_map_tolerant::<Priority>(v, parse_priority_tolerant)
+    {
+        cfg.branch_priority_aliases = map;
     }
 
     Ok(cfg)
@@ -438,10 +437,10 @@ pub fn parse_project_from_yaml_str(
         if !v.trim().is_empty() {
             cfg.project_name = v;
         }
-    } else if let Some(v) = get_path(&data, &["project_name"]).and_then(cast::<String>) {
-        if !v.trim().is_empty() {
-            cfg.project_name = v;
-        }
+    } else if let Some(v) = get_path(&data, &["project_name"]).and_then(cast::<String>)
+        && !v.trim().is_empty()
+    {
+        cfg.project_name = v;
     }
     // default.*
     if let Some(v) = get_path(&data, &["default", "reporter"]).and_then(cast::<String>) {
@@ -453,15 +452,14 @@ pub fn parse_project_from_yaml_str(
     if let Some(v) = get_path(&data, &["members"])
         .cloned()
         .or_else(|| get_path(&data, &["default", "members"]).cloned())
+        && let Ok(list) = serde_yaml::from_value::<Vec<String>>(v)
     {
-        if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v) {
-            let members: Vec<String> = list
-                .into_iter()
-                .map(|entry| entry.trim().to_string())
-                .filter(|entry| !entry.is_empty())
-                .collect();
-            cfg.members = Some(members);
-        }
+        let members: Vec<String> = list
+            .into_iter()
+            .map(|entry| entry.trim().to_string())
+            .filter(|entry| !entry.is_empty())
+            .collect();
+        cfg.members = Some(members);
     }
     if let Some(v) = get_path(&data, &["default", "strict_members"]).and_then(cast::<bool>) {
         cfg.strict_members = Some(v);
@@ -499,21 +497,21 @@ pub fn parse_project_from_yaml_str(
         cfg.issue_priorities = serde_yaml::from_value(v).ok();
     }
     // taxonomy.* (legacy)
-    if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.tags = Some(StringConfigField { values: list });
-        }
+    if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.tags = Some(StringConfigField { values: list });
     }
     // issue.tags (preferred)
-    if let Some(v) = get_path(&data, &["issue", "tags"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.tags = Some(StringConfigField { values: list });
-        }
+    if let Some(v) = get_path(&data, &["issue", "tags"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.tags = Some(StringConfigField { values: list });
     }
-    if let Some(v) = get_path(&data, &["custom", "fields"]).cloned() {
-        if let Ok(list) = serde_yaml::from_value(v) {
-            cfg.custom_fields = Some(StringConfigField { values: list });
-        }
+    if let Some(v) = get_path(&data, &["custom", "fields"]).cloned()
+        && let Ok(list) = serde_yaml::from_value(v)
+    {
+        cfg.custom_fields = Some(StringConfigField { values: list });
     }
     // scan.signal_words
     if let Some(v) = get_path(&data, &["scan", "signal_words"]).cloned() {
@@ -860,13 +858,13 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     if let Some(strict) = cfg.strict_members {
         default.insert(Y::String("strict_members".into()), Y::Bool(strict));
     }
-    if let Some(tags) = &cfg.default_tags {
-        if !tags.is_empty() {
-            default.insert(
-                Y::String("tags".into()),
-                serde_yaml::to_value(tags).unwrap_or(Y::Null),
-            );
-        }
+    if let Some(tags) = &cfg.default_tags
+        && !tags.is_empty()
+    {
+        default.insert(
+            Y::String("tags".into()),
+            serde_yaml::to_value(tags).unwrap_or(Y::Null),
+        );
     }
     if let Some(v) = &cfg.default_priority {
         default.insert(
@@ -993,29 +991,29 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             .unwrap_or(false);
     if has_branch {
         let mut branch = serde_yaml::Mapping::new();
-        if let Some(m) = &cfg.branch_type_aliases {
-            if !m.is_empty() {
-                branch.insert(
-                    Y::String("type_aliases".into()),
-                    serde_yaml::to_value(m).unwrap_or(Y::Null),
-                );
-            }
+        if let Some(m) = &cfg.branch_type_aliases
+            && !m.is_empty()
+        {
+            branch.insert(
+                Y::String("type_aliases".into()),
+                serde_yaml::to_value(m).unwrap_or(Y::Null),
+            );
         }
-        if let Some(m) = &cfg.branch_status_aliases {
-            if !m.is_empty() {
-                branch.insert(
-                    Y::String("status_aliases".into()),
-                    serde_yaml::to_value(m).unwrap_or(Y::Null),
-                );
-            }
+        if let Some(m) = &cfg.branch_status_aliases
+            && !m.is_empty()
+        {
+            branch.insert(
+                Y::String("status_aliases".into()),
+                serde_yaml::to_value(m).unwrap_or(Y::Null),
+            );
         }
-        if let Some(m) = &cfg.branch_priority_aliases {
-            if !m.is_empty() {
-                branch.insert(
-                    Y::String("priority_aliases".into()),
-                    serde_yaml::to_value(m).unwrap_or(Y::Null),
-                );
-            }
+        if let Some(m) = &cfg.branch_priority_aliases
+            && !m.is_empty()
+        {
+            branch.insert(
+                Y::String("priority_aliases".into()),
+                serde_yaml::to_value(m).unwrap_or(Y::Null),
+            );
         }
         root.insert(Y::String("branch".into()), Y::Mapping(branch));
     }

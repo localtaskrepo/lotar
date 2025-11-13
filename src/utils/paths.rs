@@ -30,10 +30,10 @@ pub fn repo_relative_display(path: &Path) -> String {
     if let Some(rel) = repo_rel {
         return rel.display().to_string();
     }
-    if let Ok(cwd) = std::env::current_dir() {
-        if let Ok(rel) = path.strip_prefix(&cwd) {
-            return rel.display().to_string();
-        }
+    if let Ok(cwd) = std::env::current_dir()
+        && let Ok(rel) = path.strip_prefix(&cwd)
+    {
+        return rel.display().to_string();
     }
     path.display().to_string()
 }

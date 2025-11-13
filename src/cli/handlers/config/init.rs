@@ -21,46 +21,49 @@ impl ConfigHandler {
         force: bool,
     ) -> Result<(), String> {
         if dry_run {
-            renderer.emit_info(&format!(
+            renderer.emit_info(format_args!(
                 "DRY RUN: Would initialize config with template '{}'",
                 template
             ));
             if let Some(ref prefix) = prefix {
-                renderer.emit_raw_stdout(&format!("  • Project prefix: {}", prefix));
+                renderer.emit_raw_stdout(format_args!("  • Project prefix: {}", prefix));
                 if let Some(ref project_name) = project {
                     if let Err(conflict) =
                         validate_explicit_prefix(prefix, project_name, &resolver.path)
                     {
-                        renderer.emit_raw_stdout(&format!("  ❌ Conflict detected: {}", conflict));
+                        renderer
+                            .emit_raw_stdout(format_args!("  ❌ Conflict detected: {}", conflict));
                         return Err(conflict);
                     }
-                    renderer.emit_raw_stdout(&format!("  ✅ Prefix '{}' is available", prefix));
+                    renderer.emit_raw_stdout(format_args!("  ✅ Prefix '{}' is available", prefix));
                 }
             }
             if let Some(ref project) = project {
-                renderer.emit_raw_stdout(&format!("  • Project name: {}", project));
+                renderer.emit_raw_stdout(format_args!("  • Project name: {}", project));
                 if prefix.is_none() {
                     match generate_unique_project_prefix(project, &resolver.path) {
                         Ok(generated_prefix) => {
-                            renderer.emit_raw_stdout(&format!(
+                            renderer.emit_raw_stdout(format_args!(
                                 "  • Generated prefix: {} ✅",
                                 generated_prefix
                             ));
                         }
                         Err(conflict) => {
-                            renderer.emit_raw_stdout(&format!(
+                            renderer.emit_raw_stdout(format_args!(
                                 "  • Generated prefix: {} ❌",
                                 generate_project_prefix(project)
                             ));
-                            renderer
-                                .emit_raw_stdout(&format!("  ❌ Conflict detected: {}", conflict));
+                            renderer.emit_raw_stdout(format_args!(
+                                "  ❌ Conflict detected: {}",
+                                conflict
+                            ));
                             return Err(conflict);
                         }
                     }
                 }
             }
             if let Some(ref copy_from) = copy_from {
-                renderer.emit_raw_stdout(&format!("  • Copy settings from: {}", copy_from));
+                renderer.emit_raw_stdout(format_args!("  • Copy settings from: {}", copy_from));
             }
             if global {
                 renderer.emit_raw_stdout("  • Target: Global configuration (.tasks/config.yml)");
@@ -74,7 +77,7 @@ impl ConfigHandler {
                         Err(_) => generate_project_prefix(project_name),
                     }
                 };
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "  • Target: Project configuration (.tasks/{}/config.yml)",
                     project_prefix
                 ));
@@ -85,7 +88,7 @@ impl ConfigHandler {
             return Ok(());
         }
 
-        renderer.emit_info(&format!(
+        renderer.emit_info(format_args!(
             "Initializing configuration with template '{}'",
             template
         ));
@@ -216,7 +219,7 @@ impl ConfigHandler {
         fs::write(&config_path, canonical)
             .map_err(|e| format!("Failed to write config file: {}", e))?;
 
-        renderer.emit_success(&format!(
+        renderer.emit_success(format_args!(
             "Configuration initialized at: {}",
             config_path.display()
         ));
@@ -257,7 +260,7 @@ impl ConfigHandler {
             }
         }
 
-        renderer.emit_info(&format!(
+        renderer.emit_info(format_args!(
             "Copied settings from project '{}'",
             source_project
         ));
@@ -343,28 +346,26 @@ impl ConfigHandler {
         use serde_yaml::Value as Y;
 
         let map = config.as_mapping()?;
-        if let Some(project_value) = map.get(Y::String("project".into())) {
-            if let Some(project_map) = project_value.as_mapping() {
-                if let Some(name_value) = project_map.get(Y::String("name".into())) {
-                    if let Some(name_str) = name_value.as_str() {
-                        let trimmed = name_str.trim();
-                        if trimmed.is_empty() || trimmed.contains("{{") {
-                            return None;
-                        }
-                        return Some(trimmed.to_string());
-                    }
-                }
+        if let Some(project_value) = map.get(Y::String("project".into()))
+            && let Some(project_map) = project_value.as_mapping()
+            && let Some(name_value) = project_map.get(Y::String("name".into()))
+            && let Some(name_str) = name_value.as_str()
+        {
+            let trimmed = name_str.trim();
+            if trimmed.is_empty() || trimmed.contains("{{") {
+                return None;
             }
+            return Some(trimmed.to_string());
         }
 
-        if let Some(legacy_name) = map.get(Y::String("project_name".into())) {
-            if let Some(name_str) = legacy_name.as_str() {
-                let trimmed = name_str.trim();
-                if trimmed.is_empty() || trimmed.contains("{{") {
-                    return None;
-                }
-                return Some(trimmed.to_string());
+        if let Some(legacy_name) = map.get(Y::String("project_name".into()))
+            && let Some(name_str) = legacy_name.as_str()
+        {
+            let trimmed = name_str.trim();
+            if trimmed.is_empty() || trimmed.contains("{{") {
+                return None;
             }
+            return Some(trimmed.to_string());
         }
 
         None
@@ -379,12 +380,12 @@ impl ConfigHandler {
         let result = validator.validate_project_config(config);
 
         for warning in &result.warnings {
-            renderer.emit_warning(&warning.to_string());
+            renderer.emit_warning(warning.to_string());
         }
 
         if result.has_errors() {
             for error in &result.errors {
-                renderer.emit_error(&error.to_string());
+                renderer.emit_error(error.to_string());
             }
             return Err("Generated project configuration failed validation".to_string());
         }
@@ -401,12 +402,12 @@ impl ConfigHandler {
         let result = validator.validate_global_config(config);
 
         for warning in &result.warnings {
-            renderer.emit_warning(&warning.to_string());
+            renderer.emit_warning(warning.to_string());
         }
 
         if result.has_errors() {
             for error in &result.errors {
-                renderer.emit_error(&error.to_string());
+                renderer.emit_error(error.to_string());
             }
             return Err("Generated global configuration failed validation".to_string());
         }

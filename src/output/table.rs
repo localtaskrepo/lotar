@@ -21,7 +21,8 @@ pub fn render_table_list<T: Outputable>(items: &[T], title: Option<&str>) -> Str
     let mut output = String::new();
 
     if let Some(title) = title {
-        output.push_str(&format!("{}\n\n", style(title).bold().underlined()));
+        output.push_str(&style(title).bold().underlined().to_string());
+        output.push_str("\n\n");
     }
 
     if items.is_empty() {

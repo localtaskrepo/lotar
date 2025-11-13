@@ -248,12 +248,12 @@ fn render_relationships(
             for (kind, value) in entries {
                 match value {
                     RelationshipValue::Single(val) => {
-                        renderer.emit_raw_stdout(&format!("  {}: {}", kind.as_kebab(), val));
+                        renderer.emit_raw_stdout(format_args!("  {}: {}", kind.as_kebab(), val));
                     }
                     RelationshipValue::Many(list) => {
-                        renderer.emit_raw_stdout(&format!("  {}:", kind.as_kebab()));
+                        renderer.emit_raw_stdout(format_args!("  {}:", kind.as_kebab()));
                         for item in list {
-                            renderer.emit_raw_stdout(&format!("    - {}", item));
+                            renderer.emit_raw_stdout(format_args!("    - {}", item));
                         }
                     }
                 }

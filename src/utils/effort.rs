@@ -184,25 +184,25 @@ pub fn parse_effort(input: &str) -> Result<EffortParsed, String> {
                     i += 1;
                 }
                 Err(_) => {
-                    if let Ok(n) = tok.parse::<f64>() {
-                        if i + 1 < parts.len() {
-                            let unit = parts[i + 1].trim().to_lowercase();
-                            if let Some(f) = time_word_unit_factor(&unit) {
-                                if n < 0.0 {
-                                    return Err("effort cannot be negative".into());
-                                }
-                                total_hours += n * f;
-                                i += 2;
-                                continue;
+                    if let Ok(n) = tok.parse::<f64>()
+                        && i + 1 < parts.len()
+                    {
+                        let unit = parts[i + 1].trim().to_lowercase();
+                        if let Some(f) = time_word_unit_factor(&unit) {
+                            if n < 0.0 {
+                                return Err("effort cannot be negative".into());
                             }
-                            if is_points_unit_word(&unit) {
-                                if n < 0.0 {
-                                    return Err("effort cannot be negative".into());
-                                }
-                                total_points += n;
-                                i += 2;
-                                continue;
+                            total_hours += n * f;
+                            i += 2;
+                            continue;
+                        }
+                        if is_points_unit_word(&unit) {
+                            if n < 0.0 {
+                                return Err("effort cannot be negative".into());
                             }
+                            total_points += n;
+                            i += 2;
+                            continue;
                         }
                     }
                     return Err("unrecognized effort token".into());

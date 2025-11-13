@@ -744,11 +744,11 @@ pub fn compute_sprint_calendar(
     });
 
     let mut truncated = false;
-    if let Some(limit) = limit {
-        if entries.len() > limit {
-            entries.truncate(limit);
-            truncated = true;
-        }
+    if let Some(limit) = limit
+        && entries.len() > limit
+    {
+        entries.truncate(limit);
+        truncated = true;
     }
 
     let payload = SprintCalendarResponse {
@@ -834,20 +834,20 @@ pub fn summarize_sprint_tasks(
             }
         }
 
-        if let Some(effort_str) = task.effort.as_ref() {
-            if let Ok(parsed) = effort::parse_effort(effort_str) {
-                match parsed.kind {
-                    EffortKind::TimeHours(hours) => {
-                        total_hours += hours;
-                        if is_done {
-                            done_hours += hours;
-                        }
+        if let Some(effort_str) = task.effort.as_ref()
+            && let Ok(parsed) = effort::parse_effort(effort_str)
+        {
+            match parsed.kind {
+                EffortKind::TimeHours(hours) => {
+                    total_hours += hours;
+                    if is_done {
+                        done_hours += hours;
                     }
-                    EffortKind::Points(points) => {
-                        total_points += points;
-                        if is_done {
-                            done_points += points;
-                        }
+                }
+                EffortKind::Points(points) => {
+                    total_points += points;
+                    if is_done {
+                        done_points += points;
                     }
                 }
             }
@@ -939,12 +939,12 @@ pub fn generate_burndown_series(
         let mut completed_points = 0.0f64;
         let mut completed_hours = 0.0f64;
         for item in &items {
-            if let Some(done_at) = item.done_at {
-                if done_at < day_end {
-                    completed_tasks += 1;
-                    completed_points += item.points;
-                    completed_hours += item.hours;
-                }
+            if let Some(done_at) = item.done_at
+                && done_at < day_end
+            {
+                completed_tasks += 1;
+                completed_points += item.points;
+                completed_hours += item.hours;
             }
         }
 
@@ -953,15 +953,15 @@ pub fn generate_burndown_series(
             points_available.map(|total| (total - completed_points).max(0.0));
         let mut remaining_hours = hours_available.map(|total| (total - completed_hours).max(0.0));
 
-        if let Some(value) = remaining_points.as_mut() {
-            if value.abs() < 0.000_1 {
-                *value = 0.0;
-            }
+        if let Some(value) = remaining_points.as_mut()
+            && value.abs() < 0.000_1
+        {
+            *value = 0.0;
         }
-        if let Some(value) = remaining_hours.as_mut() {
-            if value.abs() < 0.000_1 {
-                *value = 0.0;
-            }
+        if let Some(value) = remaining_hours.as_mut()
+            && value.abs() < 0.000_1
+        {
+            *value = 0.0;
         }
 
         let fraction = if day_span == 0 {
@@ -999,13 +999,13 @@ pub fn generate_burndown_series(
 }
 
 fn parse_effort_values(task: &StoredTask) -> (f64, f64) {
-    if let Some(effort_str) = task.effort.as_ref() {
-        if let Ok(parsed) = effort::parse_effort(effort_str) {
-            return match parsed.kind {
-                EffortKind::Points(points) => (points, 0.0),
-                EffortKind::TimeHours(hours) => (0.0, hours),
-            };
-        }
+    if let Some(effort_str) = task.effort.as_ref()
+        && let Ok(parsed) = effort::parse_effort(effort_str)
+    {
+        return match parsed.kind {
+            EffortKind::Points(points) => (points, 0.0),
+            EffortKind::TimeHours(hours) => (0.0, hours),
+        };
     }
     (0.0, 0.0)
 }

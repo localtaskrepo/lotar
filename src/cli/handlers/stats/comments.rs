@@ -47,7 +47,7 @@ pub(crate) fn run_top(
                 for r in &rows {
                     let id = r["id"].as_str().unwrap_or("");
                     let n = r["comments"].as_u64().unwrap_or(0);
-                    renderer.emit_raw_stdout(&format!("{:>4}  {}", n, id));
+                    renderer.emit_raw_stdout(format_args!("{:>4}  {}", n, id));
                 }
             }
         }
@@ -100,7 +100,7 @@ pub(crate) fn run_by_author(
                 for r in &rows {
                     let id = r["task"].as_str().unwrap_or("");
                     let n = r["comments"].as_u64().unwrap_or(0);
-                    renderer.emit_raw_stdout(&format!("{:>4}  {}", n, id));
+                    renderer.emit_raw_stdout(format_args!("{:>4}  {}", n, id));
                 }
             }
         }

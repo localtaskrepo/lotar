@@ -64,7 +64,7 @@ pub(crate) fn run(
                 renderer.emit_success("No tags found.");
             } else {
                 for (tag, count) in &limited {
-                    renderer.emit_raw_stdout(&format!("{:>6}  {}", count, tag));
+                    renderer.emit_raw_stdout(format_args!("{:>6}  {}", count, tag));
                 }
             }
         }

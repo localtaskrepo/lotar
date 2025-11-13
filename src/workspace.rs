@@ -69,47 +69,45 @@ impl TasksDirectoryResolver {
             || env::var("LOTAR_IGNORE_ENV_TASKS_DIR")
                 .map(|v| v == "1")
                 .unwrap_or(false);
-        if !test_env {
-            if let Ok(env_path) = env::var("LOTAR_TASKS_DIR") {
-                if !env_path.trim().is_empty() {
-                    let path_buf = PathBuf::from(env_path.trim());
+        if !test_env
+            && let Ok(env_path) = env::var("LOTAR_TASKS_DIR")
+            && !env_path.trim().is_empty()
+        {
+            let path_buf = PathBuf::from(env_path.trim());
 
-                    // Special handling for relative paths: simple directory names searched in parents
-                    if path_buf.is_relative() {
-                        // Extract the final directory name for simple cases
-                        if let Some(dir_name) = path_buf.file_name() {
-                            let dir_name_str = dir_name.to_string_lossy();
+            // Special handling for relative paths: simple directory names searched in parents
+            if path_buf.is_relative() {
+                // Extract the final directory name for simple cases
+                if let Some(dir_name) = path_buf.file_name() {
+                    let dir_name_str = dir_name.to_string_lossy();
 
-                            // For simple directory names (not complex paths), search parents first
-                            if !env_path.trim().contains('/') || env_path.trim().starts_with("./") {
-                                if let Some((found_path, parent_dir)) =
-                                    Self::find_tasks_folder_in_parents(&dir_name_str)?
-                                {
-                                    return Ok(TasksDirectoryResolver {
-                                        path: found_path,
-                                        source: TasksDirectorySource::FoundInParent(parent_dir),
-                                    });
-                                }
-                            }
-                        }
+                    // For simple directory names (not complex paths), search parents first
+                    if (!env_path.trim().contains('/') || env_path.trim().starts_with("./"))
+                        && let Some((found_path, parent_dir)) =
+                            Self::find_tasks_folder_in_parents(&dir_name_str)?
+                    {
+                        return Ok(TasksDirectoryResolver {
+                            path: found_path,
+                            source: TasksDirectorySource::FoundInParent(parent_dir),
+                        });
                     }
-
-                    // If no existing directory found in parents, create at the specified path
-                    if !path_buf.exists() {
-                        fs::create_dir_all(&path_buf).map_err(|e| {
-                            format!(
-                                "Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}",
-                                path_buf.display(),
-                                e
-                            )
-                        })?;
-                    }
-                    return Ok(TasksDirectoryResolver {
-                        path: path_buf,
-                        source: TasksDirectorySource::CommandLineFlag, // Treat env var like CLI
-                    });
                 }
             }
+
+            // If no existing directory found in parents, create at the specified path
+            if !path_buf.exists() {
+                fs::create_dir_all(&path_buf).map_err(|e| {
+                    format!(
+                        "Failed to create tasks directory from LOTAR_TASKS_DIR {}: {}",
+                        path_buf.display(),
+                        e
+                    )
+                })?;
+            }
+            return Ok(TasksDirectoryResolver {
+                path: path_buf,
+                source: TasksDirectorySource::CommandLineFlag, // Treat env var like CLI
+            });
         }
 
         // 3. Load home config to get tasks folder preference
@@ -146,10 +144,10 @@ impl TasksDirectoryResolver {
     /// Get the tasks folder name from config or fallback default
     fn get_tasks_folder_name(global_config_tasks_folder: Option<&str>) -> String {
         // 1. Global config setting
-        if let Some(config_folder) = global_config_tasks_folder {
-            if !config_folder.trim().is_empty() {
-                return config_folder.to_owned();
-            }
+        if let Some(config_folder) = global_config_tasks_folder
+            && !config_folder.trim().is_empty()
+        {
+            return config_folder.to_owned();
         }
 
         // 2. Default
@@ -187,12 +185,12 @@ impl TasksDirectoryResolver {
                 // Simple YAML parsing to extract tasks_folder setting (minimal parser)
                 for line in content.lines() {
                     let line = line.trim();
-                    if line.starts_with("tasks_folder:") {
-                        if let Some(value) = line.split(':').nth(1) {
-                            let value = value.trim().trim_matches('"').trim_matches('\'');
-                            if !value.is_empty() {
-                                return Ok(Some(value.to_string()));
-                            }
+                    if line.starts_with("tasks_folder:")
+                        && let Some(value) = line.split(':').nth(1)
+                    {
+                        let value = value.trim().trim_matches('"').trim_matches('\'');
+                        if !value.is_empty() {
+                            return Ok(Some(value.to_string()));
                         }
                     }
                 }
@@ -237,11 +235,11 @@ impl TasksDirectoryResolver {
             let mut probe = current_dir.clone();
             let mut boundary: Option<PathBuf> = None;
             while let Some(parent) = probe.parent() {
-                if let Some(name) = parent.file_name().and_then(|s| s.to_str()) {
-                    if name.starts_with(".tmp") || name.starts_with("tmp.") {
-                        boundary = Some(parent.to_path_buf());
-                        break;
-                    }
+                if let Some(name) = parent.file_name().and_then(|s| s.to_str())
+                    && (name.starts_with(".tmp") || name.starts_with("tmp."))
+                {
+                    boundary = Some(parent.to_path_buf());
+                    break;
                 }
                 probe = parent.to_path_buf();
             }
@@ -263,17 +261,17 @@ impl TasksDirectoryResolver {
             }
 
             // Stop if we've moved outside the temp boundary during tests
-            if let Some(boundary) = &temp_boundary {
-                if !current_dir.starts_with(boundary) {
-                    break;
-                }
+            if let Some(boundary) = &temp_boundary
+                && !current_dir.starts_with(boundary)
+            {
+                break;
             }
 
             // Safety check: don't go above home directory
-            if let Ok(home_dir) = env::var("HOME") {
-                if current_dir == PathBuf::from(home_dir).parent().unwrap_or(Path::new("/")) {
-                    break;
-                }
+            if let Ok(home_dir) = env::var("HOME")
+                && current_dir == PathBuf::from(home_dir).parent().unwrap_or(Path::new("/"))
+            {
+                break;
             }
         }
 

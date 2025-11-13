@@ -102,7 +102,7 @@ pub(crate) fn run(
                 renderer.emit_success("No items found for the selected field.");
             } else {
                 for (key, count) in &limited {
-                    renderer.emit_raw_stdout(&format!("{:>6}  {}", count, key));
+                    renderer.emit_raw_stdout(format_args!("{:>6}  {}", count, key));
                 }
             }
         }

@@ -114,23 +114,23 @@ pub(crate) fn handle_normalize(
                     updated += 1;
                     updated_ids.push(sprint_id);
                     if !is_json {
-                        renderer.emit_success(&format!("Normalized sprint #{}.", sprint_id));
+                        renderer.emit_success(format_args!("Normalized sprint #{}.", sprint_id));
                     }
                 } else if !is_json {
-                    renderer.emit_info(&format!("Sprint #{} already canonical.", sprint_id));
+                    renderer.emit_info(format_args!("Sprint #{} already canonical.", sprint_id));
                 }
             }
             SprintNormalizeMode::Check => {
                 if dirty {
                     pending_ids.push(sprint_id);
                     if !is_json {
-                        renderer.emit_warning(&format!(
+                        renderer.emit_warning(format_args!(
                             "Sprint #{} requires normalization (run with --write to update).",
                             sprint_id
                         ));
                     }
                 } else if !is_json {
-                    renderer.emit_info(&format!("Sprint #{} already canonical.", sprint_id));
+                    renderer.emit_info(format_args!("Sprint #{} already canonical.", sprint_id));
                 }
             }
         }
@@ -145,19 +145,18 @@ pub(crate) fn handle_normalize(
                     });
                 }
             } else {
-                let emit = match mode {
-                    SprintNormalizeMode::Write => OutputRenderer::emit_info,
-                    SprintNormalizeMode::Check => OutputRenderer::emit_warning,
-                };
                 for warning in warnings {
-                    emit(
-                        renderer,
-                        &format!(
+                    let warning_message = warning.message();
+                    match mode {
+                        SprintNormalizeMode::Write => renderer.emit_info(format_args!(
                             "Sprint #{} canonicalization notice: {}",
-                            sprint_id,
-                            warning.message()
-                        ),
-                    );
+                            sprint_id, warning_message
+                        )),
+                        SprintNormalizeMode::Check => renderer.emit_warning(format_args!(
+                            "Sprint #{} canonicalization notice: {}",
+                            sprint_id, warning_message
+                        )),
+                    }
                 }
             }
         }
@@ -193,7 +192,7 @@ pub(crate) fn handle_normalize(
     match mode {
         SprintNormalizeMode::Write => {
             if !is_json {
-                renderer.emit_success(&format!(
+                renderer.emit_success(format_args!(
                     "Normalization complete ({} sprint(s) processed, {} updated).",
                     processed, updated
                 ));
@@ -203,8 +202,10 @@ pub(crate) fn handle_normalize(
         SprintNormalizeMode::Check => {
             if pending_ids.is_empty() {
                 if !is_json {
-                    renderer
-                        .emit_success(&format!("All {} sprint(s) already canonical.", processed));
+                    renderer.emit_success(format_args!(
+                        "All {} sprint(s) already canonical.",
+                        processed
+                    ));
                 }
                 Ok(())
             } else {

@@ -20,19 +20,22 @@ impl CommandHandler for ServeHandler {
         renderer: &OutputRenderer,
     ) -> Self::Result {
         let ServeArgs { port, host, open } = args;
-        renderer.log_info(&format!("serve: host={} port={} open={}", host, port, open));
+        renderer.log_info(format_args!(
+            "serve: host={} port={} open={}",
+            host, port, open
+        ));
 
         renderer.emit_success("Starting LoTaR web server...");
-        renderer.emit_raw_stdout(&format!("   Host: {}", host));
-        renderer.emit_raw_stdout(&format!("   Port: {}", port));
-        renderer.emit_raw_stdout(&format!("   URL: http://{}:{}", host, port));
+        renderer.emit_raw_stdout(format_args!("   Host: {}", host));
+        renderer.emit_raw_stdout(format_args!("   Port: {}", port));
+        renderer.emit_raw_stdout(format_args!("   URL: http://{}:{}", host, port));
 
         if open {
             // Open browser automatically
             let url = format!("http://{}:{}", host, port);
             if let Err(e) = open_browser(&url) {
-                renderer.emit_warning(&format!("Failed to open browser: {}", e));
-                renderer.emit_raw_stdout(&format!("   Please navigate to {} manually", url));
+                renderer.emit_warning(format_args!("Failed to open browser: {}", e));
+                renderer.emit_raw_stdout(format_args!("   Please navigate to {} manually", url));
             }
         }
 

@@ -25,10 +25,12 @@ impl ConfigHandler {
 
         if !matches!(renderer.format, crate::output::OutputFormat::Json) {
             let mut message = format!("Tasks directory: {}", effective_read_root.display());
-            if effective_read_root.is_relative() {
-                if let Ok(resolved) = std::fs::canonicalize(&effective_read_root) {
-                    message.push_str(&format!(" (resolved: {})", resolved.display()));
-                }
+            if effective_read_root.is_relative()
+                && let Ok(resolved) = std::fs::canonicalize(&effective_read_root)
+            {
+                message.push_str(" (resolved: ");
+                message.push_str(&resolved.display().to_string());
+                message.push(')');
             }
             renderer.emit_info(&message);
         }

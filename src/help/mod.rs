@@ -3,6 +3,7 @@ use include_dir::{Dir, DirEntry, include_dir};
 use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
 use std::io::IsTerminal;
 use std::sync::LazyLock;
 
@@ -71,7 +72,7 @@ impl HelpSystem {
                     let description = self
                         .extract_description(&file)
                         .unwrap_or_else(|| String::from("No description available"));
-                    output.push_str(&format!("  {} - {}\n", command, description));
+                    let _ = writeln!(output, "  {} - {}", command, description);
                 }
                 Ok(output)
             }
@@ -288,7 +289,7 @@ impl HelpSystem {
                         for line in text.lines() {
                             match style {
                                 HelpStyle::Ansi => {
-                                    out.push_str(&format!("    \x1b[2m{}\x1b[0m\n", line))
+                                    let _ = writeln!(out, "    \x1b[2m{}\x1b[0m", line);
                                 }
                                 HelpStyle::Plain => {
                                     out.push_str("    ");
@@ -302,7 +303,9 @@ impl HelpSystem {
                     }
                 }
                 Event::Code(inline) => match style {
-                    HelpStyle::Ansi => out.push_str(&format!("\x1b[2m`{}`\x1b[0m", inline)),
+                    HelpStyle::Ansi => {
+                        let _ = write!(out, "\x1b[2m`{}`\x1b[0m", inline);
+                    }
                     HelpStyle::Plain => {
                         out.push('`');
                         out.push_str(&inline);

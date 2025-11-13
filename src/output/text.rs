@@ -1,4 +1,5 @@
 use super::Outputable;
+use std::fmt::Write;
 
 pub fn render_text_single<T: Outputable>(item: &T) -> String {
     item.to_text()
@@ -8,7 +9,7 @@ pub fn render_text_list<T: Outputable>(items: &[T], title: Option<&str>, verbose
     let mut output = String::new();
 
     if let Some(title) = title {
-        output.push_str(&format!("{}\n\n", title));
+        let _ = writeln!(output, "{title}\n");
     }
 
     if items.is_empty() {
@@ -16,9 +17,9 @@ pub fn render_text_list<T: Outputable>(items: &[T], title: Option<&str>, verbose
     } else {
         for (index, item) in items.iter().enumerate() {
             if verbose {
-                output.push_str(&format!("{}. {}\n", index + 1, item.to_text()));
+                let _ = writeln!(output, "{}. {}", index + 1, item.to_text());
             } else {
-                output.push_str(&format!("{}\n", item.to_text()));
+                let _ = writeln!(output, "{}", item.to_text());
             }
         }
     }

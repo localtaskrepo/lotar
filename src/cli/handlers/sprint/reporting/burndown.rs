@@ -36,7 +36,7 @@ pub(crate) fn handle_burndown(
     };
 
     if burndown_args.sprint_id.is_none() && !matches!(renderer.format, OutputFormat::Json) {
-        renderer.emit_info(&format!(
+        renderer.emit_info(format_args!(
             "Auto-selected sprint #{} for burndown.",
             target_id
         ));
@@ -78,7 +78,7 @@ fn render_burndown_text(
         focus_metric = SprintBurndownMetric::Tasks;
     }
 
-    renderer.emit_success(&format!(
+    renderer.emit_success(format_args!(
         "Sprint burndown for #{}{}.",
         summary.id,
         summary
@@ -87,7 +87,7 @@ fn render_burndown_text(
             .map(|label| format!(" ({})", label))
             .unwrap_or_default()
     ));
-    renderer.emit_raw_stdout(&format!("Status: {}", summary.status));
+    renderer.emit_raw_stdout(format_args!("Status: {}", summary.status));
 
     if computation.series.is_empty() {
         renderer.emit_info("No burndown samples available for this sprint.");
@@ -99,27 +99,27 @@ fn render_burndown_text(
 
     match focus_metric {
         SprintBurndownMetric::Tasks => {
-            renderer.emit_raw_stdout(&format!(
+            renderer.emit_raw_stdout(format_args!(
                 "Total tasks: {} | Ideal horizon: {} days",
                 computation.totals.tasks, computation.day_span
             ));
             for point in &context.computation.series {
                 let date_display = point.date.date_naive();
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "{}  {:>9}  {:>5.1}",
                     date_display, point.remaining_tasks, point.ideal_tasks
                 ));
             }
         }
         SprintBurndownMetric::Points => {
-            renderer.emit_raw_stdout(&format!(
+            renderer.emit_raw_stdout(format_args!(
                 "Total points: {} | Ideal horizon: {} days",
                 format_float(computation.totals.points.unwrap_or(0.0)),
                 computation.day_span
             ));
             for point in &context.computation.series {
                 let date_display = point.date.date_naive();
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "{}  {:>9}  {:>5.1}",
                     date_display,
                     format_float(point.remaining_points.unwrap_or(0.0)),
@@ -128,14 +128,14 @@ fn render_burndown_text(
             }
         }
         SprintBurndownMetric::Hours => {
-            renderer.emit_raw_stdout(&format!(
+            renderer.emit_raw_stdout(format_args!(
                 "Total hours: {} | Ideal horizon: {} days",
                 format_float(computation.totals.hours.unwrap_or(0.0)),
                 computation.day_span
             ));
             for point in &context.computation.series {
                 let date_display = point.date.date_naive();
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "{}  {:>9}  {:>5.1}",
                     date_display,
                     format_float(point.remaining_hours.unwrap_or(0.0)),

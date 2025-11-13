@@ -22,7 +22,7 @@ impl ConfigHandler {
         if global_only_fields.contains(&field.as_str()) && !global {
             global = true;
             if !dry_run {
-                renderer.emit_info(&format!(
+                renderer.emit_info(format_args!(
                     "Automatically treating '{}' as global configuration field",
                     field
                 ));
@@ -30,14 +30,14 @@ impl ConfigHandler {
         }
 
         if dry_run {
-            renderer.emit_info(&format!("DRY RUN: Would set {} = {}", field, value));
+            renderer.emit_info(format_args!("DRY RUN: Would set {} = {}", field, value));
 
             // Check for validation conflicts
             let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
             if !conflicts.is_empty() {
                 renderer.emit_warning("WARNING: This change would cause validation conflicts:");
                 for conflict in conflicts {
-                    renderer.emit_raw_stdout(&format!("  • {}", conflict));
+                    renderer.emit_raw_stdout(format_args!("  • {}", conflict));
                 }
                 if !force {
                     renderer
@@ -52,7 +52,7 @@ impl ConfigHandler {
             return Ok(());
         }
 
-        renderer.emit_info(&format!("Setting configuration: {} = {}", field, value));
+        renderer.emit_info(format_args!("Setting configuration: {} = {}", field, value));
 
         // Check for validation conflicts unless forced
         if !force {
@@ -60,7 +60,7 @@ impl ConfigHandler {
             if !conflicts.is_empty() {
                 renderer.emit_warning("WARNING: This change would cause validation conflicts:");
                 for conflict in conflicts {
-                    renderer.emit_raw_stdout(&format!("  • {}", conflict));
+                    renderer.emit_raw_stdout(format_args!("  • {}", conflict));
                 }
                 renderer.emit_info(
                     "Use --dry-run to see what would change, or --force to apply anyway.",
@@ -122,7 +122,7 @@ impl ConfigHandler {
                 "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field.",
             );
         }
-        renderer.emit_success(&format!("Successfully updated {}", field));
+        renderer.emit_success(format_args!("Successfully updated {}", field));
 
         if !validation_warnings.is_empty() {
             renderer.emit_warning("Validation warnings detected after applying the change:");

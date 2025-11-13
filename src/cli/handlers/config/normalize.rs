@@ -66,16 +66,20 @@ impl ConfigHandler {
             if write {
                 std::fs::write(&path, canonical.as_bytes())
                     .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
-                renderer.emit_success(&format!("Normalized {} -> {}", label, path.display()));
+                renderer.emit_success(format_args!("Normalized {} -> {}", label, path.display()));
                 changed += 1;
             } else {
-                renderer.emit_info(&format!("Would normalize {} -> {}", label, path.display()));
+                renderer.emit_info(format_args!(
+                    "Would normalize {} -> {}",
+                    label,
+                    path.display()
+                ));
                 renderer.emit_raw_stdout(&canonical);
             }
         }
 
         if write {
-            renderer.emit_success(&format!(
+            renderer.emit_success(format_args!(
                 "Normalization complete ({} file(s) updated)",
                 changed
             ));

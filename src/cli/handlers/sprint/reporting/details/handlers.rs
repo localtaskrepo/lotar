@@ -45,7 +45,7 @@ pub(crate) fn handle_show(
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_raw_stdout(&format!(
+            renderer.emit_raw_stdout(format_args!(
                 "Sprint {} - {} [{}]",
                 record.id,
                 summary
@@ -56,7 +56,7 @@ pub(crate) fn handle_show(
             ));
 
             if let Some(goal) = &summary.goal {
-                renderer.emit_raw_stdout(&format!("Goal: {}", goal));
+                renderer.emit_raw_stdout(format_args!("Goal: {}", goal));
             }
 
             if let Some(plan) = record.sprint.plan.as_ref() {
@@ -68,20 +68,22 @@ pub(crate) fn handle_show(
             }
 
             if let Some(computed_end) = lifecycle.computed_end.as_ref() {
-                renderer.emit_raw_stdout(&format!(
+                renderer.emit_raw_stdout(format_args!(
                     "Computed end (inferred): {}",
                     computed_end.to_rfc3339()
                 ));
             }
 
             if !record.sprint.history.is_empty() {
-                renderer
-                    .emit_raw_stdout(&format!("History entries: {}", record.sprint.history.len()));
+                renderer.emit_raw_stdout(format_args!(
+                    "History entries: {}",
+                    record.sprint.history.len()
+                ));
             }
 
             if !lifecycle.warnings.is_empty() {
                 for warning in &lifecycle.warnings {
-                    renderer.emit_warning(&warning.message());
+                    renderer.emit_warning(warning.message());
                 }
             }
         }
@@ -104,7 +106,10 @@ pub(crate) fn handle_review(
     };
 
     if review_args.sprint_id.is_none() && !matches!(renderer.format, OutputFormat::Json) {
-        renderer.emit_info(&format!("Auto-selected sprint #{} for review.", target_id));
+        renderer.emit_info(format_args!(
+            "Auto-selected sprint #{} for review.",
+            target_id
+        ));
     }
 
     let record = SprintService::get(&context.storage, target_id).map_err(|err| err.to_string())?;
@@ -132,7 +137,10 @@ pub(crate) fn handle_stats(
     };
 
     if stats_args.sprint_id.is_none() && !matches!(renderer.format, OutputFormat::Json) {
-        renderer.emit_info(&format!("Auto-selected sprint #{} for stats.", target_id));
+        renderer.emit_info(format_args!(
+            "Auto-selected sprint #{} for stats.",
+            target_id
+        ));
     }
 
     let record = SprintService::get(&context.storage, target_id).map_err(|err| err.to_string())?;
@@ -160,7 +168,10 @@ pub(crate) fn handle_summary(
     };
 
     if summary_args.sprint_id.is_none() && !matches!(renderer.format, OutputFormat::Json) {
-        renderer.emit_info(&format!("Auto-selected sprint #{} for summary.", target_id));
+        renderer.emit_info(format_args!(
+            "Auto-selected sprint #{} for summary.",
+            target_id
+        ));
     }
 
     let record = SprintService::get(&context.storage, target_id).map_err(|err| err.to_string())?;
@@ -174,7 +185,7 @@ pub(crate) fn handle_summary(
     match renderer.format {
         OutputFormat::Json => {
             renderer.emit_raw_stdout(
-                &serde_json::to_string(&summary_context.payload).unwrap_or_default(),
+                serde_json::to_string(&summary_context.payload).unwrap_or_default(),
             );
         }
         _ => render_summary_text(renderer, &summary_context),

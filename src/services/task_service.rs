@@ -133,13 +133,12 @@ impl TaskService {
             if !config.default_tags.is_empty() {
                 normalized_tags.extend(config.default_tags.clone());
             }
-            if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config) {
-                if !normalized_tags
+            if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config)
+                && !normalized_tags
                     .iter()
                     .any(|existing| existing.eq_ignore_ascii_case(&label))
-                {
-                    normalized_tags.push(label);
-                }
+            {
+                normalized_tags.push(label);
             }
         }
         t.tags = normalize_tags(normalized_tags);
@@ -217,14 +216,15 @@ impl TaskService {
             t.status = new_status.clone();
             let auto = config.auto_assign_on_status;
             let is_first_change = old_status != new_status && t.assignee.is_none();
-            if auto && is_first_change {
-                if let Some(me) = resolve_current_user(Some(&storage.root_path)) {
-                    let previous_assignee = t.assignee.clone();
-                    if previous_assignee.as_deref() != Some(me.as_str()) {
-                        record_change("assignee", previous_assignee, Some(me.clone()));
-                    }
-                    t.assignee = Some(me);
+            if auto
+                && is_first_change
+                && let Some(me) = resolve_current_user(Some(&storage.root_path))
+            {
+                let previous_assignee = t.assignee.clone();
+                if previous_assignee.as_deref() != Some(me.as_str()) {
+                    record_change("assignee", previous_assignee, Some(me.clone()));
                 }
+                t.assignee = Some(me);
             }
         }
         if let Some(v) = patch.priority {
@@ -302,21 +302,21 @@ impl TaskService {
                 t.tags = new_tags;
             }
         }
-        if let Some(v) = patch.relationships {
-            if t.relationships != v {
-                let old_json = serde_json::to_string(&t.relationships).ok();
-                let new_json = serde_json::to_string(&v).ok();
-                record_change("relationships", old_json, new_json.clone());
-                t.relationships = v;
-            }
+        if let Some(v) = patch.relationships
+            && t.relationships != v
+        {
+            let old_json = serde_json::to_string(&t.relationships).ok();
+            let new_json = serde_json::to_string(&v).ok();
+            record_change("relationships", old_json, new_json.clone());
+            t.relationships = v;
         }
-        if let Some(v) = patch.custom_fields {
-            if t.custom_fields != v {
-                let old_yaml = serde_yaml::to_string(&t.custom_fields).ok();
-                let new_yaml = serde_yaml::to_string(&v).ok();
-                record_change("custom_fields", old_yaml, new_yaml.clone());
-                t.custom_fields = v;
-            }
+        if let Some(v) = patch.custom_fields
+            && t.custom_fields != v
+        {
+            let old_yaml = serde_yaml::to_string(&t.custom_fields).ok();
+            let new_yaml = serde_yaml::to_string(&v).ok();
+            record_change("custom_fields", old_yaml, new_yaml.clone());
+            t.custom_fields = v;
         }
 
         if let Some(sprint_ids) = patch.sprints.clone() {
@@ -653,23 +653,23 @@ impl TaskService {
     }
 
     fn ensure_task_defaults(task: &mut Task, config: &ResolvedConfig) {
-        if task.status.is_empty() {
-            if let Some(default_status) = config.effective_default_status() {
-                task.status = default_status;
-            }
+        if task.status.is_empty()
+            && let Some(default_status) = config.effective_default_status()
+        {
+            task.status = default_status;
         }
 
-        if task.priority.is_empty() {
-            if let Some(default_priority) = config.effective_default_priority() {
-                task.priority = default_priority;
-            }
+        if task.priority.is_empty()
+            && let Some(default_priority) = config.effective_default_priority()
+        {
+            task.priority = default_priority;
         }
 
-        if task.task_type.is_empty() {
-            if let Some(mut default_type) = config.effective_default_task_type() {
-                default_type.ensure_leading_uppercase();
-                task.task_type = default_type;
-            }
+        if task.task_type.is_empty()
+            && let Some(mut default_type) = config.effective_default_task_type()
+        {
+            default_type.ensure_leading_uppercase();
+            task.task_type = default_type;
         }
         if task.tags.is_empty() && !config.default_tags.is_empty() {
             task.tags = config.default_tags.clone();

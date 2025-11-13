@@ -16,15 +16,13 @@ impl PrefixConflictDetector {
             for (dir_name, _path) in crate::utils::filesystem::list_visible_subdirs(tasks_dir) {
                 // Try to load config to get actual prefix
                 let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
-                if config_path.exists() {
-                    if let Ok(config_manager) =
+                if config_path.exists()
+                    && let Ok(config_manager) =
                         ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-                    {
-                        if let Ok(project_config) = config_manager.get_project_config(&dir_name) {
-                            existing_prefixes.insert(project_config.default_prefix.to_uppercase());
-                            continue;
-                        }
-                    }
+                    && let Ok(project_config) = config_manager.get_project_config(&dir_name)
+                {
+                    existing_prefixes.insert(project_config.default_prefix.to_uppercase());
+                    continue;
                 }
                 // Fallback to directory name as prefix
                 existing_prefixes.insert(dir_name.to_uppercase());

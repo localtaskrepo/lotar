@@ -30,7 +30,10 @@ pub(crate) fn handle_start(
     };
 
     if start_args.sprint_id.is_none() && !matches!(renderer.format, OutputFormat::Json) {
-        renderer.emit_info(&format!("Auto-selected sprint #{} to start.", target_id));
+        renderer.emit_info(format_args!(
+            "Auto-selected sprint #{} to start.",
+            target_id
+        ));
     }
 
     let existing =
@@ -101,7 +104,10 @@ pub(crate) fn handle_close(
     };
 
     if close_args.sprint_id.is_none() && !matches!(&renderer.format, OutputFormat::Json) {
-        renderer.emit_info(&format!("Auto-selected sprint #{} to close.", target_id));
+        renderer.emit_info(format_args!(
+            "Auto-selected sprint #{} to close.",
+            target_id
+        ));
     }
 
     let existing =
@@ -209,11 +215,11 @@ fn select_sprint_id_for_start(
             continue;
         }
 
-        if let Some(planned_start) = lifecycle.planned_start {
-            if planned_start <= evaluation_time {
-                ready.push((planned_start, record.id));
-                continue;
-            }
+        if let Some(planned_start) = lifecycle.planned_start
+            && planned_start <= evaluation_time
+        {
+            ready.push((planned_start, record.id));
+            continue;
         }
 
         if fallback.is_none() {
@@ -319,7 +325,7 @@ fn warn_about_parallel_active_sprints(
         ParallelWarningContext::Close => "",
     };
 
-    renderer.emit_warning(&format!("{}: {}.{}", prefix, list, guidance));
+    renderer.emit_warning(format_args!("{}: {}.{}", prefix, list, guidance));
 }
 
 fn warn_about_future_start(
@@ -334,7 +340,7 @@ fn warn_about_future_start(
 
     let now = Utc::now();
     if start_instant > now + Duration::hours(12) {
-        renderer.emit_warning(&format!(
+        renderer.emit_warning(format_args!(
             "The requested start time {} is more than 12 hours in the future; pass --force to proceed.",
             start_instant.to_rfc3339()
         ))
@@ -355,15 +361,15 @@ fn warn_about_overdue_start(
         return;
     }
 
-    if let Some(planned_start) = lifecycle.planned_start {
-        if Utc::now() > planned_start {
-            renderer.emit_warning(&format!(
-                "Sprint #{} ({}) was scheduled to start at {} and is now overdue to begin.",
-                record.id,
-                sprint_assignment::sprint_display_name(record),
-                planned_start.to_rfc3339()
-            ));
-        }
+    if let Some(planned_start) = lifecycle.planned_start
+        && Utc::now() > planned_start
+    {
+        renderer.emit_warning(format_args!(
+            "Sprint #{} ({}) was scheduled to start at {} and is now overdue to begin.",
+            record.id,
+            sprint_assignment::sprint_display_name(record),
+            planned_start.to_rfc3339()
+        ));
     }
 }
 
@@ -378,15 +384,15 @@ fn warn_about_overdue_close(
         return;
     }
 
-    if let Some(computed_end) = lifecycle.computed_end {
-        if close_instant > computed_end {
-            renderer.emit_warning(&format!(
-                "Sprint #{} ({}) was scheduled to end by {} and is overdue to close.",
-                record.id,
-                sprint_assignment::sprint_display_name(record),
-                computed_end.to_rfc3339()
-            ));
-        }
+    if let Some(computed_end) = lifecycle.computed_end
+        && close_instant > computed_end
+    {
+        renderer.emit_warning(format_args!(
+            "Sprint #{} ({}) was scheduled to end by {} and is overdue to close.",
+            record.id,
+            sprint_assignment::sprint_display_name(record),
+            computed_end.to_rfc3339()
+        ));
     }
 }
 

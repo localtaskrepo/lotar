@@ -63,7 +63,7 @@ impl CommandHandler for AssigneeHandler {
         } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "assignee: begin task_id={} explicit_project={:?}",
             task_id, project_hint
         ));
@@ -99,7 +99,7 @@ fn handle_set_assignee(
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
     let autop_members_enabled = ctx.config.auto_populate_members;
-    renderer.log_debug(&format!(
+    renderer.log_debug(format_args!(
         "assignee: validating new_assignee='{}'",
         candidate
     ));

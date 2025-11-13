@@ -44,7 +44,7 @@ impl StorageOperations {
                                 &existing,
                             ) {
                                 OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
-                                    &format!(
+                                    format_args!(
                                         "Failed to update project config with detected name: {}",
                                         e
                                     ),
@@ -53,8 +53,9 @@ impl StorageOperations {
                         }
                     }
                     Err(e) => {
-                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                            .log_warn(&format!("Failed to load existing project config: {}", e));
+                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
+                            format_args!("Failed to load existing project config: {}", e),
+                        );
                     }
                 }
             } else {
@@ -63,7 +64,7 @@ impl StorageOperations {
                     ConfigManager::save_project_config(root_path, project_prefix, &project_config)
                 {
                     OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                        .log_warn(&format!("Failed to create project config: {}", e));
+                        .log_warn(format_args!("Failed to create project config: {}", e));
                 }
             }
         }
@@ -110,12 +111,11 @@ impl StorageOperations {
 
             // Use filesystem-based file path resolution
             let project_path = root_path.join(&folder_from_id);
-            if let Some(file_path) = Self::get_file_path_for_id(&project_path, id) {
-                if let Ok(file_string) = fs::read_to_string(&file_path) {
-                    if let Ok(task) = serde_yaml::from_str::<Task>(&file_string) {
-                        return Some(task);
-                    }
-                }
+            if let Some(file_path) = Self::get_file_path_for_id(&project_path, id)
+                && let Ok(file_string) = fs::read_to_string(&file_path)
+                && let Ok(task) = serde_yaml::from_str::<Task>(&file_string)
+            {
+                return Some(task);
             }
         }
 
@@ -127,12 +127,11 @@ impl StorageOperations {
         };
 
         let project_path = root_path.join(project_name);
-        if let Some(file_path) = Self::get_file_path_for_id(&project_path, id) {
-            if let Ok(file_string) = fs::read_to_string(&file_path) {
-                if let Ok(task) = serde_yaml::from_str::<Task>(&file_string) {
-                    return Some(task);
-                }
-            }
+        if let Some(file_path) = Self::get_file_path_for_id(&project_path, id)
+            && let Ok(file_string) = fs::read_to_string(&file_path)
+            && let Ok(task) = serde_yaml::from_str::<Task>(&file_string)
+        {
+            return Some(task);
         }
 
         None
@@ -211,12 +210,12 @@ impl StorageOperations {
     pub fn get_file_path_for_id(project_path: &Path, task_id: &str) -> Option<PathBuf> {
         // Extract numeric part from task ID (e.g., "TP-001" -> "1")
         let parts: Vec<&str> = task_id.split('-').collect();
-        if parts.len() >= 2 {
-            if let Ok(numeric_id) = parts[1].parse::<u64>() {
-                let file_path = project_path.join(format!("{}.yml", numeric_id));
-                if file_path.exists() {
-                    return Some(file_path);
-                }
+        if parts.len() >= 2
+            && let Ok(numeric_id) = parts[1].parse::<u64>()
+        {
+            let file_path = project_path.join(format!("{}.yml", numeric_id));
+            if file_path.exists() {
+                return Some(file_path);
             }
         }
         None
@@ -261,18 +260,14 @@ impl StorageOperations {
         if prefix_path.exists() && prefix_path.is_dir() {
             // Verify this is for the same project by checking config
             let config_path = crate::utils::paths::project_config_path(root_path, &expected_prefix);
-            if config_path.exists() {
-                if let Ok(content) = fs::read_to_string(&config_path) {
-                    if let Ok(config) =
-                        serde_yaml::from_str::<crate::config::types::ProjectConfig>(&content)
-                    {
-                        // Check if the project name in config matches (either exact or prefix)
-                        if config.project_name == project_name
-                            || config.project_name == expected_prefix
-                        {
-                            return Ok(expected_prefix);
-                        }
-                    }
+            if config_path.exists()
+                && let Ok(content) = fs::read_to_string(&config_path)
+                && let Ok(config) =
+                    serde_yaml::from_str::<crate::config::types::ProjectConfig>(&content)
+            {
+                // Check if the project name in config matches (either exact or prefix)
+                if config.project_name == project_name || config.project_name == expected_prefix {
+                    return Ok(expected_prefix);
                 }
             }
         }

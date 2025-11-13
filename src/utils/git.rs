@@ -21,10 +21,10 @@ pub fn read_current_branch(repo_root: &Path) -> Option<String> {
     let head = repo_root.join(".git").join("HEAD");
     let contents = fs::read_to_string(head).ok()?;
     let line = contents.lines().next()?.trim();
-    if let Some(rest) = line.strip_prefix("ref: ") {
-        if let Some(branch) = rest.strip_prefix("refs/heads/") {
-            return Some(branch.to_string());
-        }
+    if let Some(rest) = line.strip_prefix("ref: ")
+        && let Some(branch) = rest.strip_prefix("refs/heads/")
+    {
+        return Some(branch.to_string());
     }
     None
 }

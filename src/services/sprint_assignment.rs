@@ -174,10 +174,10 @@ fn apply_assignment(
                         if other_id == sprint_id {
                             continue;
                         }
-                        if let Some(sprint) = sprint_map.get_mut(&other_id) {
-                            if remove_task_from_sprint(sprint, &task_id) {
-                                changed_sprints.insert(other_id);
-                            }
+                        if let Some(sprint) = sprint_map.get_mut(&other_id)
+                            && remove_task_from_sprint(sprint, &task_id)
+                        {
+                            changed_sprints.insert(other_id);
                         }
                         removed_from.push(other_id);
                     }

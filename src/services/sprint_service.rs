@@ -143,10 +143,10 @@ impl SprintService {
         if dir.exists() {
             for entry in fs::read_dir(dir)? {
                 let entry = entry?;
-                if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str()) {
-                    if let Ok(parsed) = stem.parse::<u32>() {
-                        max_id = max_id.max(parsed);
-                    }
+                if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str())
+                    && let Ok(parsed) = stem.parse::<u32>()
+                {
+                    max_id = max_id.max(parsed);
                 }
             }
         }
@@ -195,18 +195,18 @@ fn apply_sprint_defaults(sprint: &mut Sprint, defaults: &SprintDefaultsConfig) -
         }
     }
 
-    if let Some(length) = defaults.length.as_ref() {
-        if plan.length.is_none() {
-            plan.length = Some(length.clone());
-            applied.insert("length".to_string());
-        }
+    if let Some(length) = defaults.length.as_ref()
+        && plan.length.is_none()
+    {
+        plan.length = Some(length.clone());
+        applied.insert("length".to_string());
     }
 
-    if let Some(overdue_after) = defaults.overdue_after.as_ref() {
-        if plan.overdue_after.is_none() {
-            plan.overdue_after = Some(overdue_after.clone());
-            applied.insert("overdue_after".to_string());
-        }
+    if let Some(overdue_after) = defaults.overdue_after.as_ref()
+        && plan.overdue_after.is_none()
+    {
+        plan.overdue_after = Some(overdue_after.clone());
+        applied.insert("overdue_after".to_string());
     }
 
     applied.into_iter().collect()

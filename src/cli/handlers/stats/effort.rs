@@ -66,16 +66,16 @@ pub(crate) fn run(
                 return Some(task.status);
             }
             // Tolerant fallback: read just `status` as a string
-            if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content) {
-                if let Some(s) = val.get("status").and_then(|v| match v {
+            if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content)
+                && let Some(s) = val.get("status").and_then(|v| match v {
                     serde_yaml::Value::String(s) => Some(s.clone()),
                     _ => None,
-                }) {
-                    if let Some(ts) = parse_status_str_tolerant(&s) {
-                        return Some(ts);
-                    }
-                    return s.parse::<crate::types::TaskStatus>().ok();
+                })
+            {
+                if let Some(ts) = parse_status_str_tolerant(&s) {
+                    return Some(ts);
                 }
+                return s.parse::<crate::types::TaskStatus>().ok();
             }
             None
         }
@@ -186,51 +186,50 @@ pub(crate) fn run(
                     &repo_root_real,
                     &c.commit,
                     &file_rel,
-                ) {
-                    if let Some(ts) = parse_status_from_yaml(&content) {
-                        let curr_status = ts.to_string();
-                        if std::env::var("LOTAR_DEBUG").is_ok() {
-                            use std::fs::OpenOptions;
-                            use std::io::Write;
-                            if let Ok(mut f) = OpenOptions::new()
-                                .create(true)
-                                .append(true)
-                                .open("/tmp/lotar_transitions_debug.log")
-                            {
-                                let _ = writeln!(
-                                    f,
-                                    "  - commit @{} status={} (prev={:?})",
-                                    c.date.to_rfc3339(),
-                                    curr_status,
-                                    prev_status
-                                );
-                            }
+                ) && let Some(ts) = parse_status_from_yaml(&content)
+                {
+                    let curr_status = ts.to_string();
+                    if std::env::var("LOTAR_DEBUG").is_ok() {
+                        use std::fs::OpenOptions;
+                        use std::io::Write;
+                        if let Ok(mut f) = OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open("/tmp/lotar_transitions_debug.log")
+                        {
+                            let _ = writeln!(
+                                f,
+                                "  - commit @{} status={} (prev={:?})",
+                                c.date.to_rfc3339(),
+                                curr_status,
+                                prev_status
+                            );
                         }
-                        if c.date >= since_dt && c.date <= until_dt {
-                            // Detect transition into target within the window
-                            if prev_status.as_deref() != Some(curr_status.as_str())
-                                && curr_status == trans_status
-                            {
-                                if std::env::var("LOTAR_DEBUG").is_ok() {
-                                    use std::fs::OpenOptions;
-                                    use std::io::Write;
-                                    if let Ok(mut f) = OpenOptions::new()
-                                        .create(true)
-                                        .append(true)
-                                        .open("/tmp/lotar_transitions_debug.log")
-                                    {
-                                        let _ = writeln!(
-                                            f,
-                                            "  -> MATCH: id={} transitioned into {}",
-                                            id, curr_status
-                                        );
-                                    }
-                                }
-                                return true;
-                            }
-                        }
-                        prev_status = Some(curr_status);
                     }
+                    if c.date >= since_dt && c.date <= until_dt {
+                        // Detect transition into target within the window
+                        if prev_status.as_deref() != Some(curr_status.as_str())
+                            && curr_status == trans_status
+                        {
+                            if std::env::var("LOTAR_DEBUG").is_ok() {
+                                use std::fs::OpenOptions;
+                                use std::io::Write;
+                                if let Ok(mut f) = OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open("/tmp/lotar_transitions_debug.log")
+                                {
+                                    let _ = writeln!(
+                                        f,
+                                        "  -> MATCH: id={} transitioned into {}",
+                                        id, curr_status
+                                    );
+                                }
+                            }
+                            return true;
+                        }
+                    }
+                    prev_status = Some(curr_status);
                 }
             }
             false
@@ -302,19 +301,18 @@ pub(crate) fn run(
                                         &c.commit,
                                         &file_rel,
                                     )
+                                    && let Some(ts) = parse_status_from_yaml(&content)
                                 {
-                                    if let Some(ts) = parse_status_from_yaml(&content) {
-                                        let curr_status = ts.to_string();
-                                        if c.date >= since_dt
-                                            && c.date <= until_dt
-                                            && prev_status.as_deref() != Some(curr_status.as_str())
-                                            && curr_status == trans_status
-                                        {
-                                            is_match = true;
-                                            break;
-                                        }
-                                        prev_status = Some(curr_status);
+                                    let curr_status = ts.to_string();
+                                    if c.date >= since_dt
+                                        && c.date <= until_dt
+                                        && prev_status.as_deref() != Some(curr_status.as_str())
+                                        && curr_status == trans_status
+                                    {
+                                        is_match = true;
+                                        break;
                                     }
+                                    prev_status = Some(curr_status);
                                 }
                             }
                             if !is_match {
@@ -503,15 +501,14 @@ pub(crate) fn run(
                     }
                 }
             }
-            if std::env::var("LOTAR_DEBUG").is_ok() {
-                if let Ok(mut f) = std::fs::OpenOptions::new()
+            if std::env::var("LOTAR_DEBUG").is_ok()
+                && let Ok(mut f) = std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
                     .open("/tmp/lotar_transitions_debug.log")
-                {
-                    use std::io::Write;
-                    let _ = writeln!(f, "[FALLBACK] tasks_added={}", matched.len());
-                }
+            {
+                use std::io::Write;
+                let _ = writeln!(f, "[FALLBACK] tasks_added={}", matched.len());
             }
             if !matched.is_empty() {
                 tasks = matched;
@@ -684,10 +681,10 @@ pub(crate) fn run(
         .map_err(|e| format!("Failed to load config: {}", e))?;
         let cfg = cfg_mgr.get_resolved_config();
         let mut keys = resolve_group_key(&id, &t, &by, cfg).unwrap_or_else(|| vec![String::new()]);
-        if by.trim().to_lowercase() == "assignee" {
-            if let Some(a) = &t.assignee {
-                keys = vec![a.clone()];
-            }
+        if by.trim().to_lowercase() == "assignee"
+            && let Some(a) = &t.assignee
+        {
+            keys = vec![a.clone()];
         }
         let keys = if keys.is_empty() {
             vec![String::new()]
@@ -804,7 +801,7 @@ pub(crate) fn run(
                             (format!("{:.2}", v), suf)
                         }
                     };
-                    renderer.emit_raw_stdout(&format!("{:>8}{}  {}", val_str, suffix, key));
+                    renderer.emit_raw_stdout(format_args!("{:>8}{}  {}", val_str, suffix, key));
                 }
             }
         }

@@ -75,29 +75,29 @@ pub(crate) fn run(
     }
 
     for (_id, t) in tasks.into_iter() {
-        if let Some(due) = t.due_date {
-            if let Ok(date) = chrono::NaiveDate::parse_from_str(&due, "%Y-%m-%d") {
-                let diff = (date - now).num_days();
-                // Classify
-                if diff < 0 && enabled.contains("overdue") {
-                    // In overdue-only mode, filter by threshold age
-                    if overdue {
-                        let age_days = -diff; // how many days overdue
-                        if age_days >= overdue_cutoff_days {
-                            *counts.get_mut("overdue").unwrap() += 1;
-                        }
-                    } else {
+        if let Some(due) = t.due_date
+            && let Ok(date) = chrono::NaiveDate::parse_from_str(&due, "%Y-%m-%d")
+        {
+            let diff = (date - now).num_days();
+            // Classify
+            if diff < 0 && enabled.contains("overdue") {
+                // In overdue-only mode, filter by threshold age
+                if overdue {
+                    let age_days = -diff; // how many days overdue
+                    if age_days >= overdue_cutoff_days {
                         *counts.get_mut("overdue").unwrap() += 1;
                     }
-                } else if diff == 0 && enabled.contains("today") {
-                    *counts.get_mut("today").unwrap() += 1;
-                } else if diff <= 7 && enabled.contains("week") {
-                    *counts.get_mut("week").unwrap() += 1;
-                } else if diff <= 31 && enabled.contains("month") {
-                    *counts.get_mut("month").unwrap() += 1;
-                } else if enabled.contains("later") {
-                    *counts.get_mut("later").unwrap() += 1;
+                } else {
+                    *counts.get_mut("overdue").unwrap() += 1;
                 }
+            } else if diff == 0 && enabled.contains("today") {
+                *counts.get_mut("today").unwrap() += 1;
+            } else if diff <= 7 && enabled.contains("week") {
+                *counts.get_mut("week").unwrap() += 1;
+            } else if diff <= 31 && enabled.contains("month") {
+                *counts.get_mut("month").unwrap() += 1;
+            } else if enabled.contains("later") {
+                *counts.get_mut("later").unwrap() += 1;
             }
         }
     }
@@ -122,7 +122,7 @@ pub(crate) fn run(
         }
         _ => {
             for (k, v) in counts {
-                renderer.emit_raw_stdout(&format!("{:>6}  {}", v, k));
+                renderer.emit_raw_stdout(format_args!("{:>6}  {}", v, k));
             }
         }
     }

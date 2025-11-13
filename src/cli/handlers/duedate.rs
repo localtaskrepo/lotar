@@ -64,7 +64,7 @@ impl CommandHandler for DueDateHandler {
         } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "duedate: begin task_id={} explicit_project={:?}",
             task_id, project_hint
         ));
@@ -99,7 +99,10 @@ fn handle_set_due_date(
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
-    renderer.log_debug(&format!("duedate: validating new_due_date='{}'", candidate));
+    renderer.log_debug(format_args!(
+        "duedate: validating new_due_date='{}'",
+        candidate
+    ));
 
     let normalized = validator
         .parse_due_date(&candidate)

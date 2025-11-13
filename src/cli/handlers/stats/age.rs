@@ -119,7 +119,7 @@ pub(crate) fn run(
                 renderer.emit_success("No tasks found for age distribution.");
             } else {
                 for (label, count) in &items {
-                    renderer.emit_raw_stdout(&format!("{:>6}  {}", count, label));
+                    renderer.emit_raw_stdout(format_args!("{:>6}  {}", count, label));
                 }
             }
         }

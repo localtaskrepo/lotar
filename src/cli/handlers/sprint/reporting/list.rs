@@ -38,10 +38,10 @@ pub(crate) fn handle_list(
     tasks_root: PathBuf,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    if let Some(limit) = list_args.limit {
-        if limit == 0 {
-            return Err("--limit must be greater than zero".to_string());
-        }
+    if let Some(limit) = list_args.limit
+        && limit == 0
+    {
+        return Err("--limit must be greater than zero".to_string());
     }
 
     let mut storage_opt = Storage::try_open(tasks_root.clone());
@@ -98,11 +98,11 @@ pub(crate) fn handle_list(
     }
 
     let mut truncated = false;
-    if let Some(limit) = list_args.limit {
-        if records.len() > limit {
-            records.truncate(limit);
-            truncated = true;
-        }
+    if let Some(limit) = list_args.limit
+        && records.len() > limit
+    {
+        records.truncate(limit);
+        truncated = true;
     }
 
     let now = Utc::now();
@@ -137,11 +137,11 @@ pub(crate) fn handle_list(
                 .collect();
             let widths = compute_column_widths(&rows);
 
-            renderer.emit_raw_stdout(&format_table_header(&widths));
+            renderer.emit_raw_stdout(format_table_header(&widths));
             let separator = "-".repeat(widths.total());
-            renderer.emit_raw_stdout(&separator);
+            renderer.emit_raw_stdout(separator);
             for row in &rows {
-                renderer.emit_raw_stdout(&format_summary_row(row, &widths));
+                renderer.emit_raw_stdout(format_summary_row(row, &widths));
             }
             if truncated {
                 renderer.emit_warning(

@@ -7,15 +7,13 @@ use std::path::{Path, PathBuf};
 pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
     // Try to read from global config first
     let global_config_path = crate::utils::paths::global_config_path(&resolver.path);
-    if global_config_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&global_config_path) {
-            if let Ok(config) = serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
-            {
-                // If default_prefix is set (not empty), use it
-                if !config.default_prefix.is_empty() {
-                    return config.default_prefix;
-                }
-            }
+    if global_config_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&global_config_path)
+        && let Ok(config) = serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
+    {
+        // If default_prefix is set (not empty), use it
+        if !config.default_prefix.is_empty() {
+            return config.default_prefix;
         }
     }
 
@@ -33,10 +31,10 @@ pub fn get_project_name() -> Option<String> {
 
 pub fn detect_project_name() -> Option<String> {
     // 1. Check environment variable first
-    if let Ok(project) = std::env::var("LOTAR_PROJECT") {
-        if !project.is_empty() {
-            return Some(project);
-        }
+    if let Ok(project) = std::env::var("LOTAR_PROJECT")
+        && !project.is_empty()
+    {
+        return Some(project);
     }
 
     // 2. Try to detect from project files (nearest manifest upwards)
@@ -45,10 +43,10 @@ pub fn detect_project_name() -> Option<String> {
     }
 
     // 3. Use git repo name when available
-    if let Some(repo_root) = crate::utils::git::find_repo_root(&std::env::current_dir().ok()?) {
-        if let Some(repo_name) = repo_root.file_name().and_then(|s| s.to_str()) {
-            return Some(repo_name.to_string());
-        }
+    if let Some(repo_root) = crate::utils::git::find_repo_root(&std::env::current_dir().ok()?)
+        && let Some(repo_name) = repo_root.file_name().and_then(|s| s.to_str())
+    {
+        return Some(repo_name.to_string());
     }
 
     // 4. Use current folder name
@@ -79,10 +77,10 @@ fn detect_from_project_files() -> Option<String> {
         }
 
         // Stop at repo root if found
-        if let Some(ref root) = repo_root {
-            if &dir == root {
-                break;
-            }
+        if let Some(ref root) = repo_root
+            && &dir == root
+        {
+            break;
         }
         // Move up
         match dir.parent() {

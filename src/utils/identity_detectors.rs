@@ -103,10 +103,12 @@ impl IdentityDetector for GitConfigDetector {
                 if !name.is_empty() {
                     let mut details = format!("read from {}", config_path.to_string_lossy());
                     if let Some(b) = &branch {
-                        details.push_str(&format!(", branch: {}", b));
+                        details.push_str(", branch: ");
+                        details.push_str(b);
                     }
                     if !remotes.is_empty() {
-                        details.push_str(&format!(", remotes: {}", remotes.join(";")));
+                        details.push_str(", remotes: ");
+                        details.push_str(&remotes.join(";"));
                     }
                     return Some(IdentityDetection {
                         user: name.to_string(),
@@ -126,10 +128,12 @@ impl IdentityDetector for GitConfigDetector {
                 if !email.is_empty() {
                     let mut details = format!("read from {}", config_path.to_string_lossy());
                     if let Some(b) = &branch {
-                        details.push_str(&format!(", branch: {}", b));
+                        details.push_str(", branch: ");
+                        details.push_str(b);
                     }
                     if !remotes.is_empty() {
-                        details.push_str(&format!(", remotes: {}", remotes.join(";")));
+                        details.push_str(", remotes: ");
+                        details.push_str(&remotes.join(";"));
                     }
                     return Some(IdentityDetection {
                         user: email.to_string(),
@@ -189,23 +193,23 @@ impl ProjectManifestDetector {
             }
         }
         // contributors array fallback
-        if let Some(contribs) = json.get("contributors").and_then(|v| v.as_array()) {
-            if let Some(first) = contribs.first() {
-                if first.is_string() {
-                    let s = first.as_str()?.trim();
-                    if !s.is_empty() {
-                        return Some(s.to_string());
-                    }
-                } else if let Some(name) = first.get("name").and_then(|v| v.as_str()) {
-                    let s = name.trim();
-                    if !s.is_empty() {
-                        return Some(s.to_string());
-                    }
-                } else if let Some(email) = first.get("email").and_then(|v| v.as_str()) {
-                    let s = email.trim();
-                    if !s.is_empty() {
-                        return Some(s.to_string());
-                    }
+        if let Some(contribs) = json.get("contributors").and_then(|v| v.as_array())
+            && let Some(first) = contribs.first()
+        {
+            if first.is_string() {
+                let s = first.as_str()?.trim();
+                if !s.is_empty() {
+                    return Some(s.to_string());
+                }
+            } else if let Some(name) = first.get("name").and_then(|v| v.as_str()) {
+                let s = name.trim();
+                if !s.is_empty() {
+                    return Some(s.to_string());
+                }
+            } else if let Some(email) = first.get("email").and_then(|v| v.as_str()) {
+                let s = email.trim();
+                if !s.is_empty() {
+                    return Some(s.to_string());
                 }
             }
         }
@@ -222,14 +226,14 @@ impl ProjectManifestDetector {
             if l.starts_with("authors") && l.contains('[') {
                 in_authors = true;
                 // try inline array
-                if let Some(start) = l.find('[') {
-                    if let Some(end) = l[start + 1..].find(']') {
-                        let inner = &l[start + 1..start + 1 + end];
-                        if let Some(val) = Self::first_quoted(inner) {
-                            return Some(Self::extract_name_or_email(&val));
-                        }
-                        in_authors = false;
+                if let Some(start) = l.find('[')
+                    && let Some(end) = l[start + 1..].find(']')
+                {
+                    let inner = &l[start + 1..start + 1 + end];
+                    if let Some(val) = Self::first_quoted(inner) {
+                        return Some(Self::extract_name_or_email(&val));
                     }
+                    in_authors = false;
                 }
                 continue;
             }
@@ -248,13 +252,13 @@ impl ProjectManifestDetector {
     fn parse_csproj(path: &Path) -> Option<String> {
         let contents = std::fs::read_to_string(path).ok()?;
         // minimal XML tag search for <Authors>...</Authors>
-        if let Some(start) = contents.find("<Authors>") {
-            if let Some(end) = contents[start + 9..].find("</Authors>") {
-                let inner = &contents[start + 9..start + 9 + end];
-                let s = inner.trim();
-                if !s.is_empty() {
-                    return Some(s.to_string());
-                }
+        if let Some(start) = contents.find("<Authors>")
+            && let Some(end) = contents[start + 9..].find("</Authors>")
+        {
+            let inner = &contents[start + 9..start + 9 + end];
+            let s = inner.trim();
+            if !s.is_empty() {
+                return Some(s.to_string());
             }
         }
         None
@@ -289,43 +293,42 @@ impl IdentityDetector for ProjectManifestDetector {
         for root in Self::search_roots(ctx.tasks_root) {
             // package.json
             let pkg = root.join("package.json");
-            if pkg.exists() {
-                if let Some(author) = Self::parse_package_json(&pkg) {
-                    return Some(IdentityDetection {
-                        user: author,
-                        source: IdentitySource::ProjectManifestAuthor,
-                        confidence: 90,
-                        details: Some(format!("package.json at {}", pkg.to_string_lossy())),
-                    });
-                }
+            if pkg.exists()
+                && let Some(author) = Self::parse_package_json(&pkg)
+            {
+                return Some(IdentityDetection {
+                    user: author,
+                    source: IdentitySource::ProjectManifestAuthor,
+                    confidence: 90,
+                    details: Some(format!("package.json at {}", pkg.to_string_lossy())),
+                });
             }
             // Cargo.toml
             let cargo = root.join("Cargo.toml");
-            if cargo.exists() {
-                if let Some(author) = Self::parse_cargo_toml(&cargo) {
-                    return Some(IdentityDetection {
-                        user: author,
-                        source: IdentitySource::ProjectManifestAuthor,
-                        confidence: 88,
-                        details: Some(format!("Cargo.toml at {}", cargo.to_string_lossy())),
-                    });
-                }
+            if cargo.exists()
+                && let Some(author) = Self::parse_cargo_toml(&cargo)
+            {
+                return Some(IdentityDetection {
+                    user: author,
+                    source: IdentitySource::ProjectManifestAuthor,
+                    confidence: 88,
+                    details: Some(format!("Cargo.toml at {}", cargo.to_string_lossy())),
+                });
             }
             // .csproj (any in root)
             if let Ok(entries) = std::fs::read_dir(&root) {
                 for ent in entries.flatten() {
                     let p = ent.path();
-                    if let Some(ext) = p.extension().and_then(|e| e.to_str()) {
-                        if ext.eq_ignore_ascii_case("csproj") {
-                            if let Some(author) = Self::parse_csproj(&p) {
-                                return Some(IdentityDetection {
-                                    user: author,
-                                    source: IdentitySource::ProjectManifestAuthor,
-                                    confidence: 85,
-                                    details: Some(format!(".csproj at {}", p.to_string_lossy())),
-                                });
-                            }
-                        }
+                    if let Some(ext) = p.extension().and_then(|e| e.to_str())
+                        && ext.eq_ignore_ascii_case("csproj")
+                        && let Some(author) = Self::parse_csproj(&p)
+                    {
+                        return Some(IdentityDetection {
+                            user: author,
+                            source: IdentitySource::ProjectManifestAuthor,
+                            confidence: 85,
+                            details: Some(format!(".csproj at {}", p.to_string_lossy())),
+                        });
                     }
                 }
             }
@@ -373,13 +376,13 @@ pub fn detect_identity(ctx: &DetectContext) -> Option<IdentityDetection> {
         None => crate::config::resolution::load_and_merge_configs(None).ok(),
     };
 
-    if let Some(cfg) = cfg.clone() {
-        if !cfg.auto_identity {
-            // Smart features disabled: honor only configured default_reporter
-            let d = ConfigDefaultReporterDetector;
-            // Explicitly avoid falling back to git/system if smart is off
-            return d.detect(ctx).or(None);
-        }
+    if let Some(cfg) = cfg.clone()
+        && !cfg.auto_identity
+    {
+        // Smart features disabled: honor only configured default_reporter
+        let d = ConfigDefaultReporterDetector;
+        // Explicitly avoid falling back to git/system if smart is off
+        return d.detect(ctx).or(None);
     }
 
     let mut detectors: Vec<Box<dyn IdentityDetector>> = vec![

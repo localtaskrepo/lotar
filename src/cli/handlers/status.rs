@@ -62,7 +62,7 @@ impl CommandHandler for StatusHandler {
 
         let project_hint = explicit_project.as_deref().or(project);
 
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "status: begin task_id={} explicit_project={:?}",
             task_id, project_hint
         ));
@@ -96,7 +96,10 @@ fn handle_set_status(
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
-    renderer.log_debug(&format!("status: validating new_status='{}'", candidate));
+    renderer.log_debug(format_args!(
+        "status: validating new_status='{}'",
+        candidate
+    ));
     let validated_status = validator
         .validate_status(&candidate)
         .map_err(|e| format!("Status validation failed: {}", e))?;
@@ -188,7 +191,8 @@ fn render_status_preview(
         task_id, old_status, new_status
     );
     if let Some(candidate) = assignee {
-        text_message.push_str(&format!("; would set assignee = {}", candidate));
+        text_message.push_str("; would set assignee = ");
+        text_message.push_str(candidate);
     }
     let mut payload = PropertyPreview::new(
         task_id,
@@ -268,18 +272,13 @@ fn resolve_auto_assign_candidate(
     ctx: &TaskCommandContext,
     config: &ResolvedConfig,
 ) -> Option<String> {
-    if config.auto_codeowners_assign {
-        if let Some(repo_root) =
+    if config.auto_codeowners_assign
+        && let Some(repo_root) =
             crate::utils::codeowners::repo_root_from_tasks_root(&ctx.tasks_dir.path)
-        {
-            if let Some(codeowners) =
-                crate::utils::codeowners::CodeOwners::load_from_repo(&repo_root)
-            {
-                if let Some(owner) = codeowners.default_owner() {
-                    return Some(owner);
-                }
-            }
-        }
+        && let Some(codeowners) = crate::utils::codeowners::CodeOwners::load_from_repo(&repo_root)
+        && let Some(owner) = codeowners.default_owner()
+    {
+        return Some(owner);
     }
 
     crate::utils::identity::resolve_current_user(Some(ctx.tasks_dir.path.as_path()))

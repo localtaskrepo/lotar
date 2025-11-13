@@ -59,7 +59,7 @@ impl CommandHandler for CommentHandler {
         } = args;
 
         let project_hint = explicit_project.as_deref().or(project);
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "comment: begin task_id={} explicit_project={:?}",
             task_id, project_hint
         ));
@@ -84,7 +84,7 @@ impl CommandHandler for CommentHandler {
             task,
         } = load_task(&mut ctx, &task_id, project_hint)?;
 
-        renderer.log_debug(&format!(
+        renderer.log_debug(format_args!(
             "comment: resolved task={} project={}",
             full_id,
             if project_prefix.trim().is_empty() {
@@ -199,7 +199,7 @@ fn render_comment_preview(
             renderer.emit_json(&Value::Object(payload));
         }
         _ => {
-            renderer.emit_info(&format!(
+            renderer.emit_info(format_args!(
                 "DRY RUN: Would add comment to {} ({} total)",
                 task_id, total_after
             ));
@@ -225,7 +225,10 @@ fn render_comment_success(
             renderer.emit_json(&Value::Object(payload));
         }
         _ => {
-            renderer.emit_success(&format!("Comment added to {} ({} total)", task_id, total));
+            renderer.emit_success(format_args!(
+                "Comment added to {} ({} total)",
+                task_id, total
+            ));
         }
     }
 }
@@ -249,10 +252,10 @@ fn render_comment_list(
         }
         _ => {
             if task.comments.is_empty() {
-                renderer.emit_success(&format!("No comments for {}.", task_id));
+                renderer.emit_success(format_args!("No comments for {}.", task_id));
             } else {
                 for c in &task.comments {
-                    renderer.emit_raw_stdout(&format!("{}  {}", c.date, c.text));
+                    renderer.emit_raw_stdout(format_args!("{}  {}", c.date, c.text));
                 }
             }
             if explain {

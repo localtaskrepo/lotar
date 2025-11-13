@@ -75,14 +75,14 @@ pub(crate) fn handle_add(
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_success(&format!(
+            renderer.emit_success(format_args!(
                 "Attached sprint #{} ({}) to {} task(s).",
                 outcome.sprint_id,
                 outcome.sprint_display_name,
                 outcome.modified.len()
             ));
             if !outcome.unchanged.is_empty() {
-                renderer.emit_info(&format!(
+                renderer.emit_info(format_args!(
                     "Already assigned (skipped): {}",
                     outcome.unchanged.join(", ")
                 ));
@@ -165,7 +165,7 @@ pub(crate) fn handle_move(
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_success(&format!(
+            renderer.emit_success(format_args!(
                 "Moved {} task(s) to sprint #{} ({}).",
                 outcome.modified.len(),
                 outcome.sprint_id,
@@ -177,7 +177,7 @@ pub(crate) fn handle_move(
                 }
             }
             if !outcome.unchanged.is_empty() {
-                renderer.emit_info(&format!(
+                renderer.emit_info(format_args!(
                     "Already assigned to target sprint (skipped): {}",
                     outcome.unchanged.join(", ")
                 ));
@@ -240,14 +240,14 @@ pub(crate) fn handle_remove(
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_success(&format!(
+            renderer.emit_success(format_args!(
                 "Removed sprint #{} ({}) from {} task(s).",
                 outcome.sprint_id,
                 outcome.sprint_display_name,
                 outcome.modified.len()
             ));
             if !outcome.unchanged.is_empty() {
-                renderer.emit_info(&format!(
+                renderer.emit_info(format_args!(
                     "Tasks without that sprint membership: {}",
                     outcome.unchanged.join(", ")
                 ));

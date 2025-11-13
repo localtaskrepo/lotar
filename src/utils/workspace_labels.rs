@@ -17,12 +17,12 @@ pub fn derive_path_label_from(dir: &Path) -> Option<String> {
     let lower: Vec<String> = segs.iter().map(|s| s.to_lowercase()).collect();
     let candidate_keys = ["packages", "apps", "examples", "services", "libs"];
     for key in candidate_keys.iter() {
-        if let Some(idx) = lower.iter().position(|s| s == key) {
-            if idx + 1 < segs.len() {
-                let name = &segs[idx + 1];
-                if !name.trim().is_empty() && !name.starts_with('.') {
-                    return Some(name.trim_matches('@').to_string());
-                }
+        if let Some(idx) = lower.iter().position(|s| s == key)
+            && idx + 1 < segs.len()
+        {
+            let name = &segs[idx + 1];
+            if !name.trim().is_empty() && !name.starts_with('.') {
+                return Some(name.trim_matches('@').to_string());
             }
         }
     }

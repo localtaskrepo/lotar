@@ -1,4 +1,5 @@
 use super::Outputable;
+use std::fmt::Write;
 
 pub fn render_markdown_single<T: Outputable>(item: &T) -> String {
     let headers = T::table_headers();
@@ -6,7 +7,7 @@ pub fn render_markdown_single<T: Outputable>(item: &T) -> String {
 
     let mut output = String::new();
     for (header, value) in headers.iter().zip(values.iter()) {
-        output.push_str(&format!("**{}:** {}\n", header, value));
+    let _ = writeln!(output, "**{header}:** {value}");
     }
     output
 }
@@ -15,7 +16,7 @@ pub fn render_markdown_list<T: Outputable>(items: &[T], title: Option<&str>) -> 
     let mut output = String::new();
 
     if let Some(title) = title {
-        output.push_str(&format!("# {}\n\n", title));
+    let _ = writeln!(output, "# {title}\n");
     }
 
     if items.is_empty() {
@@ -27,7 +28,7 @@ pub fn render_markdown_list<T: Outputable>(items: &[T], title: Option<&str>) -> 
     let headers = T::table_headers();
     output.push_str("| ");
     for header in &headers {
-        output.push_str(&format!("{} | ", header));
+    let _ = write!(output, "{header} | ");
     }
     output.push('\n');
 
@@ -41,7 +42,7 @@ pub fn render_markdown_list<T: Outputable>(items: &[T], title: Option<&str>) -> 
         let values = item.to_table_row();
         output.push_str("| ");
         for value in values {
-            output.push_str(&format!("{} | ", value));
+            let _ = write!(output, "{value} | ");
         }
         output.push('\n');
     }

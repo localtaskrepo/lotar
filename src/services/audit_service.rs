@@ -402,10 +402,10 @@ impl AuditService {
                     Some(data) => data,
                     None => continue,
                 };
-                if let Some(filter) = project_filter {
-                    if !project_prefix.eq_ignore_ascii_case(filter) {
-                        continue;
-                    }
+                if let Some(filter) = project_filter
+                    && !project_prefix.eq_ignore_ascii_case(filter)
+                {
+                    continue;
                 }
 
                 let current_task = Self::load_task_version(repo_root, &commit.sha, file_rel);
@@ -505,10 +505,10 @@ impl AuditService {
                 Some(name) => name.to_string(),
                 None => continue,
             };
-            if let Some(filter) = project_filter_lower.as_ref() {
-                if !project_name.eq_ignore_ascii_case(filter) {
-                    continue;
-                }
+            if let Some(filter) = project_filter_lower.as_ref()
+                && !project_name.eq_ignore_ascii_case(filter)
+            {
+                continue;
             }
 
             let tasks = fs::read_dir(&project_path).map_err(|e| {
@@ -1138,18 +1138,18 @@ impl AuditService {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 // Flush project-level counts per commit
-                if matches!(group_by, GroupBy::Project) {
-                    if let Some((_, _, _, date)) = &current {
-                        for proj in touched_projects.drain() {
-                            let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem {
-                                key: proj.clone(),
-                                count: 0,
-                                last_date: *date,
-                            });
-                            entry.count += 1;
-                            if *date > entry.last_date {
-                                entry.last_date = *date;
-                            }
+                if matches!(group_by, GroupBy::Project)
+                    && let Some((_, _, _, date)) = &current
+                {
+                    for proj in touched_projects.drain() {
+                        let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem {
+                            key: proj.clone(),
+                            count: 0,
+                            last_date: *date,
+                        });
+                        entry.count += 1;
+                        if *date > entry.last_date {
+                            entry.last_date = *date;
                         }
                     }
                 }
@@ -1222,31 +1222,30 @@ impl AuditService {
             if matches!(group_by, GroupBy::Project) {
                 // collect project from file path lines
                 let rel_path = std::path::Path::new(trimmed);
-                if rel_path.extension().and_then(|e| e.to_str()) == Some("yml") {
-                    if let Some(project) = rel_path
+                if rel_path.extension().and_then(|e| e.to_str()) == Some("yml")
+                    && let Some(project) = rel_path
                         .parent()
                         .and_then(|p| p.file_name())
                         .and_then(|s| s.to_str())
-                    {
-                        touched_projects.insert(project.to_string());
-                    }
+                {
+                    touched_projects.insert(project.to_string());
                 }
             }
         }
 
         // In case the log doesn't end with a blank line, flush remaining projects
-        if matches!(group_by, GroupBy::Project) {
-            if let Some((_, _, _, date)) = &current {
-                for proj in touched_projects.drain() {
-                    let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem {
-                        key: proj.clone(),
-                        count: 0,
-                        last_date: *date,
-                    });
-                    entry.count += 1;
-                    if *date > entry.last_date {
-                        entry.last_date = *date;
-                    }
+        if matches!(group_by, GroupBy::Project)
+            && let Some((_, _, _, date)) = &current
+        {
+            for proj in touched_projects.drain() {
+                let entry = map.entry(proj.clone()).or_insert_with(|| ActivityItem {
+                    key: proj.clone(),
+                    count: 0,
+                    last_date: *date,
+                });
+                entry.count += 1;
+                if *date > entry.last_date {
+                    entry.last_date = *date;
                 }
             }
         }

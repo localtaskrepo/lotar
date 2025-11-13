@@ -104,7 +104,7 @@ pub(crate) fn handle_delete(
             renderer.emit_json(&payload);
         }
         _ => {
-            renderer.emit_success(&format!("Deleted {}.", display_name));
+            renderer.emit_success(format_args!("Deleted {}.", display_name));
             if let Some(outcome) = cleanup_outcome.as_ref() {
                 emit_cleanup_summary(renderer, outcome, "deleting the sprint");
             } else {

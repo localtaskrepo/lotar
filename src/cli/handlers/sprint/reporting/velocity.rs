@@ -71,7 +71,7 @@ fn render_velocity_text(
     }
 
     let metric = metric_label(computation.metric);
-    renderer.emit_success(&format!(
+    renderer.emit_success(format_args!(
         "Sprint velocity ({} metric, showing {} of {} sprint{}).",
         metric,
         computation.entries.len(),
@@ -107,7 +107,7 @@ fn render_velocity_text(
             .capacity
             .map(|cap| format_velocity_value(computation.metric, cap))
             .unwrap_or_else(|| "-".to_string());
-        renderer.emit_raw_stdout(&format!(
+        renderer.emit_raw_stdout(format_args!(
             "#{:>3} {:<20} {:<11} {:>10} {:>10} {:>7} {:>9} {}",
             entry.sprint_id,
             truncate(&label, 20),
@@ -121,7 +121,7 @@ fn render_velocity_text(
     }
 
     if let Some(avg_velocity) = computation.average_velocity {
-        renderer.emit_raw_stdout(&format!(
+        renderer.emit_raw_stdout(format_args!(
             "Average completed: {} {}",
             format_velocity_value(computation.metric, avg_velocity),
             metric
@@ -129,7 +129,7 @@ fn render_velocity_text(
     }
 
     if let Some(avg_ratio) = computation.average_completion_ratio {
-        renderer.emit_raw_stdout(&format!(
+        renderer.emit_raw_stdout(format_args!(
             "Average completion ratio: {}",
             format_percentage(Some(avg_ratio))
         ));
@@ -150,7 +150,10 @@ fn render_velocity_text(
     for entry in &computation.entries {
         if entry.summary.has_warnings && !entry.warnings.is_empty() {
             for warning in &entry.warnings {
-                renderer.emit_warning(&format!("Sprint #{}: {}", entry.sprint_id, warning.message));
+                renderer.emit_warning(format_args!(
+                    "Sprint #{}: {}",
+                    entry.sprint_id, warning.message
+                ));
             }
         }
     }

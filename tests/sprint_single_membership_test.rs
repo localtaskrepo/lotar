@@ -61,7 +61,7 @@ fn sprint_assignment_requires_force_to_replace_membership() {
     let outcome = sprint_assignment::assign_tasks(
         &mut storage,
         &records,
-        &[task.id.clone()],
+        std::slice::from_ref(&task.id),
         Some("1"),
         false,
         false,
@@ -74,7 +74,7 @@ fn sprint_assignment_requires_force_to_replace_membership() {
     let second = sprint_assignment::assign_tasks(
         &mut storage,
         &records,
-        &[task.id.clone()],
+        std::slice::from_ref(&task.id),
         Some("2"),
         false,
         false,
@@ -91,7 +91,7 @@ fn sprint_assignment_requires_force_to_replace_membership() {
     let forced = sprint_assignment::assign_tasks(
         &mut storage,
         &records,
-        &[task.id.clone()],
+        std::slice::from_ref(&task.id),
         Some("2"),
         false,
         true,

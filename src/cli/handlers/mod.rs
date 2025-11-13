@@ -43,17 +43,20 @@ pub(crate) fn emit_subcommand_overview(renderer: &OutputRenderer, command_path: 
     let display = command_path.join(" ");
     match collect_subcommand_names(command_path) {
         Some(names) if !names.is_empty() => {
-            renderer.emit_notice(&format!(
+            renderer.emit_notice(format_args!(
                 "Available {} subcommands: {}",
                 display,
                 names.join(", ")
             ));
         }
         _ => {
-            renderer.emit_notice(&format!("No subcommands registered for {}.", display));
+            renderer.emit_notice(format_args!("No subcommands registered for {}.", display));
         }
     }
-    renderer.emit_info(&format!("Run `lotar help {}` for usage details.", display));
+    renderer.emit_info(format_args!(
+        "Run `lotar help {}` for usage details.",
+        display
+    ));
 }
 
 fn collect_subcommand_names(path: &[&str]) -> Option<Vec<String>> {
@@ -238,13 +241,12 @@ impl CommandHandler for AddHandler {
         let mut validated_tags = Vec::new();
         let base_tags = if args.tags.is_empty() {
             let mut defaults = config.default_tags.clone();
-            if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config) {
-                if !defaults
+            if let Some(label) = crate::utils::task_intel::auto_tag_from_path(&config)
+                && !defaults
                     .iter()
                     .any(|existing| existing.eq_ignore_ascii_case(&label))
-                {
-                    defaults.push(label);
-                }
+            {
+                defaults.push(label);
             }
             defaults
         } else {
@@ -278,14 +280,13 @@ impl CommandHandler for AddHandler {
 
         // Set validated properties
         task.task_type = validated_type;
-        if std::env::var("LOTAR_DEBUG_ADD").ok().as_deref() == Some("1") {
-            if let Ok(mut f) = std::fs::OpenOptions::new()
+        if std::env::var("LOTAR_DEBUG_ADD").ok().as_deref() == Some("1")
+            && let Ok(mut f) = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open("/tmp/lotar_add_debug.log")
-            {
-                let _ = writeln!(f, "[ADD] chosen_type={}", task.task_type);
-            }
+        {
+            let _ = writeln!(f, "[ADD] chosen_type={}", task.task_type);
         }
         // Resolve @me if present so previews and persisted task show actual identity
         task.assignee = validated_assignee.and_then(|a| {
@@ -501,7 +502,7 @@ impl CommandHandler for AddHandler {
                     renderer.emit_json(&obj);
                 }
                 _ => {
-                    renderer.emit_info(&format!(
+                    renderer.emit_info(format_args!(
                         "DRY RUN: Would create task in project {} with title '{}' and priority {}",
                         project_for_storage, task.title, task.priority
                     ));
@@ -513,7 +514,7 @@ impl CommandHandler for AddHandler {
             return Ok(format!("{}-PREVIEW", project_for_storage));
         }
 
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "add: writing task to storage project={} original={:?}",
             project_for_storage, original_project_name
         ));
@@ -530,7 +531,7 @@ impl CommandHandler for AddHandler {
                 original_project_name.as_deref(),
             )
             .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
-        renderer.log_info(&format!("add: created id={}", task_id));
+        renderer.log_info(format_args!("add: created id={}", task_id));
 
         Ok(task_id)
     }
@@ -595,25 +596,25 @@ impl AddHandler {
                         renderer.emit_json(&response);
                     }
                     _ => {
-                        renderer.emit_success(&format!("Created task: {}", task_id));
-                        renderer.emit_raw_stdout(&format!("  Title: {}", task.title));
-                        renderer.emit_raw_stdout(&format!("  Status: {}", task.status));
-                        renderer.emit_raw_stdout(&format!("  Priority: {}", task.priority));
-                        renderer.emit_raw_stdout(&format!("  Type: {}", task.task_type));
+                        renderer.emit_success(format_args!("Created task: {}", task_id));
+                        renderer.emit_raw_stdout(format_args!("  Title: {}", task.title));
+                        renderer.emit_raw_stdout(format_args!("  Status: {}", task.status));
+                        renderer.emit_raw_stdout(format_args!("  Priority: {}", task.priority));
+                        renderer.emit_raw_stdout(format_args!("  Type: {}", task.task_type));
                         if let Some(reporter) = &task.reporter {
-                            renderer.emit_raw_stdout(&format!("  Reporter: {}", reporter));
+                            renderer.emit_raw_stdout(format_args!("  Reporter: {}", reporter));
                         }
                         if let Some(assignee) = &task.assignee {
-                            renderer.emit_raw_stdout(&format!("  Assignee: {}", assignee));
+                            renderer.emit_raw_stdout(format_args!("  Assignee: {}", assignee));
                         }
                         if let Some(due_date) = &task.due_date {
-                            renderer.emit_raw_stdout(&format!("  Due date: {}", due_date));
+                            renderer.emit_raw_stdout(format_args!("  Due date: {}", due_date));
                         }
-                        if let Some(description) = &task.description {
-                            if !description.is_empty() {
-                                renderer
-                                    .emit_raw_stdout(&format!("  Description: {}", description));
-                            }
+                        if let Some(description) = &task.description
+                            && !description.is_empty()
+                        {
+                            renderer
+                                .emit_raw_stdout(format_args!("  Description: {}", description));
                         }
                     }
                 }
@@ -629,7 +630,7 @@ impl AddHandler {
                         renderer.emit_json(&response);
                     }
                     _ => {
-                        renderer.emit_success(&format!("Created task: {}", task_id));
+                        renderer.emit_success(format_args!("Created task: {}", task_id));
                     }
                 }
             }
@@ -645,7 +646,7 @@ impl AddHandler {
                     renderer.emit_json(&response);
                 }
                 _ => {
-                    renderer.emit_success(&format!("Created task: {}", task_id));
+                    renderer.emit_success(format_args!("Created task: {}", task_id));
                 }
             }
         }
@@ -686,7 +687,7 @@ impl AddHandler {
                     .map(|value| value.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                Self::warn_logger().log_warn(&format!(
+                Self::warn_logger().log_warn(format_args!(
                     "Warning: Project default {} '{}' is not in configured {} list [{}]. Using smart fallback.",
                     field_name, explicit, field_name, formatted_values
                 ));
@@ -703,7 +704,7 @@ impl AddHandler {
                 .map(|value| value.to_string())
                 .collect::<Vec<_>>()
                 .join(", ");
-            Self::warn_logger().log_warn(&format!(
+            Self::warn_logger().log_warn(format_args!(
                 "Warning: Global default {} '{}' is not in project {} list [{}]. Using first configured value.",
                 field_name, global_default, field_name, formatted_values
             ));
@@ -726,7 +727,7 @@ impl AddHandler {
             Ok(priority) => priority,
             Err(e) => {
                 OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
-                    .log_error(&format!("Error: {}", e));
+                    .log_error(format_args!("Error: {}", e));
                 std::process::exit(1);
             }
         }
@@ -755,7 +756,7 @@ impl AddHandler {
                     .map(|value| value.to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                Self::warn_logger().log_warn(&format!(
+                Self::warn_logger().log_warn(format_args!(
                     "Warning: Project default status '{}' is not in configured status list [{}]. Using smart fallback.",
                     explicit, formatted_values
                 ));

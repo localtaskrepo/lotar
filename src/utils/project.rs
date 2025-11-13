@@ -208,10 +208,9 @@ pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String
         let config_path = crate::utils::paths::project_config_path(tasks_dir, &dir_name);
         if let Some(project_name) =
             crate::utils::config::read_project_name_from_config(&config_path)
+            && project_name == input
         {
-            if project_name == input {
-                return dir_name;
-            }
+            return dir_name;
         }
     }
 

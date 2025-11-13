@@ -123,7 +123,7 @@ pub(crate) fn run(
                 renderer.emit_success("No stale tickets over the threshold.");
             } else {
                 for i in &limited {
-                    renderer.emit_raw_stdout(&format!(
+                    renderer.emit_raw_stdout(format_args!(
                         "{:>6}d  {}  {}  {}",
                         (now - i.last_date).num_days(),
                         i.id,

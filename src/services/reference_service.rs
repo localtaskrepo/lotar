@@ -110,10 +110,10 @@ impl ReferenceService {
                 buffer.clear();
             }
         }
-        if !buffer.is_empty() {
-            if let Ok(value) = buffer.parse::<usize>() {
-                numbers.push(value);
-            }
+        if !buffer.is_empty()
+            && let Ok(value) = buffer.parse::<usize>()
+        {
+            numbers.push(value);
         }
         numbers
     }

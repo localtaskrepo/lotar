@@ -198,21 +198,21 @@ impl ConfigValidator {
         }
 
         // Validate default values exist in lists
-        if let Some(default_status) = &config.default_status {
-            if !config.issue_states.values.contains(default_status) {
-                result.add_error(
-                    ValidationError::warning(
-                        Some("default_status".to_string()),
-                        format!(
-                            "Default status '{}' not found in issue_states list",
-                            default_status
-                        ),
-                    )
-                    .with_fix(
-                        "Add the status to issue_states or choose a different default".to_string(),
+        if let Some(default_status) = &config.default_status
+            && !config.issue_states.values.contains(default_status)
+        {
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_status".to_string()),
+                    format!(
+                        "Default status '{}' not found in issue_states list",
+                        default_status
                     ),
-                );
-            }
+                )
+                .with_fix(
+                    "Add the status to issue_states or choose a different default".to_string(),
+                ),
+            );
         }
 
         if !config
@@ -256,15 +256,14 @@ impl ConfigValidator {
         // This validates the final resolved configuration for consistency
         // Similar validations as global config but for the resolved state
 
-        if !config.issue_states.values.is_empty() {
-            if let Some(default_status) = config.default_status.as_ref() {
-                if !config.issue_states.values.contains(default_status) {
-                    result.add_error(ValidationError::error(
-                        Some("default_status".to_string()),
-                        "Resolved default status not found in resolved issue states".to_string(),
-                    ));
-                }
-            }
+        if !config.issue_states.values.is_empty()
+            && let Some(default_status) = config.default_status.as_ref()
+            && !config.issue_states.values.contains(default_status)
+        {
+            result.add_error(ValidationError::error(
+                Some("default_status".to_string()),
+                "Resolved default status not found in resolved issue states".to_string(),
+            ));
         }
 
         result
@@ -366,46 +365,40 @@ impl ConfigValidator {
         // Check if default status exists in issue states
         if let (Some(default_status), Some(issue_states)) =
             (&config.default_status, &config.issue_states)
+            && !issue_states.values.contains(default_status)
         {
-            if !issue_states.values.contains(default_status) {
-                result.add_error(
-                    ValidationError::warning(
-                        Some("default_status".to_string()),
-                        format!(
-                            "Default status '{}' not found in issue_states",
-                            default_status
-                        ),
-                    )
-                    .with_fix(
-                        "Add the status to issue_states or remove default_status".to_string(),
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_status".to_string()),
+                    format!(
+                        "Default status '{}' not found in issue_states",
+                        default_status
                     ),
-                );
-            }
+                )
+                .with_fix("Add the status to issue_states or remove default_status".to_string()),
+            );
         }
 
         // Check if default priority exists in issue priorities
         if let (Some(default_priority), Some(issue_priorities)) =
             (&config.default_priority, &config.issue_priorities)
-        {
-            if !issue_priorities
+            && !issue_priorities
                 .values
                 .iter()
                 .any(|priority| priority.eq_ignore_case(default_priority.as_str()))
-            {
-                result.add_error(
-                    ValidationError::warning(
-                        Some("default_priority".to_string()),
-                        format!(
-                            "Default priority '{}' not found in issue_priorities",
-                            default_priority
-                        ),
-                    )
-                    .with_fix(
-                        "Add the priority to issue_priorities or remove default_priority"
-                            .to_string(),
+        {
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_priority".to_string()),
+                    format!(
+                        "Default priority '{}' not found in issue_priorities",
+                        default_priority
                     ),
-                );
-            }
+                )
+                .with_fix(
+                    "Add the priority to issue_priorities or remove default_priority".to_string(),
+                ),
+            );
         }
     }
 
@@ -416,28 +409,30 @@ impl ConfigValidator {
 
     fn validate_field_formats(&self, config: &ProjectConfig, result: &mut ValidationResult) {
         // Validate assignee email format if present
-        if let Some(assignee) = &config.default_assignee {
-            if !assignee.is_empty() && !self.is_valid_email_or_username(assignee) {
-                result.add_error(
-                    ValidationError::warning(
-                        Some("default_assignee".to_string()),
-                        "Assignee format doesn't look like an email or @username".to_string(),
-                    )
-                    .with_fix("Use email format (user@domain.com) or @username format".to_string()),
-                );
-            }
+        if let Some(assignee) = &config.default_assignee
+            && !assignee.is_empty()
+            && !self.is_valid_email_or_username(assignee)
+        {
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_assignee".to_string()),
+                    "Assignee format doesn't look like an email or @username".to_string(),
+                )
+                .with_fix("Use email format (user@domain.com) or @username format".to_string()),
+            );
         }
 
-        if let Some(reporter) = &config.default_reporter {
-            if !reporter.is_empty() && !self.is_valid_email_or_username(reporter) {
-                result.add_error(
-                    ValidationError::warning(
-                        Some("default_reporter".to_string()),
-                        "Reporter format doesn't look like an email or @username".to_string(),
-                    )
-                    .with_fix("Use email format (user@domain.com) or @username format".to_string()),
-                );
-            }
+        if let Some(reporter) = &config.default_reporter
+            && !reporter.is_empty()
+            && !self.is_valid_email_or_username(reporter)
+        {
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_reporter".to_string()),
+                    "Reporter format doesn't look like an email or @username".to_string(),
+                )
+                .with_fix("Use email format (user@domain.com) or @username format".to_string()),
+            );
         }
 
         if let Some(tags) = &config.default_tags {

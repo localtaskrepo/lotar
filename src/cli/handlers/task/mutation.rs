@@ -23,12 +23,13 @@ pub fn load_task(
 
     let mut task_opt = ctx.storage.get(&full_id, project_prefix.clone());
 
-    if task_opt.is_none() && raw_id.chars().all(|c| c.is_ascii_digit()) {
-        if let Some((actual_id, task)) = ctx.storage.find_task_by_numeric_id(raw_id) {
-            project_prefix = actual_id.split('-').next().unwrap_or("").to_string();
-            full_id = actual_id;
-            task_opt = Some(task);
-        }
+    if task_opt.is_none()
+        && raw_id.chars().all(|c| c.is_ascii_digit())
+        && let Some((actual_id, task)) = ctx.storage.find_task_by_numeric_id(raw_id)
+    {
+        project_prefix = actual_id.split('-').next().unwrap_or("").to_string();
+        full_id = actual_id;
+        task_opt = Some(task);
     }
 
     let task = task_opt.ok_or_else(|| format!("Task '{}' not found", raw_id))?;
@@ -108,7 +109,7 @@ pub fn render_edit_preview(renderer: &OutputRenderer, id: &str, task: &Task) {
             renderer.emit_json(&obj);
         }
         _ => {
-            renderer.emit_info(&format!(
+            renderer.emit_info(format_args!(
                 "DRY RUN: Would update '{}' with: type={:?}, priority={}, assignee={:?}, due={:?}, tags={}",
                 id,
                 task.task_type,

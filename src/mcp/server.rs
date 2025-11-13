@@ -201,6 +201,7 @@ mod mcp_server_tests {
 }
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 use std::io::{self, BufRead, Read, Write};
 use std::sync::{OnceLock, RwLock};
 
@@ -362,26 +363,24 @@ pub fn run_stdio_server() {
         .ok()
         .map(|v| v != "0")
         .unwrap_or(true);
-    if autoreload_enabled {
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Ok(meta) = std::fs::metadata(&exe_path) {
-                if let Ok(modified) = meta.modified() {
-                    let initial = modified;
-                    std::thread::spawn(move || {
-                        use std::time::Duration;
-                        loop {
-                            std::thread::sleep(Duration::from_secs(2));
-                            if let Ok(Ok(m)) = std::fs::metadata(&exe_path).map(|m| m.modified()) {
-                                if m > initial {
-                                    // Binary updated; exit to allow host to restart with new build
-                                    std::process::exit(0);
-                                }
-                            }
-                        }
-                    });
+    if autoreload_enabled
+        && let Ok(exe_path) = std::env::current_exe()
+        && let Ok(meta) = std::fs::metadata(&exe_path)
+        && let Ok(modified) = meta.modified()
+    {
+        let initial = modified;
+        std::thread::spawn(move || {
+            use std::time::Duration;
+            loop {
+                std::thread::sleep(Duration::from_secs(2));
+                if let Ok(Ok(m)) = std::fs::metadata(&exe_path).map(|m| m.modified())
+                    && m > initial
+                {
+                    // Binary updated; exit to allow host to restart with new build
+                    std::process::exit(0);
                 }
             }
-        }
+        });
     }
     let stdin = io::stdin();
     let mut stdout = io::stdout();
@@ -424,10 +423,10 @@ pub fn run_stdio_server() {
                 if l.is_empty() {
                     break;
                 }
-                if l.to_ascii_lowercase().starts_with("content-length:") {
-                    if let Some(v) = l.split(':').nth(1) {
-                        content_length = v.trim().parse::<usize>().ok();
-                    }
+                if l.to_ascii_lowercase().starts_with("content-length:")
+                    && let Some(v) = l.split(':').nth(1)
+                {
+                    content_length = v.trim().parse::<usize>().ok();
                 }
             }
             if let Some(len) = content_length {
@@ -1568,15 +1567,15 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 _ => String::new(),
             });
 
-            if let Some(reference) = sprint_ref.as_ref() {
-                if reference.is_empty() {
-                    return err(
-                        req.id,
-                        -32602,
-                        "sprint must be a numeric id or keyword when provided",
-                        None,
-                    );
-                }
+            if let Some(reference) = sprint_ref.as_ref()
+                && reference.is_empty()
+            {
+                return err(
+                    req.id,
+                    -32602,
+                    "sprint must be a numeric id or keyword when provided",
+                    None,
+                );
             }
 
             let allow_closed = req
@@ -1801,15 +1800,15 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 _ => String::new(),
             });
 
-            if let Some(reference) = sprint_ref.as_ref() {
-                if reference.is_empty() {
-                    return err(
-                        req.id,
-                        -32602,
-                        "sprint must be a numeric id or keyword when provided",
-                        None,
-                    );
-                }
+            if let Some(reference) = sprint_ref.as_ref()
+                && reference.is_empty()
+            {
+                return err(
+                    req.id,
+                    -32602,
+                    "sprint must be a numeric id or keyword when provided",
+                    None,
+                );
             }
 
             let outcome = match crate::services::sprint_assignment::remove_tasks(
@@ -2017,10 +2016,11 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
 
             if cleanup_missing {
                 if removed_references > 0 {
-                    summary.push_str(&format!(
+                    let _ = write!(
+                        summary,
                         " Removed {} dangling sprint reference(s) across {} task(s).",
                         removed_references, updated_tasks
-                    ));
+                    );
                 } else {
                     summary.push_str(" No dangling sprint references required cleanup.");
                 }
@@ -2031,10 +2031,11 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     .map(|id| format!("#{}", id))
                     .collect::<Vec<_>>()
                     .join(", ");
-                summary.push_str(&format!(
+                let _ = write!(
+                    summary,
                     " Missing sprint references detected: {}. Re-run with cleanup_missing=true to remove them.",
                     missing
-                ));
+                );
             }
 
             let mut payload = serde_json::Map::new();

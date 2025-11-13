@@ -64,7 +64,7 @@ impl CommandHandler for ScanHandler {
 
         if !matches!(renderer.format, crate::output::OutputFormat::Json) {
             if roots.len() == 1 {
-                renderer.emit_info(&format!(
+                renderer.emit_info(format_args!(
                     "Scanning {} for TODO comments...",
                     roots[0].display()
                 ));
@@ -74,7 +74,7 @@ impl CommandHandler for ScanHandler {
                     .map(|r| r.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", ");
-                renderer.emit_info(&format!("Scanning multiple paths: {}", joined));
+                renderer.emit_info(format_args!("Scanning multiple paths: {}", joined));
             }
         }
 
@@ -160,7 +160,7 @@ impl CommandHandler for ScanHandler {
 
         let mut all_results = Vec::new();
         for root in roots {
-            renderer.log_debug(&format!("scan: scanning path={}", root.display()));
+            renderer.log_debug(format_args!("scan: scanning path={}", root.display()));
             let mut scanner = scanner::Scanner::new(root)
                 .with_include_ext(&args.include)
                 .with_exclude_ext(&args.exclude)
@@ -202,9 +202,9 @@ impl CommandHandler for ScanHandler {
                 })
                 .collect();
             match serde_json::to_string(&items) {
-                Ok(s) => renderer.emit_raw_stdout(&s),
+                Ok(s) => renderer.emit_raw_stdout(s),
                 Err(e) => renderer.emit_raw_stdout(
-                    &serde_json::json!({"status":"error","message":format!("scan serialization failed: {}", e)}).to_string(),
+                    serde_json::json!({"status":"error","message":format!("scan serialization failed: {}", e)}).to_string(),
                 ),
             }
         } else if all_results.is_empty() {
@@ -214,7 +214,7 @@ impl CommandHandler for ScanHandler {
                 Self::reanchor_existing_references(_resolver, renderer, None)?;
             }
         } else {
-            renderer.emit_info(&format!("Found {} TODO comment(s):", all_results.len()));
+            renderer.emit_info(format_args!("Found {} TODO comment(s):", all_results.len()));
             // When applying, we'll need a storage context for creating tasks
             let effective_project = match project_resolver.resolve_project("", _project) {
                 Ok(project) => {
@@ -248,7 +248,7 @@ impl CommandHandler for ScanHandler {
             for entry in all_results {
                 // If detailed flag is set, emit a per-file header line
                 if args.detailed {
-                    renderer.emit_raw_stdout(&format!("  📄 {}", entry.file_path.display()));
+                    renderer.emit_raw_stdout(format_args!("  📄 {}", entry.file_path.display()));
                 }
                 // Default behavior: apply changes (unless --dry-run)
                 // Read file and target line
@@ -339,15 +339,12 @@ impl CommandHandler for ScanHandler {
 
                                         let file_key = rel.as_str();
                                         task.references.retain(|r| {
-                                            if let Some(code) = &r.code {
-                                                if let Some((file_part, _)) = code.split_once("#L")
-                                                {
-                                                    if file_part == file_key
-                                                        && code != code_ref.as_str()
-                                                    {
-                                                        return false;
-                                                    }
-                                                }
+                                            if let Some(code) = &r.code
+                                                && let Some((file_part, _)) = code.split_once("#L")
+                                                && file_part == file_key
+                                                && code != code_ref.as_str()
+                                            {
+                                                return false;
                                             }
                                             true
                                         });
@@ -358,7 +355,7 @@ impl CommandHandler for ScanHandler {
                                         true
                                     })
                                 {
-                                    renderer.log_debug(&format!(
+                                    renderer.log_debug(format_args!(
                                         "scan: unable to update references for {}: {}",
                                         task_id, err
                                     ));
@@ -386,46 +383,44 @@ impl CommandHandler for ScanHandler {
                                         continue;
                                     }
                                     if let Some(ctx) = all_lines.get(ln - 1) {
-                                        renderer.emit_raw_stdout(&format!(
+                                        renderer.emit_raw_stdout(format_args!(
                                             "    {}:{}",
                                             entry.file_path.display(),
                                             ln
                                         ));
-                                        renderer.emit_raw_stdout(&format!("      {}", ctx));
+                                        renderer.emit_raw_stdout(format_args!("      {}", ctx));
                                     }
                                 }
                             }
 
                             // Only emit and write when a real change occurs
-                            if new_line != orig_line {
-                                if let Some(updated) =
+                            if new_line != orig_line
+                                && let Some(updated) =
                                     replace_line(&contents, entry.line_number, &new_line)
-                                {
-                                    if args.dry_run {
-                                        renderer.emit_raw_stdout(&format!(
-                                            "  📄 {}:{}\n    - {}\n    + {}",
-                                            entry.file_path.display(),
-                                            entry.line_number,
-                                            orig_line,
-                                            new_line
-                                        ));
-                                    } else if let Err(e) = std::fs::write(&entry.file_path, updated)
-                                    {
-                                        renderer.log_error(&format!(
-                                            "Failed to write changes to {}: {}",
-                                            entry.file_path.display(),
-                                            e
-                                        ));
-                                    } else {
-                                        renderer.emit_raw_stdout(&format!(
-                                            "  📄 {}:{}\n    - {}\n    + {}",
-                                            entry.file_path.display(),
-                                            entry.line_number,
-                                            orig_line,
-                                            new_line
-                                        ));
-                                        applied += 1;
-                                    }
+                            {
+                                if args.dry_run {
+                                    renderer.emit_raw_stdout(format_args!(
+                                        "  📄 {}:{}\n    - {}\n    + {}",
+                                        entry.file_path.display(),
+                                        entry.line_number,
+                                        orig_line,
+                                        new_line
+                                    ));
+                                } else if let Err(e) = std::fs::write(&entry.file_path, updated) {
+                                    renderer.log_error(format_args!(
+                                        "Failed to write changes to {}: {}",
+                                        entry.file_path.display(),
+                                        e
+                                    ));
+                                } else {
+                                    renderer.emit_raw_stdout(format_args!(
+                                        "  📄 {}:{}\n    - {}\n    + {}",
+                                        entry.file_path.display(),
+                                        entry.line_number,
+                                        orig_line,
+                                        new_line
+                                    ));
+                                    applied += 1;
                                 }
                             }
                         } else if !args.dry_run && cfg_enable_mentions {
@@ -468,15 +463,12 @@ impl CommandHandler for ScanHandler {
 
                                         let file_key = rel.as_str();
                                         task.references.retain(|r| {
-                                            if let Some(code) = &r.code {
-                                                if let Some((file_part, _)) = code.split_once("#L")
-                                                {
-                                                    if file_part == file_key
-                                                        && code != code_ref.as_str()
-                                                    {
-                                                        return false;
-                                                    }
-                                                }
+                                            if let Some(code) = &r.code
+                                                && let Some((file_part, _)) = code.split_once("#L")
+                                                && file_part == file_key
+                                                && code != code_ref.as_str()
+                                            {
+                                                return false;
                                             }
                                             true
                                         });
@@ -487,7 +479,7 @@ impl CommandHandler for ScanHandler {
                                         true
                                     })
                                 {
-                                    renderer.log_debug(&format!(
+                                    renderer.log_debug(format_args!(
                                         "scan: unable to refresh anchor for {}: {}",
                                         task_id, err
                                     ));
@@ -499,7 +491,7 @@ impl CommandHandler for ScanHandler {
                 // Apply path (and dry-run preview) prints patch above when changes occur; lines with existing keys are left untouched
             }
             if !args.dry_run && applied > 0 {
-                renderer.emit_success(&format!("Applied {} update(s).", applied));
+                renderer.emit_success(format_args!("Applied {} update(s).", applied));
             }
         }
 
@@ -814,19 +806,18 @@ impl ScanHandler {
                 let lines: Vec<&str> = content.lines().collect();
 
                 // If the original line still contains the key marker, nothing to do
-                if let Some(orig_line) = orig_line_opt {
-                    if let Some(existing) = lines.get(orig_line.saturating_sub(1)) {
-                        if Self::line_contains_key(existing, &key) {
-                            // Ensure canonical formatting of code ref
-                            let rel = crate::utils::paths::repo_relative_display(&abs_path);
-                            let new_code = format!("{}#L{}", rel, orig_line);
-                            if r.code.as_deref() != Some(&new_code) {
-                                r.code = Some(new_code.clone());
-                                changed = true;
-                            }
-                            continue;
-                        }
+                if let Some(orig_line) = orig_line_opt
+                    && let Some(existing) = lines.get(orig_line.saturating_sub(1))
+                    && Self::line_contains_key(existing, &key)
+                {
+                    // Ensure canonical formatting of code ref
+                    let rel = crate::utils::paths::repo_relative_display(&abs_path);
+                    let new_code = format!("{}#L{}", rel, orig_line);
+                    if r.code.as_deref() != Some(&new_code) {
+                        r.code = Some(new_code.clone());
+                        changed = true;
                     }
+                    continue;
                 }
 
                 // Proximity search window around original line (if known)
@@ -872,7 +863,7 @@ impl ScanHandler {
                     if r.code.as_deref() != Some(&new_code) {
                         r.code = Some(new_code.clone());
                         changed = true;
-                        renderer.log_debug(&format!("reanchor: {} -> {}", code_ref, new_code));
+                        renderer.log_debug(format_args!("reanchor: {} -> {}", code_ref, new_code));
                     }
                 }
             }
@@ -887,7 +878,7 @@ impl ScanHandler {
         }
 
         if updates > 0 {
-            renderer.emit_info(&format!("Re-anchored {} task(s).", updates));
+            renderer.emit_info(format_args!("Re-anchored {} task(s).", updates));
         }
         Ok(())
     }
@@ -940,12 +931,12 @@ impl ScanHandler {
                 continue;
             }
             let status = &line[..2];
-            if status.contains('R') {
-                if let Some(pos) = line.find(" -> ") {
-                    let old = line[3..pos].trim().to_string();
-                    let newp = line[pos + 4..].trim().to_string();
-                    map.insert(old, newp);
-                }
+            if status.contains('R')
+                && let Some(pos) = line.find(" -> ")
+            {
+                let old = line[3..pos].trim().to_string();
+                let newp = line[pos + 4..].trim().to_string();
+                map.insert(old, newp);
             }
         }
         map

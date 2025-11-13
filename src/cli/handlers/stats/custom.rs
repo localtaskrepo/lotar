@@ -49,7 +49,7 @@ pub(crate) fn run_keys(
                 for r in &rows {
                     let k = r["key"].as_str().unwrap_or("");
                     let n = r["count"].as_u64().unwrap_or(0);
-                    renderer.emit_raw_stdout(&format!("{:>4}  {}", n, k));
+                    renderer.emit_raw_stdout(format_args!("{:>4}  {}", n, k));
                 }
             }
         }
@@ -109,7 +109,7 @@ pub(crate) fn run_field(
                 for r in &rows {
                     let k = r["value"].as_str().unwrap_or("");
                     let n = r["count"].as_u64().unwrap_or(0);
-                    renderer.emit_raw_stdout(&format!("{:>4}  {}", n, k));
+                    renderer.emit_raw_stdout(format_args!("{:>4}  {}", n, k));
                 }
             }
         }

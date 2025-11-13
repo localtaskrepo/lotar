@@ -102,7 +102,7 @@ pub(crate) fn run(
                 renderer.emit_success("No activity in the selected window.");
             } else {
                 for i in &limited {
-                    renderer.emit_raw_stdout(&format!(
+                    renderer.emit_raw_stdout(format_args!(
                         "{:>6}  {}  {}",
                         i.count,
                         i.key,

@@ -141,12 +141,12 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
     };
 
     // Create tasks directory if it doesn't exist
-    if let Some(parent) = config_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent).map_err(|e| {
-                ConfigError::IoError(format!("Failed to create tasks directory: {}", e))
-            })?;
-        }
+    if let Some(parent) = config_path.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent).map_err(|e| {
+            ConfigError::IoError(format!("Failed to create tasks directory: {}", e))
+        })?;
     }
 
     // Create default config with auto-detected prefix
@@ -154,13 +154,13 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
 
     // Auto-detect the default prefix from the tasks directory structure
     // This only happens during initial global config creation
-    if let Some(tasks_dir_path) = tasks_dir {
-        if let Some(detected_prefix) = auto_detect_prefix(tasks_dir_path) {
-            default_config.default_prefix = detected_prefix;
-        }
-        // If no existing projects found, leave default_prefix empty
-        // It will be set when the first project is created
+    if let Some(tasks_dir_path) = tasks_dir
+        && let Some(detected_prefix) = auto_detect_prefix(tasks_dir_path)
+    {
+        default_config.default_prefix = detected_prefix;
     }
+    // If no existing projects found, leave default_prefix empty
+    // It will be set when the first project is created
 
     // Write in canonical nested format
     let config_yaml = crate::config::normalization::to_canonical_global_yaml(&default_config);
@@ -187,7 +187,7 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
             crate::output::OutputFormat::Text,
             crate::output::LogLevel::Warn,
         );
-        renderer.log_warn(&format!(
+        renderer.log_warn(format_args!(
             "Created default global configuration at: {}",
             config_path.display()
         ));

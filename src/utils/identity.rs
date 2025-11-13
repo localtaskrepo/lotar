@@ -83,28 +83,17 @@ fn explain_cache_key(tasks_root: Option<&Path>) -> String {
 pub fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
     // Fast path: check cache first
     let key = id_cache_key(tasks_root);
-    if let Ok(guard) = identity_cache().read() {
-        if let Some(cached) = guard.get(&key) {
-            return cached.clone();
-        }
+    if let Ok(guard) = identity_cache().read()
+        && let Some(cached) = guard.get(&key)
+    {
+        return cached.clone();
     }
 
     // Config default_reporter (global/project merged)
     if let Some(root) = tasks_root {
-        if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(Some(root)) {
-            if let Some(rep_raw) = cfg.default_reporter {
-                let trimmed = rep_raw.trim();
-                if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
-                    let rep = trimmed.to_string();
-                    if let Ok(mut guard) = identity_cache().write() {
-                        guard.insert(key.clone(), Some(rep.clone()));
-                    }
-                    return Some(rep);
-                }
-            }
-        }
-    } else if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(None) {
-        if let Some(rep_raw) = cfg.default_reporter {
+        if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(Some(root))
+            && let Some(rep_raw) = cfg.default_reporter
+        {
             let trimmed = rep_raw.trim();
             if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
                 let rep = trimmed.to_string();
@@ -113,6 +102,17 @@ pub fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
                 }
                 return Some(rep);
             }
+        }
+    } else if let Ok(cfg) = crate::config::resolution::load_and_merge_configs(None)
+        && let Some(rep_raw) = cfg.default_reporter
+    {
+        let trimmed = rep_raw.trim();
+        if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+            let rep = trimmed.to_string();
+            if let Ok(mut guard) = identity_cache().write() {
+                guard.insert(key.clone(), Some(rep.clone()));
+            }
+            return Some(rep);
         }
     }
 
@@ -123,34 +123,34 @@ pub fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
         .or_else(|| std::env::current_dir().ok());
     if let Some(repo_root) = repo_root {
         let git_config = repo_root.join(".git").join("config");
-        if git_config.exists() {
-            if let Ok(contents) = std::fs::read_to_string(&git_config) {
-                // Find user.name first
-                for line in contents.lines() {
-                    let line = line.trim();
-                    if line.starts_with("name = ") {
-                        let name = line.trim_start_matches("name = ").trim();
-                        if !name.is_empty() {
-                            let v = Some(name.to_string());
-                            if let Ok(mut guard) = identity_cache().write() {
-                                guard.insert(key.clone(), v.clone());
-                            }
-                            return v;
+        if git_config.exists()
+            && let Ok(contents) = std::fs::read_to_string(&git_config)
+        {
+            // Find user.name first
+            for line in contents.lines() {
+                let line = line.trim();
+                if line.starts_with("name = ") {
+                    let name = line.trim_start_matches("name = ").trim();
+                    if !name.is_empty() {
+                        let v = Some(name.to_string());
+                        if let Ok(mut guard) = identity_cache().write() {
+                            guard.insert(key.clone(), v.clone());
                         }
+                        return v;
                     }
                 }
-                // Then user.email
-                for line in contents.lines() {
-                    let line = line.trim();
-                    if line.starts_with("email = ") {
-                        let email = line.trim_start_matches("email = ").trim();
-                        if !email.is_empty() {
-                            let v = Some(email.to_string());
-                            if let Ok(mut guard) = identity_cache().write() {
-                                guard.insert(key.clone(), v.clone());
-                            }
-                            return v;
+            }
+            // Then user.email
+            for line in contents.lines() {
+                let line = line.trim();
+                if line.starts_with("email = ") {
+                    let email = line.trim_start_matches("email = ").trim();
+                    if !email.is_empty() {
+                        let v = Some(email.to_string());
+                        if let Ok(mut guard) = identity_cache().write() {
+                            guard.insert(key.clone(), v.clone());
                         }
+                        return v;
                     }
                 }
             }
@@ -189,10 +189,10 @@ pub fn resolve_current_user(tasks_root: Option<&Path>) -> Option<String> {
 /// Falls back to the same precedence as resolve_current_user.
 pub fn resolve_current_user_explain(tasks_root: Option<&Path>) -> Option<IdentityDetection> {
     let key = explain_cache_key(tasks_root);
-    if let Ok(guard) = identity_explain_cache().read() {
-        if let Some(cached) = guard.get(&key) {
-            return cached.clone();
-        }
+    if let Ok(guard) = identity_explain_cache().read()
+        && let Some(cached) = guard.get(&key)
+    {
+        return cached.clone();
     }
 
     let ctx = DetectContext { tasks_root };

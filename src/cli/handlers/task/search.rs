@@ -47,10 +47,10 @@ impl SearchHandler {
     ) -> Result<TaskFilter, String> {
         let mut task_filter = TaskFilter::default();
 
-        if let Some(query) = args.query.as_ref() {
-            if !query.is_empty() {
-                task_filter.text_query = Some(query.clone());
-            }
+        if let Some(query) = args.query.as_ref()
+            && !query.is_empty()
+        {
+            task_filter.text_query = Some(query.clone());
         }
 
         for status in &args.status {
@@ -194,7 +194,7 @@ impl SearchHandler {
             match renderer.format {
                 crate::output::OutputFormat::Json => {
                     renderer.emit_raw_stdout(
-                        &serde_json::json!({
+                        serde_json::json!({
                             "status": "success",
                             "message": "No tasks found",
                             "tasks": []
@@ -209,7 +209,7 @@ impl SearchHandler {
             return;
         }
 
-        renderer.log_info(&format!("list: {} result(s)", tasks.len()));
+        renderer.log_info(format_args!("list: {} result(s)", tasks.len()));
 
         let display_tasks: Vec<crate::output::TaskDisplayInfo> = tasks
             .into_iter()
@@ -240,7 +240,7 @@ impl SearchHandler {
         match renderer.format {
             crate::output::OutputFormat::Json => {
                 renderer.emit_raw_stdout(
-                    &serde_json::json!({
+                    serde_json::json!({
                         "status": "success",
                         "message": format!("Found {} task(s)", display_tasks.len()),
                         "tasks": display_tasks
@@ -249,16 +249,16 @@ impl SearchHandler {
                 );
             }
             _ => {
-                renderer.emit_success(&format!("Found {} task(s):", display_tasks.len()));
+                renderer.emit_success(format_args!("Found {} task(s):", display_tasks.len()));
                 for task in display_tasks {
-                    renderer.emit_raw_stdout(&format!(
+                    renderer.emit_raw_stdout(format_args!(
                         "  {} - {} [{}] ({})",
                         task.id, task.title, task.status, task.priority
                     ));
-                    if let Some(description) = &task.description {
-                        if !description.is_empty() {
-                            renderer.emit_raw_stdout(&format!("    {}", description));
-                        }
+                    if let Some(description) = &task.description
+                        && !description.is_empty()
+                    {
+                        renderer.emit_raw_stdout(format_args!("    {}", description));
                     }
                 }
             }
@@ -337,10 +337,10 @@ impl<'a> TaskPostFilters<'a> {
         if self.args.overdue {
             let now = chrono::Utc::now();
             tasks.retain(|(_, task)| {
-                if let Some(ref due) = task.due_date {
-                    if let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due) {
-                        return dt < now;
-                    }
+                if let Some(ref due) = task.due_date
+                    && let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due)
+                {
+                    return dt < now;
                 }
                 false
             });
@@ -354,10 +354,10 @@ impl<'a> TaskPostFilters<'a> {
             let now = chrono::Utc::now();
             let cutoff = now + chrono::Duration::days(days);
             tasks.retain(|(_, task)| {
-                if let Some(ref due) = task.due_date {
-                    if let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due) {
-                        return dt >= now && dt <= cutoff;
-                    }
+                if let Some(ref due) = task.due_date
+                    && let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due)
+                {
+                    return dt >= now && dt <= cutoff;
                 }
                 false
             });

@@ -102,7 +102,7 @@ pub(super) fn render_operation_response(
                 SprintOperationKind::Close => "Closed",
             };
 
-            renderer.emit_success(&format!(
+            renderer.emit_success(format_args!(
                 "{} sprint #{}{}.",
                 verb,
                 record.id,
@@ -115,11 +115,11 @@ pub(super) fn render_operation_response(
 
             if !applied_defaults.is_empty() {
                 let defaults_list = applied_defaults.join(", ");
-                renderer.emit_info(&format!("Applied sprint defaults: {}.", defaults_list));
+                renderer.emit_info(format_args!("Applied sprint defaults: {}.", defaults_list));
             }
 
             if let Some(computed_end) = detail.computed_end.as_ref() {
-                renderer.emit_info(&format!("Computed end: {}", computed_end));
+                renderer.emit_info(format_args!("Computed end: {}", computed_end));
             }
 
             if !canonical_warnings.is_empty() {
@@ -130,24 +130,23 @@ pub(super) fn render_operation_response(
 
             if warnings_enabled && !lifecycle.warnings.is_empty() {
                 for warning in &lifecycle.warnings {
-                    renderer.emit_warning(&warning.message());
+                    renderer.emit_warning(warning.message());
                 }
             }
 
-            if matches!(kind, SprintOperationKind::Start) {
-                if let Some(started_at) = actual_started_at {
-                    renderer.emit_info(&format!("Started at: {}", started_at));
-                }
+            if matches!(kind, SprintOperationKind::Start)
+                && let Some(started_at) = actual_started_at
+            {
+                renderer.emit_info(format_args!("Started at: {}", started_at));
             }
-            if matches!(kind, SprintOperationKind::Close) {
-                if let Some(closed_at) = record
+            if matches!(kind, SprintOperationKind::Close)
+                && let Some(closed_at) = record
                     .sprint
                     .actual
                     .as_ref()
                     .and_then(|actual| actual.closed_at.clone())
-                {
-                    renderer.emit_info(&format!("Closed at: {}", closed_at));
-                }
+            {
+                renderer.emit_info(format_args!("Closed at: {}", closed_at));
             }
         }
     }

@@ -20,7 +20,7 @@ pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16
         Ok(l) => l,
         Err(e) => {
             OutputRenderer::new(OutputFormat::Text, LogLevel::Error)
-                .log_error(&format!("Failed to bind to {}: {}", addr, e));
+                .log_error(format_args!("Failed to bind to {}: {}", addr, e));
             return;
         }
     };
@@ -195,7 +195,7 @@ pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16
             }
             Err(e) => {
                 OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                    .log_warn(&format!("Connection error: {}", e));
+                    .log_warn(format_args!("Connection error: {}", e));
             }
         }
     }
@@ -364,10 +364,10 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
 
             match rx.recv_timeout(timeout) {
                 Ok(evt) => {
-                    if let Some(ref kinds) = kinds_filter {
-                        if !kinds.iter().any(|k| k.eq_ignore_ascii_case(&evt.kind)) {
-                            continue;
-                        }
+                    if let Some(ref kinds) = kinds_filter
+                        && !kinds.iter().any(|k| k.eq_ignore_ascii_case(&evt.kind))
+                    {
+                        continue;
                     }
                     if let Some(ref pf) = project_filter {
                         let matches_project = match evt.kind.as_str() {
@@ -526,31 +526,31 @@ fn start_tasks_watcher() {
                             // Walk ancestors to locate the ".tasks" directory and take the next component as project
                             let mut proj: Option<String> = None;
                             for anc in p.ancestors() {
-                                if let Some(name) = anc.file_name().and_then(|s| s.to_str()) {
-                                    if name == ".tasks" {
-                                        // The path immediately under .tasks is the project directory
-                                        if let Some(project) = p
-                                            .strip_prefix(anc)
-                                            .ok()
-                                            .and_then(|rest| rest.components().next())
-                                            .and_then(|c| match c {
-                                                std::path::Component::Normal(os) => os.to_str(),
-                                                _ => None,
-                                            })
-                                        {
-                                            proj = Some(project.to_string());
-                                        }
-                                        break;
+                                if let Some(name) = anc.file_name().and_then(|s| s.to_str())
+                                    && name == ".tasks"
+                                {
+                                    // The path immediately under .tasks is the project directory
+                                    if let Some(project) = p
+                                        .strip_prefix(anc)
+                                        .ok()
+                                        .and_then(|rest| rest.components().next())
+                                        .and_then(|c| match c {
+                                            std::path::Component::Normal(os) => os.to_str(),
+                                            _ => None,
+                                        })
+                                    {
+                                        proj = Some(project.to_string());
                                     }
+                                    break;
                                 }
                             }
-                            if let Some(project) = proj {
-                                if emitted.insert(project.clone()) {
-                                    crate::api_events::emit(crate::api_events::ApiEvent {
-                                        kind: "project_changed".to_string(),
-                                        data: serde_json::json!({ "name": project }),
-                                    });
-                                }
+                            if let Some(project) = proj
+                                && emitted.insert(project.clone())
+                            {
+                                crate::api_events::emit(crate::api_events::ApiEvent {
+                                    kind: "project_changed".to_string(),
+                                    data: serde_json::json!({ "name": project }),
+                                });
                             }
                         }
                     }

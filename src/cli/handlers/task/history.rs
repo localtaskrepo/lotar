@@ -47,7 +47,7 @@ pub fn handle_history(
                 renderer.emit_success("No history for this task.");
             } else {
                 for c in &limited {
-                    renderer.emit_raw_stdout(&format!(
+                    renderer.emit_raw_stdout(format_args!(
                         "{}  {} <{}>  {}",
                         c.date.to_rfc3339(),
                         c.author,
@@ -55,7 +55,7 @@ pub fn handle_history(
                         c.commit
                     ));
                     if !c.message.is_empty() {
-                        renderer.emit_raw_stdout(&format!("    {}", c.message));
+                        renderer.emit_raw_stdout(format_args!("    {}", c.message));
                     }
                 }
             }
@@ -93,18 +93,17 @@ pub fn handle_history_by_field(
             &context.repo_root,
             &c.commit,
             &context.file_repo_path,
-        ) {
-            if let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(&content) {
-                snapshots.push((
-                    c.commit.clone(),
-                    TaskSnapshot {
-                        status: Some(task.status),
-                        priority: Some(task.priority),
-                        assignee: task.assignee,
-                        tags: task.tags,
-                    },
-                ));
-            }
+        ) && let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(&content)
+        {
+            snapshots.push((
+                c.commit.clone(),
+                TaskSnapshot {
+                    status: Some(task.status),
+                    priority: Some(task.priority),
+                    assignee: task.assignee,
+                    tags: task.tags,
+                },
+            ));
         }
     }
 
@@ -180,7 +179,7 @@ pub fn handle_history_by_field(
                 renderer.emit_success("No changes detected for the selected field.");
             } else {
                 for ch in &limited {
-                    renderer.emit_raw_stdout(&format!("{}", ch));
+                    renderer.emit_raw_stdout(format_args!("{}", ch));
                 }
             }
         }
@@ -329,7 +328,7 @@ pub fn handle_diff(
             }
             _ => {
                 if !structured_available {
-                    renderer.emit_raw_stdout(&result.to_string());
+                    renderer.emit_raw_stdout(result.to_string());
                     return Ok(());
                 }
 
@@ -340,7 +339,10 @@ pub fn handle_diff(
                         return Ok(());
                     }
 
-                    renderer.emit_info(&format!("Field differences for {} @ {}:", id, commit_sha));
+                    renderer.emit_info(format_args!(
+                        "Field differences for {} @ {}:",
+                        id, commit_sha
+                    ));
 
                     let mut entries: Vec<_> = map.iter().collect();
                     entries.sort_by(|a, b| a.0.cmp(b.0));
@@ -348,15 +350,19 @@ pub fn handle_diff(
                         if let Some(obj) = change.as_object() {
                             let old = obj.get("old").unwrap_or(&serde_json::Value::Null);
                             let new = obj.get("new").unwrap_or(&serde_json::Value::Null);
-                            renderer.emit_raw_stdout(&format!("{}:", field));
-                            renderer
-                                .emit_raw_stdout(&format!("  - old: {}", format_diff_value(old)));
-                            renderer
-                                .emit_raw_stdout(&format!("  + new: {}", format_diff_value(new)));
+                            renderer.emit_raw_stdout(format_args!("{}:", field));
+                            renderer.emit_raw_stdout(format_args!(
+                                "  - old: {}",
+                                format_diff_value(old)
+                            ));
+                            renderer.emit_raw_stdout(format_args!(
+                                "  + new: {}",
+                                format_diff_value(new)
+                            ));
                         }
                     }
                 } else {
-                    renderer.emit_raw_stdout(&result.to_string());
+                    renderer.emit_raw_stdout(result.to_string());
                 }
             }
         }

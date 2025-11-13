@@ -581,10 +581,12 @@ fn api_add_list_get_delete_roundtrip() {
     let mut yml_count = 0;
     if let Ok(entries) = std::fs::read_dir(&project_dir) {
         for e in entries.flatten() {
-            if let Some(ext) = e.path().extension().and_then(|s| s.to_str()) {
-                if ext == "yml" {
-                    yml_count += 1;
-                }
+            if e.path()
+                .extension()
+                .and_then(|s| s.to_str())
+                .is_some_and(|ext| ext == "yml")
+            {
+                yml_count += 1;
             }
         }
     }
@@ -1098,15 +1100,17 @@ fn sse_includes_triggered_by_identity() {
             Ok(v) => v,
             Err(_) => continue,
         };
-        if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
-            if id.starts_with("TEST-") {
-                assert_eq!(
-                    json.get("triggered_by").and_then(|v| v.as_str()),
-                    Some("alice")
-                );
-                found = true;
-                break;
-            }
+        if json
+            .get("id")
+            .and_then(|v| v.as_str())
+            .is_some_and(|id| id.starts_with("TEST-"))
+        {
+            assert_eq!(
+                json.get("triggered_by").and_then(|v| v.as_str()),
+                Some("alice")
+            );
+            found = true;
+            break;
         }
     }
     assert!(found, "did not find a TEST-* task_created event");

@@ -172,10 +172,11 @@ impl TestFixtures {
 pub fn extract_task_id_from_output(output: &str) -> Option<String> {
     // JSON payloads may nest the task ID within "task" or expose "task_id" directly.
     if let Ok(json) = serde_json::from_str::<Value>(output) {
-        if let Some(task) = json.get("task") {
-            if let Some(id) = task.get("id").and_then(Value::as_str) {
-                return Some(id.to_string());
-            }
+        if let Some(id) = json
+            .get("task")
+            .and_then(|task| task.get("id").and_then(Value::as_str))
+        {
+            return Some(id.to_string());
         }
         if let Some(id) = json.get("task_id").and_then(Value::as_str) {
             return Some(id.to_string());
@@ -184,10 +185,12 @@ pub fn extract_task_id_from_output(output: &str) -> Option<String> {
 
     // Prefer explicit creation messages when present.
     for line in output.lines() {
-        if let Some(rest) = line.split("Created task: ").nth(1) {
-            if let Some(id) = rest.split_whitespace().next() {
-                return Some(id.to_string());
-            }
+        if let Some(id) = line
+            .split("Created task: ")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next())
+        {
+            return Some(id.to_string());
         }
     }
 

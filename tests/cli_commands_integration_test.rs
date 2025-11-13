@@ -2232,7 +2232,10 @@ mod list_features {
                     serde_json::from_str(&output).expect("Should return valid JSON");
 
                 if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
-                    if tasks.len() <= 3 {}
+                    assert!(
+                        tasks.len() <= 3,
+                        "list --limit=3 should cap results to three tasks"
+                    );
                 }
             }
         }
@@ -2252,7 +2255,13 @@ mod list_features {
                 let json: serde_json::Value =
                     serde_json::from_str(&output).expect("Should return valid JSON");
 
-                if let Some(_tasks) = json.get("tasks").and_then(|t| t.as_array()) {}
+                if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
+                    assert_eq!(
+                        tasks.len(),
+                        5,
+                        "list without --limit should return all created tasks"
+                    );
+                }
             }
         }
     }
@@ -2573,10 +2582,12 @@ fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
     // Find the task with the matching ID in the tasks array
     if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
         for task in tasks {
-            if let Some(id) = task.get("id").and_then(|i| i.as_str()) {
-                if id == task_id {
-                    return task.clone();
-                }
+            if task
+                .get("id")
+                .and_then(|i| i.as_str())
+                .is_some_and(|id| id == task_id)
+            {
+                return task.clone();
             }
         }
     }

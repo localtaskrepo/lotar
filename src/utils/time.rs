@@ -199,15 +199,15 @@ fn parse_unsigned_days_or_weeks(s: &str) -> Option<Duration> {
         return Some(Duration::weeks(n));
     }
     let parts: Vec<&str> = s.split_whitespace().collect();
-    if parts.len() == 2 {
-        if let Ok(n) = parts[0].parse::<i64>() {
-            let unit = parts[1].to_lowercase();
-            if unit.starts_with('d') || unit.starts_with("day") {
-                return Some(Duration::days(n));
-            }
-            if unit.starts_with('w') || unit.starts_with("week") {
-                return Some(Duration::weeks(n));
-            }
+    if parts.len() == 2
+        && let Ok(n) = parts[0].parse::<i64>()
+    {
+        let unit = parts[1].to_lowercase();
+        if unit.starts_with('d') || unit.starts_with("day") {
+            return Some(Duration::days(n));
+        }
+        if unit.starts_with('w') || unit.starts_with("week") {
+            return Some(Duration::weeks(n));
         }
     }
     None
@@ -237,20 +237,20 @@ fn next_occurrence(target: Weekday) -> chrono::NaiveDate {
 
 fn parse_weekday_phrases(s: &str) -> Option<chrono::NaiveDate> {
     let t = s.trim();
-    if let Some(rest) = t.strip_prefix("next ") {
-        if let Some(wd) = parse_weekday_name(rest.trim()) {
-            return Some(next_occurrence(wd));
-        }
+    if let Some(rest) = t.strip_prefix("next ")
+        && let Some(wd) = parse_weekday_name(rest.trim())
+    {
+        return Some(next_occurrence(wd));
     }
-    if let Some(rest) = t.strip_prefix("this ") {
-        if let Some(wd) = parse_weekday_name(rest.trim()) {
-            return Some(next_occurrence(wd));
-        }
+    if let Some(rest) = t.strip_prefix("this ")
+        && let Some(wd) = parse_weekday_name(rest.trim())
+    {
+        return Some(next_occurrence(wd));
     }
-    if let Some(rest) = t.strip_prefix("by ") {
-        if let Some(wd) = parse_weekday_name(rest.trim()) {
-            return Some(next_occurrence(wd));
-        }
+    if let Some(rest) = t.strip_prefix("by ")
+        && let Some(wd) = parse_weekday_name(rest.trim())
+    {
+        return Some(next_occurrence(wd));
     }
     if let Some(wd) = parse_weekday_name(t) {
         return Some(next_occurrence(wd));
@@ -260,14 +260,14 @@ fn parse_weekday_phrases(s: &str) -> Option<chrono::NaiveDate> {
 
 fn parse_next_week_named(s: &str) -> Option<chrono::NaiveDate> {
     let t = s.trim();
-    if let Some(rest) = t.strip_prefix("next week ") {
-        if let Some(wd) = parse_weekday_name(rest.trim()) {
-            let today = Local::now().date_naive();
-            let mon_this = today - Duration::days(today.weekday().num_days_from_monday() as i64);
-            let mon_next = mon_this + Duration::weeks(1);
-            let offset_days = wd.num_days_from_monday() as i64;
-            return Some(mon_next + Duration::days(offset_days));
-        }
+    if let Some(rest) = t.strip_prefix("next week ")
+        && let Some(wd) = parse_weekday_name(rest.trim())
+    {
+        let today = Local::now().date_naive();
+        let mon_this = today - Duration::days(today.weekday().num_days_from_monday() as i64);
+        let mon_next = mon_this + Duration::weeks(1);
+        let offset_days = wd.num_days_from_monday() as i64;
+        return Some(mon_next + Duration::days(offset_days));
     }
     None
 }
@@ -281,10 +281,10 @@ fn parse_local_naive_datetime_to_utc(s: &str) -> Option<DateTime<Utc>> {
         "%Y-%m-%dT%H:%M",
     ];
     for fmt in &fmts {
-        if let Ok(ndt) = NaiveDateTime::parse_from_str(s, fmt) {
-            if let Some(dt) = Local.from_local_datetime(&ndt).single() {
-                return Some(dt.with_timezone(&Utc));
-            }
+        if let Ok(ndt) = NaiveDateTime::parse_from_str(s, fmt)
+            && let Some(dt) = Local.from_local_datetime(&ndt).single()
+        {
+            return Some(dt.with_timezone(&Utc));
         }
     }
     None
@@ -298,29 +298,29 @@ fn parse_signed_simple_offset(s: &str) -> Option<Duration> {
     let sign = if t.starts_with('-') { -1 } else { 1 };
     let rest = &t[1..];
     // compact: +/-10d, +/-2w
-    if let Some(unit) = rest.chars().last() {
-        if unit == 'd' || unit == 'w' {
-            let num_part = &rest[..rest.len() - 1];
-            if let Ok(n) = num_part.parse::<i64>() {
-                return Some(if unit == 'd' {
-                    Duration::days(sign * n)
-                } else {
-                    Duration::weeks(sign * n)
-                });
-            }
+    if let Some(unit) = rest.chars().last()
+        && (unit == 'd' || unit == 'w')
+    {
+        let num_part = &rest[..rest.len() - 1];
+        if let Ok(n) = num_part.parse::<i64>() {
+            return Some(if unit == 'd' {
+                Duration::days(sign * n)
+            } else {
+                Duration::weeks(sign * n)
+            });
         }
     }
     // spaced: +/-10 day(s), +/-2 week(s)
     let parts: Vec<&str> = rest.split_whitespace().collect();
-    if parts.len() == 2 {
-        if let Ok(n) = parts[0].parse::<i64>() {
-            let unit = parts[1].to_lowercase();
-            if unit.starts_with("day") {
-                return Some(Duration::days(sign * n));
-            }
-            if unit.starts_with("week") {
-                return Some(Duration::weeks(sign * n));
-            }
+    if parts.len() == 2
+        && let Ok(n) = parts[0].parse::<i64>()
+    {
+        let unit = parts[1].to_lowercase();
+        if unit.starts_with("day") {
+            return Some(Duration::days(sign * n));
+        }
+        if unit.starts_with("week") {
+            return Some(Duration::weeks(sign * n));
         }
     }
     None
@@ -330,15 +330,15 @@ fn parse_in_offset(s: &str) -> Option<Duration> {
     let t = s.trim();
     if let Some(rest) = t.strip_prefix("in ") {
         let parts: Vec<&str> = rest.split_whitespace().collect();
-        if parts.len() == 2 {
-            if let Ok(n) = parts[0].parse::<i64>() {
-                let unit = parts[1].to_lowercase();
-                if unit.starts_with('d') || unit.starts_with("day") {
-                    return Some(Duration::days(n));
-                }
-                if unit.starts_with('w') || unit.starts_with("week") {
-                    return Some(Duration::weeks(n));
-                }
+        if parts.len() == 2
+            && let Ok(n) = parts[0].parse::<i64>()
+        {
+            let unit = parts[1].to_lowercase();
+            if unit.starts_with('d') || unit.starts_with("day") {
+                return Some(Duration::days(n));
+            }
+            if unit.starts_with('w') || unit.starts_with("week") {
+                return Some(Duration::weeks(n));
             }
         }
     }
@@ -348,10 +348,10 @@ fn parse_in_offset(s: &str) -> Option<Duration> {
 fn parse_ago_offset(s: &str) -> Option<Duration> {
     // "3 days ago", "2w ago"
     let t = s.trim();
-    if let Some(rest) = t.strip_suffix(" ago") {
-        if let Some(d) = parse_unsigned_days_or_weeks(rest.trim()) {
-            return Some(d);
-        }
+    if let Some(rest) = t.strip_suffix(" ago")
+        && let Some(d) = parse_unsigned_days_or_weeks(rest.trim())
+    {
+        return Some(d);
     }
     None
 }
@@ -359,18 +359,18 @@ fn parse_ago_offset(s: &str) -> Option<Duration> {
 fn parse_business_days_offset(s: &str) -> Option<i64> {
     let t = s.trim_start();
     if let Some(rest) = t.strip_prefix('+') {
-        if let Some(rest2) = rest.strip_suffix("bd") {
-            if let Ok(n) = rest2.parse::<i64>() {
-                return Some(n);
-            }
+        if let Some(rest2) = rest.strip_suffix("bd")
+            && let Ok(n) = rest2.parse::<i64>()
+        {
+            return Some(n);
         }
         let parts: Vec<&str> = rest.split_whitespace().collect();
-        if parts.len() >= 2 {
-            if let Ok(n) = parts[0].parse::<i64>() {
-                let unit = parts[1].to_lowercase();
-                if unit.starts_with("business") {
-                    return Some(n);
-                }
+        if parts.len() >= 2
+            && let Ok(n) = parts[0].parse::<i64>()
+        {
+            let unit = parts[1].to_lowercase();
+            if unit.starts_with("business") {
+                return Some(n);
             }
         }
     }

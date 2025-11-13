@@ -33,7 +33,7 @@ impl CommandHandler for PriorityHandler {
 
         let project_hint = explicit_project.as_deref().or(project);
 
-        renderer.log_info(&format!(
+        renderer.log_info(format_args!(
             "priority: begin task_id={} explicit_project={:?}",
             task_id, project_hint
         ));
@@ -64,7 +64,7 @@ fn handle_set_priority(
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let validator = CliValidator::new(&ctx.config);
-    renderer.log_debug(&format!(
+    renderer.log_debug(format_args!(
         "priority: validating new_priority='{}'",
         candidate
     ));

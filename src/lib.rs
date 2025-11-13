@@ -1,4 +1,8 @@
-#![allow(clippy::uninlined_format_args)]
+// Note: clippy allows for `uninlined_format_args` and `collapsible_if` were
+// previously added to suppress new lints when upgrading the stable toolchain.
+// We'll remove them temporarily in CI so we can evaluate whether the warnings
+// still occur and address them individually. If necessary we can re-add a more
+// targeted allow later.
 
 pub mod api_events;
 pub mod api_server;
