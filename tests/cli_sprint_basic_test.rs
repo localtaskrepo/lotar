@@ -751,7 +751,9 @@ issue.priorities: [Medium]
         Priority::from("Medium"),
     );
     task_done.status = TaskStatus::from("Done");
-    let task_done_id = storage.add(&task_done, "TEST", Some("Test Project"));
+    let task_done_id = storage
+        .add(&task_done, "TEST", Some("Test Project"))
+        .expect("failed to add done task");
 
     let mut task_in_progress = Task::new(
         fixtures.tasks_root.clone(),
@@ -759,7 +761,9 @@ issue.priorities: [Medium]
         Priority::from("Medium"),
     );
     task_in_progress.status = TaskStatus::from("InProgress");
-    let task_in_progress_id = storage.add(&task_in_progress, "TEST", Some("Test Project"));
+    let task_in_progress_id = storage
+        .add(&task_in_progress, "TEST", Some("Test Project"))
+        .expect("failed to add in-progress task");
 
     let mut task_todo = Task::new(
         fixtures.tasks_root.clone(),
@@ -767,7 +771,9 @@ issue.priorities: [Medium]
         Priority::from("Medium"),
     );
     task_todo.status = TaskStatus::from("Todo");
-    let task_todo_id = storage.add(&task_todo, "TEST", Some("Test Project"));
+    let task_todo_id = storage
+        .add(&task_todo, "TEST", Some("Test Project"))
+        .expect("failed to add todo task");
 
     let task_ids = vec![task_done_id, task_in_progress_id, task_todo_id];
     append_sprint_tasks(&mut storage, 1, &task_ids);
@@ -845,7 +851,9 @@ issue.priorities: [Medium]
     );
     done_hours_task.status = TaskStatus::from("Done");
     done_hours_task.effort = Some("8h".to_string());
-    let done_hours_id = storage.add(&done_hours_task, "TEST", Some("Test Project"));
+    let done_hours_id = storage
+        .add(&done_hours_task, "TEST", Some("Test Project"))
+        .expect("failed to add done hours task");
 
     let mut remaining_hours_task = Task::new(
         fixtures.tasks_root.clone(),
@@ -854,7 +862,9 @@ issue.priorities: [Medium]
     );
     remaining_hours_task.status = TaskStatus::from("InProgress");
     remaining_hours_task.effort = Some("4h".to_string());
-    let remaining_hours_id = storage.add(&remaining_hours_task, "TEST", Some("Test Project"));
+    let remaining_hours_id = storage
+        .add(&remaining_hours_task, "TEST", Some("Test Project"))
+        .expect("failed to add remaining hours task");
 
     let mut done_points_task = Task::new(
         fixtures.tasks_root.clone(),
@@ -863,7 +873,9 @@ issue.priorities: [Medium]
     );
     done_points_task.status = TaskStatus::from("Done");
     done_points_task.effort = Some("3pt".to_string());
-    let done_points_id = storage.add(&done_points_task, "TEST", Some("Test Project"));
+    let done_points_id = storage
+        .add(&done_points_task, "TEST", Some("Test Project"))
+        .expect("failed to add done points task");
 
     let mut remaining_points_task = Task::new(
         fixtures.tasks_root.clone(),
@@ -872,7 +884,9 @@ issue.priorities: [Medium]
     );
     remaining_points_task.status = TaskStatus::from("Todo");
     remaining_points_task.effort = Some("5pt".to_string());
-    let remaining_points_id = storage.add(&remaining_points_task, "TEST", Some("Test Project"));
+    let remaining_points_id = storage
+        .add(&remaining_points_task, "TEST", Some("Test Project"))
+        .expect("failed to add remaining points task");
 
     let task_ids = vec![
         done_hours_id,
@@ -1005,7 +1019,9 @@ fn sprint_cleanup_refs_prunes_missing_memberships() {
     );
     task.status = TaskStatus::from("Todo");
     task.sprints = vec![1, 99];
-    let task_id = storage.add(&task, "TEST", Some("Test Project"));
+    let task_id = storage
+        .add(&task, "TEST", Some("Test Project"))
+        .expect("failed to add sprint cleanup task");
 
     drop(storage);
 
@@ -1045,7 +1061,9 @@ fn sprint_cleanup_refs_targets_requested_sprint() {
     );
     task.status = TaskStatus::from("Todo");
     task.sprints = vec![5, 6];
-    let task_id = storage.add(&task, "TEST", Some("Test Project"));
+    let task_id = storage
+        .add(&task, "TEST", Some("Test Project"))
+        .expect("failed to add cleanup target");
 
     drop(storage);
 
@@ -1103,8 +1121,12 @@ fn sprint_add_assigns_tasks_to_sprint() {
     );
     task_b.status = TaskStatus::from("Todo");
 
-    let id_a = storage.add(&task_a, "TEST", Some("Test Project"));
-    let id_b = storage.add(&task_b, "TEST", Some("Test Project"));
+    let id_a = storage
+        .add(&task_a, "TEST", Some("Test Project"))
+        .expect("failed to add task a");
+    let id_b = storage
+        .add(&task_b, "TEST", Some("Test Project"))
+        .expect("failed to add task b");
     drop(storage);
 
     let mut cmd = common::cargo_bin_in(&fixtures);
@@ -1158,7 +1180,9 @@ fn sprint_add_requires_force_for_existing_membership() {
         Priority::from("Medium"),
     );
     task.status = TaskStatus::from("Todo");
-    let task_id = storage.add(&task, "TEST", Some("Test Project"));
+    let task_id = storage
+        .add(&task, "TEST", Some("Test Project"))
+        .expect("failed to add sprint-assigned task");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_one_record.sprint.tasks.push(SprintTaskEntry {
         id: task_id.clone(),
@@ -1233,7 +1257,9 @@ fn sprint_move_reassigns_memberships() {
         Priority::from("Medium"),
     );
     task.status = TaskStatus::from("Todo");
-    let task_id = storage.add(&task, "TEST", Some("Test Project"));
+    let task_id = storage
+        .add(&task, "TEST", Some("Test Project"))
+        .expect("failed to add task for sprint move");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_one_record.sprint.tasks.push(SprintTaskEntry {
         id: task_id.clone(),
@@ -1290,7 +1316,9 @@ fn sprint_move_json_reports_reassignment_messages() {
         Priority::from("Medium"),
     );
     task.status = TaskStatus::from("Todo");
-    let task_id = storage.add(&task, "TEST", Some("Test Project"));
+    let task_id = storage
+        .add(&task, "TEST", Some("Test Project"))
+        .expect("failed to add task for sprint move json");
     let mut sprint_one_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_one_record.sprint.tasks.push(SprintTaskEntry {
         id: task_id.clone(),
@@ -1344,7 +1372,9 @@ fn sprint_remove_detaches_tasks() {
         Priority::from("Medium"),
     );
     task.status = TaskStatus::from("Todo");
-    let task_id = storage.add(&task, "TEST", Some("Test Project"));
+    let task_id = storage
+        .add(&task, "TEST", Some("Test Project"))
+        .expect("failed to add task for sprint remove");
     let mut sprint_record = SprintService::get(&storage, 1).expect("load sprint #1");
     sprint_record.sprint.tasks.push(SprintTaskEntry {
         id: task_id.clone(),
@@ -1392,7 +1422,9 @@ fn sprint_backlog_lists_unassigned_tasks() {
         Priority::from("Medium"),
     );
     backlog_task.status = TaskStatus::from("Todo");
-    let backlog_id = storage.add(&backlog_task, "TEST", Some("Test Project"));
+    let backlog_id = storage
+        .add(&backlog_task, "TEST", Some("Test Project"))
+        .expect("failed to add backlog task");
 
     let mut assigned_task = Task::new(
         fixtures.tasks_root.clone(),
@@ -1400,7 +1432,9 @@ fn sprint_backlog_lists_unassigned_tasks() {
         Priority::from("Medium"),
     );
     assigned_task.status = TaskStatus::from("InProgress");
-    let assigned_id = storage.add(&assigned_task, "TEST", Some("Test Project"));
+    let assigned_id = storage
+        .add(&assigned_task, "TEST", Some("Test Project"))
+        .expect("failed to add assigned task");
     append_sprint_tasks(&mut storage, 1, &[assigned_id.clone()]);
     drop(storage);
 

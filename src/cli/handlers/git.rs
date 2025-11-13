@@ -210,7 +210,7 @@ impl GitHandler {
                     "previous": previous,
                     "state": state.label(),
                 });
-                renderer.emit_raw_stdout(&payload.to_string());
+                renderer.emit_json(&payload);
             }
             _ => {
                 let base_message = match state {

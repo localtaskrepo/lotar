@@ -614,7 +614,9 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
         .get(&ghost.id, project_prefix.clone())
         .expect("ghost record on disk");
     ghost_record.sprints = vec![42];
-    storage.edit(&ghost.id, &ghost_record);
+    storage
+        .edit(&ghost.id, &ghost_record)
+        .expect("failed to persist ghost task");
     drop(storage);
 
     let backlog_req = serde_json::json!({

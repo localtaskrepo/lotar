@@ -1,9 +1,15 @@
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
+use crate::cli::handlers::task::render::{
+    ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview,
+    PropertySuccess, render_property_current, render_property_noop, render_property_preview,
+    render_property_success,
+};
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
-use crate::output::{OutputFormat, OutputRenderer};
+use crate::output::OutputRenderer;
 use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::Value;
@@ -98,11 +104,7 @@ fn handle_set_status(
     let old_status = task.status.clone();
     if old_status == validated_status {
         renderer.log_info("status: no-op (old == new)");
-        renderer.emit_warning(&format!(
-            "Task {} already has status '{}'",
-            full_id, validated_status
-        ));
-        renderer.emit_notice(&format!("Task {} status unchanged", full_id));
+        render_status_noop(renderer, &full_id, &old_status);
         return Ok(());
     }
 
@@ -116,7 +118,7 @@ fn handle_set_status(
     };
 
     if dry_run {
-        render_dry_run_preview(
+        render_status_preview(
             renderer,
             &full_id,
             &old_status,
@@ -133,7 +135,9 @@ fn handle_set_status(
     }
 
     renderer.log_debug("status: persisting change to storage");
-    ctx.storage.edit(&full_id, &task);
+    ctx.storage
+        .edit(&full_id, &task)
+        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
     renderer.log_info("status: updated successfully");
 
     render_status_success(
@@ -147,20 +151,31 @@ fn handle_set_status(
 }
 
 fn render_current_status(renderer: &OutputRenderer, task_id: &str, status: &TaskStatus) {
-    match renderer.format {
-        OutputFormat::Json => {
-            let payload = serde_json::json!({
-                "status": "success",
-                "task_id": task_id,
-                "status_value": status.to_string(),
-            });
-            renderer.emit_raw_stdout(&payload.to_string());
-        }
-        _ => renderer.emit_success(&format!("Task {} status: {}", task_id, status)),
-    }
+    let message = format!("Task {} status: {}", task_id, status);
+    let payload = PropertyCurrent::new(
+        task_id,
+        "status_value",
+        Some(status.to_string()),
+        message.clone(),
+    );
+    render_property_current(renderer, payload);
 }
 
-fn render_dry_run_preview(
+fn render_status_noop(renderer: &OutputRenderer, task_id: &str, status: &TaskStatus) {
+    let json_message = format!("Task {} status unchanged", task_id);
+    let text_message = format!("Task {} already has status '{}'", task_id, status);
+    let payload = PropertyNoop::new(
+        task_id,
+        "status",
+        Some(status.to_string()),
+        json_message,
+        text_message,
+    )
+    .with_notice(format!("Task {} status unchanged", task_id));
+    render_property_noop(renderer, payload);
+}
+
+fn render_status_preview(
     renderer: &OutputRenderer,
     task_id: &str,
     old_status: &TaskStatus,
@@ -168,37 +183,38 @@ fn render_dry_run_preview(
     assignee: Option<&str>,
     explain: bool,
 ) {
-    match renderer.format {
-        OutputFormat::Json => {
-            let mut payload = serde_json::json!({
-                "status": "preview",
-                "action": "status_change",
-                "task_id": task_id,
-                "old_status": old_status.to_string(),
-                "new_status": new_status.to_string(),
-            });
-            if let Some(candidate) = assignee {
-                payload["would_set_assignee"] = Value::String(candidate.to_string());
-            }
-            if explain {
-                payload["explain"] = Value::String(DRY_RUN_EXPLANATION.to_string());
-            }
-            renderer.emit_raw_stdout(&payload.to_string());
-        }
-        _ => {
-            let mut message = format!(
-                "DRY RUN: Would change {} status from {} to {}",
-                task_id, old_status, new_status
-            );
-            if let Some(candidate) = assignee {
-                message.push_str(&format!("; would set assignee = {}", candidate));
-            }
-            renderer.emit_info(&message);
-            if explain {
-                renderer.emit_info(&format!("Explanation: {}", DRY_RUN_EXPLANATION));
-            }
-        }
+    let mut text_message = format!(
+        "DRY RUN: Would change {} status from {} to {}",
+        task_id, old_status, new_status
+    );
+    if let Some(candidate) = assignee {
+        text_message.push_str(&format!("; would set assignee = {}", candidate));
     }
+    let mut payload = PropertyPreview::new(
+        task_id,
+        "status_change",
+        "old_status",
+        "new_status",
+        Some(old_status.to_string()),
+        Some(new_status.to_string()),
+        text_message.clone(),
+    )
+    .with_json_message(text_message.clone());
+
+    if let Some(candidate) = assignee {
+        payload =
+            payload.with_extra_json("would_set_assignee", Value::String(candidate.to_string()));
+    }
+
+    if explain {
+        let explain_message = format!("Explanation: {}", DRY_RUN_EXPLANATION);
+        payload = payload.with_explain(PropertyExplain::info(
+            explain_message,
+            ExplainPlacement::After,
+        ));
+    }
+
+    render_property_preview(renderer, payload);
 }
 
 fn render_status_success(
@@ -208,30 +224,25 @@ fn render_status_success(
     new_status: &TaskStatus,
     assignee: Option<&str>,
 ) {
-    match renderer.format {
-        OutputFormat::Json => {
-            let mut payload = serde_json::json!({
-                "status": "success",
-                "message": format!(
-                    "Task {} status changed from {} to {}",
-                    task_id, old_status, new_status
-                ),
-                "task_id": task_id,
-                "old_status": old_status.to_string(),
-                "new_status": new_status.to_string(),
-            });
-            if let Some(value) = assignee {
-                payload["assignee"] = Value::String(value.to_string());
-            }
-            renderer.emit_raw_stdout(&payload.to_string());
-        }
-        _ => {
-            renderer.emit_success(&format!(
-                "Task {} status changed from {} to {}",
-                task_id, old_status, new_status
-            ));
-        }
+    let message = format!(
+        "Task {} status changed from {} to {}",
+        task_id, old_status, new_status
+    );
+    let mut payload = PropertySuccess::new(
+        task_id,
+        "old_status",
+        "new_status",
+        Some(old_status.to_string()),
+        Some(new_status.to_string()),
+        message.clone(),
+        message,
+    );
+
+    if let Some(value) = assignee {
+        payload = payload.with_extra_json("assignee", Value::String(value.to_string()));
     }
+
+    render_property_success(renderer, payload);
 }
 
 fn should_auto_assign(

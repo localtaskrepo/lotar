@@ -72,7 +72,7 @@ pub(crate) fn handle_add(
                     cleanup_summary.as_ref(),
                 ),
             };
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => {
             renderer.emit_success(&format!(
@@ -162,7 +162,7 @@ pub(crate) fn handle_move(
                     cleanup_summary.as_ref(),
                 ),
             };
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => {
             renderer.emit_success(&format!(
@@ -237,7 +237,7 @@ pub(crate) fn handle_remove(
                     cleanup_summary.as_ref(),
                 ),
             };
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => {
             renderer.emit_success(&format!(

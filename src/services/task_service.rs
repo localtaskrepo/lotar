@@ -155,7 +155,7 @@ impl TaskService {
             Self::maybe_auto_populate_members(storage.root_path.as_path(), &project, &t, config)?;
         Self::enforce_membership(&t, &config, &project)?;
 
-        let id = storage.add(&t, &project, None);
+        let id = storage.add(&t, &project, None)?;
         if !normalized_sprints.is_empty() {
             Self::replace_sprint_memberships(storage, &id, &normalized_sprints)?;
         }
@@ -353,7 +353,7 @@ impl TaskService {
 
         t.sprints.clear();
 
-        storage.edit(id, &t);
+        storage.edit(id, &t)?;
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
         Ok(Self::to_dto(id, t, Some(&sprint_lookup)))
@@ -362,7 +362,7 @@ impl TaskService {
     pub fn delete(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<bool> {
         let derived = id.split('-').next().unwrap_or("");
         let p = project.unwrap_or(derived).to_string();
-        Ok(storage.delete(id, p))
+        storage.delete(id, p)
     }
 
     pub fn list(storage: &Storage, filter: &TaskListFilter) -> Vec<(String, TaskDTO)> {

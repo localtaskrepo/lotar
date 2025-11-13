@@ -46,7 +46,7 @@ pub(crate) fn handle_velocity(
     match renderer.format {
         OutputFormat::Json => {
             let payload = computation.to_payload(velocity_args.include_active);
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => render_velocity_text(
             renderer,

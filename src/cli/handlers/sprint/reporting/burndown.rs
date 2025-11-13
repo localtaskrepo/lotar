@@ -47,7 +47,7 @@ pub(crate) fn handle_burndown(
 
     match renderer.format {
         OutputFormat::Json => {
-            renderer.emit_raw_stdout(&serde_json::to_string(&context.payload).unwrap_or_default());
+            renderer.emit_json(&context.payload);
         }
         _ => render_burndown_text(renderer, &context, burndown_args.metric),
     }

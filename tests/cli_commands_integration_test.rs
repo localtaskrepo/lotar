@@ -13,7 +13,7 @@ use std::fs;
 use tempfile::TempDir;
 
 mod common;
-use common::TestFixtures;
+use common::{TestFixtures, extract_task_id_from_output};
 
 // =============================================================================
 // Basic CLI Commands
@@ -468,30 +468,7 @@ mod error_handling {
 // Helper Functions
 // =============================================================================
 
-fn extract_task_id_from_output(output: &str) -> Option<String> {
-    // Try to extract task ID from JSON first
-    if let Ok(json) = serde_json::from_str::<serde_json::Value>(output) {
-        if let Some(task) = json.get("task") {
-            if let Some(id) = task.get("id").and_then(|v| v.as_str()) {
-                return Some(id.to_string());
-            }
-        }
-        // Also try top-level task_id field
-        if let Some(id) = json.get("task_id").and_then(|v| v.as_str()) {
-            return Some(id.to_string());
-        }
-    }
-
-    // Fall back to text parsing for non-JSON output
-    for line in output.lines() {
-        if line.contains("Created task:") {
-            if let Some(id_part) = line.split(":").nth(1) {
-                return Some(id_part.trim().to_string());
-            }
-        }
-    }
-    None
-}
+// Additional helper functions specific to this module live here as needed.
 
 // =============================================================================
 // Consolidated: List alias (ls)

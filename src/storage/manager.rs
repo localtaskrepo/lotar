@@ -1,3 +1,4 @@
+use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::TaskFilter;
 use crate::storage::backend::{FsBackend, StorageBackend};
 use crate::storage::locator::StorageLocator;
@@ -56,14 +57,10 @@ impl Storage {
         task: &Task,
         project_prefix: &str,
         original_project_name: Option<&str>,
-    ) -> String {
-        match self
-            .backend
+    ) -> LoTaRResult<String> {
+        self.backend
             .add(&self.root_path, task, project_prefix, original_project_name)
-        {
-            Ok(formatted_id) => formatted_id,
-            Err(_) => "ERROR".to_string(), // TODO: Better error handling
-        }
+            .map_err(map_storage_error)
     }
 
     pub fn get(&self, id: &str, project: String) -> Option<Task> {
@@ -140,17 +137,29 @@ impl Storage {
         None
     }
 
-    pub fn edit(&mut self, id: &str, new_task: &Task) {
-        let _ = self.backend.edit(&self.root_path, id, new_task);
+    pub fn edit(&mut self, id: &str, new_task: &Task) -> LoTaRResult<()> {
+        self.backend
+            .edit(&self.root_path, id, new_task)
+            .map_err(map_storage_error)
     }
 
-    pub fn delete(&mut self, id: &str, project: String) -> bool {
+    pub fn delete(&mut self, id: &str, project: String) -> LoTaRResult<bool> {
         self.backend
             .delete(&self.root_path, id, &project)
-            .unwrap_or_default()
+            .map_err(map_storage_error)
     }
 
     pub fn search(&self, filter: &TaskFilter) -> Vec<(String, Task)> {
         StorageSearch::search(&self.root_path, filter)
+    }
+}
+
+fn map_storage_error(err: Box<dyn std::error::Error>) -> LoTaRError {
+    match err.downcast::<std::io::Error>() {
+        Ok(io_err) => LoTaRError::IoError(*io_err),
+        Err(err) => match err.downcast::<serde_yaml::Error>() {
+            Ok(yaml_err) => LoTaRError::SerializationError(yaml_err.to_string()),
+            Err(other) => LoTaRError::ValidationError(other.to_string()),
+        },
     }
 }

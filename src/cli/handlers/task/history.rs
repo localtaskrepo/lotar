@@ -40,7 +40,7 @@ pub fn handle_history(
                 "count": items.len(),
                 "items": items
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if limited.is_empty() {
@@ -173,7 +173,7 @@ pub fn handle_history_by_field(
                 "count": limited.len(),
                 "items": limited,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if limited.is_empty() {
@@ -291,7 +291,28 @@ pub fn handle_diff(
                 serde_json::json!(prev.tags),
                 serde_json::json!(cur.tags),
             );
+            push_change(
+                "description",
+                serde_json::json!(prev.description),
+                serde_json::json!(cur.description),
+            );
+            push_change(
+                "relationships",
+                serde_json::json!(prev.relationships),
+                serde_json::json!(cur.relationships),
+            );
+            push_change(
+                "custom_fields",
+                serde_json::json!(prev.custom_fields),
+                serde_json::json!(cur.custom_fields),
+            );
+            push_change(
+                "sprints",
+                serde_json::json!(prev.sprints),
+                serde_json::json!(cur.sprints),
+            );
         }
+        let structured_available = cur_task.is_some() && prev_task.is_some();
         let result = serde_json::Value::Object(deltas);
         match renderer.format {
             crate::output::OutputFormat::Json => {
@@ -304,9 +325,40 @@ pub fn handle_diff(
                     "commit": commit_sha,
                     "diff": result
                 });
-                renderer.emit_raw_stdout(&obj.to_string());
+                renderer.emit_json(&obj);
             }
-            _ => renderer.emit_raw_stdout(&result.to_string()),
+            _ => {
+                if !structured_available {
+                    renderer.emit_raw_stdout(&result.to_string());
+                    return Ok(());
+                }
+
+                if let Some(map) = result.as_object() {
+                    if map.is_empty() {
+                        renderer
+                            .emit_success("No field-level changes detected between these commits.");
+                        return Ok(());
+                    }
+
+                    renderer.emit_info(&format!("Field differences for {} @ {}:", id, commit_sha));
+
+                    let mut entries: Vec<_> = map.iter().collect();
+                    entries.sort_by(|a, b| a.0.cmp(b.0));
+                    for (field, change) in entries {
+                        if let Some(obj) = change.as_object() {
+                            let old = obj.get("old").unwrap_or(&serde_json::Value::Null);
+                            let new = obj.get("new").unwrap_or(&serde_json::Value::Null);
+                            renderer.emit_raw_stdout(&format!("{}:", field));
+                            renderer
+                                .emit_raw_stdout(&format!("  - old: {}", format_diff_value(old)));
+                            renderer
+                                .emit_raw_stdout(&format!("  + new: {}", format_diff_value(new)));
+                        }
+                    }
+                } else {
+                    renderer.emit_raw_stdout(&result.to_string());
+                }
+            }
         }
     } else {
         let patch = crate::services::audit_service::AuditService::show_file_diff(
@@ -324,12 +376,45 @@ pub fn handle_diff(
                     "commit": commit_sha,
                     "patch": patch
                 });
-                renderer.emit_raw_stdout(&obj.to_string());
+                renderer.emit_json(&obj);
             }
             _ => renderer.emit_raw_stdout(&patch),
         }
     }
     Ok(())
+}
+
+fn format_diff_value(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "none".to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::String(s) => {
+            if s.is_empty() {
+                "''".to_string()
+            } else {
+                s.to_string()
+            }
+        }
+        serde_json::Value::Array(items) => {
+            if items.is_empty() {
+                "[]".to_string()
+            } else {
+                let mut buffer = String::from("[");
+                for (idx, item) in items.iter().enumerate() {
+                    if idx > 0 {
+                        buffer.push_str(", ");
+                    }
+                    buffer.push_str(&format_diff_value(item));
+                }
+                buffer.push(']');
+                buffer
+            }
+        }
+        serde_json::Value::Object(_) => {
+            serde_json::to_string(value).unwrap_or_else(|_| "{...}".to_string())
+        }
+    }
 }
 
 pub fn handle_at(
@@ -356,7 +441,7 @@ pub fn handle_at(
                 "commit": commit,
                 "content": content
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => renderer.emit_raw_stdout(&content),
     }

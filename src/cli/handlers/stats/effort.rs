@@ -776,7 +776,7 @@ pub(crate) fn run(
                 "items": rows,
                 "unit": match unit { crate::cli::args::stats::StatsEffortUnit::Hours=>"hours", crate::cli::args::stats::StatsEffortUnit::Days=>"days", crate::cli::args::stats::StatsEffortUnit::Weeks=>"weeks", crate::cli::args::stats::StatsEffortUnit::Points=>"points", crate::cli::args::stats::StatsEffortUnit::Auto=>"auto" },
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if rows.is_empty() {

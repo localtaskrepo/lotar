@@ -5,7 +5,6 @@ Features:
 - Publish to docker hub, homebrew, npm?, ...
 - VSCode Plugin (Contexts?, Issue updates, in-editor quick hints for TODOs with references/quick create dialogs)
 - IntelliJ Plugin
-- Show source code snippets (e.g. around TODOs) in cli
 - custom properties can be used to filter and query. Custom properties are accessed like any other property (no custom: prefix anywhere)
 - External references implementation: Add "link" type reference that can point to external URLs (e.g. design docs, Figma files, etc.)
 - Allow CLI list/search to filter by age older than N days
@@ -13,10 +12,13 @@ Features:
 - Option to disable history and to rely completely on git for any historic lookups
 - New issues property and search: blocked (Do we need that or can custom fields cover this?)
 - Add option to choose which screen open by default (e.g. tasks, sprints, calendar, etc.)
+- Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
+- MCP descriptions should be dynamic to include available types, severities, etc. that are configured for the project, if there is only a global config, or a single project with a config (so no ambiguity, which should be the majority of cases)
 
 Chores:
 - Test release workflow
 - parameter order is not flexible (e.g. lotar --format json sprint list works, but lotar sprint list --format json does not).
+- Add test that checks that project names starting with @ don't produce project IDs with @
 
 ## Backlog
 - [ ] Include README and LICENSE in archives

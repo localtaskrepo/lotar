@@ -300,6 +300,16 @@ impl OutputRenderer {
         let _ = writeln!(io::stderr(), "{}", message);
     }
 
+    /// Emit a JSON payload, honoring pretty-printing when verbose logging is enabled.
+    pub fn emit_json<T: Serialize>(&self, value: &T) {
+        let body = if self.pretty_json {
+            serde_json::to_string_pretty(value).unwrap_or_else(|_| "{}".to_string())
+        } else {
+            serde_json::to_string(value).unwrap_or_else(|_| "{}".to_string())
+        };
+        self.emit_raw_stdout(&body);
+    }
+
     // Private implementation methods
     fn render_text_single<T: Outputable>(&self, item: &T) -> String {
         text::render_text_single(item)

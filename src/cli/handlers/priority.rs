@@ -1,5 +1,6 @@
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
     PropertyCurrent, PropertyNoop, PropertySuccess, render_property_current, render_property_noop,
@@ -81,7 +82,9 @@ fn handle_set_priority(
     task.priority = validated_priority.clone();
 
     renderer.log_debug("priority: persisting change to storage");
-    ctx.storage.edit(&full_id, &task);
+    ctx.storage
+        .edit(&full_id, &task)
+        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
     renderer.log_info("priority: updated successfully");
 
     render_priority_success(renderer, &full_id, &old_priority, &validated_priority);

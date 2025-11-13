@@ -41,7 +41,7 @@ pub(crate) fn handle_calendar(
                     obj.remove("skipped_complete");
                 }
             }
-            renderer.emit_raw_stdout(&value.to_string());
+            renderer.emit_json(&value);
         }
         _ => render_calendar_text(renderer, &context, calendar_args.include_complete),
     }

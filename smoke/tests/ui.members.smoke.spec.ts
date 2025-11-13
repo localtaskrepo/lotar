@@ -93,8 +93,31 @@ describe('UI strict member smoke scenarios', () => {
                     expect(assigneeOptions.some((opt) => opt.includes('reviewer@example.com'))).toBe(true);
 
                     await assigneeSelect.selectOption({ value: '__custom' });
+
                     const assigneeInput = page.getByPlaceholder('Type assignee');
-                    await assigneeInput.fill('intruder@example.com');
+                    let filled = false;
+                    let attempts = 0;
+                    let lastError: unknown = null;
+
+                    while (!filled && attempts < 5) {
+                        attempts += 1;
+                        try {
+                            await assigneeInput.waitFor({ state: 'visible', timeout: 5_000 });
+                            await assigneeInput.fill('intruder@example.com');
+                            filled = true;
+                        } catch (error) {
+                            lastError = error;
+                            await assigneeSelect.selectOption({ value: '__custom' });
+                            await page.waitForTimeout(200);
+                        }
+                    }
+
+                    if (!filled) {
+                        throw lastError instanceof Error
+                            ? lastError
+                            : new Error(`Failed to enter custom assignee: ${String(lastError)}`);
+                    }
+
                     await assigneeInput.press('Enter');
 
                     await page.getByPlaceholder('Title').fill('UI Strict Members Smoke Task');

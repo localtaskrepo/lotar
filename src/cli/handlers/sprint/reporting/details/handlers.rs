@@ -42,7 +42,7 @@ pub(crate) fn handle_show(
                 "status": "ok",
                 "sprint": detail,
             });
-            renderer.emit_raw_stdout(&payload.to_string());
+            renderer.emit_json(&payload);
         }
         _ => {
             renderer.emit_raw_stdout(&format!(
@@ -193,7 +193,7 @@ pub(crate) fn render_sprint_review(
 
     match renderer.format {
         OutputFormat::Json => {
-            renderer.emit_raw_stdout(&serde_json::to_string(&context.payload).unwrap_or_default());
+            renderer.emit_json(&context.payload);
         }
         _ => render_review_text(renderer, &context),
     }
@@ -209,7 +209,7 @@ fn render_sprint_stats(
 
     match renderer.format {
         OutputFormat::Json => {
-            renderer.emit_raw_stdout(&serde_json::to_string(&context.payload).unwrap_or_default());
+            renderer.emit_json(&context.payload);
         }
         _ => render_stats_text(renderer, &context),
     }

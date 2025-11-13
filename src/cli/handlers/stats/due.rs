@@ -118,7 +118,7 @@ pub(crate) fn run(
                 "project": scope_project,
                 "items": items,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             for (k, v) in counts {

@@ -42,7 +42,7 @@ pub(crate) fn run_changed(
                         "items": Vec::<serde_json::Value>::new(),
                         "note": "Not in a git repository; returning empty set",
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => {
                     renderer.emit_warning("Not in a git repository; returning empty set");
@@ -103,7 +103,7 @@ pub(crate) fn run_changed(
                 "count": json_items.len(),
                 "items": json_items,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if limited.is_empty() {
@@ -163,7 +163,7 @@ pub(crate) fn run_churn(
                         "items": Vec::<serde_json::Value>::new(),
                         "note": "Not in a git repository; returning empty set",
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => renderer.emit_warning("Not in a git repository; returning empty set"),
             }
@@ -235,7 +235,7 @@ pub(crate) fn run_churn(
                 "count": json_items.len(),
                 "items": json_items,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if limited.is_empty() {

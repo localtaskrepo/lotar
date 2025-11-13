@@ -32,7 +32,7 @@ pub(crate) fn run(
                         "items": Vec::<serde_json::Value>::new(),
                         "note": "Not in a git repository; returning empty set",
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => renderer.emit_warning("Not in a git repository; returning empty set"),
             }
@@ -43,7 +43,10 @@ pub(crate) fn run(
     // tasks dir relative
     let tasks_abs = resolver.path.clone();
     let tasks_rel = if tasks_abs.starts_with(&repo_root) {
-        tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
+        tasks_abs
+            .strip_prefix(&repo_root)
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| tasks_abs.clone())
     } else {
         tasks_abs.clone()
     };
@@ -113,7 +116,7 @@ pub(crate) fn run(
                 "count": json_items.len(),
                 "items": json_items,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if limited.is_empty() {

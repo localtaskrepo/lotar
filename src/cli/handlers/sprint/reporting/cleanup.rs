@@ -52,7 +52,7 @@ pub(crate) fn handle_cleanup_refs(
 
     match renderer.format {
         OutputFormat::Json => {
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => {
             if outcome.removed_references == 0 {

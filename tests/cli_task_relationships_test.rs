@@ -57,13 +57,17 @@ fn relationships_command_displays_all_relationships() {
     parent_task.relationships.children = vec![child_one.clone(), child_two.clone()];
     parent_task.relationships.fixes = vec!["BUG-42".to_string()];
     parent_task.relationships.duplicate_of = Some("TP-999".to_string());
-    storage.edit(&parent_id, &parent_task);
+    storage
+        .edit(&parent_id, &parent_task)
+        .expect("failed to persist parent task relationships");
 
     let mut child_task = storage
         .get(&child_one, prefix.clone())
         .expect("expected child task to exist");
     child_task.relationships.parent = Some(parent_id.clone());
-    storage.edit(&child_one, &child_task);
+    storage
+        .edit(&child_one, &child_task)
+        .expect("failed to persist child task relationships");
 
     let output = Command::cargo_bin("lotar")
         .expect("lotar binary not found")
@@ -115,13 +119,17 @@ fn relationships_command_supports_json_filters() {
         .get(&parent_id, prefix.clone())
         .expect("expected parent task to exist");
     parent_task.relationships.children = vec![child_id.clone()];
-    storage.edit(&parent_id, &parent_task);
+    storage
+        .edit(&parent_id, &parent_task)
+        .expect("failed to persist parent task relationships");
 
     let mut child_task = storage
         .get(&child_id, prefix.clone())
         .expect("expected child task to exist");
     child_task.relationships.parent = Some(parent_id.clone());
-    storage.edit(&child_id, &child_task);
+    storage
+        .edit(&child_id, &child_task)
+        .expect("failed to persist child task relationships");
 
     let output = Command::cargo_bin("lotar")
         .expect("lotar binary not found")

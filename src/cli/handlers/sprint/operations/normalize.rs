@@ -31,7 +31,7 @@ pub(crate) fn handle_normalize(
                     warnings: Vec::new(),
                     skipped: Vec::new(),
                 };
-                renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+                renderer.emit_json(&payload);
             } else {
                 renderer.emit_info("No sprints found. Nothing to normalize.");
             }
@@ -52,7 +52,7 @@ pub(crate) fn handle_normalize(
                 warnings: Vec::new(),
                 skipped: Vec::new(),
             };
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         } else {
             renderer.emit_info("No sprints found. Nothing to normalize.");
         }
@@ -187,7 +187,7 @@ pub(crate) fn handle_normalize(
             warnings: warning_payloads,
             skipped,
         };
-        renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+        renderer.emit_json(&payload);
     }
 
     match mode {

@@ -38,7 +38,7 @@ pub(crate) fn run_top(
             let obj = serde_json::json!({
                 "status":"ok","action":"stats.comments.top","global":global,"project":scope_project,"count":rows.len(),"items":rows
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if rows.is_empty() {
@@ -91,7 +91,7 @@ pub(crate) fn run_by_author(
     match renderer.format {
         crate::output::OutputFormat::Json => {
             let obj = serde_json::json!({"status":"ok","action":"stats.comments.by_task","global":global,"project":scope_project,"count":rows.len(),"items":rows});
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if rows.is_empty() {

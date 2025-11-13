@@ -87,6 +87,7 @@ pub struct PropertyNoop {
     pub text_message: String,
     pub text_level: TextLevel,
     pub extra_json: Vec<(String, Value)>,
+    pub notice: Option<String>,
 }
 
 impl PropertyNoop {
@@ -105,11 +106,17 @@ impl PropertyNoop {
             text_message: text_message.into(),
             text_level: TextLevel::Warning,
             extra_json: Vec::new(),
+            notice: None,
         }
     }
 
     pub fn with_extra_json(mut self, key: impl Into<String>, value: Value) -> Self {
         self.extra_json.push((key.into(), value));
+        self
+    }
+
+    pub fn with_notice(mut self, notice: impl Into<String>) -> Self {
+        self.notice = Some(notice.into());
         self
     }
 }
@@ -126,6 +133,7 @@ pub struct PropertyPreview {
     pub text_level: TextLevel,
     pub json_message: Option<String>,
     pub explain: Option<PropertyExplain>,
+    pub extra_json: Vec<(String, Value)>,
 }
 
 impl PropertyPreview {
@@ -149,6 +157,7 @@ impl PropertyPreview {
             text_level: TextLevel::Info,
             json_message: None,
             explain: None,
+            extra_json: Vec::new(),
         }
     }
 
@@ -159,6 +168,11 @@ impl PropertyPreview {
 
     pub fn with_explain(mut self, explain: PropertyExplain) -> Self {
         self.explain = Some(explain);
+        self
+    }
+
+    pub fn with_extra_json(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.extra_json.push((key.into(), value));
         self
     }
 }
@@ -173,6 +187,7 @@ pub struct PropertySuccess {
     pub new_field: String,
     pub old_value: Option<String>,
     pub new_value: Option<String>,
+    pub extra_json: Vec<(String, Value)>,
 }
 
 impl PropertySuccess {
@@ -194,7 +209,13 @@ impl PropertySuccess {
             new_field: new_field.into(),
             old_value,
             new_value,
+            extra_json: Vec::new(),
         }
+    }
+
+    pub fn with_extra_json(mut self, key: impl Into<String>, value: Value) -> Self {
+        self.extra_json.push((key.into(), value));
+        self
     }
 }
 
@@ -220,7 +241,8 @@ pub fn render_property_current(renderer: &OutputRenderer, payload: PropertyCurre
                     Value::String(explain_ref.message.clone()),
                 );
             }
-            renderer.emit_raw_stdout(&Value::Object(root).to_string());
+            let payload = Value::Object(root);
+            renderer.emit_json(&payload);
         }
         _ => {
             if let Some(explain_ref) = explain.as_ref() {
@@ -247,6 +269,7 @@ pub fn render_property_noop(renderer: &OutputRenderer, payload: PropertyNoop) {
         text_message,
         text_level,
         extra_json,
+        notice,
     } = payload;
 
     match renderer.format {
@@ -259,10 +282,17 @@ pub fn render_property_noop(renderer: &OutputRenderer, payload: PropertyNoop) {
             for (key, value) in extra_json {
                 root.insert(key, value);
             }
-            renderer.emit_raw_stdout(&Value::Object(root).to_string());
+            if let Some(notice_value) = notice.as_ref() {
+                root.insert("notice".to_string(), Value::String(notice_value.clone()));
+            }
+            let payload = Value::Object(root);
+            renderer.emit_json(&payload);
         }
         _ => {
             text_level.emit(renderer, &text_message);
+            if let Some(notice_value) = notice.as_ref() {
+                renderer.emit_notice(notice_value);
+            }
         }
     }
 }
@@ -279,6 +309,7 @@ pub fn render_property_preview(renderer: &OutputRenderer, payload: PropertyPrevi
         text_level,
         json_message,
         explain,
+        extra_json,
     } = payload;
 
     match renderer.format {
@@ -298,7 +329,11 @@ pub fn render_property_preview(renderer: &OutputRenderer, payload: PropertyPrevi
                     Value::String(explain_ref.message.clone()),
                 );
             }
-            renderer.emit_raw_stdout(&Value::Object(root).to_string());
+            for (key, value) in extra_json {
+                root.insert(key, value);
+            }
+            let payload = Value::Object(root);
+            renderer.emit_json(&payload);
         }
         _ => {
             if let Some(explain_ref) = explain.as_ref() {
@@ -326,6 +361,7 @@ pub fn render_property_success(renderer: &OutputRenderer, payload: PropertySucce
         new_field,
         old_value,
         new_value,
+        extra_json,
     } = payload;
 
     match renderer.format {
@@ -336,7 +372,11 @@ pub fn render_property_success(renderer: &OutputRenderer, payload: PropertySucce
             root.insert("task_id".to_string(), Value::String(task_id));
             root.insert(old_field, option_to_value(old_value));
             root.insert(new_field, option_to_value(new_value));
-            renderer.emit_raw_stdout(&Value::Object(root).to_string());
+            for (key, value) in extra_json {
+                root.insert(key, value);
+            }
+            let payload = Value::Object(root);
+            renderer.emit_json(&payload);
         }
         _ => {
             text_level.emit(renderer, &text_message);

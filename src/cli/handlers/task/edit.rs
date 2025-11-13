@@ -1,6 +1,7 @@
 use crate::cli::TaskEditArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{
     LoadedTask, apply_auto_populate_members, ensure_membership, load_task, render_edit_preview,
 };
@@ -135,7 +136,9 @@ impl CommandHandler for EditHandler {
         }
 
         renderer.log_debug("edit: persisting edits");
-        ctx.storage.edit(&full_id, &task);
+        ctx.storage
+            .edit(&full_id, &task)
+            .map_err(TaskStorageAction::Update.map_err(&full_id))?;
         renderer.emit_success(&format!("Task '{}' updated successfully", id));
         Ok(())
     }

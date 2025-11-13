@@ -40,7 +40,7 @@ pub(crate) fn run_keys(
     match renderer.format {
         crate::output::OutputFormat::Json => {
             let obj = serde_json::json!({"status":"ok","action":"stats.custom.keys","global":global,"project":scope_project,"count":rows.len(),"items":rows});
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if rows.is_empty() {
@@ -100,7 +100,7 @@ pub(crate) fn run_field(
     match renderer.format {
         crate::output::OutputFormat::Json => {
             let obj = serde_json::json!({"status":"ok","action":"stats.custom.field","field":name,"global":global,"project":scope_project,"count":rows.len(),"items":rows});
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if rows.is_empty() {

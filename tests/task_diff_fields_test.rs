@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::*;
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -139,4 +140,51 @@ fn task_diff_fields_reports_structured_changes() {
     assert_eq!(v["action"], "task.diff");
     assert_eq!(v["mode"], "fields");
     let _ = v["diff"].as_object().expect("diff object");
+}
+
+#[test]
+fn task_diff_fields_text_output_is_human_readable() {
+    let temp = crate::common::temp_dir();
+    let root = temp.path();
+    init_repo(&temp);
+
+    write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+    write_file(
+        root,
+        ".tasks/TEST/2.yml",
+        "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-01T10:00:00Z\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/2.yml",
+        ("A", "a@example.com"),
+        "2025-08-01T10:00:00Z",
+        "add 2",
+    );
+
+    write_file(
+        root,
+        ".tasks/TEST/2.yml",
+        "title: Two\nstatus: TODO\ncreated: 2025-08-01T10:00:00Z\nmodified: 2025-08-02T09:00:00Z\ntags: [feat]\nreporter: alice\n",
+    );
+    add_and_commit(
+        root,
+        ".tasks/TEST/2.yml",
+        ("B", "b@example.com"),
+        "2025-08-02T09:00:00Z",
+        "edit 2",
+    );
+
+    Command::cargo_bin("lotar")
+        .unwrap()
+        .current_dir(root)
+        .args(["task", "diff", "TEST-2", "--fields"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Field differences for TEST-2 @"))
+        .stdout(predicate::str::contains("reporter:"))
+        .stdout(predicate::str::contains("  - old: none"))
+        .stdout(predicate::str::contains("  + new: alice"))
+        .stdout(predicate::str::contains("tags:"))
+        .stdout(predicate::str::contains("  + new: [feat]"));
 }

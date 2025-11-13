@@ -92,7 +92,7 @@ pub fn cleanup_missing_sprint_refs(
 
         task.sprints.clear();
         task.modified = Utc::now().to_rfc3339();
-        storage.edit(&task_id, &task);
+        storage.edit(&task_id, &task)?;
         updated_tasks += 1;
     }
 

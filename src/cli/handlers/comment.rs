@@ -1,9 +1,11 @@
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::types::TaskComment;
 use crate::workspace::TasksDirectoryResolver;
+use serde_json::{Map, Value};
 
 const COMMENT_PREVIEW_EXPLANATION: &str =
     "comments append to the task log with the current UTC timestamp; dry-run skips persistence";
@@ -164,7 +166,9 @@ fn handle_add_comment(
     inputs.task.comments.push(entry.clone());
     inputs.task.modified = chrono::Utc::now().to_rfc3339();
 
-    ctx.storage.edit(&full_id, &inputs.task);
+    ctx.storage
+        .edit(&full_id, &inputs.task)
+        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
     renderer.log_info("comment: comment persisted");
 
     render_comment_success(
@@ -187,26 +191,12 @@ fn render_comment_preview(
 ) {
     match renderer.format {
         OutputFormat::Json => {
-            let mut payload = serde_json::json!({
-                "status": "preview",
-                "action": "task.comment",
-                "task_id": task_id,
-                "comments": total_after,
-                "added_comment": {
-                    "date": comment.date,
-                    "text": comment.text,
-                }
-            });
-            if let Some(name) = project {
-                if !name.trim().is_empty() {
-                    payload["project"] = serde_json::Value::String(name.to_string());
-                }
-            }
-            if explain {
-                payload["explain"] =
-                    serde_json::Value::String(COMMENT_PREVIEW_EXPLANATION.to_string());
-            }
-            renderer.emit_raw_stdout(&payload.to_string());
+            let mut payload =
+                build_comment_payload("preview", "task.comment", task_id, total_after);
+            payload.insert("added_comment".to_string(), comment_to_json(comment));
+            insert_project(&mut payload, project);
+            insert_explain(&mut payload, explain.then_some(COMMENT_PREVIEW_EXPLANATION));
+            renderer.emit_json(&Value::Object(payload));
         }
         _ => {
             renderer.emit_info(&format!(
@@ -229,22 +219,10 @@ fn render_comment_success(
 ) {
     match renderer.format {
         OutputFormat::Json => {
-            let mut payload = serde_json::json!({
-                "status": "success",
-                "action": "task.comment",
-                "task_id": task_id,
-                "comments": total,
-                "added_comment": {
-                    "date": comment.date,
-                    "text": comment.text,
-                }
-            });
-            if let Some(name) = project {
-                if !name.trim().is_empty() {
-                    payload["project"] = serde_json::Value::String(name.to_string());
-                }
-            }
-            renderer.emit_raw_stdout(&payload.to_string());
+            let mut payload = build_comment_payload("success", "task.comment", task_id, total);
+            payload.insert("added_comment".to_string(), comment_to_json(comment));
+            insert_project(&mut payload, project);
+            renderer.emit_json(&Value::Object(payload));
         }
         _ => {
             renderer.emit_success(&format!("Comment added to {} ({} total)", task_id, total));
@@ -261,33 +239,13 @@ fn render_comment_list(
 ) {
     match renderer.format {
         OutputFormat::Json => {
-            let items: Vec<_> = task
-                .comments
-                .iter()
-                .map(|c| {
-                    serde_json::json!({
-                        "date": c.date,
-                        "text": c.text,
-                    })
-                })
-                .collect();
-            let mut payload = serde_json::json!({
-                "status": "ok",
-                "action": "task.comment.list",
-                "task_id": task_id,
-                "comments": items.len(),
-                "items": items,
-            });
-            if let Some(name) = project {
-                if !name.trim().is_empty() {
-                    payload["project"] = serde_json::Value::String(name.to_string());
-                }
-            }
-            if explain {
-                payload["explain"] =
-                    serde_json::Value::String(COMMENT_LIST_EXPLANATION.to_string());
-            }
-            renderer.emit_raw_stdout(&payload.to_string());
+            let items: Vec<_> = task.comments.iter().map(comment_to_json).collect();
+            let mut payload =
+                build_comment_payload("ok", "task.comment.list", task_id, items.len());
+            payload.insert("items".to_string(), Value::Array(items));
+            insert_project(&mut payload, project);
+            insert_explain(&mut payload, explain.then_some(COMMENT_LIST_EXPLANATION));
+            renderer.emit_json(&Value::Object(payload));
         }
         _ => {
             if task.comments.is_empty() {
@@ -301,5 +259,44 @@ fn render_comment_list(
                 renderer.emit_info(COMMENT_LIST_EXPLANATION);
             }
         }
+    }
+}
+
+fn build_comment_payload(
+    status: &str,
+    action: &str,
+    task_id: &str,
+    count: usize,
+) -> Map<String, Value> {
+    let mut payload = Map::with_capacity(4);
+    payload.insert("status".to_string(), Value::String(status.to_string()));
+    payload.insert("action".to_string(), Value::String(action.to_string()));
+    payload.insert("task_id".to_string(), Value::String(task_id.to_string()));
+    payload.insert("comments".to_string(), Value::from(count));
+    payload
+}
+
+fn comment_to_json(comment: &TaskComment) -> Value {
+    serde_json::json!({
+        "date": comment.date,
+        "text": comment.text,
+    })
+}
+
+fn insert_project(payload: &mut Map<String, Value>, project: Option<&str>) {
+    let trimmed = project.and_then(|candidate| {
+        let value = candidate.trim();
+        if value.is_empty() { None } else { Some(value) }
+    });
+    insert_optional_string(payload, "project", trimmed);
+}
+
+fn insert_explain(payload: &mut Map<String, Value>, explain: Option<&str>) {
+    insert_optional_string(payload, "explain", explain);
+}
+
+fn insert_optional_string(payload: &mut Map<String, Value>, key: &str, value: Option<&str>) {
+    if let Some(content) = value {
+        payload.insert(key.to_string(), Value::String(content.to_string()));
     }
 }

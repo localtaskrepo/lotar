@@ -35,9 +35,7 @@ const jsonResponse = (data: unknown) =>
     });
 
 beforeAll(() => {
-    if (typeof globalThis.localStorage !== 'object' || typeof globalThis.localStorage?.clear !== 'function') {
-        vi.stubGlobal('localStorage', new MemoryStorage());
-    }
+    vi.stubGlobal('localStorage', new MemoryStorage());
 
     vi.stubGlobal(
         'fetch',

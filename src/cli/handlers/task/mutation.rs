@@ -105,7 +105,7 @@ pub fn render_edit_preview(renderer: &OutputRenderer, id: &str, task: &Task) {
                 "due_date": task.due_date,
                 "tags": task.tags,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             renderer.emit_info(&format!(

@@ -1739,7 +1739,14 @@ pub fn initialize(api_server: &mut ApiServer) {
             }],
         });
         task.modified = chrono::Utc::now().to_rfc3339();
-        storage.edit(&id, &task);
+        if let Err(err) = storage.edit(&id, &task) {
+            return internal(json!({
+                "error": {
+                    "code": "INTERNAL",
+                    "message": err.to_string(),
+                }
+            }));
+        }
         let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
             Ok(dto) => dto,
             Err(err) => {
@@ -1810,7 +1817,14 @@ pub fn initialize(api_server: &mut ApiServer) {
             }],
         });
         task.modified = now;
-        storage.edit(&id, &task);
+        if let Err(err) = storage.edit(&id, &task) {
+            return internal(json!({
+                "error": {
+                    "code": "INTERNAL",
+                    "message": err.to_string(),
+                }
+            }));
+        }
         let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
             Ok(dto) => dto,
             Err(err) => {
@@ -1836,12 +1850,21 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(e) => return bad_request(format!("Invalid body: {}", e)),
         };
-        let deleted = TaskService::delete(
+        let deleted = match TaskService::delete(
             &mut storage,
             &del.id,
             req.query.get("project").map(|s| s.as_str()),
-        )
-        .unwrap_or(false);
+        ) {
+            Ok(value) => value,
+            Err(err) => {
+                return internal(json!({
+                    "error": {
+                        "code": "INTERNAL",
+                        "message": err.to_string(),
+                    }
+                }));
+            }
+        };
         if deleted {
             let actor = crate::utils::identity::resolve_current_user(None);
             crate::api_events::emit_task_deleted(&del.id, actor.as_deref());

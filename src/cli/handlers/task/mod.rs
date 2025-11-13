@@ -15,6 +15,7 @@ use crate::workspace::TasksDirectoryResolver;
 pub(crate) mod context;
 mod delete;
 mod edit;
+pub(crate) mod errors;
 mod history;
 pub(crate) mod mutation;
 pub(crate) mod render;

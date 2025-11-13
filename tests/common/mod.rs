@@ -2,16 +2,17 @@ use assert_cmd::Command;
 use ctor::ctor;
 use lotar::types::Priority;
 use lotar::{Storage, Task};
+use serde_json::Value;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-// Re-export shared environment mutex for tests that mutate global env vars
+// Re-export shared environment mutex for tests that mutate global env vars.
 pub mod env_mutex;
 
-/// Test utilities for LoTaR testing
+/// Test fixtures to create isolated work directories per test.
 pub struct TestFixtures {
     pub temp_dir: TempDir,
     pub tasks_root: PathBuf,
@@ -22,12 +23,9 @@ fn init_lotar_test_environment() {
     reset_lotar_test_environment();
 }
 
-/// Remove shared LOTAR environment variables that can leak in from other test suites or manual runs.
-/// Ensures each integration test starts with a clean slate and only opts into specific env overrides when needed.
+/// Remove shared LOTAR environment variables so integration tests start clean.
 pub fn reset_lotar_test_environment() {
-    // Manipulating process-wide environment variables is intrinsically unsafe per Rust's
-    // `unsafe_env` lint, but tests rely on a clean state. Guard with an unsafe block
-    // and keep the scope minimal.
+    // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny.
     unsafe {
         std::env::remove_var("LOTAR_TASKS_DIR");
         std::env::remove_var("LOTAR_HOME");
@@ -162,6 +160,44 @@ impl TestFixtures {
         let config_path = dir.join("config.yml");
         std::fs::write(&config_path, content).expect("Failed to create config file");
     }
+}
+
+/// Extract a task identifier from CLI output (text or JSON).
+#[allow(dead_code)]
+pub fn extract_task_id_from_output(output: &str) -> Option<String> {
+    // JSON payloads may nest the task ID within "task" or expose "task_id" directly.
+    if let Ok(json) = serde_json::from_str::<Value>(output) {
+        if let Some(task) = json.get("task") {
+            if let Some(id) = task.get("id").and_then(Value::as_str) {
+                return Some(id.to_string());
+            }
+        }
+        if let Some(id) = json.get("task_id").and_then(Value::as_str) {
+            return Some(id.to_string());
+        }
+    }
+
+    // Prefer explicit creation messages when present.
+    for line in output.lines() {
+        if let Some(rest) = line.split("Created task: ").nth(1) {
+            if let Some(id) = rest.split_whitespace().next() {
+                return Some(id.to_string());
+            }
+        }
+    }
+
+    // Fallback heuristic: find the first token resembling PREFIX-123.
+    output
+        .split_whitespace()
+        .find(|token| token.contains('-') && token.chars().any(|c| c.is_ascii_digit()))
+        .map(|token| token.trim_end_matches(':').to_string())
+}
+
+/// Convenience wrapper to parse IDs from binary stdout captures.
+#[allow(dead_code)]
+pub fn extract_task_id_from_bytes(output: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(output);
+    extract_task_id_from_output(&text)
 }
 
 /// Test utility functions

@@ -1,6 +1,7 @@
 use crate::cli::TaskDeleteArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::workspace::TasksDirectoryResolver;
 
@@ -54,7 +55,7 @@ impl CommandHandler for DeleteHandler {
                         "task_id": id,
                         "project": project_prefix,
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => {
                     renderer.emit_info(&format!(
@@ -67,7 +68,10 @@ impl CommandHandler for DeleteHandler {
         }
 
         // Delete the task
-        let deleted = ctx.storage.delete(&full_id, project_prefix.clone());
+        let deleted = ctx
+            .storage
+            .delete(&full_id, project_prefix.clone())
+            .map_err(TaskStorageAction::Delete.map_err(&full_id))?;
         if deleted {
             match renderer.format {
                 crate::output::OutputFormat::Json => {
@@ -76,7 +80,7 @@ impl CommandHandler for DeleteHandler {
                         "message": format!("Task '{}' deleted", id),
                         "task_id": id
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => {
                     renderer.emit_success(&format!("Task '{}' deleted successfully", id));

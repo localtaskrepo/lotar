@@ -1,16 +1,8 @@
-use crate::common::cargo_bin_silent;
+use crate::common::{cargo_bin_silent, extract_task_id_from_output};
 use predicates::prelude::*;
 
 mod common;
 use common::TestFixtures;
-
-fn extract_task_id(output: &str) -> Option<String> {
-    // Looks for a token like PREFIX-123 in the output
-    output
-        .split_whitespace()
-        .find(|tok| tok.contains('-') && tok.chars().any(|c| c.is_ascii_digit()))
-        .map(|s| s.trim_end_matches(':').to_string())
-}
 
 #[test]
 fn add_command_emits_info_logs() {
@@ -145,7 +137,7 @@ fn status_command_logs_and_json_notice_on_noop() {
         .assert()
         .success();
     let stdout = String::from_utf8_lossy(&add.get_output().stdout).to_string();
-    let task_id = extract_task_id(&stdout).expect("should extract task id");
+    let task_id = extract_task_id_from_output(&stdout).expect("should extract task id");
 
     // Set to a new status first to ensure known state
     cargo_bin_silent()
@@ -245,7 +237,7 @@ fn priority_command_emits_info_logs() {
         .assert()
         .success();
     let stdout = String::from_utf8_lossy(&add.get_output().stdout).to_string();
-    let task_id = extract_task_id(&stdout).expect("should extract task id");
+    let task_id = extract_task_id_from_output(&stdout).expect("should extract task id");
 
     let mut cmd = cargo_bin_silent();
     let assert = cmd

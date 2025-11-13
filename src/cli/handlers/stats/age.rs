@@ -112,7 +112,7 @@ pub(crate) fn run(
                 "count": json_items.len(),
                 "items": json_items,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if items.is_empty() {

@@ -1,4 +1,5 @@
 use crate::cli::AddArgs;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
@@ -497,7 +498,7 @@ impl CommandHandler for AddHandler {
                     if args.explain {
                         obj["explain"] = serde_json::Value::String("default status and priority via smart defaults; reporter/assignee per config/defaults".to_string());
                     }
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => {
                     renderer.emit_info(&format!(
@@ -522,11 +523,13 @@ impl CommandHandler for AddHandler {
                 project_for_storage, original_project_name
             );
         }
-        let task_id = storage.add(
-            &task,
-            &project_for_storage,
-            original_project_name.as_deref(),
-        );
+        let task_id = storage
+            .add(
+                &task,
+                &project_for_storage,
+                original_project_name.as_deref(),
+            )
+            .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
         renderer.log_info(&format!("add: created id={}", task_id));
 
         Ok(task_id)
@@ -589,7 +592,7 @@ impl AddHandler {
                                 "modified": task.modified
                             }
                         });
-                        renderer.emit_raw_stdout(&response.to_string());
+                        renderer.emit_json(&response);
                     }
                     _ => {
                         renderer.emit_success(&format!("Created task: {}", task_id));
@@ -623,7 +626,7 @@ impl AddHandler {
                             "message": format!("Created task: {}", task_id),
                             "task_id": task_id
                         });
-                        renderer.emit_raw_stdout(&response.to_string());
+                        renderer.emit_json(&response);
                     }
                     _ => {
                         renderer.emit_success(&format!("Created task: {}", task_id));
@@ -639,7 +642,7 @@ impl AddHandler {
                         "message": format!("Created task: {}", task_id),
                         "task_id": task_id
                     });
-                    renderer.emit_raw_stdout(&response.to_string());
+                    renderer.emit_json(&response);
                 }
                 _ => {
                     renderer.emit_success(&format!("Created task: {}", task_id));

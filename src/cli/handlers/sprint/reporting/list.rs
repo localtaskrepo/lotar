@@ -90,7 +90,7 @@ pub(crate) fn handle_list(
                         cleanup_summary.as_ref(),
                     ),
                 };
-                renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+                renderer.emit_json(&payload);
             }
             _ => renderer.emit_success("No sprints found."),
         }
@@ -128,7 +128,7 @@ pub(crate) fn handle_list(
                     cleanup_summary.as_ref(),
                 ),
             };
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => {
             let rows: Vec<PreparedSummaryRow> = summaries

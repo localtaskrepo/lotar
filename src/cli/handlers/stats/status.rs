@@ -43,7 +43,7 @@ pub(crate) fn run_status(
                         "items": Vec::<serde_json::Value>::new(),
                         "note": "Not in a git repository; returning empty set",
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => renderer.emit_warning("Not in a git repository; returning empty set"),
             }
@@ -63,7 +63,10 @@ pub(crate) fn run_status(
     )
     .ok_or_else(|| format!("Task '{}' not found", full_task_id))?;
     let file_rel = if rel_file.starts_with(&repo_root) {
-        rel_file.strip_prefix(&repo_root).unwrap().to_path_buf()
+        rel_file
+            .strip_prefix(&repo_root)
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| rel_file.clone())
     } else {
         rel_file
     };
@@ -131,7 +134,7 @@ pub(crate) fn run_status(
                     "count": 0,
                     "items": Vec::<serde_json::Value>::new(),
                 });
-                renderer.emit_raw_stdout(&obj.to_string());
+                renderer.emit_json(&obj);
             }
             _ => renderer.emit_success("No status durations in the selected window."),
         }
@@ -210,7 +213,7 @@ pub(crate) fn run_status(
                     "items": items
                 })] },
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if items.is_empty() {
@@ -273,7 +276,7 @@ pub(crate) fn run_time_in_status(
                         "items": Vec::<serde_json::Value>::new(),
                         "note": "Not in a git repository; returning empty set",
                     });
-                    renderer.emit_raw_stdout(&obj.to_string());
+                    renderer.emit_json(&obj);
                 }
                 _ => renderer.emit_warning("Not in a git repository; returning empty set"),
             }
@@ -511,7 +514,7 @@ pub(crate) fn run_time_in_status(
                 "count": limited.len(),
                 "items": limited,
             });
-            renderer.emit_raw_stdout(&obj.to_string());
+            renderer.emit_json(&obj);
         }
         _ => {
             if limited.is_empty() {

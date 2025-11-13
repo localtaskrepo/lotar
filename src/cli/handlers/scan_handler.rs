@@ -2,6 +2,7 @@ use crate::cli::ScanArgs;
 use crate::cli::handlers::AddHandler;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
+use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::OutputRenderer;
 use crate::project;
@@ -26,7 +27,9 @@ where
     let changed = mutator(&mut task);
     if changed {
         task.modified = chrono::Utc::now().to_rfc3339();
-        ctx.storage.edit(&full_id, &task);
+        ctx.storage
+            .edit(&full_id, &task)
+            .map_err(TaskStorageAction::Update.map_err(&full_id))?;
     }
     Ok(())
 }
@@ -876,7 +879,9 @@ impl ScanHandler {
 
             if changed {
                 task.modified = chrono::Utc::now().to_rfc3339();
-                ctx.storage.edit(&task_id, &task);
+                ctx.storage
+                    .edit(&task_id, &task)
+                    .map_err(TaskStorageAction::Update.map_err(&task_id))?;
                 updates += 1;
             }
         }

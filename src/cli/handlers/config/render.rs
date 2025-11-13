@@ -51,7 +51,7 @@ pub(super) fn emit_config_yaml(
         if let Some(lbl) = label.filter(|s| !s.is_empty()) {
             payload["label"] = serde_json::Value::String(lbl.to_string());
         }
-        renderer.emit_raw_stdout(&payload.to_string());
+        renderer.emit_json(&payload);
         return;
     }
 

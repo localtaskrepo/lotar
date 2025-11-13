@@ -236,7 +236,8 @@ fn render_relationships(
             }
             root.insert("relationships".to_string(), JsonValue::Object(rel_map));
 
-            renderer.emit_raw_stdout(&JsonValue::Object(root).to_string());
+            let payload = JsonValue::Object(root);
+            renderer.emit_json(&payload);
         }
         OutputFormat::Text => {
             if entries.is_empty() {

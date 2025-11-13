@@ -1,9 +1,31 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const nodeMajorVersion = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10);
+
+function createLocalStorageFile(prefix: string) {
+    if (Number.isNaN(nodeMajorVersion) || nodeMajorVersion < 22) {
+        return undefined;
+    }
+
+    try {
+        const dir = mkdtempSync(path.join(tmpdir(), prefix));
+        const file = path.join(dir, 'localstorage.json');
+        writeFileSync(file, '', { flag: 'w' });
+        return file;
+    } catch {
+        return undefined;
+    }
+}
+
+const localStorageFile = createLocalStorageFile('lotar-vitest-smoke-');
+const threadExecArgv = localStorageFile ? [`--localstorage-file=${localStorageFile}`] : [];
 
 export default defineConfig({
     test: {
@@ -19,6 +41,11 @@ export default defineConfig({
             LOTAR_TEST_SILENT: '1',
         },
         reporters: 'default',
+        poolOptions: {
+            threads: {
+                execArgv: threadExecArgv,
+            },
+        },
     },
     resolve: {
         alias: {

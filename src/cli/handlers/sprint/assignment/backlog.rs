@@ -34,7 +34,7 @@ pub(crate) fn handle_backlog(
                         missing_sprints: Vec::new(),
                         integrity: None,
                     };
-                    renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+                    renderer.emit_json(&payload);
                 }
                 _ => renderer.emit_success("No backlog tasks found."),
             }
@@ -79,7 +79,7 @@ pub(crate) fn handle_backlog(
                         cleanup_summary.as_ref(),
                     ),
                 };
-                renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+                renderer.emit_json(&payload);
             }
             _ => renderer.emit_success("No backlog tasks matched the provided filters."),
         }
@@ -100,7 +100,7 @@ pub(crate) fn handle_backlog(
                     cleanup_summary.as_ref(),
                 ),
             };
-            renderer.emit_raw_stdout(&serde_json::to_string(&payload).unwrap_or_default());
+            renderer.emit_json(&payload);
         }
         _ => {
             renderer.emit_raw_stdout(

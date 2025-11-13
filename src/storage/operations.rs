@@ -189,7 +189,13 @@ impl StorageOperations {
                 // No longer need to update index - simplified architecture
                 Ok(true)
             }
-            Err(_) => Ok(false),
+            Err(err) => {
+                if err.kind() == std::io::ErrorKind::NotFound {
+                    Ok(false)
+                } else {
+                    Err(err.into())
+                }
+            }
         }
     }
 

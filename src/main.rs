@@ -449,393 +449,414 @@ fn main() {
         }
         Commands::Changelog { since, global } => {
             renderer.log_info("BEGIN CHANGELOG");
-            // Inline small implementation to avoid a new handler file
-            // Determine repo root
-            let cwd = std::env::current_dir().map_err(|e| e.to_string()).unwrap();
-            let maybe_repo = lotar::utils::git::find_repo_root(&cwd);
-            if let Some(repo_root) = maybe_repo {
-                // Compute tasks relative path
-                let tasks_abs = resolver.path.clone();
-                let tasks_rel = if tasks_abs.starts_with(&repo_root) {
-                    tasks_abs.strip_prefix(&repo_root).unwrap().to_path_buf()
-                } else {
-                    tasks_abs.clone()
-                };
-                // Resolve project scoping
-                let project_filter: Option<String> = if global {
-                    None
-                } else {
-                    Some(if let Some(p) = cli.project.as_deref() {
-                        resolve_project_input(p, resolver.path.as_path())
+            let outcome = (|| -> Result<(), String> {
+                let cwd = std::env::current_dir()
+                    .map_err(|e| format!("Failed to resolve current directory: {}", e))?;
+                let maybe_repo = lotar::utils::git::find_repo_root(&cwd);
+                if let Some(repo_root) = maybe_repo {
+                    // Compute tasks relative path
+                    let tasks_abs = resolver.path.clone();
+                    let tasks_rel = if tasks_abs.starts_with(&repo_root) {
+                        tasks_abs
+                            .strip_prefix(&repo_root)
+                            .map(std::path::PathBuf::from)
+                            .map_err(|e| {
+                                format!(
+                                    "Failed to compute tasks directory relative to repo root: {}",
+                                    e
+                                )
+                            })?
                     } else {
-                        lotar::project::get_effective_project_name(&resolver)
-                    })
-                };
-
-                // Gather changed task files
-                let changed_files: Vec<std::path::PathBuf> = if let Some(ref_base) = &since {
-                    // Range: ref_base..HEAD
-                    let mut cmd = std::process::Command::new("git");
-                    cmd.arg("-C")
-                        .arg(&repo_root)
-                        .arg("diff")
-                        .arg("--name-only")
-                        .arg(format!("{}..HEAD", ref_base))
-                        .arg("--")
-                        .arg(&tasks_rel);
-                    match cmd.output() {
-                        Ok(o) if o.status.success() => {
-                            let out_str = String::from_utf8_lossy(&o.stdout).to_string();
-                            let base_iter = out_str
-                                .lines()
-                                .map(|l| std::path::PathBuf::from(l.trim()))
-                                .filter(|p| !p.as_os_str().is_empty())
-                                .filter(|p| p.starts_with(&tasks_rel));
-                            let iter = if let Some(ref proj) = project_filter {
-                                let expect = tasks_rel.join(proj);
-                                Box::new(base_iter.filter(move |p| p.starts_with(&expect)))
-                                    as Box<dyn Iterator<Item = std::path::PathBuf>>
-                            } else {
-                                Box::new(base_iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
-                            };
-                            iter.collect()
-                        }
-                        _ => Vec::new(),
-                    }
-                } else {
-                    // Working + staged vs HEAD, use porcelain to detect .tasks changes
-                    use std::process::Command;
-                    let out = Command::new("git")
-                        .arg("-C")
-                        .arg(&repo_root)
-                        .arg("status")
-                        .arg("--porcelain")
-                        .output();
-                    match out {
-                        Ok(o) if o.status.success() => {
-                            let mut files = Vec::new();
-                            for line in String::from_utf8_lossy(&o.stdout).lines() {
-                                if line.len() < 4 {
-                                    continue;
-                                }
-                                let status = &line[..2];
-                                if status.contains('R') {
-                                    if let Some(pos) = line.find(" -> ") {
-                                        let new_path = &line[pos + 4..];
-                                        files.push(std::path::PathBuf::from(new_path.trim()));
-                                    }
-                                    continue;
-                                }
-                                let path = line[3..].trim();
-                                if !path.is_empty() {
-                                    files.push(std::path::PathBuf::from(path));
-                                }
-                            }
-                            let iter = files.into_iter().filter(|p| p.starts_with(&tasks_rel));
-                            let iter = if let Some(ref proj) = project_filter {
-                                let expect = tasks_rel.join(proj);
-                                Box::new(iter.filter(move |p| p.starts_with(&expect)))
-                                    as Box<dyn Iterator<Item = std::path::PathBuf>>
-                            } else {
-                                Box::new(iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
-                            };
-                            iter.collect()
-                        }
-                        _ => Vec::new(),
-                    }
-                };
-
-                // For each changed file, compute field-level deltas
-                #[derive(Clone, Debug)]
-                struct BasicDelta {
-                    field: String,
-                    old: serde_json::Value,
-                    new: serde_json::Value,
-                }
-                #[derive(Clone, Debug)]
-                struct Item {
-                    id: String,
-                    project: String,
-                    file: String,
-                    changes: Vec<BasicDelta>,
-                }
-
-                let mut items: Vec<Item> = Vec::new();
-                for rel_path in changed_files {
-                    if rel_path.extension().and_then(|e| e.to_str()) != Some("yml") {
-                        continue;
-                    }
-                    // Resolve ID from path .tasks/<PROJECT>/<NUM>.yml
-                    let file_name = match rel_path.file_stem().and_then(|s| s.to_str()) {
-                        Some(s) => s,
-                        None => continue,
+                        tasks_abs.clone()
                     };
-                    let numeric: u64 = match file_name.parse() {
-                        Ok(n) => n,
-                        Err(_) => continue,
-                    };
-                    let project = match rel_path
-                        .parent()
-                        .and_then(|p| p.file_name())
-                        .and_then(|s| s.to_str())
-                    {
-                        Some(p) => p.to_string(),
-                        None => continue,
-                    };
-                    let id = format!("{}-{}", project, numeric);
-
-                    // Load snapshots with tolerant fallback for mixed-case enums in YAML
-                    let load_yaml_as_task = |content: &str| -> Option<lotar::storage::task::Task> {
-                        // First try strict parse
-                        if let Ok(t) = serde_yaml::from_str::<lotar::storage::task::Task>(content) {
-                            return Some(t);
-                        }
-                        // Fallback: tolerant parse via serde_yaml::Value and FromStr for enums
-                        let v: serde_yaml::Value = serde_yaml::from_str(content).ok()?;
-                        let get_str = |k: &str| -> Option<String> {
-                            v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
-                        };
-                        let get_vec_str = |k: &str| -> Vec<String> {
-                            v.get(k)
-                                .and_then(|x| x.as_sequence())
-                                .map(|seq| {
-                                    seq.iter()
-                                        .filter_map(|e| e.as_str().map(|s| s.to_string()))
-                                        .collect()
-                                })
-                                .unwrap_or_default()
-                        };
-
-                        let title = get_str("title").unwrap_or_else(|| "".to_string());
-
-                        let status = get_str("status")
-                            .and_then(|s| lotar::types::TaskStatus::from_str(&s).ok())
-                            .unwrap_or_default();
-                        let priority = get_str("priority")
-                            .and_then(|s| lotar::types::Priority::from_str(&s).ok())
-                            .unwrap_or_default();
-                        let task_type = get_str("task_type")
-                            .and_then(|s| lotar::types::TaskType::from_str(&s).ok())
-                            .unwrap_or_default();
-
-                        let reporter = get_str("reporter");
-                        let assignee = get_str("assignee");
-                        let created = get_str("created")
-                            .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
-                        let modified = get_str("modified")
-                            .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
-                        let due_date = get_str("due_date");
-                        let effort = get_str("effort");
-                        let tags = get_vec_str("tags");
-
-                        Some(lotar::storage::task::Task {
-                            title,
-                            status,
-                            priority,
-                            task_type,
-                            reporter,
-                            assignee,
-                            created,
-                            modified,
-                            due_date,
-                            effort,
-                            acceptance_criteria: vec![],
-                            relationships: lotar::types::TaskRelationships::default(),
-                            comments: vec![],
-                            references: vec![],
-                            sprints: vec![],
-                            history: vec![],
-                            subtitle: None,
-                            description: None,
-                            tags,
-                            custom_fields: std::collections::HashMap::new(),
+                    // Resolve project scoping
+                    let project_filter: Option<String> = if global {
+                        None
+                    } else {
+                        Some(if let Some(p) = cli.project.as_deref() {
+                            resolve_project_input(p, resolver.path.as_path())
+                        } else {
+                            lotar::project::get_effective_project_name(&resolver)
                         })
                     };
 
-                    // Current content (right side)
-                    let current_content: Option<String> = if since.is_some() {
-                        // Right = HEAD version
-                        lotar::services::audit_service::AuditService::show_file_at(
-                            &repo_root, "HEAD", &rel_path,
-                        )
-                        .ok()
+                    // Gather changed task files
+                    let changed_files: Vec<std::path::PathBuf> = if let Some(ref_base) = &since {
+                        // Range: ref_base..HEAD
+                        let mut cmd = std::process::Command::new("git");
+                        cmd.arg("-C")
+                            .arg(&repo_root)
+                            .arg("diff")
+                            .arg("--name-only")
+                            .arg(format!("{}..HEAD", ref_base))
+                            .arg("--")
+                            .arg(&tasks_rel);
+                        match cmd.output() {
+                            Ok(o) if o.status.success() => {
+                                let out_str = String::from_utf8_lossy(&o.stdout).to_string();
+                                let base_iter = out_str
+                                    .lines()
+                                    .map(|l| std::path::PathBuf::from(l.trim()))
+                                    .filter(|p| !p.as_os_str().is_empty())
+                                    .filter(|p| p.starts_with(&tasks_rel));
+                                let iter = if let Some(ref proj) = project_filter {
+                                    let expect = tasks_rel.join(proj);
+                                    Box::new(base_iter.filter(move |p| p.starts_with(&expect)))
+                                        as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                } else {
+                                    Box::new(base_iter)
+                                        as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                };
+                                iter.collect()
+                            }
+                            _ => Vec::new(),
+                        }
                     } else {
-                        // Working tree absolute path
-                        let abs = repo_root.join(&rel_path);
-                        std::fs::read_to_string(abs).ok()
+                        // Working + staged vs HEAD, use porcelain to detect .tasks changes
+                        use std::process::Command;
+                        let out = Command::new("git")
+                            .arg("-C")
+                            .arg(&repo_root)
+                            .arg("status")
+                            .arg("--porcelain")
+                            .output();
+                        match out {
+                            Ok(o) if o.status.success() => {
+                                let mut files = Vec::new();
+                                for line in String::from_utf8_lossy(&o.stdout).lines() {
+                                    if line.len() < 4 {
+                                        continue;
+                                    }
+                                    let status = &line[..2];
+                                    if status.contains('R') {
+                                        if let Some(pos) = line.find(" -> ") {
+                                            let new_path = &line[pos + 4..];
+                                            files.push(std::path::PathBuf::from(new_path.trim()));
+                                        }
+                                        continue;
+                                    }
+                                    let path = line[3..].trim();
+                                    if !path.is_empty() {
+                                        files.push(std::path::PathBuf::from(path));
+                                    }
+                                }
+                                let iter = files.into_iter().filter(|p| p.starts_with(&tasks_rel));
+                                let iter = if let Some(ref proj) = project_filter {
+                                    let expect = tasks_rel.join(proj);
+                                    Box::new(iter.filter(move |p| p.starts_with(&expect)))
+                                        as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                } else {
+                                    Box::new(iter) as Box<dyn Iterator<Item = std::path::PathBuf>>
+                                };
+                                iter.collect()
+                            }
+                            _ => Vec::new(),
+                        }
                     };
 
-                    // Base content (left side)
-                    let base_content: Option<String> = if let Some(ref_base) = &since {
-                        lotar::services::audit_service::AuditService::show_file_at(
-                            &repo_root, ref_base, &rel_path,
-                        )
-                        .ok()
-                    } else {
-                        // HEAD version
-                        lotar::services::audit_service::AuditService::show_file_at(
-                            &repo_root, "HEAD", &rel_path,
-                        )
-                        .ok()
-                    };
-
-                    let cur_task = current_content.as_deref().and_then(load_yaml_as_task);
-                    let base_task = base_content.as_deref().and_then(load_yaml_as_task);
-
-                    // If both failed to parse, skip
-                    if cur_task.is_none() && base_task.is_none() {
-                        continue;
+                    // For each changed file, compute field-level deltas
+                    #[derive(Clone, Debug)]
+                    struct BasicDelta {
+                        field: String,
+                        old: serde_json::Value,
+                        new: serde_json::Value,
+                    }
+                    #[derive(Clone, Debug)]
+                    struct Item {
+                        id: String,
+                        project: String,
+                        file: String,
+                        changes: Vec<BasicDelta>,
                     }
 
-                    // Compute minimal field deltas using the same approach as task diff --fields
-                    let mut deltas: Vec<BasicDelta> = Vec::new();
-                    let mut push = |k: &str, old: serde_json::Value, new: serde_json::Value| {
-                        if old != new {
-                            deltas.push(BasicDelta {
-                                field: k.to_string(),
-                                old,
-                                new,
+                    let mut items: Vec<Item> = Vec::new();
+                    for rel_path in changed_files {
+                        if rel_path.extension().and_then(|e| e.to_str()) != Some("yml") {
+                            continue;
+                        }
+                        // Resolve ID from path .tasks/<PROJECT>/<NUM>.yml
+                        let file_name = match rel_path.file_stem().and_then(|s| s.to_str()) {
+                            Some(s) => s,
+                            None => continue,
+                        };
+                        let numeric: u64 = match file_name.parse() {
+                            Ok(n) => n,
+                            Err(_) => continue,
+                        };
+                        let project = match rel_path
+                            .parent()
+                            .and_then(|p| p.file_name())
+                            .and_then(|s| s.to_str())
+                        {
+                            Some(p) => p.to_string(),
+                            None => continue,
+                        };
+                        let id = format!("{}-{}", project, numeric);
+
+                        // Load snapshots with tolerant fallback for mixed-case enums in YAML
+                        let load_yaml_as_task =
+                            |content: &str| -> Option<lotar::storage::task::Task> {
+                                // First try strict parse
+                                if let Ok(t) =
+                                    serde_yaml::from_str::<lotar::storage::task::Task>(content)
+                                {
+                                    return Some(t);
+                                }
+                                // Fallback: tolerant parse via serde_yaml::Value and FromStr for enums
+                                let v: serde_yaml::Value = serde_yaml::from_str(content).ok()?;
+                                let get_str = |k: &str| -> Option<String> {
+                                    v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
+                                };
+                                let get_vec_str = |k: &str| -> Vec<String> {
+                                    v.get(k)
+                                        .and_then(|x| x.as_sequence())
+                                        .map(|seq| {
+                                            seq.iter()
+                                                .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                                                .collect()
+                                        })
+                                        .unwrap_or_default()
+                                };
+
+                                let title = get_str("title").unwrap_or_else(|| "".to_string());
+
+                                let status = get_str("status")
+                                    .and_then(|s| lotar::types::TaskStatus::from_str(&s).ok())
+                                    .unwrap_or_default();
+                                let priority = get_str("priority")
+                                    .and_then(|s| lotar::types::Priority::from_str(&s).ok())
+                                    .unwrap_or_default();
+                                let task_type = get_str("task_type")
+                                    .and_then(|s| lotar::types::TaskType::from_str(&s).ok())
+                                    .unwrap_or_default();
+
+                                let reporter = get_str("reporter");
+                                let assignee = get_str("assignee");
+                                let created = get_str("created")
+                                    .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+                                let modified = get_str("modified")
+                                    .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+                                let due_date = get_str("due_date");
+                                let effort = get_str("effort");
+                                let tags = get_vec_str("tags");
+
+                                Some(lotar::storage::task::Task {
+                                    title,
+                                    status,
+                                    priority,
+                                    task_type,
+                                    reporter,
+                                    assignee,
+                                    created,
+                                    modified,
+                                    due_date,
+                                    effort,
+                                    acceptance_criteria: vec![],
+                                    relationships: lotar::types::TaskRelationships::default(),
+                                    comments: vec![],
+                                    references: vec![],
+                                    sprints: vec![],
+                                    history: vec![],
+                                    subtitle: None,
+                                    description: None,
+                                    tags,
+                                    custom_fields: std::collections::HashMap::new(),
+                                })
+                            };
+
+                        // Current content (right side)
+                        let current_content: Option<String> = if since.is_some() {
+                            // Right = HEAD version
+                            lotar::services::audit_service::AuditService::show_file_at(
+                                &repo_root, "HEAD", &rel_path,
+                            )
+                            .ok()
+                        } else {
+                            // Working tree absolute path
+                            let abs = repo_root.join(&rel_path);
+                            std::fs::read_to_string(abs).ok()
+                        };
+
+                        // Base content (left side)
+                        let base_content: Option<String> = if let Some(ref_base) = &since {
+                            lotar::services::audit_service::AuditService::show_file_at(
+                                &repo_root, ref_base, &rel_path,
+                            )
+                            .ok()
+                        } else {
+                            // HEAD version
+                            lotar::services::audit_service::AuditService::show_file_at(
+                                &repo_root, "HEAD", &rel_path,
+                            )
+                            .ok()
+                        };
+
+                        let cur_task = current_content.as_deref().and_then(load_yaml_as_task);
+                        let base_task = base_content.as_deref().and_then(load_yaml_as_task);
+
+                        // If both failed to parse, skip
+                        if cur_task.is_none() && base_task.is_none() {
+                            continue;
+                        }
+
+                        // Compute minimal field deltas using the same approach as task diff --fields
+                        let mut deltas: Vec<BasicDelta> = Vec::new();
+                        let mut push = |k: &str, old: serde_json::Value, new: serde_json::Value| {
+                            if old != new {
+                                deltas.push(BasicDelta {
+                                    field: k.to_string(),
+                                    old,
+                                    new,
+                                });
+                            }
+                        };
+                        match (cur_task.as_ref(), base_task.as_ref()) {
+                            (Some(cur), Some(prev)) => {
+                                push(
+                                    "title",
+                                    serde_json::json!(prev.title),
+                                    serde_json::json!(cur.title),
+                                );
+                                push(
+                                    "status",
+                                    serde_json::json!(prev.status.to_string()),
+                                    serde_json::json!(cur.status.to_string()),
+                                );
+                                push(
+                                    "priority",
+                                    serde_json::json!(prev.priority.to_string()),
+                                    serde_json::json!(cur.priority.to_string()),
+                                );
+                                push(
+                                    "task_type",
+                                    serde_json::json!(prev.task_type.to_string()),
+                                    serde_json::json!(cur.task_type.to_string()),
+                                );
+                                push(
+                                    "assignee",
+                                    serde_json::json!(prev.assignee),
+                                    serde_json::json!(cur.assignee),
+                                );
+                                push(
+                                    "reporter",
+                                    serde_json::json!(prev.reporter),
+                                    serde_json::json!(cur.reporter),
+                                );
+                                push(
+                                    "due_date",
+                                    serde_json::json!(prev.due_date),
+                                    serde_json::json!(cur.due_date),
+                                );
+                                push(
+                                    "effort",
+                                    serde_json::json!(prev.effort),
+                                    serde_json::json!(cur.effort),
+                                );
+                                push(
+                                    "tags",
+                                    serde_json::json!(prev.tags),
+                                    serde_json::json!(cur.tags),
+                                );
+                            }
+                            (Some(cur), None) => {
+                                // Created
+                                push(
+                                    "created",
+                                    serde_json::Value::Null,
+                                    serde_json::json!(cur.title),
+                                );
+                            }
+                            (None, Some(_prev)) => {
+                                // Deleted
+                                push("deleted", serde_json::json!(true), serde_json::Value::Null);
+                            }
+                            (None, None) => {}
+                        }
+
+                        if !deltas.is_empty() {
+                            items.push(Item {
+                                id,
+                                project,
+                                file: rel_path.to_string_lossy().to_string(),
+                                changes: deltas,
                             });
                         }
-                    };
-                    match (cur_task.as_ref(), base_task.as_ref()) {
-                        (Some(cur), Some(prev)) => {
-                            push(
-                                "title",
-                                serde_json::json!(prev.title),
-                                serde_json::json!(cur.title),
-                            );
-                            push(
-                                "status",
-                                serde_json::json!(prev.status.to_string()),
-                                serde_json::json!(cur.status.to_string()),
-                            );
-                            push(
-                                "priority",
-                                serde_json::json!(prev.priority.to_string()),
-                                serde_json::json!(cur.priority.to_string()),
-                            );
-                            push(
-                                "task_type",
-                                serde_json::json!(prev.task_type.to_string()),
-                                serde_json::json!(cur.task_type.to_string()),
-                            );
-                            push(
-                                "assignee",
-                                serde_json::json!(prev.assignee),
-                                serde_json::json!(cur.assignee),
-                            );
-                            push(
-                                "reporter",
-                                serde_json::json!(prev.reporter),
-                                serde_json::json!(cur.reporter),
-                            );
-                            push(
-                                "due_date",
-                                serde_json::json!(prev.due_date),
-                                serde_json::json!(cur.due_date),
-                            );
-                            push(
-                                "effort",
-                                serde_json::json!(prev.effort),
-                                serde_json::json!(cur.effort),
-                            );
-                            push(
-                                "tags",
-                                serde_json::json!(prev.tags),
-                                serde_json::json!(cur.tags),
-                            );
-                        }
-                        (Some(cur), None) => {
-                            // Created
-                            push(
-                                "created",
-                                serde_json::Value::Null,
-                                serde_json::json!(cur.title),
-                            );
-                        }
-                        (None, Some(_prev)) => {
-                            // Deleted
-                            push("deleted", serde_json::json!(true), serde_json::Value::Null);
-                        }
-                        (None, None) => {}
                     }
 
-                    if !deltas.is_empty() {
-                        items.push(Item {
-                            id,
-                            project,
-                            file: rel_path.to_string_lossy().to_string(),
-                            changes: deltas,
-                        });
-                    }
-                }
+                    // Sort stable by id for determinism
+                    items.sort_by(|a, b| a.id.cmp(&b.id));
 
-                // Sort stable by id for determinism
-                items.sort_by(|a, b| a.id.cmp(&b.id));
-
-                match renderer.format {
-                    output::OutputFormat::Json => {
-                        let items_json: Vec<_> = items
-                            .iter()
-                            .map(|it| {
-                                serde_json::json!({
-                                    "id": it.id,
-                                    "project": it.project,
-                                    "file": it.file,
-                                    "changes": it.changes.iter().map(|d| serde_json::json!({
-                                        "field": d.field,
-                                        "old": d.old,
-                                        "new": d.new,
-                                    })).collect::<Vec<_>>()
+                    match renderer.format {
+                        output::OutputFormat::Json => {
+                            let items_json: Vec<_> = items
+                                .iter()
+                                .map(|it| {
+                                    serde_json::json!({
+                                        "id": it.id,
+                                        "project": it.project,
+                                        "file": it.file,
+                                        "changes": it.changes.iter().map(|d| serde_json::json!({
+                                            "field": d.field,
+                                            "old": d.old,
+                                            "new": d.new,
+                                        })).collect::<Vec<_>>()
+                                    })
                                 })
-                            })
-                            .collect();
-                        renderer.emit_raw_stdout(
-                            &serde_json::json!({
-                                "status": "ok",
-                                "action": "changelog",
-                                "mode": if since.is_some() { "range" } else { "working" },
-                                "count": items_json.len(),
-                                "items": items_json
-                            })
-                            .to_string(),
-                        );
-                    }
-                    _ => {
-                        if items.is_empty() {
-                            renderer.emit_success("No task changes.");
-                        } else {
-                            for it in &items {
-                                let mut parts: Vec<String> = Vec::new();
-                                for d in &it.changes {
-                                    // Compact representation for commit messages
-                                    let s = match (&d.old, &d.new) {
-                                        (serde_json::Value::Null, v) => {
-                                            format!("{}: ∅ → {}", d.field, v)
-                                        }
-                                        (o, serde_json::Value::Null) => {
-                                            format!("{}: {} → ∅", d.field, o)
-                                        }
-                                        (o, n) => format!("{}: {} → {}", d.field, o, n),
-                                    };
-                                    parts.push(s);
+                                .collect();
+                            renderer.emit_raw_stdout(
+                                &serde_json::json!({
+                                    "status": "ok",
+                                    "action": "changelog",
+                                    "mode": if since.is_some() { "range" } else { "working" },
+                                    "count": items_json.len(),
+                                    "items": items_json
+                                })
+                                .to_string(),
+                            );
+                        }
+                        _ => {
+                            if items.is_empty() {
+                                renderer.emit_success("No task changes.");
+                            } else {
+                                for it in &items {
+                                    let mut parts: Vec<String> = Vec::new();
+                                    for d in &it.changes {
+                                        // Compact representation for commit messages
+                                        let s = match (&d.old, &d.new) {
+                                            (serde_json::Value::Null, v) => {
+                                                format!("{}: ∅ → {}", d.field, v)
+                                            }
+                                            (o, serde_json::Value::Null) => {
+                                                format!("{}: {} → ∅", d.field, o)
+                                            }
+                                            (o, n) => format!("{}: {} → {}", d.field, o, n),
+                                        };
+                                        parts.push(s);
+                                    }
+                                    renderer.emit_raw_stdout(&format!(
+                                        "{}  {}",
+                                        it.id,
+                                        parts.join("; ")
+                                    ));
                                 }
-                                renderer.emit_raw_stdout(&format!(
-                                    "{}  {}",
-                                    it.id,
-                                    parts.join("; ")
-                                ));
                             }
                         }
                     }
+                    renderer.log_info("END CHANGELOG status=ok");
+                    Ok(())
+                } else {
+                    renderer.emit_warning("Not a git repository. No changelog.");
+                    renderer.log_info("END CHANGELOG status=ok");
+                    Ok(())
                 }
-                renderer.log_info("END CHANGELOG status=ok");
-                Ok(())
-            } else {
-                renderer.emit_warning("Not a git repository. No changelog.");
-                renderer.log_info("END CHANGELOG status=ok");
-                Ok(())
+            })();
+            match outcome {
+                Ok(()) => Ok(()),
+                Err(message) => {
+                    renderer.emit_error(&message);
+                    renderer.log_info("END CHANGELOG status=err");
+                    Err(message)
+                }
             }
         }
         Commands::Mcp => {
