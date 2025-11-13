@@ -7,7 +7,7 @@ pub fn render_markdown_single<T: Outputable>(item: &T) -> String {
 
     let mut output = String::new();
     for (header, value) in headers.iter().zip(values.iter()) {
-    let _ = writeln!(output, "**{header}:** {value}");
+        let _ = writeln!(output, "**{header}:** {value}");
     }
     output
 }
@@ -16,7 +16,7 @@ pub fn render_markdown_list<T: Outputable>(items: &[T], title: Option<&str>) -> 
     let mut output = String::new();
 
     if let Some(title) = title {
-    let _ = writeln!(output, "# {title}\n");
+        let _ = writeln!(output, "# {title}\n");
     }
 
     if items.is_empty() {
@@ -28,7 +28,7 @@ pub fn render_markdown_list<T: Outputable>(items: &[T], title: Option<&str>) -> 
     let headers = T::table_headers();
     output.push_str("| ");
     for header in &headers {
-    let _ = write!(output, "{header} | ");
+        let _ = write!(output, "{header} | ");
     }
     output.push('\n');
 

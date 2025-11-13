@@ -2,7 +2,9 @@ use crate::config::types::*;
 use crate::config::validation::ConfigValidator;
 use crate::config::validation::errors::ValidationResult;
 use crate::types::{Priority, TaskStatus, TaskType};
-use crate::utils::project::generate_project_prefix;
+use crate::utils::project::{
+    RESERVED_PREFIX_MESSAGE, generate_project_prefix, is_reserved_project_prefix,
+};
 use serde::de::DeserializeOwned;
 use serde_yaml;
 use std::collections::HashMap;
@@ -773,6 +775,9 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
             })?;
         }
         "default_prefix" | "default_project" => {
+            if is_reserved_project_prefix(value) {
+                return Err(ConfigError::ParseError(RESERVED_PREFIX_MESSAGE.to_string()));
+            }
             if !value
                 .chars()
                 .all(|c| c.is_alphanumeric() || c == '-' || c == '_')

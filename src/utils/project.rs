@@ -2,6 +2,13 @@
 //! This module provides a consistent way to generate and resolve project
 //! prefixes across the entire application.
 
+const FALLBACK_PREFIX: &str = "PROJ";
+pub const RESERVED_PREFIX_MESSAGE: &str = "Project prefixes starting with '@' are reserved for internal folders (e.g., @sprints). Choose a different prefix.";
+
+pub fn is_reserved_project_prefix(candidate: &str) -> bool {
+    candidate.trim_start().starts_with('@')
+}
+
 // Generate a project prefix from a project name with conflict detection
 //
 // This is the smart algorithm that:
@@ -9,20 +16,27 @@
 // - For hyphenated/underscored names: take first letter of each word
 // - For single words: take first 4 characters
 // - Ensures no conflicts with existing projects
+// - Strips leading '.' and '@' markers so user-visible prefixes never start with '@'
 //
 // Examples:
 // - "test" -> "TEST"
 // - "my_cool_project" -> "MCP"
 // - "super-awesome-tool" -> "SAT"
 // - "longprojectname" -> "LONG"
+// - "@sprints" -> "SPRI"
 pub fn generate_project_prefix(project_name: &str) -> String {
-    // Strip leading dots to avoid hidden directory issues
-    let clean_name = project_name.trim_start_matches('.');
-
-    if clean_name.len() <= 4 {
-        clean_name.to_uppercase()
+    // Strip leading dots (hidden dirs) and '@' (reserved namespaces).
+    let trimmed = project_name.trim_start_matches(&['.', '@'][..]);
+    let source = if trimmed.is_empty() {
+        FALLBACK_PREFIX
     } else {
-        let normalized = clean_name.to_uppercase();
+        trimmed
+    };
+
+    if source.len() <= 4 {
+        source.to_uppercase()
+    } else {
+        let normalized = source.to_uppercase();
         if normalized.contains('-')
             || normalized.contains('_')
             || normalized.contains(' ')
@@ -143,6 +157,10 @@ pub fn validate_explicit_prefix(
     project_name: &str,
     tasks_dir: &std::path::Path,
 ) -> Result<(), String> {
+    if is_reserved_project_prefix(explicit_prefix) {
+        return Err(RESERVED_PREFIX_MESSAGE.to_string());
+    }
+
     // Check if tasks directory exists - if not, no conflicts possible
     if !tasks_dir.exists() {
         return Ok(());

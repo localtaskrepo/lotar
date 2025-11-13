@@ -155,6 +155,9 @@ fn generate_prefix_variants() {
     assert_eq!(generate_project_prefix(".tmpABC123"), "TMPA");
     assert_eq!(generate_project_prefix(".test_dot_prefix"), "TDP");
     assert_eq!(generate_project_prefix("..hidden"), "HIDD");
+    assert_eq!(generate_project_prefix("@frontend"), "FRON");
+    assert_eq!(generate_project_prefix("@sprints"), "SPRI");
+    assert_eq!(generate_project_prefix("@@@"), "PROJ");
 }
 
 #[test]
@@ -221,4 +224,19 @@ fn unique_prefix_generation_and_validation() {
     assert!(err.contains("prefix is already used by project"));
     assert!(validate_explicit_prefix("BACK", "backend", &tasks_dir).is_ok());
     assert!(validate_explicit_prefix("FRON", "frontend", &tasks_dir).is_ok());
+}
+
+#[test]
+fn reserved_prefixes_are_rejected() {
+    let temp_dir = TempDir::new().unwrap();
+    let tasks_dir = temp_dir.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+
+    let err = validate_explicit_prefix("@team", "Team", &tasks_dir).unwrap_err();
+    assert!(err.contains("@"));
+    assert!(err.contains("reserved"));
+
+    let cfg_err =
+        lotar::config::operations::validate_field_value("default_prefix", "@team").unwrap_err();
+    assert!(cfg_err.to_string().contains("prefixes starting with '@'"));
 }

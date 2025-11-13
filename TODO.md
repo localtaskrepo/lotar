@@ -1,5 +1,4 @@
 Features:
-- Reduce size
 - lotar config validate/normalize needs to be revisited
 - Allow env override for all config values that are in all other chains
 - Publish to docker hub, homebrew, npm?, ...
@@ -18,7 +17,6 @@ Features:
 Chores:
 - Test release workflow
 - parameter order is not flexible (e.g. lotar --format json sprint list works, but lotar sprint list --format json does not).
-- Add test that checks that project names starting with @ don't produce project IDs with @
 
 ## Backlog
 - [ ] Include README and LICENSE in archives
