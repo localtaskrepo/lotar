@@ -2,11 +2,128 @@ use std::borrow::Cow;
 
 /// Rewrite CLI arguments to support additional convenience forms.
 ///
-/// Currently this normalizes the `serve` subcommand so that legacy positional
-/// port values and the `-p` short flag are mapped to the canonical `--port`
-/// option that Clap natively understands. Global flags and other serve options
-/// are preserved untouched.
+/// Steps:
+/// 1. Hoist global flags (`--format`, `--tasks-dir`, `--log-level`, `--verbose`)
+///    so they can appear after subcommands.
+/// 2. Normalize the `serve` subcommand so positional ports and `-p` map to
+///    the canonical `--port` option Clap expects.
 pub fn normalize_args(raw_args: &[String]) -> Result<Vec<String>, String> {
+    let hoisted = hoist_global_flags(raw_args)?;
+    normalize_serve_args(&hoisted)
+}
+
+fn hoist_global_flags(raw_args: &[String]) -> Result<Vec<String>, String> {
+    if raw_args.len() <= 1 {
+        return Ok(raw_args.to_vec());
+    }
+
+    let mut hoisted: Vec<String> = Vec::new();
+    let mut remainder: Vec<String> = Vec::with_capacity(raw_args.len());
+    remainder.push(raw_args[0].clone());
+
+    let mut idx = 1;
+    while idx < raw_args.len() {
+        let token = &raw_args[idx];
+
+        if token == "--" {
+            remainder.extend_from_slice(&raw_args[idx..]);
+            break;
+        }
+
+        if let Some((consumed, produced)) = try_hoist_global_flag(raw_args, idx)? {
+            hoisted.extend(produced);
+            idx += consumed;
+            continue;
+        }
+
+        remainder.push(token.clone());
+        idx += 1;
+    }
+
+    if hoisted.is_empty() {
+        return Ok(raw_args.to_vec());
+    }
+
+    let mut normalized = Vec::with_capacity(raw_args.len() + hoisted.len());
+    normalized.push(raw_args[0].clone());
+    normalized.extend(hoisted);
+    normalized.extend(remainder.into_iter().skip(1));
+    Ok(normalized)
+}
+
+fn try_hoist_global_flag(
+    args: &[String],
+    idx: usize,
+) -> Result<Option<(usize, Vec<String>)>, String> {
+    let token = &args[idx];
+
+    match token.as_str() {
+        "--format" => {
+            let value = args
+                .get(idx + 1)
+                .ok_or_else(|| "Option '--format' requires a value".to_string())?
+                .clone();
+            return Ok(Some((2, vec!["--format".to_string(), value])));
+        }
+        "--log-level" => {
+            let value = args
+                .get(idx + 1)
+                .ok_or_else(|| "Option '--log-level' requires a value".to_string())?
+                .clone();
+            return Ok(Some((2, vec!["--log-level".to_string(), value])));
+        }
+        "--tasks-dir" => {
+            let value = args
+                .get(idx + 1)
+                .ok_or_else(|| "Option '--tasks-dir' requires a value".to_string())?
+                .clone();
+            return Ok(Some((2, vec!["--tasks-dir".to_string(), value])));
+        }
+        "--verbose" => {
+            return Ok(Some((1, vec!["--verbose".to_string()])));
+        }
+        _ => {}
+    }
+
+    if token.starts_with("--format=")
+        || token.starts_with("--log-level=")
+        || token.starts_with("--tasks-dir=")
+    {
+        return Ok(Some((1, vec![token.clone()])));
+    }
+
+    if token == "-f" {
+        let value = args
+            .get(idx + 1)
+            .ok_or_else(|| "Option '-f' requires a value".to_string())?
+            .clone();
+        return Ok(Some((2, vec!["--format".to_string(), value])));
+    }
+
+    if token.starts_with("-f") && token.len() > 2 {
+        return Ok(Some((1, vec![format!("--format={}", &token[2..])])));
+    }
+
+    if token == "-l" {
+        let value = args
+            .get(idx + 1)
+            .ok_or_else(|| "Option '-l' requires a value".to_string())?
+            .clone();
+        return Ok(Some((2, vec!["--log-level".to_string(), value])));
+    }
+
+    if token.starts_with("-l") && token.len() > 2 {
+        return Ok(Some((1, vec![format!("--log-level={}", &token[2..])])));
+    }
+
+    if token == "-v" {
+        return Ok(Some((1, vec!["-v".to_string()])));
+    }
+
+    Ok(None)
+}
+
+fn normalize_serve_args(raw_args: &[String]) -> Result<Vec<String>, String> {
     let Some(serve_idx) = find_serve_index(raw_args) else {
         return Ok(raw_args.to_vec());
     };
@@ -287,5 +404,62 @@ mod tests {
         let args = to_vec(&["lotar", "serve", "-p"]);
         let err = normalize_args(&args).unwrap_err();
         assert!(err.contains("--port"));
+    }
+
+    #[test]
+    fn hoists_global_flags_after_subcommand() {
+        let args = to_vec(&["lotar", "sprint", "list", "--format", "json"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(
+            normalized,
+            to_vec(&["lotar", "--format", "json", "sprint", "list"])
+        );
+    }
+
+    #[test]
+    fn hoists_tasks_dir_and_log_level_forms() {
+        let args = to_vec(&[
+            "lotar",
+            "sprint",
+            "list",
+            "--tasks-dir",
+            "./tmp",
+            "-linfo",
+            "-fjson",
+        ]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(
+            normalized,
+            to_vec(&[
+                "lotar",
+                "--tasks-dir",
+                "./tmp",
+                "--log-level=info",
+                "--format=json",
+                "sprint",
+                "list",
+            ])
+        );
+    }
+
+    #[test]
+    fn leaves_project_flag_for_subcommand() {
+        let args = to_vec(&["lotar", "sprint", "list", "--project", "APP"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(normalized, args);
+    }
+
+    #[test]
+    fn stops_hoisting_after_passthrough_delimiter() {
+        let args = to_vec(&["lotar", "sprint", "list", "--", "--format", "json"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(normalized, args);
+    }
+
+    #[test]
+    fn hoists_verbose_flag() {
+        let args = to_vec(&["lotar", "task", "list", "-v"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(normalized, to_vec(&["lotar", "-v", "task", "list"]));
     }
 }

@@ -345,6 +345,111 @@ mod output_formatting {
 }
 
 // =============================================================================
+// Argument Normalization
+// =============================================================================
+
+mod argument_normalization {
+    use super::*;
+    use serde_json::Value;
+    use std::path::Path;
+    use tempfile::TempDir;
+
+    fn create_task_in(dir: &Path, title: &str) {
+        crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(dir)
+            .arg("task")
+            .arg("add")
+            .arg(title)
+            .assert()
+            .success();
+    }
+
+    fn assert_has_task(payload: &Value, title: &str) {
+        let tasks = payload["tasks"].as_array().expect("tasks array present");
+        assert!(
+            tasks
+                .iter()
+                .any(|task| task["title"].as_str() == Some(title)),
+            "missing task '{title}' in payload: {payload:?}"
+        );
+    }
+
+    #[test]
+    fn short_format_flag_after_subcommand_emits_json() {
+        let temp = TempDir::new().unwrap();
+        create_task_in(temp.path(), "Inline Format Flag");
+
+        let output = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(temp.path())
+            .args(["task", "list", "-fjson"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "task list failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(payload["status"].as_str(), Some("success"));
+        assert_has_task(&payload, "Inline Format Flag");
+    }
+
+    #[test]
+    fn tasks_dir_flag_after_subcommand_is_hoisted() {
+        let fixtures = TestFixtures::new();
+        create_task_in(fixtures.temp_dir.path(), "External Tasks Dir");
+
+        let run_dir = TempDir::new().unwrap();
+        let tasks_dir = fixtures.tasks_root.to_string_lossy().to_string();
+
+        let output = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(run_dir.path())
+            .arg("task")
+            .arg("list")
+            .arg("--tasks-dir")
+            .arg(&tasks_dir)
+            .arg("--format")
+            .arg("json")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "task list with --tasks-dir failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_has_task(&payload, "External Tasks Dir");
+    }
+
+    #[test]
+    fn inline_log_level_and_format_flags_after_subcommand_work() {
+        let temp = TempDir::new().unwrap();
+        create_task_in(temp.path(), "Inline Log Level");
+
+        let output = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(temp.path())
+            .args(["task", "list", "-linfo", "-fjson"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "task list with inline flags failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let payload: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(payload["status"].as_str(), Some("success"));
+        assert_has_task(&payload, "Inline Log Level");
+    }
+}
+
+// =============================================================================
 // Error Handling
 // =============================================================================
 
