@@ -39,15 +39,22 @@ describe.concurrent('MCP sprint smoke scenarios', () => {
             });
 
             const nextResponse = async (): Promise<any> => {
-                const [line] = (await once(reader, 'line')) as [string];
-                const trimmed = line.trim();
-                if (!trimmed) {
-                    return nextResponse();
-                }
-                try {
-                    return JSON.parse(trimmed);
-                } catch (error) {
-                    throw new Error(`Failed to parse MCP response: ${trimmed}\n${String(error)}`);
+                while (true) {
+                    const [line] = (await once(reader, 'line')) as [string];
+                    const trimmed = line.trim();
+                    if (!trimmed) {
+                        continue;
+                    }
+                    let parsed: any;
+                    try {
+                        parsed = JSON.parse(trimmed);
+                    } catch (error) {
+                        throw new Error(`Failed to parse MCP response: ${trimmed}\n${String(error)}`);
+                    }
+                    if (parsed?.id === undefined) {
+                        continue;
+                    }
+                    return parsed;
                 }
             };
 

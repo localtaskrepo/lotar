@@ -309,3 +309,94 @@ jobs:
               release_id: release.data.id,
               body: nextBody,
             });
+
+  update-homebrew-tap:
+    name: Update Homebrew Tap
+    needs: update-release-page
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: localtaskrepo/homebrew-lotar
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Collect release metadata
+        id: release_meta
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          asset_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
+          {
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "asset_base=${asset_base}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download macOS checksums
+        run: |
+          cd tap
+          base="${{ steps.release_meta.outputs.asset_base }}"
+          tag="${{ steps.release_meta.outputs.tag }}"
+          curl -sSfL "${base}/lotar-${tag}-macos-arm64.sha256" -o arm64.sha
+          curl -sSfL "${base}/lotar-${tag}-macos-x64.sha256" -o x64.sha
+
+      - name: Update formula
+        env:
+          VERSION: ${{ steps.release_meta.outputs.version }}
+          BASE_URL: ${{ steps.release_meta.outputs.asset_base }}
+        run: |
+          cd tap
+          arm64_sha=$(cut -d ' ' -f1 arm64.sha)
+          x64_sha=$(cut -d ' ' -f1 x64.sha)
+          export ARM64_SHA="$arm64_sha"
+          export X64_SHA="$x64_sha"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          version = os.environ['VERSION']
+          base = os.environ['BASE_URL']
+          arm_sha = os.environ['ARM64_SHA']
+          x64_sha = os.environ['X64_SHA']
+
+          formula = f"""class Lotar < Formula
+            desc "Local-first task and project management CLI"
+            homepage "https://github.com/localtaskrepo/lotar"
+            version "{version}"
+            license "ISC"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "{base}/lotar-v{version}-macos-arm64.tar.gz"
+                sha256 "{arm_sha}"
+              else
+                url "{base}/lotar-v{version}-macos-x64.tar.gz"
+                sha256 "{x64_sha}"
+              end
+            end
+
+            def install
+              bin.install "lotar"
+            end
+
+            test do
+              assert_match "lotar", shell_output("#{bin}/lotar --version")
+            end
+          end
+          """
+
+          Path("Formula/lotar.rb").write_text(formula)
+          PY
+
+      - name: Commit and push tap update
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/lotar.rb
+          git commit -m "Update lotar formula to v${{ steps.release_meta.outputs.version }}" || echo "No changes"
+          git push

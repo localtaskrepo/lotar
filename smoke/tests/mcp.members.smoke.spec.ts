@@ -55,11 +55,17 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
                     if (!trimmed) {
                         continue;
                     }
+                    let parsed: any;
                     try {
-                        return JSON.parse(trimmed);
+                        parsed = JSON.parse(trimmed);
                     } catch (error) {
                         throw new Error(`Failed to parse MCP response: ${trimmed}\n${String(error)}`);
                     }
+                    if (parsed?.id === undefined) {
+                        // Ignore notifications (e.g., tools/listChanged) that do not correspond to our requests.
+                        continue;
+                    }
+                    return parsed;
                 }
             };
 

@@ -17,4 +17,4 @@ Features:
 - [ ] Include README and LICENSE in archives
 - [ ] Universal macOS binary via lipo (optional)
 - [ ] Post-upload verification job (download & verify checksum/signature)
-- [ ] Package managers: Homebrew, Scoop, cargo-binstall, Docker image
+- [ ] Package managers: Scoop, cargo-binstall, Docker image
