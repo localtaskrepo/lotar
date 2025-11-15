@@ -12,10 +12,6 @@ Features:
 - New issues property and search: blocked (Do we need that or can custom fields cover this?)
 - Add option to choose which screen open by default (e.g. tasks, sprints, calendar, etc.)
 - Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
-- MCP descriptions should be dynamic to include available types, severities, etc. that are configured for the project, if there is only a global config, or a single project with a config (so no ambiguity, which should be the majority of cases)
-
-Chores:
-- Test release workflow
 
 ## Backlog
 - [ ] Include README and LICENSE in archives

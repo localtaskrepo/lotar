@@ -29,6 +29,9 @@
   ],
   "author": "Ravi Gairola <mallox@pyxzl.net>",
   "license": "ISC",
+  "engines": {
+    "node": "24.x"
+  },
   "dependencies": {
     "chart.js": "^4.5.1",
     "vue": "^3.5.24",

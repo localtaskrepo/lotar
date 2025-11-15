@@ -6,8 +6,33 @@ on:
       - 'v*.*.*'
 
 jobs:
+  require-qa-green:
+    name: Ensure QA succeeded
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Verify latest QA run for this commit is green
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const response = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              head_sha: context.sha,
+              status: 'completed'
+            });
+            const success = response.data.workflow_runs.find(run => run.conclusion === 'success');
+            if (!success) {
+              core.setFailed('No successful Quality Assurance workflow run found for this commit.');
+            }
+
   create-release:
     name: Create Release
+    needs: require-qa-green
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,10 +47,14 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME#v}"
+          TAG_BASE="${TAG%%-*}"
+          if [ -z "$TAG_BASE" ]; then
+            TAG_BASE="$TAG"
+          fi
           CARGO_VERSION=$(grep -E '^version\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*version\s*=\s*"([^"]+)".*/\1/')
-          echo "Tag: $TAG | Cargo.toml: $CARGO_VERSION"
-          if [ "$TAG" != "$CARGO_VERSION" ]; then
-            echo "Error: tag ($TAG) does not match Cargo.toml version ($CARGO_VERSION)." >&2
+          echo "Tag: $TAG | Base: $TAG_BASE | Cargo.toml: $CARGO_VERSION"
+          if [ "$TAG_BASE" != "$CARGO_VERSION" ]; then
+            echo "Error: tag base ($TAG_BASE) does not match Cargo.toml version ($CARGO_VERSION)." >&2
             exit 1
           fi
 
@@ -83,15 +112,31 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: stable
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: release-${{ matrix.os }}-${{ matrix.rust_target }}
+
+      - name: Write Node version file
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const version = pkg.engines?.node;
+            if (!version) {
+              core.setFailed('package.json is missing engines.node');
+            } else {
+              fs.writeFileSync('.node-version', `${version}\n`);
+            }
+
       - name: Setup Node (for web build)
-        if: hashFiles('package.json') != ''
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version-file: '.node-version'
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
@@ -121,7 +166,7 @@ jobs:
       - name: Build (release)
         shell: bash
         run: |
-          cargo build --release --locked --target "${{ matrix.rust_target }}"
+          cargo build --release --locked --all-features --target "${{ matrix.rust_target }}"
 
       - name: Strip binary (Unix)
         if: runner.os != 'Windows'
@@ -215,3 +260,52 @@ jobs:
             lotar-${{ github.ref_name }}-${{ matrix.artifact }}.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-release-page:
+    name: Update Release Page
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Add quick download links
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = process.env.GITHUB_REF_NAME;
+            const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+
+            const assetBase = `https://github.com/${owner}/${repo}/releases/download/${tag}`;
+            const quickLinks = [
+              { label: 'macOS (Apple Silicon)', file: `lotar-${tag}-macos-arm64.tar.gz` },
+              { label: 'macOS (Intel)', file: `lotar-${tag}-macos-x64.tar.gz` },
+              { label: 'Linux (glibc x64)', file: `lotar-${tag}-linux-x64.tar.gz` },
+              { label: 'Linux (musl x64)', file: `lotar-${tag}-linux-musl-x64.tar.gz` },
+              { label: 'Windows (x64)', file: `lotar-${tag}-windows-x64.zip` },
+            ];
+
+            const lines = quickLinks.map((entry) => `- [${entry.label}](${assetBase}/${entry.file})`);
+            const markerStart = '<!-- QUICK-LINKS:START -->';
+            const markerEnd = '<!-- QUICK-LINKS:END -->';
+            const quickLinksSection = [
+              markerStart,
+              '## Download Quick Links',
+              ...lines,
+              '> Need another build? Scroll down to the Assets list for checksums and signatures.',
+              markerEnd,
+            ].join('\n');
+
+            const existingBody = release.data.body ?? '';
+            const regex = new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`);
+            const nextBody = regex.test(existingBody)
+              ? existingBody.replace(regex, quickLinksSection)
+              : `${quickLinksSection}\n\n${existingBody}`.trim();
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.data.id,
+              body: nextBody,
+            });

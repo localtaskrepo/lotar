@@ -108,15 +108,27 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
             const success = await nextResponse();
             expect(success.error).toBeUndefined();
 
-            const content = success.result?.content?.[0]?.text ?? '{}';
+            const contentEntry = (success.result?.content ?? []).find((entry: any) => {
+                return typeof entry?.text === 'string' || entry?.json;
+            });
+
+            if (!contentEntry) {
+                throw new Error(`No task payload returned: ${JSON.stringify(success.result ?? {}, null, 2)}`);
+            }
+
             let payload: Record<string, any> = {};
-            try {
-                payload = JSON.parse(content);
-            } catch (error) {
-                throw new Error(`Failed to parse task payload: ${content}\n${String(error)}`);
+            if (typeof contentEntry.text === 'string') {
+                try {
+                    payload = JSON.parse(contentEntry.text);
+                } catch (error) {
+                    throw new Error(`Failed to parse task payload: ${contentEntry.text}\n${String(error)}`);
+                }
+            } else if (contentEntry.json) {
+                payload = contentEntry.json as Record<string, any>;
             }
 
             const dto: Record<string, any> = payload.task ?? payload;
+            expect(typeof dto.id).toBe('string');
 
             expect(dto.id).toMatch(/^CLI-\d+$/);
             expect(dto.assignee).toBe('allowed@example.com');

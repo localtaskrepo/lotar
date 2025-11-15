@@ -25,6 +25,7 @@ function createLocalStorageFile(prefix: string) {
 }
 
 const localStorageFile = createLocalStorageFile('lotar-vitest-');
+const poolPreference = process.env.VITEST_POOL ?? (process.platform === 'win32' ? 'forks' : 'threads');
 
 if (localStorageFile) {
     const flag = `--localstorage-file=${localStorageFile}`;
@@ -39,7 +40,7 @@ export default mergeConfig(
         test: {
             root: __dirname,
             include: ['__tests__/**/*.spec.ts'],
-            pool: 'threads',
+            pool: poolPreference,
             environment: 'jsdom',
             globals: true,
             setupFiles: ['__tests__/vitest.setup.ts'],

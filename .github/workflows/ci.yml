@@ -9,7 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  NODE_VERSION: '22'  # Latest LTS (v22.18.0)
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:
@@ -24,10 +23,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Determine Node version
+      id: node_version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').engines.node")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
 
     - name: Install npm dependencies
@@ -39,7 +45,7 @@ jobs:
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: 1.88.0
+        toolchain: stable
 
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
@@ -95,7 +101,7 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: 1.88.0
+        toolchain: stable
         
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2  # Latest version (v2.8.0)
@@ -146,10 +152,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Determine Node version
+      id: node_version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').engines.node")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
 
     - name: Install npm dependencies
@@ -186,10 +199,17 @@ jobs:
     - name: Ensure binary is executable
       run: chmod +x target/release/lotar || true
 
+    - name: Determine Node version
+      id: node_version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').engines.node")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
 
     - name: Install npm dependencies
@@ -226,13 +246,20 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: 1.88.0
+        toolchain: stable
         components: rustfmt, clippy
+
+    - name: Determine Node version
+      id: node_version
+      shell: pwsh
+      run: |
+        $nodeVersion = node -p "require('./package.json').engines.node"
+        "version=$nodeVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ env.NODE_VERSION }}
+        node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
 
     - name: Install npm dependencies
