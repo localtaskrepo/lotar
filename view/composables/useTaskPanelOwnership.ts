@@ -21,6 +21,7 @@ interface UseTaskPanelOwnershipOptions {
     ready: Ref<boolean>
     suppressWatch: Ref<boolean>
     defaults: Ref<TaskPanelDefaultsShape>
+    members: Ref<string[]>
     mergeKnownTags: (tags: Array<string | null | undefined>) => void
     updateField: (field: 'reporter' | 'assignee') => Promise<void> | void
     onFieldBlur: (field: 'reporter' | 'assignee') => void
@@ -41,6 +42,34 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         const filtered = base.filter((user) => user !== whoami.value)
         return [whoami.value, ...filtered]
     })
+
+    const sanitizedConfiguredMembers = () => {
+        return (options.members.value || [])
+            .map((value) => (value || '').trim())
+            .filter((value) => value.length > 0)
+    }
+
+    const defaultOwnershipCandidates = () => {
+        const defaults = options.defaults.value || {}
+        return [defaults.reporter, defaults.assignee]
+            .map((value) => (value || '').trim())
+            .filter((value) => value.length > 0)
+    }
+
+    const assignKnownUsersFrom = (set: Set<string>) => {
+        knownUsers.value = Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b))
+    }
+
+    const seedKnownUsers = () => {
+        const baseline = new Set<string>()
+        sanitizedConfiguredMembers().forEach((value) => baseline.add(value))
+        defaultOwnershipCandidates().forEach((value) => baseline.add(value))
+        if (whoami.value) {
+            baseline.add(whoami.value)
+        }
+        assignKnownUsersFrom(baseline)
+        return baseline
+    }
 
     const reporterSelection = computed<string>({
         get() {
@@ -132,8 +161,10 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             return
         }
         if (orderedKnownUsers.value.includes(value)) {
-            assigneeMode.value = 'select'
-            assigneeCustom.value = ''
+            if (assigneeMode.value !== 'custom') {
+                assigneeMode.value = 'select'
+                assigneeCustom.value = ''
+            }
         } else {
             assigneeMode.value = 'custom'
             assigneeCustom.value = value
@@ -150,8 +181,10 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             return
         }
         if (orderedKnownUsers.value.includes(value)) {
-            reporterMode.value = 'select'
-            reporterCustom.value = ''
+            if (reporterMode.value !== 'custom') {
+                reporterMode.value = 'select'
+                reporterCustom.value = ''
+            }
         } else {
             reporterMode.value = 'custom'
             reporterCustom.value = value
@@ -165,6 +198,7 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
 
     async function preloadPeople(project?: string | null) {
         const scope = project && project.trim() ? project.trim() : undefined
+        const baseline = seedKnownUsers()
         try {
             const list = await api.listTasks(scope ? ({ project: scope } as any) : ({} as any))
             const seen = new Set<string>()
@@ -179,16 +213,11 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
                         if (trimmed) tags.add(trimmed)
                     })
             })
-            const defaults = options.defaults.value || {}
-            const defaultsSet = [defaults.reporter, defaults.assignee].filter(Boolean) as string[]
-            defaultsSet.forEach((value) => seen.add(value))
-            if (whoami.value) {
-                seen.add(whoami.value)
-            }
-            knownUsers.value = Array.from(seen).filter(Boolean).sort((a, b) => a.localeCompare(b))
+            baseline.forEach((value) => seen.add(value))
+            assignKnownUsersFrom(seen)
             options.mergeKnownTags(Array.from(tags))
         } catch {
-            knownUsers.value = []
+            assignKnownUsersFrom(baseline)
         }
     }
 

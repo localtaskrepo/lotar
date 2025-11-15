@@ -65,6 +65,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         tags: configTags,
         customFields: configCustomFields,
         defaults,
+        members,
         refresh: refreshConfig,
     } = useConfig()
 
@@ -337,6 +338,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         ready,
         suppressWatch,
         defaults,
+        members,
         mergeKnownTags,
         updateField: (field) => updateField(field),
         onFieldBlur: (field) => handleFieldBlur(field),

@@ -97,6 +97,11 @@ jobs:
             rust_target: x86_64-unknown-linux-musl
             artifact: linux-musl-x64
             bin: lotar
+          - os: ubuntu-latest
+            target: linux-musl
+            rust_target: aarch64-unknown-linux-musl
+            artifact: linux-musl-arm64
+            bin: lotar
           - os: windows-latest
             target: windows
             rust_target: x86_64-pc-windows-msvc
@@ -148,12 +153,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y musl-tools
-          rustup target add x86_64-unknown-linux-musl
 
       - name: Install Rust target
         shell: bash
         run: |
           rustup target add "${{ matrix.rust_target }}"
+
+      - name: Install cross (aarch64 musl)
+        if: matrix.rust_target == 'aarch64-unknown-linux-musl'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v cross >/dev/null 2>&1; then
+            cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5 --locked
+          fi
 
       - name: Build Web UI
         shell: bash
@@ -163,7 +176,14 @@ jobs:
             npm run build:web
           fi
 
+      - name: Build (release via cross)
+        if: matrix.rust_target == 'aarch64-unknown-linux-musl'
+        shell: bash
+        run: |
+          cross build --release --locked --all-features --target "${{ matrix.rust_target }}"
+
       - name: Build (release)
+        if: matrix.rust_target != 'aarch64-unknown-linux-musl'
         shell: bash
         run: |
           cargo build --release --locked --all-features --target "${{ matrix.rust_target }}"
@@ -174,6 +194,10 @@ jobs:
         run: |
           set -euo pipefail
           BIN_PATH="target/${{ matrix.rust_target }}/release/${{ matrix.bin }}"
+          if [[ "${{ matrix.rust_target }}" == aarch64-* ]]; then
+            echo "Skipping strip for cross-compiled target"
+            exit 0
+          fi
           if command -v strip >/dev/null 2>&1; then
             strip "$BIN_PATH" || true
           fi
@@ -283,6 +307,7 @@ jobs:
               { label: 'macOS (Intel)', file: `lotar-${tag}-macos-x64.tar.gz` },
               { label: 'Linux (glibc x64)', file: `lotar-${tag}-linux-x64.tar.gz` },
               { label: 'Linux (musl x64)', file: `lotar-${tag}-linux-musl-x64.tar.gz` },
+              { label: 'Linux (musl arm64)', file: `lotar-${tag}-linux-musl-arm64.tar.gz` },
               { label: 'Windows (x64)', file: `lotar-${tag}-windows-x64.zip` },
             ];
 
@@ -310,9 +335,62 @@ jobs:
               body: nextBody,
             });
 
+  publish-docker-image:
+    name: Publish Docker Image
+    needs: update-release-page
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect release metadata
+        id: release_meta
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            LOTAR_VERSION=${{ steps.release_meta.outputs.version }}
+          tags: |
+            mallox/lotar:latest
+            mallox/lotar:${{ steps.release_meta.outputs.version }}
+
+      - name: Update Docker Hub description
+        if: success()
+        uses: peter-evans/dockerhub-description@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          repository: mallox/lotar
+          short-description: LoTaR CLI packaged for containers
+          readme-filepath: docs/docker/README.md
+
   update-homebrew-tap:
     name: Update Homebrew Tap
-    needs: update-release-page
+    needs: publish-docker-image
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -341,8 +419,8 @@ jobs:
           cd tap
           base="${{ steps.release_meta.outputs.asset_base }}"
           tag="${{ steps.release_meta.outputs.tag }}"
-          curl -sSfL "${base}/lotar-${tag}-macos-arm64.sha256" -o arm64.sha
-          curl -sSfL "${base}/lotar-${tag}-macos-x64.sha256" -o x64.sha
+          curl -sSfL "${base}/lotar-${tag}-macos-arm64.tar.gz.sha256" -o arm64.sha
+          curl -sSfL "${base}/lotar-${tag}-macos-x64.tar.gz.sha256" -o x64.sha
 
       - name: Update formula
         env:

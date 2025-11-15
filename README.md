@@ -295,8 +295,6 @@ git add .tasks/ && git commit -m "Complete user authentication feature"
 ## 🛠️ Installation
 
 ### Prerequisites
-- Rust (stable toolchain)
-- Git
 
 ### Build from Source
 ```bash
@@ -307,6 +305,21 @@ cargo build --release
 # Optional: Add to PATH
 export PATH="$PATH:$(pwd)/target/release"
 ```
+
+### Docker (linux/amd64)
+```bash
+# Inspect the packaged version
+docker run --rm mallox/lotar --version
+
+# Operate on your current repository
+docker run --rm \
+    -v "$PWD":/workspace \
+    -v "$PWD/.tasks":/tasks \
+    -w /workspace \
+    mallox/lotar list
+```
+The image downloads the signed musl release asset and ships it inside a `scratch` runtime.
+See `docs/docker/README.md` for more usage patterns and Docker Hub details.
 
 ### Development
 ```bash

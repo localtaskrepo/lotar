@@ -68,6 +68,7 @@ export function useConfig() {
   const types = ref<string[]>([])
   const customFieldKeys = ref<string[]>([])
   const tags = ref<string[]>([])
+  const members = ref<string[]>([])
 
   const cfgResource = createResource<any, [string?]>(
     async (project?: string) => {
@@ -86,6 +87,7 @@ export function useConfig() {
     types.value = []
     customFieldKeys.value = []
     tags.value = []
+    members.value = []
     defaults.project = currentProject.value || ''
     defaults.status = ''
     defaults.priority = ''
@@ -115,6 +117,7 @@ export function useConfig() {
     types.value = base.types
     tags.value = base.tags
     customFieldKeys.value = base.customFields
+    members.value = sanitizeStringList(pickArray(config, ['members'], pickArray(config, ['default', 'members'])))
 
     const defaultStatus = config?.default_status
     const defaultPriority = config?.default_priority
@@ -172,6 +175,7 @@ export function useConfig() {
     types,
     customFields: customFieldKeys,
     tags,
+    members,
     defaults: computed(() => defaults),
     sprintDefaults: computed(() => sprintDefaults),
     refresh,

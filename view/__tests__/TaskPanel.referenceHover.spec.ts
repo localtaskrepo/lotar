@@ -201,6 +201,7 @@ vi.mock('../composables/useConfig', () => {
             types,
             tags,
             customFields: ref(['product']),
+            members: ref([] as string[]),
             defaults: { value: defaults },
             refresh,
         }),
