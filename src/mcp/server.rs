@@ -1,209 +1,27 @@
-#[cfg(test)]
-mod mcp_server_tests {
-    use super::*;
-    // Minimal per-variable lock for this test to avoid env races
-    use std::collections::HashMap;
-    use std::sync::LazyLock;
-    use std::sync::{Mutex, MutexGuard};
-    static ENV_LOCKS: LazyLock<Mutex<HashMap<&'static str, &'static Mutex<()>>>> =
-        LazyLock::new(|| Mutex::new(HashMap::new()));
-    fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
-        let mtx: &'static Mutex<()> = {
-            let mut map = ENV_LOCKS.lock().unwrap();
-            if let Some(m) = map.get(var) {
-                m
-            } else {
-                let boxed: Box<Mutex<()>> = Box::new(Mutex::new(()));
-                let leaked: &'static Mutex<()> = Box::leak(boxed);
-                map.insert(var, leaked);
-                leaked
-            }
-        };
-        mtx.lock().unwrap()
-    }
-
-    #[test]
-    fn tools_call_update_delete_list_and_invalid_enum() {
-        let _lock = lock_var("LOTAR_TASKS_DIR");
-        let tmp = tempfile::tempdir().unwrap();
-        let tasks_dir = tmp.path().join(".tasks");
-        std::fs::create_dir_all(&tasks_dir).unwrap();
-        // Set test-specific LOTAR_TASKS_DIR
-        unsafe {
-            std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-        }
-
-        // Create a task
-        let create_args = json!({
-            "name": "task_create",
-            "arguments": { "title": "MCP Update", "project": "MCP" }
-        });
-        let create_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(10)),
-            method: "tools/call".into(),
-            params: create_args,
-        };
-        let create_resp = dispatch(create_req);
-        assert!(create_resp.error.is_none(), "task_create failed");
-        let content = create_resp
-            .result
-            .as_ref()
-            .unwrap()
-            .get("content")
-            .and_then(|v| v.as_array())
-            .unwrap();
-        let text = content[0].get("text").and_then(|v| v.as_str()).unwrap();
-        let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
-
-        let id = task_json
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap()
-            .to_string();
-
-        // Update the task
-        let update_args = json!({
-            "name": "task_update",
-            "arguments": { "id": id, "project": "MCP", "patch": { "title": "Updated Title" } }
-        });
-        let update_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(11)),
-            method: "tools/call".into(),
-            params: update_args,
-        };
-        let update_resp = dispatch(update_req);
-        if update_resp.error.is_some() {
-            // Print tree to help debug
-            fn print_dir_tree<P: AsRef<std::path::Path>>(path: P, indent: usize) {
-                let path = path.as_ref();
-                if let Ok(entries) = std::fs::read_dir(path) {
-                    for entry in entries.flatten() {
-                        let p = entry.path();
-                        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                        eprintln!("{0:indent$}{1}", "", name, indent = indent);
-                        if p.is_dir() {
-                            print_dir_tree(&p, indent + 2);
-                        }
-                    }
-                }
-            }
-            eprintln!("Update failed; .tasks tree:");
-            print_dir_tree(&tasks_dir, 2);
-        }
-        assert!(
-            update_resp.error.is_none(),
-            "task_update failed: {:?}",
-            update_resp.error
-        );
-        let update_content = update_resp
-            .result
-            .as_ref()
-            .unwrap()
-            .get("content")
-            .and_then(|v| v.as_array())
-            .unwrap();
-        let update_text = update_content[0]
-            .get("text")
-            .and_then(|v| v.as_str())
-            .unwrap();
-        let updated_json: serde_json::Value = serde_json::from_str(update_text).unwrap();
-        assert_eq!(updated_json.get("title").unwrap(), "Updated Title");
-
-        // List tasks
-        let list_args = json!({ "name": "task_list", "arguments": { "project": "MCP" } });
-        let list_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(12)),
-            method: "tools/call".into(),
-            params: list_args,
-        };
-        let list_resp = dispatch(list_req);
-        assert!(list_resp.error.is_none(), "task_list failed");
-        let list_content = list_resp
-            .result
-            .as_ref()
-            .unwrap()
-            .get("content")
-            .and_then(|v| v.as_array())
-            .unwrap();
-        let list_text = list_content[0]
-            .get("text")
-            .and_then(|v| v.as_str())
-            .unwrap();
-        let tasks: serde_json::Value = serde_json::from_str(list_text).unwrap();
-        assert!(
-            tasks
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|t| t.get("id").unwrap() == &serde_json::Value::String(id.clone()))
-        );
-
-        // Delete the task
-        let delete_args =
-            json!({ "name": "task_delete", "arguments": { "id": id, "project": "MCP" } });
-        let delete_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(13)),
-            method: "tools/call".into(),
-            params: delete_args,
-        };
-        let delete_resp = dispatch(delete_req);
-        assert!(delete_resp.error.is_none(), "task_delete failed");
-        let del_content = delete_resp
-            .result
-            .as_ref()
-            .unwrap()
-            .get("content")
-            .and_then(|v| v.as_array())
-            .unwrap();
-        let del_text = del_content[0].get("text").and_then(|v| v.as_str()).unwrap();
-        assert!(del_text.contains("deleted=true"));
-
-        // Negative test: invalid priority
-        let bad_args = json!({ "name": "task_create", "arguments": { "title": "bad", "project": "MCP", "priority": "NOT_A_PRIORITY" } });
-        let bad_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(14)),
-            method: "tools/call".into(),
-            params: bad_args,
-        };
-        let bad_resp = dispatch(bad_req);
-        assert!(
-            bad_resp.error.is_some(),
-            "Expected error for invalid priority"
-        );
-        let msg = bad_resp.error.as_ref().unwrap().message.to_lowercase();
-        assert!(msg.contains("priority"));
-
-        // Negative test: invalid type
-        let bad_type_args = json!({ "name": "task_create", "arguments": { "title": "bad", "project": "MCP", "type": "NOT_A_TYPE" } });
-        let bad_type_req = JsonRpcRequest {
-            jsonrpc: "2.0".into(),
-            id: Some(json!(15)),
-            method: "tools/call".into(),
-            params: bad_type_args,
-        };
-        let bad_type_resp = dispatch(bad_type_req);
-        assert!(
-            bad_type_resp.error.is_some(),
-            "Expected error for invalid type"
-        );
-        let msg = bad_type_resp.error.as_ref().unwrap().message.to_lowercase();
-        assert!(msg.contains("type"));
-
-        unsafe {
-            std::env::remove_var("LOTAR_TASKS_DIR");
-        }
-    }
-}
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::fmt::Write as _;
 use std::io::{self, BufRead, Read, Write};
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock, mpsc};
+use std::time::Duration;
+
+mod handlers;
+mod hints;
+mod tools;
+mod watchers;
+
+#[cfg(test)]
+mod mcp_server_tests;
+
+use handlers::{
+    handle_config_set, handle_config_show, handle_project_list, handle_project_stats,
+    handle_sprint_add, handle_sprint_backlog, handle_sprint_delete, handle_sprint_remove,
+    handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_update,
+};
+use hints::gather_enum_hints;
+use tools::build_tool_definitions;
+#[cfg(test)]
+pub(crate) use watchers::event_affects_tooling;
+use watchers::{ServerEvent, spawn_event_dispatcher, start_tools_change_notifier};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonRpcRequest {
@@ -233,6 +51,12 @@ struct JsonRpcError {
     data: Option<Value>,
 }
 
+const MCP_DEFAULT_TASK_LIST_LIMIT: usize = 50;
+const MCP_MAX_TASK_LIST_LIMIT: usize = 200;
+const MCP_DEFAULT_BACKLOG_LIMIT: usize = 20;
+const MCP_MAX_BACKLOG_LIMIT: usize = 100;
+const MCP_MAX_CURSOR: usize = 5000;
+
 fn ok(id: Option<Value>, v: Value) -> JsonRpcResponse {
     JsonRpcResponse {
         jsonrpc: "2.0".into(),
@@ -241,6 +65,7 @@ fn ok(id: Option<Value>, v: Value) -> JsonRpcResponse {
         error: None,
     }
 }
+
 fn err(id: Option<Value>, code: i64, message: &str, data: Option<Value>) -> JsonRpcResponse {
     JsonRpcResponse {
         jsonrpc: "2.0".into(),
@@ -254,23 +79,17 @@ fn err(id: Option<Value>, code: i64, message: &str, data: Option<Value>) -> Json
     }
 }
 
-// Normalize method/tool names so callers can use either "group/op" or "group_op".
-// If a slash is present, we keep it. If only underscores, replace the first underscore with a slash.
-// Otherwise, return as-is (e.g., "initialize").
 fn normalize_method(name: &str) -> String {
     if name.contains('/') {
         name.to_string()
     } else if let Some(idx) = name.find('_') {
         let (left, right) = name.split_at(idx);
-        // right starts with '_', so skip it when joining
         format!("{}/{}", left, &right[1..])
     } else {
         name.to_string()
     }
 }
 
-// Simple in-process log level storage for MCP logging capability.
-// This is intentionally minimal; the server avoids noisy stdout and doesn't stream logs.
 static LOG_LEVEL: OnceLock<RwLock<String>> = OnceLock::new();
 fn set_log_level(level: &str) {
     let lvl = level.to_ascii_lowercase();
@@ -358,7 +177,6 @@ fn make_mcp_integrity_payload(
 }
 
 pub fn run_stdio_server() {
-    // Optional auto-reload: exit when the binary is rebuilt so the host can restart us
     let autoreload_enabled = std::env::var("LOTAR_MCP_AUTORELOAD")
         .ok()
         .map(|v| v != "0")
@@ -370,24 +188,25 @@ pub fn run_stdio_server() {
     {
         let initial = modified;
         std::thread::spawn(move || {
-            use std::time::Duration;
             loop {
                 std::thread::sleep(Duration::from_secs(2));
                 if let Ok(Ok(m)) = std::fs::metadata(&exe_path).map(|m| m.modified())
                     && m > initial
                 {
-                    // Binary updated; exit to allow host to restart with new build
                     std::process::exit(0);
                 }
             }
         });
     }
+
     let stdin = io::stdin();
-    let mut stdout = io::stdout();
+    let stdout = Arc::new(Mutex::new(io::stdout()));
+    let (event_tx, event_rx) = mpsc::channel::<ServerEvent>();
+    start_tools_change_notifier(event_tx);
+    spawn_event_dispatcher(event_rx, stdout.clone());
     let mut reader = io::BufReader::new(stdin.lock());
 
     loop {
-        // Try to read either an LSP-style header-framed message or a single-line JSON
         let mut first_line = String::new();
         if reader
             .read_line(&mut first_line)
@@ -395,7 +214,7 @@ pub fn run_stdio_server() {
             .filter(|&n| n > 0)
             .is_none()
         {
-            break; // EOF
+            break;
         }
         let trimmed = first_line.trim_end_matches(['\r', '\n']);
         if trimmed.is_empty() {
@@ -403,12 +222,10 @@ pub fn run_stdio_server() {
         }
 
         if trimmed.to_ascii_lowercase().starts_with("content-length:") {
-            // Accumulate headers until blank line
             let mut content_length: Option<usize> = None;
             if let Some(v) = trimmed.split(':').nth(1) {
                 content_length = v.trim().parse::<usize>().ok();
             }
-            // Read the rest of the headers
             loop {
                 let mut line = String::new();
                 if reader
@@ -439,9 +256,8 @@ pub fn run_stdio_server() {
                         Some(json!({"details": format!("body read failed: {}", e)})),
                     );
                     if let Ok(s) = serde_json::to_string(&resp) {
-                        let _ = writeln!(stdout, "{}", s);
+                        write_raw_json(&stdout, &s);
                     }
-                    let _ = stdout.flush();
                     continue;
                 }
                 let body = match String::from_utf8(buf) {
@@ -454,9 +270,8 @@ pub fn run_stdio_server() {
                             Some(json!({"details": format!("utf8 error: {}", e)})),
                         );
                         if let Ok(s) = serde_json::to_string(&resp) {
-                            let _ = writeln!(stdout, "{}", s);
+                            write_raw_json(&stdout, &s);
                         }
-                        let _ = stdout.flush();
                         continue;
                     }
                 };
@@ -470,7 +285,6 @@ pub fn run_stdio_server() {
                         Some(json!({"details": e.to_string()})),
                     ),
                 };
-                // Respond using the same framing style (Content-Length)
                 let payload = match serde_json::to_string(&response) {
                     Ok(s) => s,
                     Err(e) => format!(
@@ -478,16 +292,9 @@ pub fn run_stdio_server() {
                         e
                     ),
                 };
-                let _ = write!(
-                    stdout,
-                    "Content-Length: {}\r\n\r\n{}",
-                    payload.len(),
-                    payload
-                );
-                let _ = stdout.flush();
+                write_framed_json(&stdout, &payload);
                 continue;
             } else {
-                // No length found; skip
                 let resp = err(
                     None,
                     -32700,
@@ -495,14 +302,12 @@ pub fn run_stdio_server() {
                     Some(json!({"details": "missing Content-Length"})),
                 );
                 if let Ok(s) = serde_json::to_string(&resp) {
-                    let _ = writeln!(stdout, "{}", s);
+                    write_raw_json(&stdout, &s);
                 }
-                let _ = stdout.flush();
                 continue;
             }
         }
 
-        // Fallback: treat the line as a full JSON-RPC object (line-delimited mode)
         let req: Result<JsonRpcRequest, _> = serde_json::from_str(trimmed);
         let response = match req {
             Ok(r) => dispatch(r),
@@ -514,9 +319,8 @@ pub fn run_stdio_server() {
             ),
         };
         if let Ok(s) = serde_json::to_string(&response) {
-            let _ = writeln!(stdout, "{}", s);
+            write_raw_json(&stdout, &s);
         }
-        let _ = stdout.flush();
     }
 }
 
@@ -546,8 +350,8 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 json!({
                     "protocolVersion": negotiated,
                     "capabilities": {
-                        // We currently only expose tools; listChanged notifies are not implemented
-                        "tools": { "listChanged": false },
+                        // We expose tools and emit listChanged notifications when config/project metadata updates
+                        "tools": { "listChanged": true },
                         // Optionally declare logging support so hosts can subscribe if desired
                         "logging": {}
                     },
@@ -570,209 +374,50 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
             ok(req.id, json!({}))
         }
         // tools/list -> return available tool definitions with input schemas
-        "tools/list" => ok(
-            req.id,
-            json!({
-                "tools": [
-                    {
-                        "name": "task_create",
-                        "description": "Create and persist a task. Any missing priority/type/status fall back to project defaults. reporter/assignee accept '@me'. relationships should follow the TaskRelationships shape (e.g. blocks/relates). Returns the saved task JSON with defaults applied.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "title": {"type": "string"},
-                                "description": {"type": ["string", "null"]},
-                                "project": {"type": ["string", "null"]},
-                                "priority": {"type": ["string", "null"]},
-                                "type": {"type": ["string", "null"]},
-                                "reporter": {"type": ["string", "null"]},
-                                "assignee": {"type": ["string", "null"]},
-                                "due_date": {"type": ["string", "null"]},
-                                "effort": {"type": ["string", "null"]},
-                                "tags": {"type": "array", "items": {"type": "string"}},
-                                "relationships": {"type": ["object", "null"]},
-                                "custom_fields": {"type": "object"}
-                            },
-                            "required": ["title"],
-                            "additionalProperties": false
+        "tools/list" => {
+            let enum_hints = gather_enum_hints();
+            ok(
+                req.id,
+                json!({
+                    "tools": build_tool_definitions(enum_hints.as_ref())
+                }),
+            )
+        }
+        "schema/discover" => {
+            let enum_hints = gather_enum_hints();
+            let mut tools = build_tool_definitions(enum_hints.as_ref());
+            if let Some(filter) = req
+                .params
+                .get("tool")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_ascii_lowercase())
+            {
+                tools.retain(|tool| {
+                    tool.get("name")
+                        .and_then(|v| v.as_str())
+                        .map(|name| name.to_ascii_lowercase() == filter)
+                        .unwrap_or(false)
+                });
+            }
+
+            let payload = json!({
+                "status": "ok",
+                "toolCount": tools.len(),
+                "tools": tools,
+            });
+
+            ok(
+                req.id,
+                json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into())
                         }
-                    },
-                    {
-                        "name": "task_get",
-                        "description": "Fetch a task DTO by id (optionally override project prefix). Returns the canonical persisted representation.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "id": {"type": "string"},
-                                "project": {"type": ["string", "null"]}
-                            },
-                            "required": ["id"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "task_update",
-                        "description": "Patch an existing task. Provide fields inside patch; omitted properties stay unchanged. Strings are validated against project config, and reporter/assignee accept '@me'. relationships replaces the full relationship map.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "id": {"type": "string"},
-                                "patch": {
-                                    "type": "object",
-                                    "properties": {
-                                        "title": {"type": ["string", "null"]},
-                                        "description": {"type": ["string", "null"]},
-                                        "status": {"type": ["string", "null"]},
-                                        "priority": {"type": ["string", "null"]},
-                                        "type": {"type": ["string", "null"]},
-                                        "reporter": {"type": ["string", "null"]},
-                                        "assignee": {"type": ["string", "null"]},
-                                        "due_date": {"type": ["string", "null"]},
-                                        "effort": {"type": ["string", "null"]},
-                                        "tags": {"type": "array", "items": {"type": "string"}},
-                                        "relationships": {"type": ["object", "null"]},
-                                        "custom_fields": {"type": "object"}
-                                    },
-                                    "additionalProperties": false
-                                }
-                            },
-                            "required": ["id"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "task_delete",
-                        "description": "Delete a task by id (optional project override). Returns a text payload indicating deleted=true/false.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "id": {"type": "string"},
-                                "project": {"type": ["string", "null"]}
-                            },
-                            "required": ["id"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "task_list",
-            "description": "List tasks using optional filters. status/priority/type accept a single string or array and are validated via project config. assignee accepts '@me'. tag filters a single tag (repeat the tool to combine). search performs a text match across id/title/description/tags.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "project": {"type": ["string", "null"]},
-                "status": {"oneOf": [ {"type": "string"}, {"type": "array", "items": {"type": "string"}} ]},
-                                "assignee": {"type": ["string", "null"]},
-                "priority": {"oneOf": [ {"type": "string"}, {"type": "array", "items": {"type": "string"}} ]},
-                "type": {"oneOf": [ {"type": "string"}, {"type": "array", "items": {"type": "string"}} ]},
-                                "tag": {"type": ["string", "null"]},
-                                "search": {"type": ["string", "null"]}
-                            },
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "sprint_add",
-                        "description": "Attach one or more tasks to a sprint. When sprint is omitted the active sprint is assumed when unambiguous. Set allow_closed=true to override closed sprint guardrails and cleanup_missing=true to drop references to deleted sprint files before assigning.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "sprint": {"oneOf": [ {"type": "number"}, {"type": "string"} ]},
-                                "tasks": {"type": "array", "items": {"type": "string"}},
-                                "allow_closed": {"type": ["boolean", "null"]},
-                                "cleanup_missing": {"type": ["boolean", "null"]}
-                            },
-                            "required": ["tasks"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "sprint_remove",
-                        "description": "Detach sprint membership from one or more tasks. When sprint is omitted the active sprint is assumed when unambiguous. Set cleanup_missing=true to prune orphaned sprint references before removing memberships.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "sprint": {"oneOf": [ {"type": "number"}, {"type": "string"} ]},
-                                "tasks": {"type": "array", "items": {"type": "string"}},
-                                "cleanup_missing": {"type": ["boolean", "null"]}
-                            },
-                            "required": ["tasks"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "sprint_delete",
-                        "description": "Delete a sprint by id. Set cleanup_missing=true to drop dangling sprint references from tasks after deletion.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "sprint": {"oneOf": [ {"type": "number"}, {"type": "string"} ]},
-                                "cleanup_missing": {"type": ["boolean", "null"]},
-                                "force": {"type": ["boolean", "null"]}
-                            },
-                            "required": ["sprint"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "sprint_backlog",
-                        "description": "List tasks without sprint assignments using optional filters (project, status, tag, assignee). Pass cleanup_missing=true to strip references to deleted sprint files before listing.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "project": {"type": ["string", "null"]},
-                                "status": {"oneOf": [ {"type": "string"}, {"type": "array", "items": {"type": "string"}} ]},
-                                "tag": {"oneOf": [ {"type": "string"}, {"type": "array", "items": {"type": "string"}} ]},
-                                "assignee": {"type": ["string", "null"]},
-                                "limit": {"type": ["number", "null"]},
-                                "cleanup_missing": {"type": ["boolean", "null"]}
-                            },
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "project_list",
-                        "description": "List known projects and their prefixes for the current workspace root.",
-                        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
-                    },
-                    {
-                        "name": "project_stats",
-                        "description": "Return aggregate counts for a project (open/done, recent modified timestamp, top tags).",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {"name": {"type": "string"}},
-                            "required": ["name"],
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "config_show",
-                        "description": "Show the resolved configuration (global or project scope) so callers can discover allowed enum values.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "global": {"type": ["boolean", "null"]},
-                                "project": {"type": ["string", "null"]}
-                            },
-                            "additionalProperties": false
-                        }
-                    },
-                    {
-                        "name": "config_set",
-                        "description": "Update configuration strings at the selected scope. Returns validation warnings/info alongside the outcome.",
-                        "inputSchema": {
-                            "type": "object",
-                            "properties": {
-                                "global": {"type": ["boolean", "null"]},
-                                "project": {"type": ["string", "null"]},
-                                "values": {"type": "object", "additionalProperties": {"type": "string"}}
-                            },
-                            "required": ["values"],
-                            "additionalProperties": false
-                        }
-                    }
-                ]
-            }),
-        ),
+                    ]
+                }),
+            )
+        }
         // tools/call -> forward to specific method name in params.name
         "tools/call" => {
             let name = req.params.get("name").and_then(|v| v.as_str());
@@ -789,1523 +434,71 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
             dispatch(inner_req)
         }
         // task/create(params: TaskCreate) -> { task }
-        "task/create" => {
-            // Build DTO manually so we can accept strings and validate via config
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let cfg_mgr =
-                match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-                    &resolver.path,
-                ) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(json!({"message": format!("Failed to load config: {}", e)})),
-                        );
-                    }
-                };
-            let cfg = cfg_mgr.get_resolved_config();
-            let validator = crate::cli::validation::CliValidator::new(cfg);
-
-            let title = match req.params.get("title").and_then(|v| v.as_str()) {
-                Some(s) if !s.is_empty() => s.to_string(),
-                _ => return err(req.id, -32602, "Missing required field: title", None),
-            };
-            let project = req
-                .params
-                .get("project")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let priority = if let Some(s) = req.params.get("priority").and_then(|v| v.as_str()) {
-                match validator.validate_priority(s) {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32602,
-                            &format!("Priority validation failed: {}", e),
-                            None,
-                        );
-                    }
-                }
-            } else {
-                None
-            };
-            let task_type = if let Some(s) = req
-                .params
-                .get("type")
-                .or_else(|| req.params.get("task_type"))
-                .and_then(|v| v.as_str())
-            {
-                match validator.validate_task_type(s) {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32602,
-                            &format!("Type validation failed: {}", e),
-                            None,
-                        );
-                    }
-                }
-            } else {
-                None
-            };
-            let assignee = req
-                .params
-                .get("assignee")
-                .and_then(|v| v.as_str())
-                .and_then(|s| {
-                    crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()))
-                });
-            let due_date = req
-                .params
-                .get("due_date")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let effort = req
-                .params
-                .get("effort")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let description = req
-                .params
-                .get("description")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let tags = req
-                .params
-                .get("tags")
-                .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            // helper to convert JSON -> feature-aware custom value type
-            fn json_to_custom(val: &serde_json::Value) -> crate::types::CustomFieldValue {
-                #[cfg(feature = "schema")]
-                {
-                    val.clone()
-                }
-                #[cfg(not(feature = "schema"))]
-                {
-                    serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
-                }
-            }
-            let custom_fields_map: std::collections::HashMap<
-                String,
-                crate::types::CustomFieldValue,
-            > = req
-                .params
-                .get("custom_fields")
-                .and_then(|v| v.as_object())
-                .map(|o| {
-                    let mut m: std::collections::HashMap<String, crate::types::CustomFieldValue> =
-                        std::collections::HashMap::new();
-                    for (k, v) in o.iter() {
-                        m.insert(k.clone(), json_to_custom(v));
-                    }
-                    m
-                })
-                .unwrap_or_default();
-            let custom_fields = if custom_fields_map.is_empty() {
-                None
-            } else {
-                Some(custom_fields_map)
-            };
-            let relationships = match req.params.get("relationships") {
-                Some(value) => {
-                    match serde_json::from_value::<crate::types::TaskRelationships>(value.clone()) {
-                        Ok(rel) => {
-                            if rel.is_empty() {
-                                None
-                            } else {
-                                Some(rel)
-                            }
-                        }
-                        Err(e) => {
-                            return err(
-                                req.id,
-                                -32602,
-                                &format!("Invalid relationships payload: {}", e),
-                                None,
-                            );
-                        }
-                    }
-                }
-                None => None,
-            };
-
-            // Assemble DTO
-            let dto = crate::api_types::TaskCreate {
-                title,
-                project,
-                priority,
-                task_type,
-                reporter: req
-                    .params
-                    .get("reporter")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| {
-                        crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()))
-                    }),
-                assignee,
-                due_date,
-                effort,
-                description,
-                tags,
-                relationships,
-                custom_fields,
-                sprints: req
-                    .params
-                    .get("sprints")
-                    .cloned()
-                    .and_then(|v| serde_json::from_value::<Vec<u32>>(v).ok())
-                    .unwrap_or_default(),
-            };
-
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
-            match crate::services::task_service::TaskService::create(&mut storage, dto) {
-                Ok(task) => ok(
-                    req.id,
-                    json!({
-                        "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
-                    }),
-                ),
-                Err(e) => err(
-                    req.id,
-                    -32000,
-                    "Task create failed",
-                    Some(json!({"message": e.to_string()})),
-                ),
-            }
-        }
+        "task/create" => handle_task_create(req),
         // task/get({ id, project? }) -> { task }
-        "task/get" => {
-            let id = req
-                .params
-                .get("id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            if id.is_none() {
-                return err(req.id, -32602, "Missing id", None);
-            }
-            let project = req.params.get("project").and_then(|v| v.as_str());
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let storage = crate::storage::manager::Storage::new(resolver.path);
-            match crate::services::task_service::TaskService::get(&storage, &id.unwrap(), project) {
-                Ok(task) => ok(
-                    req.id,
-                    json!({
-                        "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
-                    }),
-                ),
-                Err(e) => err(
-                    req.id,
-                    -32004,
-                    "Task not found",
-                    Some(json!({"message": e.to_string()})),
-                ),
-            }
-        }
+        "task/get" => handle_task_get(req),
         // config/show({ global?, project? }) -> { config }
-        "config/show" => {
-            let global = req
-                .params
-                .get("global")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let project = req.params.get("project").and_then(|v| v.as_str());
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let scope = if global { None } else { project };
-            match crate::services::config_service::ConfigService::show(&resolver, scope) {
-                Ok(val) => ok(
-                    req.id,
-                    json!({
-                        "content": [ { "type": "text", "text": serde_json::to_string_pretty(&val).unwrap_or_else(|_| "{}".into()) } ]
-                    }),
-                ),
-                Err(e) => err(
-                    req.id,
-                    -32001,
-                    "Config error",
-                    Some(json!({"message": e.to_string()})),
-                ),
-            }
-        }
+        "config/show" => handle_config_show(req),
         // config/set({ global?, project?, values }) -> { updated }
-        // values is an object of string->string (use same behavior as REST)
-        "config/set" => {
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let values = req
-                .params
-                .get("values")
-                .and_then(|v| v.as_object())
-                .cloned()
-                .unwrap_or_default();
-            let mut map = std::collections::BTreeMap::new();
-            for (k, v) in values.iter() {
-                map.insert(k.clone(), v.as_str().unwrap_or(&v.to_string()).to_string());
-            }
-            let global = req
-                .params
-                .get("global")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let project = req.params.get("project").and_then(|v| v.as_str());
-            match crate::services::config_service::ConfigService::set(
-                &resolver, &map, global, project,
-            ) {
-                Ok(outcome) => {
-                    let mut lines = vec!["Configuration updated".to_string()];
-
-                    if !outcome.validation.warnings.is_empty() {
-                        lines.push("Warnings:".to_string());
-                        for warning in &outcome.validation.warnings {
-                            lines.push(format!("- {}", warning));
-                        }
-                    }
-
-                    if !outcome.validation.info.is_empty() {
-                        lines.push("Info:".to_string());
-                        for info in &outcome.validation.info {
-                            lines.push(format!("- {}", info));
-                        }
-                    }
-
-                    ok(
-                        req.id,
-                        json!({
-                            "content": [ { "type": "text", "text": lines.join("\n") } ]
-                        }),
-                    )
-                }
-                Err(e) => err(
-                    req.id,
-                    -32002,
-                    "Config set failed",
-                    Some(json!({"message": e.to_string()})),
-                ),
-            }
-        }
+        "config/set" => handle_config_set(req),
         // task/update({ id, patch }) -> { task }
-        "task/update" => {
-            let id = req
-                .params
-                .get("id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            if id.is_none() {
-                return err(req.id, -32602, "Missing id", None);
-            }
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let cfg_mgr =
-                match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-                    &resolver.path,
-                ) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(json!({"message": format!("Failed to load config: {}", e)})),
-                        );
-                    }
-                };
-            let cfg = cfg_mgr.get_resolved_config();
-            let validator = crate::cli::validation::CliValidator::new(cfg);
-            let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
-            if !patch_val.is_object() {
-                return err(req.id, -32602, "Invalid patch (expected object)", None);
-            }
-            let mut patch = crate::api_types::TaskUpdate::default();
-            if let Some(s) = patch_val.get("title").and_then(|v| v.as_str()) {
-                patch.title = Some(s.to_string());
-            }
-            if let Some(s) = patch_val.get("status").and_then(|v| v.as_str()) {
-                match validator.validate_status(s) {
-                    Ok(v) => patch.status = Some(v),
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32602,
-                            &format!("Status validation failed: {}", e),
-                            None,
-                        );
-                    }
-                }
-            }
-            if let Some(s) = patch_val.get("priority").and_then(|v| v.as_str()) {
-                match validator.validate_priority(s) {
-                    Ok(v) => patch.priority = Some(v),
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32602,
-                            &format!("Priority validation failed: {}", e),
-                            None,
-                        );
-                    }
-                }
-            }
-            if let Some(s) = patch_val
-                .get("type")
-                .or_else(|| patch_val.get("task_type"))
-                .and_then(|v| v.as_str())
-            {
-                match validator.validate_task_type(s) {
-                    Ok(v) => patch.task_type = Some(v),
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32602,
-                            &format!("Type validation failed: {}", e),
-                            None,
-                        );
-                    }
-                }
-            }
-            if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
-                patch.reporter =
-                    crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()));
-            }
-            if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
-                patch.assignee =
-                    crate::utils::identity::resolve_me_alias(s, Some(resolver.path.as_path()));
-            }
-            if let Some(s) = patch_val.get("due_date").and_then(|v| v.as_str()) {
-                patch.due_date = Some(s.to_string());
-            }
-            if let Some(s) = patch_val.get("effort").and_then(|v| v.as_str()) {
-                patch.effort = Some(s.to_string());
-            }
-            if let Some(s) = patch_val.get("description").and_then(|v| v.as_str()) {
-                patch.description = Some(s.to_string());
-            }
-            if let Some(arr) = patch_val.get("tags").and_then(|v| v.as_array()) {
-                patch.tags = Some(
-                    arr.iter()
-                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                        .collect(),
-                );
-            }
-            if let Some(rel_val) = patch_val.get("relationships") {
-                if rel_val.is_null() {
-                    patch.relationships = Some(crate::types::TaskRelationships::default());
-                } else {
-                    match serde_json::from_value::<crate::types::TaskRelationships>(rel_val.clone())
-                    {
-                        Ok(rel) => {
-                            if rel.is_empty() {
-                                patch.relationships =
-                                    Some(crate::types::TaskRelationships::default());
-                            } else {
-                                patch.relationships = Some(rel);
-                            }
-                        }
-                        Err(e) => {
-                            return err(
-                                req.id,
-                                -32602,
-                                &format!("Invalid relationships payload: {}", e),
-                                None,
-                            );
-                        }
-                    }
-                }
-            }
-            let mut custom_fields_map: std::collections::HashMap<
-                String,
-                crate::types::CustomFieldValue,
-            > = patch.custom_fields.take().unwrap_or_default();
-            let mut custom_fields_provided = false;
-            if let Some(obj) = patch_val.get("custom_fields").and_then(|v| v.as_object()) {
-                custom_fields_provided = true;
-                fn json_to_custom(val: &serde_json::Value) -> crate::types::CustomFieldValue {
-                    #[cfg(feature = "schema")]
-                    {
-                        val.clone()
-                    }
-                    #[cfg(not(feature = "schema"))]
-                    {
-                        serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
-                    }
-                }
-                for (k, v) in obj.iter() {
-                    custom_fields_map.insert(k.clone(), json_to_custom(v));
-                }
-            }
-            if custom_fields_provided || !custom_fields_map.is_empty() {
-                patch.custom_fields = Some(custom_fields_map);
-            }
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
-            match crate::services::task_service::TaskService::update(
-                &mut storage,
-                &id.unwrap(),
-                patch,
-            ) {
-                Ok(task) => ok(
-                    req.id,
-                    json!({
-                        "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
-                    }),
-                ),
-                Err(e) => err(
-                    req.id,
-                    -32005,
-                    "Task update failed",
-                    Some(json!({"message": e.to_string()})),
-                ),
-            }
-        }
+        "task/update" => handle_task_update(req),
         // task/delete({ id, project? }) -> { deleted }
-        "task/delete" => {
-            let id = req.params.get("id").and_then(|v| v.as_str());
-            if id.is_none() {
-                return err(req.id, -32602, "Missing id", None);
-            }
-            let project = req.params.get("project").and_then(|v| v.as_str());
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
-            match crate::services::task_service::TaskService::delete(
-                &mut storage,
-                id.unwrap(),
-                project,
-            ) {
-                Ok(deleted) => ok(
-                    req.id,
-                    json!({
-                        "content": [ { "type": "text", "text": format!("deleted={}", deleted) } ]
-                    }),
-                ),
-                Err(e) => err(
-                    req.id,
-                    -32006,
-                    "Task delete failed",
-                    Some(json!({"message": e.to_string()})),
-                ),
-            }
-        }
+        "task/delete" => handle_task_delete(req),
         // task/list(params: TaskListFilter) -> { tasks }
-        "task/list" => {
-            // Accept string or array for status/priority/type and validate via config
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let cfg_mgr =
-                match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-                    &resolver.path,
-                ) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(json!({"message": format!("Failed to load config: {}", e)})),
-                        );
-                    }
-                };
-            let cfg = cfg_mgr.get_resolved_config();
-            let validator = crate::cli::validation::CliValidator::new(cfg);
-
-            // Helper to parse list or single
-            fn parse_vec<T, F>(v: Option<&Value>, f: F) -> Vec<T>
-            where
-                F: Fn(&str) -> Result<T, String>,
-            {
-                match v {
-                    Some(Value::String(s)) => f(s).ok().into_iter().collect(),
-                    Some(Value::Array(arr)) => arr
-                        .iter()
-                        .filter_map(|it| it.as_str().and_then(|s| f(s).ok()))
-                        .collect(),
-                    _ => vec![],
-                }
-            }
-
-            let status = parse_vec(req.params.get("status"), |s| validator.validate_status(s));
-            let priority = parse_vec(req.params.get("priority"), |s| {
-                validator.validate_priority(s)
-            });
-            let task_type = parse_vec(
-                req.params
-                    .get("type")
-                    .or_else(|| req.params.get("task_type")),
-                |s| validator.validate_task_type(s),
-            );
-            let project = req
-                .params
-                .get("project")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let tag = req
-                .params
-                .get("tag")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let mut tags: Vec<String> = vec![];
-            if let Some(t) = tag {
-                tags.push(t);
-            }
-            let text_query = req
-                .params
-                .get("search")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-
-            let filter = crate::api_types::TaskListFilter {
-                status,
-                priority,
-                task_type,
-                project,
-                tags,
-                text_query,
-                sprints: Vec::new(),
-            };
-            let storage = crate::storage::manager::Storage::new(resolver.path.clone());
-            let mut tasks = crate::services::task_service::TaskService::list(&storage, &filter)
-                .into_iter()
-                .map(|(_, t)| t)
-                .collect::<Vec<_>>();
-
-            if let Some(raw) = req.params.get("assignee").and_then(|v| v.as_str()) {
-                let trimmed = raw.trim();
-                if !trimmed.is_empty() {
-                    let target = if trimmed.eq_ignore_ascii_case("@me") {
-                        crate::utils::identity::resolve_current_user(Some(
-                            storage.root_path.as_path(),
-                        ))
-                    } else {
-                        Some(trimmed.to_string())
-                    };
-                    match target {
-                        Some(user) => {
-                            tasks.retain(|task| task.assignee.as_deref() == Some(user.as_str()));
-                        }
-                        None => tasks.clear(),
-                    }
-                }
-            }
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&tasks).unwrap_or_else(|_| "[]".into()) } ]
-                }),
-            )
-        }
-        "sprint/add" => {
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
-            let mut records = match crate::services::sprint_service::SprintService::list(&storage) {
-                Ok(records) => records,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": format!("Failed to load sprints: {}", e)})),
-                    );
-                }
-            };
-
-            let cleanup_missing = req
-                .params
-                .get("cleanup_missing")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            let mut integrity_report =
-                crate::services::sprint_integrity::detect_missing_sprints(&storage, &records);
-            let baseline_report = integrity_report.clone();
-            let mut cleanup_outcome: Option<
-                crate::services::sprint_integrity::SprintCleanupOutcome,
-            > = None;
-
-            if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-                match crate::services::sprint_integrity::cleanup_missing_sprint_refs(
-                    &mut storage,
-                    &mut records,
-                    None,
-                ) {
-                    Ok(outcome) => {
-                        integrity_report =
-                            crate::services::sprint_integrity::detect_missing_sprints(
-                                &storage, &records,
-                            );
-                        cleanup_outcome = Some(outcome);
-                    }
-                    Err(error) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(
-                                json!({"message": format!("Failed to clean up sprint references: {}", error)}),
-                            ),
-                        );
-                    }
-                }
-            }
-
-            let raw_tasks = req.params.get("tasks");
-            if raw_tasks.is_none() {
-                return err(req.id, -32602, "Missing required field: tasks", None);
-            }
-            let tasks: Vec<String> = match raw_tasks.unwrap() {
-                Value::String(value) => {
-                    let trimmed = value.trim();
-                    if trimmed.is_empty() {
-                        Vec::new()
-                    } else {
-                        vec![trimmed.to_string()]
-                    }
-                }
-                Value::Array(values) => values
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string())
-                    .collect(),
-                _ => {
-                    return err(
-                        req.id,
-                        -32602,
-                        "tasks must be a string or array of strings",
-                        None,
-                    );
-                }
-            };
-
-            let sprint_ref = req.params.get("sprint").map(|value| match value {
-                Value::Number(num) => num.to_string(),
-                Value::String(text) => text.trim().to_string(),
-                _ => String::new(),
-            });
-
-            if let Some(reference) = sprint_ref.as_ref()
-                && reference.is_empty()
-            {
-                return err(
-                    req.id,
-                    -32602,
-                    "sprint must be a numeric id or keyword when provided",
-                    None,
-                );
-            }
-
-            let allow_closed = req
-                .params
-                .get("allow_closed")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            let force_single = req
-                .params
-                .get("force_single")
-                .or_else(|| req.params.get("force"))
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            let outcome = match crate::services::sprint_assignment::assign_tasks(
-                &mut storage,
-                &records,
-                &tasks,
-                sprint_ref.as_deref(),
-                allow_closed,
-                force_single,
-            ) {
-                Ok(outcome) => outcome,
-                Err(msg) => return err(req.id, -32602, msg.as_str(), None),
-            };
-
-            let mut payload = serde_json::Map::new();
-            payload.insert("status".to_string(), Value::String("ok".to_string()));
-            payload.insert(
-                "action".to_string(),
-                Value::String(outcome.action.as_str().to_string()),
-            );
-            payload.insert("sprint_id".to_string(), Value::from(outcome.sprint_id));
-            if let Some(label) = outcome.sprint_label.clone() {
-                payload.insert("sprint_label".to_string(), Value::String(label));
-            } else {
-                payload.insert("sprint_label".to_string(), Value::Null);
-            }
-            payload.insert(
-                "modified".to_string(),
-                Value::Array(
-                    outcome
-                        .modified
-                        .iter()
-                        .map(|id| Value::String(id.clone()))
-                        .collect(),
-                ),
-            );
-            payload.insert(
-                "unchanged".to_string(),
-                Value::Array(
-                    outcome
-                        .unchanged
-                        .iter()
-                        .map(|id| Value::String(id.clone()))
-                        .collect(),
-                ),
-            );
-            let reassignment_messages: Vec<String> = outcome
-                .replaced
-                .iter()
-                .filter_map(|info| info.describe())
-                .collect();
-
-            let replaced: Vec<Value> = outcome
-                .replaced
-                .into_iter()
-                .map(|info| {
-                    let mut entry = serde_json::Map::new();
-                    entry.insert("task_id".to_string(), Value::String(info.task_id));
-                    entry.insert(
-                        "previous".to_string(),
-                        Value::Array(info.previous.iter().map(|id| Value::from(*id)).collect()),
-                    );
-                    Value::Object(entry)
-                })
-                .collect();
-            payload.insert("replaced".to_string(), Value::Array(replaced));
-            if !reassignment_messages.is_empty() {
-                payload.insert(
-                    "messages".to_string(),
-                    Value::Array(
-                        reassignment_messages
-                            .iter()
-                            .map(|msg| Value::String(msg.clone()))
-                            .collect(),
-                    ),
-                );
-            }
-            payload.insert(
-                "missing_sprints".to_string(),
-                Value::Array(
-                    integrity_report
-                        .missing_sprints
-                        .iter()
-                        .map(|id| Value::from(*id))
-                        .collect(),
-                ),
-            );
-            if let Some(integrity) = make_mcp_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ) {
-                payload.insert("integrity".to_string(), integrity);
-            }
-
-            let payload = Value::Object(payload);
-
-            let mut content_items = Vec::new();
-            if !reassignment_messages.is_empty() {
-                content_items.push(json!({
-                    "type": "text",
-                    "text": reassignment_messages.join("\n"),
-                }));
-            }
-            content_items.push(json!({
-                "type": "text",
-                "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()),
-            }));
-
-            ok(req.id, json!({ "content": content_items }))
-        }
-        "sprint/remove" => {
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
-            let mut records = match crate::services::sprint_service::SprintService::list(&storage) {
-                Ok(records) => records,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": format!("Failed to load sprints: {}", e)})),
-                    );
-                }
-            };
-
-            let cleanup_missing = req
-                .params
-                .get("cleanup_missing")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            let mut integrity_report =
-                crate::services::sprint_integrity::detect_missing_sprints(&storage, &records);
-            let baseline_report = integrity_report.clone();
-            let mut cleanup_outcome: Option<
-                crate::services::sprint_integrity::SprintCleanupOutcome,
-            > = None;
-
-            if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-                match crate::services::sprint_integrity::cleanup_missing_sprint_refs(
-                    &mut storage,
-                    &mut records,
-                    None,
-                ) {
-                    Ok(outcome) => {
-                        integrity_report =
-                            crate::services::sprint_integrity::detect_missing_sprints(
-                                &storage, &records,
-                            );
-                        cleanup_outcome = Some(outcome);
-                    }
-                    Err(error) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(
-                                json!({"message": format!("Failed to clean up sprint references: {}", error)}),
-                            ),
-                        );
-                    }
-                }
-            }
-
-            let raw_tasks = req.params.get("tasks");
-            if raw_tasks.is_none() {
-                return err(req.id, -32602, "Missing required field: tasks", None);
-            }
-            let tasks: Vec<String> = match raw_tasks.unwrap() {
-                Value::String(value) => {
-                    let trimmed = value.trim();
-                    if trimmed.is_empty() {
-                        Vec::new()
-                    } else {
-                        vec![trimmed.to_string()]
-                    }
-                }
-                Value::Array(values) => values
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string())
-                    .collect(),
-                _ => {
-                    return err(
-                        req.id,
-                        -32602,
-                        "tasks must be a string or array of strings",
-                        None,
-                    );
-                }
-            };
-
-            let sprint_ref = req.params.get("sprint").map(|value| match value {
-                Value::Number(num) => num.to_string(),
-                Value::String(text) => text.trim().to_string(),
-                _ => String::new(),
-            });
-
-            if let Some(reference) = sprint_ref.as_ref()
-                && reference.is_empty()
-            {
-                return err(
-                    req.id,
-                    -32602,
-                    "sprint must be a numeric id or keyword when provided",
-                    None,
-                );
-            }
-
-            let outcome = match crate::services::sprint_assignment::remove_tasks(
-                &mut storage,
-                &records,
-                &tasks,
-                sprint_ref.as_deref(),
-            ) {
-                Ok(outcome) => outcome,
-                Err(msg) => return err(req.id, -32602, msg.as_str(), None),
-            };
-
-            let mut payload = serde_json::Map::new();
-            payload.insert("status".to_string(), Value::String("ok".to_string()));
-            payload.insert(
-                "action".to_string(),
-                Value::String(outcome.action.as_str().to_string()),
-            );
-            payload.insert("sprint_id".to_string(), Value::from(outcome.sprint_id));
-            if let Some(label) = outcome.sprint_label.clone() {
-                payload.insert("sprint_label".to_string(), Value::String(label));
-            } else {
-                payload.insert("sprint_label".to_string(), Value::Null);
-            }
-            payload.insert(
-                "modified".to_string(),
-                Value::Array(
-                    outcome
-                        .modified
-                        .iter()
-                        .map(|id| Value::String(id.clone()))
-                        .collect(),
-                ),
-            );
-            payload.insert(
-                "unchanged".to_string(),
-                Value::Array(
-                    outcome
-                        .unchanged
-                        .iter()
-                        .map(|id| Value::String(id.clone()))
-                        .collect(),
-                ),
-            );
-            payload.insert(
-                "missing_sprints".to_string(),
-                Value::Array(
-                    integrity_report
-                        .missing_sprints
-                        .iter()
-                        .map(|id| Value::from(*id))
-                        .collect(),
-                ),
-            );
-            if let Some(integrity) = make_mcp_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ) {
-                payload.insert("integrity".to_string(), integrity);
-            }
-            let payload = Value::Object(payload);
-
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            )
-        }
-        "sprint/delete" => {
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
-
-            let sprint_val = req.params.get("sprint");
-            let sprint_id = match sprint_val {
-                Some(Value::Number(num)) => {
-                    num.as_u64().and_then(|value| u32::try_from(value).ok())
-                }
-                Some(Value::String(text)) => text.trim().parse::<u32>().ok(),
-                _ => None,
-            };
-            let sprint_id = match sprint_id {
-                Some(id) => id,
-                None => return err(req.id, -32602, "Missing or invalid sprint id", None),
-            };
-
-            let cleanup_missing = req
-                .params
-                .get("cleanup_missing")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            let record =
-                match crate::services::sprint_service::SprintService::get(&storage, sprint_id) {
-                    Ok(record) => record,
-                    Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
-                        return err(
-                            req.id,
-                            -32004,
-                            &format!("Sprint #{} not found", sprint_id),
-                            None,
-                        );
-                    }
-                    Err(error) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(json!({"message": error.to_string()})),
-                        );
-                    }
-                };
-
-            let display_name = crate::services::sprint_assignment::sprint_display_name(&record);
-            let sprint_label = record
-                .sprint
-                .plan
-                .as_ref()
-                .and_then(|plan| plan.label.clone());
-
-            match crate::services::sprint_service::SprintService::delete(&mut storage, sprint_id) {
-                Ok(true) => {}
-                Ok(false) => {
-                    return err(
-                        req.id,
-                        -32004,
-                        &format!("Sprint #{} not found", sprint_id),
-                        None,
-                    );
-                }
-                Err(error) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Failed to delete sprint",
-                        Some(json!({"message": error.to_string()})),
-                    );
-                }
-            }
-
-            let mut records = match crate::services::sprint_service::SprintService::list(&storage) {
-                Ok(records) => records,
-                Err(error) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": error.to_string()})),
-                    );
-                }
-            };
-
-            let mut integrity_report =
-                crate::services::sprint_integrity::detect_missing_sprints(&storage, &records);
-            let baseline_report = integrity_report.clone();
-            let mut cleanup_outcome: Option<
-                crate::services::sprint_integrity::SprintCleanupOutcome,
-            > = None;
-
-            if cleanup_missing {
-                match crate::services::sprint_integrity::cleanup_missing_sprint_refs(
-                    &mut storage,
-                    &mut records,
-                    Some(sprint_id),
-                ) {
-                    Ok(outcome) => {
-                        integrity_report =
-                            crate::services::sprint_integrity::detect_missing_sprints(
-                                &storage, &records,
-                            );
-                        cleanup_outcome = Some(outcome);
-                    }
-                    Err(error) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Failed to clean sprint references",
-                            Some(json!({"message": error.to_string()})),
-                        );
-                    }
-                }
-            }
-
-            let removed_references = cleanup_outcome
-                .as_ref()
-                .map(|outcome| outcome.removed_references)
-                .unwrap_or(0);
-            let updated_tasks = cleanup_outcome
-                .as_ref()
-                .map(|outcome| outcome.updated_tasks)
-                .unwrap_or(0);
-
-            let mut summary = format!("Deleted {}.", display_name);
-
-            if cleanup_missing {
-                if removed_references > 0 {
-                    let _ = write!(
-                        summary,
-                        " Removed {} dangling sprint reference(s) across {} task(s).",
-                        removed_references, updated_tasks
-                    );
-                } else {
-                    summary.push_str(" No dangling sprint references required cleanup.");
-                }
-            } else if !integrity_report.missing_sprints.is_empty() {
-                let missing = integrity_report
-                    .missing_sprints
-                    .iter()
-                    .map(|id| format!("#{}", id))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let _ = write!(
-                    summary,
-                    " Missing sprint references detected: {}. Re-run with cleanup_missing=true to remove them.",
-                    missing
-                );
-            }
-
-            let mut payload = serde_json::Map::new();
-            payload.insert("status".to_string(), Value::String("ok".to_string()));
-            payload.insert("deleted".to_string(), Value::Bool(true));
-            payload.insert("sprint_id".to_string(), Value::from(sprint_id));
-            if let Some(label) = sprint_label.clone() {
-                payload.insert("sprint_label".to_string(), Value::String(label));
-            } else {
-                payload.insert("sprint_label".to_string(), Value::Null);
-            }
-            payload.insert(
-                "removed_references".to_string(),
-                Value::from(removed_references as u64),
-            );
-            payload.insert(
-                "updated_tasks".to_string(),
-                Value::from(updated_tasks as u64),
-            );
-            if let Some(integrity) = make_mcp_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ) {
-                payload.insert("integrity".to_string(), integrity);
-            }
-
-            let payload = Value::Object(payload);
-
-            ok(
-                req.id,
-                json!({
-                    "content": [
-                        { "type": "text", "text": format!("{}", summary) },
-                        { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) }
-                    ]
-                }),
-            )
-        }
-        "sprint/backlog" => {
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-
-            let mut storage = match crate::storage::manager::Storage::try_open(
-                resolver.path.clone(),
-            ) {
-                Some(storage) => storage,
-                None => {
-                    let payload = json!({
-                        "status": "ok",
-                        "count": 0,
-                        "truncated": false,
-                        "tasks": Vec::<Value>::new()
-                    });
-                    return ok(
-                        req.id,
-                        json!({
-                            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                        }),
-                    );
-                }
-            };
-
-            let limit = req
-                .params
-                .get("limit")
-                .and_then(|v| v.as_u64())
-                .map(|value| value as usize)
-                .unwrap_or(20);
-            if limit == 0 {
-                return err(req.id, -32602, "limit must be greater than zero", None);
-            }
-
-            let cleanup_missing = req
-                .params
-                .get("cleanup_missing")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-
-            fn parse_string_vec(value: Option<&Value>) -> Vec<String> {
-                match value {
-                    Some(Value::String(s)) => s
-                        .split(',')
-                        .map(|token| token.trim())
-                        .filter(|token| !token.is_empty())
-                        .map(|token| token.to_string())
-                        .collect(),
-                    Some(Value::Array(arr)) => arr
-                        .iter()
-                        .filter_map(|v| v.as_str())
-                        .map(|s| s.trim())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string())
-                        .collect(),
-                    _ => Vec::new(),
-                }
-            }
-
-            let status_tokens = parse_string_vec(req.params.get("status"));
-            let statuses: Vec<crate::types::TaskStatus> = status_tokens
-                .iter()
-                .map(|token| crate::types::TaskStatus::from(token.as_str()))
-                .collect();
-
-            let tags = parse_string_vec(req.params.get("tag"));
-
-            let options = crate::services::sprint_assignment::SprintBacklogOptions {
-                project: req
-                    .params
-                    .get("project")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                tags,
-                statuses,
-                assignee: req
-                    .params
-                    .get("assignee")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string()),
-                limit,
-            };
-
-            let mut records = match crate::services::sprint_service::SprintService::list(&storage) {
-                Ok(records) => records,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": format!("Failed to load sprints: {}", e)})),
-                    );
-                }
-            };
-
-            let mut integrity_report =
-                crate::services::sprint_integrity::detect_missing_sprints(&storage, &records);
-            let baseline_report = integrity_report.clone();
-            let mut cleanup_outcome: Option<
-                crate::services::sprint_integrity::SprintCleanupOutcome,
-            > = None;
-
-            if cleanup_missing && !integrity_report.missing_sprints.is_empty() {
-                match crate::services::sprint_integrity::cleanup_missing_sprint_refs(
-                    &mut storage,
-                    &mut records,
-                    None,
-                ) {
-                    Ok(outcome) => {
-                        integrity_report =
-                            crate::services::sprint_integrity::detect_missing_sprints(
-                                &storage, &records,
-                            );
-                        cleanup_outcome = Some(outcome);
-                    }
-                    Err(error) => {
-                        return err(
-                            req.id,
-                            -32603,
-                            "Internal error",
-                            Some(
-                                json!({"message": format!("Failed to clean up sprint references: {}", error)}),
-                            ),
-                        );
-                    }
-                }
-            }
-
-            let result = match crate::services::sprint_assignment::fetch_backlog(&storage, options)
-            {
-                Ok(result) => result,
-                Err(msg) => return err(req.id, -32602, msg.as_str(), None),
-            };
-
-            let mut payload = serde_json::Map::new();
-            payload.insert("status".to_string(), Value::String("ok".to_string()));
-            payload.insert(
-                "count".to_string(),
-                Value::from(result.entries.len() as u64),
-            );
-            payload.insert("truncated".to_string(), Value::Bool(result.truncated));
-            payload.insert(
-                "tasks".to_string(),
-                serde_json::to_value(&result.entries).unwrap_or_else(|_| Value::Array(Vec::new())),
-            );
-            payload.insert(
-                "missing_sprints".to_string(),
-                Value::Array(
-                    integrity_report
-                        .missing_sprints
-                        .iter()
-                        .map(|id| Value::from(*id))
-                        .collect(),
-                ),
-            );
-            if let Some(integrity) = make_mcp_integrity_payload(
-                &baseline_report,
-                &integrity_report,
-                cleanup_outcome.as_ref(),
-            ) {
-                payload.insert("integrity".to_string(), integrity);
-            }
-
-            let payload = Value::Object(payload);
-
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            )
-        }
+        "task/list" => handle_task_list(req),
+        "sprint/add" => handle_sprint_add(req),
+        "sprint/remove" => handle_sprint_remove(req),
+        "sprint/delete" => handle_sprint_delete(req),
+        "sprint/backlog" => handle_sprint_backlog(req),
         // project/list({}) -> { projects }
-        "project/list" => {
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let storage = crate::storage::manager::Storage::new(resolver.path);
-            let projects = crate::services::project_service::ProjectService::list(&storage);
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&projects).unwrap_or_else(|_| "[]".into()) } ]
-                }),
-            )
-        }
+        "project/list" => handle_project_list(req),
         // project/stats({ name }) -> { stats }
-        "project/stats" => {
-            let name = req.params.get("name").and_then(|v| v.as_str());
-            if name.is_none() {
-                return err(req.id, -32602, "Missing name", None);
-            }
-            let resolver = match crate::workspace::TasksDirectoryResolver::resolve(None, None) {
-                Ok(r) => r,
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32603,
-                        "Internal error",
-                        Some(json!({"message": e})),
-                    );
-                }
-            };
-            let storage = crate::storage::manager::Storage::new(resolver.path);
-            let stats =
-                crate::services::project_service::ProjectService::stats(&storage, name.unwrap());
-            ok(
-                req.id,
-                json!({
-                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&stats).unwrap_or_else(|_| "{}".into()) } ]
-                }),
-            )
-        }
+        "project/stats" => handle_project_stats(req),
         _ => err(req.id, -32601, "Method not found", None),
+    }
+}
+
+fn parse_limit_value(value: Option<&Value>, default: usize) -> Result<usize, &'static str> {
+    match value {
+        None | Some(Value::Null) => Ok(default),
+        Some(Value::Number(num)) if num.is_u64() => Ok(num.as_u64().unwrap() as usize),
+        Some(Value::String(text)) => text
+            .trim()
+            .parse::<usize>()
+            .map_err(|_| "limit must be a positive integer"),
+        _ => Err("limit must be a positive integer"),
+    }
+}
+
+fn parse_cursor_value(value: Option<&Value>) -> Result<usize, &'static str> {
+    match value {
+        None | Some(Value::Null) => Ok(0),
+        Some(Value::Number(num)) if num.is_u64() => Ok(num.as_u64().unwrap() as usize),
+        Some(Value::String(text)) => text
+            .trim()
+            .parse::<usize>()
+            .map_err(|_| "cursor must be a positive integer"),
+        _ => Err("cursor must be a positive integer"),
+    }
+}
+
+fn write_raw_json(stdout: &Arc<Mutex<io::Stdout>>, line: &str) {
+    if let Ok(mut guard) = stdout.lock() {
+        let _ = writeln!(&mut *guard, "{}", line);
+        let _ = guard.flush();
+    }
+}
+
+fn write_framed_json(stdout: &Arc<Mutex<io::Stdout>>, payload: &str) {
+    if let Ok(mut guard) = stdout.lock() {
+        let _ = write!(
+            &mut *guard,
+            "Content-Length: {}\r\n\r\n{}",
+            payload.len(),
+            payload
+        );
+        let _ = guard.flush();
     }
 }
 

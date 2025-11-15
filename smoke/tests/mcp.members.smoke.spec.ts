@@ -109,12 +109,14 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
             expect(success.error).toBeUndefined();
 
             const content = success.result?.content?.[0]?.text ?? '{}';
-            let dto: Record<string, any> = {};
+            let payload: Record<string, any> = {};
             try {
-                dto = JSON.parse(content);
+                payload = JSON.parse(content);
             } catch (error) {
                 throw new Error(`Failed to parse task payload: ${content}\n${String(error)}`);
             }
+
+            const dto: Record<string, any> = payload.task ?? payload;
 
             expect(dto.id).toMatch(/^CLI-\d+$/);
             expect(dto.assignee).toBe('allowed@example.com');

@@ -16,7 +16,6 @@ Features:
 
 Chores:
 - Test release workflow
-- parameter order is not flexible (e.g. lotar --format json sprint list works, but lotar sprint list --format json does not).
 
 ## Backlog
 - [ ] Include README and LICENSE in archives

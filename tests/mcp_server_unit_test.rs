@@ -19,6 +19,18 @@ impl Drop for CwdGuard {
     }
 }
 
+fn task_from_payload(payload: &serde_json::Value) -> serde_json::Value {
+    payload
+        .get("task")
+        .cloned()
+        .unwrap_or_else(|| payload.clone())
+}
+
+fn task_from_text(text: &str) -> serde_json::Value {
+    let payload = serde_json::from_str::<serde_json::Value>(text).expect("valid task payload");
+    task_from_payload(&payload)
+}
+
 #[test]
 fn mcp_tools_list_includes_underscore_names() {
     let req = serde_json::json!({
@@ -50,6 +62,101 @@ fn mcp_tools_list_includes_underscore_names() {
         .collect();
     assert!(names.contains(&"task_create".to_string()));
     assert!(names.contains(&"project_list".to_string()));
+}
+
+#[test]
+fn mcp_initialize_advertises_list_changed_capability() {
+    let req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 42,
+        "method": "initialize",
+        "params": {}
+    });
+    let line = serde_json::to_string(&req).unwrap();
+    let resp_line = lotar::mcp::server::handle_json_line(&line);
+    let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+    assert!(resp.get("error").is_none(), "initialize failed: {resp}");
+    let capabilities = resp
+        .get("result")
+        .and_then(|r| r.get("capabilities"))
+        .cloned()
+        .expect("capabilities present");
+    let list_changed = capabilities
+        .get("tools")
+        .and_then(|tools| tools.get("listChanged"))
+        .and_then(|flag| flag.as_bool());
+    assert_eq!(list_changed, Some(true));
+}
+
+#[test]
+fn mcp_schema_discover_lists_tools() {
+    let req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 43,
+        "method": "schema/discover",
+        "params": {}
+    });
+    let line = serde_json::to_string(&req).unwrap();
+    let resp_line = lotar::mcp::server::handle_json_line(&line);
+    let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+    assert!(
+        resp.get("error").is_none(),
+        "schema/discover failed: {resp}"
+    );
+    let payload = resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    assert!(
+        payload
+            .get("toolCount")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0)
+            > 0
+    );
+    let filtered_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 44,
+        "method": "schema/discover",
+        "params": {"tool": "task_create"}
+    });
+    let filtered_line = serde_json::to_string(&filtered_req).unwrap();
+    let filtered_resp_line = lotar::mcp::server::handle_json_line(&filtered_line);
+    let filtered_resp: serde_json::Value = serde_json::from_str(&filtered_resp_line).unwrap();
+    assert!(
+        filtered_resp.get("error").is_none(),
+        "filtered schema/discover failed: {filtered_resp}"
+    );
+    let filtered_payload = filtered_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    assert_eq!(
+        filtered_payload.get("toolCount").and_then(|v| v.as_u64()),
+        Some(1)
+    );
+    let names: Vec<String> = filtered_payload
+        .get("tools")
+        .and_then(|v| v.as_array())
+        .unwrap()
+        .iter()
+        .filter_map(|tool| {
+            tool.get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        })
+        .collect();
+    assert_eq!(names, vec!["task_create".to_string()]);
 }
 
 #[test]
@@ -100,7 +207,7 @@ fn mcp_tools_call_accepts_underscore_name_for_task_create() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap_or(serde_json::json!({}));
+    let task_json = task_from_text(text);
     let id = task_json.get("id").and_then(|v| v.as_str()).unwrap_or("");
     assert!(
         id.starts_with("MCP-"),
@@ -148,7 +255,7 @@ fn mcp_task_create_accepts_custom_fields() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let task_json = task_from_text(text);
     let custom_fields = task_json
         .get("custom_fields")
         .and_then(|v| v.as_object())
@@ -319,8 +426,16 @@ fn mcp_task_list_includes_custom_fields() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let tasks_json: serde_json::Value = serde_json::from_str(text).unwrap();
-    let tasks = tasks_json.as_array().cloned().unwrap_or_default();
+    let payload: serde_json::Value = serde_json::from_str(text).unwrap();
+    let tasks = payload
+        .get("tasks")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(false)
+    );
     assert_eq!(tasks.len(), 2);
     let mut seen = tasks
         .into_iter()
@@ -338,6 +453,92 @@ fn mcp_task_list_includes_custom_fields() {
         .collect::<Vec<_>>();
     seen.sort();
     assert_eq!(seen, vec!["Docs".to_string(), "Platform".to_string()]);
+}
+
+#[test]
+fn mcp_task_list_supports_pagination() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
+    let mut storage = lotar::Storage::new(resolver.path.clone());
+    for idx in 0..3 {
+        lotar::services::task_service::TaskService::create(
+            &mut storage,
+            lotar::api_types::TaskCreate {
+                title: format!("Paginate {idx}"),
+                project: Some("MCP".into()),
+                ..lotar::api_types::TaskCreate::default()
+            },
+        )
+        .expect("create task");
+    }
+
+    let first_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 201,
+        "method": "task/list",
+        "params": {"project": "MCP", "limit": 2}
+    });
+    let first_resp_line =
+        lotar::mcp::server::handle_json_line(&serde_json::to_string(&first_req).unwrap());
+    let first_resp: serde_json::Value = serde_json::from_str(&first_resp_line).unwrap();
+    assert!(
+        first_resp.get("error").is_none(),
+        "first page failed: {first_resp}"
+    );
+    let first_payload = first_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    assert_eq!(first_payload.get("count").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(
+        first_payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+    let cursor = first_payload
+        .get("nextCursor")
+        .and_then(|v| v.as_str())
+        .expect("next cursor present")
+        .to_string();
+
+    let second_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 202,
+        "method": "task/list",
+        "params": {"project": "MCP", "cursor": cursor, "limit": 2}
+    });
+    let second_resp_line =
+        lotar::mcp::server::handle_json_line(&serde_json::to_string(&second_req).unwrap());
+    let second_resp: serde_json::Value = serde_json::from_str(&second_resp_line).unwrap();
+    assert!(
+        second_resp.get("error").is_none(),
+        "second page failed: {second_resp}"
+    );
+    let second_payload = second_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    assert_eq!(
+        second_payload.get("count").and_then(|v| v.as_u64()),
+        Some(1)
+    );
+    assert_eq!(
+        second_payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(false)
+    );
 }
 
 #[test]
@@ -383,7 +584,7 @@ fn mcp_task_create_and_list_resolve_me_aliases() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let created_task: serde_json::Value = serde_json::from_str(create_text).unwrap();
+    let created_task = task_from_text(create_text);
     let created_id = created_task
         .get("id")
         .and_then(|v| v.as_str())
@@ -422,8 +623,12 @@ fn mcp_task_create_and_list_resolve_me_aliases() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let tasks_json: serde_json::Value = serde_json::from_str(list_text).unwrap();
-    let tasks = tasks_json.as_array().cloned().unwrap_or_default();
+    let payload: serde_json::Value = serde_json::from_str(list_text).unwrap();
+    let tasks = payload
+        .get("tasks")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     assert_eq!(tasks.len(), 1, "expected single task filtered by @me");
     assert_eq!(
         tasks[0]
@@ -551,6 +756,14 @@ fn mcp_sprint_tools_assign_and_backlog() {
         .and_then(|v| v.as_str())
         .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
         .unwrap();
+    assert_eq!(
+        backlog_payload.get("cursor").and_then(|v| v.as_u64()),
+        Some(0)
+    );
+    assert_eq!(
+        backlog_payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(false)
+    );
     let backlog_tasks = backlog_payload
         .get("tasks")
         .and_then(|v| v.as_array())
@@ -739,6 +952,99 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
 }
 
 #[test]
+fn mcp_sprint_backlog_supports_pagination() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
+    let mut storage = lotar::Storage::new(resolver.path.clone());
+    for idx in 0..3 {
+        lotar::services::task_service::TaskService::create(
+            &mut storage,
+            lotar::api_types::TaskCreate {
+                title: format!("Backlog {idx}"),
+                project: Some("MCP".into()),
+                ..lotar::api_types::TaskCreate::default()
+            },
+        )
+        .expect("create task");
+    }
+    drop(storage);
+
+    let first_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 301,
+        "method": "tools/call",
+        "params": {
+            "name": "sprint_backlog",
+            "arguments": {"project": "MCP", "limit": 1}
+        }
+    });
+    let first_resp_line =
+        lotar::mcp::server::handle_json_line(&serde_json::to_string(&first_req).unwrap());
+    let first_resp: serde_json::Value = serde_json::from_str(&first_resp_line).unwrap();
+    assert!(
+        first_resp.get("error").is_none(),
+        "first backlog page failed: {first_resp}"
+    );
+    let first_payload = first_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    assert_eq!(first_payload.get("count").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(
+        first_payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+    let cursor = first_payload
+        .get("nextCursor")
+        .and_then(|v| v.as_str())
+        .expect("next cursor present")
+        .to_string();
+
+    let second_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 302,
+        "method": "tools/call",
+        "params": {
+            "name": "sprint_backlog",
+            "arguments": {"project": "MCP", "limit": 2, "cursor": cursor}
+        }
+    });
+    let second_resp_line =
+        lotar::mcp::server::handle_json_line(&serde_json::to_string(&second_req).unwrap());
+    let second_resp: serde_json::Value = serde_json::from_str(&second_resp_line).unwrap();
+    assert!(
+        second_resp.get("error").is_none(),
+        "second backlog page failed: {second_resp}"
+    );
+    let second_payload = second_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
+        .unwrap();
+    assert_eq!(
+        second_payload.get("count").and_then(|v| v.as_u64()),
+        Some(2)
+    );
+    assert_eq!(
+        second_payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+}
+
+#[test]
 fn mcp_task_create_honors_default_assignee() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
@@ -781,7 +1087,7 @@ fn mcp_task_create_honors_default_assignee() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let task_json = task_from_text(text);
     assert_eq!(
         task_json.get("assignee").and_then(|v| v.as_str()),
         Some("default-user@example.com")
@@ -848,7 +1154,7 @@ fn mcp_task_create_infers_branch_defaults() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let task_json = task_from_text(text);
     assert_eq!(
         task_json.get("priority").and_then(|v| v.as_str()),
         Some("High")
@@ -971,7 +1277,7 @@ fn mcp_task_create_resolves_me_alias() {
         .get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let task_json = task_from_text(text);
     assert_eq!(
         task_json.get("assignee").and_then(|v| v.as_str()),
         Some("carol")
