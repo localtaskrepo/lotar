@@ -409,8 +409,8 @@ jobs:
           cd tap
           base="${{ steps.release_meta.outputs.asset_base }}"
           tag="${{ steps.release_meta.outputs.tag }}"
-          curl -sSfL "${base}/lotar-${tag}-macos-arm64.tar.gz.sha256" -o arm64.sha
-          curl -sSfL "${base}/lotar-${tag}-macos-x64.tar.gz.sha256" -o x64.sha
+          curl -sSfL "${base}/lotar-${tag}-macos-arm64.sha256" -o arm64.sha
+          curl -sSfL "${base}/lotar-${tag}-macos-x64.sha256" -o x64.sha
 
       - name: Update formula
         env:
@@ -467,4 +467,94 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/lotar.rb
           git commit -m "Update lotar formula to v${{ steps.release_meta.outputs.version }}" || echo "No changes"
+          git push
+
+  update-scoop-bucket:
+    name: Update Scoop Bucket
+    needs: update-release-page
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout scoop bucket repository
+        uses: actions/checkout@v4
+        with:
+          repository: localtaskrepo/scoop-lotar
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: scoop-bucket
+
+      - name: Collect release metadata
+        id: scoop_meta
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          asset_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${tag}"
+          {
+            echo "tag=${tag}"
+            echo "version=${version}"
+            echo "asset_base=${asset_base}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Download Windows checksum
+        env:
+          ASSET_BASE: ${{ steps.scoop_meta.outputs.asset_base }}
+          TAG: ${{ steps.scoop_meta.outputs.tag }}
+        run: |
+          cd scoop-bucket
+          curl -sSfL "${ASSET_BASE}/lotar-${TAG}-windows-x64.sha256" -o windows.sha
+
+      - name: Update manifest
+        env:
+          VERSION: ${{ steps.scoop_meta.outputs.version }}
+          BASE_URL: ${{ steps.scoop_meta.outputs.asset_base }}
+          TAG: ${{ steps.scoop_meta.outputs.tag }}
+        run: |
+          cd scoop-bucket
+          mkdir -p bucket
+          hash=$(cut -d ' ' -f1 windows.sha)
+          export HASH="$hash"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          version = os.environ['VERSION']
+          base = os.environ['BASE_URL']
+          tag = os.environ['TAG']
+          hash_value = os.environ['HASH']
+
+          manifest = {
+              "version": version,
+              "description": "Local-first task and project management CLI",
+              "homepage": "https://github.com/localtaskrepo/lotar",
+              "license": "ISC",
+              "architecture": {
+                  "64bit": {
+                      "url": f"{base}/lotar-{tag}-windows-x64.zip",
+                      "hash": hash_value,
+                  }
+              },
+              "bin": "lotar.exe",
+              "checkver": "github",
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/localtaskrepo/lotar/releases/download/v$version/lotar-v$version-windows-x64.zip",
+                      }
+                  }
+              }
+          }
+
+          Path("bucket/lotar.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+
+      - name: Commit and push bucket update
+        env:
+          VERSION: ${{ steps.scoop_meta.outputs.version }}
+        run: |
+          cd scoop-bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add bucket/lotar.json
+          git commit -m "Update lotar manifest to v${VERSION}" || echo "No changes"
           git push

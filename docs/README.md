@@ -8,12 +8,23 @@ LoTaR is an actively developed task management tool with a CLI, web server, and 
 
 ### 1. Install the CLI
 
-**Homebrew (macOS)**
+**Homebrew ([brew.sh](https://brew.sh/), macOS)**
 ```bash
 brew tap localtaskrepo/lotar
 brew install lotar
 lotar --version
 ```
+
+**Scoop ([scoop.sh](https://scoop.sh/), Windows)**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+iwr -useb get.scoop.sh | iex
+scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar
+scoop install lotar
+lotar --version
+```
+Run `scoop install lotar --version vX.Y.Z` if you need to pin a specific release from the
+bucket instead of installing the latest manifest.
 
 **GitHub Releases (macOS • Linux • Windows)**
 ```bash
@@ -31,6 +42,8 @@ lotar --version
 docker pull mallox/lotar
 docker run --rm mallox/lotar --version
 ```
+See the [Docker Hub repository](https://hub.docker.com/r/mallox/lotar) for tags and usage
+notes.
 
 **Build from source (Rust + Node)**
 ```bash
@@ -65,6 +78,12 @@ lotar scan ./src    # optional: capture TODOs
 ```
 
 > Numeric-only task references work whenever LoTaR auto-detects your single project or you set `lotar config set default_project`. Use fully-qualified IDs (`MYAP-12`) or `--project` when multiple prefixes coexist.
+
+## Release Workflow & Verification
+
+The complete release checklist, automated workflow overview, and manual verification steps
+are documented in [`docs/release-guide.md`](release-guide.md). Run through that guide when
+cutting a new version or when exercising the Scoop/Homebrew verification workflows.
 
 ## Core Features
 

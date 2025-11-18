@@ -1,0 +1,80 @@
+name: Verify Scoop Install
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket_repo:
+        description: "Override bucket repository (owner/name)"
+        required: false
+        default: "localtaskrepo/scoop-lotar"
+      bucket_branch:
+        description: "Bucket branch to checkout"
+        required: false
+        default: "main"
+      lotar_version:
+        description: "Optional lotar version to install (defaults to latest manifest)"
+        required: false
+
+jobs:
+  scoop-install-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout bucket (for reference)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.bucket_repo }}
+          ref: ${{ inputs.bucket_branch }}
+          path: scoop-bucket
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+          iwr -useb get.scoop.sh | iex
+          $shimPath = Join-Path $env:USERPROFILE 'scoop\shims'
+          if (-not (Test-Path $shimPath)) {
+            Write-Error "Scoop shim directory not found at $shimPath"
+          }
+          $shimPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "Added $shimPath to GITHUB_PATH so scoop is available in later steps."
+
+      - name: Add bucket and install lotar
+        shell: pwsh
+        env:
+          BUCKET_REPO: ${{ inputs.bucket_repo }}
+          BUCKET_BRANCH: ${{ inputs.bucket_branch }}
+          LOTAR_VERSION: ${{ inputs.lotar_version }}
+        run: |
+          $bucketName = "lotar"
+          $bucketUrl = "https://github.com/$($env:BUCKET_REPO)"
+          if ($env:BUCKET_BRANCH -ne "" -and $env:BUCKET_BRANCH -ne "main") {
+            $bucketUrl = "$bucketUrl/tree/$($env:BUCKET_BRANCH)"
+          }
+          scoop bucket add $bucketName $bucketUrl
+          if ([string]::IsNullOrWhiteSpace($env:LOTAR_VERSION)) {
+            scoop install lotar
+          } else {
+            scoop install lotar --version $env:LOTAR_VERSION
+          }
+
+      - name: Verify lotar binary
+        shell: pwsh
+        env:
+          LOTAR_VERSION: ${{ inputs.lotar_version }}
+        run: |
+          $lotarCmd = Get-Command lotar -ErrorAction Stop
+          Write-Host "lotar resolved to: $($lotarCmd.Source)"
+          $versionOutput = lotar --version
+          Write-Host $versionOutput
+          if (-not [string]::IsNullOrWhiteSpace($env:LOTAR_VERSION) -and ($versionOutput -notmatch [regex]::Escape($env:LOTAR_VERSION))) {
+            Write-Error "Expected version $($env:LOTAR_VERSION) not found in 'lotar --version' output."
+          }
+
+      - name: Cache artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoop-logs
+          path: |
+            ~\scoop\buckets
+            ~\scoop\apps\lotar

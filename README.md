@@ -12,13 +12,24 @@ LoTaR ships as both a signed Homebrew formula and a ready-to-run Docker image, s
 
 ### 1. Install LoTaR
 
-**macOS (Homebrew)**
+**macOS ([Homebrew](https://brew.sh/))**
 ```bash
 brew tap localtaskrepo/lotar
 brew install lotar
 lotar --version
 ```
 This adds the CLI to your PATH and keeps it updated with `brew upgrade lotar`.
+
+**Windows ([Scoop](https://scoop.sh/))**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+iwr -useb get.scoop.sh | iex
+scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar
+scoop install lotar
+lotar --version
+```
+This installs LoTaR via the community bucket we publish during every release. Pass
+`--version` to `scoop install` if you need to pin to a specific release.
 
 **GitHub Releases (macOS • Linux • Windows)**
 ```bash
@@ -30,7 +41,7 @@ lotar --version
 ```
 Verify signatures/checksums from the same release before moving the binary into your PATH if you need extra assurance.
 
-**Any OS (Docker)**
+**Any OS ([Docker Hub](https://hub.docker.com/r/mallox/lotar))**
 ```bash
 docker pull mallox/lotar
 docker run --rm mallox/lotar --version
@@ -340,13 +351,23 @@ git add .tasks/ && git commit -m "Complete user authentication feature"
 
 Pick the delivery path that matches your environment; every artifact is produced by the same release workflow, so features and signatures stay consistent.
 
-### macOS (Homebrew)
+### macOS ([Homebrew](https://brew.sh/))
 ```bash
 brew tap localtaskrepo/lotar
 brew install lotar
 lotar --version
 ```
 The tap hosts universal binaries, so both Apple Silicon and Intel machines are supported. Upgrade any time with `brew upgrade lotar`.
+
+### Windows ([Scoop](https://scoop.sh/))
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+iwr -useb get.scoop.sh | iex
+scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar
+scoop install lotar
+lotar --version
+```
+Use `scoop install lotar --version vX.Y.Z` when validating a specific release manifest from the bucket.
 
 ### Docker (macOS • Linux • Windows)
 ```bash
@@ -360,7 +381,7 @@ docker run --rm \
     -w /workspace \
     mallox/lotar list
 ```
-The image is a minimal `scratch` container that already contains the signed musl binary. See `docs/docker.md` for more scenarios (shared tasks directories, environment variables, etc.).
+The image is a minimal `scratch` container that already contains the signed musl binary. See [`docs/docker.md`](docs/docker.md) or the [Docker Hub page](https://hub.docker.com/r/mallox/lotar) for more scenarios (shared tasks directories, environment variables, etc.).
 
 ### Build from Source (Rust)
 ```bash
@@ -385,6 +406,12 @@ cargo clippy            # Code quality
 - Nextest uses a more efficient harness and parallelism; see `.config/nextest.toml` for defaults.
 - Doc tests remain available via `cargo test --doc --all-features`.
 - The legacy `cargo test` command intentionally errors and instructs you to use nextest.
+
+### Releases
+- Follow the automated release pipeline and post-release verification steps in
+    [`docs/release-guide.md`](docs/release-guide.md).
+- Manual verification workflows (`Verify Scoop Install` and `Verify Homebrew Install`)
+    live under **Actions** for quick smoke-tests of installer paths.
 
 ## 📄 License
 
