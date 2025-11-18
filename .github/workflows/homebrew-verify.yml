@@ -1,0 +1,132 @@
+name: Verify Homebrew Install
+
+on:
+  workflow_dispatch:
+    inputs:
+      tap_repo:
+        description: "Override tap repository (owner/name)"
+        required: false
+        default: "localtaskrepo/homebrew-lotar"
+      tap_branch:
+        description: "Tap branch to checkout"
+        required: false
+        default: "main"
+      lotar_version:
+        description: "Optional lotar version string expected from --version output"
+        required: false
+
+jobs:
+  homebrew-install-test:
+    name: Homebrew Install Test (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            label: Intel (macOS 13)
+          - runner: macos-14
+            label: Apple Silicon (macOS 14)
+    steps:
+      - name: Checkout tap (for reference)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.tap_repo }}
+          ref: ${{ inputs.tap_branch }}
+          path: tap-ref
+
+      - name: Collect tap metadata
+        id: tap_meta
+        shell: bash
+        env:
+          TAP_REPO: ${{ inputs.tap_repo }}
+        run: |
+          set -euo pipefail
+          if [[ "$TAP_REPO" != *"/"* ]]; then
+            echo "tap_repo must be in owner/repo format" >&2
+            exit 1
+          fi
+          owner="${TAP_REPO%%/*}"
+          repo="${TAP_REPO##*/}"
+          short="${repo#homebrew-}"
+          {
+            echo "owner=${owner}"
+            echo "repo=${repo}"
+            echo "short=${short}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Configure Homebrew
+        id: brew_setup
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v brew >/dev/null 2>&1; then
+            brew_bin="$(command -v brew)"
+          elif [ -x "/opt/homebrew/bin/brew" ]; then
+            brew_bin="/opt/homebrew/bin/brew"
+          elif [ -x "/usr/local/bin/brew" ]; then
+            brew_bin="/usr/local/bin/brew"
+          else
+            echo "Homebrew is not available on this runner" >&2
+            exit 1
+          fi
+
+          eval "$("$brew_bin" shellenv)"
+          {
+            echo "BREW_BIN=${brew_bin}"
+            echo "HOMEBREW_PREFIX=${HOMEBREW_PREFIX}"
+            echo "HOMEBREW_CELLAR=${HOMEBREW_CELLAR}"
+            echo "HOMEBREW_REPOSITORY=${HOMEBREW_REPOSITORY}"
+          } >> "$GITHUB_ENV"
+          echo "${HOMEBREW_PREFIX}/bin" >> "$GITHUB_PATH"
+          echo "${HOMEBREW_PREFIX}/sbin" >> "$GITHUB_PATH"
+          echo "prefix=${HOMEBREW_PREFIX}" >> "$GITHUB_OUTPUT"
+          echo "brew_bin=${brew_bin}" >> "$GITHUB_OUTPUT"
+
+      - name: Tap lotar formula
+        id: tap_clone
+        shell: bash
+        env:
+          TAP_OWNER: ${{ steps.tap_meta.outputs.owner }}
+          TAP_SHORT: ${{ steps.tap_meta.outputs.short }}
+          TAP_BRANCH: ${{ inputs.tap_branch }}
+          TAP_REPO: ${{ inputs.tap_repo }}
+        run: |
+          set -euo pipefail
+          remote="https://github.com/${TAP_REPO}.git"
+          tap_ref="${TAP_OWNER}/${TAP_SHORT}"
+
+          brew untap "${tap_ref}" >/dev/null 2>&1 || true
+          brew tap "${tap_ref}" "${remote}" --force-auto-update
+
+          tap_path="$(brew --repo "${tap_ref}")"
+          cd "$tap_path"
+          git fetch origin "${TAP_BRANCH}"
+          git checkout "${TAP_BRANCH}"
+          git rev-parse --short HEAD
+          echo "tap_path=${tap_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Install lotar (Homebrew)
+        shell: bash
+        env:
+          LOTAR_VERSION: ${{ inputs.lotar_version }}
+        run: |
+          set -euo pipefail
+          brew uninstall --ignore-dependencies --force lotar >/dev/null 2>&1 || true
+          brew install lotar
+          lotar_output="$(lotar --version)"
+          echo "$lotar_output"
+          if [ -n "${LOTAR_VERSION:-}" ] && ! grep -q "${LOTAR_VERSION}" <<<"$lotar_output"; then
+            echo "Expected version ${LOTAR_VERSION} not found in output" >&2
+            exit 1
+          fi
+
+      - name: Upload install artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-logs-${{ matrix.runner }}
+          path: |
+            ~/Library/Logs/Homebrew
+            ${{ steps.brew_setup.outputs.prefix }}/Cellar/lotar
+            ${{ steps.tap_clone.outputs.tap_path }}
