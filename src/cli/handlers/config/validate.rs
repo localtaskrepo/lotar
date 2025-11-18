@@ -1,4 +1,6 @@
 use super::ConfigHandler;
+use crate::config::validation::errors::ValidationError;
+use crate::config::validation::{ConfigValidator, ValidationSeverity};
 use crate::output::OutputRenderer;
 use crate::workspace::TasksDirectoryResolver;
 
@@ -11,8 +13,6 @@ impl ConfigHandler {
         fix: bool,
         errors_only: bool,
     ) -> Result<(), String> {
-        use crate::config::validation::{ConfigValidator, ValidationSeverity};
-
         let global_config_path = crate::utils::paths::global_config_path(&resolver.path);
         let global_config = if global_config_path.exists() {
             match std::fs::read_to_string(&global_config_path) {
@@ -30,13 +30,28 @@ impl ConfigHandler {
         let mut all_results = Vec::new();
         let mut has_errors = false;
 
+        let resolved_base =
+            match crate::config::resolution::load_and_merge_configs(Some(&resolver.path)) {
+                Ok(cfg) => Some(cfg),
+                Err(e) => {
+                    renderer
+                        .emit_error(format_args!("Failed to load resolved configuration: {}", e));
+                    has_errors = true;
+                    None
+                }
+            };
+
         if global || project.is_none() {
             renderer.emit_info("Validating global configuration");
             let result = validator.validate_global_config(&global_config);
+            let mut result = result;
+            if let Some(resolved) = resolved_base.as_ref() {
+                result.merge(validator.validate_resolved_config(resolved));
+            }
 
             if result.has_errors() || result.has_warnings() {
                 has_errors |= result.has_errors();
-                all_results.push(("Global Config".to_string(), result));
+                all_results.push((ValidationScope::Global, "Global Config".to_string(), result));
             } else {
                 renderer.emit_success("Global configuration is valid");
             }
@@ -74,9 +89,32 @@ impl ConfigHandler {
                                 let mut combined_result = result;
                                 combined_result.merge(conflict_result);
 
+                                if let Some(base_resolved) = resolved_base.as_ref() {
+                                    match crate::config::resolution::get_project_config(
+                                        base_resolved,
+                                        &project_name,
+                                        &resolver.path,
+                                    ) {
+                                        Ok(project_resolved) => {
+                                            combined_result.merge(
+                                                validator
+                                                    .validate_resolved_config(&project_resolved),
+                                            );
+                                        }
+                                        Err(e) => {
+                                            renderer.emit_error(format_args!(
+                                                "Failed to resolve project configuration '{}': {}",
+                                                project_label, e
+                                            ));
+                                            has_errors = true;
+                                        }
+                                    }
+                                }
+
                                 if combined_result.has_errors() || combined_result.has_warnings() {
                                     has_errors |= combined_result.has_errors();
                                     all_results.push((
+                                        ValidationScope::Project(project_name.clone()),
                                         format!("Project Config ({})", project_label),
                                         combined_result,
                                     ));
@@ -108,19 +146,21 @@ impl ConfigHandler {
             }
         }
 
-        for (scope, result) in all_results {
-            renderer.emit_info(format_args!("{} Validation Results:", scope));
+        for (scope, label, result) in all_results {
+            renderer.emit_info(format_args!("{} Validation Results:", label));
 
             for error in &result.errors {
                 if errors_only && error.severity != ValidationSeverity::Error {
                     continue;
                 }
                 renderer.emit_raw_stdout(format_args!("{}", error));
+                emit_cli_fix_hint(renderer, &scope, error);
             }
 
             if !errors_only {
                 for warning in &result.warnings {
                     renderer.emit_raw_stdout(format_args!("{}", warning));
+                    emit_cli_fix_hint(renderer, &scope, warning);
                 }
 
                 for info in &result.info {
@@ -144,5 +184,52 @@ impl ConfigHandler {
         }
 
         Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+enum ValidationScope {
+    Global,
+    Project(String),
+}
+
+impl ValidationScope {
+    fn cli_suffix(&self) -> String {
+        match self {
+            ValidationScope::Global => " --global".to_string(),
+            ValidationScope::Project(prefix) => format!(" --project={}", prefix),
+        }
+    }
+}
+
+fn emit_cli_fix_hint(renderer: &OutputRenderer, scope: &ValidationScope, error: &ValidationError) {
+    if let Some(hint) = cli_hint_for_field(scope, error) {
+        renderer.emit_info(format_args!("Hint: {}", hint));
+    }
+}
+
+fn cli_hint_for_field(scope: &ValidationScope, error: &ValidationError) -> Option<String> {
+    let field = error.field.as_deref()?;
+    let scope_flag = scope.cli_suffix();
+
+    match field {
+        "branch_status_aliases" | "branch_type_aliases" | "branch_priority_aliases" => {
+            Some(format!(
+                "Update {} with `lotar config set {} '<alias:Target,...>'{flag}` or clear it via `lotar config set {} ''{flag}`",
+                field,
+                field,
+                field,
+                flag = scope_flag,
+            ))
+        }
+        "default_priority" => Some(format!(
+            "Align priorities via `lotar config set issue_priorities '<comma-separated list>'{flag}` or pick a new default with `lotar config set default_priority <value>{flag}`",
+            flag = scope_flag,
+        )),
+        "default_status" => Some(format!(
+            "Align states via `lotar config set issue_states '<comma-separated list>'{flag}` or pick a new default with `lotar config set default_status <value>{flag}`",
+            flag = scope_flag,
+        )),
+        _ => None,
     }
 }

@@ -74,11 +74,36 @@ where
         return Ok(HashMap::new());
     }
 
+    fn insert_alias<T>(
+        target: &mut HashMap<String, T>,
+        raw_key: &str,
+        value: T,
+        label: &str,
+    ) -> Result<(), ConfigError> {
+        let canonical = raw_key.trim().to_ascii_lowercase();
+        if canonical.is_empty() {
+            return Err(ConfigError::ParseError(format!(
+                "{} alias cannot be empty",
+                label
+            )));
+        }
+        if target.contains_key(&canonical) {
+            return Err(ConfigError::ParseError(format!(
+                "Duplicate {} alias '{}' detected",
+                label,
+                raw_key.trim()
+            )));
+        }
+        target.insert(canonical, value);
+        Ok(())
+    }
+
     if let Ok(map) = serde_yaml::from_str::<HashMap<String, T>>(trimmed) {
-        return Ok(map
-            .into_iter()
-            .map(|(k, v)| (k.to_lowercase(), v))
-            .collect());
+        let mut out = HashMap::new();
+        for (key, value) in map.into_iter() {
+            insert_alias(&mut out, &key, value, label)?;
+        }
+        return Ok(out);
     }
 
     if let Ok(map) = serde_yaml::from_str::<HashMap<String, String>>(trimmed) {
@@ -87,7 +112,7 @@ where
             let parsed = raw.parse::<T>().map_err(|err| {
                 ConfigError::ParseError(format!("Invalid {} '{}': {}", label, raw, err))
             })?;
-            out.insert(k.to_lowercase(), parsed);
+            insert_alias(&mut out, &k, parsed, label)?;
         }
         return Ok(out);
     }
@@ -110,7 +135,7 @@ where
         let parsed = target.trim().parse::<T>().map_err(|err| {
             ConfigError::ParseError(format!("Invalid {} '{}': {}", label, target.trim(), err))
         })?;
-        out.insert(alias.trim().to_lowercase(), parsed);
+        insert_alias(&mut out, alias, parsed, label)?;
     }
 
     if out.is_empty() {
@@ -232,6 +257,14 @@ pub fn update_config_field(
     project_prefix: Option<&str>,
 ) -> Result<ValidationResult, ConfigError> {
     let validator = ConfigValidator::new(tasks_dir);
+    let format_validation_errors = |result: &ValidationResult| -> String {
+        result
+            .errors
+            .iter()
+            .map(|err| err.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
 
     if let Some(project) = project_prefix {
         // Update project config
@@ -243,12 +276,7 @@ pub fn update_config_field(
 
         let validation = validator.validate_project_config(&project_config);
         if validation.has_errors() {
-            let summary = validation
-                .errors
-                .iter()
-                .map(|err| err.to_string())
-                .collect::<Vec<_>>()
-                .join("\n");
+            let summary = format_validation_errors(&validation);
             return Err(ConfigError::ParseError(format!(
                 "Validation failed for project field '{}':\n{}",
                 field, summary
@@ -256,7 +284,27 @@ pub fn update_config_field(
         }
 
         save_project_config(tasks_dir, project, &project_config)?;
-        Ok(validation)
+        let mut combined_validation = validation;
+
+        let resolved_snapshot = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))
+            .map_err(|e| {
+                ConfigError::ParseError(format!(
+                    "Failed to resolve configuration after updating '{}': {}",
+                    field, e
+                ))
+            })?;
+        let project_resolved =
+            crate::config::resolution::get_project_config(&resolved_snapshot, project, tasks_dir)?;
+        let resolved_validation = validator.validate_resolved_config(&project_resolved);
+        if resolved_validation.has_errors() {
+            let summary = format_validation_errors(&resolved_validation);
+            return Err(ConfigError::ParseError(format!(
+                "Resolved configuration invalid after updating project field '{}':\n{}",
+                field, summary
+            )));
+        }
+        combined_validation.merge(resolved_validation);
+        Ok(combined_validation)
     } else {
         // Update global config
         let mut global_config =
@@ -265,12 +313,7 @@ pub fn update_config_field(
 
         let validation = validator.validate_global_config(&global_config);
         if validation.has_errors() {
-            let summary = validation
-                .errors
-                .iter()
-                .map(|err| err.to_string())
-                .collect::<Vec<_>>()
-                .join("\n");
+            let summary = format_validation_errors(&validation);
             return Err(ConfigError::ParseError(format!(
                 "Validation failed for global field '{}':\n{}",
                 field, summary
@@ -278,7 +321,24 @@ pub fn update_config_field(
         }
 
         save_global_config(tasks_dir, &global_config)?;
-        Ok(validation)
+        let mut combined_validation = validation;
+        let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))
+            .map_err(|e| {
+                ConfigError::ParseError(format!(
+                    "Failed to resolve configuration after updating '{}': {}",
+                    field, e
+                ))
+            })?;
+        let resolved_validation = validator.validate_resolved_config(&resolved_config);
+        if resolved_validation.has_errors() {
+            let summary = format_validation_errors(&resolved_validation);
+            return Err(ConfigError::ParseError(format!(
+                "Resolved configuration invalid after updating global field '{}':\n{}",
+                field, summary
+            )));
+        }
+        combined_validation.merge(resolved_validation);
+        Ok(combined_validation)
     }
 }
 
@@ -1015,6 +1075,21 @@ mod tests {
             .expect("alias map should parse");
         assert!(parsed.contains_key("feat"));
         assert!(parsed.contains_key("bugfix"));
+    }
+
+    #[test]
+    fn parse_alias_map_rejects_duplicate_aliases() {
+        let raw = "feat=Feature,FEAT=Bug";
+        let err = parse_alias_map::<TaskType>(raw, "branch type alias")
+            .expect_err("duplicate aliases should error");
+        assert!(format!("{}", err).contains("Duplicate branch type alias"));
+    }
+
+    #[test]
+    fn parse_alias_map_rejects_empty_alias_keys() {
+        let err = parse_alias_map::<TaskType>("=Feature", "branch type alias")
+            .expect_err("empty alias should error");
+        assert!(format!("{}", err).contains("alias cannot be empty"));
     }
 
     #[test]

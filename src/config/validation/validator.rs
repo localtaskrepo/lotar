@@ -1,7 +1,7 @@
-use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig};
+use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField};
 use crate::config::validation::conflicts::PrefixConflictDetector;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 pub struct ConfigValidator {
@@ -103,6 +103,65 @@ impl ConfigValidator {
             self.validate_ticket_patterns(patterns, &mut result);
         }
 
+        if config.strict_members.unwrap_or(false)
+            && let Some(members) = &config.members
+            && !Self::members_list_has_entries(members)
+        {
+            result.add_error(
+                ValidationError::error(
+                    Some("members".to_string()),
+                    "strict_members is enabled but no members are configured".to_string(),
+                )
+                .with_fix("Add at least one member entry or disable strict_members".to_string()),
+            );
+        }
+
+        if let (Some(default_tags), Some(tags)) = (&config.default_tags, &config.tags) {
+            self.validate_default_tags_subset(
+                "default_tags",
+                default_tags,
+                tags,
+                "issue.tags",
+                &mut result,
+            );
+        }
+
+        if let (Some(aliases), Some(states)) = (&config.branch_status_aliases, &config.issue_states)
+        {
+            self.validate_alias_targets(
+                "branch_status_aliases",
+                "issue_states",
+                aliases,
+                &states.values,
+                |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+                &mut result,
+            );
+        }
+
+        if let (Some(aliases), Some(types)) = (&config.branch_type_aliases, &config.issue_types) {
+            self.validate_alias_targets(
+                "branch_type_aliases",
+                "issue_types",
+                aliases,
+                &types.values,
+                |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+                &mut result,
+            );
+        }
+
+        if let (Some(aliases), Some(priorities)) =
+            (&config.branch_priority_aliases, &config.issue_priorities)
+        {
+            self.validate_alias_targets(
+                "branch_priority_aliases",
+                "issue_priorities",
+                aliases,
+                &priorities.values,
+                |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+                &mut result,
+            );
+        }
+
         result
     }
 
@@ -163,6 +222,24 @@ impl ConfigValidator {
         self.warn_on_duplicate_values(
             "custom_fields",
             config.custom_fields.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+
+        if config.strict_members && !Self::members_list_has_entries(&config.members) {
+            result.add_error(
+                ValidationError::error(
+                    Some("members".to_string()),
+                    "strict_members is enabled globally but no members are configured".to_string(),
+                )
+                .with_fix("Add entries under members or disable strict_members".to_string()),
+            );
+        }
+
+        self.validate_default_tags_subset(
+            "default_tags",
+            &config.default_tags,
+            &config.tags,
+            "issue.tags",
             &mut result,
         );
 
@@ -236,6 +313,31 @@ impl ConfigValidator {
             );
         }
 
+        self.validate_alias_targets(
+            "branch_status_aliases",
+            "issue_states",
+            &config.branch_status_aliases,
+            &config.issue_states.values,
+            |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+            &mut result,
+        );
+        self.validate_alias_targets(
+            "branch_type_aliases",
+            "issue_types",
+            &config.branch_type_aliases,
+            &config.issue_types.values,
+            |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+            &mut result,
+        );
+        self.validate_alias_targets(
+            "branch_priority_aliases",
+            "issue_priorities",
+            &config.branch_priority_aliases,
+            &config.issue_priorities.values,
+            |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+            &mut result,
+        );
+
         // Validate scan.ticket_patterns (if present)
         if let Some(patterns) = &config.scan_ticket_patterns {
             self.warn_on_duplicate_values(
@@ -258,13 +360,81 @@ impl ConfigValidator {
 
         if !config.issue_states.values.is_empty()
             && let Some(default_status) = config.default_status.as_ref()
-            && !config.issue_states.values.contains(default_status)
+            && !config
+                .issue_states
+                .values
+                .iter()
+                .any(|state| state.eq_ignore_case(default_status.as_str()))
         {
-            result.add_error(ValidationError::error(
-                Some("default_status".to_string()),
-                "Resolved default status not found in resolved issue states".to_string(),
-            ));
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_status".to_string()),
+                    "Resolved default status not found in resolved issue states".to_string(),
+                )
+                .with_fix("Add the status to issue.states or adjust default_status".to_string()),
+            );
         }
+
+        if !config.issue_priorities.values.is_empty()
+            && !config
+                .issue_priorities
+                .values
+                .iter()
+                .any(|priority| priority.eq_ignore_case(config.default_priority.as_str()))
+        {
+            result.add_error(
+                ValidationError::warning(
+                    Some("default_priority".to_string()),
+                    "Resolved default priority not found in resolved issue priorities".to_string(),
+                )
+                .with_fix(
+                    "Add the priority to issue.priorities or pick a different default".to_string(),
+                ),
+            );
+        }
+
+        if config.strict_members && !Self::members_list_has_entries(&config.members) {
+            result.add_error(
+                ValidationError::error(
+                    Some("members".to_string()),
+                    "strict_members is enabled but no members remain after resolution".to_string(),
+                )
+                .with_fix("Add entries under members or disable strict_members".to_string()),
+            );
+        }
+
+        self.validate_default_tags_subset(
+            "default_tags",
+            &config.default_tags,
+            &config.tags,
+            "issue.tags",
+            &mut result,
+        );
+
+        self.validate_alias_targets(
+            "branch_status_aliases",
+            "issue_states",
+            &config.branch_status_aliases,
+            &config.issue_states.values,
+            |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+            &mut result,
+        );
+        self.validate_alias_targets(
+            "branch_type_aliases",
+            "issue_types",
+            &config.branch_type_aliases,
+            &config.issue_types.values,
+            |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+            &mut result,
+        );
+        self.validate_alias_targets(
+            "branch_priority_aliases",
+            "issue_priorities",
+            &config.branch_priority_aliases,
+            &config.issue_priorities.values,
+            |alias, allowed| alias.eq_ignore_case(allowed.as_str()),
+            &mut result,
+        );
 
         result
     }
@@ -551,6 +721,92 @@ impl ConfigValidator {
                 );
                 break;
             }
+        }
+    }
+
+    fn members_list_has_entries(values: &[String]) -> bool {
+        values.iter().any(|value| !value.trim().is_empty())
+    }
+
+    fn validate_default_tags_subset(
+        &self,
+        field_name: &str,
+        defaults: &[String],
+        allowed: &StringConfigField,
+        allowed_field_label: &str,
+        result: &mut ValidationResult,
+    ) {
+        if defaults.is_empty() || allowed.has_wildcard() {
+            return;
+        }
+
+        let mut invalid = Vec::new();
+        for tag in defaults {
+            let trimmed = tag.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            if !allowed
+                .values
+                .iter()
+                .any(|candidate| candidate.eq_ignore_ascii_case(trimmed))
+            {
+                invalid.push(trimmed.to_string());
+            }
+        }
+
+        if !invalid.is_empty() {
+            result.add_error(
+                ValidationError::error(
+                    Some(field_name.to_string()),
+                    format!(
+                        "{} contains values not present in {}: {}",
+                        field_name,
+                        allowed_field_label,
+                        invalid.join(", ")
+                    ),
+                )
+                .with_fix(format!(
+                    "Add the missing values to {} or remove them from {}",
+                    allowed_field_label, field_name
+                )),
+            );
+        }
+    }
+
+    fn validate_alias_targets<T, F>(
+        &self,
+        alias_field: &str,
+        allowed_field: &str,
+        aliases: &HashMap<String, T>,
+        allowed: &[T],
+        mut equals: F,
+        result: &mut ValidationResult,
+    ) where
+        T: std::fmt::Display,
+        F: FnMut(&T, &T) -> bool,
+    {
+        if aliases.is_empty() || allowed.is_empty() {
+            return;
+        }
+
+        for (alias, target) in aliases {
+            if allowed.iter().any(|candidate| equals(target, candidate)) {
+                continue;
+            }
+            result.add_error(
+                ValidationError::error(
+                    Some(alias_field.to_string()),
+                    format!(
+                        "Alias '{}' maps to '{}' which is not present in {}",
+                        alias, target, allowed_field
+                    ),
+                )
+                .with_fix(format!(
+                    "Add '{}' to {} or change the alias target",
+                    target, allowed_field
+                )),
+            );
         }
     }
 }

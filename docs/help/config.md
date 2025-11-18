@@ -198,6 +198,19 @@ lotar config init --project=TestProject --dry-run
 
 `lotar config validate` surfaces the complete error and warning sets for global and project scopes. The `--fix` flag is a placeholder today—the handler prints guidance but no automated rewrite occurs yet.
 
+Validation now enforces that defaults and branch alias maps reference values that exist in the corresponding `issue.*` lists. When a mismatch is detected the CLI prints a remediation hint with concrete commands so you can adjust the list or clear the offending aliases right away.
+
+Example:
+
+```bash
+lotar config validate --project=ENG
+ℹ️  Project Config (ENG) Validation Results:
+❌ branch_status_aliases: Unknown status alias target 'QA'
+ℹ️  Hint: realign aliases with `lotar config set branch_status_aliases 'qa:InProgress' --project=ENG` or clear them via `lotar config set branch_status_aliases '' --project=ENG`
+```
+
+Similar hints are emitted for `default.priority`/`issue.priorities` and `default.status`/`issue.states` mismatches to highlight either adjusting the allowed list (`lotar config set issue_priorities 'Low,Medium,High' --project=ENG`) or changing the default value.
+
 ### Configuration Copying
 Copy settings between projects while preserving unique identifiers:
 ```bash

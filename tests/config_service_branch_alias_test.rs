@@ -24,13 +24,20 @@ fn project_alias_identical_to_global_is_cleared() {
     let tasks_dir = ensure_tasks_dir(tmp.path());
     let resolver = resolver_for(&tasks_dir);
 
-    let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "TEST".to_string());
-    global_values.insert(
+    let mut base_values = BTreeMap::new();
+    base_values.insert("default_prefix".to_string(), "TEST".to_string());
+    base_values.insert(
+        "issue_priorities".to_string(),
+        "Low, Medium, High, Critical".to_string(),
+    );
+    ConfigService::set(&resolver, &base_values, true, None).expect("seed global config");
+
+    let mut alias_values = BTreeMap::new();
+    alias_values.insert(
         "branch_priority_aliases".to_string(),
         "{ feat: Critical }".to_string(),
     );
-    ConfigService::set(&resolver, &global_values, true, None).expect("set global config");
+    ConfigService::set(&resolver, &alias_values, true, None).expect("set global alias");
 
     let mut project_values = BTreeMap::new();
     project_values.insert(
@@ -50,13 +57,20 @@ fn project_alias_difference_is_persisted() {
     let tasks_dir = ensure_tasks_dir(tmp.path());
     let resolver = resolver_for(&tasks_dir);
 
-    let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "APP".to_string());
-    global_values.insert(
+    let mut base_values = BTreeMap::new();
+    base_values.insert("default_prefix".to_string(), "APP".to_string());
+    base_values.insert(
+        "issue_priorities".to_string(),
+        "Low, Medium, High, Critical".to_string(),
+    );
+    ConfigService::set(&resolver, &base_values, true, None).expect("seed global config");
+
+    let mut alias_values = BTreeMap::new();
+    alias_values.insert(
         "branch_priority_aliases".to_string(),
         "{ hotfix: Critical }".to_string(),
     );
-    ConfigService::set(&resolver, &global_values, true, None).expect("set global config");
+    ConfigService::set(&resolver, &alias_values, true, None).expect("set global alias");
 
     let mut project_values = BTreeMap::new();
     project_values.insert(

@@ -1,9 +1,32 @@
-use lotar::config::types::{ConfigurableField, GlobalConfig, ProjectConfig, StringConfigField};
+use lotar::config::types::{
+    ConfigurableField, GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField,
+};
 use lotar::config::validation::errors::{ValidationError, ValidationResult};
 use lotar::config::validation::{ConfigValidator, ValidationSeverity};
 use lotar::types::{Priority, TaskStatus, TaskType};
 use tempfile::TempDir;
 // No CLI invocations here; keep this module self-contained
+
+fn base_global_config() -> GlobalConfig {
+    GlobalConfig {
+        default_prefix: "TEST".to_string(),
+        ..GlobalConfig::default()
+    }
+}
+
+fn base_project_config() -> ProjectConfig {
+    let mut config = ProjectConfig::new("Test Project".to_string());
+    config.issue_states = Some(ConfigurableField {
+        values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
+    });
+    config.issue_types = Some(ConfigurableField {
+        values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
+    });
+    config.issue_priorities = Some(ConfigurableField {
+        values: vec![Priority::from("Low"), Priority::from("High")],
+    });
+    config
+}
 
 #[test]
 fn test_global_config_validation_valid() {
@@ -347,6 +370,166 @@ fn test_global_config_duplicate_entries_warning() {
         warning_messages
             .iter()
             .any(|msg| msg.contains("Duplicate value 'todo'"))
+    );
+}
+
+#[test]
+fn test_global_config_rejects_default_tags_outside_allowed_list() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut config = base_global_config();
+    config.tags = StringConfigField {
+        values: vec!["frontend".to_string(), "backend".to_string()],
+    };
+    config.default_tags = vec!["frontend".to_string(), "ops".to_string()];
+
+    let result = validator.validate_global_config(&config);
+    assert!(result.has_errors());
+    assert!(result.errors.iter().any(|err| {
+        err.message
+            .contains("default_tags contains values not present")
+    }));
+}
+
+#[test]
+fn test_project_config_rejects_default_tags_outside_override() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut config = base_project_config();
+    config.tags = Some(StringConfigField {
+        values: vec!["frontend".to_string()],
+    });
+    config.default_tags = Some(vec!["backend".to_string()]);
+
+    let result = validator.validate_project_config(&config);
+    assert!(result.has_errors());
+    assert!(result.errors.iter().any(|err| {
+        err.message
+            .contains("default_tags contains values not present")
+    }));
+}
+
+#[test]
+fn test_resolved_config_rejects_default_tags_outside_allowed_list() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut global = base_global_config();
+    global.tags = StringConfigField {
+        values: vec!["frontend".to_string()],
+    };
+    global.default_tags = vec!["frontend".to_string()];
+    let mut resolved = ResolvedConfig::from_global(global);
+    resolved.default_tags = vec!["ops".to_string()];
+
+    let result = validator.validate_resolved_config(&resolved);
+    assert!(result.has_errors());
+    assert!(result.errors.iter().any(|err| {
+        err.message
+            .contains("default_tags contains values not present")
+    }));
+}
+
+#[test]
+fn test_global_config_requires_members_when_strict() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut config = base_global_config();
+    config.strict_members = true;
+    config.members.clear();
+
+    let result = validator.validate_global_config(&config);
+    assert!(result.has_errors());
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.message.contains("strict_members is enabled globally"))
+    );
+}
+
+#[test]
+fn test_project_config_requires_members_when_strict_and_empty() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut config = base_project_config();
+    config.strict_members = Some(true);
+    config.members = Some(vec!["   ".to_string()]);
+
+    let result = validator.validate_project_config(&config);
+    assert!(result.has_errors());
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.message.contains("strict_members is enabled"))
+    );
+}
+
+#[test]
+fn test_resolved_config_requires_members_when_strict() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut resolved = ResolvedConfig::from_global(base_global_config());
+    resolved.strict_members = true;
+    resolved.members.clear();
+
+    let result = validator.validate_resolved_config(&resolved);
+    assert!(result.has_errors());
+    assert!(result.errors.iter().any(|err| {
+        err.message
+            .contains("strict_members is enabled but no members remain")
+    }));
+}
+
+#[test]
+fn test_global_config_alias_targets_must_exist() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut config = base_global_config();
+    config.issue_states = ConfigurableField {
+        values: vec![TaskStatus::from("Todo")],
+    };
+    let mut aliases = std::collections::HashMap::new();
+    aliases.insert("wip".to_string(), TaskStatus::from("InProgress"));
+    config.branch_status_aliases = aliases;
+
+    let result = validator.validate_global_config(&config);
+    assert!(result.has_errors());
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.message.contains("Alias 'wip' maps to 'InProgress'"))
+    );
+}
+
+#[test]
+fn test_resolved_config_alias_targets_must_exist() {
+    let temp_dir = TempDir::new().unwrap();
+    let validator = ConfigValidator::new(temp_dir.path());
+
+    let mut resolved = ResolvedConfig::from_global(base_global_config());
+    resolved.issue_types = ConfigurableField {
+        values: vec![TaskType::from("Feature")],
+    };
+    resolved
+        .branch_type_aliases
+        .insert("chore".to_string(), TaskType::from("Chore"));
+
+    let result = validator.validate_resolved_config(&resolved);
+    assert!(result.has_errors());
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.message.contains("Alias 'chore' maps to 'Chore'"))
     );
 }
 
