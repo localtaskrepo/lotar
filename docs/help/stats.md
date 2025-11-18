@@ -1,7 +1,7 @@
-````markdown
 # lotar stats
 
 Read-only analytics derived from git history (no git writes).
+
 
 Project scope defaults to the current project; use `--global` to span all projects.
 
@@ -15,18 +15,9 @@ lotar stats <SUBCOMMAND> [OPTIONS]
 
 Global flags available on all subcommands:
 
-Per-ticket timing:
-
-```bash
-lotar stats status <TASK_ID> --time-in-status [--since <when>] [--until <when>]
-```
-Notes:
-- `<TASK_ID>` can be full (e.g., AUTH-123) or numeric (e.g., 123) with project context.
-- Output mirrors the cross-ticket format but returns a single item for the specified task.
-- `--since <when>`: Start of window (e.g., `14d`, `2025-08-01`, `2025-08-01T10:00Z`)
-- `--until <when>`: End of window (defaults to now)
-- `--global`: Span all projects (default: current project only)
-- `--format json|text|markdown|table`: Output format
+- Standard CLI flags apply everywhere: `--project` (override auto-detected project), `--tasks-dir` (custom `.tasks` path), `--format` (text/table/json/markdown), and `--log-level` / `--verbose`.
+- Unless otherwise noted, `--global` is the stats-scoped flag that spans every project under `.tasks`. Without it the active project (auto-detected or supplied via `--project`) scopes the query.
+- Time windows (`--since`, `--until`, `--threshold`, etc.) accept RFC3339 timestamps (`2025-08-01T10:00Z`), ISO dates, or relative tokens like `14d`, `yesterday`, and weekday names. When both flags are omitted the commands default to `since = now - 30d` and `until = now`.
 
 ## Subcommands
 
@@ -53,12 +44,20 @@ Highest churn by ticket (commit count) in a window.
 lotar stats churn [--since <when>] [--until <when>] [--author <sub>] [--limit N] [--global]
 ```
 
+Options:
+- `--author <sub>`: Case-insensitive substring match on author name/email.
+- `--limit N`: Max items (default 20).
+
 ### authors
 Top authors by commits touching tasks in a window.
 
 ```bash
 lotar stats authors [--since <when>] [--until <when>] [--limit N] [--global]
 ```
+
+Notes:
+- `--limit N`: Defaults to 20.
+- Without `--since`/`--until`, the shared resolver uses the last 30 days.
 
 ### activity
 Grouped commit activity over time.
@@ -184,24 +183,11 @@ Compute time spent in each status for tasks within a window (derived from git hi
 ```bash
 lotar stats time-in-status [--since <when>] [--until <when>] [--limit N] [--global]
 ```
-### age
 
-Group tasks by age since creation as a snapshot, using day/week/month buckets.
-
-Usage:
-
-```
-lotar stats age [--distribution day|week|month] [--limit N] [--global]
-```
-
-Notes:
-- Uses each task's `created` timestamp. Bucketing is approximate for months (30 days).
-- Default distribution: day. Limit controls how many buckets are shown (newest first).
-
-```
 Defaults: `--limit 20`.
 
 Notes:
+- Window defaults to `--since now-30d` / `--until now` when omitted.
 - Uses commit timestamps and YAML snapshots at each commit to infer status durations.
 - Tolerates individual snapshot parse failures; durations are accumulated only when status is known.
 - Results are sorted by total seconds descending and limited by `--limit`.
@@ -230,14 +216,38 @@ Example JSON output (excerpt):
 }
 ```
 
+### status (per-ticket time in status)
+
+```bash
+lotar stats status <TASK_ID> --time-in-status [--since <when>] [--until <when>]
+```
+
+Notes:
+- `<TASK_ID>` accepts numeric IDs (resolved against the active project) or fully-qualified IDs such as `AUTH-123`.
+- `--time-in-status` is currently the only supported mode; the command errors with guidance if it is omitted.
+- Windows default to `--since now-30d` / `--until now` when the flags are not provided.
+- Output matches `time-in-status` but returns a single entry for the selected task and honors global CLI `--format` settings.
+
+### age
+
+Group tasks by age since creation as a snapshot, using day/week/month buckets.
+
+```bash
+lotar stats age [--distribution day|week|month] [--limit N] [--global]
+```
+
+Notes:
+- Uses each task's `created` timestamp. Bucketing is approximate for months (30 days).
+- Default distribution: day. Limit controls how many buckets are shown (newest first).
+
 ### effort
 
 Aggregate effort estimates across tasks (snapshot). Effort strings support h (hours), d (days=8h), w (weeks=40h).
 
 Options:
-- `--by <key>` grouping key. Built-ins: assignee, reporter, type, status, priority, project, tag. Declared custom fields are accepted directly (e.g., `--by sprint`). You can also use `field:<name>` explicitly.
+- `--by <key>` grouping key. Built-ins: assignee, reporter, type, status, priority, project, tag. Declared custom fields are accepted directly (e.g., `--by sprint`). You can also use `field:<name>` explicitly. Default: `assignee`.
 - `--where key=value` (repeatable) filters. Keys follow the same rules as `--by`. Tags accept `tag` or `tags`.
-- `--unit hours|days|weeks|points|auto` select output unit; auto picks hours if any present, else points.
+- `--unit hours|days|weeks|points|auto` select output unit; auto picks hours if any present, else points. Default: `hours`.
 - `--since <date>` / `--until <date>` window filters (RFC3339 or relative like `14d`, `yesterday`, weekday names).
 - `--transitions <STATUS>` include only tasks that transitioned into STATUS within the window (requires git).
   - Window semantics: a task is included if a commit inside [since, until] shows its status changed into STATUS. Commits outside the window are ignored for this filter.
@@ -275,6 +285,9 @@ By author:
 lotar stats comments-by-author [--limit N] [--global]
 ```
 
+Notes:
+- Both commands default to `--limit 20`; raise it for larger leaderboards.
+
 ### custom fields
 
 List most common custom field keys:
@@ -289,6 +302,9 @@ Distribution of values for a specific field:
 lotar stats custom-field --field <name> [--limit N] [--global]
 ```
 
+Notes:
+- `--limit` defaults to 20 on both custom field commands.
+
 ## JSON Output Examples
 
 Changed (excerpt):
@@ -301,7 +317,6 @@ Changed (excerpt):
   ]
 }
 ```
-
 Authors (excerpt):
 ```json
 {
@@ -328,5 +343,3 @@ Activity (excerpt):
 ## Notes
 - Outside a git repository, stats return an empty set with a warning/note.
 - Time parsing is shared across commands and accepts RFC3339, YYYY-MM-DD, and relative forms like `14d`, `yesterday`, weekday names, etc.
-
-````

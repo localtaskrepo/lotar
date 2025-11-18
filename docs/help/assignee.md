@@ -16,7 +16,7 @@ lotar assignee <TASK_ID> <NEW_ASSIGNEE>
 
 ```bash
 # Get current assignee
-lotar assignee AUTH-001
+lotar assignee 1
 
 # Set to yourself (resolved via identity detection)
 lotar assignee 42 @me
@@ -25,7 +25,7 @@ lotar assignee 42 @me
 lotar assignee 42 @john_doe --project=AUTH
 
 # JSON output for automation
-lotar assignee AUTH-001 jane@example.com --format=json
+lotar assignee 42 jane@example.com --format=json
 ```
 
 ## Accepted assignee formats
@@ -39,7 +39,8 @@ Use `lotar whoami --explain` to see how identity is resolved for @me.
 ## Task ID resolution
 
 - Full IDs like AUTH-123 are used as-is
-- Numeric IDs like 123 use the default project; override with `--project`
+- Numeric IDs like 123 are resolved against the auto-detected project (current repo or configured `default_project`)
+- Override the project with `--project` when multiple prefixes coexist or when the number alone would be ambiguous
 - If both the ID prefix and `--project` are given, they must refer to the same project
 
 ## JSON output shapes
@@ -58,7 +59,7 @@ When no assignee is set: `"assignee": null`.
 ```json
 {
   "status": "success",
-  "message": "Task AUTH-001 assignee updated",
+  "message": "Task AUTH-001 assignee changed from john.doe@example.com to jane@example.com",
   "task_id": "AUTH-001",
   "old_assignee": "john.doe@example.com",
   "new_assignee": "jane@example.com"

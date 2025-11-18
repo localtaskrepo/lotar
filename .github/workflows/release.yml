@@ -378,19 +378,9 @@ jobs:
             mallox/lotar:latest
             mallox/lotar:${{ steps.release_meta.outputs.version }}
 
-      - name: Update Docker Hub description
-        if: success()
-        uses: peter-evans/dockerhub-description@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          repository: mallox/lotar
-          short-description: LoTaR CLI packaged for containers
-          readme-filepath: docs/docker/README.md
-
   update-homebrew-tap:
     name: Update Homebrew Tap
-    needs: publish-docker-image
+    needs: update-release-page
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -11,15 +11,18 @@ lotar config <ACTION> [OPTIONS]
 ## Actions
 
 ### show
-Display current configuration.
+Display the effective configuration for the global scope (default) or a specific project.
 
 ```bash
-lotar config show [--project=PROJECT] [--explain] [--full]
+lotar config show [--project=PREFIX_OR_NAME] [--explain] [--full]
 ```
 Options:
-- `--explain` — Annotate where values come from (env, home, global, project, default).
- - When `--format=json` is used, an additional structured explanation object is emitted with a `sources` map per key.
-- `--full` — Emit the entire effective configuration (canonical YAML by default, JSON payload when `--format=json`).
+- `--project` — Accepts a project prefix, project directory, or friendly name. If omitted, the command shows the merged global configuration and honors the CLI-wide `--project` flag when present.
+- `--explain` — For text output, annotate each key with inline comments showing whether the value came from env, home, global, or project configuration. JSON output always includes a `sources` map regardless of this flag.
+- `--full` — Emit the entire effective configuration (canonical YAML by default, JSON payload when `--format=json`). Without `--full`, only non-default values from the allowed sources are shown.
+
+Notes:
+- The handler always prints the resolved tasks directory path so you can confirm discovery.
 
 ### init
 Initialize project configuration from template with advanced options.
@@ -29,12 +32,28 @@ lotar config init [--project=PROJECT] [--template=TEMPLATE] [--prefix=PREFIX]
                   [--copy-from=SOURCE_PROJECT] [--global] [--dry-run] [--force]
 ```
 
+Options:
+- `--template` — Defaults to `default`. Valid templates are `default`, `agile`, and `kanban` (see `lotar config templates`).
+- `--project` — Human-readable project name stored at `project.name`. When omitted, templates keep their placeholder and the folder prefix becomes the identifier.
+- `--prefix` — Explicit project prefix (e.g., `WEB`). The handler validates collisions before writing. Without it, a unique prefix is auto-generated from the project name.
+- `--copy-from` — Merge settings from an existing project before canonicalizing the template. Pass the project prefix/directory name (the handler reads `.tasks/<PREFIX>/config.yml`).
+- `--global` — Initialize `.tasks/config.yml` instead of a project directory.
+- `--dry-run` — Preview the prefix, target path, and any conflicts without writing files.
+- `--force` — Overwrite existing config files (required if the target already exists).
+
 ### set
 Set configuration values with validation and conflict detection.
 
 ```bash
-lotar config set <KEY> <VALUE> [--project=PROJECT] [--global] [--dry-run] [--force]
+lotar config set <KEY> <VALUE> [--global] [--dry-run] [--force]
 ```
+
+Details:
+- Use dotted canonical keys such as `server.port` or `issue.tags`. Arrays/maps should be supplied as JSON strings (see examples below).
+- Project scope is chosen via the CLI-wide `--project` flag or the configured `default.project`. Pass `--global` to edit `.tasks/config.yml` instead.
+- `--dry-run` shows the pending change, runs conflict detection, and exits without editing files.
+- `--force` applies the change even when conflict detection finds issues. Validation errors (wrong field name/value) will still abort.
+- Fields that only make sense globally (`server.port`, `default_prefix`, `default_project`) are automatically treated as global even if `--global` is not passed.
 
 ### templates
 List available configuration templates.
@@ -43,12 +62,20 @@ List available configuration templates.
 lotar config templates
 ```
 
+Prints the three built-in templates (`default`, `agile`, `kanban`) with short summaries so you can choose a name for `lotar config init --template=<name>`.
+
 ### validate
 Validate configuration files for errors and warnings.
 
 ```bash
-lotar config validate [--project=PROJECT] [--global] [--fix] [--errors-only]
+lotar config validate [--project=PREFIX] [--global] [--fix] [--errors-only]
 ```
+
+Behavior:
+- With no flags, only the global configuration is validated. Pass `--project=PREFIX` to check a specific project directory, or combine `--global` and `--project` to validate both scopes in one run.
+- `--project` expects the canonical project prefix/folder name.
+- `--errors-only` limits the report to validation errors (warnings stay hidden unless a JSON format consumer inspects them separately).
+- `--fix` is reserved for future automated remediation. Today it only prints guidance when errors are present—you must still edit files manually.
 
 ### normalize
 Rewrite config files into the canonical nested YAML form (supports dotted keys on input).
@@ -57,8 +84,10 @@ Rewrite config files into the canonical nested YAML form (supports dotted keys o
 lotar config normalize [--global] [--project=PREFIX] [--write]
 ```
 Options:
-- Without --write, prints the normalized form (dry-run) and does not modify files.
-- When no scope is provided, normalizes the global config and all project configs.
+- Without `--write`, prints the canonical YAML for each target and leaves files untouched.
+- With `--write`, rewrites every targeted config and reports how many files changed.
+- `--project` expects the project prefix/directory name. When omitted (and `--global` is also omitted) the command normalizes the global config plus every project directory that already contains a config file.
+- Passing `--global` alone only touches `.tasks/config.yml` if it exists.
 
 ## Examples
 
@@ -66,7 +95,7 @@ Options:
 # Show global configuration
 lotar config show
 
-# Show project-specific configuration
+# Show project-specific configuration (prefix or friendly name)
 lotar config show --project=backend
 
 # Show the full effective configuration in canonical YAML
@@ -84,14 +113,14 @@ lotar config init --project=my-awesome-project --template=default --dry-run
 # Initialize with custom prefix
 lotar config init --project="Long Project Name" --prefix=LPN --template=kanban
 
-# Copy configuration from another project
-lotar config init --project=frontend --copy-from=backend --template=agile
+# Copy configuration from another project (use its prefix)
+lotar config init --project=frontend --copy-from=BACK --template=agile
 
 # Force overwrite existing configuration
 lotar config init --project=backend --template=default --force
 
-# Set configuration with validation preview (use dotted canonical keys)
-lotar config set default.priority HIGH --project=backend --dry-run
+# Set a project-level value with validation preview (use dotted canonical keys and the global --project flag)
+lotar --project=BACK config set default.priority HIGH --dry-run
 
 # Set global configuration (server port)
 lotar config set server.port 9000 --global
@@ -110,14 +139,14 @@ lotar config templates
 # Validate global configuration
 lotar config validate --global
 
-# Validate specific project configuration
-lotar config validate --project=backend
+# Validate specific project configuration (pass the prefix)
+lotar config validate --project=BACK
 
 # Show only errors, not warnings
 lotar config validate --global --errors-only
 
-# Validate and attempt auto-fixes
-lotar config validate --project=my-project --fix
+# Request fix suggestions (currently prints guidance only)
+lotar config validate --project=DEMO --fix
 
 # Preview canonical nested config for all files (no writes)
 lotar config normalize
@@ -143,7 +172,7 @@ Notes:
  - Identity resolution uses the merged configuration from this precedence chain.
 
 ### Canonical YAML shape
-LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to a nested structure with these groups: server, default, issue, custom, scan, auto. Use `lotar config normalize` to rewrite files into this canonical form.
+LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to sections such as server, default, project, members, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.
 
 - When a config file only uses built-in defaults the canonical writer produces a short comment instead of redundant YAML. Modify a value (for example `lotar config set server.port 9000 --global`) and rerun `lotar config normalize --write` to emit the corresponding section.
 - Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).
@@ -165,10 +194,9 @@ lotar config init --project=TestProject --dry-run
 ```
 
 ### Validation & Conflict Detection
-The system checks for conflicts when changing configurations:
-- Validates existing tasks against new config rules
-- Warns about potential breaking changes
-- Use `--force` to override validation warnings
+`lotar config set --dry-run` runs the same validation pipeline as a real write, including conflict detection against existing tasks. If the preview reports problems you can either fix the underlying data or re-run with `--force` to apply anyway (schema/type validation still runs and may block the change).
+
+`lotar config validate` surfaces the complete error and warning sets for global and project scopes. The `--fix` flag is a placeholder today—the handler prints guidance but no automated rewrite occurs yet.
 
 ### Configuration Copying
 Copy settings between projects while preserving unique identifiers:
@@ -280,6 +308,7 @@ branch:
 
 ## Global Options
 
+- `--project <PREFIX_OR_NAME>` - Override auto-detected project for any config subcommand (same resolution rules as `lotar config show --project`).
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)

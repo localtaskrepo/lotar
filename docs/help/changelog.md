@@ -22,7 +22,7 @@ lotar --format json changelog
   "status": "ok",
   "action": "changelog",
   "mode": "working",
-  "count": 2,
+  "count": 1,
   "items": [
     {
       "id": "AUTH-1",

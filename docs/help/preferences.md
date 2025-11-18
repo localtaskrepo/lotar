@@ -2,15 +2,16 @@
 
 Personalize the LoTaR web experience and reset per-browser state without touching your repository files.
 
+
 ## Access
 
-Open the Preferences view from the main navigation (top-right menu). All settings are stored in the browser (localStorage or sessionStorage) and apply only to the current machine and browser profile.
+Open the Preferences view from the main navigation (top-right menu). All settings live in the browser (`localStorage` or `sessionStorage`) and apply only to the current machine and browser profile—`view/pages/Preferences.vue` never touches your repo files.
 
 ## Theme Controls
 
 - **System** — Follow the operating system appearance (light/dark).
 - **Light / Dark** — Force a specific theme regardless of the OS.
-- Theme choices update instantly and persist between sessions.
+- Theme choices update instantly and persist between sessions (`localStorage` key `lotar.theme`, handled in `view/utils/theme.ts`).
 - Browser chrome (`<meta name="theme-color">`) stays in sync so the mobile/desktop address bar tint matches the active theme.
 
 ## Accent Color
@@ -24,7 +25,7 @@ Accent choices are stored in `localStorage` (`lotar.accent`). Disable the toggle
 
 ## Table Layout Reset
 
-Use **Reset saved columns and sorting** to clear TaskTable preferences stored per project (removes keys that start with `lotar.taskTable.columns*` and `lotar.taskTable.sort*`). This is helpful if columns were hidden accidentally or you want to revert to defaults.
+Use **Reset saved columns and sorting** to clear TaskTable preferences stored per project. The handler walks through `localStorage` and removes keys that start with `lotar.taskTable.columns` or `lotar.taskTable.sort`, matching the persistence logic in `view/composables/useTaskTableState.ts`.
 
 ## Filter Reset
 
@@ -38,10 +39,10 @@ Select **Clear last used filter** to remove the saved filter state for the Tasks
 
 ## Related CLI Options
 
-The serve command now supports both `--port` and the short `-p` flag for quickly changing the web server port:
+Use `lotar serve` to launch the web UI. The subcommand exposes a long `--port` flag (default 8080) plus the global `--project` flag (`-p`) shared with every CLI command:
 
 ```bash
-lotar serve -p 3090 --host=0.0.0.0
+lotar serve --port=3090 --host=0.0.0.0 --project=AUTH --tasks-dir=/work/.tasks
 ```
 
-Use the long `--project` flag alongside serve when you need to point LoTaR at a specific project, since `-p` is reserved for the port in this context.
+The `lotar serve` command intentionally omits a short `-p` for port because `-p` is reserved for the global project flag. Pass `--tasks-dir` or other global flags the same way—whatever context you pick for the CLI is what the browser UI will read.

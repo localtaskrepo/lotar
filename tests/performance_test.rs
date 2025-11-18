@@ -495,7 +495,7 @@ mod experimental_features {
             .arg("help")
             .assert()
             .success()
-            .stdout(predicate::str::contains("Commands"));
+            .stdout(predicate::str::contains("LoTaR Overview"));
 
         // Test edge cases in command parsing
         let mut cmd = crate::common::lotar_cmd().unwrap();

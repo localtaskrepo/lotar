@@ -1,32 +1,70 @@
 # LoTaR Documentation
 
-## Project Status - August 2025
+## Project Status - November 2025
 
 LoTaR is an actively developed task management tool with a CLI, web server, and source code integration. It includes a comprehensive test suite and aims for stable, predictable behavior.
 
 ## Quick Start
 
+### 1. Install the CLI
+
+**Homebrew (macOS)**
 ```bash
-# Install and build
+brew tap localtaskrepo/lotar
+brew install lotar
+lotar --version
+```
+
+**GitHub Releases (macOS • Linux • Windows)**
+```bash
+# Download the asset for your platform from the Releases page
+curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-musl-x64.tar.gz
+curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-musl-x64.tar.gz.sha256
+sha256sum --check lotar-vX.Y.Z-linux-musl-x64.tar.gz.sha256
+tar -xzf lotar-vX.Y.Z-linux-musl-x64.tar.gz
+sudo mv lotar /usr/local/bin/
+lotar --version
+```
+
+**Docker (macOS • Linux • Windows)**
+```bash
+docker pull mallox/lotar
+docker run --rm mallox/lotar --version
+```
+
+**Build from source (Rust + Node)**
+```bash
 git clone https://github.com/mallox/lotar
 cd lotar
-
-# Build web UI (Vue + Vite) into target/web and the Rust binary
-npm install
-npm run build
-
-# Create your first task
-lotar add "Setup project" --project=myapp --priority=HIGH
-
-# List tasks
-lotar list --project=myapp
-
-# Start web interface (serves static assets from target/web)
-lotar serve -p 8080
-
-# Scan source code for TODOs
-lotar scan ./src
+npm ci
+npm run build:web   # build Vue UI once
+cargo build --release
+export PATH="$PATH:$(pwd)/target/release"
 ```
+
+### 2. Point LoTaR at your repo
+- Homebrew/source install: run LoTaR commands from inside your repository (`cd path/to/repo`).
+- Docker: mount your repo to `/workspace` and your `.tasks` directory to `/tasks`:
+
+```bash
+docker run --rm \
+    -v "$PWD":/workspace \
+    -v "$PWD/.tasks":/tasks \
+    -w /workspace \
+    mallox/lotar list
+```
+
+### 3. Create and track work
+
+```bash
+lotar add "Setup project" --project=myapp --priority=HIGH
+lotar list --project=myapp --format=table
+lotar status 1 in_progress
+lotar serve --open  # launches the web UI locally
+lotar scan ./src    # optional: capture TODOs
+```
+
+> Numeric-only task references work whenever LoTaR auto-detects your single project or you set `lotar config set default_project`. Use fully-qualified IDs (`MYAP-12`) or `--project` when multiple prefixes coexist.
 
 ## Core Features
 

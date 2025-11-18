@@ -24,17 +24,21 @@ Examples
 
 ```bash
 # Show current effort
-lotar effort PROJ-12
+lotar effort 12
 
 # Set effort using time
-lotar effort PROJ-12 2d
+lotar effort 12 2d
 
 # Set effort using points
-lotar effort PROJ-12 5
+lotar effort 12 5
 
 # Clear effort
-lotar effort PROJ-12 --clear
+lotar effort 12 --clear
 
 # Preview (no write)
-lotar effort PROJ-12 1w --dry-run --explain
+lotar effort 12 1w --dry-run --explain
 ```
+
+Notes:
+- Numeric IDs use the current repo or configured `default_project`; supply `--project` or a fully-qualified ID when multiple prefixes coexist.
+- New effort values are normalized before saving (e.g., `1d` -> `8.00h`).

@@ -23,24 +23,24 @@ lotar task comment <TASK_ID> [TEXT]
 
 ```bash
 # Positional text
-lotar comment AUTH-1 "Investigated and will fix tomorrow"
+lotar comment 1 "Investigated and will fix tomorrow"
 
 # Message flag (shell-safe)
-lotar comment AUTH-1 -m "Re-tested with latest build; still failing"
+lotar comment 1 -m "Re-tested with latest build; still failing"
 
 # From file
-lotar comment AUTH-1 -F notes/update.txt
+lotar comment 1 -F notes/update.txt
 
 # From stdin (multiline)
-printf "Line 1\nLine 2\n" | lotar comment AUTH-1
+printf "Line 1\nLine 2\n" | lotar comment 1
 
 # JSON output
-lotar --format json comment AUTH-1 -m "First note"
+lotar --format json comment 1 -m "First note"
 
 # List existing comments (no text provided)
-lotar comment AUTH-1
-lotar --format json comment AUTH-1
-lotar task comment AUTH-1
+lotar comment 1
+lotar --format json comment 1
+lotar task comment 1
 ```
 
 Example JSON response:
@@ -72,4 +72,4 @@ Example JSON list response (when no text is provided):
 
 - Author attribution isn’t stored in the comment; use git blame/history to see who added or changed comments.
 - Each comment stores a UTC timestamp (RFC3339) and the text.
-- Project context can be inferred from the ID prefix (e.g., AUTH-1), the current repo, or set via `--project`.
+- Project context is inferred from the numeric ID using your current repo (or configured `default_project`). Pass a fully-qualified ID (`AUTH-1`) or `--project` when multiple prefixes exist.

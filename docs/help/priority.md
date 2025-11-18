@@ -12,6 +12,11 @@ lotar priority <TASK_ID>
 lotar priority <TASK_ID> <NEW_PRIORITY>
 ```
 
+Flags:
+- `--project <PREFIX>` / `-p <PREFIX>` — Override project auto-detection. Required when using numeric IDs outside the default project.
+- `--format <FORMAT>` — Same renderer options as other commands (text, json, table, markdown).
+- `--tasks-dir <PATH>` — Execute against an alternate `.tasks` workspace.
+
 ## Notes
 
 - If the task ID includes a project prefix (e.g., FOO-123) and you also pass --project, they must refer to the same project; otherwise the command errors with a Project mismatch message.
@@ -20,16 +25,18 @@ lotar priority <TASK_ID> <NEW_PRIORITY>
 
 ```bash
 # View current priority
-lotar priority AUTH-001
+lotar priority 1
 
 # Change priority to high
-lotar priority AUTH-001 high
+lotar priority 1 high
 
 # With explicit project
 lotar priority 123 critical --project=backend
 
 # JSON output for automation
-lotar priority AUTH-001 low --format=json
+lotar priority 1 low --format=json
+
+JSON payloads include `status`, `action`, `task_id`, and the before/after values. When the requested priority matches the current value the command returns a `noop` record instead of writing.
 ```
 
 ## Priority Values
@@ -43,8 +50,14 @@ Available priorities depend on your project configuration. Common defaults:
 
 Check your project's valid priorities:
 ```bash
-lotar config show priorities
+lotar config show --project=backend --format=json | jq -r '.data.issue.priorities[]'
 ```
+
+## Task ID resolution
+
+- Numeric IDs rely on the auto-detected project (current repo or configured `default_project`).
+- Supply `--project` or use the fully-qualified ID when multiple prefixes coexist.
+- If both a prefixed ID and `--project` are provided they must reference the same project.
 
 ## Project Integration
 

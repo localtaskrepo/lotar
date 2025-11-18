@@ -1,6 +1,7 @@
 # lotar status
 
-Change task status with validation and different output formats.
+Change or inspect a task's status with validation, dry-run previews, and optional auto-assignment when nobody owns the task yet.
+
 
 ## Usage
 
@@ -8,237 +9,164 @@ Change task status with validation and different output formats.
 lotar status <TASK_ID> [<NEW_STATUS>] [--dry-run] [--explain]
 ```
 
+- Omit `<NEW_STATUS>` to show the current value (the handler switches to `TaskCommandContext::new_read_only` and emits `render_property_current`).
+- `lotar task status <TASK_ID> <NEW_STATUS>` reuses the same handler but always requires the new value.
+
 ## Quick Examples
 
 ```bash
-# Basic status change
-lotar status AUTH-001 in_progress
+# Show current status
+lotar status 42
 
-# With explicit project
+# Change the status
+lotar status 42 in_progress
+
+# Explicit project (global flag shared by all commands)
 lotar status 123 verify --project=backend
 
 # JSON output for automation
-lotar status AUTH-001 done --format=json
+lotar status AUTH-7 done --format=json
 
-# Custom tasks directory
-lotar status AUTH-001 done --tasks-dir=/custom/path
+# Custom tasks directory (matches TasksDirectoryResolver precedence)
+lotar status 7 done --tasks-dir=/workspace/.tasks
+export LOTAR_TASKS_DIR=/project/.tasks && lotar status 1 in_progress
 
-# Environment variable usage
-export LOTAR_TASKS_DIR=/project/tasks
-lotar status AUTH-001 in_progress  # Uses environment directory
-
-# Preview without writing and explain resolution
-lotar status AUTH-001 done --dry-run --explain
+# Preview with diagnostics
+lotar status 42 done --dry-run --explain
 ```
 
-## Status Values
+## Flags and global options
 
-Available statuses depend on your project configuration. Common defaults:
+- `-n, --dry-run` - Preview the change without writing files. Only useful when `<NEW_STATUS>` is provided.
+- `-e, --explain` - Adds an explanation block to the dry-run preview (currently ignored without `--dry-run`).
+- `-p, --project` - Override project detection. Accepts either a prefix (AUTH) or the human-readable project name.
+- `--tasks-dir` - Override the workspace path. Shares precedence with `LOTAR_TASKS_DIR` and config defaults (see `docs/help/precedence.md`).
+- `-f, --format` - `text` or `json`. `table`, `markdown`, and `md` are aliases for `text`; `jsonl` and `ndjson` alias to `json`.
+- `-l, --log-level` - Set verbosity (`error`, `warn`, `info`, `debug`, `trace`). `--verbose` is still accepted and simply maps to `--log-level=info`.
 
-- `todo` - Task is planned but not started
-- `in_progress` - Task is currently being worked on  
-- `verify` - Task completed, awaiting verification/review
-- `blocked` - Task cannot proceed due to dependency
-- `done` - Task is completed and verified
+## Reading the current status
 
-Check your project's valid statuses:
-```bash
-# Human-readable
-lotar config show --project=backend
+With no `<NEW_STATUS>` the command loads the task in read-only mode and emits a `PropertyCurrent` payload:
 
-# JSON + jq
-lotar config show --project=backend --format=json | jq -r '.data.issue.states[]'
+```
+Task AUTH-42 status: InProgress
 ```
 
-## Task ID Resolution
+JSON output is structured for automation:
 
-LoTaR intelligently resolves task IDs:
-
-### Full Task ID
-```bash
-lotar status AUTH-001 done  # Complete project-prefixed ID
-```
-
-### Short Task ID
-```bash
-lotar status 001 done       # Auto-resolves to current project
-lotar status 123 done --project=backend  # Explicit project context
-```
-
-### Project Auto-Detection
-1. **Current directory**: If in a project directory
-2. **Default project**: From global configuration
-3. **Task ID prefix**: Extracts project from AUTH-001 format
-4. **Explicit project**: Using `--project` flag
-
-## Global Options
-
-- `--format <FORMAT>` - Output format: text, table, json, markdown
-- `--verbose` - Enable verbose output  
-- `--project <PROJECT>` - Specify project context (overrides auto-detection)
-- `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)
-
-## Environment Variables
-
-- `LOTAR_TASKS_DIR` - Default tasks directory location
-
-## Output Formats
-
-### Text (Default)
-Human-readable confirmation:
-```
-✅ Task AUTH-001 status changed from TODO to IN_PROGRESS
-```
-
-### JSON
-Machine-readable for scripts:
 ```json
 {
   "status": "success",
-  "message": "Task AUTH-001 status changed from TODO to IN_PROGRESS",
-  "task_id": "AUTH-001",
-  "old_status": "TODO",
-  "new_status": "IN_PROGRESS",
-  "assignee": "john.doe" // optional
+  "task_id": "AUTH-42",
+  "status_value": "InProgress"
 }
 ```
 
-Dry-run preview in JSON:
+## Changing a status
+
+Changing a status follows these stages:
+
+1. Resolve the workspace/project and load the task.
+2. Validate `<NEW_STATUS>` against the merged `issue_states` from config.
+3. Detect no-op transitions and report when the status already matches.
+4. Decide whether auto-assign should add an owner (when enabled) by checking CODEOWNERS defaults first and then falling back to identity resolution (the same order `@me` uses).
+5. If `--dry-run` is present, emit the preview (and optional explanation) and exit without touching disk.
+6. Otherwise write the updated status, optionally set the assignee, save the task file, and print the result.
+
+The `lotar task status` alias builds the same arguments and reuses this workflow.
+
+## Status values
+
+Each project controls allowed statuses via `issue_states` and `default_status` in `.tasks/<PROJECT>/config.yml`. Common defaults:
+
+- `todo` - planned work
+- `in_progress` - actively being developed
+- `verify` - undergoing review or QA
+- `blocked` - waiting on a dependency
+- `done` - complete and verified
+
+List the effective values for a project:
+
+```bash
+lotar config show --project=backend
+lotar config show --project=backend --format=json | jq -r '.data.issue_states[]'
+```
+
+## Task ID and project resolution
+
+Project detection runs in this order:
+
+1. Explicit `--project` flag (prefix or full name).
+2. Prefix embedded in `TASK_ID` (e.g., AUTH-123).
+3. `default_project` from merged config.
+4. Auto-detected prefix generated from the repo/workspace name when no default exists yet.
+
+Numeric IDs (for example `123`) are expanded with the chosen prefix (AUTH-123). If no prefix can be deduced the command errors and asks for `--project`.
+
+## Output formats
+
+### Text (default)
+
+```
+Task AUTH-7 status changed from Todo to InProgress
+Task AUTH-7 already has status 'InProgress'
+```
+
+### JSON
+
 ```json
 {
-  "status": "preview",
-  "old_status": "TODO",
-  "new_status": "IN_PROGRESS",
-  "would_set_assignee": "john.doe", // optional
-  "explain": "status validated against project config; auto-assign uses default_reporter→git user.name/email→system username."
+  "status": "success",
+  "message": "Task AUTH-7 status changed from Todo to InProgress",
+  "task_id": "AUTH-7",
+  "old_status": "Todo",
+  "new_status": "InProgress",
+  "assignee": "jane.doe"
 }
 ```
 
-### Table  
-Structured update information:
+Dry-run previews emit `status: "preview"`, a `status_change` action name, `old_status`, `new_status`, and any `would_set_assignee` or `explain` strings.
+
+## Dry-run and explain
+
+`--dry-run` (with optional `--explain`) shows exactly what would happen without writing:
+
 ```
-| Property    | Value       |
-|-------------|-------------|
-| New Status  | IN_PROGRESS |
-| Changed By  | john.doe    |
-| Timestamp   | 10:30 AM    |
-```
-
-## Validation
-
-### Status Validation
-- New status must be in project's `issue_states` list
-- Invalid statuses are rejected with helpful error messages
-
-### Transition Rules
-Future enhancement: Validate allowed transitions
-```yaml
-# transitions.yml (planned)
-transitions:
-  TODO: [IN_PROGRESS, BLOCKED]
-  IN_PROGRESS: [VERIFY, BLOCKED, TODO]  
-  VERIFY: [DONE, IN_PROGRESS]
+DRY RUN: Would change AUTH-7 status from Todo to InProgress; would set assignee = jane.doe
+Explanation: status validated against project config; auto-assign uses CODEOWNERS default when enabled, otherwise default_reporter→git user.name/email→system username.
 ```
 
-### Auto-Assign on Status Change
-- If `auto.assign_on_status: true` and the task has no assignee, LoTaR auto-assigns an owner on the first change away from the default status.
-- Assignment order:
-  1) If `auto.codeowners_assign: true` and a CODEOWNERS file exists in the repo, a default owner defined there (e.g., a `* @owner` catch‑all) is used when present.
-  2) Fallback to the resolved current user: `default_reporter` from config → git user.name/email → system username.
- - If you pass `--assignee=@me` via CLI (where supported) or patch `assignee: "@me"` over REST/MCP, `@me` resolves using the same identity rules.
- - REST note: the `/api/tasks/update` endpoint ignores the `status` field; status transitions are driven via CLI, but the same first-change auto-assign semantics apply in services when status is changed through supported channels.
+JSON mode includes the same properties plus the explanation string.
 
-### Planning and diagnostics
-- `--dry-run` previews changes without saving.
-- `--explain` shows how the new status was validated and how the assignee would be resolved.
- - See also: [Resolution & Precedence](./precedence.md).
+## Auto-assign semantics
 
-## Error Handling
+- Guarded by `auto.assign_on_status` (true by default, override via config or `LOTAR_AUTO_ASSIGN_ON_STATUS`).
+- CLI path requires the task to be unassigned, the status to actually change, and the previous status to equal the configured default, ensuring the first move away from the default lane assigns an owner.
+- When triggered, the candidate list checks for a CODEOWNERS default (when `auto.codeowners_assign` is true) before falling back to the standard identity chain documented in `docs/help/precedence.md`.
+- REST/MCP updates use the same toggles but simply check whether the task was unassigned and the status changed.
+- `@me` placeholders on other commands resolve to the same identity before comparisons happen.
 
-### Common Errors
+## Validation and diagnostics
 
-**Task Not Found:**
+- `CliValidator` normalizes case/whitespace and ensures the status exists in the config list.
+- `TaskCommandContext` reports detailed errors for missing workspaces, invalid IDs, or unresolved projects.
+- Combine `--dry-run` and `--explain` to see which config/identity source was used before committing.
+- Set `LOTAR_DEBUG=1` for extra resolver logs when troubleshooting precedence or identity issues.
+
+## Error handling
+
+Examples:
+
 ```
-❌ Task 'AUTH-999' not found in project 'auth'
-```
-
-**Invalid Status:**
-```
-❌ Status validation failed: 'invalid_status' is not in allowed values: [TODO, IN_PROGRESS, VERIFY, DONE]
-```
-
-**Project Resolution Failed:**
-```
-❌ Could not resolve project: No project found for task ID '123'
+Status validation failed: 'invalid_status' is not in allowed values: [Todo, InProgress, Verify, Done]
+Task 'AUTH-999' not found in project 'auth'
+Could not resolve project: No project found for task ID '123'
+Failed to edit task 'AUTH-7': <filesystem error message>
 ```
 
-## Automation Examples
+JSON mode surfaces the same messages under the `message` field.
 
-### CI/CD Integration
-```bash
-# Mark tasks as done when PR merges
-lotar status $(git log --oneline -1 | grep -o 'AUTH-[0-9]*') done --format=json
+## Environment variables
 
-# Bulk status updates
-cat task_ids.txt | xargs -I {} lotar status {} in_progress
-```
-
-### Workflow Scripts
-```bash
-#!/bin/bash
-# Deploy script that updates task status
-TASK_ID=$1
-lotar status $TASK_ID verify --format=json > /tmp/status_change.json
-if [ $? -eq 0 ]; then
-    echo "✅ Task $TASK_ID ready for verification"
-    # Notify team, update external systems, etc.
-fi
-```
-
-### Batch Operations
-```bash
-# Move all TODO tasks assigned to john to IN_PROGRESS
-lotar list --assignee=john.doe --status=todo --format=json | \
-jq -r '.[] | .id' | \
-xargs -I {} lotar status {} in_progress
-```
-
-## Integration with External Tools
-
-### Jira/GitHub Issues
-```bash
-# Sync status to external system
-TASK_ID="AUTH-001"
-NEW_STATUS="done"
-lotar status $TASK_ID $NEW_STATUS --format=json > /tmp/change.json
-
-# Extract and sync to external system
-EXTERNAL_ID=$(lotar config show --project=AUTH --format=json | jq -r '.data.custom.fields.jira_id')
-## Notes
-
-- If the task ID includes a project prefix (e.g., FOO-123) and you also pass --project, they must refer to the same project; otherwise the command errors with a Project mismatch message.
-curl -X PUT "https://api.jira.com/issue/$EXTERNAL_ID" \
-     -d '{"fields": {"status": "Done"}}'
-```
-
-### Slack Notifications
-```bash
-# Notify team when critical tasks change status
-if lotar status AUTH-001 done --format=json | jq -e '.priority == "CRITICAL"'; then
-    slack-cli send "#dev-team" "🎉 Critical task AUTH-001 completed!"
-fi
-```
-
-## Keyboard Shortcuts & Aliases
-
-Add to your shell configuration:
-```bash
-# Quick status changes
-alias s='lotar status'
-alias done='lotar status $1 done'
-alias progress='lotar status $1 in_progress'
-
-# Usage
-done AUTH-001
-progress AUTH-002
-```
+- `LOTAR_TASKS_DIR` - Highest-precedence workspace override after the command-line flag.
+- `LOTAR_AUTO_ASSIGN_ON_STATUS`, `LOTAR_AUTO_CODEOWNERS_ASSIGN`, and the identity-related overrides listed in `docs/help/precedence.md` influence auto-assignment behavior.

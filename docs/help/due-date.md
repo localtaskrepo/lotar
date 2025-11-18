@@ -16,7 +16,7 @@ lotar due-date <TASK_ID> <NEW_DATE>
 
 ```bash
 # Get current due date
-lotar due-date AUTH-001
+lotar due-date 1
 
 # Set to today/tomorrow/next week
 lotar due-date 7 today
@@ -27,7 +27,7 @@ lotar due-date 7 "next week"
 lotar due-date 7 2025-09-01 --project=AUTH
 
 # JSON output for automation
-lotar due-date AUTH-001 2025-09-01 --format=json
+lotar due-date 1 2025-09-01 --format=json
 ```
 
 ## Supported date formats
@@ -43,7 +43,8 @@ lotar due-date AUTH-001 2025-09-01 --format=json
 ## Task ID resolution
 
 - Full IDs like AUTH-123 are used as-is
-- Numeric IDs like 123 use the default project; override with `--project`
+- Numeric IDs like 123 use the auto-detected or configured default project
+- Add `--project` (or pass the full ID) in multi-project workspaces so the CLI can disambiguate
 - If both the ID prefix and `--project` are given, they must refer to the same project
 
 ## JSON output shapes

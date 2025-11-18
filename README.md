@@ -8,31 +8,75 @@
 
 ## 🚀 Quick Start
 
+LoTaR ships as both a signed Homebrew formula and a ready-to-run Docker image, so you can get moving without installing Rust or managing binaries manually. Pick the installer that matches your setup, then run the same commands everywhere.
+
+### 1. Install LoTaR
+
+**macOS (Homebrew)**
 ```bash
-# Clone and build
+brew tap localtaskrepo/lotar
+brew install lotar
+lotar --version
+```
+This adds the CLI to your PATH and keeps it updated with `brew upgrade lotar`.
+
+**GitHub Releases (macOS • Linux • Windows)**
+```bash
+# Pick the asset for your platform from the releases page
+curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-x64.tar.gz
+tar -xzf lotar-vX.Y.Z-linux-x64.tar.gz
+sudo mv lotar /usr/local/bin/
+lotar --version
+```
+Verify signatures/checksums from the same release before moving the binary into your PATH if you need extra assurance.
+
+**Any OS (Docker)**
+```bash
+docker pull mallox/lotar
+docker run --rm mallox/lotar --version
+```
+The Docker image bundles the latest signed musl build, so Linux, macOS, and Windows users can all run the same artifact.
+
+**Rust developers (from source)**
+```bash
 git clone https://github.com/mallox/lotar
 cd lotar
 cargo build --release
-
-# Create your first task (automatically initializes with smart defaults)
-lotar add "Setup authentication system" --priority=high
-
-# List all tasks (auto-detects the single project)
-lotar list
-
-# Change task status 
-lotar status AUTH-001 in_progress
-
-# Add assignee to a task
-lotar assignee AUTH-001 john.doe@company.com
-
-# Different output formats
-lotar list --format=table
-lotar list --format=json
-
-# Start web interface
-lotar serve --host=0.0.0.0 --port=8080 --open
+export PATH="$PATH:$(pwd)/target/release"
 ```
+Use this option if you want to contribute or hack on LoTaR itself.
+
+### 2. Point LoTaR at your repository
+
+- **Homebrew/source install**: `cd /path/to/your/repo` and run LoTaR commands directly.
+- **Docker**: mount your repo at `/workspace` and your `.tasks` directory at `/tasks`.
+
+```bash
+docker run --rm \
+    -v "$PWD":/workspace \
+    -v "$PWD/.tasks":/tasks \
+    -w /workspace \
+    mallox/lotar list
+```
+
+### 3. Track work
+
+```bash
+# Create your first task (auto-initializes defaults)
+lotar add "Plan product launch" --priority=high
+
+# List everything in a friendly table (auto-detects single project)
+lotar list --format table
+
+# Update status or assignee (numeric IDs work when LoTaR auto-detects the project or you set a default)
+lotar status 1 in_progress
+lotar assignee 1 alex@example.com
+
+# Open the web UI if you prefer a browser
+lotar serve --open
+```
+
+> LoTaR automatically scopes to your single project (or `default_project` setting), which is why the commands above can reference tasks with just the numeric portion. When you manage multiple projects or overlapping prefixes, use the fully-qualified IDs (`AUTH-12`) or attach `--project`. See [🗂️ Multi-Project Workflows (Advanced)](#%F0%9F%97%82%EF%B8%8F-multi-project-workflows-advanced) for details.
 
 ## ✨ What is LoTaR?
 
@@ -48,9 +92,9 @@ LoTaR is a **production-ready task management system** designed for developers w
 - ⚡ **Zero-config**: Auto-initializes projects with sensible defaults
 - 🧠 **Smart**: Intelligent project resolution and auto-detection
 
-## � Multi-Project Workflows
+## 🗂️ Multi-Project Workflows (Advanced)
 
-For teams managing multiple projects in one repository or across different directories:
+Most users never need to think about project prefixes—LoTaR automatically scopes to whichever project you’re working in. If you maintain multiple concurrent projects (monorepos, shared storage, cross-repo worktrees), use the fully-qualified IDs and project-specific commands below.
 
 ```bash
 # Explicit project specification
@@ -83,8 +127,8 @@ lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE --project=backend
 ```bash
 # Full CRUD operations with formatted IDs
 lotar add "OAuth Implementation" --type=feature --priority=high
-lotar status PROJ-001 in_progress
-lotar assignee PROJ-001 john.doe@company.com
+lotar status 2 in_progress
+lotar assignee 2 john.doe@company.com
 lotar list --priority=high
 ```
 
@@ -294,21 +338,19 @@ git add .tasks/ && git commit -m "Complete user authentication feature"
 
 ## 🛠️ Installation
 
-### Prerequisites
+Pick the delivery path that matches your environment; every artifact is produced by the same release workflow, so features and signatures stay consistent.
 
-### Build from Source
+### macOS (Homebrew)
 ```bash
-git clone https://github.com/mallox/lotar
-cd lotar
-cargo build --release
-
-# Optional: Add to PATH
-export PATH="$PATH:$(pwd)/target/release"
+brew tap localtaskrepo/lotar
+brew install lotar
+lotar --version
 ```
+The tap hosts universal binaries, so both Apple Silicon and Intel machines are supported. Upgrade any time with `brew upgrade lotar`.
 
-### Docker (linux/amd64)
+### Docker (macOS • Linux • Windows)
 ```bash
-# Inspect the packaged version
+docker pull mallox/lotar
 docker run --rm mallox/lotar --version
 
 # Operate on your current repository
@@ -318,8 +360,18 @@ docker run --rm \
     -w /workspace \
     mallox/lotar list
 ```
-The image downloads the signed musl release asset and ships it inside a `scratch` runtime.
-See `docs/docker/README.md` for more usage patterns and Docker Hub details.
+The image is a minimal `scratch` container that already contains the signed musl binary. See `docs/docker.md` for more scenarios (shared tasks directories, environment variables, etc.).
+
+### Build from Source (Rust)
+```bash
+git clone https://github.com/mallox/lotar
+cd lotar
+cargo build --release
+
+# Optional: Add to PATH
+export PATH="$PATH:$(pwd)/target/release"
+```
+You’ll need the stable Rust toolchain plus Node/npm (for the web assets) if you intend to run tests or `npm run build` locally.
 
 ### Development
 ```bash

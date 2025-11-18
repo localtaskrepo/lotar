@@ -2,57 +2,61 @@
 
 This page explains how LoTaR resolves values for configuration, identity (for @me), and common paths, with a consistent, predictable order.
 
+
 ## Configuration precedence
 
-When resolving configuration values, this order applies (highest wins):
-1. Command-line flags (per command invocation)
-2. Environment variables
-3. Home config (~/.lotar)
-4. Project config (.tasks/<PROJECT>/config.yml)
-5. Global config (.tasks/config.yml)
-6. Built-in defaults
+Configuration layers merge in a fixed order (highest wins):
+1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`). These are evaluated inside each command handler and never persisted.
+2. Environment overrides (see `docs/help/environment.md` for the full table). The first set variable wins per key and is applied globally before any project overlays.
+3. Home config (`~/.lotar` or `%APPDATA%/lotar/config.yml`). Allowed to override both global and project scopes.
+4. Project config (`.tasks/<PROJECT>/config.yml`). Applied after global defaults but before home/env so smart settings such as `issue_states`, `issue_priorities`, `default_status`, branch aliases, and scan toggles can remain project-specific.
+5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
+6. Built-in defaults.
 
 Notes:
-- The same chain applies across CLI, REST, and MCP.
-- Project config overrides global, but home/env can override both; CLI flags always win.
-- Automation toggles (auto.set_reporter, auto.assign_on_status) default to true when unspecified and follow the same precedence.
+- The same chain powers CLI, REST, and MCP. Project-aware commands always resolve the project context first, so they inherit project-level overrides while still respecting user/home/env tweaks.
+- Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified and honor the same precedence chain.
+- When a field cannot be expressed per-project (for example `tasks_folder`), only the global/home/env layers are considered.
 
 ## Identity resolution and @me
 
-Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. It resolves to the current user using this order:
-1) Merged config default_reporter (using the precedence above)
-2) Project manifest author (package.json author, Cargo.toml authors, .csproj Authors) if present
-3) git config (user.name or user.email) at the repository root
-4) System user from $USER/$USERNAME
+Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. Detectors run in this order:
+1) Merged config `default_reporter` (using the precedence above). `LOTAR_DEFAULT_REPORTER` feeds this via the env overrides table.
+2) Project manifest author (package.json `author`/`contributors`, Cargo.toml `authors`, or the first `.csproj` `<Authors>` tag) searched from repo root downward.
+3) Git config (`user.name`, then `user.email`) at the repository root, gated by `auto.identity_git`.
+4) System user from `$USER` / `$USERNAME`.
 
-Applied consistently by CLI, REST, and MCP. Automation toggles `auto.identity` and `auto.identity_git` can gate steps in this order.
+Identity lookups are cached per workspace so CLI/REST/MCP share the same answer. Set `auto.identity=false` to restrict @me lookups to the configured reporter only; set `auto.identity_git=false` to skip git-based fallbacks while still honoring manifests and env values. `lotar whoami --explain` surfaces the same order along with detector metadata.
 
 ## Tasks directory resolution
 
-LoTaR locates the tasks directory in this order:
-1. --tasks-dir <PATH> command-line flag
-2. LOTAR_TASKS_DIR environment variable
-3. Parent directory search for existing .tasks folder
-4. Current directory .tasks folder (created if needed)
+Tasks directory discovery follows these steps:
+1. `--tasks-dir <PATH>` (highest priority). The directory is created automatically when missing so initialization commands can run in fresh folders.
+2. `LOTAR_TASKS_DIR` environment variable (skipped when `LOTAR_TEST_MODE=1`, `RUST_TEST_THREADS` is set, or `LOTAR_IGNORE_ENV_TASKS_DIR=1`). Relative single-segment values first try to match parent directories before falling back to creating the path.
+3. Home config `tasks_folder` setting (in `~/.lotar` unless overridden by `LOTAR_IGNORE_HOME_CONFIG=1`).
+4. Global config `tasks_folder` setting (allows repos to standardize on a folder such as `.work` instead of `.tasks`).
+5. Parent directory search for an initialized tasks folder (matching the configured name and containing `config.yml`). The resolver returns the parent path so status output can explain where it was found.
+6. Current directory + configured folder name (created on demand).
 
-See also: docs/help/main.md for quick start and global options.
+These rules apply everywhere (CLI, REST server, MCP). Run commands with `LOTAR_DEBUG=1` to emit the resolved workspace path whenever you need to confirm which folder was selected.
 
 ## Project resolution (short guide)
 
-Project context is determined based on:
-- Explicit --project flag (highest)
-- Task ID prefix (e.g., AUTH-123 → AUTH)
-- Auto-detection from current directory/repo naming
-- Default project from configuration
+Project context is determined in this order:
+- Explicit `--project` flag (highest). Accepts either a prefix or the full project name; both are normalized via `resolve_project_input`.
+- Task ID prefix (e.g., AUTH-123 → AUTH) when present.
+- Auto-detection from the current `.tasks/<PREFIX>` directory name when the repo has a single initialized project.
+- Default project (`default_prefix`) from merged configuration. A prefix is generated from the repo name when no project yet exists.
 
 ## Automation semantics
 
-- auto.set_reporter: When true, reporter is auto-populated on create/update when missing (uses identity resolution above).
-- auto.assign_on_status: When true, the first time a task moves away from the default/first status and has no assignee, assignee is set to the resolved current user. Explicit assignee values are never overwritten.
+- `auto.set_reporter`: When true, reporter is auto-populated during task creation whenever an explicit value is absent. The service first honors `default_reporter`, then falls back to the identity detectors above.
+- `auto.assign_on_status`: When true, the first time a task moves away from the default/first status and has no assignee, it is set to the resolved current user. The logic is shared across CLI, REST, and MCP updates.
 
-Both settings honor the configuration precedence chain.
+Both settings honor the configuration precedence chain, and they can be toggled globally, per-project, or at runtime through `LOTAR_AUTO_SET_REPORTER` / `LOTAR_AUTO_ASSIGN_ON_STATUS`.
 
 ## Tips
 
-- Use --explain (where available) to see how values were chosen.
-- Use whoami to see your resolved identity and source chain.
+- Use `--explain` (where available) to see how values were chosen. Commands such as `lotar whoami --explain` and `lotar config show --explain` surface each layer in the order above.
+- Use `lotar whoami` to see your resolved identity and source chain.
+- Enable `LOTAR_DEBUG=1` temporarily to log the resolved tasks directory, config sources, and identity detector outcomes when diagnosing precedence issues.

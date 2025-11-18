@@ -1,129 +1,92 @@
-# LoTaR - Local Task Repository
+# LoTaR Overview
 
-Git-integrated task management with beautiful terminal output.
+LoTaR keeps lightweight task trackers inside your repository so you can plan work without leaving Git. Use it from the CLI, the web dashboard, or IDE integrations.
 
 ## Quick Start
 
 ```bash
-# Add a task
-lotar add "Implement OAuth authentication" --type=feature --priority=high
+# Initialize a workspace (creates .tasks if needed)
+lotar add "Implement OAuth" --type feature --priority high
 
-# List tasks
-lotar list
+# Review work
+lotar list --status todo --mine
 
-# Change task status  
-lotar status AUTH-001 done
+# Move the work forward
+lotar status 1 in_progress
 
-# List with different output formats
-lotar list --format=table
-lotar list --format=json
+# Capture context
+lotar comment 1 -m "Ready for review"
 
-# Use custom tasks directory
-lotar add "Custom task" --tasks-dir=/custom/path
-lotar list --tasks-dir=/custom/path
-
-# Environment variable support
-export LOTAR_TASKS_DIR=/project/tasks
-lotar add "Environment task"  # Uses environment-configured directory
+# Launch the web UI
+lotar serve --open
 ```
 
-## Global Options
+> Tip: LoTaR auto-detects your project prefix. Type the numeric ID (`1`) for day‑to‑day commands, and switch to the fully qualified ID (`AUTH-1`) when you hop between projects.
 
-**Available on ALL commands:**
-- `--format <FORMAT>` - Output format: text, table, json, markdown (default: text)
-- `--verbose` - Enable verbose output
-- `--project <PROJECT>`, `-p <PROJECT>` - Specify project context (overrides auto-detection)
-  - _Serve-specific note_: On `lotar serve`, `-p` is reused as a shorthand for `--port`. Use the long `--project` form if you need to point the server at a specific project directory.
-- `--tasks-dir <PATH>` - Custom tasks directory (overrides all auto-detection)
+## Everyday Workflow
 
-## Environment Variables
+| Need to… | Command |
+| --- | --- |
+| Capture new work | `lotar add` with title, type, priority, tags, and custom fields |
+| Find tasks | `lotar list` with filters such as `--status`, `--priority`, `--mine`, `--tag`, or `--where key=value` |
+| Move tasks through states | `lotar status <id> <new_status>` (supports dry-run + explain) |
+| Update ownership | `lotar assignee <id> <name|@me>` |
+| Track deadlines and estimates | `lotar due-date`, `lotar effort` |
+| Capture discussion | `lotar comment` or use the web UI task panel |
+| Watch metrics | `lotar stats`, `lotar sprint ...`, or the Insights tab in the browser |
 
-- `LOTAR_TASKS_DIR` - Override default tasks directory location
-- `LOTAR_DEFAULT_ASSIGNEE` - Set default assignee for all new tasks
-- `LOTAR_DEFAULT_REPORTER` - Set default reporter identity used when auto-setting
+## Global CLI Flags
 
-## Commands
+| Flag | What it does |
+| --- | --- |
+| `--format text|table|json|markdown` | Pick an output style once and reuse it everywhere. |
+| `--log-level <level>` / `--verbose` | Control how chatty the command should be. |
+| `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. On `lotar serve`, use `--project` (the short `-p` is reserved for `--port`). |
+| `--tasks-dir <PATH>` | Point at a completely different workspace; the folder is created automatically when missing. |
 
-- **add** - Create new tasks with validation
-- **list** - Display tasks with filtering and multiple output formats
-- **status** - Change task status with validation  
-- **priority** - Change task priority
-- **assignee** - Change task assignee
-- **due-date** - Manage task due dates
-- **task** - Full task management (legacy interface)
-- **config** - Comprehensive project configuration with templates, validation, and dry-run
-- **scan** - Find TODO comments in code
-- **serve** - Start web interface
-- **git** - Manage repository integrations (hooks)
-- **completions** - Generate or install shell completion scripts
-- **mcp** - Run JSON-RPC server (tools for tasks/projects/config)
-- **whoami** - Show resolved current user identity (with --explain)
+These flags stack with command-specific options. Example:
 
-Use `lotar help <command>` for detailed command information.
-
-See also: [Resolution & Precedence](./precedence.md) for value sources and identity resolution.
-
-## Output Formats
-
-### Text (Default)
-Human-readable with colors, emojis, and styling:
-```
-📋 Implement OAuth [feature] - HIGH (TODO) - 👤 john.doe
-🚧 Fix login bug [bug] - CRITICAL (IN_PROGRESS) - 📅 2025-08-15
+```bash
+lotar --format json list --project AUTH --status todo --limit 50
 ```
 
-### Table
-Clean tabular output:
-```
-ID       TITLE               STATUS      PRIORITY  ASSIGNEE
-AUTH-001 Implement OAuth     TODO        HIGH      john.doe  
-BUG-042  Fix login bug       IN_PROGRESS CRITICAL  jane.smith
-```
+## Environment Essentials
 
-### JSON  
-Machine-readable for scripts and integrations:
-```json
-{
-  "tasks": [
-    {
-      "id": "AUTH-001",
-      "title": "Implement OAuth",
-      "status": "TODO",
-      "priority": "HIGH",
-      "assignee": "john.doe"
-    }
-  ]
-}
-```
+| Variable | Why set it? |
+| --- | --- |
+| `LOTAR_TASKS_DIR` | Keep your workspace alongside the repo, or point CI at a shared cache. |
+| `LOTAR_PROJECT` | Default prefix when you rarely switch projects. |
+| `LOTAR_DEFAULT_ASSIGNEE` / `LOTAR_DEFAULT_REPORTER` | Seed new tasks with the right people. |
+| `LOTAR_PORT` | Lock the web UI to a known port for tunnels or shared dev boxes. |
+| `LOTAR_AUTO_IDENTITY` / `LOTAR_AUTO_IDENTITY_GIT` | Enable or disable `@me` lookups based on local policy. |
 
-### Markdown
-Documentation-friendly format:
-```markdown
-## Tasks
+See [Environment Variables](./environment.md) for automation toggles, sprint defaults, diagnostics, and more.
 
-- [x] **AUTH-001**: Implement OAuth *(HIGH)* - @john.doe
-- [ ] **BUG-042**: Fix login bug *(CRITICAL)* - @jane.smith
-```
+## Working with Projects
 
-## Project Management
+LoTaR stores data in `.tasks/<PROJECT>` folders. Discovery order:
 
-LoTaR automatically detects project context:
-- Uses `.tasks` directory in project root
-- Supports multiple projects in monorepos
-- Git integration for change tracking
-- Template-based configuration
-- Environment variable support for custom locations
+1. `--tasks-dir` flag
+2. `LOTAR_TASKS_DIR`
+3. Home/global `tasks_folder` setting
+4. Parent directory search
+5. Create `.tasks` beside the current directory
 
-**Tasks Directory Resolution Order:**
-1. `--tasks-dir <PATH>` command line flag (highest priority)
-2. `LOTAR_TASKS_DIR` environment variable
-3. Parent directory search for existing `.tasks` folder
-4. Current directory `.tasks` folder (created if needed)
+Configuration precedence follows the same idea: CLI flag → environment → home → project → global → defaults. Learn the full chain in [Resolution & Precedence](./precedence.md).
 
-Configuration precedence (for config values): CLI > env > home > project > global > defaults
+## Output Styles
 
-## Getting Help
+- **Text**: colorful summaries for terminals.
+- **Table**: clean columns when you need to scan IDs quickly.
+- **JSON**: structured payloads for scripts and dashboards.
+- **Markdown**: copy/paste directly into docs or pull requests.
 
-- `lotar help` - Show this overview
-- `lotar help <command>` - Detailed command help
-- `lotar <command> --help` - Quick command options
+Switch formats with `--format` and keep piping them into other tools (e.g., `lotar list --format markdown | tee TASKS.md`).
+
+## Launch Points
+
+- `lotar help <command>` – detailed usage for any subcommand
+- `lotar serve --open` – browser UI + REST API + SSE stream
+- `lotar mcp` – IDE or AI agent integrations (JSON-RPC)
+- `lotar scan <paths>` – turn TODO/FIXME comments into tasks
+

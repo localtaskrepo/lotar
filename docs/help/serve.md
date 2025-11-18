@@ -1,6 +1,7 @@
 # lotar serve
 
-Start the web interface server for task management.
+Launch the bundled HTTP server that serves the SPA from `target/web` and exposes the REST + SSE APIs used by the CLI.
+
 
 ## Usage
 
@@ -14,14 +15,11 @@ lotar serve [OPTIONS]
 # Start server on default port (8080)
 lotar serve
 
-# Start on custom port (short flag)
-lotar serve -p 3000
-
-# Positional port is still accepted for compatibility
-lotar serve 4200
+# Start on custom port
+lotar serve --port=3000
 
 # Start with specific host binding
-lotar serve --host=0.0.0.0 -p 8080
+lotar serve --host=0.0.0.0 --port=8080
 
 # Open browser automatically
 lotar serve --open
@@ -36,25 +34,27 @@ lotar serve  # Uses environment-configured directory
 
 ## Options
 
-- `-p, --port <PORT>` - Port to bind server to (default: 8080)
+- `--port <PORT>` - Port to bind server to (default: 8080). The short `-p` flag is reserved for the global `--project` option, so always use the long form when setting the port.
 - `--host <HOST>` - Host address to bind to (default: localhost)
 - `--open` - Automatically open browser after starting server
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Override tasks directory resolution
 
-> Tip: Unlike other commands, `lotar serve` does not take a project context. The short `-p` flag is dedicated to the port; use the long `--project` form alongside serve if you need to influence project resolution.
+> Tip: `lotar serve` ignores the `--project/-p` global flag on purpose—project defaults are resolved dynamically per request inside the REST handlers—so passing `-p` before the command only changes the CLI project context, not the server port.
 
 ## Environment Variables
 - `LOTAR_TASKS_DIR` - Default tasks directory location
+- `LOTAR_SSE_DEBOUNCE_MS` - Default debounce window for `/api/events` and `/api/tasks/stream` (overridden by the `debounce_ms` query parameter).
+- `LOTAR_SSE_READY` / `LOTAR_TEST_FAST_IO` - Testing hooks that control synthetic readiness events and heartbeat cadence.
 
 ### Web Interface
-- **Task Dashboard** - Overview of all tasks and projects
-- **Task Management** - Create, edit, and update tasks
-- **Project Views** - Project-specific task organization
-- **Search & Filtering** - Advanced task filtering and search
-- **Insights** - Task completion and project metrics
-- **Personalization** - Preferences page lets you pick system/light/dark themes and optionally set a custom accent color that updates focus rings and browser chrome.
+- **Task Dashboard** - Overview panes powered by the `/api/tasks/list` endpoint.
+- **Task Management** - Creation, editing, effort/status changes, and comments all call the same REST endpoints used by the CLI.
+- **Project Views** - Per-project filters share logic with CLI list filters; preferences are stored client-side (see `docs/help/preferences.md`).
+- **Search & Filtering** - Advanced filtering mirrors `lotar list` options (`assignee`, `tags`, `status`, unified filters, etc.).
+- **Insights** - Metrics components consume `/api/stats/*` and `/api/sprints/*` endpoints.
+- **Personalization** - Preferences view interacts solely with browser storage; no server-side config is modified.
 
 ### API Endpoints
 - `POST /api/tasks/add` - Create new task (body: TaskCreate; supports `@me` for people fields; auto-set reporter if enabled)
@@ -75,6 +75,8 @@ lotar serve  # Uses environment-configured directory
 - `POST /api/tasks/delete` - Delete task (body: { id })
 - `GET /api/projects/list` - List projects
 - `GET /api/projects/stats?project=PREFIX` - Project stats
+- `GET /api/whoami` - Resolve the identity that auto-populates reporter/assignee fields.
+- Sprint endpoints (`/api/sprints/*`) expose creation, listing, metrics, and cleanup flows (see `docs/help/sprints.md` for the full matrix).
 
 ### Real-time Updates
 - Server-Sent Events (SSE)
@@ -87,17 +89,19 @@ lotar serve  # Uses environment-configured directory
 	- Behavior & reliability:
 		- Sends `retry: 1000` on connect to advise client reconnection delay
 		- Emits `:heartbeat` comments periodically when idle to keep connections alive
+		- A filesystem watcher monitors `.tasks/**` and emits `project_changed` events whenever YAML files are added/modified/removed, ensuring the UI refreshes even when tasks are edited outside the browser.
+	- Testing aids: set `LOTAR_SSE_READY=1` and pass `?ready=1` to receive a one-time `ready` event when the connection is established (used by the smoke suite).
 
 ## Access URLs
 
 Once started, the server provides:
-- **Web Interface**: `http://localhost:8080`
-- **API Base**: `http://localhost:8080/api`
+- **Web Interface**: `http://<host>:<port>`
+- **API Base**: `http://<host>:<port>/api`
 
-## File Watching (planned)
+## File Watching
 
-- Filesystem watcher integration will broadcast updates to connected clients
-- Debounce defaults to ~100ms; configuration TBD (env + CLI)
+- `notify` watches `.tasks` recursively when the server starts. Any create/modify/remove event under a project directory emits a `project_changed` SSE payload with `{ "name": "<PREFIX>" }` so browsers refresh caches or task lists.
+- Debounce is handled client-side through the SSE `debounce_ms` parameter or the `LOTAR_SSE_DEBOUNCE_MS` fallback.
 
 ## Development Notes
 
@@ -106,12 +110,11 @@ Once started, the server provides:
 	- `Access-Control-Allow-Origin: *`
 	- `Access-Control-Allow-Methods: GET,POST,OPTIONS`
 	- `Access-Control-Allow-Headers: Content-Type`
-- Static files are served from `target/web`
+- Static files are served from `target/web` (built via `npm run build`), embedded at compile time through `include_dir!` for release builds with a filesystem fallback during development.
 
 ## Notes
 
 - Server runs until interrupted (Ctrl+C)
 - Web interface works with all modern browsers
-- API supports both JSON and form data
-- File changes are reflected immediately with `--watch`
+- API handlers expect JSON bodies and respond with JSON envelopes that mirror the CLI output (`{status,message,data}`); CORS headers are always added for local development.
 - Use `--host=0.0.0.0` to allow external connections
