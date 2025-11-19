@@ -13,6 +13,7 @@ use crate::storage::manager::Storage;
 use crate::types::{CustomFieldValue, TaskRelationships};
 use crate::utils::identity;
 use crate::workspace::TasksDirectoryResolver;
+use std::collections::BTreeMap;
 
 pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
@@ -625,6 +626,51 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
+    let mut custom_fields: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    if let Some(raw_fields) = req.params.get("custom_fields") {
+        let Some(map) = raw_fields.as_object() else {
+            return err(
+                req.id,
+                -32602,
+                "custom_fields must be an object with string or array values",
+                None,
+            );
+        };
+        for (name, value) in map.iter() {
+            let mut collected: Vec<String> = Vec::new();
+            match value {
+                Value::String(s) => {
+                    let trimmed = s.trim();
+                    if !trimmed.is_empty() {
+                        collected.push(trimmed.to_string());
+                    }
+                }
+                Value::Array(items) => {
+                    for item in items {
+                        if let Some(s) = item.as_str() {
+                            let trimmed = s.trim();
+                            if !trimmed.is_empty() {
+                                collected.push(trimmed.to_string());
+                            }
+                        }
+                    }
+                }
+                Value::Null => {}
+                _ => {
+                    return err(
+                        req.id,
+                        -32602,
+                        "custom_fields entries must be strings or arrays of strings",
+                        None,
+                    );
+                }
+            }
+            if !collected.is_empty() {
+                custom_fields.insert(name.clone(), collected);
+            }
+        }
+    }
+
     let filter = TaskListFilter {
         status,
         priority,
@@ -633,6 +679,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         tags,
         text_query,
         sprints: Vec::new(),
+        custom_fields,
     };
     let storage = Storage::new(resolver.path.clone());
     let mut tasks = TaskService::list(&storage, &filter)

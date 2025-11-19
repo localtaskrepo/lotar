@@ -4,7 +4,7 @@ use lotar::services::sprint_service::SprintService;
 use lotar::storage::TaskFilter;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintCapacity, SprintPlan, SprintTaskEntry};
-use lotar::types::Priority;
+use lotar::types::{Priority, custom_value_string};
 use lotar::utils::paths;
 use lotar::{Task, TaskStatus};
 use predicates::prelude::*;
@@ -1349,6 +1349,71 @@ fn sprint_move_json_reports_reassignment_messages() {
             .map(|text| text.contains("moved from sprint(s) #1"))
             .unwrap_or(false)
     }));
+}
+
+#[test]
+fn sprint_add_appends_select_filter_results() {
+    let fixtures = common::TestFixtures::new();
+
+    let mut storage = Storage::new(fixtures.tasks_root.clone());
+
+    let sprint = Sprint {
+        plan: Some(SprintPlan {
+            label: Some("Select".to_string()),
+            ..SprintPlan::default()
+        }),
+        ..Sprint::default()
+    };
+    SprintService::create(&mut storage, sprint, None).expect("create sprint");
+
+    let mut manual = Task::new(
+        fixtures.tasks_root.clone(),
+        "Manual".to_string(),
+        Priority::from("Medium"),
+    );
+    manual.status = TaskStatus::from("Todo");
+    let manual_id = storage
+        .add(&manual, "TEST", Some("Test Project"))
+        .expect("add manual task");
+
+    let mut selected = Task::new(
+        fixtures.tasks_root.clone(),
+        "Selected".to_string(),
+        Priority::from("Medium"),
+    );
+    selected.status = TaskStatus::from("Todo");
+    selected
+        .custom_fields
+        .insert("iteration".to_string(), custom_value_string("beta"));
+    let selected_id = storage
+        .add(&selected, "TEST", Some("Test Project"))
+        .expect("add selected task");
+    drop(storage);
+
+    let mut cmd = common::cargo_bin_in(&fixtures);
+    cmd.args([
+        "sprint",
+        "add",
+        "--sprint",
+        "1",
+        &manual_id,
+        "--select-where",
+        "field:iteration=beta",
+    ])
+    .assert()
+    .success()
+    .stdout(predicate::str::contains("2 task(s)"));
+
+    let storage_after = Storage::new(fixtures.tasks_root.clone());
+    let record = SprintService::get(&storage_after, 1).expect("sprint #1 exists");
+    let assigned: Vec<String> = record
+        .sprint
+        .tasks
+        .iter()
+        .map(|entry| entry.id.clone())
+        .collect();
+    assert!(assigned.contains(&manual_id));
+    assert!(assigned.contains(&selected_id));
 }
 
 #[test]

@@ -456,6 +456,77 @@ fn mcp_task_list_includes_custom_fields() {
 }
 
 #[test]
+fn mcp_task_list_filters_by_custom_fields() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
+    let mut storage = lotar::Storage::new(resolver.path.clone());
+
+    for (title, product) in [("Platform", "Platform"), ("Docs", "Docs")] {
+        let mut fields: lotar::types::CustomFields = HashMap::new();
+        fields.insert(
+            "product".to_string(),
+            lotar::types::custom_value_string(product),
+        );
+        lotar::services::task_service::TaskService::create(
+            &mut storage,
+            lotar::api_types::TaskCreate {
+                title: format!("{title} task"),
+                project: Some("MCP".into()),
+                custom_fields: Some(fields),
+                ..lotar::api_types::TaskCreate::default()
+            },
+        )
+        .expect("create task");
+    }
+
+    let list_req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 191,
+        "method": "task/list",
+        "params": {
+            "project": "MCP",
+            "custom_fields": {"product": "Docs"}
+        }
+    });
+    let list_line = serde_json::to_string(&list_req).unwrap();
+    let list_resp_line = lotar::mcp::server::handle_json_line(&list_line);
+    let list_resp: serde_json::Value = serde_json::from_str(&list_resp_line).unwrap();
+    assert!(
+        list_resp.get("error").is_none(),
+        "task/list failed: {list_resp}"
+    );
+    let content = list_resp
+        .get("result")
+        .and_then(|r| r.get("content"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!content.is_empty());
+    let text = content[0]
+        .get("text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let payload: serde_json::Value = serde_json::from_str(text).unwrap();
+    let tasks = payload
+        .get("tasks")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(tasks.len(), 1, "expected only docs task in response");
+    let product = tasks[0]
+        .get("custom_fields")
+        .and_then(|v| v.as_object())
+        .and_then(|cf| cf.get("product"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    assert_eq!(product, "Docs");
+}
+
+#[test]
 fn mcp_task_list_supports_pagination() {
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");

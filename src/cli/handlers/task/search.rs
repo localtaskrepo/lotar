@@ -22,15 +22,17 @@ impl CommandHandler for SearchHandler {
         renderer.log_info("list: begin");
         let ctx = TaskCommandContext::new(resolver, project, None)?;
         let validator = CliValidator::new(&ctx.config);
-        let task_filter = Self::build_task_filter(&args, &validator, project, &ctx)?;
+        let build = Self::build_task_filter(&args, &validator, project, &ctx)?;
 
         #[allow(clippy::drop_non_drop)]
         drop(validator);
 
         renderer.log_debug("list: executing search");
-        let mut tasks: Vec<(String, Task)> = ctx.storage.search(&task_filter).into_iter().collect();
+        let mut tasks: Vec<(String, Task)> =
+            ctx.storage.search(&build.task_filter).into_iter().collect();
 
-        TaskPostFilters::new(&args, &ctx.config, resolver).apply(&mut tasks)?;
+        TaskPostFilters::new(&args, &ctx.config, resolver, build.where_filters)
+            .apply(&mut tasks)?;
         Self::apply_sort_and_limit(&mut tasks, &args, &ctx.config);
         Self::render_results(renderer, tasks);
 
@@ -44,7 +46,7 @@ impl SearchHandler {
         validator: &CliValidator,
         project: Option<&str>,
         ctx: &TaskCommandContext,
-    ) -> Result<TaskFilter, String> {
+    ) -> Result<BuiltTaskFilter, String> {
         let mut task_filter = TaskFilter::default();
 
         if let Some(query) = args.query.as_ref()
@@ -81,7 +83,17 @@ impl SearchHandler {
             task_filter.project = Some(project_prefix);
         }
 
-        Ok(task_filter)
+        let (custom_where, remaining_where, _) =
+            crate::utils::custom_fields::partition_where_filters(&args.r#where, &ctx.config);
+        for (name, values) in custom_where {
+            let entry = task_filter.custom_fields.entry(name).or_default();
+            entry.extend(values);
+        }
+
+        Ok(BuiltTaskFilter {
+            task_filter,
+            where_filters: remaining_where,
+        })
     }
 
     fn apply_sort_and_limit(
@@ -266,10 +278,16 @@ impl SearchHandler {
     }
 }
 
+struct BuiltTaskFilter {
+    task_filter: TaskFilter,
+    where_filters: Vec<(String, String)>,
+}
+
 struct TaskPostFilters<'a> {
     args: &'a TaskSearchArgs,
     config: &'a ResolvedConfig,
     resolver: &'a TasksDirectoryResolver,
+    where_filters: Vec<(String, String)>,
 }
 
 impl<'a> TaskPostFilters<'a> {
@@ -277,11 +295,13 @@ impl<'a> TaskPostFilters<'a> {
         args: &'a TaskSearchArgs,
         config: &'a ResolvedConfig,
         resolver: &'a TasksDirectoryResolver,
+        where_filters: Vec<(String, String)>,
     ) -> Self {
         Self {
             args,
             config,
             resolver,
+            where_filters,
         }
     }
 
@@ -365,14 +385,14 @@ impl<'a> TaskPostFilters<'a> {
     }
 
     fn apply_where_filters(&self, tasks: &mut Vec<(String, Task)>) {
-        if self.args.r#where.is_empty() {
+        if self.where_filters.is_empty() {
             return;
         }
 
         use std::collections::{HashMap, HashSet};
 
         let mut filters: HashMap<String, HashSet<String>> = HashMap::new();
-        for (key, value) in &self.args.r#where {
+        for (key, value) in &self.where_filters {
             filters
                 .entry(key.clone())
                 .or_default()
@@ -381,7 +401,6 @@ impl<'a> TaskPostFilters<'a> {
 
         let resolve_vals = |id: &str, task: &Task, key: &str| -> Option<Vec<String>> {
             let raw = key.trim();
-            let normalized = raw.to_lowercase();
 
             if let Some(canonical) = crate::utils::fields::is_reserved_field(raw) {
                 match canonical {
@@ -398,22 +417,13 @@ impl<'a> TaskPostFilters<'a> {
                 }
             }
 
-            let mut field_name: Option<&str> = None;
-            if let Some(rest) = normalized.strip_prefix("field:") {
-                field_name = Some(rest.trim());
-            } else if self
-                .args
-                .r#where
-                .iter()
-                .any(|(k, _)| k.trim().eq_ignore_ascii_case(raw))
-                && (self.config.custom_fields.has_wildcard()
-                    || self.config.custom_fields.values.iter().any(|v| v == raw))
-            {
-                field_name = Some(raw);
+            let mut field_name: Option<String> = None;
+            if let Some(name) = crate::utils::custom_fields::resolve_filter_name(raw, self.config) {
+                field_name = Some(name);
             }
 
             if let Some(name) = field_name {
-                if let Some(value) = task.custom_fields.get(name) {
+                if let Some(value) = task.custom_fields.get(&name) {
                     return Some(vec![crate::types::custom_value_to_string(value)]);
                 }
 

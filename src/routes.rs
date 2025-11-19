@@ -26,6 +26,7 @@ use crate::{
 };
 use chrono::Utc;
 use serde_json::json;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn make_cleanup_summary(outcome: &sprint_integrity::SprintCleanupOutcome) -> SprintCleanupSummary {
     SprintCleanupSummary {
@@ -425,7 +426,7 @@ pub fn initialize(api_server: &mut ApiServer) {
         }
 
         // Build filter from query
-        let filter = crate::api_types::TaskListFilter {
+        let mut filter = crate::api_types::TaskListFilter {
             status: statuses,
             priority: priorities,
             task_type: types_vec,
@@ -437,11 +438,10 @@ pub fn initialize(api_server: &mut ApiServer) {
                 .unwrap_or_default(),
             text_query: req.query.get("q").cloned(),
             sprints: vec![],
+            custom_fields: BTreeMap::new(),
         };
-        let tasks = TaskService::list(&storage, &filter);
         // API parity: accept additional query keys (built-ins or declared custom fields)
         // Build filters map from unknown keys and assignee
-        use std::collections::{BTreeMap, BTreeSet};
         let mut uf: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let known = ["project", "status", "priority", "type", "tags", "q"];
         // Assignee (supports @me)
@@ -461,9 +461,21 @@ pub fn initialize(api_server: &mut ApiServer) {
             }
             // CSV allowed
             for part in v.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-                uf.entry(k.clone()).or_default().insert(part.to_string());
+                if let Some(name) =
+                    crate::utils::custom_fields::resolve_filter_name(k, cfg)
+                {
+                    filter
+                        .custom_fields
+                        .entry(name)
+                        .or_default()
+                        .push(part.to_string());
+                } else {
+                    uf.entry(k.clone()).or_default().insert(part.to_string());
+                }
             }
         }
+
+        let tasks = TaskService::list(&storage, &filter);
 
         // Apply in-memory filters if any
         let mut tasks = tasks; // shadow mutable
@@ -1432,7 +1444,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             }
         }
 
-        let filter = crate::api_types::TaskListFilter {
+        let mut filter = crate::api_types::TaskListFilter {
             status: statuses,
             priority: priorities,
             task_type: types_vec,
@@ -1444,7 +1456,25 @@ pub fn initialize(api_server: &mut ApiServer) {
                 .unwrap_or_default(),
             text_query: req.query.get("q").cloned(),
             sprints: vec![],
+            custom_fields: BTreeMap::new(),
         };
+        let known = ["project", "status", "priority", "type", "tags", "q"];
+        for (k, v) in req.query.iter() {
+            if known.contains(&k.as_str()) {
+                continue;
+            }
+            for part in v.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+                if let Some(name) =
+                    crate::utils::custom_fields::resolve_filter_name(k, cfg)
+                {
+                    filter
+                        .custom_fields
+                        .entry(name)
+                        .or_default()
+                        .push(part.to_string());
+                }
+            }
+        }
         let tasks = TaskService::list(&storage, &filter);
 
         // Build CSV (quoted where needed)

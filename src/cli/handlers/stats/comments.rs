@@ -15,13 +15,8 @@ pub(crate) fn run_top(
     };
     let storage = crate::storage::manager::Storage::new(resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
-        status: Vec::new(),
-        priority: Vec::new(),
-        task_type: Vec::new(),
         project: scope_project.clone(),
-        tags: Vec::new(),
-        text_query: None,
-        sprints: Vec::new(),
+        ..Default::default()
     };
     let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
     let mut rows: Vec<_> = tasks
@@ -71,13 +66,8 @@ pub(crate) fn run_by_author(
     };
     let storage = crate::storage::manager::Storage::new(resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
-        status: Vec::new(),
-        priority: Vec::new(),
-        task_type: Vec::new(),
         project: scope_project.clone(),
-        tags: Vec::new(),
-        text_query: None,
-        sprints: Vec::new(),
+        ..Default::default()
     };
     let tasks = crate::services::task_service::TaskService::list(&storage, &filter);
     // Author attribute removed from TaskComment; we can't group by author without blame here.

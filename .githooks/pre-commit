@@ -5,6 +5,9 @@ set -e
 # Set up PATH for Rust tools
 export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 
+# Allow slower machines or cold caches to extend the test timeout.
+TEST_TIMEOUT_SECONDS=${LOTAR_PRECOMMIT_TEST_TIMEOUT:-420}
+
 echo "🔧 Running pre-commit checks..."
 
 # Check prerequisites
@@ -86,10 +89,11 @@ fi
 
 # 4. Quick tests (nextest)
 echo "🧪 Running tests (nextest)..."
+echo "    (timeout: ${TEST_TIMEOUT_SECONDS}s; override via LOTAR_PRECOMMIT_TEST_TIMEOUT)"
 if command -v cargo-nextest >/dev/null 2>&1; then
     tmp_nextest=$(mktemp -t lotar-nextest.XXXXXX)
     trap 'rm -f "$tmp_nextest"' EXIT
-    if timeout 120 cargo nextest run --all-features --failure-output immediate --status-level fail >"$tmp_nextest" 2>&1; then
+    if timeout "$TEST_TIMEOUT_SECONDS" cargo nextest run --all-features --failure-output immediate --status-level fail >"$tmp_nextest" 2>&1; then
         echo "✅ Tests OK"
         rm -f "$tmp_nextest"
         trap - EXIT
@@ -112,7 +116,7 @@ else
     echo "⚠️  cargo-nextest not installed; falling back to cargo test"
     tmp_cargotest=$(mktemp -t lotar-cargotest.XXXXXX)
     trap 'rm -f "$tmp_cargotest"' EXIT
-    if timeout 120 cargo test --all-features >"$tmp_cargotest" 2>&1; then
+    if timeout "$TEST_TIMEOUT_SECONDS" cargo test --all-features >"$tmp_cargotest" 2>&1; then
         echo "✅ Tests OK"
         rm -f "$tmp_cargotest"
         trap - EXIT

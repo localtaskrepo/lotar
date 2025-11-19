@@ -110,6 +110,17 @@ pub struct TaskListFilter {
     pub tags: Vec<String>,
     pub text_query: Option<String>,
     pub sprints: Vec<u32>,
+    #[serde(default)]
+    pub custom_fields: BTreeMap<String, Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskSelection {
+    #[serde(default)]
+    pub filter: TaskListFilter,
+    #[serde(default)]
+    pub r#where: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,6 +153,8 @@ pub struct SprintAssignmentRequest {
     pub cleanup_missing: bool,
     #[serde(default)]
     pub force_single: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selection: Option<TaskSelection>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -1,15 +1,24 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use crate::cli::args::sprint::{SprintAddArgs, SprintMoveArgs, SprintRemoveArgs};
+use crate::api_types::TaskSelection;
+use crate::cli::args::sprint::{
+    SprintAddArgs, SprintMoveArgs, SprintRemoveArgs, TaskSelectionArgs,
+};
 use crate::cli::handlers::sprint::shared::{
     SprintAssignmentIntegrityPayload, build_assignment_integrity,
 };
+use crate::cli::validation::CliValidator;
+use crate::config::manager::ConfigManager;
+use crate::config::types::ResolvedConfig;
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_assignment;
 use crate::services::sprint_service::SprintRecord;
+use crate::services::task_selection;
 use crate::storage::manager::Storage;
+use crate::utils::resolve_project_input;
+use crate::workspace::{TasksDirectoryResolver, TasksDirectorySource};
 
 use super::context::AssignmentContext;
 
@@ -18,6 +27,8 @@ pub(crate) fn handle_add(
     tasks_root: PathBuf,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
+    let resolver = local_resolver(&tasks_root);
+    let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
     let cleanup_summary = context.reconcile_missing(
@@ -26,12 +37,32 @@ pub(crate) fn handle_add(
         "assigning sprint memberships",
     )?;
 
-    let (explicit, tasks) = split_assignment_inputs(
+    let (explicit, mut tasks) = split_assignment_inputs(
         &context.storage,
         &context.records,
         &add_args.sprint,
         &add_args.items,
     )?;
+
+    if let Some(selection) =
+        build_selection_from_args(&add_args.select, &resolver, &resolved_config)?
+    {
+        let mut selected = task_selection::select_task_ids(
+            &context.storage,
+            &selection,
+            &resolver,
+            &resolved_config,
+        )?;
+        tasks.append(&mut selected);
+    }
+
+    tasks.sort();
+    tasks.dedup();
+    if tasks.is_empty() {
+        return Err(
+            "Provide at least one task identifier via arguments or --select filters.".to_string(),
+        );
+    }
 
     let outcome = sprint_assignment::assign_tasks(
         &mut context.storage,
@@ -108,6 +139,8 @@ pub(crate) fn handle_move(
     tasks_root: PathBuf,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
+    let resolver = local_resolver(&tasks_root);
+    let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
     let cleanup_summary = context.reconcile_missing(
@@ -116,12 +149,32 @@ pub(crate) fn handle_move(
         "moving sprint memberships",
     )?;
 
-    let (explicit, tasks) = split_assignment_inputs(
+    let (explicit, mut tasks) = split_assignment_inputs(
         &context.storage,
         &context.records,
         &move_args.sprint,
         &move_args.items,
     )?;
+
+    if let Some(selection) =
+        build_selection_from_args(&move_args.select, &resolver, &resolved_config)?
+    {
+        let mut selected = task_selection::select_task_ids(
+            &context.storage,
+            &selection,
+            &resolver,
+            &resolved_config,
+        )?;
+        tasks.append(&mut selected);
+    }
+
+    tasks.sort();
+    tasks.dedup();
+    if tasks.is_empty() {
+        return Err(
+            "Provide at least one task identifier via arguments or --select filters.".to_string(),
+        );
+    }
 
     let outcome = sprint_assignment::assign_tasks(
         &mut context.storage,
@@ -198,6 +251,8 @@ pub(crate) fn handle_remove(
     tasks_root: PathBuf,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
+    let resolver = local_resolver(&tasks_root);
+    let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
     let cleanup_summary = context.reconcile_missing(
@@ -206,12 +261,32 @@ pub(crate) fn handle_remove(
         "removing sprint memberships",
     )?;
 
-    let (explicit, tasks) = split_assignment_inputs(
+    let (explicit, mut tasks) = split_assignment_inputs(
         &context.storage,
         &context.records,
         &remove_args.sprint,
         &remove_args.items,
     )?;
+
+    if let Some(selection) =
+        build_selection_from_args(&remove_args.select, &resolver, &resolved_config)?
+    {
+        let mut selected = task_selection::select_task_ids(
+            &context.storage,
+            &selection,
+            &resolver,
+            &resolved_config,
+        )?;
+        tasks.append(&mut selected);
+    }
+
+    tasks.sort();
+    tasks.dedup();
+    if tasks.is_empty() {
+        return Err(
+            "Provide at least one task identifier via arguments or --select filters.".to_string(),
+        );
+    }
 
     let outcome = sprint_assignment::remove_tasks(
         &mut context.storage,
@@ -292,6 +367,82 @@ fn split_assignment_inputs(
     } else {
         Ok((None, items.to_vec()))
     }
+}
+
+fn local_resolver(tasks_root: &Path) -> TasksDirectoryResolver {
+    TasksDirectoryResolver {
+        path: tasks_root.to_path_buf(),
+        source: TasksDirectorySource::CommandLineFlag,
+    }
+}
+
+fn load_resolved_config(resolver: &TasksDirectoryResolver) -> Result<ResolvedConfig, String> {
+    let manager = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+    Ok(manager.get_resolved_config().clone())
+}
+
+fn build_selection_from_args(
+    args: &TaskSelectionArgs,
+    resolver: &TasksDirectoryResolver,
+    config: &ResolvedConfig,
+) -> Result<Option<TaskSelection>, String> {
+    if !args.is_active() {
+        return Ok(None);
+    }
+
+    let validator = CliValidator::new(config);
+    let mut filter = crate::api_types::TaskListFilter::default();
+
+    if let Some(query) = args
+        .query
+        .as_ref()
+        .map(|q| q.trim())
+        .filter(|q| !q.is_empty())
+    {
+        filter.text_query = Some(query.to_string());
+    }
+
+    for status in &args.status {
+        let validated = validator
+            .validate_status(status)
+            .map_err(|e| format!("Status validation failed: {}", e))?;
+        filter.status.push(validated);
+    }
+
+    for priority in &args.priority {
+        let validated = validator
+            .validate_priority(priority)
+            .map_err(|e| format!("Priority validation failed: {}", e))?;
+        filter.priority.push(validated);
+    }
+
+    for task_type in &args.task_type {
+        let validated = validator
+            .validate_task_type(task_type)
+            .map_err(|e| format!("Type validation failed: {}", e))?;
+        filter.task_type.push(validated);
+    }
+
+    if !args.tag.is_empty() {
+        filter.tags = args.tag.clone();
+    }
+
+    if let Some(project) = args.project.as_deref() {
+        let prefix = resolve_project_input(project, resolver.path.as_path());
+        filter.project = Some(prefix);
+    }
+
+    let (custom_where, remaining_where, _) =
+        crate::utils::custom_fields::partition_where_filters(&args.r#where, config);
+    for (name, values) in custom_where {
+        filter.custom_fields.entry(name).or_default().extend(values);
+    }
+
+    Ok(Some(TaskSelection {
+        filter,
+        r#where: remaining_where,
+    }))
 }
 
 #[derive(Debug, Serialize)]

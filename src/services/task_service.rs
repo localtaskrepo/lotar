@@ -375,6 +375,7 @@ impl TaskService {
             tags: filter.tags.clone(),
             text_query: filter.text_query.clone(),
             sprints: Vec::new(),
+            custom_fields: filter.custom_fields.clone(),
         };
 
         let mut config_cache: HashMap<String, ResolvedConfig> = HashMap::new();

@@ -7,9 +7,18 @@
       :statuses="statusOptions"
       :priorities="priorityOptions"
       :value="filter"
+      :custom-presets="customFilterPresets"
       @update:value="onChipsUpdate"
+      @preset="handleCustomPreset"
     />
-    <FilterBar :statuses="statuses" :priorities="priorities" :types="types" :value="filter" @update:value="onFilterUpdate" />
+    <FilterBar
+      ref="filterBarRef"
+      :statuses="statuses"
+      :priorities="priorities"
+      :types="types"
+      :value="filter"
+      @update:value="onFilterUpdate"
+    />
 
     <div class="col" style="gap: 16px;">
       <UiLoader v-if="loading && !hasTasks" size="md" />
@@ -215,9 +224,16 @@ const tasks = items
 const { add: addActivity, markTaskTouch, removeTaskTouch, touches: activityTouches } = useActivity()
 
 const route = useRoute()
-const { statuses, priorities, types, refresh: refreshConfig } = useConfig()
+const { statuses, priorities, types, refresh: refreshConfig, customFields: availableCustomFields } = useConfig()
 const statusOptions = computed(() => [...(statuses.value || [])])
 const priorityOptions = computed(() => [...(priorities.value || [])])
+const customFilterPresets = computed(() => {
+  const names = (availableCustomFields.value || []).filter((name) => name !== '*')
+  return names.slice(0, 6).map((name) => ({
+    label: name,
+    expression: `field:${name}=`,
+  }))
+})
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
 const sprintLookup = computed<Record<number, { label: string; state?: string }>>(() => {
@@ -269,10 +285,16 @@ watch(
 )
 
 const filter = ref<Record<string,string>>({})
+const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void } | null>(null)
+const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 
 function onFilterUpdate(v: Record<string,string>){ filter.value = v }
 function onChipsUpdate(v: Record<string,string>){ filter.value = { ...v } }
 function resetFilters(){ filter.value = {}; selectedIds.value = [] }
+
+function handleCustomPreset(expression: string) {
+  filterBarRef.value?.appendCustomFilter(expression)
+}
 
 type NavMode = 'push' | 'replace' | 'none'
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -362,24 +384,24 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
   if (!onTasksRoute) return
   const q = { ...raw }
   const qnorm: Record<string, string> = {}
-  if (q.q) qnorm.q = q.q
-  if (q.project) qnorm.project = q.project
-  if (q.status) qnorm.status = q.status
-  if (q.priority) qnorm.priority = q.priority
-  if (q.type) qnorm.type = q.type
-  if (q.assignee) qnorm.assignee = q.assignee
-  if (q.tags) qnorm.tags = q.tags
-  if (q.due) qnorm.due = q.due
-  if (q.recent) qnorm.recent = q.recent
-  if (q.needs) qnorm.needs = q.needs
+  const extraQuery: Record<string, string> = {}
+  for (const [key, value] of Object.entries(q)) {
+    if (!value || key === 'order') continue
+    if (BUILTIN_QUERY_KEYS.has(key)) {
+      qnorm[key] = value
+    } else {
+      extraQuery[key] = value
+    }
+  }
   qnorm.order = (q.order === 'asc' || q.order === 'desc') ? q.order : 'desc'
+  const nextQuery = { ...extraQuery, ...qnorm }
 
   if (disposed) return
 
   if (nav === 'replace') {
-    if (!disposed) await router.replace({ path: '/', query: qnorm })
+    if (!disposed) await router.replace({ path: '/', query: nextQuery })
   } else if (nav === 'push') {
-    if (!disposed) await router.push({ path: '/', query: qnorm })
+    if (!disposed) await router.push({ path: '/', query: nextQuery })
   }
 
   const serverFilter: any = {}
@@ -390,6 +412,7 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
   if (qnorm.type) serverFilter.type = qnorm.type.split(',').map(s => s.trim()).filter(Boolean)
   if (qnorm.assignee && qnorm.assignee !== '__none__') serverFilter.assignee = qnorm.assignee
   if (qnorm.tags) serverFilter.tags = qnorm.tags.split(',').map(s => s.trim()).filter(Boolean)
+  Object.assign(serverFilter, extraQuery)
 
   if (disposed) return
 

@@ -26,16 +26,36 @@
         <div v-if="bulk" class="bulk-menu-wrapper">
           <button class="btn" type="button" title="Bulk actions" :disabled="disableBulkActions" ref="bulkMenuButton" @click.stop="toggleBulkMenu">⋯</button>
           <div v-if="showBulkMenu" class="menu-popover card bulk-actions-menu" ref="bulkMenuPopover">
-            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">Assign…</button>
-            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">Clear assignee</button>
-            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">Add to sprint…</button>
-            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">Remove from sprint…</button>
-            <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">Delete tasks…</button>
+            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
+              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
+              <span class="menu-item__label">Assign…</span>
+            </button>
+            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">
+              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
+              <span class="menu-item__label">Clear assignee</span>
+            </button>
+            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">
+              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+              <span class="menu-item__label">Add to sprint…</span>
+            </button>
+            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">
+              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+              <span class="menu-item__label">Remove from sprint…</span>
+            </button>
+            <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">
+              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+              <span class="menu-item__label">Delete tasks…</span>
+            </button>
             <div class="menu-separator" role="separator"></div>
-            <button class="menu-item" type="button" @click="openBacklog">Open sprint backlog</button>
+            <button class="menu-item" type="button" @click="openBacklog">
+              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="list" /></span>
+              <span class="menu-item__label">Open sprint backlog</span>
+            </button>
           </div>
         </div>
-  <button class="btn primary" @click="$emit('add')">Add</button>
+        <button class="btn primary icon-only" type="button" aria-label="Add" title="Add task" @click="$emit('add')">
+          <IconGlyph name="plus" />
+        </button>
       </div>
     </div>
 
@@ -138,8 +158,9 @@
                   <span
                     v-for="sprintId in (t.sprints || [])"
                     :key="`${t.id}-sprint-${sprintId}`"
-                    class="chip small"
+                    class="chip small sprint-chip"
                     :class="sprintStateClass(sprintId)"
+                    :title="sprintTooltip(sprintId)"
                   >
                     {{ sprintLabel(sprintId) }}
                   </span>
@@ -161,13 +182,34 @@
             <td class="actions-cell" @click.stop>
               <button class="btn" aria-label="Row actions" title="Actions" @click.stop="toggleRowMenu(t.id)">⋯</button>
               <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
-                <button class="menu-item" v-if="!isEditingTags(t.id)" @click="toggleTagsEdit(t.id); closeRowMenu(t.id)">Edit tags</button>
-                <button class="menu-item" v-else @click="saveTags(t); closeRowMenu(t.id)">Save tags</button>
-                <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">Assign…</button>
-                <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">Clear assignee</button>
-                <button class="menu-item" @click="$emit('sprint-add', t.id); closeRowMenu(t.id)">Add to sprint…</button>
-                <button class="menu-item" @click="$emit('sprint-remove', t.id); closeRowMenu(t.id)">Remove from sprint…</button>
-                <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">Delete…</button>
+                <button class="menu-item" v-if="!isEditingTags(t.id)" @click="toggleTagsEdit(t.id); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
+                  <span class="menu-item__label">Edit tags</span>
+                </button>
+                <button class="menu-item" v-else @click="saveTags(t); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="check" /></span>
+                  <span class="menu-item__label">Save tags</span>
+                </button>
+                <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
+                  <span class="menu-item__label">Assign…</span>
+                </button>
+                <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
+                  <span class="menu-item__label">Clear assignee</span>
+                </button>
+                <button class="menu-item" @click="$emit('sprint-add', t.id); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                  <span class="menu-item__label">Add to sprint…</span>
+                </button>
+                <button class="menu-item" @click="$emit('sprint-remove', t.id); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+                  <span class="menu-item__label">Remove from sprint…</span>
+                </button>
+                <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                  <span class="menu-item__label">Delete…</span>
+                </button>
               </div>
             </td>
           </tr>
@@ -181,9 +223,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState'
-import UiCard from './UiCard.vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
+import IconGlyph from './IconGlyph.vue';
+import UiCard from './UiCard.vue';
 
 const props = defineProps<TaskTableProps>()
 const emit = defineEmits<TaskTableEmit>()
@@ -242,14 +285,23 @@ const disableSprintActions = computed(() => disableBulkActions.value || sprintsL
 
 function sprintLabel(id: number) {
   const entry = sprintLookup.value[id]
-  if (entry?.label) return entry.label
-  return `#${id}`
+  const raw = (entry?.label || `#${id}`).trim()
+  const firstSpace = raw.indexOf(' ')
+  if (firstSpace === -1) return raw
+  const head = raw.slice(0, firstSpace)
+  const tail = raw.slice(firstSpace + 1).trim()
+  if (!tail) return head
+  return `${head}\u00a0${tail}`
 }
 
 function sprintStateClass(id: number) {
   const state = sprintLookup.value[id]?.state?.toLowerCase()
   if (!state) return 'sprint--unknown'
   return `sprint--${state}`
+}
+
+function sprintTooltip(id: number) {
+  return sprintLabel(id).replace(/\u00a0/g, ' ')
 }
 
 function toggleBulkMenu() {
@@ -494,6 +546,23 @@ tbody tr.is-recent {
   border-radius: 999px;
 }
 
+.chip.sprint-chip {
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn.icon-only {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 1.25rem;
+}
+
 .chip.sprint--active {
   background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
   color: var(--color-accent, #0ea5e9);
@@ -584,6 +653,9 @@ tbody tr.is-recent {
   border-radius: var(--radius-md, 0.375rem);
   cursor: pointer;
   transition: background 120ms ease;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
 }
 
 .menu-item:hover {
@@ -592,6 +664,24 @@ tbody tr.is-recent {
 
 .menu-item.danger {
   color: var(--color-danger, #ef4444);
+}
+
+.menu-item__icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted, #6b7280);
+  font-size: 1rem;
+}
+
+.menu-item.danger .menu-item__icon {
+  color: inherit;
+}
+
+.menu-item__label {
+  flex: 1;
 }
 
 .menu-separator {

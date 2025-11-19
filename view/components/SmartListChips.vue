@@ -8,14 +8,31 @@
     <button class="btn" :class="{ primary: isOverdue }" @click="toggleOverdue">Overdue</button>
     <button class="btn" :class="{ primary: isRecent }" @click="toggleRecent">Recent</button>
     <button class="btn" :class="{ primary: isNoEstimate }" @click="toggleNoEstimate">No estimate</button>
+    <template v-if="customPresets?.length">
+      <span class="muted smart-list-chips__label">Custom fields</span>
+      <button
+        v-for="preset in customPresets"
+        :key="preset.expression"
+        class="btn ghost smart-list-chips__preset"
+        type="button"
+        @click="emitPreset(preset.expression)"
+      >
+        {{ preset.label }}
+      </button>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const props = defineProps<{ statuses?: string[]; priorities?: string[]; value?: Record<string, string> }>()
-const emit = defineEmits<{ (e: 'update:value', v: Record<string,string>): void }>()
+interface CustomPreset {
+  label: string
+  expression: string
+}
+
+const props = defineProps<{ statuses?: string[]; priorities?: string[]; value?: Record<string, string>; customPresets?: CustomPreset[] }>()
+const emit = defineEmits<{ (e: 'update:value', v: Record<string,string>): void; (e: 'preset', expr: string): void }>()
 
 function normalize(s: string){ return (s || '').toLowerCase().replace(/\s|[_-]/g, '') }
 function isBlockedLike(s: string){ return normalize(s).includes('blocked') }
@@ -64,8 +81,19 @@ function toggleNoEstimate(){
   const csv = Array.from(set).join(',')
   patch({ needs: csv || '' })
 }
+
+function emitPreset(expression: string) {
+  emit('preset', expression)
+}
 </script>
 
 <style scoped>
-/* Uses global .btn styles; no extra styling needed */
+.smart-list-chips__label {
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.smart-list-chips__preset {
+  font-size: var(--text-xs, 0.75rem);
+  padding-inline: var(--space-2);
+}
 </style>

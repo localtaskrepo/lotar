@@ -235,6 +235,21 @@ impl StorageSearch {
             }
         }
 
+        if !filter.custom_fields.is_empty() {
+            for (name, allowed) in &filter.custom_fields {
+                let Some(values) =
+                    crate::utils::custom_fields::extract_value_strings(&task.custom_fields, name)
+                else {
+                    return false;
+                };
+                if values.is_empty()
+                    || !crate::utils::fuzzy_match::fuzzy_set_match(&values, allowed)
+                {
+                    return false;
+                }
+            }
+        }
+
         true
     }
 

@@ -2,13 +2,14 @@ use crate::api_server::{self, HttpRequest};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use include_dir::{Dir, include_dir};
 use notify::event::EventKind;
-use notify::{Config as NotifyConfig, RecursiveMode, Watcher, recommended_watcher};
+use notify::{Config as NotifyConfig, PollWatcher, RecursiveMode, Watcher, recommended_watcher};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
 use std::sync::{LazyLock, Mutex};
+use std::time::Duration;
 
 static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web");
 static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
@@ -510,6 +511,33 @@ fn start_tasks_watcher() {
             return;
         }
 
+        let enable_poll = std::env::var("LOTAR_ENABLE_POLL_WATCH")
+            .map(|v| v != "0")
+            .unwrap_or_else(
+                |_| matches!(std::env::var("LOTAR_TEST_FAST_IO"), Ok(ref v) if v == "1"),
+            );
+        let mut poll_watcher: Option<PollWatcher> = None;
+        if enable_poll {
+            let interval = std::env::var("LOTAR_POLL_WATCH_INTERVAL_MS")
+                .ok()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(|ms| ms.max(50))
+                .unwrap_or(200);
+            let cfg = NotifyConfig::default().with_poll_interval(Duration::from_millis(interval));
+            if let Ok(mut poller) = PollWatcher::new(
+                {
+                    let tx = tx.clone();
+                    move |res| {
+                        let _ = tx.send(res);
+                    }
+                },
+                cfg,
+            ) && poller.watch(&tasks_dir, RecursiveMode::Recursive).is_ok()
+            {
+                poll_watcher = Some(poller);
+            }
+        }
+
         drop(tx);
 
         // Simple loop: for any modify/create/remove, emit project_changed events.
@@ -558,5 +586,7 @@ fn start_tasks_watcher() {
                 _ => {}
             }
         }
+
+        drop(poll_watcher);
     });
 }

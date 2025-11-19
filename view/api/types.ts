@@ -136,7 +136,13 @@ export interface TaskListFilter {
   q?: string
   assignee?: string
   sprints?: number[]
+  custom_fields?: Record<string, string | string[]>
   [key: string]: any
+}
+
+export interface TaskSelection {
+  filter?: TaskListFilter
+  where?: Array<[string, string]>
 }
 
 export interface SprintAssignmentRequest {
@@ -145,6 +151,7 @@ export interface SprintAssignmentRequest {
   allow_closed?: boolean
   cleanup_missing?: boolean
   force_single?: boolean
+  selection?: TaskSelection
 }
 
 export interface SprintAssignmentResponse {

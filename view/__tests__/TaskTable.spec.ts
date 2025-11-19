@@ -86,4 +86,26 @@ describe('TaskTable', () => {
     expect(s1.key).toBe('title')
     expect(s2.key).toBe('status')
   })
+
+  it('renders sprint chips with non-breaking labels', () => {
+    const sprintTasks = [
+      {
+        ...tasks[0],
+        sprints: [42],
+      },
+    ]
+    const wrapper = mount(TaskTable, {
+      props: {
+        tasks: sprintTasks,
+        sprintLookup: {
+          42: { label: '#42 Ultra Long Sprint Name For Preview', state: 'active' },
+        },
+        statuses: ['open'],
+      },
+    })
+    const chip = wrapper.find('.sprint-chip')
+    expect(chip.exists()).toBe(true)
+    expect(chip.text()).toContain('\u00a0')
+    expect(chip.attributes('title')).toContain('#42 Ultra Long Sprint Name For Preview')
+  })
 })

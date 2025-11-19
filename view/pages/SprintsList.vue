@@ -183,7 +183,9 @@
           <input class="input" v-model="filters.search" placeholder="Title or description" />
         </label>
         <button class="btn ghost" type="button" :disabled="!filtersActive" @click="clearFilters">Clear</button>
-        <button class="btn primary icon-only" type="button" aria-label="Create sprint" @click="openCreate">+</button>
+        <button class="btn primary icon-only" type="button" aria-label="Create sprint" @click="openCreate">
+          <IconGlyph name="plus" />
+        </button>
       </div>
       <div class="filter-meta">
         <div class="row" style="gap: 12px; align-items: center; flex-wrap: wrap;">
@@ -722,14 +724,15 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type {
-  SprintBurndownResponse,
-  SprintCreateRequest,
-  SprintListItem,
-  SprintSummaryReportResponse,
-  SprintUpdateRequest,
-  SprintVelocityResponse,
-  TaskDTO,
+    SprintBurndownResponse,
+    SprintCreateRequest,
+    SprintListItem,
+    SprintSummaryReportResponse,
+    SprintUpdateRequest,
+    SprintVelocityResponse,
+    TaskDTO,
 } from '../api/types'
+import IconGlyph from '../components/IconGlyph.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'

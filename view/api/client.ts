@@ -30,14 +30,28 @@ const BASE = '' // same origin; server serves /api
 
 function qs(params: Record<string, any> = {}): string {
   const usp = new URLSearchParams()
-  Object.entries(params).forEach(([k, v]) => {
-    if (v === undefined || v === null) return
-    if (Array.isArray(v)) {
-      if (v.length) usp.set(k, v.join(','))
-    } else {
-      usp.set(k, String(v))
+
+  const append = (key: string, value: unknown) => {
+    if (value === undefined || value === null) return
+    if (Array.isArray(value)) {
+      if (value.length) usp.set(key, value.join(','))
+      return
     }
+    usp.set(key, String(value))
+  }
+
+  Object.entries(params).forEach(([k, v]) => {
+    if (k === 'custom_fields' && v && typeof v === 'object' && !Array.isArray(v)) {
+      Object.entries(v as Record<string, unknown>).forEach(([name, value]) => {
+        if (value === undefined || value === null) return
+        const key = name.startsWith('field:') ? name : `field:${name}`
+        append(key, value)
+      })
+      return
+    }
+    append(k, v)
   })
+
   const s = usp.toString()
   return s ? `?${s}` : ''
 }

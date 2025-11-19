@@ -27,13 +27,8 @@ pub(crate) fn run(
     // Load tasks snapshot
     let storage = crate::storage::manager::Storage::new(resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
-        status: Vec::new(),
-        priority: Vec::new(),
-        task_type: Vec::new(),
         project: scope_project.clone(),
-        tags: Vec::new(),
-        text_query: None,
-        sprints: Vec::new(),
+        ..Default::default()
     };
     let mut tasks = crate::services::task_service::TaskService::list(&storage, &filter);
     // Performance guardrail: cap tasks processed for aggregation
