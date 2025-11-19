@@ -49,7 +49,7 @@ lotar config set <KEY> <VALUE> [--global] [--dry-run] [--force]
 ```
 
 Details:
-- Use dotted canonical keys such as `server.port` or `issue.tags`. Arrays/maps should be supplied as JSON strings (see examples below).
+- Use canonical keys such as `server.port`, `issue.tags`, or `custom_fields`. Arrays/maps accept JSON strings (e.g., `"[\"frontend\",\"backend\"]"`) or comma-separated values (e.g., `frontend,backend`).
 - Project scope is chosen via the CLI-wide `--project` flag or the configured `default.project`. Pass `--global` to edit `.tasks/config.yml` instead.
 - `--dry-run` shows the pending change, runs conflict detection, and exits without editing files.
 - `--force` applies the change even when conflict detection finds issues. Validation errors (wrong field name/value) will still abort.
@@ -127,7 +127,9 @@ lotar config set server.port 9000 --global
 
 # Set global tags and custom fields for all projects (arrays)
 lotar config set issue.tags '["frontend","backend","urgent"]' --global
-lotar config set custom.fields '["product","sprint"]' --global
+lotar config set custom_fields '["product","sprint"]' --global
+# Comma-separated list works too
+lotar config set custom_fields product,sprint --global
 
 # Environment variable integration
 export LOTAR_TASKS_DIR=/custom/tasks
@@ -160,14 +162,16 @@ lotar config normalize --project=DEMO --write
 ### Configuration Precedence
 When resolving configuration, LoTaR uses this order (highest wins):
 1. Command-line flags (per command)
-2. Environment variables
-3. Home config (~/.lotar)
-4. Project config (.tasks/<PROJECT>/config.yml)
+2. Project config (.tasks/<PROJECT>/config.yml) when a project context is resolved
+3. Environment variables
+4. Home config (~/.lotar)
 5. Global config (.tasks/config.yml)
 6. Built-in defaults
 
+Commands that do not operate on a specific project simply skip step 2, so they evaluate CLI → env → home → global → defaults.
+
 Notes:
-- Project config overrides global, but home/env can override both.
+- Project config overrides env/home/global, so use env/home for broad defaults and commit per-project differences inside `.tasks/<PROJECT>/config.yml`.
 - CLI flags are applied by each command and always win for that invocation.
  - Identity resolution uses the merged configuration from this precedence chain.
 
@@ -176,7 +180,7 @@ LoTaR accepts both dotted keys and nested sections in YAML. Internally, values a
 
 - When a config file only uses built-in defaults the canonical writer produces a short comment instead of redundant YAML. Modify a value (for example `lotar config set server.port 9000 --global`) and rerun `lotar config normalize --write` to emit the corresponding section.
 - Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).
-- Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility. They are normalized, but `issue.categories` is considered legacy and is no longer consumed directly—prefer using `custom.fields` instead.
+- Legacy `taxonomy.categories` and `taxonomy.tags` are accepted on input for backward compatibility. They are normalized, but `issue.categories` is considered legacy and is no longer consumed directly—prefer using `custom_fields` instead.
 - Branch alias maps live under a top-level `branch` section and are merged with project-level overrides.
 
 ### Automatic Prefix Generation
@@ -221,7 +225,7 @@ lotar config init --project=new-service --copy-from=existing-service
 
 ## Configuration Keys
 
-> Legacy note: older configurations may still carry `issue.categories`. The value is normalized for backwards compatibility, but the runtime no longer uses it—model the same information with `custom.fields` instead.
+> Legacy note: older configurations may still carry `issue.categories`. The value is normalized for backwards compatibility, but the runtime no longer uses it—model the same information with `custom_fields` instead (the older `custom.fields` alias remains accepted for compatibility).
 
 ### Project-Level
 - `project.name` - Optional human-readable project name; folder name remains the canonical identifier
@@ -236,7 +240,7 @@ lotar config init --project=new-service --copy-from=existing-service
 - `default.status` - Default task status
 - `members` - Allowed members when `default.strict_members` is true
 - `default.strict_members` - Enforce member list for reporter/assignee fields
-- `custom.fields` - Custom field definitions
+- `custom_fields` - Custom field definitions
     
 Automation (defaults inherited from global):
 - `auto.populate_members` - Automatically add new assignees/reporters to the project member list when strict members are enabled (default: true)
@@ -244,6 +248,13 @@ Automation (defaults inherited from global):
 - `auto.assign_on_status` - If true, auto-assign assignee on first meaningful status change
     - First-change is defined as: when a task moves away from the default.status (or the first state if default unset) and the task currently has no assignee.
     - The assignee chosen is, in order: CODEOWNERS default owner (when available and `auto.codeowners_assign` is true) → resolved current user (see Identity Resolution below).
+- `auto.codeowners_assign` - Enable CODEOWNERS fallback when auto-assigning on first status change
+- `auto.tags_from_path` - Allow monorepo path heuristics to seed tags when no defaults were provided
+- `auto.branch_infer_type` - Infer task type from branch prefixes like feat/, fix/, chore/
+- `auto.branch_infer_status` - Infer task status via `branch.status_aliases`
+- `auto.branch_infer_priority` - Infer task priority via `branch.priority_aliases`
+- `auto.identity` - Enable manifest/git/system detection for `@me`
+- `auto.identity_git` - Allow git config to feed `@me` resolution
 
 ### Global
 - `server.port` - Web server port
@@ -259,7 +270,7 @@ Automation (defaults inherited from global):
 - `default.status` - Default task status for all projects
 - `members` - Global allowed members list (project overrides replace/extend)
 - `default.strict_members` - Enforce member list globally (projects can override)
-- `custom.fields` - Default custom fields for all projects
+- `custom_fields` - Default custom fields for all projects
 - `sprints.defaults.length` - Default planned sprint length (e.g., `2w`) applied when creating sprints without an explicit length.
 - `sprints.defaults.capacity_points` / `sprints.defaults.capacity_hours` - Default sprint capacity values used when not provided by the caller.
 - `sprints.defaults.overdue_after` - Default grace period (e.g., `12h`) before overdue warnings trigger.
@@ -322,6 +333,7 @@ branch:
 ## Global Options
 
 - `--project <PREFIX_OR_NAME>` - Override auto-detected project for any config subcommand (same resolution rules as `lotar config show --project`).
+- `-C, --config KEY=VALUE` - Inline configuration override for the current invocation. Accepts the same field names as `lotar config set` (e.g., `-C default_status=Done`). Multiple flags can be supplied; later ones win. Existing per-command options remain as shorthands.
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)

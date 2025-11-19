@@ -642,7 +642,11 @@ impl TaskService {
     }
     fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
         let base = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
-            .unwrap_or_else(|_| ResolvedConfig::from_global(GlobalConfig::default()));
+            .unwrap_or_else(|_| {
+                let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());
+                crate::config::resolution::apply_cli_overrides(&mut fallback);
+                fallback
+            });
 
         if project_prefix.trim().is_empty() {
             return base;

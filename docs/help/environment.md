@@ -5,7 +5,7 @@ LoTaR reads environment variables for workspace discovery, configuration overrid
 
 ## Resolution & Precedence
 
-- CLI flags → environment variables → home config (`~/.lotar`) → project config (`.tasks/<project>/config.yml`) → global config (`.tasks/config.yml`) → built-in defaults. See [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md) for resolver details.
+- CLI flags → project config (when applicable) → environment variables → home config (`~/.lotar`) → global config (`.tasks/config.yml`) → built-in defaults. Commands without a project context skip the project step. See [Configuration Reference](./config-reference.md) and [Resolution & Precedence](./precedence.md) for resolver details.
 - Override variables feed directly into the configuration system; provide values in the same shape used in YAML (simple scalars) or JSON/YAML strings for lists and maps.
 - Changes require restarting the CLI/server so the fresh environment is read.
 
@@ -34,7 +34,7 @@ All rows below are defined inside the same override table and map directly to th
 | `default_tags` | `LOTAR_DEFAULT_TAGS` | JSON/YAML list or comma string | Extra tags added to every new task. |
 | `default_priority` | `LOTAR_DEFAULT_PRIORITY` | Priority slug | Sets the initial priority when not provided. |
 | `default_status` | `LOTAR_DEFAULT_STATUS` | Status slug | Sets the initial workflow status. |
-| `members` | `LOTAR_MEMBERS` | JSON/YAML map | Replaces the members directory used by mention auto-complete. |
+| `members` | `LOTAR_MEMBERS` | JSON/YAML list or comma string | Replaces the members directory used by mention auto-complete. |
 | `strict_members` | `LOTAR_STRICT_MEMBERS` | `true`/`false` | When true, limits assignments to the declared members list. |
 | `auto_populate_members` | `LOTAR_AUTO_POPULATE_MEMBERS` | `true`/`false` | Automatically add new assignees/reporters into the members list. |
 | `auto_identity` | `LOTAR_AUTO_IDENTITY` | `true`/`false` | Enables identity guessing from local config when reporter/assignee is omitted. |
@@ -48,14 +48,14 @@ All rows below are defined inside the same override table and map directly to th
 | `issue_types` | `LOTAR_ISSUE_TYPES` | JSON/YAML list | Replaces the list of type options. |
 | `issue_priorities` | `LOTAR_ISSUE_PRIORITIES` | JSON/YAML list | Replaces the priority scale shown in CLI/UI. |
 | `tags` | `LOTAR_ISSUE_TAGS` | JSON/YAML list | Provides the canonical tag whitelist. |
-| `custom_fields` | `LOTAR_CUSTOM_FIELDS` | JSON/YAML map | Declares additional per-task fields. |
+| `custom_fields` | `LOTAR_CUSTOM_FIELDS` | JSON/YAML list or comma string | Declares additional per-task fields. |
 
 ### Automation & branching behavior
 
 | Config key | Env var(s) | Accepted values | Purpose |
 | --- | --- | --- | --- |
 | `auto_set_reporter` | `LOTAR_AUTO_SET_REPORTER` | `true`/`false` | Automatically set the reporter to the caller when missing. |
-| `auto_assign_on_status` | `LOTAR_AUTO_ASSIGN_ON_STATUS` | JSON/YAML map | Maps workflow transitions to automatic assignees. |
+| `auto_assign_on_status` | `LOTAR_AUTO_ASSIGN_ON_STATUS` | `true`/`false` | Toggles first-change auto-assignment. |
 | `auto_codeowners_assign` | `LOTAR_AUTO_CODEOWNERS_ASSIGN` | `true`/`false` | Assign tasks based on CODEOWNERS matches. |
 | `auto_tags_from_path` | `LOTAR_AUTO_TAGS_FROM_PATH` | `true`/`false` | Adds tags inferred from filesystem paths. |
 | `auto_branch_infer_type` | `LOTAR_AUTO_BRANCH_INFER_TYPE` | `true`/`false` | Infers issue type from git branches. |

@@ -13,9 +13,18 @@ use std::path::Path;
 
 fn parse_token_list<T>(value: &str, label: &str) -> Result<Vec<T>, ConfigError>
 where
-    T: std::str::FromStr,
+    T: std::str::FromStr + DeserializeOwned,
     T::Err: std::fmt::Display,
 {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    if let Ok(list) = serde_yaml::from_str::<Vec<T>>(trimmed) {
+        return Ok(list);
+    }
+
     value
         .split(',')
         .map(|part| part.trim())
@@ -56,6 +65,19 @@ fn parse_optional_bool_flag(value: &str, field: &str) -> Result<Option<bool>, Co
 }
 
 fn parse_simple_csv(value: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    if let Ok(mut list) = serde_yaml::from_str::<Vec<String>>(trimmed) {
+        for entry in &mut list {
+            *entry = entry.trim().to_string();
+        }
+        list.retain(|entry| !entry.is_empty());
+        return list;
+    }
+
     value
         .split(',')
         .map(|s| s.trim())
@@ -420,13 +442,7 @@ pub fn apply_field_to_global_config(
             }
         }
         "default_tags" => {
-            let tags: Vec<String> = value
-                .split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect();
-            config.default_tags = tags;
+            config.default_tags = parse_simple_csv(value);
         }
         "members" => {
             config.members = parse_simple_csv(value);
@@ -598,13 +614,12 @@ fn apply_field_to_project_config(
             config.default_status = Some(status);
         }
         "default_tags" => {
-            let values: Vec<String> = value
-                .split(',')
-                .map(|s| s.trim())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect();
-            config.default_tags = Some(values);
+            let values = parse_simple_csv(value);
+            config.default_tags = if values.is_empty() {
+                None
+            } else {
+                Some(values)
+            };
         }
         "members" => {
             let members = parse_simple_csv(value);
@@ -657,6 +672,27 @@ fn apply_field_to_project_config(
         }
         "auto_assign_on_status" => {
             config.auto_assign_on_status = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_codeowners_assign" => {
+            config.auto_codeowners_assign = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_tags_from_path" => {
+            config.auto_tags_from_path = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_branch_infer_type" => {
+            config.auto_branch_infer_type = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_branch_infer_status" => {
+            config.auto_branch_infer_status = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_branch_infer_priority" => {
+            config.auto_branch_infer_priority = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_identity" => {
+            config.auto_identity = parse_optional_bool_flag(value, field)?;
+        }
+        "auto_identity_git" => {
+            config.auto_identity_git = parse_optional_bool_flag(value, field)?;
         }
         "scan_signal_words" => {
             let entries = parse_simple_csv(value);
@@ -776,6 +812,13 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "custom_fields",
         "auto_set_reporter",
         "auto_assign_on_status",
+        "auto_codeowners_assign",
+        "auto_tags_from_path",
+        "auto_branch_infer_type",
+        "auto_branch_infer_status",
+        "auto_branch_infer_priority",
+        "auto_identity",
+        "auto_identity_git",
         "scan_signal_words",
         "scan_ticket_patterns",
         "scan_enable_ticket_words",

@@ -3,7 +3,7 @@
 All configuration keys by scope with types and notes. Canonical YAML uses nested groups and only emits values that differ from the built-in defaults. If `.tasks/config.yml` contains just a comment, you're still using the defaults listed below.
 
 ## Precedence
-CLI > env > home > project > global > defaults. See [Resolution & Precedence](./precedence.md).
+CLI > project > env > home > global > defaults (commands without a project skip the project step). See [Resolution & Precedence](./precedence.md).
 
 ## Canonical keys (nested)
 - server.port: number (default 8080)
@@ -19,7 +19,7 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 - issue.types: string[] (feature, bug, epic, spike, chore)
 - issue.priorities: string[] (Low, Medium, High, Critical)
 - issue.tags: string[]
-- custom.fields: string[]
+- custom_fields: string[]
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
 - scan.enable_ticket_words: boolean (default: false) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
@@ -39,7 +39,9 @@ CLI > env > home > project > global > defaults. See [Resolution & Precedence](./
 ## Home and Project keys
 Same shape as global; project values override global for that project. Use `project.name` for an optional human-readable label (the folder name remains the canonical identifier).
 
-> Legacy: older configs may include `issue.categories`. The key is normalized for compatibility but is not consumed by the runtime. Prefer modeling these labels with `custom.fields`.
+Automation overrides mirror the global `auto.*` toggles when set at the project level. Acceptable keys: `auto.populate_members`, `auto.set_reporter`, `auto.assign_on_status`, `auto.codeowners_assign`, `auto.tags_from_path`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`, `auto.identity`, and `auto.identity_git`.
+
+> Legacy: older configs may include `issue.categories`. The key is normalized for compatibility but is not consumed by the runtime. Prefer modeling these labels with `custom_fields` (the dotted alias remains accepted for compatibility).
 
 ## Examples
 ```yaml

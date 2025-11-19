@@ -23,6 +23,15 @@ pub struct Cli {
     #[arg(long, short = 'p', global = true)]
     pub project: Option<String>,
 
+    /// Inline configuration overrides (KEY=VALUE). Applies to this invocation only.
+    #[arg(
+        long = "config",
+        value_name = "KEY=VALUE",
+        global = true,
+        value_parser = crate::cli::args::parse_key_value
+    )]
+    pub config_overrides: Vec<(String, String)>,
+
     /// Tasks directory path (overrides default)
     #[arg(long, global = true)]
     pub tasks_dir: Option<String>,

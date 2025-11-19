@@ -486,6 +486,27 @@ pub fn parse_project_from_yaml_str(
     if let Some(v) = get_path(&data, &["auto", "assign_on_status"]).and_then(cast::<bool>) {
         cfg.auto_assign_on_status = Some(v);
     }
+    if let Some(v) = get_path(&data, &["auto", "codeowners_assign"]).and_then(cast::<bool>) {
+        cfg.auto_codeowners_assign = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "tags_from_path"]).and_then(cast::<bool>) {
+        cfg.auto_tags_from_path = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "branch_infer_type"]).and_then(cast::<bool>) {
+        cfg.auto_branch_infer_type = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "branch_infer_status"]).and_then(cast::<bool>) {
+        cfg.auto_branch_infer_status = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "branch_infer_priority"]).and_then(cast::<bool>) {
+        cfg.auto_branch_infer_priority = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "identity"]).and_then(cast::<bool>) {
+        cfg.auto_identity = Some(v);
+    }
+    if let Some(v) = get_path(&data, &["auto", "identity_git"]).and_then(cast::<bool>) {
+        cfg.auto_identity_git = Some(v);
+    }
     // issue.*
     if let Some(v) = get_path(&data, &["issue", "states"]).cloned() {
         cfg.issue_states = parse_issue_states_tolerant(v);
@@ -887,6 +908,41 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             Y::String("members".into()),
             serde_yaml::to_value(members).unwrap_or(Y::Null),
         );
+    }
+
+    let mut auto = serde_yaml::Mapping::new();
+    if let Some(v) = cfg.auto_populate_members {
+        auto.insert(Y::String("populate_members".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_set_reporter {
+        auto.insert(Y::String("set_reporter".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_assign_on_status {
+        auto.insert(Y::String("assign_on_status".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_codeowners_assign {
+        auto.insert(Y::String("codeowners_assign".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_tags_from_path {
+        auto.insert(Y::String("tags_from_path".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_branch_infer_type {
+        auto.insert(Y::String("branch_infer_type".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_branch_infer_status {
+        auto.insert(Y::String("branch_infer_status".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_branch_infer_priority {
+        auto.insert(Y::String("branch_infer_priority".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_identity {
+        auto.insert(Y::String("identity".into()), Y::Bool(v));
+    }
+    if let Some(v) = cfg.auto_identity_git {
+        auto.insert(Y::String("identity_git".into()), Y::Bool(v));
+    }
+    if !auto.is_empty() {
+        root.insert(Y::String("auto".into()), Y::Mapping(auto));
     }
 
     // issue

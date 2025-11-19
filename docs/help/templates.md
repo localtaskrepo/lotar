@@ -17,21 +17,21 @@ lotar config templates
   - `issue.priorities`: Low, Medium, High
   - `issue.tags`: ["*"] (wildcard means "accept anything")
   - `issue.categories`: ["*"] to smooth migrations from legacy taxonomy files
-  - `custom.fields`: *(not set; configure later if needed)*
+  - `custom_fields`: *(not set; configure later if needed)*
 - **agile** — Sprint workflow with a verify column and rich issue types.
   - `issue.states`: Todo, InProgress, Verify, Done
   - `issue.types`: Epic, Feature, Bug, Spike, Chore
   - `issue.priorities`: Low, Medium, High, Critical
   - `issue.tags`: ["*"]
   - `issue.categories`: *(not set)*
-  - `custom.fields`: ["category", "sprint"] to hint at reporting dimensions
+  - `custom_fields`: ["category", "sprint"] to hint at reporting dimensions
 - **kanban** — Continuous flow with review/verification.
   - `issue.states`: Todo, InProgress, Verify, Done
   - `issue.types`: Feature, Bug, Epic, Chore
   - `issue.priorities`: Low, Medium, High
   - `issue.tags`: ["*"]
   - `issue.categories`: *(not set)*
-  - `custom.fields`: ["category"]
+  - `custom_fields`: ["category"]
 
 Each template file includes metadata (`name`, `description`) plus a `config:` block. Only the `config:` block is written to disk.
 
@@ -52,7 +52,7 @@ Every `init` call serializes the merged YAML, validates it, and writes the canon
 
 - Issue vocabularies are simple arrays. Legacy wrappers like `{values: [...]}` or `{primitive: ...}` are stripped by the loader, so feel free to remove them manually as well.
 - Default template includes `issue.categories: ["*"]`; agile and kanban omit it because they expect explicit categories if you need them.
-- Agile and kanban templates seed `custom.fields` to encourage grouping ("category", "sprint"). Delete or rename these if your workflow prefers other dimensions.
+- Agile and kanban templates seed `custom_fields` to encourage grouping ("category", "sprint"). Delete or rename these if your workflow prefers other dimensions.
 - Wildcards (`"*"`) mean "allow any value" and map to `StringConfigField::new_wildcard()` internally.
 - Template metadata such as `project_name`, `prefix`, or `issue_states` is also accepted for backward compatibility. The loader rewrites those keys into the modern nested `project.*` and `issue.*` structure so you never have to.
 
@@ -111,7 +111,8 @@ Continue customizing after initialization:
 
 ```bash
 lotar config set default.tags '["triage","sev"]' --project=DEMO
-lotar config set custom.fields '["product","squad"]' --project=DEMO
+lotar config set custom_fields '["product","squad"]' --project=DEMO
+lotar config set custom_fields product,squad --project=DEMO  # comma form
 lotar config set issue.tags '["frontend","backend"]' --project=DEMO
 ```
 

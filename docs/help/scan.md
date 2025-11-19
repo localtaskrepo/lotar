@@ -88,7 +88,7 @@ Tweak the vocabulary via:
 
 | Setting | Where | Notes |
 | --- | --- | --- |
-| `scan.strip_attributes` | `.tasks/config.yml`, project config, or CLI flag | CLI > env > home > project > global > defaults. |
+| `scan.strip_attributes` | `.tasks/config.yml`, project config, or CLI flag | CLI > project > env > home > global > defaults (drop the project layer when the command is global). |
 | `LOTAR_SCAN_SIGNAL_WORDS` | Environment | Comma-separated list; beats any config file. |
 | `scan.signal_words` | Home/global/project | Extend/replace the trigger words per scope. |
 | `scan.enable_mentions` | Config | When true (default) bare IDs add anchors without creating tasks. |

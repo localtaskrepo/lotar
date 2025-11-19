@@ -158,6 +158,20 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub auto_assign_on_status: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_codeowners_assign: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_tags_from_path: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_branch_infer_type: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_branch_infer_status: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_branch_infer_priority: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_identity: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auto_identity_git: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_signal_words: Option<Vec<String>>, // case-insensitive signal words for scanner
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub scan_ticket_patterns: Option<Vec<String>>, // regex patterns to detect ticket keys
@@ -198,6 +212,13 @@ impl ProjectConfig {
             custom_fields: None,
             auto_set_reporter: None,
             auto_assign_on_status: None,
+            auto_codeowners_assign: None,
+            auto_tags_from_path: None,
+            auto_branch_infer_type: None,
+            auto_branch_infer_status: None,
+            auto_branch_infer_priority: None,
+            auto_identity: None,
+            auto_identity_git: None,
             scan_signal_words: None,
             scan_ticket_patterns: None,
             scan_enable_ticket_words: None,

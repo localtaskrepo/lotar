@@ -27,7 +27,13 @@ fn config_set_global_custom_fields_and_tags() {
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "set", "tags", "team,backend,ui", "--global"])
+        .args([
+            "config",
+            "set",
+            "tags",
+            r#"["team","backend","ui"]"#,
+            "--global",
+        ])
         .assert()
         .success();
 
@@ -38,7 +44,7 @@ fn config_set_global_custom_fields_and_tags() {
             "config",
             "set",
             "custom_fields",
-            "product,component",
+            r#"["product","component"]"#,
             "--global",
         ])
         .assert()
@@ -47,7 +53,13 @@ fn config_set_global_custom_fields_and_tags() {
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "set", "default_tags", "team,ui", "--global"])
+        .args([
+            "config",
+            "set",
+            "default_tags",
+            r#"["team","ui"]"#,
+            "--global",
+        ])
         .assert()
         .success();
 
@@ -125,14 +137,14 @@ fn config_set_project_custom_fields_and_tags() {
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "set", "tags", "team,backend"])
+        .args(["config", "set", "tags", r#"["team","backend"]"#])
         .assert()
         .success();
 
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp.path())
-        .args(["config", "set", "custom_fields", "product,feature"])
+        .args(["config", "set", "custom_fields", r#"["product","feature"]"#])
         .assert()
         .success();
 

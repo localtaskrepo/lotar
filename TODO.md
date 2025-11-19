@@ -1,6 +1,4 @@
 Features:
-- lotar config validate/normalize needs to be revisited
-- Allow env override for all config values that are in all other chains
 - VSCode Plugin (Contexts?, Issue updates, in-editor quick hints for TODOs with references/quick create dialogs)
 - IntelliJ Plugin
 - custom properties can be used to filter and query. Custom properties are accessed like any other property (no custom: prefix anywhere)

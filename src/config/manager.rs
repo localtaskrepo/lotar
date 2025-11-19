@@ -200,7 +200,9 @@ impl ConfigManager {
         let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
         crate::config::resolution::merge_global_config(&mut config, env_snapshot.global);
 
-        Ok(ResolvedConfig::from_global(config))
+        let mut resolved = ResolvedConfig::from_global(config);
+        crate::config::resolution::apply_cli_overrides(&mut resolved);
+        Ok(resolved)
     }
 }
 

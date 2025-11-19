@@ -124,6 +124,17 @@ fn main() {
         }
     };
 
+    if let Err(err) = lotar::config::resolution::configure_cli_overrides(&cli.config_overrides) {
+        let early_level = if cli.verbose {
+            output::LogLevel::Info
+        } else {
+            cli.log_level
+        };
+        let renderer = output::OutputRenderer::new(cli.format, early_level);
+        renderer.emit_error(format_args!("Invalid --config override: {}", err));
+        std::process::exit(1);
+    }
+
     // Resolve tasks directory
     let resolver = match resolve_tasks_directory_with_override(cli.tasks_dir.clone()) {
         Ok(resolver) => resolver,

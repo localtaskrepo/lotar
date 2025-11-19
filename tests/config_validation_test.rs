@@ -538,46 +538,24 @@ fn test_project_config_validation_valid() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "Test Project".to_string(),
-        issue_states: Some(ConfigurableField {
-            values: vec![
-                TaskStatus::from("Todo"),
-                TaskStatus::from("InProgress"),
-                TaskStatus::from("Done"),
-            ],
-        }),
-        issue_types: Some(ConfigurableField {
-            values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
-        }),
-        issue_priorities: Some(ConfigurableField {
-            values: vec![
-                Priority::from("Low"),
-                Priority::from("Medium"),
-                Priority::from("High"),
-            ],
-        }),
-        tags: None,
-        default_assignee: Some("user@example.com".to_string()),
-        default_reporter: None,
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: Some(Priority::from("Medium")),
-        default_status: Some(TaskStatus::from("Todo")),
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_strip_attributes: None,
-        scan_enable_mentions: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-    };
+    let mut config = base_project_config();
+    config.issue_states = Some(ConfigurableField {
+        values: vec![
+            TaskStatus::from("Todo"),
+            TaskStatus::from("InProgress"),
+            TaskStatus::from("Done"),
+        ],
+    });
+    config.issue_priorities = Some(ConfigurableField {
+        values: vec![
+            Priority::from("Low"),
+            Priority::from("Medium"),
+            Priority::from("High"),
+        ],
+    });
+    config.default_assignee = Some("user@example.com".to_string());
+    config.default_priority = Some(Priority::from("Medium"));
+    config.default_status = Some(TaskStatus::from("Todo"));
 
     let result = validator.validate_project_config(&config);
     assert!(!result.has_errors());
@@ -589,42 +567,28 @@ fn test_project_config_duplicate_overrides_warning() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "Demo".to_string(),
-        issue_states: Some(ConfigurableField {
-            values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
-        }),
-        issue_types: Some(ConfigurableField {
-            values: vec![TaskType::from("Feature"), TaskType::from("feature")],
-        }),
-        issue_priorities: Some(ConfigurableField {
-            values: vec![Priority::from("Low"), Priority::from("low")],
-        }),
-        tags: Some(StringConfigField {
-            values: vec!["UI".to_string(), "ui".to_string()],
-        }),
-        default_assignee: None,
-        default_reporter: None,
-        default_tags: Some(vec!["tag".to_string(), "TAG".to_string()]),
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: Some(Priority::from("Low")),
-        default_status: Some(TaskStatus::from("Todo")),
-        custom_fields: Some(StringConfigField {
-            values: vec!["field".to_string(), "Field".to_string()],
-        }),
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: Some(vec!["TODO".to_string(), "todo".to_string()]),
-        scan_ticket_patterns: Some(vec!["PROJ-[0-9]+".to_string(), "proj-[0-9]+".to_string()]),
-        scan_strip_attributes: None,
-        scan_enable_mentions: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-    };
+    let mut config = base_project_config();
+    config.project_name = "Demo".to_string();
+    config.issue_states = Some(ConfigurableField {
+        values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
+    });
+    config.issue_types = Some(ConfigurableField {
+        values: vec![TaskType::from("Feature"), TaskType::from("feature")],
+    });
+    config.issue_priorities = Some(ConfigurableField {
+        values: vec![Priority::from("Low"), Priority::from("low")],
+    });
+    config.tags = Some(StringConfigField {
+        values: vec!["UI".to_string(), "ui".to_string()],
+    });
+    config.default_tags = Some(vec!["tag".to_string(), "TAG".to_string()]);
+    config.default_priority = Some(Priority::from("Low"));
+    config.default_status = Some(TaskStatus::from("Todo"));
+    config.custom_fields = Some(StringConfigField {
+        values: vec!["field".to_string(), "Field".to_string()],
+    });
+    config.scan_signal_words = Some(vec!["TODO".to_string(), "todo".to_string()]);
+    config.scan_ticket_patterns = Some(vec!["PROJ-[0-9]+".to_string(), "proj-[0-9]+".to_string()]);
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_warnings());
@@ -641,32 +605,11 @@ fn test_project_config_empty_override_errors() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "Demo".to_string(),
-        issue_states: Some(ConfigurableField { values: vec![] }),
-        issue_types: Some(ConfigurableField { values: vec![] }),
-        issue_priorities: Some(ConfigurableField { values: vec![] }),
-        tags: None,
-        default_assignee: None,
-        default_reporter: None,
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: None,
-        default_status: None,
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_strip_attributes: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-        scan_enable_mentions: None,
-    };
+    let mut config = base_project_config();
+    config.project_name = "Demo".to_string();
+    config.issue_states = Some(ConfigurableField { values: vec![] });
+    config.issue_types = Some(ConfigurableField { values: vec![] });
+    config.issue_priorities = Some(ConfigurableField { values: vec![] });
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());
@@ -693,32 +636,8 @@ fn test_project_config_validation_empty_project_name() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "".to_string(), // Empty name should trigger error
-        issue_states: None,
-        issue_types: None,
-        issue_priorities: None,
-        tags: None,
-        default_assignee: None,
-        default_reporter: None,
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: None,
-        default_status: None,
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_strip_attributes: None,
-        scan_enable_mentions: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-    };
+    let mut config = base_project_config();
+    config.project_name = "".to_string(); // Empty name should trigger error
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());
@@ -736,32 +655,8 @@ fn test_project_config_validation_whitespace_project_name() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "   ".to_string(),
-        issue_states: None,
-        issue_types: None,
-        issue_priorities: None,
-        tags: None,
-        default_assignee: None,
-        default_reporter: None,
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: None,
-        default_status: None,
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_strip_attributes: None,
-        scan_enable_mentions: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-    };
+    let mut config = base_project_config();
+    config.project_name = "   ".to_string();
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());
@@ -780,32 +675,8 @@ fn test_project_config_validation_long_project_name() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let long_name = "a".repeat(150); // Very long name should trigger warning
-    let config = ProjectConfig {
-        project_name: long_name,
-        issue_states: None,
-        issue_types: None,
-        issue_priorities: None,
-        tags: None,
-        default_assignee: None,
-        default_reporter: None,
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: None,
-        default_status: None,
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_strip_attributes: None,
-        scan_enable_mentions: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-    };
+    let mut config = base_project_config();
+    config.project_name = long_name;
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_warnings());
@@ -823,36 +694,9 @@ fn test_project_config_validation_invalid_defaults() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "Test Project".to_string(),
-        issue_states: Some(ConfigurableField {
-            values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
-        }),
-        issue_types: None,
-        issue_priorities: Some(ConfigurableField {
-            values: vec![Priority::from("Low"), Priority::from("High")],
-        }),
-        tags: None,
-        default_assignee: None,
-        default_reporter: None,
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: Some(Priority::from("Medium")), // Medium not in priorities list
-        default_status: Some(TaskStatus::from("Done")),   // Done not in states list
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_strip_attributes: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_ticket_words: None,
-        scan_enable_mentions: None,
-    };
+    let mut config = base_project_config();
+    config.default_priority = Some(Priority::from("Medium")); // Medium not in priorities list
+    config.default_status = Some(TaskStatus::from("Done")); // Done not in states list
 
     let result = validator.validate_project_config(&config);
     assert!(!result.has_errors());
@@ -876,32 +720,14 @@ fn test_project_config_validation_invalid_email_format() {
     let temp_dir = TempDir::new().unwrap();
     let validator = ConfigValidator::new(temp_dir.path());
 
-    let config = ProjectConfig {
-        project_name: "Test Project".to_string(),
-        issue_states: None,
-        issue_types: None,
-        issue_priorities: None,
-        tags: None,
-        default_assignee: Some("invalid-email".to_string()), // Invalid email format
-        default_reporter: Some("invalid-reporter".to_string()),
-        default_tags: None,
-        members: None,
-        strict_members: None,
-        auto_populate_members: None,
-        default_priority: None,
-        default_status: None,
-        custom_fields: None,
-        auto_set_reporter: None,
-        auto_assign_on_status: None,
-        scan_signal_words: None,
-        scan_ticket_patterns: None,
-        scan_enable_ticket_words: None,
-        scan_strip_attributes: None,
-        branch_type_aliases: None,
-        branch_status_aliases: None,
-        branch_priority_aliases: None,
-        scan_enable_mentions: None,
-    };
+    let mut config = base_project_config();
+    config.default_assignee = Some("invalid-email".to_string()); // Invalid email format
+    config.default_reporter = Some("invalid-reporter".to_string());
+    config.issue_states = None;
+    config.issue_types = None;
+    config.issue_priorities = None;
+    config.default_priority = None;
+    config.default_status = None;
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_warnings());

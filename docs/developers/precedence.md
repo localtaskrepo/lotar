@@ -5,15 +5,17 @@ This page explains how LoTaR resolves values for configuration, identity (for @m
 ## Configuration precedence
 
 `src/config/resolution.rs` and `src/config/manager.rs` merge configuration layers in a fixed order (highest wins):
-1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`). These are evaluated inside each command handler and never persisted.
-2. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key and is applied globally before any project overlays.
-3. Home config (`~/.lotar` or `%APPDATA%/lotar/config.yml`). Read via `ConfigManager::load_home_config*` and allowed to override both global and project scopes.
-4. Project config (`.tasks/<PROJECT>/config.yml`). Loaded via `ConfigManager::get_project_config` and applied after global defaults but before home/env so smart settings such as `issue_states`, `issue_priorities`, `default_status`, branch aliases, and scan toggles can remain project-specific.
+1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, scoped to the running process, and never persisted.
+2. Project config (`.tasks/<PROJECT>/config.yml`) when a project has been resolved. These files represent the most local settings and override everything except explicit CLI flags.
+3. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key and applies globally across projects.
+4. Home config (`~/.lotar` or `%APPDATA%/lotar/config.yml`). Read via `ConfigManager::load_home_config*` and allowed to override the workspace-global config.
 5. Global config (`.tasks/config.yml` in the resolved workspace). Provides the shared baseline for every project.
 6. Built-in defaults from `src/config/types.rs`.
 
+Commands that do not operate on a project simply skip step 2, so they evaluate CLI → env → home → global → defaults.
+
 Notes:
-- The same chain powers CLI, REST, and MCP. Project-aware commands always call `ProjectResolver::resolve_project` and then `ConfigManager::get_project_config`, so they inherit project-level overrides while still respecting user/home/env tweaks.
+- The same chain powers CLI, REST, and MCP. Project-aware commands always call `ProjectResolver::resolve_project` and then `ConfigManager::get_project_config`, so they inherit project-level overrides while still respecting user/home/env/CLI tweaks. `--config KEY=VALUE` is implemented via `configure_cli_overrides` in `src/config/resolution.rs` and sits above everything else, while existing per-command flags remain available as shorthands.
 - Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified (see `src/config/types.rs`) and honor the same precedence chain.
 - When a field cannot be expressed per-project (for example `tasks_folder`), only the global/home/env layers are considered.
 

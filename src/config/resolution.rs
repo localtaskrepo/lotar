@@ -1,14 +1,28 @@
+use crate::config::operations::{
+    apply_field_to_global_config, validate_field_name, validate_field_value,
+};
 use crate::config::types::*;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
 
 // Simple in-process cache for resolved configuration keyed by tasks root path.
 // This reduces repeated disk IO for common read paths. Invalidate on writes.
 static CONFIG_CACHE: OnceLock<RwLock<HashMap<String, ResolvedConfig>>> = OnceLock::new();
+static CLI_OVERRIDE_LAYER: OnceLock<RwLock<Option<CliOverrideLayer>>> = OnceLock::new();
+
+#[derive(Clone)]
+struct CliOverrideLayer {
+    config: GlobalConfig,
+    signature: String,
+}
 
 fn config_cache() -> &'static RwLock<HashMap<String, ResolvedConfig>> {
     CONFIG_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+fn cli_override_state() -> &'static RwLock<Option<CliOverrideLayer>> {
+    CLI_OVERRIDE_LAYER.get_or_init(|| RwLock::new(None))
 }
 
 fn cache_key_for(tasks_dir: Option<&Path>) -> String {
@@ -24,7 +38,85 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
         .to_string();
     // Include relevant env overrides in the cache key so runtime env changes create a new entry
     let env_signature = crate::config::env_overrides::env_signature();
-    format!("{}|ENV={}", root_str, env_signature)
+    let cli_signature = cli_override_signature();
+    format!("{}|ENV={}|CLI={}", root_str, env_signature, cli_signature)
+}
+
+fn cli_override_signature() -> String {
+    cli_override_state()
+        .read()
+        .ok()
+        .and_then(|guard| guard.as_ref().map(|layer| layer.signature.clone()))
+        .unwrap_or_else(|| "NONE".to_string())
+}
+
+fn active_cli_override_layer() -> Option<CliOverrideLayer> {
+    cli_override_state()
+        .read()
+        .ok()
+        .and_then(|guard| guard.as_ref().cloned())
+}
+
+fn clear_all_cached_configs() {
+    if let Ok(mut guard) = config_cache().write() {
+        guard.clear();
+    }
+}
+
+fn set_cli_override_layer(layer: Option<CliOverrideLayer>) {
+    if let Ok(mut guard) = cli_override_state().write() {
+        *guard = layer;
+    }
+    clear_all_cached_configs();
+}
+
+pub fn clear_cli_overrides() {
+    set_cli_override_layer(None);
+}
+
+pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigError> {
+    if pairs.is_empty() {
+        clear_cli_overrides();
+        return Ok(());
+    }
+
+    let mut normalized = BTreeMap::new();
+    for (raw_key, raw_value) in pairs {
+        let key = raw_key.trim();
+        if key.is_empty() {
+            return Err(ConfigError::ParseError(
+                "CLI config override keys cannot be empty".to_string(),
+            ));
+        }
+        let canonical = key.replace('.', "_");
+        normalized.insert(canonical, raw_value.trim().to_string());
+    }
+
+    let mut overlay = GlobalConfig::default();
+    for (key, value) in &normalized {
+        validate_field_name(key, true)?;
+        validate_field_value(key, value)?;
+        apply_field_to_global_config(&mut overlay, key, value)?;
+    }
+
+    let signature = normalized
+        .iter()
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect::<Vec<_>>()
+        .join("|");
+
+    set_cli_override_layer(Some(CliOverrideLayer {
+        config: overlay,
+        signature,
+    }));
+
+    Ok(())
+}
+
+pub fn apply_cli_overrides(resolved: &mut ResolvedConfig) {
+    if let Some(layer) = active_cli_override_layer() {
+        overlay_global_into_resolved(resolved, layer.config);
+    }
 }
 
 /// Load and merge all configurations with proper priority order
@@ -63,7 +155,8 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
     let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
     merge_global_config(&mut config, env_snapshot.global);
 
-    let resolved = ResolvedConfig::from_global(config);
+    let mut resolved = ResolvedConfig::from_global(config);
+    apply_cli_overrides(&mut resolved);
     if let Ok(mut guard) = config_cache().write() {
         guard.insert(key, resolved.clone());
     }
@@ -296,9 +389,10 @@ pub fn get_project_config(
     project_name: &str,
     tasks_dir: &std::path::Path,
 ) -> Result<ResolvedConfig, ConfigError> {
-    // Desired precedence: CLI > env > home > project > global > defaults
+    // Desired precedence: CLI > project > env > home > global > defaults
     // We don't re-handle CLI here (handled by command handlers). Implement the
-    // remainder by building a fresh chain to ensure home/env can override project.
+    // remainder by building a fresh chain where project config is the most local
+    // layer applied after env/home/global baselines.
 
     // 1) Start from defaults -> global
     let mut base_global = GlobalConfig::default();
@@ -308,9 +402,25 @@ pub fn get_project_config(
     // Convert to resolved baseline
     let mut resolved = ResolvedConfig::from_global(base_global.clone());
 
-    // 2) Overlay project-specific config
+    // 2) Overlay home config (higher priority than global)
+    if let Ok(home_config) = crate::config::persistence::load_home_config() {
+        overlay_global_into_resolved(&mut resolved, home_config);
+    }
+
+    // 3) Overlay environment variables (higher than home/global)
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    overlay_global_into_resolved(&mut resolved, env_snapshot.global.clone());
+
+    // 4) Apply project-specific config last so it overrides env/home/global
     let project_config =
         crate::config::persistence::load_project_config_from_dir(project_name, tasks_dir)?;
+    apply_project_config_overrides(&mut resolved, project_config);
+    apply_cli_overrides(&mut resolved);
+
+    Ok(resolved)
+}
+
+fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config: ProjectConfig) {
     if let Some(states) = project_config.issue_states {
         resolved.issue_states = states;
     }
@@ -322,6 +432,9 @@ pub fn get_project_config(
     }
     if let Some(tags) = project_config.tags {
         resolved.tags = tags;
+    }
+    if let Some(default_tags) = project_config.default_tags {
+        resolved.default_tags = default_tags;
     }
     if let Some(assignee) = project_config.default_assignee {
         resolved.default_assignee = Some(assignee);
@@ -343,6 +456,27 @@ pub fn get_project_config(
     }
     if let Some(auto) = project_config.auto_assign_on_status {
         resolved.auto_assign_on_status = auto;
+    }
+    if let Some(auto) = project_config.auto_codeowners_assign {
+        resolved.auto_codeowners_assign = auto;
+    }
+    if let Some(auto) = project_config.auto_tags_from_path {
+        resolved.auto_tags_from_path = auto;
+    }
+    if let Some(auto) = project_config.auto_branch_infer_type {
+        resolved.auto_branch_infer_type = auto;
+    }
+    if let Some(auto) = project_config.auto_branch_infer_status {
+        resolved.auto_branch_infer_status = auto;
+    }
+    if let Some(auto) = project_config.auto_branch_infer_priority {
+        resolved.auto_branch_infer_priority = auto;
+    }
+    if let Some(auto) = project_config.auto_identity {
+        resolved.auto_identity = auto;
+    }
+    if let Some(auto) = project_config.auto_identity_git {
+        resolved.auto_identity_git = auto;
     }
     if let Some(priority) = project_config.default_priority {
         resolved.default_priority = priority;
@@ -373,7 +507,6 @@ pub fn get_project_config(
     if let Some(m) = project_config.branch_type_aliases
         && !m.is_empty()
     {
-        // normalize keys to lowercase at use-time to be safe
         resolved.branch_type_aliases = m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
     if let Some(m) = project_config.branch_status_aliases
@@ -388,22 +521,7 @@ pub fn get_project_config(
         resolved.branch_priority_aliases =
             m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
     }
-    // Smart toggles are currently only global/home/env scoped; project-level toggles could be added later
-
-    // 3) Overlay home config (higher priority than project)
-    if let Ok(home_config) = crate::config::persistence::load_home_config() {
-        overlay_global_into_resolved(&mut resolved, home_config);
-    }
-
-    // 4) Overlay environment variables (highest of config sources)
-    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-    overlay_global_into_resolved(&mut resolved, env_snapshot.global);
-
-    // Preserve any already-resolved fields from the provided resolved_config that
-    // are not impacted by project/home/env precedence (e.g., server_port from
-    // tasks-dir scoped config). For now, prefer the rebuilt values to ensure
-    // strict precedence as requested.
-    Ok(resolved)
+    // Smart toggles for branch/codeowners remain global/home/env scoped for now.
 }
 
 /// Invalidate the cached resolved configuration for a specific tasks_dir
