@@ -12,7 +12,7 @@ use tempfile::TempDir;
 fn make_resolver() -> ProjectResolver {
     let cfg = ResolvedConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![TaskStatus::from("Todo"), TaskStatus::from("Done")],
         },
@@ -237,6 +237,6 @@ fn reserved_prefixes_are_rejected() {
     assert!(err.contains("reserved"));
 
     let cfg_err =
-        lotar::config::operations::validate_field_value("default_prefix", "@team").unwrap_err();
+        lotar::config::operations::validate_field_value("default_project", "@team").unwrap_err();
     assert!(cfg_err.to_string().contains("prefixes starting with '@'"));
 }

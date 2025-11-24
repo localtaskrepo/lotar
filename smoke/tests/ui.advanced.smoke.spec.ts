@@ -151,7 +151,7 @@ describe.concurrent('UI advanced smoke scenarios', () => {
                     expect((totalTasksValue as number)).toBeGreaterThanOrEqual(3);
 
                     const waitForRefreshData = waitForInsightsData(page);
-                    await page.locator('button:has-text("Refresh")').click();
+                    await page.locator('button[aria-label="Refresh insights"]').click();
                     await waitForRefreshData;
                     await loader.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => null);
                     await loader.waitFor({ state: 'detached', timeout: 15_000 }).catch(() => null);

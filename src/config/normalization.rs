@@ -223,7 +223,7 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
 
     // default.*
     if let Some(v) = get_path(&data, &["default", "project"]).and_then(cast::<String>) {
-        cfg.default_prefix = v;
+        cfg.default_project = v;
     }
     if let Some(v) = get_path(&data, &["default", "assignee"]).and_then(cast::<String>) {
         cfg.default_assignee = Some(v);
@@ -594,10 +594,10 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
 
     // default
     let mut default = serde_yaml::Mapping::new();
-    if cfg.default_prefix != defaults.default_prefix && !cfg.default_prefix.is_empty() {
+    if cfg.default_project != defaults.default_project && !cfg.default_project.is_empty() {
         default.insert(
             Y::String("project".into()),
-            Y::String(cfg.default_prefix.clone()),
+            Y::String(cfg.default_project.clone()),
         );
     }
     if let Some(v) = &cfg.default_assignee {

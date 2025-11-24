@@ -11,9 +11,9 @@ pub fn get_effective_project_name(resolver: &TasksDirectoryResolver) -> String {
         && let Ok(content) = std::fs::read_to_string(&global_config_path)
         && let Ok(config) = serde_yaml::from_str::<crate::config::types::GlobalConfig>(&content)
     {
-        // If default_prefix is set (not empty), use it
-        if !config.default_prefix.is_empty() {
-            return config.default_prefix;
+        // If default_project is set (not empty), use it
+        if !config.default_project.is_empty() {
+            return config.default_project;
         }
     }
 

@@ -8,13 +8,13 @@
       <div v-for="(entry, index) in entries" :key="`alias-${index}`" class="alias-row">
         <UiInput v-model="entries[index].key" :placeholder="keyPlaceholder" @blur="onFieldBlur" />
         <UiInput v-model="entries[index].value" :placeholder="valuePlaceholder" @blur="onFieldBlur" />
-        <button class="btn icon-only" type="button" aria-label="Remove alias" @click="$emit('remove', index)">
-          ✕
-        </button>
+        <UiButton icon-only type="button" aria-label="Remove alias" @click="$emit('remove', index)">
+          <IconGlyph name="close" />
+        </UiButton>
       </div>
       <div class="alias-actions">
-        <button class="btn secondary" type="button" @click="$emit('add')">{{ addLabel }}</button>
-        <button v-if="showClear" class="btn link" type="button" @click="$emit('clear')">{{ clearLabel }}</button>
+        <UiButton type="button" @click="$emit('add')">{{ addLabel }}</UiButton>
+        <UiButton v-if="showClear" variant="ghost" type="button" @click="$emit('clear')">{{ clearLabel }}</UiButton>
       </div>
     </div>
     <p v-if="error" class="field-error">{{ error }}</p>
@@ -23,6 +23,8 @@
 
 <script setup lang="ts">
 import { toRefs } from 'vue'
+import IconGlyph from './IconGlyph.vue'
+import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
 
 export interface AliasEntry {
@@ -121,35 +123,4 @@ function onFieldBlur() {
   flex-wrap: wrap;
 }
 
-.btn.icon-only {
-  padding: 0;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.source-project {
-  background: rgba(0, 180, 120, 0.25);
-  color: #9ef0d0;
-}
-
-.source-global {
-  background: rgba(0, 120, 255, 0.2);
-  color: #8bc0ff;
-}
-
-.source-built_in {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.85);
-}
 </style>

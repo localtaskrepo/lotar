@@ -110,7 +110,7 @@ const apiFixtures = vi.hoisted(() => {
         issue_types: ['bug', 'feature'],
         tags: ['alpha', 'beta', 'gamma'],
         custom_fields: ['product'],
-        default_prefix: 'DEMO',
+        default_project: 'DEMO',
         default_status: 'Open',
         default_priority: 'Medium',
         default_type: 'bug',
@@ -195,7 +195,7 @@ const apiFixtures = vi.hoisted(() => {
             issue_types: ['bug', 'feature'],
             tags: ['alpha', 'beta', 'gamma'],
             custom_fields: ['product'],
-            default_prefix: 'DEMO',
+            default_project: 'DEMO',
             default_status: 'Open',
             default_priority: 'Medium',
             default_type: 'bug',
@@ -351,18 +351,31 @@ describe('TaskPanel integration safeguards', () => {
         const wrapper = await mountTaskPanel()
         apiFixtures.updateTaskMock.mockClear()
 
-        const tagInput = wrapper.find('#task-panel-tags-input')
+        const tagSection = wrapper.find('.task-panel__tags-section')
+        const tagAddButton = tagSection.find('.chip-field__add')
+        expect(tagAddButton.exists()).toBe(true)
+        await tagAddButton.trigger('click')
+        await nextTick()
+
+        const tagDialog = wrapper.find('[data-testid="tag-dialog"]')
+        expect(tagDialog.exists()).toBe(true)
+
+        const tagInput = tagDialog.find('#task-panel-tags-input')
         expect(tagInput.exists()).toBe(true)
 
         await tagInput.trigger('focus')
         await tagInput.setValue('al')
         await nextTick()
 
-        const suggestions = wrapper.findAll('.task-panel__tag-suggestion')
+        const suggestions = tagDialog.findAll('.task-panel__tag-suggestion')
         expect(suggestions.length).toBeGreaterThan(0)
 
         await suggestions[0].trigger('click')
         await flushPromises()
+
+        const closeButton = tagDialog.find('[data-testid="tag-dialog-done"]')
+        expect(closeButton.exists()).toBe(true)
+        await closeButton.trigger('click')
 
         expect((wrapper.vm as any).form.tags).toContain('alpha')
         expect(apiFixtures.updateTaskMock).toHaveBeenCalledTimes(1)
@@ -422,9 +435,9 @@ describe('TaskPanel integration safeguards', () => {
         expect(commitEntries.length).toBeGreaterThan(0)
 
         apiFixtures.taskHistoryMock.mockClear()
-        const refreshButton = wrapper.findAll('button').find((button) => button.text().includes('Refresh'))
-        expect(refreshButton).toBeTruthy()
-        await refreshButton!.trigger('click')
+        const refreshButton = wrapper.find('button[aria-label="Refresh commits"]')
+        expect(refreshButton.exists()).toBe(true)
+        await refreshButton.trigger('click')
         await flushPromises()
 
         expect(apiFixtures.taskHistoryMock).toHaveBeenCalledTimes(1)

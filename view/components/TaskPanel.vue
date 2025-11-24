@@ -15,7 +15,16 @@
             </div>
             <div class="task-panel__header-actions">
               <span v-if="mode === 'edit'" class="badge" :class="statusBadgeClass">{{ form.status }}</span>
-              <UiButton variant="ghost" type="button" @click="closePanel">✕</UiButton>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                aria-label="Close panel"
+                title="Close panel"
+                @click="closePanel"
+              >
+                <IconGlyph name="close" />
+              </UiButton>
             </div>
           </header>
 
@@ -60,52 +69,39 @@
                   <UiLoader size="sm">Loading sprint info…</UiLoader>
                 </div>
                 <div v-else class="task-panel__sprint-area">
-                  <div class="task-panel__sprint-tags">
-                    <template v-if="hasAssignedSprints">
+                  <ChipListField
+                    class="task-panel__sprint-field"
+                    :model-value="sprintChipLabels"
+                    empty-label="Not assigned to a sprint."
+                    add-label="Assign sprint"
+                    add-behavior="external"
+                    :removable="false"
+                    :chip-class="null"
+                    @add-click="openSprintDialog('add')"
+                  >
+                    <template #chip="{ index }">
                       <span
-                        v-for="sprint in assignedSprints"
-                        :key="sprint.id"
+                        v-if="assignedSprints[index]"
                         :class="[
                           'task-panel__sprint-chip',
-                          `task-panel__sprint-chip--${sprint.state}`,
-                          { 'task-panel__sprint-chip--missing': sprint.missing },
+                          `task-panel__sprint-chip--${assignedSprints[index].state}`,
+                          { 'task-panel__sprint-chip--missing': assignedSprints[index].missing },
                         ]"
                       >
-                        {{ sprint.label }}
+                        {{ assignedSprints[index].label }}
                         <button
                           type="button"
                           class="task-panel__sprint-chip-remove"
-                          :aria-label="`Remove ${sprint.label}`"
-                          :title="`Remove ${sprint.label}`"
-                          :disabled="removingSprintId === sprint.id"
-                          @click="removeSprintChip(sprint.id)"
+                          :aria-label="`Remove ${assignedSprints[index].label}`"
+                          :title="`Remove ${assignedSprints[index].label}`"
+                          :disabled="removingSprintId === assignedSprints[index].id"
+                          @click.stop="removeSprintChip(assignedSprints[index].id)"
                         >
-                          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                            <path
-                              d="M12.8 4.21 11.59 3 8 6.59 4.41 3 3.2 4.21 6.79 7.8 3.2 11.39 4.41 12.6 8 9.01 11.59 12.6 12.8 11.39 9.21 7.8 12.8 4.21Z"
-                              fill="currentColor"
-                            />
-                          </svg>
+                          <IconGlyph name="close" />
                         </button>
                       </span>
                     </template>
-                    <span v-else class="task-panel__sprint-empty muted">Not assigned to a sprint.</span>
-                    <button
-                      type="button"
-                      class="task-panel__sprint-add"
-                      :aria-label="hasSprints ? 'Assign to sprint' : 'No sprints available'"
-                      :title="hasSprints ? 'Assign to sprint' : 'No sprints available'"
-                      :disabled="sprintsLoading || !hasSprints"
-                      @click="openSprintDialog('add')"
-                    >
-                      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                        <path
-                          d="M7.25 3.25v3.5h-3.5v2h3.5v3.5h2v-3.5h3.5v-2h-3.5v-3.5h-2Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </button>
-                  </div>
+                  </ChipListField>
                   <p v-if="assignedSprintNotice" class="task-panel__sprint-warning">
                     {{ assignedSprintNotice }}
                   </p>
@@ -269,8 +265,16 @@
         <form class="task-panel-dialog__form" @submit.prevent="submitSprintDialog">
           <header class="task-panel-dialog__header">
             <h2>{{ sprintDialogTitle }}</h2>
-            <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">
-              Cancel
+            <UiButton
+              variant="ghost"
+              icon-only
+              type="button"
+              :disabled="sprintDialogSubmitting"
+              aria-label="Close dialog"
+              title="Close dialog"
+              @click="closeSprintDialog"
+            >
+              <IconGlyph name="close" />
             </UiButton>
           </header>
           <label class="task-panel-dialog__field">
@@ -312,6 +316,8 @@ import { Teleport, Transition, computed, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { SprintIntegrityDiagnostics, TaskDTO } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
+import ChipListField from './ChipListField.vue'
+import IconGlyph from './IconGlyph.vue'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
 import UiLoader from './UiLoader.vue'
@@ -440,6 +446,7 @@ const sprintDialogMode = ref<'add' | 'remove'>('add')
 const sprintDialogSelection = ref('active')
 const sprintDialogAllowClosed = ref(false)
 const removingSprintId = ref<number | null>(null)
+const sprintChipLabels = computed(() => assignedSprints.value.map((entry) => entry.label))
 
 function handleIntegrityFeedback(integrity?: SprintIntegrityDiagnostics | null) {
   if (!integrity) return
@@ -706,21 +713,10 @@ async function removeSprintChip(sprintId: number) {
   color: var(--color-muted, #64748b);
 }
 
-.task-panel__sprint-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2, 0.5rem);
-  align-items: center;
-}
-
 .task-panel__sprint-area {
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 0.5rem);
-}
-
-.task-panel__sprint-empty {
-  font-size: var(--text-sm, 0.875rem);
 }
 
 .task-panel__sprint-chip-remove {
@@ -736,7 +732,7 @@ async function removeSprintChip(sprintId: number) {
   transition: color 0.15s ease;
 }
 
-.task-panel__sprint-chip-remove svg {
+.task-panel__sprint-chip-remove .icon-glyph {
   width: 0.75rem;
   height: 0.75rem;
 }
@@ -751,36 +747,18 @@ async function removeSprintChip(sprintId: number) {
   cursor: not-allowed;
 }
 
-.task-panel__sprint-add {
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--color-accent, #0ea5e9) 55%, transparent);
-  background: transparent;
-  color: var(--color-accent, #0ea5e9);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.task-panel__sprint-field :deep(.chip-field__control) {
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__sprint-field :deep(.chip-field__chip) {
   padding: 0;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  background: transparent;
 }
 
-.task-panel__sprint-add svg {
-  width: 0.9rem;
-  height: 0.9rem;
-}
-
-.task-panel__sprint-add:hover:not(:disabled),
-.task-panel__sprint-add:focus-visible {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 70%, transparent);
-  color: var(--color-bg, #fff);
-}
-
-.task-panel__sprint-add:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.task-panel__sprint-field :deep(.chip-field__add) {
+  margin-left: 0;
 }
 
 .task-panel__sprint-chip {
@@ -876,42 +854,33 @@ async function removeSprintChip(sprintId: number) {
   color: var(--color-muted, var(--muted));
 }
 
-.task-panel__tag-input-wrapper {
-  position: relative;
-  max-width: 420px;
+.task-panel__tags-section :deep(.chip-field__control) {
+  background: color-mix(in oklab, var(--color-surface, #1f2937) 94%, transparent);
 }
 
-.task-panel__tag-input {
+.task-panel__tag-dialog .task-panel-dialog__card {
+  width: min(520px, 100%);
+}
+
+.task-panel__tag-dialog-body {
   display: flex;
-  gap: var(--space-2, 0.5rem);
-  align-items: center;
-}
-
-.task-panel__tag-input :deep(.input) {
-  flex: 1;
-}
-
-.task-panel__tag-input :deep(button) {
-  flex: 0 0 auto;
-  white-space: nowrap;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
 }
 
 .task-panel__tag-suggestions {
-  position: absolute;
-  inset: calc(100% + var(--space-1, 0.25rem)) 0 auto 0;
   list-style: none;
   margin: 0;
-  padding: var(--space-1, 0.25rem);
-  background: var(--color-surface, var(--bg));
+  padding: var(--space-2, 0.5rem);
+  background: color-mix(in oklab, var(--color-surface, #1f2937) 96%, transparent);
   border: 1px solid var(--color-border, var(--border));
-  border-radius: var(--radius-md, 0.375rem);
-  box-shadow: var(--shadow-lg, 0 14px 32px rgba(15, 23, 42, 0.18));
+  border-radius: var(--radius-md, 0.5rem);
+  box-shadow: var(--shadow-md, 0 10px 24px rgba(15, 23, 42, 0.25));
   display: flex;
   flex-direction: column;
   gap: var(--space-1, 0.25rem);
-  max-height: 240px;
+  max-height: 300px;
   overflow-y: auto;
-  z-index: 75;
 }
 
 .task-panel__tag-suggestions-item {
@@ -1095,30 +1064,6 @@ async function removeSprintChip(sprintId: number) {
 .task-panel__ownership-reset {
   flex: 0 0 auto;
   white-space: nowrap;
-}
-
-.task-panel__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2, 0.5rem);
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1, 0.25rem);
-  padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border, var(--border));
-  background: color-mix(in oklab, var(--color-surface, var(--bg)) 90%, transparent);
-  font-size: var(--text-xs, 0.75rem);
-}
-
-.chip__close {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: inherit;
 }
 
 textarea {

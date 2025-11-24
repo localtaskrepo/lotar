@@ -34,7 +34,7 @@ impl Storage {
         let backend: Box<dyn StorageBackend> = Box::new(FsBackend);
         let _ = fs::create_dir_all(&root_path);
 
-        // Ensure global config exists with smart default_prefix detection
+        // Ensure global config exists with smart default_project detection
         let _ = crate::config::bootstrap::ensure_global_config(&root_path, project_context);
         Self { root_path, backend }
     }

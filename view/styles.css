@@ -204,6 +204,37 @@ p {
 	background: color-mix(in oklab, var(--color-surface) 60%, transparent);
 }
 
+.provenance {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 8px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	border: 1px solid transparent;
+	white-space: nowrap;
+}
+
+.provenance.source-project {
+	background: rgba(0, 180, 120, 0.25);
+	border-color: rgba(0, 180, 120, 0.35);
+	color: #9ef0d0;
+}
+
+.provenance.source-global {
+	background: rgba(0, 120, 255, 0.2);
+	border-color: rgba(0, 120, 255, 0.35);
+	color: #8bc0ff;
+}
+
+.provenance.source-built_in {
+	background: rgba(255, 255, 255, 0.12);
+	border-color: rgba(255, 255, 255, 0.25);
+	color: rgba(255, 255, 255, 0.85);
+}
+
 .list {
 	list-style: none;
 	padding: 0;
@@ -231,6 +262,32 @@ p {
 	font-weight: 500;
 	cursor: pointer;
 	transition: background 120ms ease, border 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
+.btn.icon-only {
+	padding: 0;
+	width: 2.25rem;
+	height: 2.25rem;
+	min-width: auto;
+	gap: 0;
+}
+
+.btn.icon-only .icon-glyph {
+	font-size: 1.1rem;
+}
+
+.btn.icon-only.small,
+.btn.small.icon-only {
+	padding: 0;
+	width: 2.25rem;
+	height: 2.25rem;
+	min-width: auto;
 }
 
 .btn:hover {
@@ -337,14 +394,24 @@ p {
 	align-items: center;
 }
 
-.nav a {
+.nav__link {
 	color: var(--color-fg);
-	opacity: 0.9;
+	opacity: 0.85;
+	text-decoration: none;
+	padding: var(--space-1) var(--space-2);
+	border-radius: var(--radius-sm);
+	transition: color 0.2s ease, opacity 0.2s ease, background 0.2s ease;
 }
 
-.nav a:hover {
+.nav__link:hover {
 	opacity: 1;
-	text-decoration: none;
+}
+
+.nav__link.active {
+	color: var(--color-accent);
+	opacity: 1;
+	background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+	font-weight: 600;
 }
 
 main {

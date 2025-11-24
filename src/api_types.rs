@@ -1,3 +1,4 @@
+use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
@@ -59,6 +60,15 @@ pub fn map_is_empty(map: &crate::types::CustomFields) -> bool {
 
 pub fn btreemap_u32_is_empty(map: &BTreeMap<u32, u32>) -> bool {
     map.is_empty()
+}
+
+fn deserialize_double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let inner = Option::<T>::deserialize(deserializer)?;
+    Ok(Some(inner))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -207,17 +217,33 @@ pub struct SprintUpdateRequest {
     pub ends_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub starts_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "crate::api_types::deserialize_double_option"
+    )]
     pub capacity_points: Option<Option<u32>>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "crate::api_types::deserialize_double_option"
+    )]
     pub capacity_hours: Option<Option<u32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overdue_after: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "crate::api_types::deserialize_double_option"
+    )]
     pub actual_started_at: Option<Option<String>>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        deserialize_with = "crate::api_types::deserialize_double_option"
+    )]
     pub actual_closed_at: Option<Option<String>>,
 }
 
@@ -402,6 +428,52 @@ pub struct ProjectStatsDTO {
     pub done_count: u64,
     pub recent_modified: Option<String>,
     pub tags_top: Vec<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn sprint_update_request_handles_absent_closed_at() {
+        let payload: SprintUpdateRequest = serde_json::from_value(json!({
+            "sprint": 1
+        }))
+        .unwrap();
+        assert!(payload.actual_closed_at.is_none());
+    }
+
+    #[test]
+    fn sprint_update_request_handles_null_closed_at() {
+        let payload: SprintUpdateRequest = serde_json::from_value(json!({
+            "sprint": 1,
+            "actual_closed_at": null
+        }))
+        .unwrap();
+        assert!(matches!(payload.actual_closed_at, Some(None)));
+    }
+
+    #[test]
+    fn sprint_update_request_handles_value_closed_at() {
+        let iso = "2025-01-01T00:00:00Z";
+        let payload: SprintUpdateRequest = serde_json::from_value(json!({
+            "sprint": 1,
+            "actual_closed_at": iso
+        }))
+        .unwrap();
+        assert!(matches!(payload.actual_closed_at, Some(Some(ref value)) if value == iso));
+    }
+
+    #[test]
+    fn sprint_update_request_handles_null_capacity_points() {
+        let payload: SprintUpdateRequest = serde_json::from_value(json!({
+            "sprint": 1,
+            "capacity_points": null
+        }))
+        .unwrap();
+        assert!(matches!(payload.capacity_points, Some(None)));
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

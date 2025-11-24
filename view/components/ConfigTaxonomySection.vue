@@ -10,9 +10,12 @@
           {{ provenanceLabel(tagsSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="tags"
         placeholder="frontend"
+        add-label="Add tag"
+        composer-label="Tag"
+        empty-label="No tags configured"
         @update:modelValue="handleUpdate('tags')"
       />
       <p v-if="tagWildcard" class="field-hint">
@@ -31,13 +34,16 @@
           {{ provenanceLabel(customFieldsSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="customFields"
         placeholder="Name a custom field"
+        add-label="Add field"
+        composer-label="Field"
+        empty-label="No custom fields"
         @update:modelValue="handleUpdate('custom_fields')"
       />
       <p class="field-hint">
-        List custom field keys (e.g., "Story Points"). Values are captured later when editing individual tasks.
+        List custom field keys (e.g., "Category", "Product Line", or "Environment"). Values are captured later when editing individual tasks.
       </p>
       <p v-if="customFieldWildcard" class="field-hint">
         Wildcard enabled — leave empty to accept any custom field name.
@@ -49,8 +55,8 @@
 
 <script setup lang="ts">
 import type { ConfigSource } from '../api/types'
+import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
-import TokenInput from './TokenInput.vue'
 
 const tags = defineModel<string[]>('tags', { required: true })
 const customFields = defineModel<string[]>('customFields', { required: true })
@@ -100,37 +106,6 @@ function handleUpdate(field: 'tags' | 'custom_fields') {
   font-weight: 600;
 }
 
-.field :deep(.token-input) {
-  width: 100%;
-}
-
-.field :deep(.token-input .tokens) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  min-height: 32px;
-  padding: calc(var(--space-2) - 4px) var(--space-3);
-  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.field :deep(.token-input:focus-within .tokens) {
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
-}
-
-.field :deep(.token-input .tokens input) {
-  color: var(--color-fg);
-}
-
-.field :deep(.token-input .tokens input::placeholder) {
-  color: var(--color-muted);
-  opacity: 1;
-}
-
 .field-hint {
   color: rgba(255, 255, 255, 0.6);
   font-size: 12px;
@@ -141,11 +116,4 @@ function handleUpdate(field: 'tags' | 'custom_fields') {
   font-size: 12px;
 }
 
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
 </style>

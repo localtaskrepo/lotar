@@ -35,7 +35,13 @@
           <span class="muted">Limit</span>
           <input class="input" type="number" min="1" max="200" v-model.number="limit" />
         </label>
-        <button class="btn" type="button" @click="refreshBacklog">Refresh</button>
+        <ReloadButton
+          :disabled="loading"
+          :loading="loading"
+          label="Refresh backlog"
+          title="Refresh backlog"
+          @click="refreshBacklog"
+        />
       </div>
       <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
         <strong>Assign selected</strong>
@@ -46,7 +52,7 @@
           <input type="checkbox" v-model="allowClosed" />
           Allow closed
         </label>
-        <button class="btn primary" :disabled="!selectedIds.length" type="button" @click="assignSelected">Assign to sprint</button>
+        <UiButton variant="primary" :disabled="!selectedIds.length" type="button" @click="assignSelected">Assign to sprint</UiButton>
         <span class="muted">Selected: {{ selectedIds.length }}</span>
         <UiLoader v-if="loading || sprintsLoading" size="sm" />
       </div>
@@ -63,9 +69,17 @@
       v-if="!loading && !tasks.length"
       title="Backlog is clear"
       description="No tasks match the filters."
-      primary-label="Refresh"
-      @primary="refreshBacklog"
-    />
+    >
+      <template #actions>
+        <ReloadButton
+          :disabled="loading"
+          :loading="loading"
+          label="Refresh backlog"
+          title="Refresh backlog"
+          @click="refreshBacklog"
+        />
+      </template>
+    </UiEmptyState>
 
     <UiLoader v-else-if="loading && !tasks.length" size="md" />
 
@@ -112,10 +126,12 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { api } from '../api/client'
 import type { SprintBacklogTask } from '../api/types'
+import ReloadButton from '../components/ReloadButton.vue'
+import { showToast } from '../components/toast'
+import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
-import { showToast } from '../components/toast'
 import { useProjects } from '../composables/useProjects'
 import { useSprints } from '../composables/useSprints'
 

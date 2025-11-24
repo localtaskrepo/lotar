@@ -173,7 +173,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     await page.waitForSelector(sprintRowSelector, { state: 'detached', timeout: 15_000 });
                     await page.waitForSelector(backlogRowSelector, { timeout: 15_000 });
 
-                    await page.click('.task-panel__sprint-add');
+                    await page.click('.task-panel__sprint-field .chip-field__add');
                     await page.waitForSelector('.task-panel-dialog__overlay', { timeout: 10_000 });
                     await page.selectOption('.task-panel-dialog__overlay select.input', sprintId);
                     await page.click('.task-panel-dialog__overlay button[type="submit"]');

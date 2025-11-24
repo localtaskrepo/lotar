@@ -3,7 +3,16 @@
     <div class="card" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <h2 style="margin: 0;">Keyboard shortcuts</h2>
-        <button class="btn" @click="$emit('close')">Close</button>
+        <UiButton
+          variant="ghost"
+          icon-only
+          type="button"
+          aria-label="Close dialog"
+          title="Close dialog"
+          @click="$emit('close')"
+        >
+          <IconGlyph name="close" />
+        </UiButton>
       </div>
       <ul class="list" style="margin-top: 8px;">
         <li><strong>?</strong> — Toggle this help</li>
@@ -17,8 +26,11 @@
   </div>
 </template>
 <script setup lang="ts">
+import IconGlyph from './IconGlyph.vue';
+import UiButton from './UiButton.vue';
+
 const props = defineProps<{ open: boolean }>()
-const emit = defineEmits<{ (e:'close'): void }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
 </script>
 <style scoped>
 .backdrop{

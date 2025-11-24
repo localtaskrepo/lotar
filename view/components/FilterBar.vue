@@ -1,11 +1,11 @@
 <template>
   <div class="row" style="flex-wrap: wrap; gap:8px;">
     <UiInput v-model="query" placeholder="Search…" />
-    <UiSelect v-model="project">
+    <UiSelect v-model="project" aria-label="Project filter" data-testid="filter-project">
       <option value="">Project</option>
       <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
     </UiSelect>
-    <UiSelect v-model="status">
+    <UiSelect v-if="showStatusSelect" v-model="status" aria-label="Status filter">
       <option value="">Status</option>
       <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
     </UiSelect>
@@ -17,13 +17,10 @@
       <option value="">Type</option>
       <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
     </UiSelect>
-    <UiSelect v-model="order">
+    <UiSelect v-if="showOrderSelect" v-model="order">
       <option value="desc">Newest</option>
       <option value="asc">Oldest</option>
     </UiSelect>
-    <label class="row" style="gap:6px; align-items:center;">
-      <input type="checkbox" v-model="mine" /> My tasks
-    </label>
     <UiInput v-model="tags" placeholder="Tags (comma)" />
     <div class="filter-bar__custom">
       <UiInput
@@ -61,18 +58,16 @@
         </div>
       </div>
     </div>
-  <UiButton @click="onClear">Clear</UiButton>
   </div>
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch, watchEffect } from 'vue'
 import { useProjects } from '../composables/useProjects'
 import { formatProjectLabel } from '../utils/projectLabels'
-import UiButton from './UiButton.vue'
 import UiInput from './UiInput.vue'
 import UiSelect from './UiSelect.vue'
 
-const props = defineProps<{ statuses?: string[]; priorities?: string[]; types?: string[]; value?: Record<string, string> }>()
+const props = defineProps<{ statuses?: string[]; priorities?: string[]; types?: string[]; value?: Record<string, string>; storageKey?: string; showStatus?: boolean; emitProjectKey?: boolean; showOrder?: boolean }>()
 const emit = defineEmits<{ (e:'update:value', v: Record<string,string>): void }>()
 
 const query = ref('')
@@ -81,9 +76,8 @@ const status = ref('')
 const priority = ref('')
 const type = ref('')
 const order = ref<'asc'|'desc'>('desc')
-const mine = ref(false)
 const tags = ref('')
-const assigneeOverride = ref('')
+const assignee = ref('')
 const extraFilters = ref('')
 const customFilterErrors = ref<string[]>([])
 const customFilterInput = ref<{ focus: () => void } | null>(null)
@@ -118,22 +112,23 @@ const RESERVED_FIELD_ALIASES: Record<string, string> = {
 }
 const customHintPopoverId = `custom-filter-hint-${Math.random().toString(36).slice(2, 8)}`
 const customHintVisible = ref(false)
+const showStatusSelect = computed(() => props.showStatus !== false)
+const showOrderSelect = computed(() => props.showOrder !== false)
 
 // Persist last used filter to sessionStorage for convenience
-const FILTER_KEY = 'lotar.tasks.filter'
+const FILTER_KEY = computed(() => props.storageKey || 'lotar.tasks.filter')
 onMounted(() => {
   try {
     const hasIncoming = props.value && Object.keys(props.value).length > 0
     if (!hasIncoming) {
-      const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null')
+      const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY.value) || 'null')
       if (saved && typeof saved === 'object') {
         query.value = saved.q || ''
         project.value = saved.project || ''
         status.value = saved.status || ''
         priority.value = saved.priority || ''
         type.value = saved.type || ''
-        mine.value = saved.assignee === '@me'
-        assigneeOverride.value = saved.assignee && saved.assignee !== '@me' ? saved.assignee : ''
+        assignee.value = saved.assignee || ''
         tags.value = saved.tags || ''
         order.value = (saved.order === 'asc' || saved.order === 'desc') ? saved.order : 'desc'
         const extras = Object.entries(saved)
@@ -161,8 +156,7 @@ watchEffect(() => {
     type.value = props.value.type || ''
     const incomingAssignee = props.value.assignee || ''
     const isMine = props.value.mine === 'true' || incomingAssignee === '@me'
-    mine.value = isMine
-    assigneeOverride.value = !isMine && incomingAssignee ? incomingAssignee : ''
+    assignee.value = isMine ? '@me' : incomingAssignee
     tags.value = props.value.tags || ''
     const o = props.value.order
     order.value = (o === 'asc' || o === 'desc') ? o : order.value
@@ -283,23 +277,22 @@ function hideCustomHint() {
 function emitFilter(){
   const v: Record<string,string> = {}
   if (query.value) v.q = query.value
-  if (project.value) v.project = project.value
+  const shouldEmitProject = props.emitProjectKey || !!project.value
+  if (shouldEmitProject) v.project = project.value || ''
   if (status.value) v.status = status.value
   if (priority.value) v.priority = priority.value
   if (type.value) v.type = type.value
-  if (mine.value) {
-    v.assignee = '@me'
-  } else if (assigneeOverride.value) {
-    v.assignee = assigneeOverride.value
-  }
+  if (assignee.value) v.assignee = assignee.value
   if (tags.value) v.tags = tags.value
-  v.order = order.value
+  if (showOrderSelect.value) {
+    v.order = order.value
+  }
   const parsed = parseCustomFilters(extraFilters.value)
   customFilterErrors.value = parsed.errors
   Object.entries(parsed.map).forEach(([key, value]) => {
     if (value) v[key] = value
   })
-  try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(v)) } catch {}
+  try { sessionStorage.setItem(FILTER_KEY.value, JSON.stringify(v)) } catch {}
   emit('update:value', v)
 }
 function onClear(){
@@ -310,21 +303,25 @@ function onClear(){
   priority.value = ''
   type.value = ''
   tags.value = ''
-  mine.value = false
-  assigneeOverride.value = ''
-  order.value = 'desc'
+  assignee.value = ''
+  if (showOrderSelect.value) {
+    order.value = 'desc'
+  }
   extraFilters.value = ''
   lastSyncedExtras = ''
   customFilterErrors.value = []
-  try { sessionStorage.removeItem(FILTER_KEY) } catch {}
-  const empty: Record<string,string> = { order: 'desc' }
+  try { sessionStorage.removeItem(FILTER_KEY.value) } catch {}
+  const empty: Record<string,string> = {}
+  if (showOrderSelect.value) {
+    empty.order = 'desc'
+  }
   emit('update:value', empty)
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, order, mine, tags, extraFilters], emitFilter, { deep: false })
+watch([query, project, status, priority, type, order, tags, extraFilters], emitFilter, { deep: false })
 
-defineExpose({ appendCustomFilter })
+defineExpose({ appendCustomFilter, clear: onClear })
 </script>
 <style scoped>
 .filter-bar__custom {

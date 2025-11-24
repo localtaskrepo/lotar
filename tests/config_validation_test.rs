@@ -9,7 +9,7 @@ use tempfile::TempDir;
 
 fn base_global_config() -> GlobalConfig {
     GlobalConfig {
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         ..GlobalConfig::default()
     }
 }
@@ -35,7 +35,7 @@ fn test_global_config_validation_valid() {
 
     let config = GlobalConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![
                 TaskStatus::from("Todo"),
@@ -101,7 +101,7 @@ fn test_global_config_validation_privileged_port_warning() {
 
     let config = GlobalConfig {
         server_port: 80, // Privileged port should trigger warning
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![TaskStatus::from("Todo")],
         },
@@ -176,7 +176,7 @@ fn test_global_config_validation_empty_lists_error() {
 
     let config = GlobalConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![], // Empty list should trigger error
         },
@@ -253,7 +253,7 @@ fn test_global_config_validation_invalid_defaults() {
 
     let config = GlobalConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![TaskStatus::from("Todo"), TaskStatus::from("InProgress")],
         },
@@ -323,7 +323,7 @@ fn test_global_config_duplicate_entries_warning() {
 
     let config = GlobalConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![TaskStatus::from("Todo"), TaskStatus::from("todo")],
         },

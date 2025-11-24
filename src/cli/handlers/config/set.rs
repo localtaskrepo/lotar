@@ -18,7 +18,7 @@ impl ConfigHandler {
         project: Option<&str>,
     ) -> Result<(), String> {
         // Auto-detect global-only fields
-        let global_only_fields = ["server_port", "default_prefix", "default_project"];
+        let global_only_fields = ["server_port", "default_project"];
         if global_only_fields.contains(&field.as_str()) && !global {
             global = true;
             if !dry_run {
@@ -91,10 +91,10 @@ impl ConfigHandler {
             let config_manager =
                 ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path)
                     .map_err(|e| format!("Failed to load config: {}", e))?;
-            let default_prefix = config_manager.get_resolved_config().default_prefix.clone();
+            let default_project = config_manager.get_resolved_config().default_project.clone();
 
-            if !default_prefix.is_empty() {
-                Some(default_prefix)
+            if !default_project.is_empty() {
+                Some(default_project)
             } else {
                 return Err(
                     "No default project set. Use --global flag or set a default project first."

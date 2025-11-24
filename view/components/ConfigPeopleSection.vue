@@ -39,7 +39,7 @@
         <p v-if="defaultAssigneeError" class="field-error">{{ defaultAssigneeError }}</p>
       </div>
 
-      <div class="field">
+      <div class="field field--full">
         <label class="field-label">
           <span>Default tags</span>
           <span
@@ -49,10 +49,13 @@
             {{ provenanceLabel(defaultTagsSource) }}
           </span>
         </label>
-        <TokenInput
+        <ChipListField
           v-model="defaultTags"
           :suggestions="tagSuggestions"
           placeholder="Add a tag"
+          add-label="Add tag"
+          composer-label="Tag"
+          empty-label="No default tags"
           @update:modelValue="handleTagsUpdate"
         />
         <p v-if="defaultTagsError" class="field-error">{{ defaultTagsError }}</p>
@@ -64,8 +67,8 @@
 
 <script setup lang="ts">
 import type { ConfigSource } from '../api/types'
+import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
-import TokenInput from './TokenInput.vue'
 import UiInput from './UiInput.vue'
 
 const defaultReporter = defineModel<string>('defaultReporter', { required: true })
@@ -130,39 +133,12 @@ function handleTagsUpdate() {
   font-weight: 600;
 }
 
-.field :deep(.token-input) {
-  width: 100%;
-}
-
-.field :deep(.token-input .tokens) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  min-height: 32px;
-  padding: calc(var(--space-2) - 4px) var(--space-3);
-  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.field :deep(.token-input:focus-within .tokens) {
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
-}
-
-.field :deep(.token-input .tokens input) {
-  color: var(--color-fg);
-}
-
-.field :deep(.token-input .tokens input::placeholder) {
-  color: var(--color-muted);
-  opacity: 1;
+.field--full {
+  grid-column: 1 / -1;
 }
 
 .field :deep(.input) {
-  height: 32px;
+  height: var(--config-control-height, 40px);
   padding: calc(var(--space-2) - 4px) var(--space-3);
   box-sizing: border-box;
 }
@@ -175,13 +151,5 @@ function handleTagsUpdate() {
 .field-hint {
   color: rgba(255, 255, 255, 0.6);
   font-size: 12px;
-}
-
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 </style>

@@ -187,7 +187,11 @@ pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16
                 } else {
                     let request_path = if path == "/" { "/index.html" } else { &path };
                     let rel_path = request_path.trim_start_matches('/');
-                    if !try_serve_static(rel_path, &mut stream) {
+                    let mut served = try_serve_static(rel_path, &mut stream);
+                    if !served && should_fallback_to_index(&path) {
+                        served = try_serve_static("index.html", &mut stream);
+                    }
+                    if !served {
                         let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
                         let _ = stream.write_all(response.as_bytes());
                         let _ = stream.flush();
@@ -241,6 +245,11 @@ fn try_serve_static(rel_path: &str, stream: &mut TcpStream) -> bool {
         }
         Err(_) => false,
     }
+}
+
+fn should_fallback_to_index(path: &str) -> bool {
+    let trimmed = path.trim_matches('/');
+    trimmed.is_empty() || !trimmed.contains('.')
 }
 
 fn content_type_for(path: &str) -> &'static str {

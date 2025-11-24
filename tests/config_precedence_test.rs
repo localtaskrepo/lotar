@@ -81,7 +81,7 @@ fn project_config_overrides_environment_defaults() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "ENG".to_string());
+    global_values.insert("default_project".to_string(), "ENG".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("seed global default prefix");
 
     let mut project_values = BTreeMap::new();
@@ -109,7 +109,7 @@ fn environment_fills_gap_when_project_omits_value() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "OPS".to_string());
+    global_values.insert("default_project".to_string(), "OPS".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("seed global default prefix");
 
     // Create a project config file without overriding default_status
@@ -138,7 +138,7 @@ fn cli_overrides_have_highest_priority() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "CLI".to_string());
+    global_values.insert("default_project".to_string(), "CLI".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("seed global default prefix");
 
     let mut project_values = BTreeMap::new();
@@ -168,7 +168,7 @@ fn project_overrides_can_toggle_auto_codeowners() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "AUTO".to_string());
+    global_values.insert("default_project".to_string(), "AUTO".to_string());
     global_values.insert("auto_codeowners_assign".to_string(), "false".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("seed global config");
 

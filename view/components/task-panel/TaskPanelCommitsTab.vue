@@ -2,14 +2,16 @@
   <div class="task-panel__tab-panel">
     <header class="task-panel__group-header">
       <h3>Recent commits</h3>
-      <UiButton
-        type="button"
-        variant="ghost"
-        :disabled="commitsLoading || mode !== 'edit'"
-        @click="$emit('refresh')"
-      >
-        {{ commitsLoading ? 'Refreshing…' : 'Refresh' }}
-      </UiButton>
+      <div class="row" style="gap: 8px; align-items: center;">
+        <ReloadButton
+          variant="ghost"
+          :disabled="commitsLoading || mode !== 'edit'"
+          :loading="commitsLoading"
+          :label="commitsLoading ? 'Refreshing commits…' : 'Refresh commits'"
+          :title="commitsLoading ? 'Refreshing commits…' : 'Refresh commits'"
+          @click="$emit('refresh')"
+        />
+      </div>
     </header>
     <template v-if="mode === 'edit'">
       <div class="task-panel__history-scroll" role="region" aria-label="Recent commits">
@@ -32,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import UiButton from '../UiButton.vue'
+import ReloadButton from '../ReloadButton.vue'
 import UiLoader from '../UiLoader.vue'
 
 interface CommitEntry {

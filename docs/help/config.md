@@ -53,7 +53,7 @@ Details:
 - Project scope is chosen via the CLI-wide `--project` flag or the configured `default.project`. Pass `--global` to edit `.tasks/config.yml` instead.
 - `--dry-run` shows the pending change, runs conflict detection, and exits without editing files.
 - `--force` applies the change even when conflict detection finds issues. Validation errors (wrong field name/value) will still abort.
-- Fields that only make sense globally (`server.port`, `default_prefix`, `default_project`) are automatically treated as global even if `--global` is not passed.
+- Fields that only make sense globally (`server.port`, `default_project`) are automatically treated as global even if `--global` is not passed.
 
 ### templates
 List available configuration templates.

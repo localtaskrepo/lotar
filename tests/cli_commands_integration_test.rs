@@ -3428,10 +3428,10 @@ mod file_structure {
     }
 
     #[test]
-    fn test_smart_global_config_default_prefix() {
+    fn test_smart_global_config_default_project() {
         let temp_dir = TempDir::new().unwrap();
 
-        // Test with explicit project - should set smart default_prefix
+        // Test with explicit project - should set smart default_project
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(&temp_dir)
             .args(["add", "Test smart prefix", "--project=myawesomeproject"])

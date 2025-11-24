@@ -2,9 +2,13 @@
   <div class="task-panel__tab-panel">
     <header class="task-panel__group-header">
       <h3>References</h3>
-      <UiButton type="button" variant="ghost" :disabled="mode !== 'edit'" @click="$emit('reload')">
-        Reload
-      </UiButton>
+      <ReloadButton
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Reload references"
+        title="Reload references"
+        @click="$emit('reload')"
+      />
     </header>
     <template v-if="mode === 'edit'">
       <div class="task-panel__references" role="region" aria-label="Task references">
@@ -107,6 +111,7 @@
 <script setup lang="ts">
 import { Teleport, Transition, computed, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import type { ReferenceSnippet } from '../../api/types'
+import ReloadButton from '../ReloadButton.vue'
 import UiButton from '../UiButton.vue'
 import UiLoader from '../UiLoader.vue'
 

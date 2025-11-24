@@ -2,29 +2,22 @@
   <div class="table-wrap" ref="rootRef">
     <div class="table-toolbar row" style="justify-content: space-between; align-items: center; margin-bottom: 8px; position: relative;">
       <div class="row columns-control" style="gap:8px; align-items:center; position: relative;">
-        <strong>Columns</strong>
-        <button class="btn" @click="toggleColumnMenu">Configure</button>
-        <div v-if="showColumnMenu" class="columns-popover card" @click.self="showColumnMenu=false">
-          <div class="col" style="gap:6px;">
-            <label v-for="col in allColumns" :key="col" class="row" style="gap:6px; align-items:center;">
-              <input type="checkbox" :checked="columnsSet.has(col)" @change="toggleColumn(col, $event)" />
-              <span>{{ headerLabel(col) }}</span>
-            </label>
-            <div class="row" style="gap:6px; margin-top: 6px;">
-              <button class="btn" @click="showColumnMenu=false">Close</button>
-              <button class="btn" @click="resetColumns">Reset</button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="row controls" style="gap:8px; align-items:center; flex-wrap: wrap;">
-        <!-- Bulk controls and Add placed in same toolbar row -->
         <label class="row" style="gap:6px; align-items:center;">
           <input type="checkbox" :checked="bulk" @change="onToggleBulk($event)" /> Bulk select
         </label>
-        <span v-if="bulk" class="muted">Selected: {{ selected.length }}</span>
+        <span v-if="bulk" class="muted columns-control__selected">Selected: {{ selected.length }}</span>
         <div v-if="bulk" class="bulk-menu-wrapper">
-          <button class="btn" type="button" title="Bulk actions" :disabled="disableBulkActions" ref="bulkMenuButton" @click.stop="toggleBulkMenu">⋯</button>
+          <UiButton
+            icon-only
+            type="button"
+            aria-label="Bulk actions"
+            title="Bulk actions"
+            :disabled="disableBulkActions"
+            ref="bulkMenuButton"
+            @click.stop="toggleBulkMenu"
+          >
+            <IconGlyph name="dots-horizontal" />
+          </UiButton>
           <div v-if="showBulkMenu" class="menu-popover card bulk-actions-menu" ref="bulkMenuPopover">
             <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
               <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
@@ -46,16 +39,32 @@
               <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
               <span class="menu-item__label">Delete tasks…</span>
             </button>
-            <div class="menu-separator" role="separator"></div>
-            <button class="menu-item" type="button" @click="openBacklog">
-              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="list" /></span>
-              <span class="menu-item__label">Open sprint backlog</span>
-            </button>
           </div>
         </div>
-        <button class="btn primary icon-only" type="button" aria-label="Add" title="Add task" @click="$emit('add')">
-          <IconGlyph name="plus" />
-        </button>
+      </div>
+      <div class="row controls" style="gap:8px; align-items:center; flex-wrap: wrap;">
+        <div class="columns-button-wrapper">
+          <UiButton class="columns-button" type="button" title="Configure columns" @click="toggleColumnMenu">
+            <IconGlyph name="columns" aria-hidden="true" />
+            <span>Columns</span>
+          </UiButton>
+          <div v-if="showColumnMenu" class="columns-popover card" @click.self="showColumnMenu=false">
+            <div class="col" style="gap:6px;">
+              <label v-for="col in allColumns" :key="col" class="row" style="gap:6px; align-items:center;">
+                <input type="checkbox" :checked="columnsSet.has(col)" @change="toggleColumn(col, $event)" />
+                <span>{{ headerLabel(col) }}</span>
+              </label>
+              <div class="row" style="gap:6px; margin-top: 6px;">
+                <UiButton type="button" @click="showColumnMenu=false">Close</UiButton>
+                <UiButton type="button" @click="resetColumns">Reset</UiButton>
+              </div>
+            </div>
+          </div>
+        </div>
+        <UiButton class="add-button" type="button" aria-label="Add task" title="Add task" @click="$emit('add')">
+          <IconGlyph name="plus" aria-hidden="true" />
+          <span>Task</span>
+        </UiButton>
       </div>
     </div>
 
@@ -80,28 +89,16 @@
                 @keydown.enter.prevent="onSort(col)"
                 @keydown.space.prevent="onSort(col)"
               >
-                {{ headerLabel(col) }}
+                <span class="header-button__label">{{ headerLabel(col) }}</span>
+                <span class="header-button__sort" aria-hidden="true">
+                  <template v-if="sort.key === col">
+                    {{ sort.dir === 'asc' ? '▲' : '▼' }}
+                  </template>
+                  <template v-else>
+                    ⇅
+                  </template>
+                </span>
               </button>
-              <div class="sort-controls" role="group" aria-label="Sorting">
-                <button
-                  class="sort-control"
-                  type="button"
-                  aria-label="Sort ascending"
-                  :aria-pressed="sort.key === col && sort.dir === 'asc'"
-                  :class="{ 'sort-control--active': sort.key === col && sort.dir === 'asc' }"
-                  :disabled="sort.key === col && sort.dir === 'asc'"
-                  @click.stop="setSort(col, 'asc')"
-                >▲</button>
-                <button
-                  class="sort-control"
-                  type="button"
-                  aria-label="Sort descending"
-                  :aria-pressed="sort.key === col && sort.dir === 'desc'"
-                  :class="{ 'sort-control--active': sort.key === col && sort.dir === 'desc' }"
-                  :disabled="sort.key === col && sort.dir === 'desc'"
-                  @click.stop="setSort(col, 'desc')"
-                >▼</button>
-              </div>
             </th>
             <th style="width: 1%; white-space: nowrap;">Actions</th>
           </tr>
@@ -180,7 +177,9 @@
               </template>
             </td>
             <td class="actions-cell" @click.stop>
-              <button class="btn" aria-label="Row actions" title="Actions" @click.stop="toggleRowMenu(t.id)">⋯</button>
+              <UiButton icon-only aria-label="Row actions" title="Actions" @click.stop="toggleRowMenu(t.id)">
+                <IconGlyph name="dots-horizontal" />
+              </UiButton>
               <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
                 <button class="menu-item" v-if="!isEditingTags(t.id)" @click="toggleTagsEdit(t.id); closeRowMenu(t.id)">
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
@@ -223,9 +222,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
 import IconGlyph from './IconGlyph.vue';
+import UiButton from './UiButton.vue';
 import UiCard from './UiCard.vue';
 
 const props = defineProps<TaskTableProps>()
@@ -270,15 +270,16 @@ const {
   relativeTime,
   touchBadge,
   isOverdue,
-  setSort,
 } = useTaskTableState(props, emit)
 
 const sprintLookup = computed(() => props.sprintLookup ?? {})
 const hasSprintsLocal = computed(() => props.hasSprints ?? false)
 const sprintsLoadingLocal = computed(() => props.sprintsLoading ?? false)
 
+type BulkMenuButtonRef = HTMLElement | (ComponentPublicInstance & { $el: HTMLElement })
+
 const showBulkMenu = ref(false)
-const bulkMenuButton = ref<HTMLElement | null>(null)
+const bulkMenuButton = ref<BulkMenuButtonRef | null>(null)
 const bulkMenuPopover = ref<HTMLElement | null>(null)
 const disableBulkActions = computed(() => !selected.value.length)
 const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoadingLocal.value || !hasSprintsLocal.value)
@@ -344,16 +345,16 @@ function handleBulkAction(action: BulkMenuAction) {
   closeBulkMenu()
 }
 
-function openBacklog() {
-  emit('open-sprint-backlog')
-  closeBulkMenu()
-}
-
 function handleOutsideClick(event: MouseEvent) {
   if (!showBulkMenu.value) return
   const target = event.target as Node | null
   if (!target) return
-  if (bulkMenuButton.value && bulkMenuButton.value.contains(target)) return
+  const bulkButtonEl = bulkMenuButton.value
+    ? bulkMenuButton.value instanceof HTMLElement
+      ? bulkMenuButton.value
+      : bulkMenuButton.value.$el
+    : null
+  if (bulkButtonEl && bulkButtonEl.contains(target)) return
   if (bulkMenuPopover.value && bulkMenuPopover.value.contains(target)) return
   closeBulkMenu()
 }
@@ -447,15 +448,18 @@ th.active {
 }
 
 .header-button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--space-1, 0.25rem);
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+  width: 100%;
   background: transparent;
   border: none;
   padding: 0;
   font: inherit;
   color: inherit;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .header-button:focus-visible {
@@ -464,37 +468,21 @@ th.active {
   border-radius: var(--radius-sm, 0.25rem);
 }
 
-.sort-controls {
-  display: inline-flex;
-  margin-left: var(--space-1, 0.25rem);
-  border-radius: var(--radius-sm, 0.25rem);
-  background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
+.header-button__label {
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.sort-control {
-  border: none;
-  background: transparent;
-  font-size: 0.75rem;
+.header-button__sort {
+  font-size: 0.8rem;
   line-height: 1;
-  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
-  cursor: pointer;
+  min-width: 1.5em;
+  text-align: center;
   color: var(--color-muted, #6b7280);
 }
 
-.sort-control:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--color-surface, var(--bg)) 75%, transparent);
-}
-
-.sort-control--active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  color: var(--color-accent, #0ea5e9);
-  font-weight: 600;
-}
-
-.sort-control:disabled {
-  cursor: default;
-  opacity: 0.65;
+th.active .header-button__sort {
+  color: var(--color-fg, var(--fg));
 }
 
 .task-table__cell {
@@ -502,9 +490,9 @@ th.active {
 }
 
 .task-table__cell--title {
-  width: 40%;
-  max-width: 520px;
-  min-width: 240px;
+  width: 38%;
+  max-width: 480px;
+  min-width: 200px;
 }
 
 @media (max-width: 1024px) {
@@ -584,6 +572,17 @@ tbody tr.is-recent {
   color: var(--color-muted, #6b7280);
 }
 
+.columns-button-wrapper {
+  position: relative;
+}
+
+.columns-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  height: 2.25rem;
+}
+
 .columns-popover {
   position: absolute;
   margin-top: var(--space-2, 0.5rem);
@@ -635,6 +634,10 @@ tbody tr.is-recent {
   z-index: 10;
 }
 
+.columns-control__selected {
+  font-size: var(--text-sm, 0.875rem);
+}
+
 .bulk-menu-wrapper {
   position: relative;
 }
@@ -667,13 +670,13 @@ tbody tr.is-recent {
 }
 
 .menu-item__icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--color-muted, #6b7280);
-  font-size: 1rem;
+  font-size: 1.15rem;
 }
 
 .menu-item.danger .menu-item__icon {
@@ -737,5 +740,26 @@ tbody tr.is-recent {
 .session-touch__badge.deleted {
   border-color: color-mix(in oklab, var(--color-danger, #ef4444) 40%, transparent);
   background: color-mix(in oklab, var(--color-danger, #ef4444) 12%, transparent);
+}
+
+.controls .add-button {
+  font-weight: 600;
+  height: 2.25rem;
+  padding: 0 var(--space-4, 1rem);
+  gap: var(--space-2, 0.5rem);
+}
+
+.controls .add-button .icon-glyph {
+  font-size: 1rem;
+}
+
+.add-button:hover {
+  background: var(--color-accent, #0ea5e9);
+  color: var(--color-accent-contrast, #ffffff);
+  border-color: transparent;
+}
+
+.add-button:hover .icon-glyph {
+  color: inherit;
 }
 </style>

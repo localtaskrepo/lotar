@@ -25,7 +25,7 @@ fn project_alias_identical_to_global_is_cleared() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut base_values = BTreeMap::new();
-    base_values.insert("default_prefix".to_string(), "TEST".to_string());
+    base_values.insert("default_project".to_string(), "TEST".to_string());
     base_values.insert(
         "issue_priorities".to_string(),
         "Low, Medium, High, Critical".to_string(),
@@ -58,7 +58,7 @@ fn project_alias_difference_is_persisted() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut base_values = BTreeMap::new();
-    base_values.insert("default_prefix".to_string(), "APP".to_string());
+    base_values.insert("default_project".to_string(), "APP".to_string());
     base_values.insert(
         "issue_priorities".to_string(),
         "Low, Medium, High, Critical".to_string(),
@@ -95,7 +95,7 @@ fn project_alias_can_be_cleared_with_empty_payload() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "LIB".to_string());
+    global_values.insert("default_project".to_string(), "LIB".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("set global prefix");
 
     let mut set_values = BTreeMap::new();

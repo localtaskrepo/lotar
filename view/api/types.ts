@@ -473,7 +473,7 @@ export type ConfigSource = 'project' | 'global' | 'built_in'
 
 export interface ResolvedConfigDTO {
   server_port: number
-  default_prefix: string
+  default_project: string
   default_assignee?: string | null
   default_reporter?: string | null
   default_tags: string[]
@@ -505,7 +505,7 @@ export interface ResolvedConfigDTO {
 
 export interface GlobalConfigRaw {
   server_port: number
-  default_prefix: string
+  default_project: string
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]

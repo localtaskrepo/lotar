@@ -48,7 +48,7 @@ Project context is determined in this order:
 - Explicit `--project` flag (highest). Accepts either a prefix or the full project name; both are normalized via `resolve_project_input`.
 - Task ID prefix (e.g., AUTH-123 → AUTH) when present.
 - Auto-detection from the current `.tasks/<PREFIX>` directory name when the repo has a single initialized project.
-- Default project (`default_prefix`) from merged configuration. A prefix is generated from the repo name when no project yet exists.
+- Default project (`default_project`) from merged configuration. A prefix is generated from the repo name when no project yet exists.
 
 ## Automation semantics
 

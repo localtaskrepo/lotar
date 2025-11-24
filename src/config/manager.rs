@@ -60,11 +60,11 @@ impl ConfigManager {
         })
     }
 
-    /// Ensure default_prefix is set in global config, auto-detecting if necessary
-    pub fn ensure_default_prefix(&mut self, tasks_dir: &Path) -> Result<String, ConfigError> {
-        // Check if default_prefix is already set
-        if !self.resolved_config.default_prefix.is_empty() {
-            return Ok(self.resolved_config.default_prefix.clone());
+    /// Ensure default_project is set in global config, auto-detecting if necessary
+    pub fn ensure_default_project(&mut self, tasks_dir: &Path) -> Result<String, ConfigError> {
+        // Check if default_project is already set
+        if !self.resolved_config.default_project.is_empty() {
+            return Ok(self.resolved_config.default_project.clone());
         }
 
         // Default prefix is empty, need to auto-detect and update
@@ -91,8 +91,8 @@ impl ConfigManager {
                 ConfigError::ParseError(format!("Failed to parse global config: {}", e))
             })?;
 
-            // Update the default_prefix
-            global_config.default_prefix = detected_prefix.clone();
+            // Update the default_project
+            global_config.default_project = detected_prefix.clone();
 
             // Save updated config using canonical writer
             let updated_yaml =
@@ -102,7 +102,7 @@ impl ConfigManager {
             })?;
 
             // Update our resolved config too
-            self.resolved_config.default_prefix = detected_prefix.clone();
+            self.resolved_config.default_project = detected_prefix.clone();
         }
 
         Ok(detected_prefix)

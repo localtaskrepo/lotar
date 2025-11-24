@@ -41,7 +41,6 @@ export interface TaskTableEmit {
     (event: 'bulk-sprint-add'): void
     (event: 'bulk-sprint-remove'): void
     (event: 'bulk-delete'): void
-    (event: 'open-sprint-backlog'): void
 }
 
 type ColKey =

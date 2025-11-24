@@ -47,7 +47,7 @@ Project context is determined by `src/cli/project.rs`/`ProjectResolver`:
 - Explicit `--project` flag (highest). Accepts either a prefix or the full project name; both are normalized via `resolve_project_input`.
 - Task ID prefix (e.g., AUTH-123 → AUTH) when present.
 - Auto-detection from the current `.tasks/<PREFIX>` directory name when the repo has a single initialized project.
-- Default project (`default_prefix`) from merged configuration. `ConfigManager::ensure_default_prefix` will generate one from the repo name when no project yet exists.
+- Default project (`default_project`) from merged configuration. `ConfigManager::ensure_default_project` will generate one from the repo name when no project yet exists.
 
 ## Automation semantics
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="velocity-trend">
+  <div class="velocity-trend" :data-visible-sprint-ids="visibleSprintIdsAttribute">
     <div class="velocity-trend__summary" v-if="response">
       <div>
         <span class="velocity-trend__label">Average velocity</span>
@@ -33,17 +33,43 @@ const props = withDefaults(defineProps<{
   metric?: SprintMetric
   width?: number
   height?: number
+  currentSprintId?: number | null
+  windowSize?: number
 }>(), {
   metric: 'points',
   width: 560,
   height: 220,
+  currentSprintId: null,
+  windowSize: 8,
 })
 
 const fallbackLabel = (entry: SprintVelocityEntryPayload) => entry.summary.label || `#${entry.summary.id}`
+const chartWindowSize = computed(() => Math.max(1, props.windowSize ?? 1))
+
+const orderedEntries = computed(() => {
+  if (!props.response?.entries?.length) return []
+  return [...props.response.entries].reverse()
+})
+
+const focusIndex = computed(() => {
+  if (!props.currentSprintId) return -1
+  return orderedEntries.value.findIndex((entry) => entry.summary.id === props.currentSprintId)
+})
+
+const visibleEntries = computed(() => {
+  if (!orderedEntries.value.length) return []
+  const size = Math.min(chartWindowSize.value, orderedEntries.value.length)
+  if (focusIndex.value === -1) {
+    return orderedEntries.value.slice(-size)
+  }
+  const end = focusIndex.value + 1
+  const start = Math.max(0, end - size)
+  return orderedEntries.value.slice(start, end)
+})
 
 const series = computed(() => {
-  if (!props.response) return []
-  return props.response.entries.map((entry) => ({
+  if (!visibleEntries.value.length) return []
+  return visibleEntries.value.map((entry) => ({
     key: fallbackLabel(entry),
     breakdown: {
       committed: Math.max(0, entry.committed),
@@ -51,6 +77,10 @@ const series = computed(() => {
     },
   }))
 })
+
+const visibleSprintIdsAttribute = computed(() =>
+  visibleEntries.value.map((entry) => entry.summary.id).join(','),
+)
 
 function formatNumber(value?: number | null) {
   if (value === null || value === undefined || Number.isNaN(value)) return '—'

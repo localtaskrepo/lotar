@@ -1,24 +1,45 @@
 <template>
   <section class="col" style="gap: 16px;">
-    <div class="row" style="justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;">
+    <div class="row" style="justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
       <h1>Tasks <span class="muted" v-if="count">({{ count }})</span></h1>
+      <div class="row split-actions" style="gap: 8px; align-items: center;">
+        <UiButton
+          icon-only
+          type="button"
+          aria-label="Clear filters"
+          title="Clear filters"
+          :disabled="!hasFilters"
+          @click="clearFilters"
+        >
+          <IconGlyph name="close" />
+        </UiButton>
+        <ReloadButton
+          :disabled="loading"
+          :loading="loading"
+          label="Refresh tasks"
+          title="Refresh tasks"
+          @click="retry"
+        />
+      </div>
     </div>
-    <SmartListChips
-      :statuses="statusOptions"
-      :priorities="priorityOptions"
-      :value="filter"
-      :custom-presets="customFilterPresets"
-      @update:value="onChipsUpdate"
-      @preset="handleCustomPreset"
-    />
-    <FilterBar
-      ref="filterBarRef"
-      :statuses="statuses"
-      :priorities="priorities"
-      :types="types"
-      :value="filter"
-      @update:value="onFilterUpdate"
-    />
+    <div class="filter-card">
+      <SmartListChips
+        :statuses="statusOptions"
+        :priorities="priorityOptions"
+        :value="filter"
+        :custom-presets="customFilterPresets"
+        @update:value="onChipsUpdate"
+        @preset="handleCustomPreset"
+      />
+      <FilterBar
+        ref="filterBarRef"
+        :statuses="statuses"
+        :priorities="priorities"
+        :types="types"
+        :value="filter"
+        @update:value="onFilterUpdate"
+      />
+    </div>
 
     <div class="col" style="gap: 16px;">
       <UiLoader v-if="loading && !hasTasks" size="md" />
@@ -69,7 +90,6 @@
         @unassign="unassignOne"
         @sprint-add="openSingleSprintAdd"
         @sprint-remove="openSingleSprintRemove"
-        @open-sprint-backlog="openSprintBacklog"
       />
     </div>
 
@@ -89,7 +109,17 @@
                 <h2>{{ assignDialogTitle }}</h2>
                 <p class="muted tasks-modal__hint">Use <code>@me</code> to assign the tasks to yourself.</p>
               </div>
-              <button class="btn ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</button>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                aria-label="Close dialog"
+                title="Close dialog"
+                :disabled="assignDialogSubmitting"
+                @click="closeAssignDialog"
+              >
+                <IconGlyph name="close" />
+              </UiButton>
             </header>
             <label class="col" style="gap: 4px;">
               <span class="muted">Assignee</span>
@@ -102,13 +132,13 @@
               />
             </label>
             <div class="row" style="gap: 8px; flex-wrap: wrap;">
-              <button class="btn" type="button" @click="useAssignShortcut('@me')">Use @me</button>
+              <UiButton variant="ghost" type="button" @click="useAssignShortcut('@me')">Use @me</UiButton>
             </div>
             <footer class="row tasks-modal__footer">
-              <button class="btn primary" type="submit" :disabled="assignDialogSubmitting || !assignInputValue.trim()">
+              <UiButton variant="primary" type="submit" :disabled="assignDialogSubmitting || !assignInputValue.trim()">
                 {{ assignDialogSubmitting ? 'Assigning…' : assignDialogTitle }}
-              </button>
-              <button class="btn ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</button>
+              </UiButton>
+              <UiButton variant="ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</UiButton>
             </footer>
           </form>
         </UiCard>
@@ -133,7 +163,17 @@
                   Choose the sprint target for the selected task{{ sprintDialogIds.length === 1 ? '' : 's' }}.
                 </p>
               </div>
-              <button class="btn ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</button>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                aria-label="Close dialog"
+                title="Close dialog"
+                :disabled="sprintDialogSubmitting"
+                @click="closeSprintDialog"
+              >
+                <IconGlyph name="close" />
+              </UiButton>
             </header>
             <label class="col" style="gap: 4px;">
               <span class="muted">Sprint</span>
@@ -151,10 +191,10 @@
               Allow assigning to closed sprints
             </label>
             <footer class="row tasks-modal__footer">
-              <button class="btn primary" type="submit" :disabled="sprintDialogSubmitting || !sprintOptions.length">
+              <UiButton variant="primary" type="submit" :disabled="sprintDialogSubmitting || !sprintOptions.length">
                 {{ sprintDialogSubmitting ? (sprintDialogMode === 'add' ? 'Assigning…' : 'Removing…') : (sprintDialogMode === 'add' ? 'Assign to sprint' : 'Remove from sprint') }}
-              </button>
-              <button class="btn ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</button>
+              </UiButton>
+              <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</UiButton>
             </footer>
           </form>
         </UiCard>
@@ -177,14 +217,24 @@
                 <h2>{{ deleteDialogTitle }}</h2>
                 <p class="muted tasks-modal__hint">This cannot be undone.</p>
               </div>
-              <button class="btn ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</button>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                aria-label="Close dialog"
+                title="Close dialog"
+                :disabled="deleteDialogSubmitting"
+                @click="closeDeleteDialog"
+              >
+                <IconGlyph name="close" />
+              </UiButton>
             </header>
             <p>Are you sure you want to delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?</p>
             <footer class="row tasks-modal__footer">
-              <button class="btn danger" type="button" :disabled="deleteDialogSubmitting" @click="submitDeleteDialog">
+              <UiButton variant="danger" type="button" :disabled="deleteDialogSubmitting" @click="submitDeleteDialog">
                 {{ deleteDialogSubmitting ? 'Deleting…' : 'Delete' }}
-              </button>
-              <button class="btn ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</button>
+              </UiButton>
+              <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
             </footer>
           </div>
         </UiCard>
@@ -200,9 +250,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
+import IconGlyph from '../components/IconGlyph.vue'
+import ReloadButton from '../components/ReloadButton.vue'
 import SmartListChips from '../components/SmartListChips.vue'
 import TaskTable from '../components/TaskTable.vue'
 import { showToast } from '../components/toast'
+import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
@@ -284,13 +337,19 @@ watch(
   { immediate: true },
 )
 
-const filter = ref<Record<string,string>>({})
-const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void } | null>(null)
+const filter = ref<Record<string, string>>({})
+const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
 const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
+const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
 function onFilterUpdate(v: Record<string,string>){ filter.value = v }
 function onChipsUpdate(v: Record<string,string>){ filter.value = { ...v } }
-function resetFilters(){ filter.value = {}; selectedIds.value = [] }
+function resetFilters(){
+  filter.value = {}
+  selectedIds.value = []
+  filterBarRef.value?.clear?.()
+}
+function clearFilters(){ resetFilters() }
 
 function handleCustomPreset(expression: string) {
   filterBarRef.value?.appendCustomFilter(expression)
@@ -780,8 +839,6 @@ function openBulkSprintRemove() {
   openSprintDialog(selectedIds.value, 'remove')
 }
 
-function openSprintBacklog(){ router.push({ path: '/sprints', hash: '#backlog' }) }
-
 const deleteDialogOpen = ref(false)
 const deleteDialogSubmitting = ref(false)
 const deleteDialogIds = ref<string[]>([])
@@ -994,6 +1051,13 @@ const handleTaskUpdated = (task: TaskDTO) => {
 </script>
 
 <style scoped>
+.filter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+}
+
 .tasks-modal__overlay {
   position: fixed;
   inset: 0;

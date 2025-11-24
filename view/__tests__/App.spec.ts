@@ -11,5 +11,6 @@ describe('App shell', () => {
     const wrapper = mount(App, { global: { plugins: [router] } })
     expect(wrapper.text()).toContain('Tasks')
     expect(wrapper.text()).toContain('Insights')
+    wrapper.unmount()
   })
 })

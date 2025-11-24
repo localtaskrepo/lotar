@@ -17,7 +17,7 @@ fn make_cfg(
 ) -> ResolvedConfig {
     ResolvedConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField { values: statuses },
         issue_types: ConfigurableField {
             values: vec![TaskType::from("Feature"), TaskType::from("Bug")],

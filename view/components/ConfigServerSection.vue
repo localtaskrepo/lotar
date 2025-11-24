@@ -9,7 +9,14 @@
         <span>Server port</span>
         <span v-if="fieldSourceLabel" class="provenance" :class="fieldSourceClass">{{ fieldSourceLabel }}</span>
       </label>
-      <UiInput v-model="serverPort" inputmode="numeric" placeholder="8080" @blur="onBlur" />
+      <UiInput
+        v-model="serverPort"
+        class="server-port-input"
+        inputmode="numeric"
+        maxlength="5"
+        placeholder="8080"
+        @blur="onBlur"
+      />
       <p v-if="error" class="field-error">{{ error }}</p>
       <p class="field-hint">Any value &gt;= 1024 works. Restart the server if you change this.</p>
     </div>
@@ -32,7 +39,9 @@ const props = defineProps<{
 }>()
 
 const error = computed(() => props.error ?? null)
-const groupSource = computed(() => props.groupSource)
+const groupSource = computed<ConfigSource | undefined>(() =>
+  props.groupSource === 'built_in' ? undefined : props.groupSource,
+)
 const fieldSourceLabel = computed(() => props.fieldSourceLabel ?? '')
 const fieldSourceClass = computed(() => props.fieldSourceClass ?? '')
 
@@ -57,14 +66,6 @@ function onBlur() {
   font-weight: 600;
 }
 
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
 .field-error {
   color: #ff8091;
   font-size: 12px;
@@ -73,5 +74,9 @@ function onBlur() {
 .field-hint {
   color: rgba(255, 255, 255, 0.6);
   font-size: 12px;
+}
+
+.server-port-input {
+  width: min(120px, 100%);
 }
 </style>

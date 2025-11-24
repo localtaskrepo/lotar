@@ -5,6 +5,7 @@
     fill="none"
     aria-hidden="true"
     focusable="false"
+    shape-rendering="geometricPrecision"
   >
     <path
       v-for="(d, index) in activeIcon.paths"
@@ -14,6 +15,7 @@
       :stroke-width="activeIcon.strokeWidth || 1.8"
       :stroke-linecap="activeIcon.linecap || 'round'"
       :stroke-linejoin="activeIcon.linejoin || 'round'"
+      vector-effect="non-scaling-stroke"
       fill="none"
     />
   </svg>
@@ -32,6 +34,15 @@ type IconName =
   | 'flag-remove'
   | 'trash'
   | 'list'
+  | 'refresh'
+  | 'help'
+  | 'close'
+  | 'dots-horizontal'
+  | 'chevron-left'
+  | 'chevron-right'
+  | 'send'
+  | 'edit'
+  | 'columns'
 
 type IconDef = {
   paths: string[]
@@ -68,6 +79,45 @@ const ICONS: Record<IconName, IconDef> = {
   },
   list: {
     paths: ['M8 7h11', 'M8 12h11', 'M8 17h11', 'M4.5 7h.01', 'M4.5 12h.01', 'M4.5 17h.01'],
+  },
+  refresh: {
+    paths: [
+      'M4 12A8 8 0 0112 4h3',
+      'M15 4l3 3-3 3',
+      'M20 12A8 8 0 0112 20H9',
+      'M9 20l-3-3 3-3',
+    ],
+  },
+  help: {
+    paths: [
+      'M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+      'M8.227 9a3.001 3.001 0 115.546 1.5c-.457.77-1.414 1.28-1.773 2.25',
+      'M12 17h.01',
+    ],
+  },
+  close: {
+    paths: ['M6 6l12 12', 'M6 18L18 6'],
+  },
+  'dots-horizontal': {
+    paths: ['M6 12h.01', 'M12 12h.01', 'M18 12h.01'],
+    strokeWidth: 2.8,
+  },
+  'chevron-left': {
+    paths: ['M15 6l-6 6 6 6'],
+  },
+  'chevron-right': {
+    paths: ['M9 6l6 6-6 6'],
+  },
+  send: {
+    paths: ['M3 3l18 9-18 9 4-9-4-9z', 'M3 12h11'],
+    linejoin: 'round',
+  },
+  edit: {
+    paths: ['M5 19h4L20 8l-4-4L5 15v4', 'M15 4l5 5'],
+  },
+  columns: {
+    paths: ['M4 5h5v14H4z', 'M9.5 5h5v14h-5z', 'M15 5h5v14h-5z'],
+    linejoin: 'miter',
   },
 }
 

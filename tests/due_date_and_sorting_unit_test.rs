@@ -5,7 +5,7 @@ use lotar::types::{Priority, TaskStatus, TaskType};
 fn cfg() -> ResolvedConfig {
     ResolvedConfig {
         server_port: 8080,
-        default_prefix: "TEST".to_string(),
+        default_project: "TEST".to_string(),
         issue_states: ConfigurableField {
             values: vec![
                 TaskStatus::from("Todo"),

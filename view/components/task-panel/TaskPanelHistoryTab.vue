@@ -2,7 +2,13 @@
   <div class="task-panel__tab-panel">
     <header class="task-panel__group-header">
       <h3>History</h3>
-      <UiButton type="button" variant="ghost" :disabled="mode !== 'edit'" @click="$emit('reload')">Reload</UiButton>
+      <ReloadButton
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Reload history"
+        title="Reload history"
+        @click="$emit('reload')"
+      />
     </header>
     <template v-if="mode === 'edit'">
       <div class="task-panel__history-scroll" role="region" aria-label="Task history">
@@ -40,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import UiButton from '../UiButton.vue';
+import ReloadButton from '../ReloadButton.vue';
 
 defineProps<{
   mode: 'create' | 'edit'

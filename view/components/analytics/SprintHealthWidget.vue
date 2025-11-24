@@ -33,13 +33,13 @@
         </div>
         <div>
           <dt>Blocked tasks</dt>
-          <dd>{{ summary.blocked_tasks.length }}</dd>
+          <dd>{{ blockedTasks.length }}</dd>
         </div>
       </dl>
-      <div v-if="summary.sprint.has_warnings && summary.sprint.status_warnings.length" class="sprint-health__warnings">
+      <div v-if="summary.sprint.has_warnings && statusWarnings.length" class="sprint-health__warnings">
         <h4>Warnings</h4>
         <ul>
-          <li v-for="warning in summary.sprint.status_warnings" :key="warning.code">
+          <li v-for="warning in statusWarnings" :key="warning.code || warning.message">
             <strong>{{ warning.code }}</strong>: {{ warning.message }}
           </li>
         </ul>
@@ -106,23 +106,29 @@
       </dl>
     </section>
 
-    <section v-if="summary.blocked_tasks.length" class="sprint-health__section">
+    <section v-if="blockedTasks.length" class="sprint-health__section">
       <header>
         <h3>Blocked tasks</h3>
       </header>
       <ul class="sprint-health__blocked">
-        <li v-for="task in summary.blocked_tasks" :key="task.id">
+        <li v-for="task in blockedTasks" :key="task.id || task.title">
           <span>{{ task.title }}</span>
           <span class="muted">{{ task.status }}</span>
         </li>
       </ul>
     </section>
   </div>
-  <p v-else class="sprint-health__empty">Select a sprint to view health metrics.</p>
+  <div v-else class="sprint-health__placeholder">
+    <span class="badge badge--muted">Unknown</span>
+    <h3>Health metrics unavailable</h3>
+    <p>
+      We haven't collected lifecycle data for this sprint yet. Refresh analytics after the sprint starts or when more activity is recorded.
+    </p>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { toRefs } from 'vue';
+import { computed, toRefs } from 'vue';
 import type { SprintSummaryReportResponse } from '../../api/types';
 
 import UiLoader from '../UiLoader.vue';
@@ -137,6 +143,8 @@ const props = withDefaults(
 )
 
 const { summary, loading, error } = toRefs(props)
+const blockedTasks = computed(() => summary.value?.blocked_tasks ?? [])
+const statusWarnings = computed(() => summary.value?.sprint.status_warnings ?? [])
 
 function statusClass(state: string) {
   const lowered = state?.toLowerCase()
@@ -273,8 +281,24 @@ function formatDuration(days: number | null | undefined) {
   color: var(--color-muted, #64748b);
 }
 
-.sprint-health__empty {
+.sprint-health__placeholder {
+  border: 1px dashed var(--color-border, #e2e8f0);
+  border-radius: var(--radius-md, 6px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   color: var(--color-muted, #64748b);
+  background: color-mix(in oklab, var(--color-surface, #fff) 60%, transparent);
+}
+
+.sprint-health__placeholder h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.sprint-health__placeholder p {
+  margin: 0;
   font-size: 0.95rem;
 }
 

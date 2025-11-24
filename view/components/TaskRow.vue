@@ -7,15 +7,33 @@
   <strong>{{ numeric }}</strong>
         <template v-if="!editingTitle">
           <span>{{ task.title }}</span>
-          <button class="btn link" title="Edit title" @click.stop="startEditTitle">✎</button>
+          <UiButton
+            icon-only
+            variant="ghost"
+            type="button"
+            aria-label="Edit title"
+            title="Edit title"
+            @click.stop="startEditTitle"
+          >
+            <IconGlyph name="edit" />
+          </UiButton>
         </template>
         <template v-else>
           <input class="input" v-model="titleDraft" @keyup.enter.prevent="saveTitle" @blur="saveTitle" style="max-width: 420px;" />
-          <button class="btn" @click.stop="cancelTitle">Cancel</button>
+          <UiButton variant="ghost" type="button" @click.stop="cancelTitle">Cancel</UiButton>
         </template>
       </div>
       <div class="row" style="gap:8px; font-size:12px; align-items:center; color: var(--muted);">
-        <button class="status btn link" :data-status="task.status" title="Toggle status" @click.stop="cycleStatus">{{ task.status || 'status' }}</button>
+        <UiButton
+          class="status-button"
+          variant="ghost"
+          type="button"
+          :data-status="task.status"
+          title="Toggle status"
+          @click.stop="cycleStatus"
+        >
+          {{ task.status || 'status' }}
+        </UiButton>
         <span>• {{ task.priority }}</span>
         <span>• {{ task.task_type }}</span>
         <span v-if="task.assignee">• @{{ task.assignee }}</span>
@@ -23,14 +41,16 @@
       </div>
       <div class="row" style="gap:6px; flex-wrap: wrap; margin-top: 4px; align-items: center;">
   <span v-for="tag in task.tags" :key="tag" class="chip small">{{ tag }}</span>
-        <button class="btn link" @click.stop="toggleTagsEdit">{{ editingTags ? 'Save tags' : 'Edit tags' }}</button>
+        <UiButton variant="ghost" type="button" @click.stop="toggleTagsEdit">
+          {{ editingTags ? 'Save tags' : 'Edit tags' }}
+        </UiButton>
         <input v-if="editingTags" class="input" v-model="tagsDraft" placeholder="tag1, tag2" style="max-width: 320px;" @keyup.enter.prevent="saveTags" />
       </div>
     </div>
     <div class="row" @click.stop>
-  <button class="btn" @click="$emit('assign', task.id)">@assign</button>
-  <button class="btn" @click="$emit('unassign', task.id)">@clear</button>
-      <UiButton variant="danger" @click="$emit('delete', task.id)">Delete</UiButton>
+      <UiButton variant="ghost" type="button" @click="$emit('assign', task.id)">Assign</UiButton>
+      <UiButton variant="ghost" type="button" @click="$emit('unassign', task.id)">Clear</UiButton>
+      <UiButton variant="danger" type="button" @click="$emit('delete', task.id)">Delete</UiButton>
     </div>
   </li>
   
@@ -39,6 +59,7 @@
 import { computed, ref, watch } from 'vue';
 import type { TaskDTO } from '../api/types';
 import { formatTaskDate } from '../utils/date';
+import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
 const props = defineProps<{ task: TaskDTO; statuses?: string[]; selectable?: boolean; selected?: boolean }>()
 const emit = defineEmits<{ (e:'open', id: string): void; (e:'delete', id: string): void; (e:'update-title', payload: { id: string; title: string }): void; (e:'update-tags', payload: { id: string; tags: string[] }): void; (e:'set-status', payload: { id: string; status: string }): void; (e:'assign', id: string): void; (e:'unassign', id: string): void; (e:'update:selected', v: boolean): void }>()
@@ -77,6 +98,10 @@ function cycleStatus(){
 </script>
 <style scoped>
 .item { justify-content: space-between; cursor: pointer; padding: 8px 0; }
-.status { color: var(--color-muted, #6b7280); font-weight: 600; }
+.status-button {
+  color: var(--color-muted, #6b7280);
+  font-weight: 600;
+  padding-inline: 0.5rem;
+}
 .chip.small { font-size: 11px; padding: 2px 6px; background: color-mix(in oklab, var(--bg) 85%, var(--fg)); border-radius: 999px; }
 </style>

@@ -1,7 +1,14 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import ConfigToggleField from '../components/ConfigToggleField.vue'
 import ConfigToggleFieldSource from '../components/ConfigToggleField.vue?raw'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const globalStyleSource = readFileSync(resolve(__dirname, '../styles.css'), 'utf8')
 
 type ToggleValue = 'inherit' | 'true' | 'false'
 
@@ -15,7 +22,7 @@ describe('ConfigToggleField styles', () => {
         return match ? match[1] : ''
     }
 
-    function mountToggle(modelValue: ToggleValue = 'inherit') {
+    function mountToggle(modelValue: ToggleValue = 'inherit', extraProps: Record<string, unknown> = {}) {
         return mount(ConfigToggleField, {
             attachTo: document.body,
             props: {
@@ -28,6 +35,7 @@ describe('ConfigToggleField styles', () => {
                 ],
                 modelValue,
                 'onUpdate:modelValue': () => { },
+                ...extraProps,
             },
         })
     }
@@ -45,12 +53,18 @@ describe('ConfigToggleField styles', () => {
     })
 
     it('keeps provenance badges styled consistently', () => {
-        const wrapper = mountToggle()
-        const style = extractStyle(ConfigToggleFieldSource)
+        const wrapper = mountToggle('inherit', {
+            sourceLabel: 'Project',
+            sourceClass: 'source-project',
+        })
 
-        expect(style).toMatch(/\.provenance[^{}]*\{[^}]*text-transform:\s*uppercase/)
-        expect(style).toMatch(/\.source-project[^{}]*\{[^}]*background:\s*rgba\(0,\s*180,\s*120,\s*0\.25\)/)
-        expect(style).toMatch(/\.source-global[^{}]*\{[^}]*color:\s*#8bc0ff/)
+        expect(globalStyleSource).toMatch(/\.provenance[^{}]*\{[^}]*text-transform:\s*uppercase/)
+        expect(globalStyleSource).toMatch(/\.provenance\.source-project[^{}]*\{[^}]*background:\s*rgba\(0,\s*180,\s*120,\s*0\.25\)/)
+        expect(globalStyleSource).toMatch(/\.provenance\.source-global[^{}]*\{[^}]*color:\s*#8bc0ff/)
+
+        const badge = wrapper.find('.provenance')
+        expect(badge.exists()).toBe(true)
+        expect(badge.classes()).toContain('source-project')
 
         wrapper.unmount()
     })

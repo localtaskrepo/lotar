@@ -67,12 +67,12 @@ impl ProjectResolver {
             (None, Some(id_prefix)) => Ok(id_prefix),
             // Neither provided - use default
             (None, None) => {
-                // Ensure default_prefix is set, auto-detecting if necessary
-                let default_prefix = self
+                // Ensure default_project is set, auto-detecting if necessary
+                let default_project = self
                     .config_manager
-                    .ensure_default_prefix(&self.tasks_dir)
+                    .ensure_default_project(&self.tasks_dir)
                     .map_err(|e| format!("Failed to determine default project: {}", e))?;
-                Ok(default_prefix)
+                Ok(default_project)
             }
         }
     }

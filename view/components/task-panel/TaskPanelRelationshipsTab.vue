@@ -2,7 +2,13 @@
   <div class="task-panel__tab-panel">
     <header class="task-panel__group-header">
       <h3>Relationships</h3>
-      <UiButton type="button" variant="ghost" :disabled="mode !== 'edit'" @click="$emit('reload')">Reload</UiButton>
+      <ReloadButton
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Reload relationships"
+        title="Reload relationships"
+        @click="$emit('reload')"
+      />
     </header>
     <div class="task-panel__relations">
       <label v-for="rel in relationDefs" :key="rel.key" class="task-panel__relation">
@@ -34,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import UiButton from '../UiButton.vue'
+import ReloadButton from '../ReloadButton.vue'
 import UiInput from '../UiInput.vue'
 
 type RelationDef = {

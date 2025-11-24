@@ -722,6 +722,7 @@ fn api_config_show_set() {
     assert_eq!(resp.status, 200);
     let show2: Value = serde_json::from_slice(&resp.body).unwrap();
     assert_eq!(show2["data"]["default_project"].as_str().unwrap(), "DEMO");
+    assert!(show2["data"].get("default_prefix").is_none());
 
     // Restored by guard
 }

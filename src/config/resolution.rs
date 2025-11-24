@@ -171,8 +171,8 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.server_port != defaults.server_port {
         base.server_port = override_config.server_port;
     }
-    if override_config.default_prefix != defaults.default_prefix {
-        base.default_prefix = override_config.default_prefix;
+    if override_config.default_project != defaults.default_project {
+        base.default_project = override_config.default_project;
     }
 
     // For configurable fields, we do full replacement if they differ
@@ -282,8 +282,8 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if override_config.server_port != defaults.server_port {
         resolved.server_port = override_config.server_port;
     }
-    if override_config.default_prefix != defaults.default_prefix {
-        resolved.default_prefix = override_config.default_prefix;
+    if override_config.default_project != defaults.default_project {
+        resolved.default_project = override_config.default_project;
     }
 
     if override_config.issue_states.values != defaults.issue_states.values {
@@ -536,7 +536,7 @@ impl ResolvedConfig {
     pub fn from_global(global: GlobalConfig) -> Self {
         Self {
             server_port: global.server_port,
-            default_prefix: global.default_prefix,
+            default_project: global.default_project,
             issue_states: global.issue_states,
             issue_types: global.issue_types,
             issue_priorities: global.issue_priorities,

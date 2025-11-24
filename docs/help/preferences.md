@@ -31,6 +31,17 @@ Use **Reset saved columns and sorting** to clear TaskTable preferences stored pe
 
 Select **Clear last used filter** to remove the saved filter state for the Tasks list (`sessionStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set.
 
+## Board Filters
+
+Boards now include a **Filters** popover next to the WIP controls. Use it to keep the final columns readable without touching server data:
+
+- **Statuses** — pick which board columns count as “done.” Only the selected statuses are affected; everything else stays untouched.
+- **Hide cards older than (days)** — optionally drop cards whose most recent status-change timestamp is older than the provided window. The helper (`findLastStatusChangeAt`) scans each task’s history, so cards without history stay visible.
+- **Limit visible cards** — cap the number of done cards per column. Cards are sorted by `modified` before trimming so the newest ones stay on the board.
+- **Reset** — clears the per-project settings stored in `localStorage` (`lotar.doneFilters::<PROJECT>`), restoring the full column view.
+
+These preferences apply per project and per browser—other users or machines keep their own thresholds. The filtering happens client-side, so hidden cards still exist in the underlying tasks list and remain searchable via `lotar list` or the REST API.
+
 ## Storage Notes
 
 - Settings never modify project configuration files; they are browser-scoped only.

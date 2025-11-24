@@ -21,7 +21,7 @@ impl PrefixConflictDetector {
                         ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
                     && let Ok(project_config) = config_manager.get_project_config(&dir_name)
                 {
-                    existing_prefixes.insert(project_config.default_prefix.to_uppercase());
+                    existing_prefixes.insert(project_config.default_project.to_uppercase());
                     continue;
                 }
                 // Fallback to directory name as prefix
@@ -40,7 +40,7 @@ impl PrefixConflictDetector {
         if self.existing_prefixes.contains(&new_prefix_upper) {
             result.add_error(
                 ValidationError::error(
-                    Some("default_prefix".to_string()),
+                    Some("default_project".to_string()),
                     format!("Project prefix '{}' already exists", new_prefix),
                 )
                 .with_fix("Choose a different prefix or use --force to override".to_string()),
@@ -53,7 +53,7 @@ impl PrefixConflictDetector {
             if existing.contains(&new_prefix_upper) || new_prefix_upper.contains(existing) {
                 result.add_error(
                     ValidationError::warning(
-                        Some("default_prefix".to_string()),
+                        Some("default_project".to_string()),
                         format!(
                             "Project prefix '{}' conflicts with existing prefix '{}'",
                             new_prefix, existing
@@ -71,7 +71,7 @@ impl PrefixConflictDetector {
             if self.are_similar(&new_prefix_upper, existing) {
                 result.add_error(
                     ValidationError::warning(
-                        Some("default_prefix".to_string()),
+                        Some("default_project".to_string()),
                         format!(
                             "Project prefix '{}' is very similar to existing prefix '{}'",
                             new_prefix, existing

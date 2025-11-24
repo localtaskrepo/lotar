@@ -1,5 +1,5 @@
 <template>
-  <ConfigGroup title="Automation" :description="description" :source="groupSource">
+  <ConfigGroup title="Automation" :description="description" :source="sanitizedGroupSource">
     <div class="toggle-grid">
       <ConfigToggleField
         label="Auto-set reporter"
@@ -82,6 +82,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ConfigSource } from '../api/types'
 import type { ToggleField, ToggleValue } from '../composables/useConfigForm'
 import ConfigGroup from './ConfigGroup.vue'
@@ -110,10 +111,14 @@ const props = defineProps<{
   sourceFor: (field: string) => ConfigSource | undefined
 }>()
 
+const sanitizedGroupSource = computed<ConfigSource | undefined>(() =>
+  props.groupSource === 'built_in' ? undefined : props.groupSource,
+)
+
 function hint(field: ToggleField) {
   if (props.isGlobal) return ''
   const summary = props.globalToggleSummary(field)
-  return `Global default: ${summary || 'unknown'}`
+  return `Global: ${summary || 'unknown'}`
 }
 </script>
 

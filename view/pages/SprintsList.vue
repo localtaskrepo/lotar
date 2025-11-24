@@ -3,10 +3,25 @@
     <header class="row header">
       <div class="col" style="gap: 4px;">
         <h1>Sprints</h1>
-        <p class="muted">Plan, reprioritize, and retime work across sprints without leaving the board.</p>
       </div>
-      <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
-        <button class="btn ghost" type="button" @click="handleManualRefresh">Refresh</button>
+      <div class="row split-actions" style="gap: 8px; align-items: center; flex-wrap: wrap;">
+        <UiButton
+          icon-only
+          type="button"
+          aria-label="Clear sprint filters"
+          title="Clear sprint filters"
+          :disabled="!filtersActive"
+          @click="clearFilters"
+        >
+          <IconGlyph name="close" />
+        </UiButton>
+        <ReloadButton
+          :disabled="busy"
+          :loading="busy"
+          label="Refresh sprints"
+          title="Refresh sprints"
+          @click="handleManualRefresh"
+        />
       </div>
     </header>
 
@@ -36,7 +51,16 @@
                     : 'Update plan metadata, timing, or capacity for this sprint.' }}
                 </p>
               </div>
-              <button class="btn ghost" type="button" :disabled="submitting" @click="closeModal">Cancel</button>
+              <UiButton
+                icon-only
+                variant="ghost"
+                type="button"
+                aria-label="Close dialog"
+                :disabled="submitting"
+                @click="closeModal"
+              >
+                <IconGlyph name="close" />
+              </UiButton>
             </header>
             <div class="row" style="gap: 12px; flex-wrap: wrap;">
               <label class="col" style="gap: 4px; min-width: 200px;">
@@ -85,11 +109,16 @@
               Skip applying sprint defaults for this sprint
             </label>
             <footer class="row" style="gap: 8px; flex-wrap: wrap;">
-              <button class="btn primary" type="submit" :disabled="submitting">
+              <UiButton variant="primary" type="submit" :disabled="submitting">
                 {{ submitting ? (modal.mode === 'create' ? 'Creating…' : 'Saving…') : modal.mode === 'create' ? 'Create sprint' : 'Save changes' }}
-              </button>
-              <button class="btn" type="button" :disabled="submitting" @click="handleManualRefresh">Refresh</button>
-              <button class="btn ghost" type="button" :disabled="submitting" @click="closeModal">Cancel</button>
+              </UiButton>
+              <ReloadButton
+                :disabled="submitting || busy"
+                :loading="busy"
+                label="Refresh sprint list"
+                title="Refresh sprint list"
+                @click="handleManualRefresh"
+              />
             </footer>
           </form>
         </UiCard>
@@ -112,7 +141,17 @@
                 <h2>{{ deleteDialogTitle }}</h2>
                 <p class="muted">This action cannot be undone.</p>
               </div>
-              <button class="btn ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</button>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                aria-label="Close dialog"
+                title="Close dialog"
+                :disabled="deleteDialogSubmitting"
+                @click="closeDeleteDialog"
+              >
+                <IconGlyph name="close" />
+              </UiButton>
             </header>
             <div class="col sprint-delete__body">
               <p>Deleting this sprint removes its board card and clears memberships from affected tasks.</p>
@@ -121,10 +160,10 @@
               </p>
             </div>
             <footer class="row sprint-delete__actions">
-              <button class="btn danger" type="button" :disabled="deleteDialogSubmitting" @click="confirmDeleteSprint">
+              <UiButton variant="danger" type="button" :disabled="deleteDialogSubmitting" @click="confirmDeleteSprint">
                 {{ deleteDialogSubmitting ? 'Deleting…' : 'Delete sprint' }}
-              </button>
-              <button class="btn ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</button>
+              </UiButton>
+              <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
             </footer>
           </div>
         </UiCard>
@@ -144,6 +183,8 @@
       :error="analyticsError"
       :velocity-loading="velocityLoading"
       :velocity-error="velocityError"
+      :velocity-window-size="velocityWindowSize"
+      :velocity-focus-sprint-ids="velocityFocusSprintIds"
       :active-tab="analyticsModal.tab"
       :burndown-metric="analyticsModal.burndownMetric"
       :velocity-metric="analyticsModal.velocityMetric"
@@ -155,40 +196,25 @@
       @update:velocity-metric="setVelocityMetric"
     />
 
-    <UiCard class="filter-card">
-      <div class="filter-row">
-        <label class="filter-field">
-          <span class="muted">Project</span>
-          <UiSelect v-model="filters.project">
-            <option value="">All projects</option>
-            <option v-for="project in projects" :key="project.prefix" :value="project.prefix">
-              {{ projectLabel(project) }}
-            </option>
-          </UiSelect>
-        </label>
-        <label class="filter-field">
-          <span class="muted">Statuses</span>
-          <input class="input" v-model="filters.statuses" placeholder="Todo, InProgress" />
-        </label>
-        <label class="filter-field">
-          <span class="muted">Tags</span>
-          <input class="input" v-model="filters.tags" placeholder="frontend, bug" />
-        </label>
-        <label class="filter-field">
-          <span class="muted">Assignee</span>
-          <input class="input" v-model="filters.assignee" placeholder="@me or username" />
-        </label>
-        <label class="filter-field filter-field--grow">
-          <span class="muted">Search</span>
-          <input class="input" v-model="filters.search" placeholder="Title or description" />
-        </label>
-        <button class="btn ghost" type="button" :disabled="!filtersActive" @click="clearFilters">Clear</button>
-        <button class="btn primary icon-only" type="button" aria-label="Create sprint" @click="openCreate">
-          <IconGlyph name="plus" />
-        </button>
-      </div>
+    <div class="filter-card">
+      <SmartListChips
+        :statuses="statusOptions"
+        :priorities="priorityOptions"
+        :value="filter"
+        :custom-presets="customFilterPresets"
+        @update:value="onChipsUpdate"
+        @preset="handleCustomPreset"
+      />
+      <FilterBar
+        ref="filterBarRef"
+        :statuses="statuses"
+        :priorities="priorities"
+        :types="types"
+        :value="filter"
+        @update:value="onFilterUpdate"
+      />
       <div class="filter-meta">
-        <div class="row" style="gap: 12px; align-items: center; flex-wrap: wrap;">
+        <div class="filter-meta__primary">
           <label class="filter-field">
             <span class="muted">Sprint window</span>
             <UiSelect v-model="timeRange">
@@ -199,30 +225,37 @@
           </label>
           <label
             v-if="showAllowClosedControl"
-            class="row"
-            style="gap: 6px; align-items: center;"
+            class="filter-checkbox"
           >
             <input type="checkbox" v-model="allowClosed" />
             Allow editing closed sprints
           </label>
-          <label class="row" style="gap: 6px; align-items: center;">
+          <label class="filter-checkbox">
             <input type="checkbox" v-model="highlightMultiSprint" />
             Highlight tasks in multiple sprints
           </label>
-        </div>
-        <div class="row" style="gap: 8px; align-items: center; flex-wrap: wrap;">
-          <button
-            ref="columnMenuButtonRef"
-            class="btn ghost"
-            type="button"
-            @click="toggleColumnMenu"
-          >
-            Columns
-          </button>
-          <span class="muted" v-if="visibleColumns.length !== allColumns.length">
-            Showing {{ visibleColumns.length }} of {{ allColumns.length }}
-          </span>
-          <UiLoader v-if="busy" size="sm" />
+          <div class="filter-meta__actions">
+            <UiButton
+              ref="columnMenuButtonRef"
+              type="button"
+              class="filter-columns-btn"
+              title="Configure columns"
+              @click="toggleColumnMenu"
+            >
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span>Columns</span>
+            </UiButton>
+            <UiButton
+              class="create-sprint-button"
+              type="button"
+              aria-label="Create sprint"
+              title="Create sprint"
+              @click="openCreate"
+            >
+              <IconGlyph name="plus" aria-hidden="true" />
+              <span>Sprint</span>
+            </UiButton>
+          </div>
         </div>
       </div>
       <div v-if="columnMenuOpen" ref="columnMenuRef" class="columns-popover card">
@@ -237,12 +270,12 @@
             <span>{{ headerLabel(col) }}</span>
           </label>
           <div class="row" style="gap: 8px; flex-wrap: wrap;">
-            <button class="btn" type="button" @click="resetColumns">Reset</button>
-            <button class="btn ghost" type="button" @click="closeColumnMenu">Close</button>
+            <UiButton type="button" @click="resetColumns">Reset</UiButton>
+            <UiButton variant="ghost" type="button" @click="closeColumnMenu">Close</UiButton>
           </div>
         </div>
       </div>
-    </UiCard>
+    </div>
 
     <p v-if="hiddenClosedCount" class="muted hint">
       Hiding {{ hiddenClosedCount }} completed sprint{{ hiddenClosedCount === 1 ? '' : 's' }} outside the selected window. Choose "All time" to include every sprint.
@@ -288,13 +321,17 @@
                 <template v-if="sprint.actual_start">
                   <div class="meta-item">
                     <span class="meta-label">Started</span>
-                    <span class="meta-value">{{ formatRelative(sprint.actual_start) }}</span>
+                    <span class="meta-value" :title="formatRelative(sprint.actual_start)">
+                      {{ formatShortDate(sprint.actual_start) || formatRelative(sprint.actual_start) }}
+                    </span>
                   </div>
                 </template>
                 <template v-else-if="sprint.planned_start">
                   <div class="meta-item">
                     <span class="meta-label">Planned start</span>
-                    <span class="meta-value">{{ formatShortDate(sprint.planned_start) }}</span>
+                    <span class="meta-value" :title="formatRelative(sprint.planned_start)">
+                      {{ formatShortDate(sprint.planned_start) }}
+                    </span>
                   </div>
                 </template>
                 <div
@@ -315,13 +352,17 @@
                 <template v-if="sprint.actual_end">
                   <div class="meta-item">
                     <span class="meta-label">Completed</span>
-                    <span class="meta-value">{{ formatRelative(sprint.actual_end) }}</span>
+                    <span class="meta-value" :title="formatRelative(sprint.actual_end)">
+                      {{ formatShortDate(sprint.actual_end) || formatRelative(sprint.actual_end) }}
+                    </span>
                   </div>
                 </template>
                 <template v-else-if="sprint.planned_end">
                   <div class="meta-item">
                     <span class="meta-label">Planned end</span>
-                    <span class="meta-value">{{ formatShortDate(sprint.planned_end) }}</span>
+                    <span class="meta-value" :title="formatRelative(sprint.planned_end)">
+                      {{ formatShortDate(sprint.planned_end) }}
+                    </span>
                   </div>
                 </template>
                 <div v-if="sprint.plan_length" class="meta-item">
@@ -402,63 +443,57 @@
             <span class="group-count">{{ getTasksForSprint(sprint.id).length }} task{{ getTasksForSprint(sprint.id).length === 1 ? '' : 's' }}</span>
             <div class="group-actions">
               <UiLoader v-if="isLifecycleBusy(sprint.id)" size="sm" />
-              <button
+              <UiButton
                 v-if="canStartSprint(sprint)"
-                class="btn ghost small"
+                class="small"
                 type="button"
                 :disabled="isLifecycleBusy(sprint.id)"
                 @click="startSprint(sprint)"
               >
                 Start
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 v-if="canCompleteSprint(sprint)"
-                class="btn ghost small"
+                class="small"
                 type="button"
                 :disabled="isLifecycleBusy(sprint.id)"
                 @click="completeSprint(sprint)"
               >
                 Complete
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 v-if="canReopenSprint(sprint)"
-                class="btn ghost small"
+                class="small"
                 type="button"
                 :disabled="isLifecycleBusy(sprint.id)"
                 @click="reopenSprint(sprint)"
               >
                 Reopen
-              </button>
-              <button class="btn ghost small" type="button" @click="openAnalytics(sprint)">
+              </UiButton>
+              <UiButton class="small" type="button" @click="openAnalytics(sprint)">
                 Insights
-              </button>
-              <button class="btn ghost small" type="button" @click="openEdit(sprint)">Edit</button>
-              <button
-                class="btn danger small icon-only"
+              </UiButton>
+              <UiButton
+                icon-only
+                type="button"
+                aria-label="Edit sprint"
+                title="Edit sprint"
+                @click="openEdit(sprint)"
+              >
+                <IconGlyph name="edit" />
+              </UiButton>
+              <UiButton
+                class="sprint-delete-button"
+                icon-only
                 type="button"
                 aria-label="Delete sprint"
+                title="Delete sprint"
                 data-testid="sprint-delete"
                 :disabled="deleteDialogSubmitting"
                 @click="openDelete(sprint)"
               >
-                <svg
-                  aria-hidden="true"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.5"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M9 4h6" />
-                  <path d="M4 7h16" />
-                  <path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" />
-                  <path d="M10 11v6" />
-                  <path d="M14 11v6" />
-                </svg>
-              </button>
+                <IconGlyph name="trash" />
+              </UiButton>
             </div>
           </header>
           <transition name="collapse">
@@ -732,7 +767,11 @@ import type {
     SprintVelocityResponse,
     TaskDTO,
 } from '../api/types'
+import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
+import ReloadButton from '../components/ReloadButton.vue'
+import SmartListChips from '../components/SmartListChips.vue'
+import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
@@ -741,11 +780,10 @@ import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
 import { useCopyModifier } from '../composables/useCopyModifier'
-import { useProjects } from '../composables/useProjects'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { fromDateTimeInputValue, safeTimestamp, toDateTimeInputValue } from '../utils/date'
+import { fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
 
 type ColumnKey =
   | 'id'
@@ -763,7 +801,7 @@ type ColumnKey =
   | 'modified'
 
 type SprintMetric = 'tasks' | 'points' | 'hours'
-type AnalyticsTab = 'health' | 'burndown' | 'velocity'
+type AnalyticsTab = 'burndown' | 'velocity' | 'health' | 'history'
 type TimeRangeKey = 'current' | '30' | '90' | '180' | 'all'
 
 const columnStorageKey = 'lotar.sprints.columns'
@@ -796,6 +834,8 @@ const allColumns: ColumnKey[] = [
 ]
 
 const defaultColumns: ColumnKey[] = ['id', 'title', 'status', 'priority', 'assignee', 'due_date', 'modified']
+
+const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'order', 'due', 'recent', 'needs'])
 
 function normalizeSprintMembership(raw: unknown): number[] {
   if (!Array.isArray(raw)) return []
@@ -893,10 +933,16 @@ function loadHighlightPreference(): boolean {
 
 const route = useRoute()
 
-const { projects, refresh: refreshProjects } = useProjects()
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, missingSprints, hasMissing: hasMissingSprints } = useSprints()
 const { openTaskPanel } = useTaskPanelController()
-const { sprintDefaults, refresh: refreshConfigDefaults } = useConfig()
+const {
+  sprintDefaults,
+  statuses,
+  priorities,
+  types,
+  customFields: availableCustomFields,
+  refresh: refreshConfigDefaults,
+} = useConfig()
 
 const sprintAnalytics = useSprintAnalytics()
 const highlightMultiSprint = ref(loadHighlightPreference())
@@ -925,6 +971,8 @@ const analyticsModal = reactive<{ open: boolean; tab: AnalyticsTab; burndownMetr
     velocityMetric: DEFAULT_VELOCITY_PARAMS.metric as SprintMetric,
   },
 )
+
+const VELOCITY_WINDOW = DEFAULT_VELOCITY_PARAMS.limit
 
 const selectedAnalyticsSprintId = ref<number | null>(null)
 
@@ -973,14 +1021,39 @@ const form = reactive({
   notes: '',
   skip_defaults: false,
 })
-
-const filters = reactive({
-  project: '',
-  statuses: '',
-  tags: '',
-  assignee: '',
-  search: '',
+const filter = ref<Record<string, string>>({})
+const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
+const statusOptions = computed(() => [...(statuses.value || [])])
+const priorityOptions = computed(() => [...(priorities.value || [])])
+const customFilterPresets = computed(() => {
+  const names = (availableCustomFields.value || []).filter((name) => name !== '*')
+  return names.slice(0, 6).map((name) => ({
+    label: name,
+    expression: `field:${name}=`,
+  }))
 })
+
+function onFilterUpdate(value: Record<string, string>) {
+  filter.value = { ...value }
+}
+
+function onChipsUpdate(value: Record<string, string>) {
+  filter.value = { ...value }
+}
+
+function handleCustomPreset(expression: string) {
+  filterBarRef.value?.appendCustomFilter(expression)
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+function startOfDay(date: Date) {
+  return startOfLocalDay(date)
+}
+
+function parseDateLike(value?: string | null) {
+  return parseTaskDate(value || undefined)
+}
 
 const allowClosed = ref(false)
 const timeRange = ref<TimeRangeKey>(loadStoredTimeRange())
@@ -1247,13 +1320,31 @@ const sortedSprints = computed(() => {
   return [...withStart, ...withoutStart]
 })
 
+function sprintStateKey(sprint: SprintListItem | null | undefined): string {
+  return (sprint?.state || '').toLowerCase()
+}
+
+function sprintIsFuture(sprint: SprintListItem) {
+  return sprintStateKey(sprint) === 'pending'
+}
+
+const nonFutureSprints = computed(() => sortedSprints.value.filter((entry) => !sprintIsFuture(entry)))
+
 const analyticsDefaultSprintId = computed<number | null>(() => {
-  const active = sortedSprints.value.find((entry) => {
-    const state = (entry.state || '').toLowerCase()
-    return state === 'active' || state === 'overdue'
-  })
+  const items = sortedSprints.value
+  if (!items.length) return null
+  const active = [...items]
+    .reverse()
+    .find((entry) => {
+      const state = sprintStateKey(entry)
+      return state === 'active' || state === 'overdue'
+    })
   if (active) return active.id
-  return sortedSprints.value[0]?.id ?? null
+  const fallbackPool = nonFutureSprints.value
+  if (fallbackPool.length) {
+    return fallbackPool[fallbackPool.length - 1]?.id ?? null
+  }
+  return items[items.length - 1]?.id ?? null
 })
 
 const showCurrentOnly = computed(() => timeRange.value === 'current')
@@ -1266,7 +1357,7 @@ const timeRangeDays = computed(() => {
 })
 
 function sprintIsComplete(sprint: SprintListItem) {
-  return (sprint.state || '').toLowerCase() === 'complete'
+  return sprintStateKey(sprint) === 'complete'
 }
 
 function sprintReferenceTimestamp(sprint: SprintListItem): number | null {
@@ -1335,6 +1426,39 @@ watch(showAllowClosedControl, (value) => {
     allowClosed.value = false
   }
 })
+
+watch(
+  sortedSprints,
+  (list) => {
+    if (!Array.isArray(list) || list.length === 0) {
+      selectedAnalyticsSprintId.value = null
+      return
+    }
+    const current = selectedAnalyticsSprintId.value
+    const exists = current ? list.some((item) => item.id === current) : false
+    if (!current || !exists) {
+      selectedAnalyticsSprintId.value = analyticsDefaultSprintId.value ?? list[list.length - 1].id
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => selectedAnalyticsSprintId.value,
+  (id) => {
+    if (!id || analyticsModal.open) return
+    void ensureSprintAnalytics()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [selectedAnalyticsSprintId.value, velocityHistoryLimit.value],
+  ([id]) => {
+    if (!id || !analyticsModal.open) return
+    void ensureVelocity(false)
+  },
+)
 
 const missingSprintMessage = computed(() => {
   if (!hasMissingSprints.value) return ''
@@ -1405,15 +1529,7 @@ function capacitySummary(sprint: SprintListItem): string {
 
 const backlogTasks = computed(() => tasks.value.filter((task) => !(Array.isArray(task.sprints) && task.sprints.length > 0)))
 
-const filtersActive = computed(() =>
-  Boolean(
-    filters.project ||
-      filters.statuses.trim().length ||
-      filters.tags.trim().length ||
-      filters.assignee.trim().length ||
-      filters.search.trim().length,
-  ),
-)
+const filtersActive = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
 const busy = computed(
   () => sprintsLoading.value || tasksLoading.value || Object.keys(lifecycleBusy).length > 0,
@@ -1434,8 +1550,35 @@ const burndownError = computed(() => sprintAnalytics.getBurndownError(selectedAn
 const analyticsLoading = computed(() => summaryLoading.value || burndownLoading.value)
 const analyticsError = computed(() => summaryError.value ?? burndownError.value)
 
+const velocityFocusSprintIds = computed(() => {
+  const items = nonFutureSprints.value
+  if (!items.length) return []
+  const selectedId = selectedAnalyticsSprintId.value
+  let anchorIndex = selectedId ? items.findIndex((entry) => entry.id === selectedId) : -1
+  if (anchorIndex === -1) {
+    anchorIndex = items.length - 1
+  }
+  const start = Math.max(0, anchorIndex - 3)
+  return items.slice(start, anchorIndex + 1).map((entry) => entry.id)
+})
+
+const velocityWindowSize = computed(() => velocityFocusSprintIds.value.length || 0)
+
+const velocityHistoryLimit = computed(() => {
+  const items = nonFutureSprints.value
+  if (!items.length) return VELOCITY_WINDOW
+  const selectedId = selectedAnalyticsSprintId.value
+  let index = selectedId ? items.findIndex((entry) => entry.id === selectedId) : -1
+  if (index === -1) {
+    index = items.length - 1
+  }
+  const remaining = items.length - index
+  return Math.max(VELOCITY_WINDOW, remaining)
+})
+
 const velocityParams = computed(() => ({
-  ...DEFAULT_VELOCITY_PARAMS,
+  limit: velocityHistoryLimit.value,
+  include_active: DEFAULT_VELOCITY_PARAMS.include_active,
   metric: analyticsModal.velocityMetric,
 }))
 
@@ -1460,14 +1603,15 @@ watch(visibleSprints, (list) => {
 })
 
 watch(
-  () => [filters.project, filters.statuses, filters.tags, filters.assignee, filters.search],
+  filter,
   () => {
     scheduleTasksRefresh()
   },
+  { deep: true },
 )
 
 watch(
-  () => filters.project,
+  () => filter.value.project || '',
   (project) => {
     refreshConfigDefaults(project || undefined).catch((error) => {
       console.warn('Failed to refresh sprint defaults', error)
@@ -1508,7 +1652,7 @@ watch(
       if (selectedAnalyticsSprintId.value) {
         void ensureSprintAnalytics(true)
       }
-      void ensureVelocity(false)
+      void ensureVelocity(true)
     }
   },
 )
@@ -1635,11 +1779,8 @@ watch(
 )
 
 function clearFilters() {
-  filters.project = ''
-  filters.statuses = ''
-  filters.tags = ''
-  filters.assignee = ''
-  filters.search = ''
+  filter.value = {}
+  filterBarRef.value?.clear?.()
 }
 
 function toStringValue(value: unknown) {
@@ -1833,13 +1974,73 @@ function parseList(value: string): string[] {
     .filter(Boolean)
 }
 
-function projectLabel(project: { prefix: string; name?: string | null }) {
-  const prefix = project?.prefix || ''
-  const name = (project?.name || '').trim()
-  if (name && name !== prefix) {
-    return `${name} (${prefix})`
-  }
-  return prefix
+function applySprintSmartFilters(source: TaskDTO[], q: Record<string, string>): TaskDTO[] {
+  const wantsUnassigned = q.assignee === '__none__'
+  const due = q.due || ''
+  const recent = q.recent || ''
+  const needsSet = new Set((q.needs || '').split(',').map((s) => s.trim()).filter(Boolean))
+  const now = new Date()
+  const today = startOfDay(now)
+  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
+  const soonCutoff = new Date(today.getTime() + 7 * MS_PER_DAY)
+  const recentCutoff = new Date(now.getTime() - 7 * MS_PER_DAY)
+
+  return source.filter((task) => {
+    if (wantsUnassigned && (task.assignee || '').trim()) {
+      return false
+    }
+
+    if (due) {
+      const dueDate = parseDateLike(task.due_date)
+      if (!dueDate) {
+        return false
+      }
+      const dueTime = startOfDay(dueDate).getTime()
+      const todayStart = today.getTime()
+      const tomorrowStart = tomorrow.getTime()
+      const soonCutoffTime = startOfDay(soonCutoff).getTime()
+      if (due === 'today') {
+        if (dueTime < todayStart || dueTime >= tomorrowStart) {
+          return false
+        }
+      } else if (due === 'soon') {
+        if (dueTime < tomorrowStart || dueTime > soonCutoffTime) {
+          return false
+        }
+      } else if (due === 'later') {
+        if (dueTime <= soonCutoffTime) {
+          return false
+        }
+      } else if (due === 'overdue') {
+        if (dueTime >= todayStart) {
+          return false
+        }
+      }
+    }
+
+    if (recent === '7d') {
+      const modified = parseDateLike(task.modified)
+      if (!modified || modified.getTime() < recentCutoff.getTime()) {
+        return false
+      }
+    }
+
+    if (needsSet.size) {
+      if (needsSet.has('effort')) {
+        const effort = (task.effort || '').trim()
+        if (effort) {
+          return false
+        }
+      }
+      if (needsSet.has('due')) {
+        if ((task.due_date || '').trim()) {
+          return false
+        }
+      }
+    }
+
+    return true
+  })
 }
 
 function sectionKey(id: number) {
@@ -1878,20 +2079,40 @@ async function refreshTasks() {
   }
   tasksLoading.value = true
   try {
-    const statuses = parseList(filters.statuses)
-    const tags = parseList(filters.tags)
+    const rawFilter = { ...(filter.value || {}) }
+    const qnorm: Record<string, string> = {}
+    const extraQuery: Record<string, string> = {}
+    for (const [key, value] of Object.entries(rawFilter)) {
+      if (!value || key === 'order') continue
+      if (BUILTIN_QUERY_KEYS.has(key)) {
+        qnorm[key] = value
+      } else {
+        extraQuery[key] = value
+      }
+    }
+
     const payload: Record<string, unknown> = {}
-    if (filters.project) payload.project = filters.project
-    if (statuses.length) payload.status = statuses
-    if (tags.length) payload.tags = tags
-    if (filters.assignee.trim().length) payload.assignee = filters.assignee.trim()
-    if (filters.search.trim().length) payload.q = filters.search.trim()
+    if (qnorm.q) payload.q = qnorm.q
+    if (qnorm.project) payload.project = qnorm.project
+    const statusList = parseList(qnorm.status || '')
+    if (statusList.length) payload.status = statusList
+    const priorityList = parseList(qnorm.priority || '')
+    if (priorityList.length) payload.priority = priorityList
+    const typeList = parseList(qnorm.type || '')
+    if (typeList.length) payload.type = typeList
+    const tagList = parseList(qnorm.tags || '')
+    if (tagList.length) payload.tags = tagList
+    if (qnorm.assignee && qnorm.assignee !== '__none__') payload.assignee = qnorm.assignee
+    Object.entries(extraQuery).forEach(([key, value]) => {
+      payload[key] = value
+    })
 
     const response = (await api.listTasks(payload as any)) as TaskDTO[]
     const normalized: TaskDTO[] = Array.isArray(response)
       ? response.map((task) => normalizeTaskRecord(task))
       : []
-    tasks.value = normalized
+    const filtered = applySprintSmartFilters(normalized, qnorm)
+    tasks.value = filtered
   } catch (error: any) {
     showToast(error?.message || 'Failed to load sprint tasks')
     tasks.value = []
@@ -2578,7 +2799,6 @@ function openAnalytics(initial?: SprintListItem) {
   if (candidate) {
     void ensureSprintAnalytics(true)
   }
-  void ensureVelocity(false)
 }
 
 function closeAnalytics() {
@@ -2605,7 +2825,7 @@ function setVelocityMetric(metric: SprintMetric) {
   }
 }
 
-async function ensureSprintAnalytics(force: boolean) {
+async function ensureSprintAnalytics(force = false) {
   const sprintId = selectedAnalyticsSprintId.value
   if (!sprintId) return
   try {
@@ -2620,7 +2840,7 @@ async function ensureSprintAnalytics(force: boolean) {
   }
 }
 
-async function ensureVelocity(force: boolean) {
+async function ensureVelocity(force = false) {
   try {
     await sprintAnalytics.loadVelocity(velocityParams.value, { force })
   } catch (error: any) {
@@ -2635,15 +2855,6 @@ async function ensureVelocity(force: boolean) {
 
 async function refreshAnalytics() {
   await Promise.all([ensureSprintAnalytics(true), ensureVelocity(true)])
-}
-
-async function refreshProjectList() {
-  try {
-    await refreshProjects()
-  } catch (error: any) {
-    console.warn('Failed to load projects for sprint filters', error)
-    showToast(error?.message || 'Failed to load projects')
-  }
 }
 
 function focusBacklogIfRequested() {
@@ -2662,7 +2873,6 @@ onMounted(() => {
   }
   bindCopyModifierListeners()
   void (async () => {
-    await refreshProjectList()
     await refreshAll(true)
     focusBacklogIfRequested()
   })()
@@ -2684,8 +2894,8 @@ onUnmounted(() => {
 <style scoped>
 .header {
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -2699,15 +2909,9 @@ onUnmounted(() => {
 .filter-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  position: relative;
-}
-
-.filter-row {
-  display: flex;
-  flex-wrap: wrap;
   gap: 12px;
-  align-items: flex-end;
+  padding: 0;
+  position: relative;
 }
 
 .filter-field {
@@ -2715,10 +2919,6 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 4px;
   min-width: 160px;
-}
-
-.filter-field--grow {
-  flex: 1 1 220px;
 }
 
 .icon-only {
@@ -2733,12 +2933,45 @@ onUnmounted(() => {
 
 .filter-meta {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   font-size: var(--text-sm, 0.875rem);
   color: var(--color-muted, #6b7280);
+}
+
+.filter-meta__primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.filter-meta__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.filter-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-end;
+  padding-bottom: 4px;
+}
+
+.filter-checkbox input {
+  margin: 0;
+}
+
+.filter-columns-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 2.25rem;
 }
 
 .columns-popover {
@@ -3130,6 +3363,40 @@ onUnmounted(() => {
 .badge--muted {
   background: color-mix(in oklab, var(--color-muted, #6b7280) 20%, transparent);
   color: var(--color-muted, #6b7280);
+}
+
+.filter-meta__actions .create-sprint-button {
+  font-weight: 600;
+  height: 2.25rem;
+  padding: 0 var(--space-4, 1rem);
+  gap: var(--space-2, 0.5rem);
+}
+
+.create-sprint-button:hover {
+  background: var(--color-accent, #0ea5e9);
+  color: var(--color-accent-contrast, #ffffff);
+  border-color: transparent;
+}
+
+.create-sprint-button:hover .icon-glyph {
+  color: inherit;
+}
+
+.sprint-delete-button {
+  background: color-mix(in oklab, var(--color-surface, #f8fafc) 94%, transparent);
+  border-color: color-mix(in oklab, var(--color-border, #e2e8f0) 85%, transparent);
+  color: var(--color-muted, #64748b);
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.sprint-delete-button:hover {
+  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
+  color: var(--color-danger, #ef4444);
+  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 45%, transparent);
+}
+
+.sprint-delete-button:hover .icon-glyph {
+  color: inherit;
 }
 
 .empty-placeholder {

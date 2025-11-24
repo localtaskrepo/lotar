@@ -1,53 +1,72 @@
 <template>
-  <section class="col preferences" style="gap:16px; max-width: 720px;">
+  <section class="preferences">
     <h1>Preferences</h1>
 
-    <UiCard>
-      <h3>Theme</h3>
-      <div class="col" style="gap:8px;">
-        <label class="row" style="gap:8px; align-items:center;">
-          <input type="radio" name="theme" value="system" v-model="theme" /> System (follow OS)
-        </label>
-        <label class="row" style="gap:8px; align-items:center;">
-          <input type="radio" name="theme" value="light" v-model="theme" /> Light
-        </label>
-        <label class="row" style="gap:8px; align-items:center;">
-          <input type="radio" name="theme" value="dark" v-model="theme" /> Dark
-        </label>
-      </div>
-    </UiCard>
+    <div class="preferences-layout">
+      <div class="preference-column">
+        <UiCard>
+          <h3>Theme</h3>
+          <div class="col" style="gap:8px;">
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="radio" name="theme" value="system" v-model="theme" /> System (follow OS)
+            </label>
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="radio" name="theme" value="light" v-model="theme" /> Light
+            </label>
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="radio" name="theme" value="dark" v-model="theme" /> Dark
+            </label>
+          </div>
+        </UiCard>
 
-    <UiCard>
-      <h3>Accent color</h3>
-      <div class="col" style="gap:12px;">
-        <label class="row" style="gap:8px; align-items:center;">
-          <input type="checkbox" v-model="accentEnabled" /> Use custom accent color
-        </label>
-        <div v-if="accentEnabled" class="accent-controls row" style="gap:12px; align-items:center; flex-wrap: wrap;">
-          <input class="accent-color" type="color" v-model="accent" aria-label="Accent color" />
-          <UiInput class="accent-hex" v-model="accent" maxlength="7" placeholder="#0ea5e9" aria-label="Accent color hex" />
-          <span class="chip preview" :style="{ background: accentPreview, color: accentPreviewContrast }">Preview</span>
-          <UiButton variant="ghost" @click="resetAccent">Reset</UiButton>
-        </div>
-        <p class="muted" style="margin:0;">Accent affects highlights, focus rings, and selection states across the app.</p>
+        <UiCard>
+          <h3>Accent color</h3>
+          <div class="col" style="gap:12px;">
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="checkbox" v-model="accentEnabled" /> Use custom accent color
+            </label>
+            <div v-if="accentEnabled" class="accent-controls row" style="gap:12px; align-items:center; flex-wrap: wrap;">
+              <input class="accent-color" type="color" v-model="accent" aria-label="Accent color" />
+              <UiInput class="accent-hex" v-model="accent" maxlength="7" placeholder="#0ea5e9" aria-label="Accent color hex" />
+              <span class="chip preview" :style="{ background: accentPreview, color: accentPreviewContrast }">Preview</span>
+              <UiButton variant="ghost" @click="resetAccent">Reset</UiButton>
+            </div>
+            <p class="muted" style="margin:0;">Accent affects highlights, focus rings, and selection states across the app.</p>
+          </div>
+        </UiCard>
       </div>
-    </UiCard>
 
-    <UiCard>
-      <h3>Tables</h3>
-      <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
-        <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
-        <span class="muted">Clears saved TaskTable column visibility and sort for all projects.</span>
-      </div>
-    </UiCard>
+      <div class="preference-column">
+        <UiCard>
+          <h3>Startup destination</h3>
+          <div class="col" style="gap:8px;">
+            <UiSelect v-model="startupDestination">
+              <option v-for="option in startupDestinationOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </UiSelect>
+            <p class="muted" style="margin:0;">Choose where LoTaR lands after loading. “Remember where I left off” reopens the last main section you visited.</p>
+          </div>
+        </UiCard>
 
-    <UiCard>
-      <h3>Filters</h3>
-      <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
-        <UiButton @click="clearSavedFilters">Clear last used filter</UiButton>
-        <span class="muted">Removes the saved FilterBar state from this browser.</span>
+        <UiCard>
+          <h3>Tables</h3>
+          <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
+            <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
+            <span class="muted">Clears saved TaskTable column visibility and sort for all projects.</span>
+          </div>
+        </UiCard>
+
+        <UiCard>
+          <h3>Filters</h3>
+          <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
+            <UiButton @click="clearSavedFilters">Clear last used filter</UiButton>
+            <span class="muted">Removes the saved FilterBar state from this browser.</span>
+          </div>
+        </UiCard>
+
       </div>
-    </UiCard>
+    </div>
   </section>
 </template>
 
@@ -56,7 +75,15 @@ import { computed, onMounted, ref, watch } from 'vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiInput from '../components/UiInput.vue'
+import UiSelect from '../components/UiSelect.vue'
 import { getContrastingColor } from '../utils/color'
+import {
+    DEFAULT_STARTUP_DESTINATION,
+    readStartupDestination,
+    STARTUP_DESTINATION_OPTIONS,
+    storeStartupDestination,
+    type StartupDestination,
+} from '../utils/preferences'
 import {
     applyAccentPreference,
     applyThemePreference,
@@ -72,6 +99,8 @@ import {
 const theme = ref<ThemePreference>('system')
 const accent = ref<string>(DEFAULT_ACCENT)
 const accentEnabled = ref(false)
+const startupDestination = ref<StartupDestination>(DEFAULT_STARTUP_DESTINATION)
+const startupDestinationOptions = STARTUP_DESTINATION_OPTIONS
 
 onMounted(() => {
   const storedTheme = readThemePreference()
@@ -88,6 +117,8 @@ onMounted(() => {
     accentEnabled.value = false
     applyAccentPreference(null)
   }
+
+  startupDestination.value = readStartupDestination()
 })
 
 watch(theme, (value) => {
@@ -119,6 +150,10 @@ watch(accent, (value) => {
   storeAccentPreference(normalized)
 })
 
+watch(startupDestination, (value) => {
+  storeStartupDestination(value)
+})
+
 const accentPreview = computed(() => (accentEnabled.value ? accent.value : DEFAULT_ACCENT))
 const accentPreviewContrast = computed(() => getContrastingColor(accentPreview.value))
 
@@ -140,6 +175,26 @@ function clearSavedFilters(){
 </script>
 
 <style scoped>
+.preferences {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.preferences-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.preference-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .preferences input[type="color"] {
   border: none;
   background: transparent;

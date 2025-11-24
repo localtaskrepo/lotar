@@ -6,15 +6,22 @@
     </div>
     <div v-if="$slots.actions || primaryLabel || secondaryLabel" class="row" style="gap:8px; margin-top: 8px;">
       <slot name="actions">
-        <button v-if="primaryLabel" class="btn primary" @click="$emit('primary')">{{ primaryLabel }}</button>
-        <button v-if="secondaryLabel" class="btn" @click="$emit('secondary')">{{ secondaryLabel }}</button>
+        <UiButton v-if="primaryLabel" variant="primary" type="button" @click="$emit('primary')">
+          {{ primaryLabel }}
+        </UiButton>
+        <UiButton v-if="secondaryLabel" type="button" @click="$emit('secondary')">
+          {{ secondaryLabel }}
+        </UiButton>
       </slot>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import UiButton from './UiButton.vue';
+
 const props = defineProps<{ title: string; description?: string; primaryLabel?: string; secondaryLabel?: string }>()
+const emit = defineEmits<{ (e: 'primary'): void; (e: 'secondary'): void }>()
 </script>
 
 <style scoped>

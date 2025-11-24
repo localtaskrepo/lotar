@@ -33,7 +33,7 @@ describe('TaskRow inline edits', () => {
 
   it('emits set-status on quick toggle', async () => {
     const wrapper = mount(TaskRow, { props: { task: baseTask, statuses: ['open', 'in-progress', 'done'] } })
-    const statusBtn = wrapper.find('button.status')
+    const statusBtn = wrapper.find('button.status-button')
     await statusBtn.trigger('click')
     const evt = wrapper.emitted('set-status') as any[]
     expect(evt?.[0]?.[0]).toEqual({ id: 'PRJ-1', status: 'in-progress' })

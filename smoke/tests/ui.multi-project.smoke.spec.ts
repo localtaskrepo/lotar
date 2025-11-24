@@ -32,7 +32,8 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
                     await page.waitForSelector(`text=${frontendTitle}`, { timeout: 20_000 });
                     await page.waitForSelector(`text=${apiTitle}`, { timeout: 20_000 });
 
-                    const projectSelect = page.locator('select.ui-select').first();
+                    const projectSelect = page.locator('[data-testid="filter-project"]');
+                    console.log('project select html', await page.evaluate(() => document.querySelector('[data-testid="filter-project"]')?.outerHTML));
                     await projectSelect.selectOption(apiTask.project);
 
                     await page.waitForFunction(
@@ -79,7 +80,8 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
                     await page.waitForSelector(`text=${defaultTitle}`, { timeout: 20_000 });
                     await page.waitForSelector(`text=${overrideTitle}`, { timeout: 20_000 });
 
-                    const projectSelect = page.locator('select.ui-select').first();
+                    const projectSelect = page.locator('[data-testid="filter-project"]');
+                    console.log('project select html', await page.evaluate(() => document.querySelector('[data-testid="filter-project"]')?.outerHTML));
                     await projectSelect.selectOption('QA');
 
                     await page.waitForFunction(

@@ -45,7 +45,7 @@ function extractStyle(source: string): string {
 function baseResolvedConfig(): ResolvedConfigDTO {
     return {
         server_port: 8080,
-        default_prefix: 'TEST',
+        default_project: 'TEST',
         default_assignee: null,
         default_reporter: null,
         default_tags: [],
@@ -79,7 +79,7 @@ function baseResolvedConfig(): ResolvedConfigDTO {
 function baseGlobalRaw(): GlobalConfigRaw {
     return {
         server_port: 8080,
-        default_prefix: 'TEST',
+        default_project: 'TEST',
         issue_states: ['Todo', 'InProgress', 'Done'],
         issue_types: ['Feature', 'Bug'],
         issue_priorities: ['Low', 'Medium', 'High'],
@@ -247,11 +247,9 @@ describe('ConfigView branch alias handling', () => {
 
             ; (api.inspectConfig as any).mockRejectedValueOnce(new Error('server exploded'))
 
-        const reloadButton = wrapper
-            .findAll('button')
-            .find((button) => button.text() === 'Reload')
-        expect(reloadButton).toBeDefined()
-        await reloadButton!.trigger('click')
+        const reloadButton = wrapper.find('button[aria-label="Reload configuration"]')
+        expect(reloadButton.exists()).toBe(true)
+        await reloadButton.trigger('click')
         await flushPromises()
 
         const errorBanner = wrapper.find('.alert-error')
@@ -269,17 +267,16 @@ describe('ConfigView branch alias handling', () => {
         await flushPromises()
 
         const vm = wrapper.vm as any
-        vm.form.defaultPrefix = 'ALPHA'
+        vm.form.defaultProject = 'ALPHA'
         await wrapper.vm.$nextTick()
 
             ; (api.setConfig as any).mockRejectedValueOnce(new Error('save denied'))
 
-        const saveButton = wrapper
-            .findAll('button')
-            .find((button) => button.text() === 'Save changes')
-        expect(saveButton).toBeDefined()
-        expect(saveButton!.attributes('disabled')).toBeUndefined()
-        await saveButton!.trigger('click')
+        const saveButton = wrapper.find('.floating-actions__buttons .btn')
+        expect(saveButton.exists()).toBe(true)
+        expect(saveButton.text()).toContain('Save changes')
+        expect(saveButton.attributes('disabled')).toBeUndefined()
+        await saveButton.trigger('click')
         await flushPromises()
         await wrapper.vm.$nextTick()
 
@@ -300,11 +297,11 @@ describe('ConfigView branch alias handling', () => {
                     effective: {
                         ...baseResolvedConfig(),
                         project_name: 'APP',
-                        default_prefix: 'APP',
+                        default_project: 'APP',
                     } as any,
                     project_raw: {
                         project_name: 'APP',
-                        default_prefix: 'APP',
+                        default_project: 'APP',
                     } as any,
                     project_exists: true,
                     sources: { project_name: 'project' },
@@ -384,5 +381,21 @@ describe('ConfigView branch alias handling', () => {
         expect(Object.keys(projectPayload)).toEqual(['auto_assign_on_status'])
 
         projectWrapper.unmount()
+    })
+
+    it('hydrates default project from inspect payloads', async () => {
+        const inspect = createInspectResult()
+            ; (api.inspectConfig as any).mockResolvedValue(inspect)
+
+        const { wrapper } = await mountConfigView('/')
+        await flushPromises()
+
+        const vm = wrapper.vm as any
+        expect(vm.form.defaultProject).toBe('TEST')
+
+        vm.openCreateDialog()
+        expect(vm.createPrefix).toBe('TEST')
+
+        wrapper.unmount()
     })
 })

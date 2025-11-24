@@ -23,7 +23,7 @@ const fn entry(
 
 pub const CONFIG_SOURCE_ENTRIES: &[ConfigSourceEntry] = &[
     entry("server.port", "server_port", "server_port"),
-    entry("default.project", "default_project", "default_prefix"),
+    entry("default.project", "default_project", "default_project"),
     entry("default.assignee", "default_assignee", "default_assignee"),
     entry("default.reporter", "default_reporter", "default_reporter"),
     entry("default.tags", "default_tags", "default_tags"),
@@ -311,7 +311,7 @@ fn source_label_for_global(
 
     match key {
         "server_port" => scope_field!(server_port),
-        "default_project" => scope_field!(default_prefix),
+        "default_project" => scope_field!(default_project),
         "default_assignee" => scope_field!(default_assignee),
         "default_reporter" => scope_field!(default_reporter),
         "default_tags" => scope_field!(default_tags),
@@ -388,7 +388,7 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
 
     match key {
         "server_port" => env_equal!(server_port),
-        "default_project" => env_equal!(default_prefix),
+        "default_project" => env_equal!(default_project),
         "default_assignee" => env_equal!(default_assignee),
         "default_reporter" => env_equal!(default_reporter),
         "default_tags" => env_equal!(default_tags),

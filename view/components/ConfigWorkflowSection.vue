@@ -10,10 +10,13 @@
           {{ provenanceLabel(issueStatesSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="issueStates"
         :suggestions="statusSuggestions"
         placeholder="Add status"
+        add-label="Add status"
+        composer-label="Status"
+        empty-label="No statuses defined"
         @update:modelValue="handleUpdate('issue_states')"
       />
       <p v-if="issueStatesError" class="field-error">{{ issueStatesError }}</p>
@@ -29,10 +32,13 @@
           {{ provenanceLabel(issueTypesSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="issueTypes"
         :suggestions="typeSuggestions"
         placeholder="Add type"
+        add-label="Add type"
+        composer-label="Type"
+        empty-label="No types defined"
         @update:modelValue="handleUpdate('issue_types')"
       />
       <p v-if="issueTypesError" class="field-error">{{ issueTypesError }}</p>
@@ -48,10 +54,13 @@
           {{ provenanceLabel(issuePrioritiesSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="issuePriorities"
         :suggestions="prioritySuggestions"
         placeholder="Add priority"
+        add-label="Add priority"
+        composer-label="Priority"
+        empty-label="No priorities defined"
         @update:modelValue="handleUpdate('issue_priorities')"
       />
       <p v-if="issuePrioritiesError" class="field-error">{{ issuePrioritiesError }}</p>
@@ -61,8 +70,8 @@
 
 <script setup lang="ts">
 import type { ConfigSource } from '../api/types'
+import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
-import TokenInput from './TokenInput.vue'
 
 const issueStates = defineModel<string[]>('issueStates', { required: true })
 const issueTypes = defineModel<string[]>('issueTypes', { required: true })
@@ -119,47 +128,9 @@ function handleUpdate(field: 'issue_states' | 'issue_types' | 'issue_priorities'
   font-weight: 600;
 }
 
-.field :deep(.token-input) {
-  width: 100%;
-}
-
-.field :deep(.token-input .tokens) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  min-height: 32px;
-  padding: calc(var(--space-2) - 4px) var(--space-3);
-  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.field :deep(.token-input:focus-within .tokens) {
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
-}
-
-.field :deep(.token-input .tokens input) {
-  color: var(--color-fg);
-}
-
-.field :deep(.token-input .tokens input::placeholder) {
-  color: var(--color-muted);
-  opacity: 1;
-}
-
 .field-error {
   color: #ff8091;
   font-size: 12px;
 }
 
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
 </style>

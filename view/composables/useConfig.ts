@@ -124,9 +124,9 @@ export function useConfig() {
     const defaultReporter = config?.default_reporter
     const defaultAssignee = config?.default_assignee
     const defaultTags = config?.default_tags
-    const defaultPrefix = config?.default_prefix || config?.default_project || ''
+    const defaultProject = config?.default_project || ''
 
-    defaults.project = currentProject.value || String(defaultPrefix || '')
+    defaults.project = currentProject.value || String(defaultProject || '')
     defaults.status = (defaultStatus && String(defaultStatus)) || statuses.value[0] || ''
     defaults.priority = (defaultPriority && String(defaultPriority)) || priorities.value[0] || ''
     defaults.type = types.value[0] || ''

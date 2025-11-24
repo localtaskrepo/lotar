@@ -157,9 +157,9 @@ fn create_default_global_config(tasks_dir: Option<&Path>) -> Result<(), ConfigEr
     if let Some(tasks_dir_path) = tasks_dir
         && let Some(detected_prefix) = auto_detect_prefix(tasks_dir_path)
     {
-        default_config.default_prefix = detected_prefix;
+        default_config.default_project = detected_prefix;
     }
-    // If no existing projects found, leave default_prefix empty
+    // If no existing projects found, leave default_project empty
     // It will be set when the first project is created
 
     // Write in canonical nested format
@@ -216,6 +216,6 @@ pub fn auto_detect_prefix(tasks_dir: &Path) -> Option<String> {
     }
 
     // No existing project directories found
-    // Return None so default_prefix remains empty until first project is created
+    // Return None so default_project remains empty until first project is created
     None
 }

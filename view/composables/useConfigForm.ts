@@ -1,5 +1,6 @@
-import { computed, reactive, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, reactive, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { ConfigInspectResult, ConfigSource, ProjectDTO } from '../api/types'
+import { provenanceClass as getProvenanceClass, provenanceLabel as getProvenanceLabel } from '../utils/provenance'
 
 export type ToggleValue = 'inherit' | 'true' | 'false'
 
@@ -10,7 +11,7 @@ export interface BranchAliasEntry {
 
 export interface ConfigFormState {
     serverPort: string
-    defaultPrefix: string
+    defaultProject: string
     projectName: string
     defaultReporter: string
     defaultAssignee: string
@@ -120,7 +121,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     const form = reactive<ConfigFormState>({
         serverPort: '',
-        defaultPrefix: '',
+        defaultProject: '',
         projectName: '',
         defaultReporter: '',
         defaultAssignee: '',
@@ -297,6 +298,18 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     const prioritySuggestions = computed(() => priorityOptions.value)
     const typeSuggestions = computed(() => typeOptions.value)
 
+    watch(
+        [isGlobal, statusOptions],
+        ([global, options]) => {
+            if (!global) return
+            if (!options.length) return
+            if (!form.defaultStatus || !options.includes(form.defaultStatus)) {
+                form.defaultStatus = options[0]
+            }
+        },
+        { immediate: true },
+    )
+
     const peopleDescription = computed(() =>
         isGlobal.value
             ? 'Used when tasks omit reporter/assignee information. @me resolves to the current identity.'
@@ -339,24 +352,6 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             : 'Project-specific aliases replace global mappings. Clear the list to fall back to global behavior.',
     )
 
-    function provenanceLabel(source: ConfigSource | undefined): string {
-        if (!source) return ''
-        switch (source) {
-            case 'project':
-                return 'Project override'
-            case 'global':
-                return 'Global default'
-            case 'built_in':
-                return 'Built-in'
-            default:
-                return ''
-        }
-    }
-
-    function provenanceClass(source: ConfigSource | undefined): string {
-        return source ? `source-${source}` : ''
-    }
-
     function sourceFor(field: string): ConfigSource | undefined {
         return inspectData.value?.sources?.[field]
     }
@@ -364,7 +359,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function snapshotForm(): ConfigFormState {
         return {
             serverPort: form.serverPort,
-            defaultPrefix: form.defaultPrefix,
+            defaultProject: form.defaultProject,
             projectName: form.projectName,
             defaultReporter: form.defaultReporter,
             defaultAssignee: form.defaultAssignee,
@@ -398,7 +393,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     function applySnapshot(snapshot: ConfigFormState) {
         form.serverPort = snapshot.serverPort
-        form.defaultPrefix = snapshot.defaultPrefix
+        form.defaultProject = snapshot.defaultProject
         form.projectName = snapshot.projectName
         form.defaultReporter = snapshot.defaultReporter
         form.defaultAssignee = snapshot.defaultAssignee
@@ -552,18 +547,18 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 }
                 break
             }
-            case 'default_prefix': {
-                const value = form.defaultPrefix.trim()
+            case 'default_project': {
+                const value = form.defaultProject.trim()
                 if (!value) {
-                    errors.default_prefix = null
+                    errors.default_project = null
                     return
                 }
                 if (!/^[A-Za-z0-9_-]+$/.test(value)) {
-                    errors.default_prefix = 'Only letters, numbers, hyphen, or underscore allowed.'
+                    errors.default_project = 'Only letters, numbers, hyphen, or underscore allowed.'
                 } else if (value.length > 20) {
-                    errors.default_prefix = 'Keep prefixes under 20 characters.'
+                    errors.default_project = 'Keep prefixes under 20 characters.'
                 } else {
-                    errors.default_prefix = null
+                    errors.default_project = null
                 }
                 break
             }
@@ -767,7 +762,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'branch_priority_aliases',
         ]
         if (isGlobal.value) {
-            fields.push('server_port', 'default_prefix')
+            fields.push('server_port', 'default_project')
         } else {
             fields.push('project_name')
         }
@@ -778,7 +773,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function populateForm(data: ConfigInspectResult) {
         const effective = data.effective
         form.serverPort = effective.server_port?.toString() ?? ''
-        form.defaultPrefix = effective.default_prefix ?? ''
+        const effectiveDefaultProject = effective.default_project ?? ''
+        form.defaultProject = effectiveDefaultProject
         form.defaultReporter = effective.default_reporter ?? ''
         form.defaultAssignee = effective.default_assignee ?? ''
         form.defaultTags = [...effective.default_tags]
@@ -899,7 +895,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
         if (isGlobal.value) {
             addValue('serverPort', 'server_port', { trim: true, allowEmpty: false })
-            addValue('defaultPrefix', 'default_prefix', { trim: true, allowEmpty: true })
+            addValue('defaultProject', 'default_project', { trim: true, allowEmpty: true })
         } else {
             addValue('projectName', 'project_name', { trim: true, allowEmpty: false })
         }
@@ -969,8 +965,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         saveDisabled,
         toggleSelectOptions,
         globalToggleSummary,
-        provenanceLabel,
-        provenanceClass,
+        provenanceLabel: getProvenanceLabel,
+        provenanceClass: getProvenanceClass,
         sourceFor,
         addAliasEntry,
         removeAliasEntry,

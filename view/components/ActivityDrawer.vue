@@ -7,8 +7,24 @@
           <p class="muted">Combined from task history and recent commits.</p>
         </div>
         <div class="card-actions row">
-          <button class="btn ghost" type="button" :disabled="loading" @click="refresh">Refresh</button>
-          <button class="btn" type="button" @click="$emit('close')">Close</button>
+          <ReloadButton
+            variant="ghost"
+            :disabled="loading"
+            :loading="loading"
+            label="Refresh activity feed"
+            title="Refresh activity feed"
+            @click="refresh"
+          />
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close activity drawer"
+            title="Close activity drawer"
+            @click="$emit('close')"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
         </div>
       </div>
       <div v-if="loading" class="muted" style="padding: 12px 0;">Loading activity…</div>
@@ -52,10 +68,13 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, watch } from 'vue';
-import { useActivity } from '../composables/useActivity';
-import { useTaskPanelController } from '../composables/useTaskPanelController';
-import { startOfLocalDay } from '../utils/date';
+import { computed, watch } from 'vue'
+import { useActivity } from '../composables/useActivity'
+import { useTaskPanelController } from '../composables/useTaskPanelController'
+import { startOfLocalDay } from '../utils/date'
+import IconGlyph from './IconGlyph.vue'
+import ReloadButton from './ReloadButton.vue'
+import UiButton from './UiButton.vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -142,18 +161,18 @@ watch(
   inset: 0;
   background: color-mix(in oklab, black 40%, transparent);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  overflow-y: auto;
+  overflow-y: hidden;
   z-index: 1000;
 }
 
 .card {
   width: 100%;
   max-width: 880px;
-  max-height: 90vh;
-  margin: 5vh auto;
+  max-height: min(90vh, calc(100vh - 64px));
+  margin: 0 auto;
   padding: 20px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -161,6 +180,7 @@ watch(
   box-shadow: 0 12px 34px color-mix(in oklab, black 18%, transparent);
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .card-head {

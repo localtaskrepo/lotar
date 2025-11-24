@@ -24,15 +24,15 @@ pub fn ensure_global_config(
 
     let mut global_config = GlobalConfig::default();
 
-    if let Some(prefix) = determine_smart_default_prefix(root_path, project_context) {
-        global_config.default_prefix = prefix;
+    if let Some(prefix) = determine_smart_default_project(root_path, project_context) {
+        global_config.default_project = prefix;
     }
 
     let config_yaml = crate::config::normalization::to_canonical_global_yaml(&global_config);
     fs::write(&global_config_path, config_yaml)
 }
 
-fn determine_smart_default_prefix(
+fn determine_smart_default_project(
     root_path: &Path,
     project_context: Option<&str>,
 ) -> Option<String> {

@@ -3,14 +3,17 @@
     <div class="topbar-inner container">
       <div class="brand">LoTaR</div>
       <nav class="nav">
-        <a href="/" @click.prevent="go('/')">Tasks</a>
-        <a href="/sprints" @click.prevent="go('/sprints')">Sprints</a>
-        <a href="/boards" @click.prevent="go('/boards')">Boards</a>
-        <a href="/calendar" @click.prevent="go('/calendar')">Calendar</a>
-        <a href="/insights" @click.prevent="go('/insights')">Insights</a>
-        <a href="/config" @click.prevent="go('/config')">Config</a>
-        <a href="/preferences" @click.prevent="go('/preferences')">Preferences</a>
-        <button class="btn ghost" type="button" @click="activityOpen = true">Activity</button>
+        <a
+          v-for="item in navItems"
+          :key="item.path"
+          class="nav__link"
+          :class="{ active: isActive(item) }"
+          :href="item.path"
+          @click.prevent="go(item.path)"
+        >
+          {{ item.label }}
+        </a>
+        <UiButton variant="ghost" type="button" @click="activityOpen = true">Activity</UiButton>
       </nav>
     </div>
   </header>
@@ -29,14 +32,40 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ActivityDrawer from './components/ActivityDrawer.vue'
 import TaskPanelHost from './components/TaskPanelHost.vue'
 import ToastHost from './components/ToastHost.vue'
+import UiButton from './components/UiButton.vue'
 const version = (import.meta as any).env?.VITE_CARGO_VERSION || ''
 const router = useRouter()
+const route = useRoute()
 const activityOpen = ref(false)
-function go(path: string) { router.push(path) }
+
+type NavItem = {
+  label: string
+  path: string
+  matches?: (currentPath: string) => boolean
+}
+
+const navItems: NavItem[] = [
+  { label: 'Tasks', path: '/', matches: (current) => current === '/' || current.startsWith('/task/') },
+  { label: 'Sprints', path: '/sprints' },
+  { label: 'Boards', path: '/boards' },
+  { label: 'Calendar', path: '/calendar' },
+  { label: 'Insights', path: '/insights' },
+  { label: 'Config', path: '/config' },
+  { label: 'Preferences', path: '/preferences' },
+]
+
+function isActive(item: NavItem) {
+  const currentPath = route.path
+  return item.matches ? item.matches(currentPath) : currentPath === item.path
+}
+
+function go(path: string) {
+  router.push(path)
+}
 </script>
 
 <style>

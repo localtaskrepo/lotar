@@ -1,3 +1,4 @@
+use chrono::{Duration, Utc};
 use lotar::services::sprint_service::SprintService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintPlan};
@@ -24,14 +25,20 @@ issue.priorities: [Low, Medium, High]
     .expect("write config");
 
     let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let now = Utc::now();
+    let upcoming_start = now + Duration::days(21);
+    let upcoming_end = upcoming_start + Duration::days(14);
+    let active_start = now - Duration::days(7);
+    let completed_end = now - Duration::days(35);
+    let completed_start = completed_end - Duration::days(14);
 
     // Upcoming sprint
     let upcoming = Sprint {
         plan: Some(SprintPlan {
             label: Some("Upcoming Sprint".to_string()),
             goal: Some("Ship new analytics panel".to_string()),
-            starts_at: Some("2025-11-10T09:00:00Z".to_string()),
-            ends_at: Some("2025-11-21T17:00:00Z".to_string()),
+            starts_at: Some(upcoming_start.to_rfc3339()),
+            ends_at: Some(upcoming_end.to_rfc3339()),
             ..SprintPlan::default()
         }),
         ..Sprint::default()
@@ -43,7 +50,7 @@ issue.priorities: [Low, Medium, High]
         plan: Some(SprintPlan {
             label: Some("Current Sprint".to_string()),
             goal: Some("Burn down backlog".to_string()),
-            starts_at: Some("2025-10-10T09:00:00Z".to_string()),
+            starts_at: Some(active_start.to_rfc3339()),
             length: Some("2w".to_string()),
             ..SprintPlan::default()
         }),
@@ -54,7 +61,7 @@ issue.priorities: [Low, Medium, High]
     let active_id = active_created.record.id;
     let mut active_doc = active_created.record.sprint.clone();
     active_doc.actual = Some(SprintActual {
-        started_at: Some("2025-10-10T09:00:00Z".to_string()),
+        started_at: Some(active_start.to_rfc3339()),
         ..SprintActual::default()
     });
     SprintService::update(&mut storage, active_id, active_doc).expect("activate sprint");
@@ -64,8 +71,8 @@ issue.priorities: [Low, Medium, High]
         plan: Some(SprintPlan {
             label: Some("September Sprint".to_string()),
             goal: Some("Stabilize release".to_string()),
-            starts_at: Some("2025-09-01T09:00:00Z".to_string()),
-            ends_at: Some("2025-09-14T17:00:00Z".to_string()),
+            starts_at: Some(completed_start.to_rfc3339()),
+            ends_at: Some(completed_end.to_rfc3339()),
             ..SprintPlan::default()
         }),
         ..Sprint::default()
@@ -75,8 +82,8 @@ issue.priorities: [Low, Medium, High]
     let completed_id = completed_created.record.id;
     let mut completed_doc = completed_created.record.sprint.clone();
     completed_doc.actual = Some(SprintActual {
-        started_at: Some("2025-09-01T09:00:00Z".to_string()),
-        closed_at: Some("2025-09-14T17:00:00Z".to_string()),
+        started_at: Some(completed_start.to_rfc3339()),
+        closed_at: Some(completed_end.to_rfc3339()),
     });
     SprintService::update(&mut storage, completed_id, completed_doc).expect("close sprint");
 

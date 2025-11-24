@@ -185,8 +185,8 @@ impl ConfigValidator {
         // Note: u16 max value is 65535, so no need to check config.server_port > 65535
 
         // Validate default prefix
-        if !config.default_prefix.is_empty() {
-            self.validate_prefix(&config.default_prefix, &mut result);
+        if !config.default_project.is_empty() {
+            self.validate_prefix(&config.default_project, &mut result);
         }
 
         self.warn_on_duplicate_values(
@@ -483,7 +483,7 @@ impl ConfigValidator {
     fn validate_prefix(&self, prefix: &str, result: &mut ValidationResult) {
         if prefix.is_empty() {
             result.add_error(ValidationError::warning(
-                Some("default_prefix".to_string()),
+                Some("default_project".to_string()),
                 "Default prefix is empty, will auto-generate from project name".to_string(),
             ));
             return;
@@ -492,7 +492,7 @@ impl ConfigValidator {
         if prefix.len() > MAX_PREFIX_LENGTH {
             result.add_error(
                 ValidationError::error(
-                    Some("default_prefix".to_string()),
+                    Some("default_project".to_string()),
                     format!(
                         "Prefix is too long ({} characters); maximum supported length is {}",
                         prefix.len(),
@@ -510,7 +510,7 @@ impl ConfigValidator {
         if prefix.len() > LONG_PREFIX_WARNING_THRESHOLD {
             result.add_error(
                 ValidationError::warning(
-                    Some("default_prefix".to_string()),
+                    Some("default_project".to_string()),
                     "Prefix is quite long, shorter prefixes are more practical".to_string(),
                 )
                 .with_fix("Consider using a 2-4 character prefix".to_string()),
@@ -523,7 +523,7 @@ impl ConfigValidator {
         {
             result.add_error(
                 ValidationError::error(
-                    Some("default_prefix".to_string()),
+                    Some("default_project".to_string()),
                     "Prefix contains invalid characters".to_string(),
                 )
                 .with_fix("Use only letters, numbers, underscores, and hyphens".to_string()),

@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, withDefaults } from 'vue';
+import { computed } from 'vue';
 import type { TaskDTO } from '../api/types';
 import { parseTaskDate, startOfLocalDay } from '../utils/date';
 

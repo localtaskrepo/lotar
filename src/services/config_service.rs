@@ -100,7 +100,7 @@ impl ConfigService {
         let is_project_scope = project_prefix.is_some();
 
         for entry in CONFIG_SOURCE_ENTRIES {
-            if is_project_scope && entry.inspect_key == "default_prefix" {
+            if is_project_scope && entry.inspect_key == "default_project" {
                 let scope = if has_global_file {
                     "global"
                 } else {
@@ -180,7 +180,7 @@ impl ConfigService {
                     "Project prefix cannot be empty".into(),
                 ));
             }
-            crate::config::operations::validate_field_value("default_prefix", &normalized)
+            crate::config::operations::validate_field_value("default_project", &normalized)
                 .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
             crate::utils::project::validate_explicit_prefix(
                 &normalized,
@@ -241,7 +241,7 @@ impl ConfigService {
             Some(
                 project
                     .map(|s| s.to_string())
-                    .unwrap_or_else(|| mgr.get_resolved_config().default_prefix.clone()),
+                    .unwrap_or_else(|| mgr.get_resolved_config().default_project.clone()),
             )
         };
 

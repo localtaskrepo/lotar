@@ -376,9 +376,9 @@ pub fn apply_field_to_global_config(
                 .parse::<u16>()
                 .map_err(|_| ConfigError::ParseError(format!("Invalid port number: {}", value)))?;
         }
-        "default_prefix" | "default_project" => {
+        "default_project" => {
             // Normalize to storage prefix, accepting either full project name or prefix
-            config.default_prefix = generate_project_prefix(value);
+            config.default_project = generate_project_prefix(value);
         }
         "default_assignee" => {
             config.default_assignee = if value.is_empty() {
@@ -757,7 +757,6 @@ fn apply_field_to_project_config(
 pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigError> {
     let valid_global_fields = vec![
         "server_port",
-        "default_prefix",
         "default_project",
         "default_assignee",
         "default_reporter",
@@ -877,7 +876,7 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 ConfigError::ParseError(format!("Invalid status '{}': {}", value, err))
             })?;
         }
-        "default_prefix" | "default_project" => {
+        "default_project" => {
             if is_reserved_project_prefix(value) {
                 return Err(ConfigError::ParseError(RESERVED_PREFIX_MESSAGE.to_string()));
             }

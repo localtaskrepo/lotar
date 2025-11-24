@@ -2,7 +2,13 @@
   <div class="task-panel__tab-panel">
     <header class="task-panel__group-header">
       <h3>Comments</h3>
-      <UiButton type="button" variant="ghost" :disabled="mode !== 'edit'" @click="$emit('reload')">Refresh</UiButton>
+      <ReloadButton
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Refresh comments"
+        title="Refresh comments"
+        @click="$emit('reload')"
+      />
     </header>
     <template v-if="mode === 'edit'">
       <ul class="task-panel__comments">
@@ -65,12 +71,13 @@
         <UiButton
           class="task-panel__comment-submit"
           variant="primary"
+          icon-only
           type="button"
           aria-label="Add comment"
           :disabled="!newComment.trim() || submitting"
           @click="$emit('addComment')"
         >
-          <span aria-hidden="true">➤</span>
+          <IconGlyph name="send" />
         </UiButton>
       </div>
     </template>
@@ -80,6 +87,8 @@
 
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue';
+import IconGlyph from '../IconGlyph.vue';
+import ReloadButton from '../ReloadButton.vue';
 import UiButton from '../UiButton.vue';
 
 interface TaskComment {
@@ -186,5 +195,10 @@ function onEditingTextareaRef(ref: Element | ComponentPublicInstance | null) {
   align-items: center;
   justify-content: center;
   font-size: 1.1rem;
+}
+
+.task-panel__comment-submit .icon-glyph {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 </style>

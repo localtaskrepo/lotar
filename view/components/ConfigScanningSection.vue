@@ -10,9 +10,12 @@
           {{ provenanceLabel(signalWordsSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="scanSignalWords"
         placeholder="TODO"
+        add-label="Add word"
+        composer-label="Signal word"
+        empty-label="No signal words"
         @update:modelValue="handleUpdate('scan_signal_words')"
       />
       <p class="field-hint">Found words highlight source code for review. Keep them short.</p>
@@ -29,9 +32,12 @@
           {{ provenanceLabel(ticketPatternsSource) }}
         </span>
       </label>
-      <TokenInput
+      <ChipListField
         v-model="scanTicketPatterns"
         placeholder="ABC-\d+"
+        add-label="Add pattern"
+        composer-label="Pattern"
+        empty-label="No ticket patterns"
         @update:modelValue="handleUpdate('scan_ticket_patterns')"
       />
       <p class="field-hint">Regex patterns matched in commits or code trigger ticket discovery.</p>
@@ -73,9 +79,9 @@
 <script setup lang="ts">
 import type { ConfigSource } from '../api/types'
 import type { ToggleField, ToggleValue } from '../composables/useConfigForm'
+import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
 import ConfigToggleField from './ConfigToggleField.vue'
-import TokenInput from './TokenInput.vue'
 
 type ToggleOption = { value: ToggleValue; label: string }
 
@@ -117,7 +123,7 @@ function handleUpdate(field: ValidateField) {
 function hint(field: ToggleField) {
   if (props.isGlobal) return ''
   const summary = props.globalToggleSummary(field)
-  return `Global default: ${summary || 'unknown'}`
+  return `Global: ${summary || 'unknown'}`
 }
 </script>
 
@@ -133,37 +139,6 @@ function hint(field: ToggleField) {
   align-items: center;
   gap: 8px;
   font-weight: 600;
-}
-
-.field :deep(.token-input) {
-  width: 100%;
-}
-
-.field :deep(.token-input .tokens) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  min-height: 32px;
-  padding: calc(var(--space-2) - 4px) var(--space-3);
-  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.field :deep(.token-input:focus-within .tokens) {
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
-}
-
-.field :deep(.token-input .tokens input) {
-  color: var(--color-fg);
-}
-
-.field :deep(.token-input .tokens input::placeholder) {
-  color: var(--color-muted);
-  opacity: 1;
 }
 
 .field-hint {
@@ -182,11 +157,4 @@ function hint(field: ToggleField) {
   gap: 12px;
 }
 
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
 </style>

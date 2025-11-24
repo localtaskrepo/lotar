@@ -1,37 +1,39 @@
 <template>
   <div class="row" style="gap:8px; flex-wrap: wrap; align-items: center;">
-    <button class="btn" :class="{ primary: isMine }" @click="toggleMine">Mine</button>
-    <button class="btn" :class="{ primary: isUnassigned }" @click="toggleUnassigned">No assignee</button>
-    <button v-if="blocked" class="btn" :class="{ primary: isBlocked }" @click="toggleBlocked">Blocked</button>
-    <button v-if="reviewList.length" class="btn" :class="{ primary: isReview }" @click="toggleReview">Review</button>
-    <button class="btn" :class="{ primary: isDueSoon }" @click="toggleDueSoon">Due soon</button>
-    <button class="btn" :class="{ primary: isOverdue }" @click="toggleOverdue">Overdue</button>
-    <button class="btn" :class="{ primary: isRecent }" @click="toggleRecent">Recent</button>
-    <button class="btn" :class="{ primary: isNoEstimate }" @click="toggleNoEstimate">No estimate</button>
+    <UiButton :variant="isMine ? 'primary' : ''" type="button" @click="toggleMine">Mine</UiButton>
+    <UiButton :variant="isUnassigned ? 'primary' : ''" type="button" @click="toggleUnassigned">No assignee</UiButton>
+    <UiButton v-if="blocked" :variant="isBlocked ? 'primary' : ''" type="button" @click="toggleBlocked">Blocked</UiButton>
+    <UiButton v-if="reviewList.length" :variant="isReview ? 'primary' : ''" type="button" @click="toggleReview">Review</UiButton>
+    <UiButton v-if="showDueSoonChip" :variant="isDueSoon ? 'primary' : ''" type="button" @click="toggleDueSoon">Due soon</UiButton>
+    <UiButton :variant="isOverdue ? 'primary' : ''" type="button" @click="toggleOverdue">Overdue</UiButton>
+    <UiButton v-if="showRecentChip" :variant="isRecent ? 'primary' : ''" type="button" @click="toggleRecent">Recent</UiButton>
+    <UiButton :variant="isNoEstimate ? 'primary' : ''" type="button" @click="toggleNoEstimate">No estimate</UiButton>
     <template v-if="customPresets?.length">
       <span class="muted smart-list-chips__label">Custom fields</span>
-      <button
+      <UiButton
         v-for="preset in customPresets"
         :key="preset.expression"
-        class="btn ghost smart-list-chips__preset"
+        class="smart-list-chips__preset"
+        variant="ghost"
         type="button"
         @click="emitPreset(preset.expression)"
       >
         {{ preset.label }}
-      </button>
+      </UiButton>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import UiButton from './UiButton.vue';
 
 interface CustomPreset {
   label: string
   expression: string
 }
 
-const props = defineProps<{ statuses?: string[]; priorities?: string[]; value?: Record<string, string>; customPresets?: CustomPreset[] }>()
+const props = defineProps<{ statuses?: string[]; priorities?: string[]; value?: Record<string, string>; customPresets?: CustomPreset[]; enableDueSoon?: boolean; enableRecent?: boolean }>()
 const emit = defineEmits<{ (e: 'update:value', v: Record<string,string>): void; (e: 'preset', expr: string): void }>()
 
 function normalize(s: string){ return (s || '').toLowerCase().replace(/\s|[_-]/g, '') }
@@ -51,6 +53,8 @@ const isReview = computed(() => {
   const want = reviewList.value.join(',')
   return !!want && (props.value?.status || '') === want
 })
+const showDueSoonChip = computed(() => props.enableDueSoon !== false)
+const showRecentChip = computed(() => props.enableRecent !== false)
 
 // New meta filters
 const isDueSoon = computed(() => (props.value?.due || '') === 'soon')

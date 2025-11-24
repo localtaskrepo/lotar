@@ -98,12 +98,12 @@ fn render_resolved_config_yaml(
 
     let mut default_body = String::new();
     let mut default_written = false;
-    if !resolved.default_prefix.is_empty() {
+    if !resolved.default_project.is_empty() {
         default_written |= write_scalar_line(
             &mut default_body,
             2,
             "project",
-            &yaml_scalar(&resolved.default_prefix),
+            &yaml_scalar(&resolved.default_project),
             sources.get("default.project"),
             options,
         );

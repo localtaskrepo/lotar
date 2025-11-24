@@ -24,13 +24,16 @@ fn inspect_reports_sources_for_global_scope() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "ACME".to_string());
+    global_values.insert("default_project".to_string(), "ACME".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("set global prefix");
 
     let payload = ConfigService::inspect(&resolver, None).expect("inspect global scope");
+    let effective = payload["effective"].as_object().expect("effective config");
     let sources = payload["sources"].as_object().expect("sources object");
 
-    assert_eq!(sources["default_prefix"].as_str(), Some("global"));
+    assert_eq!(effective["default_project"].as_str(), Some("ACME"));
+    assert!(effective.get("default_prefix").is_none());
+    assert_eq!(sources["default_project"].as_str(), Some("global"));
     assert_eq!(sources["tags"].as_str(), Some("built_in"));
 }
 
@@ -41,7 +44,7 @@ fn inspect_reports_project_overrides_with_shared_helpers() {
     let resolver = resolver_for(&tasks_dir);
 
     let mut global_values = BTreeMap::new();
-    global_values.insert("default_prefix".to_string(), "ACME".to_string());
+    global_values.insert("default_project".to_string(), "ACME".to_string());
     ConfigService::set(&resolver, &global_values, true, None).expect("set global prefix");
 
     ConfigService::create_project(&resolver, "Acme", Some("ACME"), None).expect("create project");
@@ -55,5 +58,5 @@ fn inspect_reports_project_overrides_with_shared_helpers() {
     let sources = payload["sources"].as_object().expect("sources object");
 
     assert_eq!(sources["default_priority"].as_str(), Some("project"));
-    assert_eq!(sources["default_prefix"].as_str(), Some("global"));
+    assert_eq!(sources["default_project"].as_str(), Some("global"));
 }

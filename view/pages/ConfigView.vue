@@ -10,9 +10,32 @@
           <option value="">Global defaults</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
-        <button class="btn" type="button" @click="openCreateDialog" :disabled="loading">New project</button>
-        <button class="btn" type="button" @click="handleReload" :disabled="loading">Reload</button>
-        <button class="btn secondary" type="button" @click="helpOpen = true">Help</button>
+        <UiButton
+          type="button"
+          class="new-project-button"
+          :disabled="loading"
+          @click="openCreateDialog"
+        >
+          <IconGlyph name="plus" aria-hidden="true" />
+          <span>New project</span>
+        </UiButton>
+        <ReloadButton
+          :disabled="loading"
+          :loading="loading"
+          label="Reload configuration"
+          title="Reload configuration"
+          @click="handleReload"
+        />
+        <UiButton
+          icon-only
+          variant="ghost"
+          type="button"
+          aria-label="Open help"
+          title="Open help"
+          @click="helpOpen = true"
+        >
+          <IconGlyph name="help" />
+        </UiButton>
       </div>
     </header>
 
@@ -34,205 +57,232 @@
 
     <div v-if="inspectData" class="config-body">
       <div class="config-main">
-        <ConfigServerSection
-          v-if="isGlobal"
-          v-model="form.serverPort"
-          :error="errors.server_port"
-          :group-source="serverPortSource"
-          :field-source-label="serverPortSourceLabel"
-          :field-source-class="serverPortSourceClass"
-          @validate="validateField('server_port')"
-        />
-
-        <ConfigGroup v-if="isGlobal" title="Project defaults" description="Applied when new tasks are created without explicit overrides." :source="sourceFor('default_prefix')">
-          <div class="field-grid">
-            <div class="field">
-              <label class="field-label">
-                <span>Default project prefix</span>
-                <span v-if="sourceFor('default_prefix')" :class="['provenance', provenanceClass(sourceFor('default_prefix'))]">{{ provenanceLabel(sourceFor('default_prefix')) }}</span>
-              </label>
-              <UiInput v-model="form.defaultPrefix" maxlength="20" @blur="validateField('default_prefix')" placeholder="ACME" />
-              <p v-if="errors.default_prefix" class="field-error">{{ errors.default_prefix }}</p>
-            </div>
-            <div class="field">
-              <label class="field-label">
-                <span>Default priority</span>
-                <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">{{ provenanceLabel(sourceFor('default_priority')) }}</span>
-              </label>
-              <UiSelect v-model="form.defaultPriority" @change="validateField('default_priority')">
-                <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
-              </UiSelect>
-              <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
-            </div>
-            <div class="field">
-              <label class="field-label">
-                <span>Default status</span>
-                <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
-              </label>
-              <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
-                <option value="">(inherit workflow)</option>
-                <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
-              </UiSelect>
-              <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
-            </div>
+        <div class="config-grid">
+          <div v-if="isGlobal" class="config-grid__item">
+            <ConfigServerSection
+              v-model="form.serverPort"
+              :error="errors.server_port"
+              :group-source="serverPortSource"
+              :field-source-label="serverPortSourceLabel"
+              :field-source-class="serverPortSourceClass"
+              @validate="validateField('server_port')"
+            />
           </div>
-        </ConfigGroup>
 
-        <ConfigGroup v-if="!isGlobal" title="Project overview" :description="projectOverviewDescription">
-          <div class="field-grid">
-            <div class="field">
-              <label class="field-label">Project name</label>
-              <UiInput v-model="form.projectName" maxlength="100" @blur="validateField('project_name')" :placeholder="currentProject?.name || 'Project display name'" />
-              <p v-if="errors.project_name" class="field-error">{{ errors.project_name }}</p>
-            </div>
-            <div class="field">
-              <label class="field-label">
-                <span>Default priority</span>
-                <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">{{ provenanceLabel(sourceFor('default_priority')) }}</span>
-              </label>
-              <UiSelect v-model="form.defaultPriority" @change="validateField('default_priority')">
-                <option value="">(inherit global)</option>
-                <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
-              </UiSelect>
-              <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
-            </div>
-            <div class="field">
-              <label class="field-label">
-                <span>Default status</span>
-                <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
-              </label>
-              <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
-                <option value="">(inherit global)</option>
-                <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
-              </UiSelect>
-              <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
-            </div>
+          <div v-if="isGlobal" class="config-grid__item">
+            <ConfigGroup title="Project defaults" description="Applied when new tasks are created without explicit overrides.">
+              <div class="field-grid">
+                <div class="field">
+                  <label class="field-label">
+                    <span>Default project prefix</span>
+                    <span v-if="sourceFor('default_project')" :class="['provenance', provenanceClass(sourceFor('default_project'))]">{{ provenanceLabel(sourceFor('default_project')) }}</span>
+                  </label>
+                  <UiInput v-model="form.defaultProject" maxlength="20" @blur="validateField('default_project')" placeholder="ACME" />
+                  <p v-if="errors.default_project" class="field-error">{{ errors.default_project }}</p>
+                </div>
+                <div class="field">
+                  <label class="field-label">
+                    <span>Default priority</span>
+                    <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">{{ provenanceLabel(sourceFor('default_priority')) }}</span>
+                  </label>
+                  <UiSelect v-model="form.defaultPriority" @change="validateField('default_priority')">
+                    <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
+                  </UiSelect>
+                  <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
+                </div>
+                <div class="field">
+                  <label class="field-label">
+                    <span>Default status</span>
+                    <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
+                  </label>
+                  <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
+                    <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
+                  </UiSelect>
+                  <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
+                </div>
+              </div>
+            </ConfigGroup>
           </div>
-        </ConfigGroup>
 
-        <ConfigPeopleSection
-          :description="peopleDescription"
-          :is-global="isGlobal"
-          v-model:default-reporter="form.defaultReporter"
-          v-model:default-assignee="form.defaultAssignee"
-          v-model:default-tags="form.defaultTags"
-          :tag-suggestions="tagSuggestions"
-          :default-reporter-error="errors.default_reporter"
-          :default-assignee-error="errors.default_assignee"
-          :default-tags-error="errors.default_tags"
-          :provenance-label="provenanceLabel"
-          :provenance-class="provenanceClass"
-          :default-reporter-source="sourceFor('default_reporter')"
-          :default-assignee-source="sourceFor('default_assignee')"
-          :default-tags-source="sourceFor('default_tags')"
-          @validate="validateField"
-        />
-
-        <ConfigWorkflowSection
-          :description="workflowDescription"
-          v-model:issue-states="form.issueStates"
-          v-model:issue-types="form.issueTypes"
-          v-model:issue-priorities="form.issuePriorities"
-          :status-suggestions="statusSuggestions"
-          :type-suggestions="typeSuggestions"
-          :priority-suggestions="prioritySuggestions"
-          :issue-states-error="errors.issue_states"
-          :issue-types-error="errors.issue_types"
-          :issue-priorities-error="errors.issue_priorities"
-          :issue-states-source="sourceFor('issue_states')"
-          :issue-types-source="sourceFor('issue_types')"
-          :issue-priorities-source="sourceFor('issue_priorities')"
-          :provenance-label="provenanceLabel"
-          :provenance-class="provenanceClass"
-          @validate="validateField"
-        />
-
-        <ConfigTaxonomySection
-          :description="taxonomyDescription"
-          v-model:tags="form.tags"
-          v-model:custom-fields="form.customFields"
-          :tag-wildcard="tagWildcard"
-          :custom-field-wildcard="customFieldWildcard"
-          :tags-error="errors.tags"
-          :custom-fields-error="errors.custom_fields"
-          :tags-source="sourceFor('tags')"
-          :custom-fields-source="sourceFor('custom_fields')"
-          :provenance-label="provenanceLabel"
-          :provenance-class="provenanceClass"
-          @validate="validateField"
-        />
-
-        <ConfigAutomationSection
-          :description="automationDescription"
-          :group-source="sourceFor('auto_set_reporter')"
-          :is-global="isGlobal"
-          v-model:auto-set-reporter="form.autoSetReporter"
-          v-model:auto-assign-on-status="form.autoAssignOnStatus"
-          v-model:auto-codeowners-assign="form.autoCodeownersAssign"
-          v-model:auto-tags-from-path="form.autoTagsFromPath"
-          v-model:auto-branch-infer-type="form.autoBranchInferType"
-          v-model:auto-branch-infer-status="form.autoBranchInferStatus"
-          v-model:auto-branch-infer-priority="form.autoBranchInferPriority"
-          v-model:auto-identity="form.autoIdentity"
-          v-model:auto-identity-git="form.autoIdentityGit"
-          :toggle-select-options="toggleSelectOptions"
-          :global-toggle-summary="globalToggleSummary"
-          :provenance-label="provenanceLabel"
-          :provenance-class="provenanceClass"
-          :source-for="sourceFor"
-        />
-
-        <ConfigScanningSection
-          :description="scanningDescription"
-          :is-global="isGlobal"
-          v-model:scan-signal-words="form.scanSignalWords"
-          v-model:scan-ticket-patterns="form.scanTicketPatterns"
-          v-model:scan-enable-ticket-words="form.scanEnableTicketWords"
-          v-model:scan-enable-mentions="form.scanEnableMentions"
-          v-model:scan-strip-attributes="form.scanStripAttributes"
-          :toggle-select-options="toggleSelectOptions"
-          :global-toggle-summary="globalToggleSummary"
-          :provenance-label="provenanceLabel"
-          :provenance-class="provenanceClass"
-          :source-for="sourceFor"
-          :scan-signal-words-error="errors.scan_signal_words"
-          :scan-ticket-patterns-error="errors.scan_ticket_patterns"
-          :signal-words-source="sourceFor('scan_signal_words')"
-          :ticket-patterns-source="sourceFor('scan_ticket_patterns')"
-          @validate="validateField"
-        />
-
-        <ConfigBranchAliasSection
-          :description="branchAliasDescription"
-          :is-global="isGlobal"
-          v-model:type-entries="form.branchTypeAliases"
-          v-model:status-entries="form.branchStatusAliases"
-          v-model:priority-entries="form.branchPriorityAliases"
-          :type-error="errors.branch_type_aliases"
-          :status-error="errors.branch_status_aliases"
-          :priority-error="errors.branch_priority_aliases"
-          :provenance-label="provenanceLabel"
-          :provenance-class="provenanceClass"
-          :source-for="sourceFor"
-          @add="addAliasEntry"
-          @remove="removeAliasEntry"
-          @clear="clearAliasField"
-          @validate="validateField"
-        />
-
-        <div class="form-actions card">
-          <div class="form-actions__left">
-            <button class="btn" type="button" @click="save" :disabled="saveDisabled">Save changes</button>
-            <button class="btn secondary" type="button" @click="resetForm" :disabled="!isDirty">Reset</button>
+          <div v-if="!isGlobal" class="config-grid__item">
+            <ConfigGroup title="Project overview" :description="projectOverviewDescription">
+              <div class="field-grid">
+                <div class="field">
+                  <label class="field-label">Project name</label>
+                  <UiInput v-model="form.projectName" maxlength="100" @blur="validateField('project_name')" :placeholder="currentProject?.name || 'Project display name'" />
+                  <p v-if="errors.project_name" class="field-error">{{ errors.project_name }}</p>
+                </div>
+                <div class="field">
+                  <label class="field-label">
+                    <span>Default priority</span>
+                    <span v-if="sourceFor('default_priority')" :class="['provenance', provenanceClass(sourceFor('default_priority'))]">{{ provenanceLabel(sourceFor('default_priority')) }}</span>
+                  </label>
+                  <UiSelect v-model="form.defaultPriority" @change="validateField('default_priority')">
+                    <option value="">(inherit global)</option>
+                    <option v-for="option in priorityOptions" :key="option" :value="option">{{ option }}</option>
+                  </UiSelect>
+                  <p v-if="errors.default_priority" class="field-error">{{ errors.default_priority }}</p>
+                </div>
+                <div class="field">
+                  <label class="field-label">
+                    <span>Default status</span>
+                    <span v-if="sourceFor('default_status')" :class="['provenance', provenanceClass(sourceFor('default_status'))]">{{ provenanceLabel(sourceFor('default_status')) }}</span>
+                  </label>
+                  <UiSelect v-model="form.defaultStatus" @change="validateField('default_status')">
+                    <option value="">(inherit global)</option>
+                    <option v-for="option in statusOptions" :key="option" :value="option">{{ option }}</option>
+                  </UiSelect>
+                  <p v-if="errors.default_status" class="field-error">{{ errors.default_status }}</p>
+                </div>
+              </div>
+            </ConfigGroup>
           </div>
-          <div class="form-actions__meta">
-            <span v-if="saving" class="muted">Saving…</span>
-            <span v-else-if="isDirty" class="muted">You have unsaved changes.</span>
-            <span v-else-if="inspectData" class="muted">Last updated {{ lastLoaded }}</span>
+
+          <div class="config-grid__item">
+            <ConfigPeopleSection
+              :description="peopleDescription"
+              :is-global="isGlobal"
+              v-model:default-reporter="form.defaultReporter"
+              v-model:default-assignee="form.defaultAssignee"
+              v-model:default-tags="form.defaultTags"
+              :tag-suggestions="tagSuggestions"
+              :default-reporter-error="errors.default_reporter"
+              :default-assignee-error="errors.default_assignee"
+              :default-tags-error="errors.default_tags"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :default-reporter-source="sourceFor('default_reporter')"
+              :default-assignee-source="sourceFor('default_assignee')"
+              :default-tags-source="sourceFor('default_tags')"
+              @validate="validateField"
+            />
           </div>
+
+          <div class="config-grid__item">
+            <ConfigTaxonomySection
+              :description="taxonomyDescription"
+              v-model:tags="form.tags"
+              v-model:custom-fields="form.customFields"
+              :tag-wildcard="tagWildcard"
+              :custom-field-wildcard="customFieldWildcard"
+              :tags-error="errors.tags"
+              :custom-fields-error="errors.custom_fields"
+              :tags-source="sourceFor('tags')"
+              :custom-fields-source="sourceFor('custom_fields')"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+          </div>
+
+          <div class="config-grid__item">
+            <ConfigWorkflowSection
+              :description="workflowDescription"
+              v-model:issue-states="form.issueStates"
+              v-model:issue-types="form.issueTypes"
+              v-model:issue-priorities="form.issuePriorities"
+              :status-suggestions="statusSuggestions"
+              :type-suggestions="typeSuggestions"
+              :priority-suggestions="prioritySuggestions"
+              :issue-states-error="errors.issue_states"
+              :issue-types-error="errors.issue_types"
+              :issue-priorities-error="errors.issue_priorities"
+              :issue-states-source="sourceFor('issue_states')"
+              :issue-types-source="sourceFor('issue_types')"
+              :issue-priorities-source="sourceFor('issue_priorities')"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              @validate="validateField"
+            />
+          </div>
+
+          <div class="config-grid__item">
+            <ConfigAutomationSection
+              :description="automationDescription"
+              :group-source="sourceFor('auto_set_reporter')"
+              :is-global="isGlobal"
+              v-model:auto-set-reporter="form.autoSetReporter"
+              v-model:auto-assign-on-status="form.autoAssignOnStatus"
+              v-model:auto-codeowners-assign="form.autoCodeownersAssign"
+              v-model:auto-tags-from-path="form.autoTagsFromPath"
+              v-model:auto-branch-infer-type="form.autoBranchInferType"
+              v-model:auto-branch-infer-status="form.autoBranchInferStatus"
+              v-model:auto-branch-infer-priority="form.autoBranchInferPriority"
+              v-model:auto-identity="form.autoIdentity"
+              v-model:auto-identity-git="form.autoIdentityGit"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :source-for="sourceFor"
+            />
+          </div>
+
+          <div class="config-grid__item">
+            <ConfigScanningSection
+              :description="scanningDescription"
+              :is-global="isGlobal"
+              v-model:scan-signal-words="form.scanSignalWords"
+              v-model:scan-ticket-patterns="form.scanTicketPatterns"
+              v-model:scan-enable-ticket-words="form.scanEnableTicketWords"
+              v-model:scan-enable-mentions="form.scanEnableMentions"
+              v-model:scan-strip-attributes="form.scanStripAttributes"
+              :toggle-select-options="toggleSelectOptions"
+              :global-toggle-summary="globalToggleSummary"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :source-for="sourceFor"
+              :scan-signal-words-error="errors.scan_signal_words"
+              :scan-ticket-patterns-error="errors.scan_ticket_patterns"
+              :signal-words-source="sourceFor('scan_signal_words')"
+              :ticket-patterns-source="sourceFor('scan_ticket_patterns')"
+              @validate="validateField"
+            />
+          </div>
+
+          <div class="config-grid__item">
+            <ConfigBranchAliasSection
+              :description="branchAliasDescription"
+              :is-global="isGlobal"
+              v-model:type-entries="form.branchTypeAliases"
+              v-model:status-entries="form.branchStatusAliases"
+              v-model:priority-entries="form.branchPriorityAliases"
+              :type-error="errors.branch_type_aliases"
+              :status-error="errors.branch_status_aliases"
+              :priority-error="errors.branch_priority_aliases"
+              :provenance-label="provenanceLabel"
+              :provenance-class="provenanceClass"
+              :source-for="sourceFor"
+              @add="addAliasEntry"
+              @remove="removeAliasEntry"
+              @clear="clearAliasField"
+              @validate="validateField"
+            />
+          </div>
+
         </div>
       </div>
+    </div>
 
+    <div
+      v-if="inspectData"
+      class="floating-actions"
+      role="region"
+      aria-label="Save controls"
+    >
+      <div class="floating-actions__buttons">
+        <UiButton variant="primary" type="button" @click="save" :disabled="saveDisabled">
+          Save changes
+        </UiButton>
+        <UiButton variant="ghost" type="button" @click="resetForm" :disabled="!isDirty">
+          Reset
+        </UiButton>
+      </div>
+      <div class="floating-actions__meta" aria-live="polite">
+        <span v-if="saving" class="muted">Saving…</span>
+        <span v-else-if="isDirty" class="muted">You have unsaved changes.</span>
+        <span v-else class="muted">Last updated {{ lastLoaded }}</span>
+      </div>
     </div>
 
     <div v-if="createOpen" class="dialog-backdrop" @click.self="closeCreateDialog">
@@ -242,7 +292,17 @@
             <h2>Create a project</h2>
             <p class="muted">New projects inherit the global defaults shown below.</p>
           </div>
-          <button class="btn secondary" type="button" @click="closeCreateDialog" :disabled="creatingProject">Cancel</button>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            @click="closeCreateDialog"
+            :disabled="creatingProject"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
         </header>
         <form class="dialog-form" @submit.prevent="submitCreateProject">
           <div class="field-grid">
@@ -277,8 +337,8 @@
           </section>
 
           <footer class="dialog-actions">
-            <button class="btn secondary" type="button" @click="closeCreateDialog" :disabled="creatingProject">Cancel</button>
-            <button class="btn" type="submit" :disabled="createDisabled">{{ creatingProject ? 'Creating…' : 'Create project' }}</button>
+            <UiButton variant="ghost" type="button" @click="closeCreateDialog" :disabled="creatingProject">Cancel</UiButton>
+            <UiButton variant="primary" type="submit" :disabled="createDisabled">{{ creatingProject ? 'Creating…' : 'Create project' }}</UiButton>
           </footer>
         </form>
       </div>
@@ -291,7 +351,16 @@
             <h2>Configuration help</h2>
             <p class="muted">Highlights from the CLI docs plus handy tips for the UI editor.</p>
           </div>
-          <button class="btn" type="button" @click="helpOpen = false">Close</button>
+          <UiButton
+            variant="ghost"
+            icon-only
+            type="button"
+            aria-label="Close dialog"
+            title="Close dialog"
+            @click="helpOpen = false"
+          >
+            <IconGlyph name="close" />
+          </UiButton>
         </header>
         <div class="help-content">
           <section v-for="section in helpSections" :key="section.title">
@@ -317,6 +386,9 @@ import ConfigScanningSection from '../components/ConfigScanningSection.vue'
 import ConfigServerSection from '../components/ConfigServerSection.vue'
 import ConfigTaxonomySection from '../components/ConfigTaxonomySection.vue'
 import ConfigWorkflowSection from '../components/ConfigWorkflowSection.vue'
+import IconGlyph from '../components/IconGlyph.vue'
+import ReloadButton from '../components/ReloadButton.vue'
+import UiButton from '../components/UiButton.vue'
 import UiInput from '../components/UiInput.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { showToast } from '../components/toast'
@@ -344,6 +416,11 @@ const prefixEdited = ref(false)
 const trimmedCreateName = computed(() => createName.value.trim())
 const normalizedCreatePrefix = computed(() => normalizePrefixInput(createPrefix.value))
 
+function extractDefaultPrefix(source: Record<string, any> | null | undefined): string {
+  if (!source) return ''
+  return source.default_project ?? ''
+}
+
 watch(normalizedCreatePrefix, (value) => {
   if (createPrefix.value !== value) {
     createPrefix.value = value
@@ -361,7 +438,7 @@ function resetCreateDialog() {
 
 function openCreateDialog() {
   resetCreateDialog()
-  const defaultPrefix = inspectData.value?.global_effective?.default_prefix ?? ''
+  const defaultPrefix = extractDefaultPrefix(inspectData.value?.global_effective)
   if (defaultPrefix) {
     createPrefix.value = normalizePrefixInput(defaultPrefix)
   }
@@ -513,7 +590,7 @@ const defaultPreviewSections = computed(() => {
     {
       title: 'Workflow defaults',
       items: [
-        { label: 'Project prefix', value: formatValue(global.default_prefix) },
+        { label: 'Project prefix', value: formatValue(extractDefaultPrefix(global)) },
         { label: 'Default priority', value: formatValue(global.default_priority) },
         { label: 'Default status', value: formatValue(global.default_status) },
       ],
@@ -662,10 +739,12 @@ watch(
 
 <style scoped>
 .config-page {
+  --field-height: 34px;
+  --config-control-height: var(--field-height);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding-bottom: 32px;
+  padding-bottom: 72px;
 }
 
 .page-header {
@@ -687,8 +766,29 @@ watch(
   align-items: center;
 }
 
+.new-project-button {
+  font-weight: 600;
+  height: var(--field-height);
+  padding: 0 var(--space-4, 1rem);
+  gap: var(--space-2, 0.5rem);
+}
+
+.new-project-button:hover {
+  background: var(--color-accent, #0ea5e9);
+  color: var(--color-accent-contrast, #ffffff);
+  border-color: transparent;
+}
+
+.new-project-button:hover .icon-glyph {
+  color: inherit;
+}
+
 .scope-select {
   min-width: 200px;
+  min-height: var(--field-height);
+  height: var(--field-height);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .alert {
@@ -733,41 +833,46 @@ watch(
   gap: 16px;
 }
 
+.config-grid {
+  column-width: 420px;
+  column-gap: 20px;
+  width: 100%;
+}
+
+.config-grid__item {
+  display: inline-block;
+  width: 100%;
+  break-inside: avoid;
+  margin-bottom: 20px;
+}
+
+.config-grid__item--full {
+  column-span: all;
+}
+
+@media (max-width: 960px) {
+  .config-grid {
+    column-width: auto;
+    column-count: 1;
+  }
+}
+
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.field :deep(.token-input) {
-  width: 100%;
-}
-
-
 .field :deep(.input) {
-  height: 32px;
+  height: var(--field-height);
   padding: calc(var(--space-2) - 4px) var(--space-3);
   box-sizing: border-box;
 }
 
 .field :deep(.ui-select) {
-  height: 32px;
+  height: var(--field-height);
   padding: calc(var(--space-2) - 4px) calc(var(--space-3) + 16px) calc(var(--space-2) - 4px) var(--space-3);
   box-sizing: border-box;
-}
-
-.field :deep(.token-input .tokens) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  min-height: 32px;
-  padding: calc(var(--space-2) - 4px) var(--space-3);
-  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-fg);
-  transition: border 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 
 .toggle-grid {
@@ -795,20 +900,6 @@ watch(
   height: 14px;
 }
 
-.field :deep(.token-input:focus-within .tokens) {
-  border-color: var(--color-accent);
-  box-shadow: var(--focus-ring);
-}
-
-.field :deep(.token-input .tokens input) {
-  color: var(--color-fg);
-}
-
-.field :deep(.token-input .tokens input::placeholder) {
-  color: var(--color-muted);
-  opacity: 1;
-}
-
 .field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -832,45 +923,45 @@ watch(
   font-size: 12px;
 }
 
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.source-project {
-  background: rgba(0, 180, 120, 0.25);
-  color: #9ef0d0;
-}
-
-.source-global {
-  background: rgba(0, 120, 255, 0.2);
-  color: #8bc0ff;
-}
-
-.source-built_in {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: space-between;
+.floating-actions {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: color-mix(in oklab, var(--color-surface-contrast) 92%, transparent);
+  box-shadow: var(--shadow-md);
+  z-index: 900;
 }
 
-.form-actions__left {
+.floating-actions__buttons {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.form-actions__meta {
+.floating-actions__meta {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .floating-actions {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .floating-actions__meta {
+    white-space: normal;
+  }
 }
 
 .dialog-backdrop {

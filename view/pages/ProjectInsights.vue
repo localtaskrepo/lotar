@@ -1,72 +1,75 @@
 <template>
   <section class="col" style="gap:16px;">
-    <div class="header row" style="justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px;">
+    <div class="header row insights-header">
       <div class="col" style="gap:4px;">
         <h1>Insights</h1>
         <p class="muted" v-if="selectedProject">
           Health overview for <strong>{{ projectDisplayName }}</strong>
         </p>
-        <p class="muted" v-else>Cross-project health, workload, and delivery trends.</p>
       </div>
-      <div class="controls row" style="gap:8px; flex-wrap: wrap; align-items: center;">
+      <div class="controls row insights-controls">
         <UiSelect v-model="selectedProject" style="min-width:220px;">
           <option value="">All projects</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
-        <div class="tag-filter-group">
-          <div class="tag-filter">
-            <UiInput
-              v-model="tagFilterInput"
-              placeholder="Filter tags (comma separated)"
-              @focus="onTagFilterFocus"
-              @blur="onTagFilterBlur"
-              @keydown="onTagFilterKeydown"
-              @input="onTagFilterInput"
-            />
-            <ul
-              v-if="tagSuggestionsVisible"
-              class="tag-suggestions"
-              role="listbox"
-              aria-label="Tag suggestions"
+        <div class="tag-filter">
+          <UiInput
+            v-model="tagFilterInput"
+            placeholder="Filter tags (comma separated)"
+            @focus="onTagFilterFocus"
+            @blur="onTagFilterBlur"
+            @keydown="onTagFilterKeydown"
+            @input="onTagFilterInput"
+          />
+          <ul
+            v-if="tagSuggestionsVisible"
+            class="tag-suggestions"
+            role="listbox"
+            aria-label="Tag suggestions"
+          >
+            <li
+              v-for="(entry, index) in tagSuggestionEntries"
+              :key="entry.value"
+              class="tag-suggestions__item"
             >
-              <li v-for="(entry, index) in tagSuggestionEntries" :key="entry.value" class="tag-suggestions__item">
-                <button
-                  type="button"
-                  class="tag-suggestion"
-                  :class="{ active: tagActiveIndex === index }"
-                  role="option"
-                  :aria-selected="tagActiveIndex === index"
-                  @mousedown.prevent
-                  @click.prevent="selectTagSuggestion(entry.value)"
-                  @mouseenter="tagActiveIndex = index"
-                >
-                  <span class="tag-suggestion__label">
-                    <span
-                      v-for="(part, partIndex) in entry.parts"
-                      :key="partIndex"
-                      :class="['tag-suggestion__part', { match: part.match }]"
-                    >
-                      {{ part.text }}
-                    </span>
+              <button
+                type="button"
+                class="tag-suggestion"
+                :class="{ active: tagActiveIndex === index }"
+                role="option"
+                :aria-selected="tagActiveIndex === index"
+                @mousedown.prevent
+                @click.prevent="selectTagSuggestion(entry.value)"
+                @mouseenter="tagActiveIndex = index"
+              >
+                <span class="tag-suggestion__label">
+                  <span
+                    v-for="(part, partIndex) in entry.parts"
+                    :key="partIndex"
+                    :class="['tag-suggestion__part', { match: part.match }]"
+                  >
+                    {{ part.text }}
                   </span>
-                </button>
-              </li>
-            </ul>
-          </div>
-          <div class="tag-filter-actions">
-            <UiButton
-              v-if="tagFilters.length"
-              variant="ghost"
-              type="button"
-              @click="clearTagFilter"
-            >
-              Clear tags
-            </UiButton>
-            <UiButton type="button" :disabled="refreshing" @click="refreshData">
-              Refresh
-            </UiButton>
-          </div>
+                </span>
+              </button>
+            </li>
+          </ul>
         </div>
+        <UiButton
+          v-if="tagFilters.length"
+          variant="ghost"
+          type="button"
+          @click="clearTagFilter"
+        >
+          Clear tags
+        </UiButton>
+        <ReloadButton
+          :disabled="refreshing"
+          :loading="refreshing"
+          label="Refresh insights"
+          title="Refresh insights"
+          @click="refreshData"
+        />
       </div>
     </div>
 
@@ -256,6 +259,7 @@ import { api } from '../api/client'
 import type { ProjectDTO, ProjectStatsDTO, TaskDTO } from '../api/types'
 import BarChart from '../components/BarChart.vue'
 import PieChart from '../components/PieChart.vue'
+import ReloadButton from '../components/ReloadButton.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
@@ -1007,6 +1011,54 @@ onMounted(async () => {
 .card-head h3 {
   margin: 0;
 }
+.insights-header {
+  flex-direction: row;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.insights-header > .col {
+  flex: 1 1 280px;
+  min-width: 220px;
+}
+.insights-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-left: auto;
+  justify-content: flex-end;
+  min-width: 320px;
+}
+.insights-controls > .ui-select {
+  flex: 0 0 220px;
+  min-width: 220px;
+}
+.insights-controls :is(.ui-select, .input, .btn) {
+  min-height: 2.25rem;
+  height: 2.25rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.insights-controls .ui-select {
+  padding-right: calc(var(--space-3, 0.75rem) + 16px);
+}
+.tag-filter {
+  position: relative;
+  flex: 0 0 220px;
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+  display: flex;
+}
+.tag-filter .input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 2.25rem;
+  height: 2.25rem;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .activity-card {
   grid-column: span 2;
 }
@@ -1073,26 +1125,19 @@ onMounted(async () => {
   background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
   border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 40%, transparent);
 }
-.tag-filter-group {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: nowrap;
-  gap: 8px;
+@media (max-width: 960px) {
+  .insights-header {
+    flex-direction: column;
+  }
+  .insights-controls {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
 }
-.tag-filter-group .tag-filter {
-  flex: 1 1 220px;
-  min-width: 160px;
-}
-.tag-filter { position: relative; }
-.tag-filter-actions {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  flex-shrink: 0;
-}
-@media (max-width: 640px) {
-  .tag-filter-group {
-    flex-wrap: wrap;
+@media (max-width: 960px) {
+  .insights-controls {
+    justify-content: flex-start;
   }
 }
 .tag-suggestions {

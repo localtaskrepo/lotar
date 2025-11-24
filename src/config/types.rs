@@ -235,8 +235,8 @@ impl ProjectConfig {
 pub struct GlobalConfig {
     #[serde(default = "default_port")]
     pub server_port: u16,
-    #[serde(default = "default_prefix_name", rename = "default_project")]
-    pub default_prefix: String,
+    #[serde(default = "default_project_name", rename = "default_project")]
+    pub default_project: String,
 
     // Default configurations for all projects
     #[serde(default = "default_issue_states")]
@@ -314,8 +314,7 @@ pub struct GlobalConfig {
 #[derive(Debug, Clone, Serialize)]
 pub struct ResolvedConfig {
     pub server_port: u16,
-    #[serde(rename = "default_project")]
-    pub default_prefix: String,
+    pub default_project: String,
     pub issue_states: ConfigurableField<TaskStatus>,
     pub issue_types: ConfigurableField<TaskType>,
     pub issue_priorities: ConfigurableField<Priority>,
@@ -421,7 +420,7 @@ impl std::error::Error for ConfigError {}
 fn default_port() -> u16 {
     8080
 }
-fn default_prefix_name() -> String {
+fn default_project_name() -> String {
     // Don't default to "auto" - this should only be set during initial config creation
     // with actual auto-detection. Empty string means no default project is set.
     "".to_string()
@@ -482,7 +481,7 @@ impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
             server_port: default_port(),
-            default_prefix: default_prefix_name(),
+            default_project: default_project_name(),
             issue_states: default_issue_states(),
             issue_types: default_issue_types(),
             issue_priorities: default_issue_priorities(),

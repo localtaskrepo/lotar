@@ -8,22 +8,15 @@ function findByPlaceholder(wrapper: any, ph: string) {
 }
 
 describe('FilterBar', () => {
-  it('emits assignee=@me when My tasks is checked', async () => {
-    const wrapper = mount(FilterBar, {
-      props: { statuses: ['TODO'], priorities: ['P1'], types: ['feature'], value: {} },
-    })
-    const my = wrapper.find('input[type="checkbox"]')
-    await my.setValue(true)
-    await nextTick()
-    const evts = wrapper.emitted('update:value') || []
-    const last = evts[evts.length - 1]?.[0] as Record<string, string> | undefined
-    expect(last?.assignee).toBe('@me')
-  })
-
-  it('restores My tasks when value has assignee=@me', async () => {
+  it('preserves incoming assignee when emitting after edits', async () => {
     const wrapper = mount(FilterBar, { props: { value: { assignee: '@me' } } })
-    const my = wrapper.find('input[type="checkbox"]')
-    expect((my.element as HTMLInputElement).checked).toBe(true)
+    const search = findByPlaceholder(wrapper, 'Search')
+    await search!.setValue('roadmap')
+    await nextTick()
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last?.assignee).toBe('@me')
+    expect(last?.q).toBe('roadmap')
   })
 
   it('shows helper text in tooltip when custom filters are invalid', async () => {
@@ -100,5 +93,22 @@ describe('FilterBar', () => {
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     expect(custom?.element.value).toContain('field:iteration=beta')
     expect(custom?.element.value).toContain('scope=edge')
+  })
+
+  it('hides the status select when showStatus is false', () => {
+    const wrapper = mount(FilterBar, { props: { value: {}, statuses: ['Todo'], showStatus: false } })
+    expect(wrapper.find('select[aria-label="Status filter"]').exists()).toBe(false)
+  })
+
+  it('emits project key when emitProjectKey is enabled even if empty', async () => {
+    const wrapper = mount(FilterBar, { props: { value: {}, emitProjectKey: true } })
+    const search = findByPlaceholder(wrapper, 'Search')
+    await search!.setValue('foo')
+    await nextTick()
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last).toBeTruthy()
+    expect(Object.prototype.hasOwnProperty.call(last, 'project')).toBe(true)
+    expect(last?.project).toBe('')
   })
 })

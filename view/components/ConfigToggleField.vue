@@ -82,28 +82,6 @@ function onCheckboxChange(event: Event) {
   font-weight: 600;
 }
 
-.provenance {
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.source-project {
-  background: rgba(0, 180, 120, 0.25);
-  color: #9ef0d0;
-}
-
-.source-global {
-  background: rgba(0, 120, 255, 0.2);
-  color: #8bc0ff;
-}
-
-.source-built_in {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.85);
-}
 
 .toggle-control {
   display: inline-flex;

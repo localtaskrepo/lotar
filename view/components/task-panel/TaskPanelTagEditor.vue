@@ -1,68 +1,108 @@
 <template>
   <div class="task-panel__tags-section">
     <label class="task-panel__tags-label" for="task-panel-tags-input">Tags</label>
-    <div class="task-panel__tag-input-wrapper">
-      <div class="task-panel__tag-input">
-        <UiInput
-          id="task-panel-tags-input"
-          v-model="tagsInput"
-          placeholder="Add tag"
-          @input="onTagInputChange"
-          @keydown="onTagInputKeydown"
-          @focus="onTagInputFocus"
-          @blur="onTagInputBlur"
-        />
-        <UiButton type="button" @click="commitTagInput">Add</UiButton>
-      </div>
-      <ul
-        v-if="tagSuggestionsVisible"
-        class="task-panel__tag-suggestions"
-        role="listbox"
-        aria-label="Tag suggestions"
+    <ChipListField
+      :model-value="tags"
+      empty-label="No tags yet"
+      add-label="Add tag"
+      add-behavior="external"
+      @update:modelValue="handleChipUpdate"
+      @add-click="openTagDialog"
+    />
+    <Teleport to="body">
+      <div
+        v-if="tagDialogOpen"
+        class="task-panel-dialog__overlay task-panel__tag-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Manage tags"
+        data-testid="tag-dialog"
+        @click.self="closeTagDialog"
       >
-        <li
-          v-for="(entry, suggestionIndex) in tagSuggestionEntries"
-          :key="entry.value"
-          class="task-panel__tag-suggestions-item"
-        >
-          <button
-            type="button"
-            :class="['task-panel__tag-suggestion', { active: tagActiveIndex === suggestionIndex }]"
-            role="option"
-            :aria-selected="tagActiveIndex === suggestionIndex"
-            @mousedown.prevent
-            @click.prevent="selectTag(entry.value)"
-            @mouseenter="tagActiveIndex = suggestionIndex"
-            @focus="tagActiveIndex = suggestionIndex"
-          >
-            <span class="task-panel__tag-suggestion-label">
-              <span
-                v-for="(part, partIndex) in entry.parts"
-                :key="partIndex"
-                :class="['task-panel__tag-suggestion-part', { 'task-panel__tag-suggestion-part--match': part.match }]"
+        <UiCard class="task-panel-dialog__card">
+          <form class="task-panel-dialog__form" @submit.prevent="handleTagDialogSubmit">
+            <header class="task-panel-dialog__header">
+              <h2>Manage tags</h2>
+              <UiButton
+                variant="ghost"
+                icon-only
+                type="button"
+                data-testid="tag-dialog-close"
+                aria-label="Close dialog"
+                title="Close dialog"
+                @click="closeTagDialog"
               >
-                {{ part.text }}
-              </span>
-            </span>
-          </button>
-        </li>
-      </ul>
-    </div>
-    <p v-if="tagSuggestionPrompt" class="task-panel__tag-info">{{ tagSuggestionPrompt }}</p>
-    <p v-if="tagHint" class="task-panel__tag-hint">{{ tagHint }}</p>
-    <div class="task-panel__tags">
-      <span v-for="tag in tags" :key="tag" class="chip">
-        {{ tag }}
-        <button type="button" class="chip__close" @click="removeTag(tag)">×</button>
-      </span>
-    </div>
+                <IconGlyph name="close" />
+              </UiButton>
+            </header>
+            <div class="task-panel__tag-dialog-body">
+              <label class="task-panel-dialog__field" for="task-panel-tags-input">
+                <span class="muted">Tag</span>
+                <UiInput
+                  id="task-panel-tags-input"
+                  ref="tagDialogInputRef"
+                  v-model="tagsInput"
+                  placeholder="Search or add tag"
+                  @input="onTagInputChange"
+                  @keydown="onTagInputKeydown($event, closeTagDialog)"
+                />
+              </label>
+              <p v-if="tagHint" class="task-panel__tag-hint">{{ tagHint }}</p>
+              <p v-else-if="tagSuggestionPrompt" class="task-panel__tag-info">{{ tagSuggestionPrompt }}</p>
+              <ul
+                v-if="tagSuggestionsVisible"
+                class="task-panel__tag-suggestions"
+                role="listbox"
+                aria-label="Tag suggestions"
+              >
+                <li
+                  v-for="(entry, suggestionIndex) in tagSuggestionEntries"
+                  :key="entry.value"
+                  class="task-panel__tag-suggestions-item"
+                >
+                  <button
+                    type="button"
+                    :class="['task-panel__tag-suggestion', { active: tagActiveIndex === suggestionIndex }]"
+                    role="option"
+                    :aria-selected="tagActiveIndex === suggestionIndex"
+                    @mousedown.prevent
+                    @click.prevent="selectTag(entry.value)"
+                    @mouseenter="tagActiveIndex = suggestionIndex"
+                    @focus="tagActiveIndex = suggestionIndex"
+                  >
+                    <span class="task-panel__tag-suggestion-label">
+                      <span
+                        v-for="(part, partIndex) in entry.parts"
+                        :key="partIndex"
+                        :class="['task-panel__tag-suggestion-part', { 'task-panel__tag-suggestion-part--match': part.match }]"
+                      >
+                        {{ part.text }}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <footer class="task-panel-dialog__footer">
+              <UiButton variant="primary" type="submit">Add tag</UiButton>
+              <UiButton variant="ghost" type="button" data-testid="tag-dialog-done" @click="closeTagDialog">
+                Done
+              </UiButton>
+            </footer>
+          </form>
+        </UiCard>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import UiButton from '../UiButton.vue';
-import UiInput from '../UiInput.vue';
+import { computed, nextTick, ref, watch } from 'vue'
+import ChipListField from '../ChipListField.vue'
+import IconGlyph from '../IconGlyph.vue'
+import UiButton from '../UiButton.vue'
+import UiCard from '../UiCard.vue'
+import UiInput from '../UiInput.vue'
 
 const props = defineProps<{
   tags: string[]
@@ -78,9 +118,10 @@ const emit = defineEmits<{
 
 const tagsInput = ref('')
 const tagHint = ref('')
-const tagInputFocused = ref(false)
 const tagActiveIndex = ref(-1)
-let tagBlurTimer: ReturnType<typeof setTimeout> | null = null
+const composerActive = ref(false)
+const tagDialogOpen = ref(false)
+const tagDialogInputRef = ref<{ focus: () => void } | null>(null)
 const TAG_SUGGESTION_LIMIT = 8
 
 const normalizedConfigured = computed(() => uniqueNormalizedTags(props.configuredTags))
@@ -102,7 +143,7 @@ const tagSuggestionList = computed(() => {
   const base = availableTags.value
   if (!base.length) return [] as string[]
   const query = tagsInput.value.trim().toLowerCase()
-  if (!tagInputFocused.value && !query) {
+  if (!composerActive.value && !query) {
     return []
   }
   if (!query) {
@@ -111,7 +152,7 @@ const tagSuggestionList = computed(() => {
   return base.filter((tag) => tag.toLowerCase().includes(query)).slice(0, TAG_SUGGESTION_LIMIT)
 })
 
-const tagSuggestionsVisible = computed(() => tagInputFocused.value && tagSuggestionList.value.length > 0)
+const tagSuggestionsVisible = computed(() => composerActive.value && tagSuggestionList.value.length > 0)
 
 const tagSuggestionEntries = computed(() =>
   tagSuggestionList.value.map((tag) => ({
@@ -121,7 +162,7 @@ const tagSuggestionEntries = computed(() =>
 )
 
 const tagSuggestionPrompt = computed(() => {
-  if (!tagInputFocused.value) {
+  if (!composerActive.value) {
     return ''
   }
   if (tagsInput.value.trim()) {
@@ -180,6 +221,31 @@ function highlightTagSuggestion(tag: string): Array<{ text: string; match: boole
   return segments
 }
 
+function handleChipUpdate(next: string[]) {
+  emit('update:tags', next)
+  tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
+}
+
+function openTagDialog() {
+  if (tagDialogOpen.value) return
+  tagDialogOpen.value = true
+  composerActive.value = true
+  nextTick(() => tagDialogInputRef.value?.focus())
+}
+
+function closeTagDialog() {
+  if (!tagDialogOpen.value) return
+  tagDialogOpen.value = false
+  composerActive.value = false
+  tagsInput.value = ''
+  tagHint.value = ''
+  tagActiveIndex.value = -1
+}
+
+function handleTagDialogSubmit() {
+  commitTagInput()
+}
+
 function onTagInputChange() {
   const value = tagsInput.value.trim()
   if (!value) {
@@ -202,27 +268,7 @@ function onTagInputChange() {
   }
 }
 
-function onTagInputFocus() {
-  if (tagBlurTimer) {
-    clearTimeout(tagBlurTimer)
-    tagBlurTimer = null
-  }
-  tagInputFocused.value = true
-}
-
-function onTagInputBlur() {
-  if (tagBlurTimer) {
-    clearTimeout(tagBlurTimer)
-    tagBlurTimer = null
-  }
-  tagBlurTimer = setTimeout(() => {
-    tagInputFocused.value = false
-    tagActiveIndex.value = -1
-    tagBlurTimer = null
-  }, 120)
-}
-
-function onTagInputKeydown(event: KeyboardEvent) {
+function onTagInputKeydown(event: KeyboardEvent, close?: () => void) {
   const suggestions = tagSuggestionList.value
   if (event.key === 'ArrowDown') {
     if (!suggestions.length) return
@@ -252,6 +298,7 @@ function onTagInputKeydown(event: KeyboardEvent) {
   } else if (event.key === 'Escape') {
     tagActiveIndex.value = -1
     tagHint.value = ''
+    close?.()
   }
 }
 
@@ -297,20 +344,5 @@ function selectTag(tag: string) {
     tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
   }
 }
-
-function removeTag(tag: string) {
-  const lower = tag.toLowerCase()
-  const next = props.tags.filter((existing) => existing.toLowerCase() !== lower)
-  emit('update:tags', next)
-  tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
-}
-
-onBeforeUnmount(() => {
-  if (tagBlurTimer) {
-    clearTimeout(tagBlurTimer)
-    tagBlurTimer = null
-  }
-})
 </script>
-
-
+  emit('update:tags', next)
