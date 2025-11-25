@@ -127,7 +127,7 @@ lotar add "Integration test" --project=testing
 lotar add "Deploy script" --tasks-dir=/ops/tasks --project=deployment
 
 # Advanced configuration per project
-lotar config init --template=agile --project=backend
+lotar init --template=agile --project=backend    # shortcut for `lotar config init`
 lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE --project=backend
 ```
 > **[📖 Smart Project Management Guide](docs/smart-project-management.md)** - Detailed documentation on intelligent project resolution, auto-detection, and flexible naming
@@ -247,7 +247,7 @@ lotar add "First task" --project=myproject
 lotar config show
 
 # Manual initialization (only for custom templates)
-lotar config init --template=agile --project=myapp
+lotar init --template=agile --project=myapp
 
 # Set global/project settings
 lotar config set server_port 9000
@@ -257,6 +257,8 @@ lotar config set issue_states TODO,WORKING,REVIEW,DONE --project=myapp
 lotar config templates
 # See also: docs/help/templates.md for details
 ```
+
+> Tip: `lotar init` is a shorthand for `lotar config init` and accepts the same flags.
 
 ### Configuration Hierarchy
 1. Built-in defaults

@@ -162,6 +162,9 @@ pub enum Commands {
         action: Option<ConfigAction>,
     },
 
+    /// Initialize project configuration (shortcut for `lotar config init`)
+    Init(ConfigInitArgs),
+
     /// Scan source files for TODO comments (existing)
     Scan(ScanArgs),
 

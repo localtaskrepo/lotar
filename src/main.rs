@@ -12,7 +12,7 @@ use lotar::cli::handlers::{
     ServeHandler, SprintHandler, StatsHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
-use lotar::cli::{Cli, Commands, TaskAction};
+use lotar::cli::{Cli, Commands, ConfigAction, TaskAction};
 use lotar::utils::resolve_project_input;
 use lotar::workspace::TasksDirectoryResolver;
 use lotar::{help, output};
@@ -52,6 +52,7 @@ fn is_valid_command(command: &str) -> bool {
             | "mcp"
             | "git"
             | "completions"
+            | "init"
     )
 }
 
@@ -395,6 +396,25 @@ fn main() {
                 Err(e) => {
                     renderer.emit_error(&e);
                     renderer.log_info("END CONFIG status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Init(args) => {
+            renderer.log_info("BEGIN INIT");
+            match ConfigHandler::execute(
+                Some(ConfigAction::Init(args)),
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
+                Ok(()) => {
+                    renderer.log_info("END INIT status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END INIT status=err");
                     Err(e)
                 }
             }

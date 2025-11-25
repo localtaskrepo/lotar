@@ -27,6 +27,8 @@ Notes:
 ### init
 Initialize project configuration from template with advanced options.
 
+> Tip: `lotar init` is equivalent to `lotar config init`.
+
 ```bash
 lotar config init [--project=PROJECT] [--template=TEMPLATE] [--prefix=PREFIX] 
                   [--copy-from=SOURCE_PROJECT] [--global] [--dry-run] [--force]

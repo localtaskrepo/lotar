@@ -17,7 +17,7 @@ static DEFAULT_DOCS_BASE_URL: LazyLock<String> = LazyLock::new(|| {
     )
 });
 static HELP_ALIASES: LazyLock<HashMap<&'static str, &'static str>> =
-    LazyLock::new(|| HashMap::from([("sprint", "sprints")]));
+    LazyLock::new(|| HashMap::from([("sprint", "sprints"), ("init", "config")]));
 
 pub struct HelpSystem {
     renderer: OutputRenderer,
