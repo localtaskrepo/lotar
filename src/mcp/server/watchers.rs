@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use super::hints::{EnumHints, gather_enum_hints};
-use super::write_raw_json;
+use super::{session_initialized, write_json_message};
 
 #[derive(Debug)]
 pub(super) enum ServerEvent {
@@ -22,9 +22,12 @@ pub(super) fn spawn_event_dispatcher(
         while let Ok(event) = receiver.recv() {
             match event {
                 ServerEvent::ToolsChanged { hint_categories } => {
+                    if !session_initialized() {
+                        continue;
+                    }
                     let notification = build_tools_changed_notification(&hint_categories);
                     if let Ok(line) = serde_json::to_string(&notification) {
-                        write_raw_json(&stdout, &line);
+                        write_json_message(&stdout, &line);
                     }
                 }
             }

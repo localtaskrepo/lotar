@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, mpsc};
 use std::time::Duration;
 
@@ -91,6 +92,8 @@ fn normalize_method(name: &str) -> String {
 }
 
 static LOG_LEVEL: OnceLock<RwLock<String>> = OnceLock::new();
+static USE_FRAMED_OUTPUT: AtomicBool = AtomicBool::new(false);
+static SESSION_INITIALIZED: AtomicBool = AtomicBool::new(false);
 fn set_log_level(level: &str) {
     let lvl = level.to_ascii_lowercase();
     let valid = matches!(
@@ -176,6 +179,38 @@ fn make_mcp_integrity_payload(
     Some(Value::Object(payload))
 }
 
+fn enable_framed_output() {
+    USE_FRAMED_OUTPUT.store(true, Ordering::Relaxed);
+}
+
+fn write_json_message(stdout: &Arc<Mutex<io::Stdout>>, payload: &str) {
+    if USE_FRAMED_OUTPUT.load(Ordering::Relaxed) {
+        write_framed_json(stdout, payload);
+    } else {
+        write_raw_json(stdout, payload);
+    }
+}
+
+fn respond_parse_error(stdout: &Arc<Mutex<io::Stdout>>, details: &str) {
+    let response = err(
+        Some(Value::Null),
+        -32700,
+        "Parse error",
+        Some(json!({"details": details})),
+    );
+    if let Ok(encoded) = serde_json::to_string(&response) {
+        write_json_message(stdout, &encoded);
+    }
+}
+
+fn mark_session_initialized() {
+    SESSION_INITIALIZED.store(true, Ordering::Relaxed);
+}
+
+fn session_initialized() -> bool {
+    SESSION_INITIALIZED.load(Ordering::Relaxed)
+}
+
 pub fn run_stdio_server() {
     let autoreload_enabled = std::env::var("LOTAR_MCP_AUTORELOAD")
         .ok()
@@ -222,6 +257,7 @@ pub fn run_stdio_server() {
         }
 
         if trimmed.to_ascii_lowercase().starts_with("content-length:") {
+            enable_framed_output();
             let mut content_length: Option<usize> = None;
             if let Some(v) = trimmed.split(':').nth(1) {
                 content_length = v.trim().parse::<usize>().ok();
@@ -249,77 +285,69 @@ pub fn run_stdio_server() {
             if let Some(len) = content_length {
                 let mut buf = vec![0u8; len];
                 if let Err(e) = reader.read_exact(&mut buf) {
-                    let resp = err(
-                        None,
-                        -32700,
-                        "Parse error",
-                        Some(json!({"details": format!("body read failed: {}", e)})),
-                    );
-                    if let Ok(s) = serde_json::to_string(&resp) {
-                        write_raw_json(&stdout, &s);
-                    }
+                    let detail = format!("body read failed: {}", e);
+                    respond_parse_error(&stdout, &detail);
                     continue;
                 }
                 let body = match String::from_utf8(buf) {
                     Ok(s) => s,
                     Err(e) => {
-                        let resp = err(
-                            None,
-                            -32700,
-                            "Parse error",
-                            Some(json!({"details": format!("utf8 error: {}", e)})),
-                        );
-                        if let Ok(s) = serde_json::to_string(&resp) {
-                            write_raw_json(&stdout, &s);
-                        }
+                        let detail = format!("utf8 error: {}", e);
+                        respond_parse_error(&stdout, &detail);
                         continue;
                     }
                 };
                 let req: Result<JsonRpcRequest, _> = serde_json::from_str(&body);
-                let response = match req {
-                    Ok(r) => dispatch(r),
-                    Err(e) => err(
-                        None,
-                        -32700,
-                        "Parse error",
-                        Some(json!({"details": e.to_string()})),
-                    ),
-                };
-                let payload = match serde_json::to_string(&response) {
-                    Ok(s) => s,
-                    Err(e) => format!(
-                        "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":-32603,\"message\":\"Serialization error: {}\"}},\"id\":null}}",
-                        e
-                    ),
-                };
-                write_framed_json(&stdout, &payload);
+                match req {
+                    Ok(r) => {
+                        let should_respond = r.id.is_some();
+                        let response = dispatch(r);
+                        if should_respond {
+                            let payload = match serde_json::to_string(&response) {
+                                Ok(s) => s,
+                                Err(e) => format!(
+                                    "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":-32603,\"message\":\"Serialization error: {}\"}},\"id\":null}}",
+                                    e
+                                ),
+                            };
+                            write_framed_json(&stdout, &payload);
+                        }
+                    }
+                    Err(e) => {
+                        respond_parse_error(&stdout, &e.to_string());
+                    }
+                }
                 continue;
             } else {
-                let resp = err(
-                    None,
-                    -32700,
-                    "Parse error",
-                    Some(json!({"details": "missing Content-Length"})),
-                );
-                if let Ok(s) = serde_json::to_string(&resp) {
-                    write_raw_json(&stdout, &s);
-                }
+                respond_parse_error(&stdout, "missing Content-Length");
                 continue;
             }
         }
 
         let req: Result<JsonRpcRequest, _> = serde_json::from_str(trimmed);
-        let response = match req {
-            Ok(r) => dispatch(r),
-            Err(e) => err(
-                None,
-                -32700,
-                "Parse error",
-                Some(json!({"details": e.to_string()})),
-            ),
-        };
-        if let Ok(s) = serde_json::to_string(&response) {
-            write_raw_json(&stdout, &s);
+        match req {
+            Ok(r) => {
+                let should_respond = r.id.is_some();
+                let response = dispatch(r);
+                if should_respond {
+                    match serde_json::to_string(&response) {
+                        Ok(s) => write_json_message(&stdout, &s),
+                        Err(e) => {
+                            let fallback = json!({
+                                "jsonrpc": "2.0",
+                                "error": {
+                                    "code": -32603,
+                                    "message": format!("Serialization error: {}", e)
+                                },
+                                "id": Value::Null
+                            })
+                            .to_string();
+                            write_json_message(&stdout, &fallback);
+                        }
+                    }
+                }
+            }
+            Err(e) => respond_parse_error(&stdout, &e.to_string()),
         }
     }
 }
@@ -345,6 +373,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                 server_version
             };
 
+            mark_session_initialized();
             ok(
                 req.id,
                 json!({

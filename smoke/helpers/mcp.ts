@@ -1,0 +1,144 @@
+import type { ExecaChildProcess } from 'execa';
+
+export interface McpFrame {
+    readonly headers: string;
+    readonly bodyText: string;
+    readonly message: any;
+}
+
+export class FramedMcpClient {
+    private buffer = Buffer.alloc(0);
+    private readonly waiters: Array<() => void> = [];
+
+    constructor(private readonly child: ExecaChildProcess) {
+        if (!child.stdin || !child.stdout) {
+            throw new Error('Framed MCP client requires piped stdio.');
+        }
+
+        child.stdout.on('data', (chunk: Buffer | string) => {
+            const data = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
+            this.buffer = Buffer.concat([this.buffer, data]);
+            this.flushWaiters();
+        });
+    }
+
+    async send(message: Record<string, unknown>): Promise<void> {
+        if (!this.child.stdin) {
+            throw new Error('Cannot write to MCP process without stdin pipe.');
+        }
+        const payload = Buffer.from(JSON.stringify(message), 'utf8');
+        const header = Buffer.from(`Content-Length: ${payload.length}\r\n\r\n`, 'utf8');
+        this.child.stdin.write(header);
+        this.child.stdin.write(payload);
+    }
+
+    async readFrame(timeoutMs = 8000): Promise<McpFrame> {
+        const deadline = Date.now() + timeoutMs;
+        while (true) {
+            const frame = this.tryParseFrame();
+            if (frame) {
+                return frame;
+            }
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) {
+                throw new Error('Timed out waiting for MCP frame');
+            }
+            const hasData = await this.waitForData(Math.min(remaining, 500));
+            if (!hasData) {
+                continue;
+            }
+        }
+    }
+
+    async readUntil(predicate: (frame: McpFrame) => boolean, timeoutMs = 8000): Promise<McpFrame> {
+        const deadline = Date.now() + timeoutMs;
+        while (true) {
+            const remaining = deadline - Date.now();
+            if (remaining <= 0) {
+                throw new Error('Timed out waiting for expected MCP frame');
+            }
+            const frame = await this.readFrame(Math.min(remaining, 5000));
+            if (predicate(frame)) {
+                return frame;
+            }
+        }
+    }
+
+    async dispose(): Promise<void> {
+        if (this.child.stdin && !this.child.stdin.destroyed) {
+            this.child.stdin.end();
+        }
+        this.child.kill('SIGTERM');
+        const timeout = setTimeout(() => {
+            this.child.kill('SIGKILL');
+        }, 2000);
+        try {
+            await this.child;
+        } catch {
+            // Ignore errors from terminating the child process during cleanup.
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    private tryParseFrame(): McpFrame | null {
+        const separator = Buffer.from('\r\n\r\n', 'utf8');
+        const headerIndex = this.buffer.indexOf(separator);
+        if (headerIndex === -1) {
+            return null;
+        }
+        const headerBuffer = this.buffer.slice(0, headerIndex);
+        const headers = headerBuffer.toString('utf8');
+        const contentLengthMatch = headers.match(/Content-Length:\s*(\d+)/i);
+        if (!contentLengthMatch) {
+            return null;
+        }
+        const length = Number(contentLengthMatch[1]);
+        const bodyStart = headerIndex + separator.length;
+        const bytesRemaining = this.buffer.length - bodyStart;
+        if (bytesRemaining < length) {
+            return null;
+        }
+        const bodyBuffer = this.buffer.slice(bodyStart, bodyStart + length);
+        this.buffer = this.buffer.slice(bodyStart + length);
+        const bodyText = bodyBuffer.toString('utf8');
+        let message: any = null;
+        try {
+            message = JSON.parse(bodyText);
+        } catch {
+            // Leave message as null to help debugging when invalid JSON is encountered.
+        }
+        return {
+            headers,
+            bodyText,
+            message,
+        };
+    }
+
+    private async waitForData(timeoutMs: number): Promise<boolean> {
+        if (this.buffer.length > 0) {
+            return true;
+        }
+        return new Promise<boolean>((resolve) => {
+            const timeoutHandle = setTimeout(() => {
+                const index = this.waiters.indexOf(notify);
+                if (index >= 0) {
+                    this.waiters.splice(index, 1);
+                }
+                resolve(false);
+            }, timeoutMs);
+            const notify = () => {
+                clearTimeout(timeoutHandle);
+                resolve(true);
+            };
+            this.waiters.push(notify);
+        });
+    }
+
+    private flushWaiters(): void {
+        while (this.waiters.length) {
+            const waiter = this.waiters.shift();
+            waiter?.();
+        }
+    }
+}
