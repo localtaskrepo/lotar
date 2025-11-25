@@ -420,18 +420,35 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
         }
         // tools/call -> forward to specific method name in params.name
         "tools/call" => {
-            let name = req.params.get("name").and_then(|v| v.as_str());
+            let tool_name = match req.params.get("name").and_then(|v| v.as_str()) {
+                Some(name) => name.to_string(),
+                None => return err(req.id, -32602, "Missing tool name", None),
+            };
             let arguments = req.params.get("arguments").cloned().unwrap_or(json!({}));
-            if name.is_none() {
-                return err(req.id, -32602, "Missing tool name", None);
-            }
             let inner_req = JsonRpcRequest {
                 jsonrpc: "2.0".into(),
                 id: req.id.clone(),
-                method: name.unwrap().to_string(),
+                method: tool_name.clone(),
                 params: arguments,
             };
-            dispatch(inner_req)
+            let mut response = dispatch(inner_req);
+            if response.error.is_none() {
+                let already_wrapped = response
+                    .result
+                    .as_ref()
+                    .and_then(|value| value.get("functionResponse"))
+                    .is_some();
+                if !already_wrapped {
+                    let inner_result = response.result.take().unwrap_or_else(|| json!({}));
+                    response.result = Some(json!({
+                        "functionResponse": {
+                            "name": tool_name,
+                            "response": inner_result
+                        }
+                    }));
+                }
+            }
+            response
         }
         // task/create(params: TaskCreate) -> { task }
         "task/create" => handle_task_create(req),

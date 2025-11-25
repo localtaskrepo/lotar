@@ -114,7 +114,11 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
             const success = await nextResponse();
             expect(success.error).toBeUndefined();
 
-            const contentEntry = (success.result?.content ?? []).find((entry: any) => {
+            const content =
+                success.result?.functionResponse?.response?.content ??
+                success.result?.content ??
+                [];
+            const contentEntry = (content as any[]).find((entry: any) => {
                 return typeof entry?.text === 'string' || entry?.json;
             });
 

@@ -7,3 +7,5 @@ Features:
 - Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
 - Extend custom fields to support more complex queries (AND/OR logic)
 - Should the api support pagination?
+
+- lotar init alias for lotar config init

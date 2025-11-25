@@ -77,6 +77,34 @@ fn tool_description(tool: &Value) -> &str {
         .unwrap_or_else(|| panic!("Missing description for tool"))
 }
 
+fn tool_response_payload(resp: &JsonRpcResponse) -> &Value {
+    resp.result
+        .as_ref()
+        .unwrap_or_else(|| panic!("missing result payload"))
+        .get("functionResponse")
+        .and_then(|fr| fr.get("response"))
+        .unwrap_or_else(|| panic!("missing functionResponse response"))
+}
+
+fn tool_content_entries(resp: &JsonRpcResponse) -> &[Value] {
+    tool_response_payload(resp)
+        .get("content")
+        .and_then(|v| v.as_array())
+        .unwrap_or_else(|| panic!("missing content array"))
+}
+
+fn first_tool_text(resp: &JsonRpcResponse) -> &str {
+    tool_content_entries(resp)
+        .first()
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| panic!("missing text entry"))
+}
+
+fn parse_tool_payload(resp: &JsonRpcResponse) -> serde_json::Value {
+    serde_json::from_str(first_tool_text(resp)).expect("tool payload should be valid json")
+}
+
 #[test]
 fn tools_call_update_delete_list_and_invalid_enum() {
     let _lock = lock_var("LOTAR_TASKS_DIR");
@@ -101,15 +129,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     };
     let create_resp = dispatch(create_req);
     assert!(create_resp.error.is_none(), "task_create failed");
-    let content = create_resp
-        .result
-        .as_ref()
-        .unwrap()
-        .get("content")
-        .and_then(|v| v.as_array())
-        .unwrap();
-    let text = content[0].get("text").and_then(|v| v.as_str()).unwrap();
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let task_json = parse_tool_payload(&create_resp);
     let id = task_json
         .get("task")
         .and_then(|task| task.get("id"))
@@ -152,18 +172,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
         "task_update failed: {:?}",
         update_resp.error
     );
-    let update_content = update_resp
-        .result
-        .as_ref()
-        .unwrap()
-        .get("content")
-        .and_then(|v| v.as_array())
-        .unwrap();
-    let update_text = update_content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap();
-    let updated_json: serde_json::Value = serde_json::from_str(update_text).unwrap();
+    let updated_json = parse_tool_payload(&update_resp);
     assert_eq!(updated_json.get("title").unwrap(), "Updated Title");
 
     // List tasks
@@ -176,18 +185,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     };
     let list_resp = dispatch(list_req);
     assert!(list_resp.error.is_none(), "task_list failed");
-    let list_content = list_resp
-        .result
-        .as_ref()
-        .unwrap()
-        .get("content")
-        .and_then(|v| v.as_array())
-        .unwrap();
-    let list_text = list_content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap();
-    let payload: serde_json::Value = serde_json::from_str(list_text).unwrap();
+    let payload = parse_tool_payload(&list_resp);
     assert!(payload.get("hasMore").and_then(|v| v.as_bool()).is_some());
     let listed_tasks = payload
         .get("tasks")
@@ -210,14 +208,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     };
     let delete_resp = dispatch(delete_req);
     assert!(delete_resp.error.is_none(), "task_delete failed");
-    let del_content = delete_resp
-        .result
-        .as_ref()
-        .unwrap()
-        .get("content")
-        .and_then(|v| v.as_array())
-        .unwrap();
-    let del_text = del_content[0].get("text").and_then(|v| v.as_str()).unwrap();
+    let del_text = first_tool_text(&delete_resp);
     assert!(del_text.contains("deleted=true"));
 
     // Negative test: invalid priority
@@ -277,18 +268,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     };
     let recreate_resp = dispatch(recreate_req);
     assert!(recreate_resp.error.is_none(), "recreate task failed");
-    let recreate_content = recreate_resp
-        .result
-        .as_ref()
-        .unwrap()
-        .get("content")
-        .and_then(|c| c.as_array())
-        .unwrap();
-    let recreate_text = recreate_content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap();
-    let recreate_json: serde_json::Value = serde_json::from_str(recreate_text).unwrap();
+    let recreate_json = parse_tool_payload(&recreate_resp);
     let recreated_id = recreate_json
         .get("task")
         .and_then(|task| task.get("id"))
@@ -580,17 +560,7 @@ fn task_create_response_includes_metadata_and_enum_hints() {
     };
     let resp = dispatch(req);
     assert!(resp.error.is_none(), "task_create failed: {:?}", resp.error);
-    let content = resp
-        .result
-        .as_ref()
-        .and_then(|value| value.get("content"))
-        .and_then(|value| value.as_array())
-        .expect("content array present");
-    let payload_text = content[0]
-        .get("text")
-        .and_then(|value| value.as_str())
-        .expect("text payload available");
-    let payload: serde_json::Value = serde_json::from_str(payload_text).unwrap();
+    let payload = parse_tool_payload(&resp);
     let metadata = payload
         .get("metadata")
         .and_then(|value| value.as_object())

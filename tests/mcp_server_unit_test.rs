@@ -31,6 +31,42 @@ fn task_from_text(text: &str) -> serde_json::Value {
     task_from_payload(&payload)
 }
 
+fn function_response(resp: &serde_json::Value) -> Option<&serde_json::Value> {
+    resp.get("result").and_then(|r| r.get("functionResponse"))
+}
+
+fn function_response_name(resp: &serde_json::Value) -> Option<&str> {
+    function_response(resp)
+        .and_then(|fr| fr.get("name"))
+        .and_then(|v| v.as_str())
+}
+
+fn tool_response_payload(resp: &serde_json::Value) -> Option<&serde_json::Value> {
+    function_response(resp).and_then(|fr| fr.get("response"))
+}
+
+fn tool_content(resp: &serde_json::Value) -> Vec<serde_json::Value> {
+    tool_response_payload(resp)
+        .and_then(|payload| payload.get("content"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn first_tool_text(resp: &serde_json::Value) -> Option<String> {
+    tool_response_payload(resp)
+        .and_then(|payload| payload.get("content"))
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+fn tool_payload_json(resp: &serde_json::Value) -> Option<serde_json::Value> {
+    first_tool_text(resp).and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+}
+
 #[test]
 fn mcp_tools_list_includes_underscore_names() {
     let req = serde_json::json!({
@@ -196,18 +232,11 @@ fn mcp_tools_call_accepts_underscore_name_for_task_create() {
         resp.get("error").is_none(),
         "tools/call task_create failed: {resp}"
     );
-    let content = resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    assert_eq!(function_response_name(&resp), Some("task_create"));
+    let content = tool_content(&resp);
     assert!(!content.is_empty(), "expected content array with task json");
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json = task_from_text(text);
+    let text = first_tool_text(&resp).unwrap_or_default();
+    let task_json = task_from_text(&text);
     let id = task_json.get("id").and_then(|v| v.as_str()).unwrap_or("");
     assert!(
         id.starts_with("MCP-"),
@@ -244,18 +273,10 @@ fn mcp_task_create_accepts_custom_fields() {
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     assert!(resp.get("error").is_none(), "task_create failed: {resp}");
 
-    let content = resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content = tool_content(&resp);
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json = task_from_text(text);
+    let text = first_tool_text(&resp).unwrap_or_default();
+    let task_json = task_from_text(&text);
     let custom_fields = task_json
         .get("custom_fields")
         .and_then(|v| v.as_object())
@@ -325,18 +346,10 @@ fn mcp_task_update_overwrites_custom_fields() {
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     assert!(resp.get("error").is_none(), "task_update failed: {resp}");
 
-    let content = resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content = tool_content(&resp);
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let text = first_tool_text(&resp).unwrap_or_default();
+    let task_json: serde_json::Value = serde_json::from_str(&text).unwrap();
     let custom_fields = task_json
         .get("custom_fields")
         .and_then(|v| v.as_object())
@@ -644,18 +657,10 @@ fn mcp_task_create_and_list_resolve_me_aliases() {
         create_resp.get("error").is_none(),
         "task_create failed: {create_resp}"
     );
-    let create_content = create_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let create_content = tool_content(&create_resp);
     assert!(!create_content.is_empty());
-    let create_text = create_content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let created_task = task_from_text(create_text);
+    let create_text = first_tool_text(&create_resp).unwrap_or_default();
+    let created_task = task_from_text(&create_text);
     let created_id = created_task
         .get("id")
         .and_then(|v| v.as_str())
@@ -786,15 +791,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
         add_resp.get("error").is_none(),
         "sprint_add failed: {add_resp:?}"
     );
-    let add_payload = add_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
-        .unwrap();
+    let add_payload = tool_payload_json(&add_resp).expect("sprint_add payload");
     let modified = add_payload
         .get("modified")
         .and_then(|v| v.as_array())
@@ -818,15 +815,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
         backlog_resp.get("error").is_none(),
         "sprint_backlog failed: {backlog_resp:?}"
     );
-    let backlog_payload = backlog_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
-        .unwrap();
+    let backlog_payload = tool_payload_json(&backlog_resp).expect("sprint_backlog payload");
     assert_eq!(
         backlog_payload.get("cursor").and_then(|v| v.as_u64()),
         Some(0)
@@ -916,15 +905,7 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
         backlog_resp.get("error").is_none(),
         "sprint_backlog failed: {backlog_resp:?}"
     );
-    let backlog_payload = backlog_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
-        .unwrap();
+    let backlog_payload = tool_payload_json(&backlog_resp).expect("sprint_backlog payload");
     let missing_initial = backlog_payload
         .get("missing_sprints")
         .and_then(|v| v.as_array())
@@ -981,15 +962,7 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
         cleanup_resp.get("error").is_none(),
         "sprint_backlog cleanup failed: {cleanup_resp:?}"
     );
-    let cleanup_payload = cleanup_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
-        .unwrap();
+    let cleanup_payload = tool_payload_json(&cleanup_resp).expect("cleanup payload");
     let missing_after = cleanup_payload
         .get("missing_sprints")
         .and_then(|v| v.as_array())
@@ -1060,15 +1033,7 @@ fn mcp_sprint_backlog_supports_pagination() {
         first_resp.get("error").is_none(),
         "first backlog page failed: {first_resp}"
     );
-    let first_payload = first_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
-        .unwrap();
+    let first_payload = tool_payload_json(&first_resp).expect("first backlog payload");
     assert_eq!(first_payload.get("count").and_then(|v| v.as_u64()), Some(1));
     assert_eq!(
         first_payload.get("hasMore").and_then(|v| v.as_bool()),
@@ -1096,15 +1061,7 @@ fn mcp_sprint_backlog_supports_pagination() {
         second_resp.get("error").is_none(),
         "second backlog page failed: {second_resp}"
     );
-    let second_payload = second_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|entry| entry.get("text"))
-        .and_then(|v| v.as_str())
-        .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap())
-        .unwrap();
+    let second_payload = tool_payload_json(&second_resp).expect("second backlog payload");
     assert_eq!(
         second_payload.get("count").and_then(|v| v.as_u64()),
         Some(2)
@@ -1147,18 +1104,10 @@ fn mcp_task_create_honors_default_assignee() {
         create_resp.get("error").is_none(),
         "task_create failed: {create_resp}"
     );
-    let content = create_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content = tool_content(&create_resp);
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json = task_from_text(text);
+    let text = first_tool_text(&create_resp).unwrap_or_default();
+    let task_json = task_from_text(&text);
     assert_eq!(
         task_json.get("assignee").and_then(|v| v.as_str()),
         Some("default-user@example.com")
@@ -1214,18 +1163,10 @@ fn mcp_task_create_infers_branch_defaults() {
         create_resp.get("error").is_none(),
         "task_create failed: {create_resp}"
     );
-    let content = create_resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content = tool_content(&create_resp);
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json = task_from_text(text);
+    let text = first_tool_text(&create_resp).unwrap_or_default();
+    let task_json = task_from_text(&text);
     assert_eq!(
         task_json.get("priority").and_then(|v| v.as_str()),
         Some("High")
@@ -1337,18 +1278,10 @@ fn mcp_task_create_resolves_me_alias() {
         resp.get("error").is_none(),
         "task_create should not error: {resp}"
     );
-    let content = resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content = tool_content(&resp);
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json = task_from_text(text);
+    let text = first_tool_text(&resp).unwrap_or_default();
+    let task_json = task_from_text(&text);
     assert_eq!(
         task_json.get("assignee").and_then(|v| v.as_str()),
         Some("carol")
@@ -1406,18 +1339,10 @@ fn mcp_task_update_resolves_me_in_patch() {
         resp.get("error").is_none(),
         "task_update should not error: {resp}"
     );
-    let content = resp
-        .get("result")
-        .and_then(|r| r.get("content"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+    let content = tool_content(&resp);
     assert!(!content.is_empty());
-    let text = content[0]
-        .get("text")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    let task_json: serde_json::Value = serde_json::from_str(text).unwrap();
+    let text = first_tool_text(&resp).unwrap_or_default();
+    let task_json: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(
         task_json.get("assignee").and_then(|v| v.as_str()),
         Some("dave")

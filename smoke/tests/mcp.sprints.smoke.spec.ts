@@ -89,7 +89,7 @@ describe.concurrent('MCP sprint smoke scenarios', () => {
             const deletion = await nextResponse();
             expect(deletion.error).toBeUndefined();
 
-            const content = deletion.result?.content;
+            const content = deletion.result?.functionResponse?.response?.content;
             expect(Array.isArray(content)).toBe(true);
 
             const summaryText = content?.[0]?.text ?? '';
