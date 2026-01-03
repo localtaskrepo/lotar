@@ -238,7 +238,7 @@
                 <div v-if="Object.keys(errors).length" class="task-panel__errors">
                   <p v-for="(message, field) in errors" :key="field">{{ message }}</p>
                 </div>
-                <UiButton v-if="mode === 'create'" variant="primary" type="submit" :disabled="submitting">
+                <UiButton v-if="mode === 'create'" variant="primary" type="submit" :disabled="submitting || !(form.project || '').trim()">
                   {{ submitting ? 'Creating…' : 'Create task' }}
                 </UiButton>
               </footer>

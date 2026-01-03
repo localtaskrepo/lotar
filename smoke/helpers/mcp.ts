@@ -53,14 +53,20 @@ export class FramedMcpClient {
     async readUntil(predicate: (frame: McpFrame) => boolean, timeoutMs = 8000): Promise<McpFrame> {
         const deadline = Date.now() + timeoutMs;
         while (true) {
+            const frame = this.tryParseFrame();
+            if (frame) {
+                if (predicate(frame)) {
+                    return frame;
+                }
+                continue;
+            }
+
             const remaining = deadline - Date.now();
             if (remaining <= 0) {
                 throw new Error('Timed out waiting for expected MCP frame');
             }
-            const frame = await this.readFrame(Math.min(remaining, 5000));
-            if (predicate(frame)) {
-                return frame;
-            }
+
+            await this.waitForData(Math.min(remaining, 500));
         }
     }
 

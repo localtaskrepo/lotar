@@ -406,7 +406,12 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         resetErrors()
         resetForm()
         if (mode.value === 'create') {
-            const scopeProject = props.initialProject || defaults.value.project || ''
+            await ensureProjectsLoaded()
+            const scopeProject =
+                props.initialProject ||
+                defaults.value.project ||
+                projects.value[0]?.prefix ||
+                ''
             await refreshConfig(scopeProject)
             applyDefaults(scopeProject)
             loading.value = false

@@ -171,7 +171,15 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
 
     const handleSubmit = async () => {
         if (options.mode.value !== 'create') return
-        if (!options.validate()) return
+        if (!(options.form.project || '').trim()) {
+            options.validate()
+            options.showToast('Project is required')
+            return
+        }
+        if (!options.validate()) {
+            options.showToast('Please fill out required fields')
+            return
+        }
         options.submitting.value = true
         try {
             const dueDateValue = fromDateInputValue(options.form.due_date)

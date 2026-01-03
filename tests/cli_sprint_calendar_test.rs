@@ -199,11 +199,15 @@ issue.priorities: [Low, High]
 
     let mut storage = Storage::new(fixtures.tasks_root.clone());
 
+    let now = Utc::now();
+    let starts_at = now + Duration::days(2);
+    let ends_at = starts_at + Duration::days(11);
+
     let pending = Sprint {
         plan: Some(SprintPlan {
             label: Some("Calendar Sprint".to_string()),
-            starts_at: Some("2025-12-01T09:00:00Z".to_string()),
-            ends_at: Some("2025-12-12T17:00:00Z".to_string()),
+            starts_at: Some(starts_at.to_rfc3339()),
+            ends_at: Some(ends_at.to_rfc3339()),
             ..SprintPlan::default()
         }),
         ..Sprint::default()

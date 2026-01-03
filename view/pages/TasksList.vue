@@ -1039,7 +1039,6 @@ const openTask = (id: string) => {
 
 const handleTaskCreated = (task: TaskDTO) => {
   applyFilter(filter.value, 'none').catch(() => {})
-  router.push(`/task/${encodeURIComponent(task.id)}`)
 }
 
 const handleTaskUpdated = (task: TaskDTO) => {

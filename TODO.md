@@ -6,4 +6,21 @@ Features:
 - Allow ticket files to be stored in neseted folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
 - Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
 - Extend custom fields to support more complex queries (AND/OR logic)
-- Should the api support pagination?
+- API pagination
+- Allow to add images/attachments to ticket (definitely via web UI, not sure how to do this via CLI)
+- Sync with Jira/Github (two-way ideally)
+- Support Markdown in ticket descriptions and comments
+- Move details below the type, severity and status box
+- Don't show sprint section when there are no sprints (button doesn nothing)
+- Creating a new ticket in the tasks list puts the UI in a broken state where the list is empty
+- The default sort when adding new tickets is wrong. New tickets should appear at the bottom.
+- Add ability to assign (and run) an LLM.
+- Allow reoreding columns in the web UI task list via drag and drop
+- Sort direction buttons in web UI are at the end of a column header, but should be next to the column name
+- Web UI: Tasks are missing status filter
+- How do you negative filter? E.g. show me all tasks that are NOT "done"
+- Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
+- Project select can be static when there's only one project.
+- Custom filter query should support "Not" operator
+- MCP errors config_show/project_list: TypeError: r.content is not iterable
+- History stored exact same content as comments when a new one is added
