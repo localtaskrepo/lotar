@@ -170,7 +170,14 @@ function resetTables(){
 }
 
 function clearSavedFilters(){
-  try { sessionStorage.removeItem('lotar.tasks.filter') } catch {}
+  const filterKeys = ['lotar.tasks.filter', 'lotar.sprints.filter', 'lotar.calendar.filter', 'lotar.boards.filter']
+  try {
+    for (const key of filterKeys) localStorage.removeItem(key)
+  } catch {}
+  // Backwards compatibility: older builds may have used sessionStorage.
+  try {
+    for (const key of filterKeys) sessionStorage.removeItem(key)
+  } catch {}
 }
 </script>
 
