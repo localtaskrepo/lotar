@@ -5,23 +5,82 @@
       <option value="">Project</option>
       <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
     </UiSelect>
-    <UiSelect v-if="showStatusSelect" v-model="statusSelection" multiple aria-label="Status filter">
-      <option value="" disabled hidden>Status</option>
-      <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
-    </UiSelect>
-    <UiSelect v-model="prioritySelection" multiple aria-label="Priority filter">
-      <option value="" disabled hidden>Priority</option>
-      <option v-for="p in priorities" :key="p" :value="p">{{ p }}</option>
-    </UiSelect>
-    <UiSelect v-model="typeSelection" multiple aria-label="Type filter">
-      <option value="" disabled hidden>Type</option>
-      <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
-    </UiSelect>
+    <div v-if="showStatusSelect" ref="statusDropdown" class="filter-bar__dropdown">
+      <button
+        type="button"
+        class="input filter-bar__dropdown-trigger"
+        aria-label="Status filter"
+        data-testid="filter-status"
+        :title="statusTitle"
+        :aria-expanded="statusMenuOpen ? 'true' : 'false'"
+        @click="toggleStatusMenu"
+      >
+        <span class="filter-bar__dropdown-trigger-label">{{ statusTriggerLabel }}</span>
+      </button>
+      <div v-if="statusMenuOpen" class="filter-bar__menu-popover" role="menu" @click.stop>
+        <div v-if="statusHasSelections" class="filter-bar__menu-actions">
+          <button type="button" class="filter-bar__menu-action" @click="clearStatus">Clear</button>
+          <button type="button" class="filter-bar__menu-action" @click="invertStatus">Invert</button>
+        </div>
+        <label v-for="s in statuses" :key="s" class="filter-bar__menu-item">
+          <input type="checkbox" :checked="statusSelectionSet.has(s)" @change="toggleStatusValue(s)" />
+          <span>{{ s }}</span>
+        </label>
+      </div>
+    </div>
+
+    <div ref="priorityDropdown" class="filter-bar__dropdown">
+      <button
+        type="button"
+        class="input filter-bar__dropdown-trigger"
+        aria-label="Priority filter"
+        data-testid="filter-priority"
+        :title="priorityTitle"
+        :aria-expanded="priorityMenuOpen ? 'true' : 'false'"
+        @click="togglePriorityMenu"
+      >
+        <span class="filter-bar__dropdown-trigger-label">{{ priorityTriggerLabel }}</span>
+      </button>
+      <div v-if="priorityMenuOpen" class="filter-bar__menu-popover" role="menu" @click.stop>
+        <div v-if="priorityHasSelections" class="filter-bar__menu-actions">
+          <button type="button" class="filter-bar__menu-action" @click="clearPriority">Clear</button>
+          <button type="button" class="filter-bar__menu-action" @click="invertPriority">Invert</button>
+        </div>
+        <label v-for="p in priorities" :key="p" class="filter-bar__menu-item">
+          <input type="checkbox" :checked="prioritySelectionSet.has(p)" @change="togglePriorityValue(p)" />
+          <span>{{ p }}</span>
+        </label>
+      </div>
+    </div>
+
+    <div ref="typeDropdown" class="filter-bar__dropdown">
+      <button
+        type="button"
+        class="input filter-bar__dropdown-trigger"
+        aria-label="Type filter"
+        data-testid="filter-type"
+        :title="typeTitle"
+        :aria-expanded="typeMenuOpen ? 'true' : 'false'"
+        @click="toggleTypeMenu"
+      >
+        <span class="filter-bar__dropdown-trigger-label">{{ typeTriggerLabel }}</span>
+      </button>
+      <div v-if="typeMenuOpen" class="filter-bar__menu-popover" role="menu" @click.stop>
+        <div v-if="typeHasSelections" class="filter-bar__menu-actions">
+          <button type="button" class="filter-bar__menu-action" @click="clearType">Clear</button>
+          <button type="button" class="filter-bar__menu-action" @click="invertType">Invert</button>
+        </div>
+        <label v-for="t in types" :key="t" class="filter-bar__menu-item">
+          <input type="checkbox" :checked="typeSelectionSet.has(t)" @change="toggleTypeValue(t)" />
+          <span>{{ t }}</span>
+        </label>
+      </div>
+    </div>
     <UiSelect v-if="showOrderSelect" v-model="order">
       <option value="desc">Newest</option>
       <option value="asc">Oldest</option>
     </UiSelect>
-    <UiInput v-model="tags" placeholder="Tags (comma)" />
+    <UiInput v-model="tags" placeholder="Tags" />
     <div class="filter-bar__custom">
       <UiInput
         ref="customFilterInput"
@@ -61,20 +120,34 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch, watchEffect } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useProjects } from '../composables/useProjects'
 import { formatProjectLabel } from '../utils/projectLabels'
 import UiInput from './UiInput.vue'
 import UiSelect from './UiSelect.vue'
 
-const props = defineProps<{ statuses?: string[]; priorities?: string[]; types?: string[]; value?: Record<string, string>; storageKey?: string; showStatus?: boolean; emitProjectKey?: boolean; showOrder?: boolean }>()
+const props = withDefaults(
+  defineProps<{
+    statuses?: string[]
+    priorities?: string[]
+    types?: string[]
+    value?: Record<string, string>
+    storageKey?: string
+    showStatus?: boolean
+    emitProjectKey?: boolean
+    showOrder?: boolean
+  }>(),
+  {
+    showStatus: true,
+  },
+)
 const emit = defineEmits<{ (e:'update:value', v: Record<string,string>): void }>()
 
 const query = ref('')
 const project = ref('')
-const statusList = ref<string[]>([])
-const priorityList = ref<string[]>([])
-const typeList = ref<string[]>([])
+const status = ref('')
+const priority = ref('')
+const type = ref('')
 const order = ref<'asc'|'desc'>('desc')
 const tags = ref('')
 const assignee = ref('')
@@ -112,70 +185,191 @@ const RESERVED_FIELD_ALIASES: Record<string, string> = {
 }
 const customHintPopoverId = `custom-filter-hint-${Math.random().toString(36).slice(2, 8)}`
 const customHintVisible = ref(false)
-const showStatusSelect = computed(() => props.showStatus !== false)
+const showStatusSelect = computed(() => props.showStatus)
 const showOrderSelect = computed(() => props.showOrder !== false)
 
-function listFromCsv(input: string): string[] {
-  return (input || '')
+const DOCUMENT_CLICK_OPTS: AddEventListenerOptions = { capture: true }
+
+function splitCsv(value: string): string[] {
+  return value
     .split(',')
-    .map((value) => value.trim())
+    .map((part) => part.trim())
     .filter(Boolean)
 }
 
-function listsEqual(a: string[], b: string[]) {
-  if (a === b) return true
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false
+function joinCsv(values: string[]): string {
+  return values.join(',')
+}
+
+function toggleInCsv(csv: string, value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) return csv
+  const next = new Set(splitCsv(csv))
+  if (next.has(trimmed)) {
+    next.delete(trimmed)
+  } else {
+    next.add(trimmed)
   }
-  return true
+  return joinCsv(Array.from(next))
 }
 
-function setList(target: { value: string[] }, next: string[]) {
-  if (listsEqual(target.value, next)) return
-  target.value = next
+function invertCsv(csv: string, universe: readonly string[]): string {
+  if (!universe.length) return ''
+  const selected = new Set(splitCsv(csv))
+  const next = universe
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .filter((v) => !selected.has(v))
+  return joinCsv(next)
 }
 
-const statusSelection = computed<string[]>({
-  get() {
-    return statusList.value.length ? statusList.value : ['']
-  },
-  set(value) {
-    statusList.value = (Array.isArray(value) ? value : []).map((v) => String(v).trim()).filter(Boolean)
-  },
+const statusTitle = computed(() => {
+  const values = splitCsv(status.value)
+  return values.length ? `Selected: ${values.join(', ')}` : ''
 })
+const statusHasSelections = computed(() => splitCsv(status.value).length > 0)
+const statusSelections = computed(() => splitCsv(status.value))
+const statusSelectionSet = computed(() => new Set(statusSelections.value))
+const statusTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Status', statusSelections.value))
+const priorityTitle = computed(() => {
+  const values = splitCsv(priority.value)
+  return values.length ? `Selected: ${values.join(', ')}` : ''
+})
+const priorityHasSelections = computed(() => splitCsv(priority.value).length > 0)
+const prioritySelections = computed(() => splitCsv(priority.value))
+const prioritySelectionSet = computed(() => new Set(prioritySelections.value))
+const priorityTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Priority', prioritySelections.value))
+const typeTitle = computed(() => {
+  const values = splitCsv(type.value)
+  return values.length ? `Selected: ${values.join(', ')}` : ''
+})
+const typeHasSelections = computed(() => splitCsv(type.value).length > 0)
+const typeSelections = computed(() => splitCsv(type.value))
+const typeSelectionSet = computed(() => new Set(typeSelections.value))
+const typeTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Type', typeSelections.value))
 
-const prioritySelection = computed<string[]>({
-  get() {
-    return priorityList.value.length ? priorityList.value : ['']
-  },
-  set(value) {
-    priorityList.value = (Array.isArray(value) ? value : []).map((v) => String(v).trim()).filter(Boolean)
-  },
-})
+function formatMultiSelectTriggerLabel(label: string, selected: string[]): string {
+  if (!selected.length) return label
+  if (selected.length <= 2) return `${label}: ${selected.join(', ')}`
+  return `${label}: ${selected.slice(0, 2).join(', ')} (+${selected.length - 2})`
+}
 
-const typeSelection = computed<string[]>({
-  get() {
-    return typeList.value.length ? typeList.value : ['']
-  },
-  set(value) {
-    typeList.value = (Array.isArray(value) ? value : []).map((v) => String(v).trim()).filter(Boolean)
-  },
-})
+const statusMenuOpen = ref(false)
+const priorityMenuOpen = ref(false)
+const typeMenuOpen = ref(false)
+
+const statusDropdown = ref<HTMLElement | null>(null)
+const priorityDropdown = ref<HTMLElement | null>(null)
+const typeDropdown = ref<HTMLElement | null>(null)
+
+function closeAllMenus() {
+  statusMenuOpen.value = false
+  priorityMenuOpen.value = false
+  typeMenuOpen.value = false
+}
+
+function toggleStatusMenu() {
+  const next = !statusMenuOpen.value
+  closeAllMenus()
+  statusMenuOpen.value = next
+}
+
+function togglePriorityMenu() {
+  const next = !priorityMenuOpen.value
+  closeAllMenus()
+  priorityMenuOpen.value = next
+}
+
+function toggleTypeMenu() {
+  const next = !typeMenuOpen.value
+  closeAllMenus()
+  typeMenuOpen.value = next
+}
+
+function toggleStatusValue(value: string) {
+  status.value = toggleInCsv(status.value, value)
+}
+
+function togglePriorityValue(value: string) {
+  priority.value = toggleInCsv(priority.value, value)
+}
+
+function toggleTypeValue(value: string) {
+  type.value = toggleInCsv(type.value, value)
+}
+
+function clearStatus() {
+  status.value = ''
+}
+
+function invertStatus() {
+  status.value = invertCsv(status.value, props.statuses ?? [])
+}
+
+function clearPriority() {
+  priority.value = ''
+}
+
+function invertPriority() {
+  priority.value = invertCsv(priority.value, props.priorities ?? [])
+}
+
+function clearType() {
+  type.value = ''
+}
+
+function invertType() {
+  type.value = invertCsv(type.value, props.types ?? [])
+}
+
+function onDocumentClick(event: MouseEvent) {
+  const target = event.target as Node | null
+  if (!target) return
+
+  if (statusMenuOpen.value && statusDropdown.value && !statusDropdown.value.contains(target)) {
+    statusMenuOpen.value = false
+  }
+  if (priorityMenuOpen.value && priorityDropdown.value && !priorityDropdown.value.contains(target)) {
+    priorityMenuOpen.value = false
+  }
+  if (typeMenuOpen.value && typeDropdown.value && !typeDropdown.value.contains(target)) {
+    typeMenuOpen.value = false
+  }
+}
+
+function onDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closeAllMenus()
+  }
+}
+
+function hasMeaningfulIncoming(value?: Record<string, string>): boolean {
+  if (!value) return false
+  for (const [key, raw] of Object.entries(value)) {
+    if (key === 'order') {
+      if (raw === 'asc') return true
+      continue
+    }
+    if ((raw || '').trim().length) return true
+  }
+  return false
+}
 
 // Persist last used filter to localStorage for convenience
 const FILTER_KEY = computed(() => props.storageKey || 'lotar.tasks.filter')
 onMounted(() => {
+  document.addEventListener('click', onDocumentClick, DOCUMENT_CLICK_OPTS)
+  document.addEventListener('keydown', onDocumentKeydown)
   try {
-    const hasIncoming = props.value && Object.keys(props.value).length > 0
+    const hasIncoming = hasMeaningfulIncoming(props.value)
     if (!hasIncoming) {
       const saved = JSON.parse(localStorage.getItem(FILTER_KEY.value) || 'null')
       if (saved && typeof saved === 'object') {
         query.value = saved.q || ''
         project.value = saved.project || ''
-        statusList.value = listFromCsv(saved.status || '')
-        priorityList.value = listFromCsv(saved.priority || '')
-        typeList.value = listFromCsv(saved.type || '')
+        status.value = saved.status || ''
+        priority.value = saved.priority || ''
+        type.value = saved.type || ''
         assignee.value = saved.assignee || ''
         tags.value = saved.tags || ''
         order.value = (saved.order === 'asc' || saved.order === 'desc') ? saved.order : 'desc'
@@ -192,6 +386,11 @@ onMounted(() => {
   } catch {}
 })
 
+onUnmounted(() => {
+  document.removeEventListener('click', onDocumentClick, DOCUMENT_CLICK_OPTS)
+  document.removeEventListener('keydown', onDocumentKeydown)
+})
+
 const { projects, refresh } = useProjects()
 onMounted(() => { refresh() })
 
@@ -199,9 +398,9 @@ watchEffect(() => {
   if (props.value) {
     query.value = props.value.q || ''
     project.value = props.value.project || ''
-    setList(statusList, listFromCsv(props.value.status || ''))
-    setList(priorityList, listFromCsv(props.value.priority || ''))
-    setList(typeList, listFromCsv(props.value.type || ''))
+    status.value = props.value.status || ''
+    priority.value = props.value.priority || ''
+    type.value = props.value.type || ''
     const incomingAssignee = props.value.assignee || ''
     const isMine = props.value.mine === 'true' || incomingAssignee === '@me'
     assignee.value = isMine ? '@me' : incomingAssignee
@@ -327,9 +526,9 @@ function emitFilter(){
   if (query.value) v.q = query.value
   const shouldEmitProject = props.emitProjectKey || !!project.value
   if (shouldEmitProject) v.project = project.value || ''
-  if (statusList.value.length) v.status = statusList.value.join(',')
-  if (priorityList.value.length) v.priority = priorityList.value.join(',')
-  if (typeList.value.length) v.type = typeList.value.join(',')
+  if (status.value) v.status = status.value
+  if (priority.value) v.priority = priority.value
+  if (type.value) v.type = type.value
   if (assignee.value) v.assignee = assignee.value
   if (tags.value) v.tags = tags.value
   if (showOrderSelect.value) {
@@ -347,9 +546,9 @@ function onClear(){
   // Reset all local state and emit an empty filter
   query.value = ''
   project.value = ''
-  statusList.value = []
-  priorityList.value = []
-  typeList.value = []
+  status.value = ''
+  priority.value = ''
+  type.value = ''
   tags.value = ''
   assignee.value = ''
   if (showOrderSelect.value) {
@@ -367,11 +566,89 @@ function onClear(){
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, statusList, priorityList, typeList, assignee, order, tags, extraFilters], emitFilter, { deep: false })
+watch([query, project, status, priority, type, order, tags, extraFilters], emitFilter, { deep: false })
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>
 <style scoped>
+.filter-bar__dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.filter-bar__dropdown-trigger {
+  min-height: 32px;
+  padding: calc(var(--space-2, 0.5rem) - 2px) var(--space-3, 0.75rem);
+}
+
+.filter-bar__dropdown-trigger-label {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-bar__menu-popover {
+  position: absolute;
+  top: calc(100% + var(--space-2, 0.5rem));
+  left: 0;
+  padding: var(--space-2, 0.5rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  z-index: 10;
+  min-width: 220px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.filter-bar__menu-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.filter-bar__menu-action {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, border 120ms ease;
+}
+
+.filter-bar__menu-action:hover {
+  background: color-mix(in oklab, var(--color-surface) 70%, transparent);
+  border-color: var(--color-border-strong);
+}
+
+.filter-bar__menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-bar__menu-item:hover {
+  background: color-mix(in oklab, var(--color-surface) 75%, transparent);
+}
+
+.filter-bar__menu-item input[type='checkbox'] {
+  cursor: pointer;
+}
+
 .filter-bar__custom {
   flex: 1 1 280px;
   min-width: 240px;

@@ -89,36 +89,51 @@ export class FramedMcpClient {
 
     private tryParseFrame(): McpFrame | null {
         const separator = Buffer.from('\r\n\r\n', 'utf8');
-        const headerIndex = this.buffer.indexOf(separator);
-        if (headerIndex === -1) {
-            return null;
+
+        while (true) {
+            const headerIndex = this.buffer.indexOf(separator);
+            if (headerIndex === -1) {
+                return null;
+            }
+
+            const headerBuffer = this.buffer.slice(0, headerIndex);
+            const headers = headerBuffer.toString('utf8');
+            const contentLengthMatch = headers.match(/Content-Length:\s*(\d+)/i);
+            const bodyStart = headerIndex + separator.length;
+
+            if (!contentLengthMatch) {
+                // If stdout includes any non-framed output, discard up to the separator
+                // so we can search for the next valid MCP frame.
+                this.buffer = this.buffer.slice(bodyStart);
+                continue;
+            }
+
+            const length = Number(contentLengthMatch[1]);
+            if (!Number.isFinite(length) || length < 0) {
+                this.buffer = this.buffer.slice(bodyStart);
+                continue;
+            }
+
+            const bytesRemaining = this.buffer.length - bodyStart;
+            if (bytesRemaining < length) {
+                return null;
+            }
+
+            const bodyBuffer = this.buffer.slice(bodyStart, bodyStart + length);
+            this.buffer = this.buffer.slice(bodyStart + length);
+            const bodyText = bodyBuffer.toString('utf8');
+            let message: any = null;
+            try {
+                message = JSON.parse(bodyText);
+            } catch {
+                // Leave message as null to help debugging when invalid JSON is encountered.
+            }
+            return {
+                headers,
+                bodyText,
+                message,
+            };
         }
-        const headerBuffer = this.buffer.slice(0, headerIndex);
-        const headers = headerBuffer.toString('utf8');
-        const contentLengthMatch = headers.match(/Content-Length:\s*(\d+)/i);
-        if (!contentLengthMatch) {
-            return null;
-        }
-        const length = Number(contentLengthMatch[1]);
-        const bodyStart = headerIndex + separator.length;
-        const bytesRemaining = this.buffer.length - bodyStart;
-        if (bytesRemaining < length) {
-            return null;
-        }
-        const bodyBuffer = this.buffer.slice(bodyStart, bodyStart + length);
-        this.buffer = this.buffer.slice(bodyStart + length);
-        const bodyText = bodyBuffer.toString('utf8');
-        let message: any = null;
-        try {
-            message = JSON.parse(bodyText);
-        } catch {
-            // Leave message as null to help debugging when invalid JSON is encountered.
-        }
-        return {
-            headers,
-            bodyText,
-            message,
-        };
     }
 
     private async waitForData(timeoutMs: number): Promise<boolean> {
@@ -126,7 +141,12 @@ export class FramedMcpClient {
             return true;
         }
         return new Promise<boolean>((resolve) => {
+            let settled = false;
             const timeoutHandle = setTimeout(() => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
                 const index = this.waiters.indexOf(notify);
                 if (index >= 0) {
                     this.waiters.splice(index, 1);
@@ -134,10 +154,20 @@ export class FramedMcpClient {
                 resolve(false);
             }, timeoutMs);
             const notify = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
                 clearTimeout(timeoutHandle);
                 resolve(true);
             };
             this.waiters.push(notify);
+
+            // Avoid a race where data arrives between the initial buffer check and
+            // registering the waiter.
+            if (this.buffer.length > 0) {
+                this.flushWaiters();
+            }
         });
     }
 

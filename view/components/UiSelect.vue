@@ -1,11 +1,11 @@
 <template>
-  <select class="input ui-select" v-model="model" :multiple="multiple">
+  <select class="input ui-select" :value="modelValue" @change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)">
     <slot />
   </select>
 </template>
 <script setup lang="ts">
-const model = defineModel<string | string[]>()
-defineProps<{ multiple?: boolean }>()
+defineProps<{ modelValue?: string }>()
+defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 </script>
 <style scoped>
 .ui-select {

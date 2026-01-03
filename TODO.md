@@ -21,3 +21,4 @@ Features:
 - Custom filter query should support "Not" operator
 - MCP errors config_show/project_list: TypeError: r.content is not iterable
 - History stored exact same content as comments when a new one is added
+- "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.

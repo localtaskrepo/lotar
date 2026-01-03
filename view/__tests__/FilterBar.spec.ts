@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 import FilterBar from '../components/FilterBar.vue'
 
@@ -8,11 +8,6 @@ function findByPlaceholder(wrapper: any, ph: string) {
 }
 
 describe('FilterBar', () => {
-  beforeEach(() => {
-    try { localStorage.clear() } catch { }
-    try { sessionStorage.clear() } catch { }
-  })
-
   it('preserves incoming assignee when emitting after edits', async () => {
     const wrapper = mount(FilterBar, { props: { value: { assignee: '@me' } } })
     const search = findByPlaceholder(wrapper, 'Search')
@@ -102,7 +97,32 @@ describe('FilterBar', () => {
 
   it('hides the status select when showStatus is false', () => {
     const wrapper = mount(FilterBar, { props: { value: {}, statuses: ['Todo'], showStatus: false } })
-    expect(wrapper.find('select[aria-label="Status filter"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="filter-status"]').exists()).toBe(false)
+  })
+
+  it('inverts status selection when requested', async () => {
+    const wrapper = mount(FilterBar, {
+      props: {
+        statuses: ['Todo', 'Doing', 'Done'],
+        value: { status: 'Todo,Done' },
+      },
+    })
+
+    await nextTick()
+    await wrapper.find('[data-testid="filter-status"]').trigger('click')
+    await nextTick()
+
+    const invert = wrapper.find('button.filter-bar__menu-action')
+    // First action button might be Clear depending on initial selection; pick the one labeled Invert.
+    const invertBtn = wrapper.findAll('button.filter-bar__menu-action').find((b) => b.text().includes('Invert'))
+    expect(invertBtn).toBeTruthy()
+
+    await invertBtn!.trigger('click')
+    await nextTick()
+
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last?.status).toBe('Doing')
   })
 
   it('emits project key when emitProjectKey is enabled even if empty', async () => {
