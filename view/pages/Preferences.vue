@@ -170,7 +170,11 @@ function resetTables(){
 }
 
 function clearSavedFilters(){
-  try { sessionStorage.removeItem('lotar.tasks.filter') } catch {}
+  const keys = ['lotar.tasks.filter', 'lotar.calendar.filter', 'lotar.boards.filter', 'lotar.sprints.filter']
+  for (const key of keys) {
+    try { localStorage.removeItem(key) } catch {}
+    try { sessionStorage.removeItem(key) } catch {}
+  }
 }
 </script>
 

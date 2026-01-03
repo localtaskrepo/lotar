@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { nextTick } from 'vue'
 import FilterBar from '../components/FilterBar.vue'
 
@@ -8,6 +8,11 @@ function findByPlaceholder(wrapper: any, ph: string) {
 }
 
 describe('FilterBar', () => {
+  beforeEach(() => {
+    try { localStorage.clear() } catch { }
+    try { sessionStorage.clear() } catch { }
+  })
+
   it('preserves incoming assignee when emitting after edits', async () => {
     const wrapper = mount(FilterBar, { props: { value: { assignee: '@me' } } })
     const search = findByPlaceholder(wrapper, 'Search')

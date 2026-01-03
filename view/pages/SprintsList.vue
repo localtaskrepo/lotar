@@ -211,6 +211,7 @@
         :priorities="priorities"
         :types="types"
         :value="filter"
+        storage-key="lotar.sprints.filter"
         @update:value="onFilterUpdate"
       />
       <div class="filter-meta">

@@ -37,6 +37,7 @@
         :priorities="priorities"
         :types="types"
         :value="filter"
+        storage-key="lotar.tasks.filter"
         @update:value="onFilterUpdate"
       />
     </div>

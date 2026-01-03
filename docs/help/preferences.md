@@ -5,7 +5,7 @@ Personalize the LoTaR web experience and reset per-browser state without touchin
 
 ## Access
 
-Open the Preferences view from the main navigation (top-right menu). All settings live in the browser (`localStorage` or `sessionStorage`) and apply only to the current machine and browser profile—`view/pages/Preferences.vue` never touches your repo files.
+Open the Preferences view from the main navigation (top-right menu). All settings live in the browser (`localStorage`) and apply only to the current machine and browser profile—`view/pages/Preferences.vue` never touches your repo files.
 
 ## Theme Controls
 
@@ -29,7 +29,7 @@ Use **Reset saved columns and sorting** to clear TaskTable preferences stored pe
 
 ## Filter Reset
 
-Select **Clear last used filter** to remove the saved filter state for the Tasks list (`sessionStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set.
+Select **Clear last used filter** to remove the saved filter state stored in this browser (for example `localStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set.
 
 ## Board Filters
 

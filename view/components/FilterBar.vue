@@ -5,16 +5,16 @@
       <option value="">Project</option>
       <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
     </UiSelect>
-    <UiSelect v-if="showStatusSelect" v-model="status" aria-label="Status filter">
-      <option value="">Status</option>
+    <UiSelect v-if="showStatusSelect" v-model="statusSelection" multiple aria-label="Status filter">
+      <option value="" disabled hidden>Status</option>
       <option v-for="s in statuses" :key="s" :value="s">{{ s }}</option>
     </UiSelect>
-    <UiSelect v-model="priority">
-      <option value="">Priority</option>
+    <UiSelect v-model="prioritySelection" multiple aria-label="Priority filter">
+      <option value="" disabled hidden>Priority</option>
       <option v-for="p in priorities" :key="p" :value="p">{{ p }}</option>
     </UiSelect>
-    <UiSelect v-model="type">
-      <option value="">Type</option>
+    <UiSelect v-model="typeSelection" multiple aria-label="Type filter">
+      <option value="" disabled hidden>Type</option>
       <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
     </UiSelect>
     <UiSelect v-if="showOrderSelect" v-model="order">
@@ -72,9 +72,9 @@ const emit = defineEmits<{ (e:'update:value', v: Record<string,string>): void }>
 
 const query = ref('')
 const project = ref('')
-const status = ref('')
-const priority = ref('')
-const type = ref('')
+const statusList = ref<string[]>([])
+const priorityList = ref<string[]>([])
+const typeList = ref<string[]>([])
 const order = ref<'asc'|'desc'>('desc')
 const tags = ref('')
 const assignee = ref('')
@@ -115,19 +115,67 @@ const customHintVisible = ref(false)
 const showStatusSelect = computed(() => props.showStatus !== false)
 const showOrderSelect = computed(() => props.showOrder !== false)
 
-// Persist last used filter to sessionStorage for convenience
+function listFromCsv(input: string): string[] {
+  return (input || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
+function listsEqual(a: string[], b: string[]) {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+function setList(target: { value: string[] }, next: string[]) {
+  if (listsEqual(target.value, next)) return
+  target.value = next
+}
+
+const statusSelection = computed<string[]>({
+  get() {
+    return statusList.value.length ? statusList.value : ['']
+  },
+  set(value) {
+    statusList.value = (Array.isArray(value) ? value : []).map((v) => String(v).trim()).filter(Boolean)
+  },
+})
+
+const prioritySelection = computed<string[]>({
+  get() {
+    return priorityList.value.length ? priorityList.value : ['']
+  },
+  set(value) {
+    priorityList.value = (Array.isArray(value) ? value : []).map((v) => String(v).trim()).filter(Boolean)
+  },
+})
+
+const typeSelection = computed<string[]>({
+  get() {
+    return typeList.value.length ? typeList.value : ['']
+  },
+  set(value) {
+    typeList.value = (Array.isArray(value) ? value : []).map((v) => String(v).trim()).filter(Boolean)
+  },
+})
+
+// Persist last used filter to localStorage for convenience
 const FILTER_KEY = computed(() => props.storageKey || 'lotar.tasks.filter')
 onMounted(() => {
   try {
     const hasIncoming = props.value && Object.keys(props.value).length > 0
     if (!hasIncoming) {
-      const saved = JSON.parse(sessionStorage.getItem(FILTER_KEY.value) || 'null')
+      const saved = JSON.parse(localStorage.getItem(FILTER_KEY.value) || 'null')
       if (saved && typeof saved === 'object') {
         query.value = saved.q || ''
         project.value = saved.project || ''
-        status.value = saved.status || ''
-        priority.value = saved.priority || ''
-        type.value = saved.type || ''
+        statusList.value = listFromCsv(saved.status || '')
+        priorityList.value = listFromCsv(saved.priority || '')
+        typeList.value = listFromCsv(saved.type || '')
         assignee.value = saved.assignee || ''
         tags.value = saved.tags || ''
         order.value = (saved.order === 'asc' || saved.order === 'desc') ? saved.order : 'desc'
@@ -151,9 +199,9 @@ watchEffect(() => {
   if (props.value) {
     query.value = props.value.q || ''
     project.value = props.value.project || ''
-    status.value = props.value.status || ''
-    priority.value = props.value.priority || ''
-    type.value = props.value.type || ''
+    setList(statusList, listFromCsv(props.value.status || ''))
+    setList(priorityList, listFromCsv(props.value.priority || ''))
+    setList(typeList, listFromCsv(props.value.type || ''))
     const incomingAssignee = props.value.assignee || ''
     const isMine = props.value.mine === 'true' || incomingAssignee === '@me'
     assignee.value = isMine ? '@me' : incomingAssignee
@@ -279,9 +327,9 @@ function emitFilter(){
   if (query.value) v.q = query.value
   const shouldEmitProject = props.emitProjectKey || !!project.value
   if (shouldEmitProject) v.project = project.value || ''
-  if (status.value) v.status = status.value
-  if (priority.value) v.priority = priority.value
-  if (type.value) v.type = type.value
+  if (statusList.value.length) v.status = statusList.value.join(',')
+  if (priorityList.value.length) v.priority = priorityList.value.join(',')
+  if (typeList.value.length) v.type = typeList.value.join(',')
   if (assignee.value) v.assignee = assignee.value
   if (tags.value) v.tags = tags.value
   if (showOrderSelect.value) {
@@ -292,16 +340,16 @@ function emitFilter(){
   Object.entries(parsed.map).forEach(([key, value]) => {
     if (value) v[key] = value
   })
-  try { sessionStorage.setItem(FILTER_KEY.value, JSON.stringify(v)) } catch {}
+  try { localStorage.setItem(FILTER_KEY.value, JSON.stringify(v)) } catch {}
   emit('update:value', v)
 }
 function onClear(){
   // Reset all local state and emit an empty filter
   query.value = ''
   project.value = ''
-  status.value = ''
-  priority.value = ''
-  type.value = ''
+  statusList.value = []
+  priorityList.value = []
+  typeList.value = []
   tags.value = ''
   assignee.value = ''
   if (showOrderSelect.value) {
@@ -310,7 +358,7 @@ function onClear(){
   extraFilters.value = ''
   lastSyncedExtras = ''
   customFilterErrors.value = []
-  try { sessionStorage.removeItem(FILTER_KEY.value) } catch {}
+  try { localStorage.removeItem(FILTER_KEY.value) } catch {}
   const empty: Record<string,string> = {}
   if (showOrderSelect.value) {
     empty.order = 'desc'
@@ -319,7 +367,7 @@ function onClear(){
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, order, tags, extraFilters], emitFilter, { deep: false })
+watch([query, project, statusList, priorityList, typeList, assignee, order, tags, extraFilters], emitFilter, { deep: false })
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>

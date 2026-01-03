@@ -15,7 +15,6 @@ Features:
 - Add ability to assign (and run) an LLM.
 - Allow reoreding columns in the web UI task list via drag and drop
 - Sort direction buttons in web UI are at the end of a column header, but should be next to the column name
-- Web UI: Tasks are missing status filter
 - How do you negative filter? E.g. show me all tasks that are NOT "done"
 - Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
 - Project select can be static when there's only one project.
