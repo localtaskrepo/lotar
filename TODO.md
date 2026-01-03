@@ -11,8 +11,6 @@ Features:
 - Sync with Jira/Github (two-way ideally)
 - Support Markdown in ticket descriptions and comments
 - Move details below the type, severity and status box
-- Don't show sprint section when there are no sprints (button doesn nothing)
-- Creating a new ticket in the tasks list puts the UI in a broken state where the list is empty
 - The default sort when adding new tickets is wrong. New tickets should appear at the bottom.
 - Add ability to assign (and run) an LLM.
 - Allow reoreding columns in the web UI task list via drag and drop

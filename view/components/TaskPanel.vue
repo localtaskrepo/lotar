@@ -63,7 +63,7 @@
                 @fieldBlur="handleFieldBlur"
               />
 
-              <fieldset class="task-panel__group">
+              <fieldset v-if="sprintsLoading || hasSprints" class="task-panel__group">
                 <legend>Sprints</legend>
                 <div v-if="sprintsLoading" class="task-panel__sprints-loading">
                   <UiLoader size="sm">Loading sprint info…</UiLoader>
