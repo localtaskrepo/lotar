@@ -1,13 +1,37 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
-import { nextTick } from 'vue'
-import FilterBar from '../components/FilterBar.vue'
+import { mount } from '@vue/test-utils';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { nextTick } from 'vue';
+
+const projectState = vi.hoisted(() => ({
+  projectsRef: null as null | { value: Array<{ name: string; prefix: string }> },
+}))
+
+vi.mock('../composables/useProjects', async () => {
+  const vue = await import('vue')
+  projectState.projectsRef ??= vue.ref<Array<{ name: string; prefix: string }>>([])
+  return {
+    useProjects: () => ({
+      projects: projectState.projectsRef!,
+      refresh: async () => { },
+    }),
+  }
+})
+
+import FilterBar from '../components/FilterBar.vue';
 
 function findByPlaceholder(wrapper: any, ph: string) {
   return wrapper.findAll('input').find((i: any) => i.attributes('placeholder')?.includes(ph))
 }
 
 describe('FilterBar', () => {
+  beforeEach(() => {
+    // Default to multi-project so the project control renders as a select in most tests.
+    projectState.projectsRef!.value = [
+      { name: 'api-service', prefix: 'AS' },
+      { name: 'frontend-app', prefix: 'FA' },
+    ]
+  })
+
   it('preserves incoming assignee when emitting after edits', async () => {
     const wrapper = mount(FilterBar, { props: { value: { assignee: '@me' } } })
     const search = findByPlaceholder(wrapper, 'Search')
@@ -98,6 +122,22 @@ describe('FilterBar', () => {
   it('hides the status select when showStatus is false', () => {
     const wrapper = mount(FilterBar, { props: { value: {}, statuses: ['Todo'], showStatus: false } })
     expect(wrapper.find('[data-testid="filter-status"]').exists()).toBe(false)
+  })
+
+  it('renders project as static text when only one project exists', async () => {
+    projectState.projectsRef!.value = [{ name: 'api-service', prefix: 'AS' }]
+    const wrapper = mount(FilterBar, { props: { value: {} } })
+    await nextTick()
+
+    expect(wrapper.find('select[data-testid="filter-project"]').exists()).toBe(false)
+    const projectEl = wrapper.find('[data-testid="filter-project"]')
+    expect(projectEl.exists()).toBe(true)
+    expect(projectEl.text()).toContain('api-service')
+    expect(projectEl.text()).toContain('AS')
+
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last?.project).toBe('AS')
   })
 
   it('inverts status selection when requested', async () => {

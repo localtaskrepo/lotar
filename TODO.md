@@ -15,7 +15,6 @@ Features:
 - Allow reoreding columns in the web UI task list via drag and drop
 - Sort direction buttons in web UI are at the end of a column header, but should be next to the column name
 - Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
-- Project select can be static when there's only one project.
 - Custom filter query should support "Not" operator
 - MCP errors config_show/project_list: TypeError: r.content is not iterable
 - History stored exact same content as comments when a new one is added

@@ -8,7 +8,15 @@
         </p>
       </div>
       <div class="controls row insights-controls">
-        <UiSelect v-model="selectedProject" style="min-width:220px;">
+        <div
+          v-if="hasSingleProject"
+          class="input insights-project-static"
+          aria-label="Project filter"
+          :title="singleProjectLabel"
+        >
+          <span class="insights-project-static__label">{{ singleProjectLabel }}</span>
+        </div>
+        <UiSelect v-else v-model="selectedProject" style="min-width:220px;">
           <option value="">All projects</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>
@@ -253,7 +261,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { ProjectDTO, ProjectStatsDTO, TaskDTO } from '../api/types'
@@ -279,6 +287,13 @@ const route = useRoute()
 
 const { projects, refresh: refreshProjects } = useProjects()
 const { items: tasks, refresh: refreshTasks, loading: tasksLoading } = useTasks()
+
+const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
+const hasSingleProject = computed(() => !!singleProject.value)
+const singleProjectLabel = computed(() => {
+  const p = singleProject.value
+  return p ? formatProjectLabel(p) : ''
+})
 
 const selectedProject = ref<string>('')
 const tagFilterInput = ref<string>('')
@@ -389,6 +404,16 @@ const projectDisplayName = computed(() => {
   if (!selectedProject.value) return 'All projects'
   const project = projects.value.find(p => p.prefix === selectedProject.value)
   return project ? project.name : selectedProject.value
+})
+
+watchEffect(() => {
+  const p = singleProject.value
+  if (!p) return
+  const prefix = (p.prefix ?? '').trim()
+  if (!prefix) return
+  if (selectedProject.value !== prefix) {
+    selectedProject.value = prefix
+  }
 })
 
 const filteredTasks = computed(() => {
@@ -1033,6 +1058,28 @@ onMounted(async () => {
 .insights-controls > .ui-select {
   flex: 0 0 220px;
   min-width: 220px;
+}
+.insights-controls > .insights-project-static {
+  flex: 0 0 220px;
+  min-width: 220px;
+  max-width: 220px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-muted);
+  box-shadow: none;
+  cursor: default;
+}
+
+.insights-project-static__label {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 .insights-controls :is(.ui-select, .input, .btn) {
   min-height: 2.25rem;

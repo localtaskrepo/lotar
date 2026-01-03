@@ -43,7 +43,7 @@ export class FramedMcpClient {
             if (remaining <= 0) {
                 throw new Error('Timed out waiting for MCP frame');
             }
-            const hasData = await this.waitForData(Math.min(remaining, 500));
+            const hasData = await this.waitForData(Math.min(remaining, 500), true);
             if (!hasData) {
                 continue;
             }
@@ -66,7 +66,7 @@ export class FramedMcpClient {
                 throw new Error('Timed out waiting for expected MCP frame');
             }
 
-            await this.waitForData(Math.min(remaining, 500));
+            await this.waitForData(Math.min(remaining, 500), true);
         }
     }
 
@@ -136,8 +136,8 @@ export class FramedMcpClient {
         }
     }
 
-    private async waitForData(timeoutMs: number): Promise<boolean> {
-        if (this.buffer.length > 0) {
+    private async waitForData(timeoutMs: number, requireNewData = false): Promise<boolean> {
+        if (!requireNewData && this.buffer.length > 0) {
             return true;
         }
         return new Promise<boolean>((resolve) => {

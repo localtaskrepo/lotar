@@ -6,7 +6,7 @@
         <p class="muted">Compare global defaults with per-project overrides, edit safely, and see where each value comes from.</p>
       </div>
       <div class="page-actions">
-        <UiSelect v-model="project" class="scope-select">
+        <UiSelect v-model="project" class="scope-select" aria-label="Project scope">
           <option value="">Global defaults</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
         </UiSelect>

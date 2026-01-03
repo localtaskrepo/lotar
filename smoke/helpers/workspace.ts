@@ -220,7 +220,10 @@ export class SmokeWorkspace {
     async write(relativePath: string, contents: string): Promise<void> {
         const target = path.join(this.root, relativePath);
         await fs.ensureDir(path.dirname(target));
-        await fs.writeFile(target, contents);
+
+        const tmpPath = `${target}.${process.pid}.${Date.now()}.tmp`;
+        await fs.writeFile(tmpPath, contents);
+        await fs.move(tmpPath, target, { overwrite: true });
     }
 
     async read(relativePath: string): Promise<string> {

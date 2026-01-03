@@ -1,7 +1,16 @@
 <template>
   <div class="row" style="flex-wrap: wrap; gap:8px;">
     <UiInput v-model="query" placeholder="Search…" />
-    <UiSelect v-model="project" aria-label="Project filter" data-testid="filter-project">
+    <div
+      v-if="hasSingleProject"
+      class="input filter-bar__project-static"
+      aria-label="Project filter"
+      data-testid="filter-project"
+      :title="singleProjectLabel"
+    >
+      {{ singleProjectLabel }}
+    </div>
+    <UiSelect v-else v-model="project" aria-label="Project filter" data-testid="filter-project">
       <option value="">Project</option>
       <option v-for="p in projects" :key="p.prefix" :value="p.prefix">{{ formatProjectLabel(p) }}</option>
     </UiSelect>
@@ -187,6 +196,14 @@ const customHintPopoverId = `custom-filter-hint-${Math.random().toString(36).sli
 const customHintVisible = ref(false)
 const showStatusSelect = computed(() => props.showStatus)
 const showOrderSelect = computed(() => props.showOrder !== false)
+
+const { projects, refresh } = useProjects()
+const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
+const hasSingleProject = computed(() => !!singleProject.value)
+const singleProjectLabel = computed(() => {
+  const p = singleProject.value
+  return p ? formatProjectLabel(p) : ''
+})
 
 const DOCUMENT_CLICK_OPTS: AddEventListenerOptions = { capture: true }
 
@@ -391,8 +408,19 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onDocumentKeydown)
 })
 
-const { projects, refresh } = useProjects()
-onMounted(() => { refresh() })
+onMounted(() => {
+  refresh()
+})
+
+watchEffect(() => {
+  const p = singleProject.value
+  if (!p) return
+  const prefix = (p.prefix ?? '').trim()
+  if (!prefix) return
+  if (project.value !== prefix) {
+    project.value = prefix
+  }
+})
 
 watchEffect(() => {
   if (props.value) {
@@ -574,6 +602,22 @@ defineExpose({ appendCustomFilter, clear: onClear })
 .filter-bar__dropdown {
   position: relative;
   display: inline-flex;
+}
+
+.filter-bar__project-static {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: calc(var(--space-2, 0.5rem) - 4px) var(--space-3, 0.75rem);
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-muted);
+  box-shadow: none;
+  cursor: default;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .filter-bar__dropdown-trigger {
