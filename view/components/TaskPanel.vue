@@ -42,6 +42,25 @@
                 @projectChange="onProjectChange"
                 @updateStatus="updateStatus"
               />
+
+              <fieldset class="task-panel__group">
+                <legend>Details</legend>
+                <textarea
+                  v-model="form.description"
+                  rows="6"
+                  placeholder="Description"
+                  @blur="() => onFieldBlur('description')"
+                ></textarea>
+                <TaskPanelTagEditor
+                  :tags="form.tags"
+                  :configured-tags="configTagOptions"
+                  :known-tags="knownTags"
+                  :allow-custom-tags="allowCustomTags"
+                  @update:tags="setTags"
+                  @discoveredTags="mergeKnownTags"
+                />
+              </fieldset>
+
               <TaskPanelOwnershipSection
                 :form="form"
                 :ordered-known-users="orderedKnownUsers"
@@ -106,24 +125,6 @@
                     {{ assignedSprintNotice }}
                   </p>
                 </div>
-              </fieldset>
-
-              <fieldset class="task-panel__group">
-                <legend>Details</legend>
-                <textarea
-                  v-model="form.description"
-                  rows="6"
-                  placeholder="Description"
-                  @blur="() => onFieldBlur('description')"
-                ></textarea>
-                <TaskPanelTagEditor
-                  :tags="form.tags"
-                  :configured-tags="configTagOptions"
-                  :known-tags="knownTags"
-                  :allow-custom-tags="allowCustomTags"
-                  @update:tags="setTags"
-                  @discoveredTags="mergeKnownTags"
-                />
               </fieldset>
 
               <TaskPanelCustomFieldsSection

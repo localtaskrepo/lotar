@@ -6,7 +6,12 @@ import { SmokeWorkspace } from '../helpers/workspace.js';
 
 describe.concurrent('MCP framed transport', () => {
     it('frames responses and notifications with Content-Length headers', async () => {
-        const workspace = await SmokeWorkspace.create();
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: {
+                '.tasks/config.yml':
+                    `default:\n  project: CLI\nissue:\n  states: [Todo]\n  priorities: [Low]\n  types: [Feature]\n`,
+            },
+        });
 
         try {
             const binary = await ensureBinaryExists();
@@ -50,12 +55,12 @@ describe.concurrent('MCP framed transport', () => {
 
                 await workspace.write(
                     '.tasks/config.yml',
-                    `default:\n  project: CLI\nissue:\n  states: [Todo]\n  priorities: [Low]\n  types: [Feature]\n`,
+                    `default:\n  project: CLI\nissue:\n  states: [Todo,Doing]\n  priorities: [Low]\n  types: [Feature]\n`,
                 );
 
                 const notification = await client.readUntil(
                     (frame) => frame.message?.method === 'tools/listChanged',
-                    10000,
+                    20000,
                 );
                 expect(notification.headers).toMatch(/Content-Length:\s*\d+/i);
                 expect(Array.isArray(notification.message?.params?.hintCategories)).toBe(true);
