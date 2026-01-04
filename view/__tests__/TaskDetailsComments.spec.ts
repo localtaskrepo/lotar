@@ -89,7 +89,7 @@ describe('TaskDetails comments', () => {
     expect(Array.isArray(initialComments)).toBe(true)
     expect(initialComments).toHaveLength(0)
     const commentBox = wrapper.find('textarea[placeholder="Add a comment…"]')
-    await commentBox.setValue('hello world')
+    await commentBox.setValue('hello **world**')
     const postButton = wrapper.find('button[aria-label="Add comment"]')
     expect(postButton.exists()).toBe(true)
     await postButton.trigger('click')
@@ -98,7 +98,11 @@ describe('TaskDetails comments', () => {
     await flushPromises()
     const comments = (panel.vm as any).task.comments || []
     expect(comments).toHaveLength(1)
-    expect(comments[0].text).toBe('hello world')
-    expect(addCommentMock).toHaveBeenCalledWith('PRJ-1', 'hello world')
+    expect(comments[0].text).toBe('hello **world**')
+    expect(addCommentMock).toHaveBeenCalledWith('PRJ-1', 'hello **world**')
+
+    const renderedStrong = wrapper.find('strong')
+    expect(renderedStrong.exists()).toBe(true)
+    expect(renderedStrong.text()).toBe('world')
   })
 })

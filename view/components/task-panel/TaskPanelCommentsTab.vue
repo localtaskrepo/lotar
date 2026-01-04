@@ -46,7 +46,7 @@
               </template>
             </div>
           </div>
-          <p v-if="editingCommentIndex !== commentIndex">{{ comment.text }}</p>
+          <MarkdownContent v-if="editingCommentIndex !== commentIndex" :source="comment.text" />
           <textarea
             v-else
             :ref="onEditingTextareaRef"
@@ -88,6 +88,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue';
 import IconGlyph from '../IconGlyph.vue';
+import MarkdownContent from '../MarkdownContent.vue';
 import ReloadButton from '../ReloadButton.vue';
 import UiButton from '../UiButton.vue';
 

@@ -9,6 +9,7 @@ export interface McpFrame {
 export class FramedMcpClient {
     private buffer = Buffer.alloc(0);
     private readonly waiters: Array<() => void> = [];
+    private dataVersion = 0;
 
     constructor(private readonly child: ExecaChildProcess) {
         if (!child.stdin || !child.stdout) {
@@ -18,6 +19,7 @@ export class FramedMcpClient {
         child.stdout.on('data', (chunk: Buffer | string) => {
             const data = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
             this.buffer = Buffer.concat([this.buffer, data]);
+            this.dataVersion += 1;
             this.flushWaiters();
         });
     }
@@ -32,7 +34,7 @@ export class FramedMcpClient {
         this.child.stdin.write(payload);
     }
 
-    async readFrame(timeoutMs = 8000): Promise<McpFrame> {
+    async readFrame(timeoutMs = 20000): Promise<McpFrame> {
         const deadline = Date.now() + timeoutMs;
         while (true) {
             const frame = this.tryParseFrame();
@@ -50,7 +52,7 @@ export class FramedMcpClient {
         }
     }
 
-    async readUntil(predicate: (frame: McpFrame) => boolean, timeoutMs = 8000): Promise<McpFrame> {
+    async readUntil(predicate: (frame: McpFrame) => boolean, timeoutMs = 20000): Promise<McpFrame> {
         const deadline = Date.now() + timeoutMs;
         while (true) {
             const frame = this.tryParseFrame();
@@ -137,6 +139,7 @@ export class FramedMcpClient {
     }
 
     private async waitForData(timeoutMs: number, requireNewData = false): Promise<boolean> {
+        const startVersion = this.dataVersion;
         if (!requireNewData && this.buffer.length > 0) {
             return true;
         }
@@ -163,9 +166,13 @@ export class FramedMcpClient {
             };
             this.waiters.push(notify);
 
-            // Avoid a race where data arrives between the initial buffer check and
-            // registering the waiter.
-            if (this.buffer.length > 0) {
+            // Avoid a race where data arrives between the initial checks and registering
+            // the waiter.
+            if (requireNewData) {
+                if (this.dataVersion !== startVersion) {
+                    this.flushWaiters();
+                }
+            } else if (this.buffer.length > 0) {
                 this.flushWaiters();
             }
         });

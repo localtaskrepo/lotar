@@ -347,6 +347,56 @@ afterEach(() => {
 })
 
 describe('TaskPanel integration safeguards', () => {
+    it('renders description as markdown until clicked', async () => {
+        apiFixtures.baseTask.description = 'Hello **world**'
+        const wrapper = await mountTaskPanel()
+
+        const display = wrapper.find('.task-panel__description-display')
+        expect(display.exists()).toBe(true)
+        expect(display.find('strong').exists()).toBe(true)
+
+        expect(wrapper.find('.task-panel__description textarea').exists()).toBe(false)
+
+        await display.trigger('click')
+        await nextTick()
+
+        const textarea = wrapper.find('.task-panel__description textarea')
+        expect(textarea.exists()).toBe(true)
+
+        const previewToggle = wrapper.find('.task-panel__description-preview-toggle')
+        expect(previewToggle.exists()).toBe(true)
+
+        await previewToggle.trigger('click')
+        await nextTick()
+
+        expect(wrapper.find('.task-panel__description-preview').exists()).toBe(true)
+        expect(wrapper.find('.task-panel__description textarea').exists()).toBe(false)
+    })
+
+    it('saves description when leaving the editor', async () => {
+        apiFixtures.baseTask.description = 'Initial'
+        const wrapper = await mountTaskPanel()
+        apiFixtures.updateTaskMock.mockClear()
+
+        await wrapper.find('.task-panel__description-display').trigger('click')
+        await nextTick()
+
+        const textarea = wrapper.find('.task-panel__description textarea')
+        await textarea.setValue('Updated')
+
+            ; (textarea.element as HTMLTextAreaElement).focus()
+
+        const closeButton = wrapper.find('button[aria-label="Close panel"]')
+        expect(closeButton.exists()).toBe(true)
+
+            ; (closeButton.element as HTMLButtonElement).focus()
+        await new Promise((resolve) => setTimeout(resolve, 0))
+        await flushPromises()
+
+        expect(apiFixtures.updateTaskMock).toHaveBeenCalled()
+        expect(apiFixtures.updateTaskMock.mock.calls.some((call) => call[1]?.description === 'Updated')).toBe(true)
+    })
+
     it('updates tags via API when a suggestion is chosen', async () => {
         const wrapper = await mountTaskPanel()
         apiFixtures.updateTaskMock.mockClear()

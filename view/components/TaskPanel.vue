@@ -45,12 +45,56 @@
 
               <fieldset class="task-panel__group">
                 <legend>Details</legend>
-                <textarea
-                  v-model="form.description"
-                  rows="6"
-                  placeholder="Description"
-                  @blur="() => onFieldBlur('description')"
-                ></textarea>
+                <div
+                  ref="descriptionEditorRoot"
+                  class="task-panel__description"
+                  @focusout="onDescriptionFocusOut"
+                >
+                  <div
+                    v-if="!editingDescription"
+                    class="task-panel__description-display"
+                    tabindex="0"
+                    role="button"
+                    aria-label="Edit description"
+                    @pointerdown.prevent="startEditingDescription"
+                    @click="startEditingDescription"
+                    @keydown.enter.prevent="startEditingDescription"
+                    @keydown.space.prevent="startEditingDescription"
+                  >
+                    <MarkdownContent v-if="(form.description || '').trim()" :source="form.description || ''" />
+                    <span v-else class="muted">Click to add a description…</span>
+                  </div>
+
+                  <div v-else class="task-panel__description-editor">
+                    <div class="task-panel__description-controls">
+                      <UiButton
+                        variant="ghost"
+                        type="button"
+                        class="task-panel__description-preview-toggle"
+                        @click="descriptionPreview = !descriptionPreview"
+                      >
+                        {{ descriptionPreview ? 'Hide preview' : 'Preview' }}
+                      </UiButton>
+                    </div>
+                    <div class="task-panel__description-body">
+                      <textarea
+                        v-if="!descriptionPreview"
+                        ref="descriptionTextarea"
+                        v-model="form.description"
+                        rows="5"
+                        placeholder="Description"
+                        @input="onDescriptionInput"
+                      ></textarea>
+                      <div
+                        v-else
+                        class="task-panel__description-preview"
+                        tabindex="0"
+                      >
+                        <MarkdownContent :source="form.description || ''" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 <TaskPanelTagEditor
                   :tags="form.tags"
                   :configured-tags="configTagOptions"
@@ -313,12 +357,13 @@
 </template>
 
 <script setup lang="ts">
-import { Teleport, Transition, computed, ref, watch } from 'vue'
+import { Teleport, Transition, computed, nextTick, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { SprintIntegrityDiagnostics, TaskDTO } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
 import ChipListField from './ChipListField.vue'
 import IconGlyph from './IconGlyph.vue'
+import MarkdownContent from './MarkdownContent.vue'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
 import UiLoader from './UiLoader.vue'
@@ -448,6 +493,84 @@ const sprintDialogSelection = ref('active')
 const sprintDialogAllowClosed = ref(false)
 const removingSprintId = ref<number | null>(null)
 const sprintChipLabels = computed(() => assignedSprints.value.map((entry) => entry.label))
+
+const editingDescription = ref(false)
+const descriptionPreview = ref(false)
+const descriptionEditorRoot = ref<HTMLElement | null>(null)
+const descriptionTextarea = ref<HTMLTextAreaElement | null>(null)
+const descriptionFocusoutTick = ref(0)
+
+function autosizeDescriptionTextarea() {
+  const el = descriptionTextarea.value
+  if (!el) return
+
+  el.style.height = 'auto'
+
+  const computed = window.getComputedStyle(el)
+  const minHeight = Number.parseFloat(computed.minHeight || '0') || 0
+  const borderTop = Number.parseFloat(computed.borderTopWidth || '0') || 0
+  const borderBottom = Number.parseFloat(computed.borderBottomWidth || '0') || 0
+
+  let target = el.scrollHeight
+  if (computed.boxSizing === 'border-box') {
+    target += borderTop + borderBottom
+  }
+
+  if (!Number.isFinite(target) || target <= 0) {
+    return
+  }
+
+  // If we're within a couple pixels of the min-height, prefer the min-height.
+  // This avoids tiny scrollHeight rounding differences making edit mode look taller.
+  const epsilon = 3
+  if (minHeight > 0 && target <= minHeight + epsilon) {
+    el.style.height = `${minHeight}px`
+    return
+  }
+
+  el.style.height = `${target}px`
+}
+
+function onDescriptionInput() {
+  nextTick(() => autosizeDescriptionTextarea())
+}
+
+function startEditingDescription() {
+  if (editingDescription.value) return
+  editingDescription.value = true
+  descriptionPreview.value = false
+  nextTick(() => {
+    descriptionTextarea.value?.focus()
+    autosizeDescriptionTextarea()
+  })
+}
+
+function onDescriptionFocusOut(event: FocusEvent) {
+  if (!editingDescription.value) return
+
+  descriptionFocusoutTick.value += 1
+  const tick = descriptionFocusoutTick.value
+
+  setTimeout(() => {
+    if (tick !== descriptionFocusoutTick.value) return
+
+    const active = document.activeElement as HTMLElement | null
+    if (active && descriptionEditorRoot.value?.contains(active)) return
+
+    editingDescription.value = false
+    descriptionPreview.value = false
+    onFieldBlur('description')
+  }, 0)
+}
+
+watch(descriptionPreview, (isPreview) => {
+  if (editingDescription.value && !isPreview) {
+    nextTick(() => {
+      descriptionTextarea.value?.focus()
+      autosizeDescriptionTextarea()
+    })
+  }
+})
 
 function handleIntegrityFeedback(integrity?: SprintIntegrityDiagnostics | null) {
   if (!integrity) return
@@ -1077,6 +1200,69 @@ textarea {
   background: var(--color-surface, var(--bg));
   color: inherit;
   box-sizing: border-box;
+}
+
+.task-panel__description {
+  --task-panel-description-min-height: calc(5 * 1.5em + var(--space-4, 1rem));
+  display: flex;
+  flex-direction: column;
+}
+
+.task-panel__description-display {
+  min-height: var(--task-panel-description-min-height);
+  padding: var(--space-2, 0.5rem);
+  border-radius: var(--radius-md, 0.375rem);
+  border: 1px solid var(--color-border, var(--border));
+  background: var(--color-surface, var(--bg));
+  cursor: text;
+  box-sizing: border-box;
+}
+
+.task-panel__description-display:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.task-panel__description-editor {
+  position: relative;
+}
+
+.task-panel__description-controls {
+  position: absolute;
+  top: var(--space-1, 0.25rem);
+  right: var(--space-1, 0.25rem);
+  z-index: 2;
+}
+
+.task-panel__description-body {
+  min-height: var(--task-panel-description-min-height);
+  display: flex;
+}
+
+.task-panel__description-body textarea {
+  min-height: var(--task-panel-description-min-height);
+  resize: none;
+  overflow: hidden;
+}
+
+.task-panel__description-preview-toggle {
+  font-size: var(--text-xs, 0.75rem);
+  padding: 0 var(--space-2, 0.5rem);
+}
+
+.task-panel__description-preview {
+  min-height: var(--task-panel-description-min-height);
+  width: 100%;
+  padding: var(--space-2, 0.5rem);
+  border-radius: var(--radius-md, 0.375rem);
+  border: 1px solid var(--color-border, var(--border));
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 94%, transparent);
+  box-sizing: border-box;
+}
+
+.task-panel__description-preview:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .task-panel :deep(.input),

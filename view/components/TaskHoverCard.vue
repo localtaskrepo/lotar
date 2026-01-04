@@ -6,7 +6,9 @@
         <span class="task-hover-card__id">{{ task.id }}</span>
         <span class="task-hover-card__title">{{ task.title }}</span>
       </header>
-      <p v-if="summary" class="task-hover-card__summary">{{ summary }}</p>
+      <div v-if="summary" class="task-hover-card__summary">
+        <MarkdownContent :source="summary" />
+      </div>
       <dl class="task-hover-card__meta">
         <div v-if="task.status" class="task-hover-card__row">
           <dt>Status</dt>
@@ -39,6 +41,7 @@
 import { computed } from 'vue';
 import type { TaskDTO } from '../api/types';
 import { parseTaskDate, startOfLocalDay } from '../utils/date';
+import MarkdownContent from './MarkdownContent.vue';
 
 const props = withDefaults(defineProps<{
   task: TaskDTO
