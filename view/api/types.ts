@@ -30,6 +30,30 @@ export interface TaskDTO {
 export interface ReferenceEntry {
   code?: string | null
   link?: string | null
+  file?: string | null
+}
+
+export interface AttachmentUploadRequest {
+  id: string
+  filename: string
+  content_base64: string
+}
+
+export interface AttachmentUploadResponse {
+  stored_path: string
+  attached: boolean
+  task: TaskDTO
+}
+
+export interface AttachmentRemoveRequest {
+  id: string
+  stored_path: string
+}
+
+export interface AttachmentRemoveResponse {
+  task: TaskDTO
+  deleted: boolean
+  still_referenced: boolean
 }
 
 export interface ReferenceSnippetLine {
@@ -474,6 +498,8 @@ export type ConfigSource = 'project' | 'global' | 'built_in'
 export interface ResolvedConfigDTO {
   server_port: number
   default_project: string
+  attachments_dir: string
+  attachments_max_upload_mb: number
   default_assignee?: string | null
   default_reporter?: string | null
   default_tags: string[]
@@ -506,6 +532,8 @@ export interface ResolvedConfigDTO {
 export interface GlobalConfigRaw {
   server_port: number
   default_project: string
+  attachments_dir: string
+  attachments_max_upload_mb: number
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]
@@ -537,6 +565,8 @@ export interface GlobalConfigRaw {
 
 export interface ProjectConfigRaw {
   project_name?: string
+  attachments_dir?: string
+  attachments_max_upload_mb?: number
   issue_states?: string[]
   issue_types?: string[]
   issue_priorities?: string[]

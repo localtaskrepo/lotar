@@ -323,6 +323,19 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         cfg.scan_strip_attributes = v;
     }
 
+    // attachments.dir
+    if let Some(v) = get_path(&data, &["attachments", "dir"]).and_then(cast::<String>) {
+        let trimmed = v.trim().to_string();
+        if !trimmed.is_empty() {
+            cfg.attachments_dir = trimmed;
+        }
+    }
+
+    // attachments.max_upload_mb
+    if let Some(v) = get_path(&data, &["attachments", "max_upload_mb"]).and_then(cast::<i64>) {
+        cfg.attachments_max_upload_mb = v;
+    }
+
     // sprints.defaults
     if let Some(value) =
         get_path(&data, &["sprints", "defaults", "capacity_points"]).and_then(cast::<u32>)
@@ -563,6 +576,18 @@ pub fn parse_project_from_yaml_str(
         cfg.scan_enable_mentions = Some(v);
     }
 
+    // attachments.dir (project override)
+    if let Some(v) = get_path(&data, &["attachments", "dir"]).and_then(cast::<String>) {
+        let trimmed = v.trim().to_string();
+        if !trimmed.is_empty() {
+            cfg.attachments_dir = Some(trimmed);
+        }
+    }
+    // attachments.max_upload_mb (project override)
+    if let Some(v) = get_path(&data, &["attachments", "max_upload_mb"]).and_then(cast::<i64>) {
+        cfg.attachments_max_upload_mb = Some(v);
+    }
+
     // branch alias maps (project)
     if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
         cfg.branch_type_aliases = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant);
@@ -715,6 +740,28 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
     if !scan.is_empty() {
         root.insert(Y::String("scan".into()), Y::Mapping(scan));
+    }
+
+    // attachments
+    if (cfg.attachments_dir != defaults.attachments_dir && !cfg.attachments_dir.is_empty())
+        || cfg.attachments_max_upload_mb != defaults.attachments_max_upload_mb
+    {
+        let mut attachments = serde_yaml::Mapping::new();
+        if cfg.attachments_dir != defaults.attachments_dir && !cfg.attachments_dir.is_empty() {
+            attachments.insert(
+                Y::String("dir".into()),
+                Y::String(cfg.attachments_dir.clone()),
+            );
+        }
+        if cfg.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
+            attachments.insert(
+                Y::String("max_upload_mb".into()),
+                Y::Number(cfg.attachments_max_upload_mb.into()),
+            );
+        }
+        if !attachments.is_empty() {
+            root.insert(Y::String("attachments".into()), Y::Mapping(attachments));
+        }
     }
 
     // sprints
@@ -1027,6 +1074,28 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
     if !scan.is_empty() {
         root.insert(Y::String("scan".into()), Y::Mapping(scan));
+    }
+
+    // attachments
+    let has_attachments = cfg
+        .attachments_dir
+        .as_ref()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+        || cfg.attachments_max_upload_mb.is_some();
+    if has_attachments {
+        let mut attachments = serde_yaml::Mapping::new();
+        if let Some(dir) = &cfg.attachments_dir
+            && !dir.trim().is_empty()
+        {
+            attachments.insert(Y::String("dir".into()), Y::String(dir.clone()));
+        }
+        if let Some(max_mb) = cfg.attachments_max_upload_mb {
+            attachments.insert(Y::String("max_upload_mb".into()), Y::Number(max_mb.into()));
+        }
+        if !attachments.is_empty() {
+            root.insert(Y::String("attachments".into()), Y::Mapping(attachments));
+        }
     }
 
     // branch alias maps in project canonical YAML

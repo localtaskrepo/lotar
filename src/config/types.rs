@@ -191,6 +191,12 @@ pub struct ProjectConfig {
     pub branch_status_aliases: Option<HashMap<String, TaskStatus>>, // token -> TaskStatus
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub branch_priority_aliases: Option<HashMap<String, Priority>>, // token -> Priority
+
+    // Attachments (project-level override)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub attachments_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub attachments_max_upload_mb: Option<i64>,
 }
 
 impl ProjectConfig {
@@ -227,6 +233,9 @@ impl ProjectConfig {
             branch_type_aliases: None,
             branch_status_aliases: None,
             branch_priority_aliases: None,
+
+            attachments_dir: None,
+            attachments_max_upload_mb: None,
         }
     }
 }
@@ -309,6 +318,17 @@ pub struct GlobalConfig {
     pub auto_identity: bool,
     #[serde(default = "default_true")]
     pub auto_identity_git: bool,
+
+    // Attachments
+    #[serde(default = "default_attachments_dir")]
+    pub attachments_dir: String,
+
+    /// Maximum upload size in megabytes.
+    /// - `10` (default): allow up to 10 MiB
+    /// - `0`: disable uploads
+    /// - `-1`: unlimited
+    #[serde(default = "default_attachments_max_upload_mb")]
+    pub attachments_max_upload_mb: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -353,6 +373,10 @@ pub struct ResolvedConfig {
     pub branch_type_aliases: HashMap<String, TaskType>,
     pub branch_status_aliases: HashMap<String, TaskStatus>,
     pub branch_priority_aliases: HashMap<String, Priority>,
+
+    // Attachments
+    pub attachments_dir: String,
+    pub attachments_max_upload_mb: i64,
 }
 
 impl ResolvedConfig {
@@ -477,6 +501,14 @@ fn default_scan_signal_words() -> Vec<String> {
     ]
 }
 
+fn default_attachments_dir() -> String {
+    "@attachments".to_string()
+}
+
+fn default_attachments_max_upload_mb() -> i64 {
+    10
+}
+
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
@@ -514,6 +546,8 @@ impl Default for GlobalConfig {
             branch_priority_aliases: HashMap::new(),
             auto_identity: true,
             auto_identity_git: true,
+            attachments_dir: default_attachments_dir(),
+            attachments_max_upload_mb: default_attachments_max_upload_mb(),
         }
     }
 }

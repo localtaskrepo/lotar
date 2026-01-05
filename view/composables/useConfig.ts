@@ -81,6 +81,12 @@ export function useConfig() {
   const loading = cfgResource.loading
   const error = computed<string | null>(() => cfgResource.error.value?.message ?? null)
 
+  const attachmentsDir = computed<string>(() => {
+    const raw = cfg.value?.attachments_dir
+    const value = typeof raw === 'string' ? raw.trim() : ''
+    return value || '@attachments'
+  })
+
   function resetState() {
     statuses.value = []
     priorities.value = []
@@ -178,6 +184,7 @@ export function useConfig() {
     members,
     defaults: computed(() => defaults),
     sprintDefaults: computed(() => sprintDefaults),
+    attachmentsDir,
     refresh,
   }
 }

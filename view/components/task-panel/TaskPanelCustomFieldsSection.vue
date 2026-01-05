@@ -1,5 +1,5 @@
 <template>
-  <details class="task-panel__group" open>
+  <details v-if="showSection" class="task-panel__group" :open="detailsOpen" @toggle="onToggle">
     <summary>Custom fields</summary>
     <div class="task-panel__custom-fields">
       <div v-for="(value, key) in customFields" :key="key" class="task-panel__custom-row">
@@ -17,7 +17,7 @@
         />
         <UiButton variant="ghost" type="button" @click="emit('removeField', key)">Remove</UiButton>
       </div>
-      <div class="task-panel__custom-row">
+      <div v-if="allowNewFields" class="task-panel__custom-row">
         <UiInput
           :model-value="newFieldKey"
           placeholder="New field"
@@ -35,15 +35,38 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import UiButton from '../UiButton.vue';
 import UiInput from '../UiInput.vue';
 
-defineProps<{
+const props = defineProps<{
   customFields: Record<string, string>
   customFieldKeys: Record<string, string>
   newFieldKey: string
   newFieldValue: string
+  allowNewFields: boolean
 }>()
+
+const hasAnyField = computed(() => Object.keys(props.customFields || {}).length > 0)
+const hasAnyValue = computed(() =>
+  Object.entries(props.customFields || {}).some(([key, value]) => (key || '').trim() && String(value ?? '').trim()),
+)
+
+const showSection = computed(() => props.allowNewFields || hasAnyField.value)
+
+const detailsOpen = ref(hasAnyValue.value)
+const userToggled = ref(false)
+
+watch(hasAnyValue, (next) => {
+  if (!userToggled.value) {
+    detailsOpen.value = next
+  }
+})
+
+function onToggle(event: Event) {
+  userToggled.value = true
+  detailsOpen.value = (event.target as HTMLDetailsElement).open
+}
 
 const emit = defineEmits<{
   (e: 'updateCustomFieldKey', key: string, value: string): void

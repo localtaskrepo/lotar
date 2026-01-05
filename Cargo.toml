@@ -23,6 +23,8 @@ rayon = { version = "1.11.0", default-features = false, optional = true }
 ignore = { version = "0.4.25" }
 notify = "8.2.0"
 pulldown-cmark = { version = "0.13.0", default-features = false }
+blake3 = { version = "1.8.2", default-features = false, features = ["std"] }
+base64 = { version = "0.22.1", default-features = false, features = ["std"] }
 
 # Production release profile optimized for minimal binary size
 [profile.release]
@@ -32,6 +34,19 @@ panic = "abort"
 strip = "symbols"
 opt-level = "z"
 debug = false
+
+# Profile intended for running tests in CI and locally.
+#
+# The default release profile is tuned for smallest binary size (fat LTO, opt-level=z,
+# single codegen unit), which can significantly slow down linking many test binaries and
+# can trigger intermittent macOS toolchain crashes.
+[profile.ci]
+inherits = "release"
+lto = false
+codegen-units = 16
+opt-level = 2
+panic = "unwind"
+strip = "none"
 
 # Test profile optimization for faster test compilation and execution
 [profile.test]

@@ -65,6 +65,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         tags: configTags,
         customFields: configCustomFields,
         defaults,
+        attachmentsDir,
         members,
         refresh: refreshConfig,
     } = useConfig()
@@ -72,6 +73,12 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     const statusOptions = computed(() => statuses.value ?? [])
     const priorityOptions = computed(() => priorities.value ?? [])
     const typeOptions = computed(() => types.value ?? [])
+
+    const allowNewCustomFields = computed(() =>
+        Array.isArray(configCustomFields.value)
+            ? configCustomFields.value.some((value) => (value || '').trim() === '*')
+            : false,
+    )
 
     const loading = ref(false)
     const submitting = ref(false)
@@ -523,6 +530,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         types,
         configTags,
         defaults,
+        attachmentsDir,
         refreshConfig,
         statusOptions,
         priorityOptions,
@@ -556,6 +564,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         customFields,
         customFieldKeys,
         newField,
+        allowNewCustomFields,
         activityTabs,
         activityTab,
         changeLog,

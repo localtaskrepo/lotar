@@ -7,9 +7,7 @@ Features:
 - Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
 - Extend custom fields to support more complex queries (AND/OR logic)
 - API pagination
-- Allow to add images/attachments to ticket (definitely via web UI, not sure how to do this via CLI)
 - Sync with Jira/Github (two-way ideally)
-- Support Markdown in ticket descriptions and comments
 - Add ability to assign (and run) an LLM.
 - Allow reoreding columns in the web UI task list via drag and drop
 - Sort direction buttons in web UI are at the end of a column header, but should be next to the column name

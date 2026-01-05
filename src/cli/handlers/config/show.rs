@@ -3,6 +3,7 @@ use super::render::{YamlRenderOptions, emit_config_yaml};
 use crate::config::ConfigManager;
 use crate::config::source_labels::{build_global_source_labels, build_project_source_labels};
 use crate::output::OutputRenderer;
+use crate::services::attachment_service::AttachmentService;
 use crate::workspace::TasksDirectoryResolver;
 use std::io::IsTerminal;
 
@@ -22,6 +23,17 @@ impl ConfigHandler {
 
         let colorize_comments =
             std::env::var("NO_COLOR").is_err() && std::io::stdout().is_terminal();
+
+        let resolved_tasks_dir = if effective_read_root.is_relative() {
+            std::fs::canonicalize(&effective_read_root).ok()
+        } else {
+            None
+        };
+
+        let tasks_dir_for_paths = resolved_tasks_dir
+            .as_ref()
+            .unwrap_or(&effective_read_root)
+            .clone();
 
         if !matches!(renderer.format, crate::output::OutputFormat::Json) {
             let mut message = format!("Tasks directory: {}", effective_read_root.display());
@@ -80,6 +92,44 @@ impl ConfigHandler {
                 },
             };
 
+            let attachments_root = AttachmentService::compute_attachments_root(
+                &tasks_dir_for_paths,
+                &resolved_project,
+            );
+            let (uploads_mode, uploads_limit_bytes) =
+                describe_upload_policy(resolved_project.attachments_max_upload_mb);
+
+            if !matches!(renderer.format, crate::output::OutputFormat::Json) {
+                if let Ok(root) = &attachments_root {
+                    renderer.emit_info(format!("Attachments root: {}", root.display()));
+                }
+                renderer.emit_info(format!("Attachment uploads: {uploads_mode}"));
+            }
+
+            let mut json_meta = serde_json::json!({
+                "paths": {
+                    "tasks_dir": tasks_dir_for_paths.display().to_string(),
+                },
+                "attachments": {
+                    "uploads": uploads_mode,
+                    "max_upload_bytes": uploads_limit_bytes,
+                }
+            });
+            if let Some(resolved) = resolved_tasks_dir.as_ref() {
+                json_meta["paths"]["tasks_dir_resolved"] =
+                    serde_json::Value::String(resolved.display().to_string());
+            }
+            match attachments_root {
+                Ok(root) => {
+                    json_meta["paths"]["attachments_root"] =
+                        serde_json::Value::String(root.display().to_string());
+                }
+                Err(err) => {
+                    json_meta["paths"]["attachments_root_error"] =
+                        serde_json::Value::String(err.to_string());
+                }
+            }
+
             emit_config_yaml(
                 renderer,
                 "project",
@@ -87,6 +137,7 @@ impl ConfigHandler {
                 &resolved_project,
                 &project_sources,
                 &options,
+                Some(json_meta),
             );
         } else {
             let resolved_config = config_manager.get_resolved_config();
@@ -103,6 +154,42 @@ impl ConfigHandler {
                 allowed_sources: if full { None } else { Some(GLOBAL_SOURCES) },
             };
 
+            let attachments_root =
+                AttachmentService::compute_attachments_root(&tasks_dir_for_paths, resolved_config);
+            let (uploads_mode, uploads_limit_bytes) =
+                describe_upload_policy(resolved_config.attachments_max_upload_mb);
+
+            if !matches!(renderer.format, crate::output::OutputFormat::Json) {
+                if let Ok(root) = &attachments_root {
+                    renderer.emit_info(format!("Attachments root: {}", root.display()));
+                }
+                renderer.emit_info(format!("Attachment uploads: {uploads_mode}"));
+            }
+
+            let mut json_meta = serde_json::json!({
+                "paths": {
+                    "tasks_dir": tasks_dir_for_paths.display().to_string(),
+                },
+                "attachments": {
+                    "uploads": uploads_mode,
+                    "max_upload_bytes": uploads_limit_bytes,
+                }
+            });
+            if let Some(resolved) = resolved_tasks_dir.as_ref() {
+                json_meta["paths"]["tasks_dir_resolved"] =
+                    serde_json::Value::String(resolved.display().to_string());
+            }
+            match attachments_root {
+                Ok(root) => {
+                    json_meta["paths"]["attachments_root"] =
+                        serde_json::Value::String(root.display().to_string());
+                }
+                Err(err) => {
+                    json_meta["paths"]["attachments_root_error"] =
+                        serde_json::Value::String(err.to_string());
+                }
+            }
+
             emit_config_yaml(
                 renderer,
                 "global",
@@ -110,9 +197,24 @@ impl ConfigHandler {
                 resolved_config,
                 &sources,
                 &options,
+                Some(json_meta),
             );
         }
 
         Ok(())
+    }
+}
+
+fn describe_upload_policy(max_upload_mb: i64) -> (String, Option<u64>) {
+    match max_upload_mb {
+        0 => ("disabled".to_string(), None),
+        -1 => ("unlimited".to_string(), None),
+        n if n > 0 => {
+            let bytes = u64::try_from(n)
+                .ok()
+                .and_then(|v| v.checked_mul(1024 * 1024));
+            (format!("limited ({n} MiB)"), bytes)
+        }
+        other => (format!("invalid ({other})"), None),
     }
 }

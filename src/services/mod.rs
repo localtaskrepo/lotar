@@ -1,3 +1,4 @@
+pub mod attachment_service;
 pub mod audit_service;
 pub mod config_service;
 pub mod project_service;

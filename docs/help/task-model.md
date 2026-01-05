@@ -29,7 +29,7 @@ Field | Type | Notes
 `tags` | `string[]` | Normalized, unique tags. Empty array when unset.
 `relationships` | `TaskRelationships` | Structured references to other tasks (see below).
 `comments` | `TaskComment[]` | Each comment carries `{ date, text }`.
-`references` | `ReferenceEntry[]` | Code locations (`code`) and/or external URLs (`link`).
+`references` | `ReferenceEntry[]` | Code locations (`code`), external URLs (`link`), and/or attachments (`file`).
 `sprints` | `u32[]` | Numeric sprint IDs the task belongs to.
 `sprint_order` | `BTreeMap<u32, u32>` | Optional manual ordering per sprint (task id → order index).
 `history` | `TaskChangeLogEntry[]` | Chronological change log entries (field deltas, actor, timestamp).
@@ -39,7 +39,7 @@ Field | Type | Notes
 
 - `TaskRelationships` exposes dedicated arrays for `depends_on`, `blocks`, `related`, `children`, `fixes`, plus single-value `parent` and `duplicate_of`. All properties are optional; empty collections are dropped on serialization.
 - `TaskComment` holds `{ date: RFC3339, text: string }`. Comments do not store authorship today.
-- `ReferenceEntry` supports either `code` (e.g., `app/lib.rs:120`) or `link` (URL). Multiple references may be attached to track external systems.
+- `ReferenceEntry` supports `code` (e.g., `app/lib.rs:120`), `link` (URL), or `file` (a relative attachment path stored under the configured attachments root).
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 
 ### Custom fields

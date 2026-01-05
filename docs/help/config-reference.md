@@ -20,6 +20,8 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - issue.priorities: string[] (Low, Medium, High, Critical)
 - issue.tags: string[]
 - custom_fields: string[]
+- attachments.dir: string (default "@attachments")
+- attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited; positive values are MiB
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
 - scan.enable_ticket_words: boolean (default: false) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
@@ -59,11 +61,20 @@ scan:
 	enable_ticket_words: true
 	enable_mentions: true
 
+attachments:
+	# Relative paths resolve under the tasks directory (the `.tasks` folder)
+	dir: "@attachments"
+	# 0 disables uploads, -1 is unlimited, positive values are MiB
+	max_upload_mb: 10
+
 # .tasks/DEMO/config.yml (project)
 project:
 	name: Demo Service
 issue:
 	types: [feature, bug, chore]
+attachments:
+	# Project-specific override (optional)
+	max_upload_mb: 25
 scan:
 	enable_mentions: false  # example: disable adding anchors for existing keys in this project
 auto:

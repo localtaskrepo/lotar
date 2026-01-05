@@ -326,6 +326,7 @@ impl CommandHandler for ScanHandler {
                                                     crate::types::ReferenceEntry {
                                                         code: Some(code_ref),
                                                         link: None,
+                                                        file: None,
                                                     },
                                                 );
                                                 changed = true;
@@ -351,6 +352,7 @@ impl CommandHandler for ScanHandler {
                                         task.references.push(crate::types::ReferenceEntry {
                                             code: Some(code_ref),
                                             link: None,
+                                            file: None,
                                         });
                                         true
                                     })
@@ -450,6 +452,7 @@ impl CommandHandler for ScanHandler {
                                                     crate::types::ReferenceEntry {
                                                         code: Some(code_ref),
                                                         link: None,
+                                                        file: None,
                                                     },
                                                 );
                                                 changed = true;
@@ -475,6 +478,7 @@ impl CommandHandler for ScanHandler {
                                         task.references.push(crate::types::ReferenceEntry {
                                             code: Some(code_ref),
                                             link: None,
+                                            file: None,
                                         });
                                         true
                                     })

@@ -107,6 +107,12 @@ pub const CONFIG_SOURCE_ENTRIES: &[ConfigSourceEntry] = &[
         "auto_identity_git",
         "auto_identity_git",
     ),
+    entry("attachments.dir", "attachments_dir", "attachments_dir"),
+    entry(
+        "attachments.max_upload_mb",
+        "attachments_max_upload_mb",
+        "attachments_max_upload_mb",
+    ),
     entry(
         "sprints.defaults.capacity_points",
         "sprints_defaults_capacity_points",
@@ -339,6 +345,8 @@ fn source_label_for_global(
         "auto_branch_infer_priority" => scope_field!(auto_branch_infer_priority),
         "auto_identity" => scope_field!(auto_identity),
         "auto_identity_git" => scope_field!(auto_identity_git),
+        "attachments_dir" => scope_field!(attachments_dir),
+        "attachments_max_upload_mb" => scope_field!(attachments_max_upload_mb),
         "sprints_defaults_capacity_points" => scope_for_global_value(
             &resolved.sprint_defaults.capacity_points,
             home.map(|cfg| &cfg.sprints.defaults.capacity_points),
@@ -416,6 +424,8 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "auto_branch_infer_priority" => env_equal!(auto_branch_infer_priority),
         "auto_identity" => env_equal!(auto_identity),
         "auto_identity_git" => env_equal!(auto_identity_git),
+        "attachments_dir" => env_equal!(attachments_dir),
+        "attachments_max_upload_mb" => env_equal!(attachments_max_upload_mb),
         "branch_type_aliases" => env_equal!(branch_type_aliases),
         "branch_status_aliases" => env_equal!(branch_status_aliases),
         "branch_priority_aliases" => env_equal!(branch_priority_aliases),
@@ -627,6 +637,21 @@ fn source_label_for_project(
             let diff =
                 resolved_project.branch_priority_aliases != base_config.branch_priority_aliases;
             project_scope!("branch_priority_aliases", has_override, diff)
+        }
+        "attachments_dir" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.attachments_dir.as_ref())
+                .is_some();
+            let diff = resolved_project.attachments_dir != base_config.attachments_dir;
+            project_scope!("attachments_dir", has_override, diff)
+        }
+        "attachments_max_upload_mb" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.attachments_max_upload_mb)
+                .is_some();
+            let diff =
+                resolved_project.attachments_max_upload_mb != base_config.attachments_max_upload_mb;
+            project_scope!("attachments_max_upload_mb", has_override, diff)
         }
         "server_port" => source_label_for_global(
             base_config,

@@ -1,15 +1,13 @@
 <template>
   <div class="task-panel__tab-panel">
-    <header class="task-panel__group-header">
-      <h3>History</h3>
-      <ReloadButton
-        variant="ghost"
-        :disabled="mode !== 'edit'"
-        label="Reload history"
-        title="Reload history"
-        @click="$emit('reload')"
-      />
-    </header>
+    <ReloadButton
+      class="task-panel__tab-action"
+      variant="ghost"
+      :disabled="mode !== 'edit'"
+      label="Reload history"
+      title="Reload history"
+      @click="$emit('reload')"
+    />
     <template v-if="mode === 'edit'">
       <div class="task-panel__history-scroll" role="region" aria-label="Task history">
         <div class="task-panel__history">

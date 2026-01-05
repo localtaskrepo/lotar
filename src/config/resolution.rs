@@ -238,6 +238,13 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.custom_fields.values != defaults.custom_fields.values {
         base.custom_fields = override_config.custom_fields;
     }
+
+    if override_config.attachments_dir != defaults.attachments_dir {
+        base.attachments_dir = override_config.attachments_dir;
+    }
+    if override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
+        base.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
+    }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
@@ -346,6 +353,13 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.custom_fields.values != defaults.custom_fields.values {
         resolved.custom_fields = override_config.custom_fields;
+    }
+
+    if override_config.attachments_dir != defaults.attachments_dir {
+        resolved.attachments_dir = override_config.attachments_dir;
+    }
+    if override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
+        resolved.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
@@ -487,6 +501,12 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(custom_fields) = project_config.custom_fields {
         resolved.custom_fields = custom_fields;
     }
+    if let Some(attachments_dir) = project_config.attachments_dir {
+        resolved.attachments_dir = attachments_dir;
+    }
+    if let Some(max_mb) = project_config.attachments_max_upload_mb {
+        resolved.attachments_max_upload_mb = max_mb;
+    }
     if let Some(scan_words) = project_config.scan_signal_words {
         resolved.scan_signal_words = scan_words;
     }
@@ -569,6 +589,8 @@ impl ResolvedConfig {
             branch_type_aliases: global.branch_type_aliases,
             branch_status_aliases: global.branch_status_aliases,
             branch_priority_aliases: global.branch_priority_aliases,
+            attachments_dir: global.attachments_dir,
+            attachments_max_upload_mb: global.attachments_max_upload_mb,
         }
     }
 }

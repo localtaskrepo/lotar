@@ -31,6 +31,7 @@ pub(super) fn emit_config_yaml(
     resolved: &ResolvedConfig,
     sources: &HashMap<String, String>,
     options: &YamlRenderOptions,
+    json_meta: Option<serde_json::Value>,
 ) {
     if matches!(renderer.format, OutputFormat::Json) {
         let sources_payload: HashMap<String, String> = if options.include_defaults {
@@ -51,6 +52,15 @@ pub(super) fn emit_config_yaml(
         });
         if let Some(lbl) = label.filter(|s| !s.is_empty()) {
             payload["label"] = serde_json::Value::String(lbl.to_string());
+        }
+
+        if let Some(meta) = json_meta
+            && let Some(meta_map) = meta.as_object()
+            && let Some(payload_map) = payload.as_object_mut()
+        {
+            for (k, v) in meta_map {
+                payload_map.insert(k.clone(), v.clone());
+            }
         }
         renderer.emit_json(&payload);
         return;
@@ -369,6 +379,28 @@ fn render_resolved_config_yaml(
     );
     if auto_written {
         sections.push(format!("auto:\n{}", auto_body));
+    }
+
+    let mut attachments_body = String::new();
+    let mut attachments_written = false;
+    attachments_written |= write_scalar_line(
+        &mut attachments_body,
+        2,
+        "dir",
+        &yaml_scalar(&resolved.attachments_dir),
+        sources.get("attachments.dir"),
+        options,
+    );
+    attachments_written |= write_scalar_line(
+        &mut attachments_body,
+        2,
+        "max_upload_mb",
+        &yaml_scalar(&resolved.attachments_max_upload_mb),
+        sources.get("attachments.max_upload_mb"),
+        options,
+    );
+    if attachments_written {
+        sections.push(format!("attachments:\n{}", attachments_body));
     }
 
     let mut sprint_body = String::new();

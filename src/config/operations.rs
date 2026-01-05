@@ -480,6 +480,24 @@ pub fn apply_field_to_global_config(
         "auto_identity_git" => {
             config.auto_identity_git = parse_bool_flag(value, field)?;
         }
+        "attachments_dir" => {
+            config.attachments_dir = value.trim().to_string();
+        }
+        "attachments_max_upload_mb" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.attachments_max_upload_mb =
+                    GlobalConfig::default().attachments_max_upload_mb;
+            } else {
+                let parsed = trimmed.parse::<i64>().map_err(|_| {
+                    ConfigError::ParseError(format!(
+                        "{} must be an integer (MiB), got '{}'",
+                        field, trimmed
+                    ))
+                })?;
+                config.attachments_max_upload_mb = parsed;
+            }
+        }
         "scan_signal_words" => {
             config.scan_signal_words = parse_simple_csv(value);
         }
@@ -719,6 +737,28 @@ fn apply_field_to_project_config(
         "scan_strip_attributes" => {
             config.scan_strip_attributes = parse_optional_bool_flag(value, field)?;
         }
+        "attachments_dir" => {
+            let trimmed = value.trim();
+            config.attachments_dir = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        "attachments_max_upload_mb" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.attachments_max_upload_mb = None;
+            } else {
+                let parsed = trimmed.parse::<i64>().map_err(|_| {
+                    ConfigError::ParseError(format!(
+                        "{} must be an integer (MiB), got '{}'",
+                        field, trimmed
+                    ))
+                })?;
+                config.attachments_max_upload_mb = Some(parsed);
+            }
+        }
         "branch_type_aliases" => {
             if value.trim().is_empty() {
                 config.branch_type_aliases = None;
@@ -788,6 +828,8 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "branch_type_aliases",
         "branch_status_aliases",
         "branch_priority_aliases",
+        "attachments_dir",
+        "attachments_max_upload_mb",
         "sprints_defaults_capacity_points",
         "sprints_defaults_capacity_hours",
         "sprints_defaults_length",
@@ -826,6 +868,8 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "branch_type_aliases",
         "branch_status_aliases",
         "branch_priority_aliases",
+        "attachments_dir",
+        "attachments_max_upload_mb",
     ];
 
     let valid_fields = if is_global {
@@ -924,6 +968,36 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                         token
                     )));
                 }
+            }
+        }
+        "attachments_dir" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Err(ConfigError::ParseError(
+                    "attachments_dir cannot be empty".to_string(),
+                ));
+            }
+            if trimmed.len() > 512 {
+                return Err(ConfigError::ParseError(
+                    "attachments_dir is too long".to_string(),
+                ));
+            }
+        }
+        "attachments_max_upload_mb" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Ok(());
+            }
+            let parsed = trimmed.parse::<i64>().map_err(|_| {
+                ConfigError::ParseError(format!(
+                    "attachments_max_upload_mb must be an integer (MiB), got '{}'",
+                    trimmed
+                ))
+            })?;
+            if parsed < -1 {
+                return Err(ConfigError::ParseError(
+                    "attachments_max_upload_mb must be -1 (unlimited), 0 (disabled), or a positive integer".to_string(),
+                ));
             }
         }
         "strict_members" => {

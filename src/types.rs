@@ -422,6 +422,8 @@ pub struct ReferenceEntry {
     pub code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub link: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file: Option<String>,
 }
 
 // Type alias for custom fields - can hold any YAML-serializable value

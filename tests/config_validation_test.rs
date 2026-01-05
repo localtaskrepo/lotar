@@ -87,6 +87,8 @@ fn test_global_config_validation_valid() {
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
         sprints: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     };
 
     let result = validator.validate_global_config(&config);
@@ -145,6 +147,8 @@ fn test_global_config_validation_privileged_port_warning() {
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
         sprints: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     };
 
     let result = validator.validate_global_config(&config);
@@ -220,6 +224,8 @@ fn test_global_config_validation_empty_lists_error() {
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
         sprints: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     };
 
     let result = validator.validate_global_config(&config);
@@ -297,6 +303,8 @@ fn test_global_config_validation_invalid_defaults() {
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
         sprints: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     };
 
     let result = validator.validate_global_config(&config);
@@ -361,6 +369,8 @@ fn test_global_config_duplicate_entries_warning() {
         branch_status_aliases: std::collections::HashMap::new(),
         branch_priority_aliases: std::collections::HashMap::new(),
         sprints: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     };
 
     let result = validator.validate_global_config(&config);

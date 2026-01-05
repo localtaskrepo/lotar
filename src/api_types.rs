@@ -110,6 +110,37 @@ pub struct TaskUpdate {
     pub sprints: Option<Vec<u32>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentUploadRequest {
+    pub id: String,
+    pub filename: String,
+    pub content_base64: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentUploadResponse {
+    pub stored_path: String,
+    pub attached: bool,
+    pub task: TaskDTO,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentRemoveRequest {
+    pub id: String,
+    pub stored_path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AttachmentRemoveResponse {
+    pub task: TaskDTO,
+    pub deleted: bool,
+    pub still_referenced: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskListFilter {

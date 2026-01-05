@@ -65,6 +65,8 @@ fn cfg() -> ResolvedConfig {
         branch_priority_aliases: std::collections::HashMap::new(),
         sprint_defaults: Default::default(),
         sprint_notifications: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     }
 }
 
@@ -84,7 +86,6 @@ fn due_date_next_weekday_and_offsets() {
 
 #[test]
 fn ordering_invariants_for_status_and_priority() {
-    // Priority: Low < Medium < High < Critical
     assert!(Priority::from("Low") < Priority::from("Medium"));
     assert!(Priority::from("Medium") < Priority::from("High"));
     assert!(Priority::from("High") < Priority::from("Critical"));

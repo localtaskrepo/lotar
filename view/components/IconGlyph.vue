@@ -43,6 +43,7 @@ type IconName =
   | 'send'
   | 'edit'
   | 'columns'
+  | 'file'
 
 type IconDef = {
   paths: string[]
@@ -118,6 +119,9 @@ const ICONS: Record<IconName, IconDef> = {
   columns: {
     paths: ['M4 5h5v14H4z', 'M9.5 5h5v14h-5z', 'M15 5h5v14h-5z'],
     linejoin: 'miter',
+  },
+  file: {
+    paths: ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6'],
   },
 }
 

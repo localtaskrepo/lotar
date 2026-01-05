@@ -12,6 +12,8 @@ export interface BranchAliasEntry {
 export interface ConfigFormState {
     serverPort: string
     defaultProject: string
+    attachmentsDir: string
+    attachmentsMaxUploadMb: string
     projectName: string
     defaultReporter: string
     defaultAssignee: string
@@ -122,6 +124,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     const form = reactive<ConfigFormState>({
         serverPort: '',
         defaultProject: '',
+        attachmentsDir: '',
+        attachmentsMaxUploadMb: '',
         projectName: '',
         defaultReporter: '',
         defaultAssignee: '',
@@ -360,6 +364,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         return {
             serverPort: form.serverPort,
             defaultProject: form.defaultProject,
+            attachmentsDir: form.attachmentsDir,
+            attachmentsMaxUploadMb: form.attachmentsMaxUploadMb,
             projectName: form.projectName,
             defaultReporter: form.defaultReporter,
             defaultAssignee: form.defaultAssignee,
@@ -394,6 +400,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     function applySnapshot(snapshot: ConfigFormState) {
         form.serverPort = snapshot.serverPort
         form.defaultProject = snapshot.defaultProject
+        form.attachmentsDir = snapshot.attachmentsDir
+        form.attachmentsMaxUploadMb = snapshot.attachmentsMaxUploadMb
         form.projectName = snapshot.projectName
         form.defaultReporter = snapshot.defaultReporter
         form.defaultAssignee = snapshot.defaultAssignee
@@ -545,6 +553,39 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 } else {
                     errors.server_port = null
                 }
+                break
+            }
+            case 'attachments_dir': {
+                const value = form.attachmentsDir.trim()
+                if (!value) {
+                    errors.attachments_dir = isGlobal.value ? 'Attachments folder is required.' : null
+                    return
+                }
+                if (value.length > 512) {
+                    errors.attachments_dir = 'Keep the attachments folder under 512 characters.'
+                    return
+                }
+                errors.attachments_dir = null
+                break
+            }
+            case 'attachments_max_upload_mb': {
+                const raw = form.attachmentsMaxUploadMb.trim()
+                if (!raw) {
+                    errors.attachments_max_upload_mb = isGlobal.value
+                        ? 'Max upload size is required.'
+                        : null
+                    return
+                }
+                const value = Number(raw)
+                if (!Number.isInteger(value)) {
+                    errors.attachments_max_upload_mb = 'Enter an integer (MiB).'
+                    return
+                }
+                if (value < -1) {
+                    errors.attachments_max_upload_mb = 'Use -1 (unlimited), 0 (disabled), or a positive integer.'
+                    return
+                }
+                errors.attachments_max_upload_mb = null
                 break
             }
             case 'default_project': {
@@ -745,6 +786,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
 
     function validateAll(): boolean {
         const fields: string[] = [
+            'attachments_dir',
+            'attachments_max_upload_mb',
             'default_reporter',
             'default_assignee',
             'default_tags',
@@ -775,6 +818,8 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.serverPort = effective.server_port?.toString() ?? ''
         const effectiveDefaultProject = effective.default_project ?? ''
         form.defaultProject = effectiveDefaultProject
+        form.attachmentsDir = effective.attachments_dir ?? ''
+        form.attachmentsMaxUploadMb = effective.attachments_max_upload_mb?.toString() ?? ''
         form.defaultReporter = effective.default_reporter ?? ''
         form.defaultAssignee = effective.default_assignee ?? ''
         form.defaultTags = [...effective.default_tags]
@@ -803,6 +848,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         if (!isGlobal.value) {
             const raw = ((data.project_raw as any) || {}) as Record<string, any>
             form.projectName = raw.project_name || currentProject.value?.name || ''
+            if (raw.attachments_dir !== undefined) {
+                form.attachmentsDir = typeof raw.attachments_dir === 'string' ? raw.attachments_dir : ''
+            }
+            if (raw.attachments_max_upload_mb !== undefined) {
+                form.attachmentsMaxUploadMb = raw.attachments_max_upload_mb === null ? '' : String(raw.attachments_max_upload_mb)
+            }
             form.autoSetReporter = toTriToggle(raw.auto_set_reporter)
             form.autoAssignOnStatus = toTriToggle(raw.auto_assign_on_status)
             form.scanEnableTicketWords = toTriToggle(raw.scan_enable_ticket_words)
@@ -896,8 +947,12 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         if (isGlobal.value) {
             addValue('serverPort', 'server_port', { trim: true, allowEmpty: false })
             addValue('defaultProject', 'default_project', { trim: true, allowEmpty: true })
+            addValue('attachmentsDir', 'attachments_dir', { trim: true, allowEmpty: false })
+            addValue('attachmentsMaxUploadMb', 'attachments_max_upload_mb', { trim: true, allowEmpty: false })
         } else {
             addValue('projectName', 'project_name', { trim: true, allowEmpty: false })
+            addValue('attachmentsDir', 'attachments_dir', { trim: true, allowEmpty: true })
+            addValue('attachmentsMaxUploadMb', 'attachments_max_upload_mb', { trim: true, allowEmpty: true })
         }
 
         addValue('defaultReporter', 'default_reporter', { trim: true })

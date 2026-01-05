@@ -57,6 +57,8 @@ fn make_resolver() -> ProjectResolver {
         branch_priority_aliases: std::collections::HashMap::new(),
         sprint_defaults: Default::default(),
         sprint_notifications: Default::default(),
+        attachments_dir: "@attachments".to_string(),
+        attachments_max_upload_mb: 10,
     };
     resolver_from_config(cfg, std::path::PathBuf::from("/tmp"))
 }

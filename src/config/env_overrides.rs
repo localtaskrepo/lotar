@@ -140,6 +140,16 @@ pub const ENV_OVERRIDE_DEFINITIONS: &[EnvOverrideDefinition] = &[
         &["LOTAR_AUTO_IDENTITY_GIT"],
     ),
     def(
+        "attachments_dir",
+        "attachments_dir",
+        &["LOTAR_ATTACHMENTS_DIR"],
+    ),
+    def(
+        "attachments_max_upload_mb",
+        "attachments_max_upload_mb",
+        &["LOTAR_ATTACHMENTS_MAX_UPLOAD_MB"],
+    ),
+    def(
         "branch_type_aliases",
         "branch_type_aliases",
         &["LOTAR_BRANCH_TYPE_ALIASES"],

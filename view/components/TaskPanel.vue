@@ -7,6 +7,11 @@
           role="dialog"
           aria-modal="true"
           :aria-label="mode === 'create' ? 'Create task' : `Task ${form.id || ''}`"
+          :class="{ 'task-panel--drag-active': attachmentsDragActive }"
+          @dragenter.capture="onAttachmentsDragEnter"
+          @dragover.capture="onAttachmentsDragOver"
+          @dragleave.capture="onAttachmentsDragLeave"
+          @drop.capture="onAttachmentsDrop"
         >
           <header class="task-panel__header">
             <div class="task-panel__title">
@@ -14,7 +19,6 @@
               <h2>{{ mode === 'create' ? 'Create task' : form.title || 'Task details' }}</h2>
             </div>
             <div class="task-panel__header-actions">
-              <span v-if="mode === 'edit'" class="badge" :class="statusBadgeClass">{{ form.status }}</span>
               <UiButton
                 variant="ghost"
                 icon-only
@@ -94,6 +98,51 @@
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <div v-if="attachments.length || attachmentsUploading" class="task-panel__attachments">
+                  <div class="task-panel__attachments-header">
+                    <span>Attachments</span>
+                    <span v-if="attachmentsUploading" class="muted">Uploading…</span>
+                  </div>
+
+                  <ul class="task-panel__attachments-list">
+                    <li v-for="entry in attachments" :key="entry.file || ''" class="task-panel__attachment">
+                      <div class="task-panel__attachment-chip">
+                        <a
+                          class="task-panel__attachment-link"
+                          :href="attachmentUrl(entry.file || '')"
+                          target="_blank"
+                          rel="noopener"
+                          :title="attachmentHoverTitle(entry.file || '')"
+                        >
+                          <span class="task-panel__attachment-icon" aria-hidden="true">
+                            <img
+                              v-if="isImageAttachment(entry.file || '')"
+                              class="task-panel__attachment-thumb"
+                              :src="attachmentUrl(entry.file || '')"
+                              alt=""
+                              loading="lazy"
+                            />
+                            <IconGlyph v-else name="file" />
+                          </span>
+                          <span class="task-panel__attachment-name">{{ attachmentDisplayName(entry.file || '') }}</span>
+                        </a>
+                        <UiButton
+                          variant="ghost"
+                          icon-only
+                          type="button"
+                          class="task-panel__attachment-remove"
+                          aria-label="Remove attachment"
+                          title="Remove attachment"
+                          :disabled="attachmentsUploading || removingAttachmentPath === (entry.file || '')"
+                          @click.prevent.stop="removeAttachment(entry.file || '')"
+                        >
+                          <IconGlyph name="close" />
+                        </UiButton>
+                      </div>
+                    </li>
+                  </ul>
                 </div>
                 <TaskPanelTagEditor
                   :tags="form.tags"
@@ -176,6 +225,7 @@
                 :custom-field-keys="customFieldKeys"
                 :new-field-key="newField.key"
                 :new-field-value="newField.value"
+                :allow-new-fields="allowNewCustomFields"
                 @updateCustomFieldKey="updateCustomFieldKey"
                 @updateCustomFieldValue="updateCustomFieldValue"
                 @updateNewFieldKey="updateNewFieldKey"
@@ -260,6 +310,7 @@
                   v-else
                   :mode="mode"
                   :task="task"
+                  :attachments-dir="attachmentsDir"
                   :hovered-reference-code="hoveredReferenceCode"
                   :hovered-reference-style="hoveredReferenceStyle"
                   :hovered-reference-loading="hoveredReferenceLoading"
@@ -293,6 +344,13 @@
           <section v-else class="task-panel__loading">
             <UiLoader size="md">Loading task…</UiLoader>
           </section>
+
+          <div v-if="attachmentsDragActive" class="task-panel__drop-overlay" aria-hidden="true">
+            <div class="task-panel__drop-overlay-card">
+              <strong>{{ attachmentsDropLabel }}</strong>
+              <span v-if="attachmentsUploading" class="muted">Uploading…</span>
+            </div>
+          </div>
         </aside>
       </div>
     </Transition>
@@ -413,12 +471,12 @@ const {
   customFields,
   customFieldKeys,
   newField,
+  allowNewCustomFields,
   activityTabs,
   activityTab,
   changeLog,
   commitHistory,
   commitsLoading,
-  statusBadgeClass,
   sprintsLoading,
   assignedSprints,
   hasAssignedSprints,
@@ -484,6 +542,7 @@ const {
   resetAssigneeSelection,
   whoami,
   refreshSprints,
+  attachmentsDir,
 } = useTaskPanelState(props, emit)
 
 const sprintDialogOpen = ref(false)
@@ -499,6 +558,278 @@ const descriptionPreview = ref(false)
 const descriptionEditorRoot = ref<HTMLElement | null>(null)
 const descriptionTextarea = ref<HTMLTextAreaElement | null>(null)
 const descriptionFocusoutTick = ref(0)
+
+const attachmentsDragActive = ref(false)
+const attachmentsDragDepth = ref(0)
+const attachmentsUploading = ref(false)
+const removingAttachmentPath = ref<string | null>(null)
+
+const attachmentsDropLabel = computed(() => {
+  if (attachmentsUploading.value) return 'Uploading attachments'
+  if (mode.value !== 'edit' || !task.id) return 'Save the task to attach files'
+  return 'Drop files to attach'
+})
+
+const attachments = computed(() => {
+  const list = Array.isArray(task.references) ? task.references : []
+  return list.filter((entry) => typeof entry?.file === 'string' && (entry.file || '').trim().length > 0)
+})
+
+function applyReferencesFromTaskResponse(updated: Partial<TaskDTO> | null | undefined) {
+  task.references = Array.isArray(updated?.references)
+    ? updated!.references!.map((reference) => ({ ...reference }))
+    : []
+}
+
+function attachmentUrl(relPath: string): string {
+  const stored = (typeof relPath === 'string' ? relPath : '').trim()
+  if (!stored) return '/api/attachments/get?path='
+
+  const taskId = (task.id || '').trim()
+  const dashPos = taskId.indexOf('-')
+  const project = dashPos > 0 ? taskId.slice(0, dashPos) : ''
+
+  const hash = extractAttachmentHash(stored)
+  const display = attachmentDisplayName(stored)
+  if (hash) {
+    const qs = project ? `?${new URLSearchParams({ project }).toString()}` : ''
+    return `/api/attachments/h/${encodeURIComponent(hash)}/${encodeURIComponent(display)}${qs}`
+  }
+
+  const params = new URLSearchParams({ path: stored })
+  if (project) params.set('project', project)
+  return `/api/attachments/get?${params.toString()}`
+}
+
+function extractAttachmentHash(relPath: string): string | null {
+  const cleaned = (relPath || '').trim()
+  if (!cleaned) return null
+  const parts = cleaned.split('/')
+  const leaf = parts[parts.length - 1] || cleaned
+
+  const lastDot = leaf.lastIndexOf('.')
+  const base = lastDot > 0 ? leaf.slice(0, lastDot) : leaf
+  const ext = lastDot > 0 ? leaf.slice(lastDot + 1) : ''
+
+  if (ext.length === 32 && /^[0-9a-f]{32}$/i.test(ext)) {
+    return ext
+  }
+
+  const m = base.match(/^(.*)[.-]([0-9a-f]{32})$/i)
+  return m ? m[2] : null
+}
+
+function attachmentDisplayName(relPath: string): string {
+  const cleaned = (relPath || '').trim()
+  if (!cleaned) return 'attachment'
+  const parts = cleaned.split('/')
+  const leaf = parts[parts.length - 1] || cleaned
+
+  const dot = leaf.lastIndexOf('.')
+  const stem = dot > 0 ? leaf.slice(0, dot) : leaf
+  const ext = dot > 0 ? leaf.slice(dot) : ''
+
+  const hashMatch = stem.match(/^(.*)[.-]([0-9a-f]{32})$/i)
+  if (hashMatch) {
+    const displayStem = (hashMatch[1] || '').trim()
+    return `${displayStem || 'attachment'}${ext}`
+  }
+
+  return leaf
+}
+
+function attachmentPathSet(value: { references?: Array<{ file?: string | null }> | null }): Set<string> {
+  const refs = Array.isArray(value?.references) ? value.references : []
+  return new Set(
+    refs
+      .map((entry) => (typeof entry?.file === 'string' ? entry.file.trim() : ''))
+      .filter((file) => file.length > 0),
+  )
+}
+
+async function removeAttachment(relPath: string) {
+  const path = (relPath || '').trim()
+  if (!path) return
+  if (attachmentsUploading.value) return
+  if (removingAttachmentPath.value) return
+
+  if (mode.value !== 'edit' || !task.id) {
+    showToast('Save the task before removing attachments')
+    return
+  }
+
+  removingAttachmentPath.value = path
+  try {
+    const response = await api.removeTaskAttachment({ id: task.id, stored_path: path })
+    Object.assign(task, response.task)
+    applyReferencesFromTaskResponse(response.task)
+    emit('updated', response.task)
+    if (response.deleted) {
+      showToast('Attachment removed')
+    } else if (response.still_referenced) {
+      showToast('Attachment removed (file kept: used by other tasks)')
+    } else {
+      showToast('Attachment removed (file may already be gone)')
+    }
+  } catch (error: any) {
+    console.warn('Failed to remove attachment', { path, error })
+    showToast('Failed to remove attachment')
+  } finally {
+    removingAttachmentPath.value = null
+  }
+}
+
+function attachmentHoverTitle(relPath: string): string {
+  const cleaned = (relPath || '').trim()
+  if (!cleaned) return ''
+
+  const configured = (attachmentsDir.value || '').trim()
+  if (configured.startsWith('/')) {
+    return `${configured.replace(/\/+$/, '')}/${cleaned.replace(/^\/+/, '')}`
+  }
+
+  const dir = (configured || '@attachments').replace(/^\/+/, '').replace(/\/+$/, '')
+  const leaf = cleaned.replace(/^\/+/, '')
+  return `.tasks/${dir}/${leaf}`
+}
+
+function isImageAttachment(relPath: string): boolean {
+  const name = attachmentDisplayName(relPath).toLowerCase()
+  return (
+    name.endsWith('.png') ||
+    name.endsWith('.jpg') ||
+    name.endsWith('.jpeg') ||
+    name.endsWith('.gif') ||
+    name.endsWith('.webp') ||
+    name.endsWith('.svg')
+  )
+}
+
+function resetAttachmentsDragState() {
+  attachmentsDragDepth.value = 0
+  attachmentsDragActive.value = false
+}
+
+function isFileDrag(event: DragEvent): boolean {
+  const dt = event.dataTransfer
+  if (!dt) return false
+
+  const items = Array.from(dt.items ?? [])
+  if (items.some((item) => item.kind === 'file')) return true
+
+  const types = Array.from(dt.types ?? [])
+  return (
+    types.includes('Files') ||
+    types.includes('public.file-url') ||
+    types.includes('application/x-moz-file')
+  )
+}
+
+function onAttachmentsDragEnter(event: DragEvent) {
+  if (attachmentsUploading.value) return
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+  attachmentsDragDepth.value += 1
+  attachmentsDragActive.value = true
+}
+
+function onAttachmentsDragOver(event: DragEvent) {
+  if (attachmentsUploading.value) return
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+}
+
+function onAttachmentsDragLeave(event: DragEvent) {
+  if (attachmentsUploading.value) return
+  if (!attachmentsDragActive.value) return
+  event.preventDefault()
+  attachmentsDragDepth.value = Math.max(0, attachmentsDragDepth.value - 1)
+  if (attachmentsDragDepth.value === 0) {
+    attachmentsDragActive.value = false
+  }
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      const marker = 'base64,'
+      const idx = result.indexOf(marker)
+      if (idx >= 0) {
+        resolve(result.slice(idx + marker.length))
+        return
+      }
+      reject(new Error('Failed to encode file'))
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+async function onAttachmentsDrop(event: DragEvent) {
+  if (attachmentsUploading.value) return
+  if (!isFileDrag(event)) return
+  event.preventDefault()
+  resetAttachmentsDragState()
+
+  if (mode.value !== 'edit' || !task.id) {
+    showToast('Save the task before attaching files')
+    return
+  }
+
+  const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
+  if (!files.length) return
+
+  attachmentsUploading.value = true
+  try {
+    let added = 0
+    let skipped = 0
+    let failed = 0
+
+    for (const file of files) {
+      try {
+        const base64 = await fileToBase64(file)
+        const response = await api.uploadTaskAttachment({
+          id: task.id,
+          filename: file.name,
+          content_base64: base64,
+        })
+
+        if (response.attached) {
+          added += 1
+        } else {
+          skipped += 1
+        }
+
+        Object.assign(task, response.task)
+        applyReferencesFromTaskResponse(response.task)
+        emit('updated', response.task)
+      } catch (error: any) {
+        failed += 1
+        console.warn('Failed to upload attachment', { file: file.name, error })
+      }
+    }
+
+    if (files.length === 1 && added === 0 && skipped === 1 && failed === 0) {
+      showToast('Attachment already attached')
+      return
+    }
+
+    if (added > 0 && skipped === 0 && failed === 0) {
+      showToast(added === 1 ? 'Attachment added' : 'Attachments added')
+    } else {
+      const parts = []
+      if (added > 0) parts.push(`${added} added`)
+      if (skipped > 0) parts.push(`${skipped} already attached`)
+      if (failed > 0) parts.push(`${failed} failed`)
+      showToast(parts.length ? `Attachments: ${parts.join(', ')}` : 'No attachments uploaded')
+    }
+  } finally {
+    attachmentsUploading.value = false
+    resetAttachmentsDragState()
+  }
+}
 
 function autosizeDescriptionTextarea() {
   const el = descriptionTextarea.value
@@ -766,6 +1097,7 @@ async function removeSprintChip(sprintId: number) {
   background: var(--color-bg, var(--bg));
   display: flex;
   flex-direction: column;
+  position: relative;
   box-shadow: var(--shadow-lg, 0 10px 30px rgba(15, 23, 42, 0.3));
   border-left: 1px solid var(--color-border, var(--border));
 }
@@ -953,7 +1285,15 @@ async function removeSprintChip(sprintId: number) {
 .task-panel__group summary {
   font-weight: 600;
   font-size: var(--text-sm, 0.875rem);
+  margin-bottom: 0;
+}
+
+details.task-panel__group[open] > summary {
   margin-bottom: var(--space-2, 0.5rem);
+}
+
+details.task-panel__group:not([open]) {
+  padding-bottom: 0;
 }
 
 .task-panel__row {
@@ -1069,7 +1409,8 @@ async function removeSprintChip(sprintId: number) {
 }
 
 .task-panel__activity {
-  gap: var(--space-4, 1rem);
+  position: relative;
+  gap: var(--space-3, 0.75rem);
 }
 
 .task-panel-dialog__overlay {
@@ -1130,7 +1471,8 @@ async function removeSprintChip(sprintId: number) {
   gap: var(--space-2, 0.5rem);
   border-bottom: 1px solid var(--color-border, var(--border));
   padding-bottom: var(--space-2, 0.5rem);
-  margin-bottom: var(--space-3, 0.75rem);
+  padding-right: 2.75rem;
+  margin-bottom: 0;
   flex-wrap: wrap;
 }
 
@@ -1159,6 +1501,13 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   flex-direction: column;
   gap: var(--space-3, 0.75rem);
+}
+
+.task-panel__tab-action {
+  position: absolute;
+  top: var(--space-2, 0.5rem);
+  right: var(--space-2, 0.5rem);
+  z-index: 2;
 }
 
 .task-panel__ownership-column {
@@ -1265,6 +1614,127 @@ textarea {
   box-shadow: var(--focus-ring);
 }
 
+.task-panel--drag-active {
+  box-shadow: var(--focus-ring);
+}
+
+.task-panel__drop-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4, 1rem);
+  z-index: 10;
+  background: color-mix(in oklab, var(--color-bg, var(--bg)) 35%, transparent);
+  backdrop-filter: blur(1px);
+}
+
+.task-panel__drop-overlay-card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+  padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
+  border-radius: var(--radius-lg, 0.5rem);
+  border: 1px dashed var(--color-border, var(--border));
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 88%, transparent);
+  text-align: center;
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(15, 23, 42, 0.3));
+}
+
+.task-panel__attachments {
+  margin-top: var(--space-2, 0.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__attachments-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-muted, var(--muted));
+}
+
+.task-panel__attachments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__attachment {
+  max-width: 100%;
+}
+
+.task-panel__attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+  padding: 2px var(--space-2, 0.5rem);
+  border-radius: var(--radius-md, 0.375rem);
+  border: 1px solid var(--color-border, var(--border));
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 96%, transparent);
+  min-width: 0;
+}
+
+.task-panel__attachment-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  text-decoration: none;
+  min-width: 0;
+  flex: 1;
+}
+
+.task-panel__attachment-link:hover {
+  text-decoration: underline;
+}
+
+.task-panel__attachment-remove {
+  flex: 0 0 auto;
+}
+
+.task-panel__attachment-remove.btn.icon-only {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.task-panel__attachment-remove.btn.icon-only .icon-glyph {
+  font-size: 1rem;
+}
+
+.task-panel__attachment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+}
+
+.task-panel__attachment-thumb {
+  width: 1em;
+  height: 1em;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.task-panel__attachment-name {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .task-panel :deep(.input),
 .task-panel :deep(select) {
   max-width: 100%;
@@ -1352,7 +1822,7 @@ textarea {
 
 .task-panel__group-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
 }
 
@@ -1360,12 +1830,12 @@ textarea {
   max-height: clamp(240px, 55vh, 520px);
   overflow-y: auto;
   width: 100%;
-  padding-right: calc(var(--space-3, 0.75rem) + 12px);
+  padding: 0;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: var(--space-3, 0.75rem);
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
 }
 
 .task-panel__history h4,
@@ -1475,10 +1945,11 @@ textarea {
 
 .task-panel__reference-item {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1, 0.25rem);
+  align-items: flex-start;
+  gap: var(--space-2, 0.5rem);
   position: relative;
   overflow: visible;
+  min-width: 0;
 }
 
 .task-panel__reference-item--interactive {
@@ -1490,12 +1961,21 @@ textarea {
   outline-offset: 2px;
 }
 
-.task-panel__reference-code {
-  font-family: var(--font-mono, 'SFMono-Regular', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
-  font-size: var(--text-xs, 0.75rem);
-  padding: 0.1rem 0.4rem;
-  border-radius: var(--radius-sm, 0.25rem);
-  background: color-mix(in oklab, var(--color-border, rgba(148, 163, 184, 0.4)) 24%, transparent);
+.task-panel__reference-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1em;
+  height: 1em;
+  margin-top: 0.1rem;
+  color: var(--color-muted, var(--muted));
+}
+
+.task-panel__reference-text {
+  font-size: var(--text-sm, 0.875rem);
+  word-break: break-word;
+  min-width: 0;
 }
 
 .task-panel__reference-link {
@@ -1503,6 +1983,7 @@ textarea {
   color: var(--color-primary, #2563eb);
   text-decoration: none;
   word-break: break-word;
+  min-width: 0;
 }
 
 .task-panel__reference-link:hover {

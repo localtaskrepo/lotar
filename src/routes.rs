@@ -9,8 +9,9 @@ use crate::services::sprint_velocity::{
     DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
 };
 use crate::services::{
-    config_service::ConfigService, project_service::ProjectService,
-    reference_service::ReferenceService, sprint_service::SprintService, task_service::TaskService,
+    attachment_service::AttachmentService, config_service::ConfigService,
+    project_service::ProjectService, reference_service::ReferenceService,
+    sprint_service::SprintService, task_service::TaskService,
 };
 use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
 use crate::workspace::TasksDirectoryResolver;
@@ -1561,6 +1562,373 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(msg) => bad_request(msg),
         }
     });
+
+    // GET /api/attachments/get?path=<relative>
+    api_server.register_handler("GET", "/api/attachments/get", |req: &HttpRequest| {
+        let rel = match req.query.get("path") {
+            Some(v) if !v.trim().is_empty() => v.trim().to_string(),
+            _ => return bad_request("Missing attachment path".into()),
+        };
+        let download = req
+            .query
+            .get("download")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+            Ok(c) => c,
+            Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+        };
+        let config = if let Some(project) = req.query.get("project").map(|s| s.as_str()) {
+            resolution::get_project_config(&base_config, project, resolver.path.as_path())
+                .unwrap_or(base_config)
+        } else {
+            base_config
+        };
+        let root =
+            match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
+                Ok(p) => p,
+                Err(e) => return bad_request(e.to_string()),
+            };
+
+        let resolved = match AttachmentService::resolve_attachment_path(&root, &rel) {
+            Ok(p) => p,
+            Err(msg) if msg.contains("not found") => return not_found(msg),
+            Err(msg) => return bad_request(msg),
+        };
+
+        let bytes = match std::fs::read(&resolved) {
+            Ok(b) => b,
+            Err(_) => return not_found("Attachment not found".into()),
+        };
+
+        let content_type = match resolved
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "png" => "image/png",
+            "jpg" | "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            "pdf" => "application/pdf",
+            "txt" | "log" | "md" => "text/plain; charset=utf-8",
+            _ => "application/octet-stream",
+        };
+
+        let stored_filename = resolved
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("attachment");
+        let filename = AttachmentService::download_filename(stored_filename);
+        let disposition = if download {
+            format!("attachment; filename=\"{}\"", filename)
+        } else {
+            format!("inline; filename=\"{}\"", filename)
+        };
+
+        HttpResponse {
+            status: 200,
+            headers: vec![
+                ("Content-Type".to_string(), content_type.to_string()),
+                ("Content-Disposition".to_string(), disposition),
+            ],
+            body: bytes,
+        }
+    });
+
+    // GET /api/attachments/h/<hash>/<filename>
+    // This is primarily for browser "Save Link As" and copy-link ergonomics.
+    api_server.register_prefix_handler("GET", "/api/attachments/h", |req: &HttpRequest| {
+        let download = req
+            .query
+            .get("download")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        let raw_path = req.path.trim_end_matches('/');
+        let prefix = "/api/attachments/h";
+        let rest = raw_path
+            .get(prefix.len()..)
+            .unwrap_or("")
+            .trim_start_matches('/');
+
+        let (hash_tag, requested_name) = match rest.split_once('/') {
+            Some((h, name)) if !h.trim().is_empty() && !name.trim().is_empty() => (h.trim(), name),
+            _ => return bad_request("Missing attachment hash".into()),
+        };
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+            Ok(c) => c,
+            Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+        };
+        let config = if let Some(project) = req.query.get("project").map(|s| s.as_str()) {
+            resolution::get_project_config(&base_config, project, resolver.path.as_path())
+                .unwrap_or(base_config)
+        } else {
+            base_config
+        };
+        let root =
+            match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
+                Ok(p) => p,
+                Err(e) => return bad_request(e.to_string()),
+            };
+
+        let resolved = match AttachmentService::find_attachment_by_hash(&root, hash_tag) {
+            Some(p) => p,
+            None => return not_found("Attachment not found".into()),
+        };
+
+        let bytes = match std::fs::read(&resolved) {
+            Ok(b) => b,
+            Err(_) => return not_found("Attachment not found".into()),
+        };
+
+        let content_type = match resolved
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "png" => "image/png",
+            "jpg" | "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            "pdf" => "application/pdf",
+            "txt" | "log" | "md" => "text/plain; charset=utf-8",
+            _ => "application/octet-stream",
+        };
+
+        // For Save Link As, browsers often use the URL path segment.
+        // Still send Content-Disposition to help other download flows.
+        let requested_leaf = requested_name.split('/').next_back().unwrap_or("").trim();
+        let stored_filename = resolved
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("attachment");
+        let computed = AttachmentService::download_filename(stored_filename);
+        let filename = if requested_leaf.contains('.') {
+            requested_leaf.to_string()
+        } else {
+            computed
+        };
+
+        let disposition = if download {
+            format!("attachment; filename=\"{}\"", filename)
+        } else {
+            format!("inline; filename=\"{}\"", filename)
+        };
+
+        HttpResponse {
+            status: 200,
+            headers: vec![
+                ("Content-Type".to_string(), content_type.to_string()),
+                ("Content-Disposition".to_string(), disposition),
+            ],
+            body: bytes,
+        }
+    });
+
+    // POST /api/tasks/attachments/upload
+    api_server.register_handler("POST", "/api/tasks/attachments/upload", |req: &HttpRequest| {
+        use base64::Engine;
+
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let payload: crate::api_types::AttachmentUploadRequest = match serde_json::from_value(body)
+        {
+            Ok(v) => v,
+            Err(e) => return bad_request(format!("Invalid body: {}", e)),
+        };
+
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
+        }
+        if payload.filename.trim().is_empty() {
+            return bad_request("Missing filename".into());
+        }
+        if payload.content_base64.trim().is_empty() {
+            return bad_request("Missing attachment content".into());
+        }
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+            Ok(c) => c,
+            Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+        };
+
+        // Apply per-project overrides (if task id contains a project prefix)
+        let config = if let Some(dash_pos) = payload.id.find('-') {
+            let prefix = payload.id[..dash_pos].trim();
+            if prefix.is_empty() {
+                base_config
+            } else {
+                resolution::get_project_config(&base_config, prefix, resolver.path.as_path())
+                    .unwrap_or(base_config)
+            }
+        } else {
+            base_config
+        };
+
+        // Enforce configured upload limit before decoding base64.
+        match config.attachments_max_upload_mb {
+            0 => {
+                return bad_request(
+                    "Attachment uploads are disabled by configuration".to_string(),
+                )
+            }
+            -1 => {}
+            n if n > 0 => {
+                // keep going; enforce after decoding
+            }
+            _ => {}
+        }
+
+        let bytes = match base64::engine::general_purpose::STANDARD
+            .decode(payload.content_base64.trim())
+        {
+            Ok(b) => b,
+            Err(_) => return bad_request("Invalid base64 content".into()),
+        };
+
+        if config.attachments_max_upload_mb > 0 {
+            let max_bytes = match i128::from(config.attachments_max_upload_mb)
+                .checked_mul(1024)
+                .and_then(|v| v.checked_mul(1024))
+            {
+                Some(v) if v > 0 => v,
+                _ => 0,
+            };
+
+            if max_bytes > 0 && (bytes.len() as i128) > max_bytes {
+                return bad_request(format!(
+                    "Attachment too large: {} bytes (max {} MiB)",
+                    bytes.len(),
+                    config.attachments_max_upload_mb
+                ));
+            }
+        }
+
+        let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config)
+        {
+            Ok(p) => p,
+            Err(e) => return bad_request(e.to_string()),
+        };
+
+        let stored = match AttachmentService::store_bytes(&root, &payload.filename, &bytes) {
+            Ok(name) => name,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e.to_string()}})),
+        };
+
+        let mut storage = crate::storage::manager::Storage::new(resolver.path);
+        match AttachmentService::attach_file_reference(&mut storage, &payload.id, &stored) {
+            Ok((task, attached)) => ok_json(
+                200,
+                json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached, task }}),
+            ),
+            Err(e) => match e {
+                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                _ => bad_request(e.to_string()),
+            },
+        }
+    });
+
+    // POST /api/tasks/attachments/remove
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/attachments/remove",
+        |req: &HttpRequest| {
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let payload: crate::api_types::AttachmentRemoveRequest =
+                match serde_json::from_value(body) {
+                    Ok(v) => v,
+                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
+                };
+
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            if payload.stored_path.trim().is_empty() {
+                return bad_request("Missing attachment path".into());
+            }
+
+            let resolver = match TasksDirectoryResolver::resolve(None, None) {
+                Ok(r) => r,
+                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            };
+
+            let base_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+                Ok(c) => c,
+                Err(e) => return bad_request(format!("Failed to load config: {}", e)),
+            };
+
+            let config = if let Some(dash_pos) = payload.id.find('-') {
+                let prefix = payload.id[..dash_pos].trim();
+                if prefix.is_empty() {
+                    base_config
+                } else {
+                    resolution::get_project_config(&base_config, prefix, resolver.path.as_path())
+                        .unwrap_or(base_config)
+                }
+            } else {
+                base_config
+            };
+            let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
+                Ok(p) => p,
+                Err(e) => return bad_request(e.to_string()),
+            };
+
+            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            match AttachmentService::detach_file_reference(
+                &mut storage,
+                &payload.id,
+                &payload.stored_path,
+            ) {
+                Ok(task) => {
+                    let hash_tag = AttachmentService::extract_hash_tag(&payload.stored_path);
+                    let still_referenced = match hash_tag.as_deref() {
+                        Some(hash) => AttachmentService::is_hash_referenced(&storage, hash),
+                        None => false,
+                    };
+
+                    let mut deleted = false;
+                    if !still_referenced {
+                        if let Some(hash) = hash_tag.as_deref() {
+                            deleted = AttachmentService::delete_all_by_hash(&root, hash) > 0;
+                        } else if let Ok(path) =
+                            AttachmentService::resolve_attachment_path(&root, &payload.stored_path)
+                        {
+                            deleted = std::fs::remove_file(path).is_ok();
+                        }
+                    }
+                    ok_json(
+                        200,
+                        json!({"data": crate::api_types::AttachmentRemoveResponse { task, deleted, still_referenced }}),
+                    )
+                }
+                Err(e) => match e {
+                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                    _ => bad_request(e.to_string()),
+                },
+            }
+        },
+    );
 
     // GET /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N]
     api_server.register_handler("GET", "/api/tasks/suggest", |req: &HttpRequest| {

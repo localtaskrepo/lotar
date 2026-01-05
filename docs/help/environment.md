@@ -50,6 +50,13 @@ All rows below are defined inside the same override table and map directly to th
 | `tags` | `LOTAR_ISSUE_TAGS` | JSON/YAML list | Provides the canonical tag whitelist. |
 | `custom_fields` | `LOTAR_CUSTOM_FIELDS` | JSON/YAML list or comma string | Declares additional per-task fields. |
 
+### Attachments
+
+| Config key | Env var(s) | Accepted values | Purpose |
+| --- | --- | --- | --- |
+| `attachments_dir` | `LOTAR_ATTACHMENTS_DIR` | Path string | Root directory for storing attachments. Relative paths resolve under the tasks directory; `..` is rejected. |
+| `attachments_max_upload_mb` | `LOTAR_ATTACHMENTS_MAX_UPLOAD_MB` | Integer MiB (`-1`, `0`, or positive) | Maximum upload size for attachments. `0` disables uploads; `-1` allows unlimited uploads; positive values are MiB. |
+
 ### Automation & branching behavior
 
 | Config key | Env var(s) | Accepted values | Purpose |

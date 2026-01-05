@@ -104,6 +104,34 @@
             </ConfigGroup>
           </div>
 
+          <div class="config-grid__item">
+            <ConfigGroup title="Attachments" :description="isGlobal ? 'Where uploaded files are stored. Relative paths resolve under .tasks.' : 'Override attachment settings for this project (leave blank to inherit global).'">
+              <div class="field-grid">
+                <div class="field">
+                  <label class="field-label">
+                    <span>Attachments folder</span>
+                    <span v-if="sourceFor('attachments_dir')" :class="['provenance', provenanceClass(sourceFor('attachments_dir'))]">{{ provenanceLabel(sourceFor('attachments_dir')) }}</span>
+                  </label>
+                  <UiInput v-model="form.attachmentsDir" maxlength="512" @blur="validateField('attachments_dir')" :placeholder="isGlobal ? '@attachments' : '(inherit global)'" />
+                  <p class="field-hint" v-if="isGlobal">Defaults to .tasks/@attachments (absolute paths are allowed).</p>
+                  <p class="field-hint" v-else>Leave empty to inherit the global attachments folder.</p>
+                  <p v-if="errors.attachments_dir" class="field-error">{{ errors.attachments_dir }}</p>
+                </div>
+
+                <div class="field">
+                  <label class="field-label">
+                    <span>Max upload (MiB)</span>
+                    <span v-if="sourceFor('attachments_max_upload_mb')" :class="['provenance', provenanceClass(sourceFor('attachments_max_upload_mb'))]">{{ provenanceLabel(sourceFor('attachments_max_upload_mb')) }}</span>
+                  </label>
+                  <UiInput v-model="form.attachmentsMaxUploadMb" maxlength="32" @blur="validateField('attachments_max_upload_mb')" :placeholder="isGlobal ? '10' : '(inherit global)'" />
+                  <p class="field-hint" v-if="isGlobal">0 disables uploads. -1 allows unlimited uploads. Positive values are MiB.</p>
+                  <p class="field-hint" v-else>Leave empty to inherit the global limit. 0 disables uploads; -1 is unlimited; positive values are MiB.</p>
+                  <p v-if="errors.attachments_max_upload_mb" class="field-error">{{ errors.attachments_max_upload_mb }}</p>
+                </div>
+              </div>
+            </ConfigGroup>
+          </div>
+
           <div v-if="!isGlobal" class="config-grid__item">
             <ConfigGroup title="Project overview" :description="projectOverviewDescription">
               <div class="field-grid">

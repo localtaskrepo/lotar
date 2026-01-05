@@ -46,6 +46,8 @@ function baseResolvedConfig(): ResolvedConfigDTO {
     return {
         server_port: 8080,
         default_project: 'TEST',
+        attachments_dir: '@attachments',
+        attachments_max_upload_mb: 10,
         default_assignee: null,
         default_reporter: null,
         default_tags: [],
@@ -80,6 +82,8 @@ function baseGlobalRaw(): GlobalConfigRaw {
     return {
         server_port: 8080,
         default_project: 'TEST',
+        attachments_dir: '@attachments',
+        attachments_max_upload_mb: 10,
         issue_states: ['Todo', 'InProgress', 'Done'],
         issue_types: ['Feature', 'Bug'],
         issue_priorities: ['Low', 'Medium', 'High'],
