@@ -5,14 +5,12 @@ Features:
 - Allow CLI list/search to filter by age older than N days
 - Allow ticket files to be stored in neseted folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
 - Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
-- Extend custom fields to support more complex queries (AND/OR logic)
+- Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
 - API pagination
 - Sync with Jira/Github (two-way ideally)
 - Add ability to assign (and run) an LLM.
 - Allow reoreding columns in the web UI task list via drag and drop
-- Sort direction buttons in web UI are at the end of a column header, but should be next to the column name
 - Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
-- Custom filter query should support "Not" operator
 - MCP errors config_show/project_list: TypeError: r.content is not iterable
 - History stored exact same content as comments when a new one is added
 - "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.

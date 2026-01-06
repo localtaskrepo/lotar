@@ -450,7 +450,7 @@ th.active {
 .header-button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--space-2, 0.5rem);
   width: 100%;
   background: transparent;
@@ -469,6 +469,7 @@ th.active {
 }
 
 .header-button__label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
