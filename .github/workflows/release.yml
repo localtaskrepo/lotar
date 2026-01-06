@@ -292,7 +292,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Add quick download links
+      - name: Add quick download links and commit list
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -300,6 +300,45 @@ jobs:
             const { owner, repo } = context.repo;
             const tag = process.env.GITHUB_REF_NAME;
             const release = await github.rest.repos.getReleaseByTag({ owner, repo, tag });
+
+            const versionTagRegex = /^v\d+\.\d+\.\d+(?:[-+].+)?$/;
+            const tags = await github.paginate(github.rest.repos.listTags, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            const currentIndex = tags.findIndex((t) => t.name === tag);
+            const previousTag =
+              currentIndex >= 0
+                ? tags.slice(currentIndex + 1).map((t) => t.name).find((name) => versionTagRegex.test(name))
+                : tags.map((t) => t.name).find((name) => versionTagRegex.test(name) && name !== tag);
+
+            let commitsSectionBody = '_No previous tag found to compare against._';
+            if (previousTag) {
+              const comparison = await github.rest.repos.compareCommits({
+                owner,
+                repo,
+                base: previousTag,
+                head: tag,
+              });
+
+              const commits = comparison.data.commits ?? [];
+              const maxCommits = 100;
+              const subjects = commits
+                .slice(0, maxCommits)
+                .map((c) => (c.commit?.message ?? '').split('\n')[0].trim() || '(no message)')
+                .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+
+              const lines = subjects.map((s) => `- ${s}`);
+
+              const remaining = Math.max(0, commits.length - maxCommits);
+              if (remaining > 0) {
+                lines.push(`- …and ${remaining} more`);
+              }
+
+              commitsSectionBody = lines.length ? lines.join('\n') : '_No commits found in this range._';
+            }
 
             const assetBase = `https://github.com/${owner}/${repo}/releases/download/${tag}`;
             const quickLinks = [
@@ -322,17 +361,41 @@ jobs:
               markerEnd,
             ].join('\n');
 
+            const commitsMarkerStart = '<!-- COMMITS:START -->';
+            const commitsMarkerEnd = '<!-- COMMITS:END -->';
+            const commitsSection = [
+              commitsMarkerStart,
+              'Changes:',
+              commitsSectionBody,
+              commitsMarkerEnd,
+            ].join('\n');
+
             const existingBody = release.data.body ?? '';
             const regex = new RegExp(`${markerStart}[\\s\\S]*?${markerEnd}`);
             const nextBody = regex.test(existingBody)
               ? existingBody.replace(regex, quickLinksSection)
               : `${quickLinksSection}\n\n${existingBody}`.trim();
 
+            const commitsRegex = new RegExp(`${commitsMarkerStart}[\\s\\S]*?${commitsMarkerEnd}`);
+            const nextBodyWithCommits = (() => {
+              if (commitsRegex.test(nextBody)) {
+                return nextBody.replace(commitsRegex, commitsSection);
+              }
+
+              const quickLinksEndIndex = nextBody.indexOf(markerEnd);
+              if (quickLinksEndIndex !== -1) {
+                const insertAt = quickLinksEndIndex + markerEnd.length;
+                return `${nextBody.slice(0, insertAt)}\n\n${commitsSection}\n\n${nextBody.slice(insertAt)}`.trim();
+              }
+
+              return `${commitsSection}\n\n${nextBody}`.trim();
+            })();
+
             await github.rest.repos.updateRelease({
               owner,
               repo,
               release_id: release.data.id,
-              body: nextBody,
+              body: nextBodyWithCommits,
             });
 
   publish-docker-image:
