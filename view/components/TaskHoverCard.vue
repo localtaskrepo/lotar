@@ -31,7 +31,7 @@
         </div>
       </dl>
       <div v-if="tags.length" class="task-hover-card__tags">
-        <span v-for="tag in tags" :key="tag" class="chip small">{{ tag }}</span>
+        <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
       </div>
     </div>
   </div>

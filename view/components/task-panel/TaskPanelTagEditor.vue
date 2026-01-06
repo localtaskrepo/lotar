@@ -1,14 +1,34 @@
 <template>
   <div class="task-panel__tags-section">
-    <label class="task-panel__tags-label" for="task-panel-tags-input">Tags</label>
-    <ChipListField
-      :model-value="tags"
-      empty-label="No tags yet"
-      add-label="Add tag"
-      add-behavior="external"
-      @update:modelValue="handleChipUpdate"
-      @add-click="openTagDialog"
-    />
+    <div class="task-panel__tags-header">
+      <label class="task-panel__tags-label" for="task-panel-tags-input">Tags</label>
+      <UiButton
+        class="task-panel__tags-add"
+        variant="ghost"
+        type="button"
+        data-testid="tags-add"
+        @click="openTagDialog"
+      >
+        <IconGlyph name="plus" aria-hidden="true" />
+        <span>Add tag</span>
+      </UiButton>
+    </div>
+
+    <div v-if="tags.length" class="task-panel__tags-list" aria-label="Tags">
+      <span v-for="tag in tags" :key="tag" class="tag task-panel__tag">
+        <span class="task-panel__tag-label">{{ tag }}</span>
+        <button
+          type="button"
+          class="task-panel__tag-remove"
+          :aria-label="`Remove ${tag}`"
+          :title="`Remove ${tag}`"
+          @click="removeTag(tag)"
+        >
+          <IconGlyph name="close" aria-hidden="true" />
+        </button>
+      </span>
+    </div>
+    <p v-else class="muted task-panel__tags-empty">No tags yet</p>
     <Teleport to="body">
       <div
         v-if="tagDialogOpen"
@@ -98,7 +118,6 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import ChipListField from '../ChipListField.vue'
 import IconGlyph from '../IconGlyph.vue'
 import UiButton from '../UiButton.vue'
 import UiCard from '../UiCard.vue'
@@ -221,7 +240,11 @@ function highlightTagSuggestion(tag: string): Array<{ text: string; match: boole
   return segments
 }
 
-function handleChipUpdate(next: string[]) {
+function removeTag(tag: string) {
+  const index = props.tags.findIndex((value) => value.toLowerCase() === tag.toLowerCase())
+  if (index === -1) return
+  const next = [...props.tags]
+  next.splice(index, 1)
   emit('update:tags', next)
   tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
 }

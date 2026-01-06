@@ -1,5 +1,5 @@
-import process from 'node:process'
 import { execa } from 'execa'
+import process from 'node:process'
 
 function usage(exitCode = 0) {
   const msg = `Usage: node scripts/agent.mjs <command>

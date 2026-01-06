@@ -402,7 +402,7 @@ describe('TaskPanel integration safeguards', () => {
         apiFixtures.updateTaskMock.mockClear()
 
         const tagSection = wrapper.find('.task-panel__tags-section')
-        const tagAddButton = tagSection.find('.chip-field__add')
+        const tagAddButton = tagSection.find('[data-testid="tags-add"]')
         expect(tagAddButton.exists()).toBe(true)
         await tagAddButton.trigger('click')
         await nextTick()

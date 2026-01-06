@@ -40,7 +40,7 @@
         <span v-if="dueDateLabel">• due {{ dueDateLabel }}</span>
       </div>
       <div class="row" style="gap:6px; flex-wrap: wrap; margin-top: 4px; align-items: center;">
-  <span v-for="tag in task.tags" :key="tag" class="chip small">{{ tag }}</span>
+  <span v-for="tag in task.tags" :key="tag" class="tag">{{ tag }}</span>
         <UiButton variant="ghost" type="button" @click.stop="toggleTagsEdit">
           {{ editingTags ? 'Save tags' : 'Edit tags' }}
         </UiButton>
@@ -103,5 +103,4 @@ function cycleStatus(){
   font-weight: 600;
   padding-inline: 0.5rem;
 }
-.chip.small { font-size: 11px; padding: 2px 6px; background: color-mix(in oklab, var(--bg) 85%, var(--fg)); border-radius: 999px; }
 </style>

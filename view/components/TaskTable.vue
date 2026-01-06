@@ -146,7 +146,7 @@
               </template>
               <template v-else-if="col === 'tags'">
                 <div class="row" style="gap:6px; flex-wrap: wrap; align-items:center;">
-                  <span v-for="tag in (t.tags || [])" :key="tag" class="chip small">{{ tag }}</span>
+                  <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
                   <input v-if="isEditingTags(t.id)" class="input" v-model="tagsDrafts[t.id]" placeholder="tag1, tag2" style="max-width: 240px;" @click.stop @keyup.enter.prevent="saveTags(t)" />
                 </div>
               </template>

@@ -1312,14 +1312,52 @@ details.task-panel__group:not([open]) {
   gap: var(--space-2, 0.5rem);
 }
 
+.task-panel__tags-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 0.5rem);
+}
+
 .task-panel__tags-label {
   font-size: var(--text-xs, 0.75rem);
   font-weight: 500;
   color: var(--color-muted, var(--muted));
 }
 
-.task-panel__tags-section :deep(.chip-field__control) {
-  background: color-mix(in oklab, var(--color-surface, #1f2937) 94%, transparent);
+.task-panel__tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-panel__tag {
+  display: inline-flex;
+  align-items: center;
+}
+
+.task-panel__tag-remove {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  margin-left: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.task-panel__tag-remove:hover,
+.task-panel__tag-remove:focus-visible {
+  opacity: 1;
+}
+
+.task-panel__tag-remove .icon-glyph {
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 .task-panel__tag-dialog .task-panel-dialog__card {

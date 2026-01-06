@@ -41,7 +41,10 @@
     <div class="col" style="gap:6px;">
       <label class="muted">Tags</label>
       <div class="row" style="gap:8px; flex-wrap: wrap; align-items:flex-start;">
-        <span class="chip" v-for="t in form.tags" :key="t">{{ t }} <button @click="removeTag(t)">×</button></span>
+        <span class="tag task-editor__tag" v-for="t in form.tags" :key="t">
+          <span class="task-editor__tag-label">{{ t }}</span>
+          <button type="button" class="task-editor__tag-remove" @click="removeTag(t)">×</button>
+        </span>
         <div class="col suggest-wrap">
           <input v-model="tagInput" @keydown.enter.prevent="onTagEnter" @focus="tagsOpen=true" placeholder="Add tag" class="tag-input input" />
           <ul v-if="tagsOpen && tagOpts.length" class="suggest">
@@ -346,8 +349,20 @@ function pickTag(t: string){ if (!form.tags) form.tags = []; if (!form.tags.incl
 
 <style scoped>
 .task-editor textarea { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
-.chip { background: var(--surface-2); border: 1px solid var(--border); padding: 2px 6px; border-radius: 10px; }
-.chip button { margin-left: 6px; }
+.task-editor__tag-remove {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-left: var(--space-1);
+  color: inherit;
+  cursor: pointer;
+}
+
+.task-editor__tag-remove:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
 .tag-input { min-width: 120px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
 .suggest { list-style: none; padding: 0; margin: 6px 0; border: 1px solid var(--border); border-radius: 6px; max-height: 160px; overflow: auto; }

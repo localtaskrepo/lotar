@@ -137,7 +137,7 @@
               <footer class="task-meta">
                 <div class="row task-meta__tags">
                   <span v-if="t.assignee" class="muted">@{{ t.assignee }}</span>
-                  <span v-for="tag in t.tags" :key="tag" class="chip small">{{ tag }}</span>
+                  <span v-for="tag in t.tags" :key="tag" class="tag">{{ tag }}</span>
                 </div>
                 <div v-if="t.sprints?.length" class="row task-meta__sprints">
                   <span
@@ -178,7 +178,7 @@
               <footer class="task-meta">
                 <div class="row task-meta__tags">
                   <span v-if="t.assignee" class="muted">@{{ t.assignee }}</span>
-                  <span v-for="tag in t.tags" :key="tag" class="chip small">{{ tag }}</span>
+                  <span v-for="tag in t.tags" :key="tag" class="tag">{{ tag }}</span>
                 </div>
                 <div v-if="t.sprints?.length" class="row task-meta__sprints">
                   <span

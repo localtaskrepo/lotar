@@ -111,7 +111,7 @@
             <td>{{ task.assignee || '—' }}</td>
             <td>{{ task.due_date || '—' }}</td>
             <td>
-              <span v-for="tag in task.tags" :key="tag" class="chip small">{{ tag }}</span>
+              <span v-for="tag in task.tags" :key="tag" class="tag">{{ tag }}</span>
               <span v-if="!task.tags.length" class="muted">—</span>
             </td>
           </tr>

@@ -277,12 +277,17 @@ const filteredSuggestions = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  color: var(--color-accent, #0ea5e9);
-  font-size: 12px;
+  padding: calc(var(--space-1, 4px) - 1px) var(--space-2, 8px);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-xs, 12px);
   line-height: 1.2;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chip-field__chip-remove {
@@ -381,7 +386,7 @@ const filteredSuggestions = computed(() => {
 
 .chip-field__suggestion {
   border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
-  border-radius: 999px;
+  border-radius: var(--radius-md, 8px);
   background: transparent;
   color: inherit;
   padding: 4px 10px;
@@ -390,8 +395,7 @@ const filteredSuggestions = computed(() => {
 }
 
 .chip-field__suggestion:hover {
-  border-color: var(--color-accent, #0ea5e9);
-  color: var(--color-accent, #0ea5e9);
+  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.3));
 }
 
 .chip-field__suggestion-empty {

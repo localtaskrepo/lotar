@@ -573,7 +573,7 @@
                         </template>
                         <template v-else-if="col === 'tags'">
                           <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
-                            <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="chip small">{{ tag }}</span>
+                            <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag">{{ tag }}</span>
                             <span v-if="!task.tags.length" class="muted">—</span>
                           </div>
                         </template>
@@ -716,7 +716,7 @@
                         </template>
                         <template v-else-if="col === 'tags'">
                           <div class="row" style="gap: 6px; flex-wrap: wrap; align-items: center;">
-                            <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="chip small">{{ tag }}</span>
+                            <span v-for="tag in task.tags" :key="task.id + '-tag-' + tag" class="tag">{{ tag }}</span>
                             <span v-if="!task.tags.length" class="muted">—</span>
                           </div>
                         </template>
