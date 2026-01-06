@@ -32,7 +32,7 @@ const apiFixtures = vi.hoisted(() => {
                 code: 'src/lib.rs',
                 link: 'https://example.com/lib.rs',
             },
-        ],
+        ] as any[],
         history: [
             {
                 at: '2025-09-30T00:00:00.000Z',
@@ -253,6 +253,36 @@ vi.mock('../api/client', () => ({
         setStatus: apiFixtures.setStatusMock,
         addTask: vi.fn(),
         addComment: apiFixtures.addCommentMock,
+        addTaskLinkReference: vi.fn(async (payload: any) => {
+            const id = typeof payload?.id === 'string' ? payload.id : ''
+            const url = typeof payload?.url === 'string' ? payload.url.trim() : ''
+            if (!id || !url) {
+                return { task: apiFixtures.clone(apiFixtures.state.task), added: false }
+            }
+
+            const refs = Array.isArray(apiFixtures.state.task.references) ? apiFixtures.state.task.references : []
+            const exists = refs.some((ref: any) => (typeof ref?.link === 'string' ? ref.link.trim() : '') === url)
+            if (!exists) {
+                refs.push({ link: url })
+                apiFixtures.state.task.references = refs
+            }
+
+            return { task: apiFixtures.clone(apiFixtures.state.task), added: !exists }
+        }),
+        removeTaskLinkReference: vi.fn(async (payload: any) => {
+            const id = typeof payload?.id === 'string' ? payload.id : ''
+            const url = typeof payload?.url === 'string' ? payload.url.trim() : ''
+            if (!id || !url) {
+                return { task: apiFixtures.clone(apiFixtures.state.task), removed: false }
+            }
+
+            const refs = Array.isArray(apiFixtures.state.task.references) ? apiFixtures.state.task.references : []
+            const next = refs.filter((ref: any) => (typeof ref?.link === 'string' ? ref.link.trim() : '') !== url)
+            const removed = next.length !== refs.length
+            apiFixtures.state.task.references = next
+
+            return { task: apiFixtures.clone(apiFixtures.state.task), removed }
+        }),
         taskHistory: apiFixtures.taskHistoryMock,
         suggestTasks: apiFixtures.suggestTasksMock,
         referenceSnippet: apiFixtures.referenceSnippetMock,
@@ -339,6 +369,14 @@ const mountTaskPanel = async () => {
 beforeEach(() => {
     apiFixtures.reset()
     configDefaults.reporter = ''
+
+    try {
+        localStorage.removeItem('lotar.preferences.taskPanel.showAttachments')
+        localStorage.removeItem('lotar.preferences.taskPanel.showLinksInAttachments')
+        localStorage.removeItem('lotar.preferences.taskPanel.autoDetectLinks')
+    } catch {
+        // ignore
+    }
 })
 
 afterEach(() => {
@@ -539,5 +577,75 @@ describe('TaskPanel integration safeguards', () => {
         expect((wrapper.vm as any).form.reporter).toBe('tester')
 
         wrapper.unmount()
+    })
+})
+
+describe('TaskPanel attachments-area link preferences', () => {
+    it('hides the entire attachments area when showAttachments is disabled', async () => {
+        localStorage.setItem('lotar.preferences.taskPanel.showAttachments', 'false')
+        localStorage.setItem('lotar.preferences.taskPanel.showLinksInAttachments', 'true')
+        localStorage.setItem('lotar.preferences.taskPanel.autoDetectLinks', 'true')
+
+        apiFixtures.baseTask.references = [{ link: 'https://example.com/foo' }] as any
+        const wrapper = await mountTaskPanel()
+
+        expect(wrapper.find('.task-panel__attachments').exists()).toBe(false)
+    })
+
+    it('keeps file attachments visible when showLinksInAttachments is disabled', async () => {
+        localStorage.setItem('lotar.preferences.taskPanel.showAttachments', 'true')
+        localStorage.setItem('lotar.preferences.taskPanel.showLinksInAttachments', 'false')
+        localStorage.setItem('lotar.preferences.taskPanel.autoDetectLinks', 'false')
+
+        apiFixtures.baseTask.references = [{ file: 'demo/attachment.txt' }, { link: 'https://example.com/foo' }] as any
+        const wrapper = await mountTaskPanel()
+
+        const attachmentsArea = wrapper.find('.task-panel__attachments')
+        expect(attachmentsArea.exists()).toBe(true)
+        expect(attachmentsArea.text()).toContain('Attachments')
+        expect(attachmentsArea.text()).not.toContain('Links')
+    })
+
+    it('shows link references in the attachments area by default', async () => {
+        apiFixtures.baseTask.references = [{ link: 'https://example.com/foo' }] as any
+        const wrapper = await mountTaskPanel()
+
+        const attachmentsArea = wrapper.find('.task-panel__attachments')
+        expect(attachmentsArea.exists()).toBe(true)
+        expect(attachmentsArea.text()).toContain('Links')
+        expect(attachmentsArea.text()).toContain('example.com')
+    })
+})
+
+describe('TaskPanel references manual link add', () => {
+    it('adds a link reference via the dialog', async () => {
+        const wrapper = await mountTaskPanel()
+
+        const tabs = wrapper.findAll('button.task-panel__tab')
+        const referencesTab = tabs.find((tab) => tab.text().trim() === 'References')
+        expect(referencesTab).toBeTruthy()
+        await referencesTab!.trigger('click')
+        await nextTick()
+
+        const addButton = wrapper.find('[data-testid="references-add-link"]')
+        expect(addButton.exists()).toBe(true)
+        await addButton.trigger('click')
+        await nextTick()
+
+        const dialog = wrapper.find('[data-testid="references-add-link-dialog"]')
+        expect(dialog.exists()).toBe(true)
+
+        const input = dialog.find('#task-panel-add-link-input')
+        expect(input.exists()).toBe(true)
+        await input.setValue('https://example.com/manual')
+
+        await dialog.find('form').trigger('submit')
+        await flushPromises()
+
+        const { api } = await import('../api/client')
+        expect((api as any).addTaskLinkReference).toHaveBeenCalled()
+
+        // Should show up in the references list.
+        expect(wrapper.text()).toContain('https://example.com/manual')
     })
 })

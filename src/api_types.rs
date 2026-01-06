@@ -141,6 +141,34 @@ pub struct AttachmentRemoveResponse {
     pub still_referenced: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct LinkReferenceAddRequest {
+    pub id: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct LinkReferenceAddResponse {
+    pub task: TaskDTO,
+    pub added: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct LinkReferenceRemoveRequest {
+    pub id: String,
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct LinkReferenceRemoveResponse {
+    pub task: TaskDTO,
+    pub removed: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskListFilter {

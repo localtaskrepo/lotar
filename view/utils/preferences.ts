@@ -4,6 +4,32 @@ export type FixedStartupDestination = Exclude<StartupDestination, 'remember'>
 const STARTUP_DESTINATION_KEY = 'lotar.preferences.startupDestination'
 const LAST_VISITED_SECTION_KEY = 'lotar.preferences.lastVisitedSection'
 
+const TASK_PANEL_SHOW_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showAttachments'
+const TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showLinksInAttachments'
+const TASK_PANEL_AUTO_DETECT_LINKS_KEY = 'lotar.preferences.taskPanel.autoDetectLinks'
+
+const PREFERENCES_EVENT = 'lotar:preferences-changed'
+
+function emitPreferencesChanged(key: string) {
+    if (typeof window === 'undefined') return
+    try {
+        window.dispatchEvent(new CustomEvent(PREFERENCES_EVENT, { detail: { key } }))
+    } catch {
+        // ignore event failures
+    }
+}
+
+export function onPreferencesChanged(handler: (key: string) => void): () => void {
+    if (typeof window === 'undefined') return () => { }
+    const listener = (event: Event) => {
+        const detail = (event as CustomEvent<any>)?.detail
+        const key = typeof detail?.key === 'string' ? detail.key : ''
+        handler(key)
+    }
+    window.addEventListener(PREFERENCES_EVENT, listener as any)
+    return () => window.removeEventListener(PREFERENCES_EVENT, listener as any)
+}
+
 const DEFAULT_FIXED_DESTINATION: FixedStartupDestination = 'tasks'
 export const DEFAULT_STARTUP_DESTINATION: StartupDestination = DEFAULT_FIXED_DESTINATION
 
@@ -71,6 +97,51 @@ export function storeLastVisitedStartupRoute(path: string) {
     } catch (err) {
         console.warn('Unable to persist last visited section', err)
     }
+}
+
+function readBooleanPreference(key: string, defaultValue: boolean): boolean {
+    if (typeof window === 'undefined') return defaultValue
+    try {
+        const raw = localStorage.getItem(key)
+        if (raw === null) return defaultValue
+        return raw === 'true'
+    } catch {
+        return defaultValue
+    }
+}
+
+function storeBooleanPreference(key: string, value: boolean) {
+    if (typeof window === 'undefined') return
+    try {
+        localStorage.setItem(key, value ? 'true' : 'false')
+        emitPreferencesChanged(key)
+    } catch (err) {
+        console.warn('Unable to persist preference', err)
+    }
+}
+
+export function readTaskPanelShowAttachmentsPreference(): boolean {
+    return readBooleanPreference(TASK_PANEL_SHOW_ATTACHMENTS_KEY, true)
+}
+
+export function storeTaskPanelShowAttachmentsPreference(value: boolean) {
+    storeBooleanPreference(TASK_PANEL_SHOW_ATTACHMENTS_KEY, value)
+}
+
+export function readTaskPanelShowLinksInAttachmentsPreference(): boolean {
+    return readBooleanPreference(TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY, true)
+}
+
+export function storeTaskPanelShowLinksInAttachmentsPreference(value: boolean) {
+    storeBooleanPreference(TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY, value)
+}
+
+export function readTaskPanelAutoDetectLinksPreference(): boolean {
+    return readBooleanPreference(TASK_PANEL_AUTO_DETECT_LINKS_KEY, true)
+}
+
+export function storeTaskPanelAutoDetectLinksPreference(value: boolean) {
+    storeBooleanPreference(TASK_PANEL_AUTO_DETECT_LINKS_KEY, value)
 }
 
 export function resolveStartupPath(destination: StartupDestination, lastVisited: string | null): string {

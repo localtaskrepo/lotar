@@ -1,13 +1,15 @@
 <template>
   <div class="task-panel__tab-panel">
-    <ReloadButton
-      class="task-panel__tab-action"
-      variant="ghost"
-      :disabled="mode !== 'edit'"
-      label="Refresh comments"
-      title="Refresh comments"
-      @click="$emit('reload')"
-    />
+    <div class="task-panel__tab-actions">
+      <ReloadButton
+        class="task-panel__tab-action"
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Refresh comments"
+        title="Refresh comments"
+        @click="$emit('reload')"
+      />
+    </div>
     <template v-if="mode === 'edit'">
       <ul class="task-panel__comments">
         <li

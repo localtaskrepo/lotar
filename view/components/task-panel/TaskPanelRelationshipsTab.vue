@@ -1,13 +1,15 @@
 <template>
   <div class="task-panel__tab-panel">
-    <ReloadButton
-      class="task-panel__tab-action"
-      variant="ghost"
-      :disabled="mode !== 'edit'"
-      label="Reload relationships"
-      title="Reload relationships"
-      @click="$emit('reload')"
-    />
+    <div class="task-panel__tab-actions">
+      <ReloadButton
+        class="task-panel__tab-action"
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Reload relationships"
+        title="Reload relationships"
+        @click="$emit('reload')"
+      />
+    </div>
     <div class="task-panel__relations">
       <label v-for="rel in relationDefs" :key="rel.key" class="task-panel__relation">
         <span>{{ rel.label }}</span>

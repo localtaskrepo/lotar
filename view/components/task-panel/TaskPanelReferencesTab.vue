@@ -1,13 +1,29 @@
 <template>
   <div class="task-panel__tab-panel">
-    <ReloadButton
-      class="task-panel__tab-action"
-      variant="ghost"
-      :disabled="mode !== 'edit'"
-      label="Reload references"
-      title="Reload references"
-      @click="$emit('reload')"
-    />
+    <div class="task-panel__tab-actions">
+      <UiButton
+        v-if="mode === 'edit'"
+        class="task-panel__tab-action"
+        variant="ghost"
+        icon-only
+        type="button"
+        data-testid="references-add-link"
+        aria-label="Add link"
+        title="Add link"
+        :disabled="!taskId"
+        @click="openAddLinkDialog"
+      >
+        <IconGlyph name="plus" aria-hidden="true" />
+      </UiButton>
+      <ReloadButton
+        class="task-panel__tab-action"
+        variant="ghost"
+        :disabled="mode !== 'edit'"
+        label="Reload references"
+        title="Reload references"
+        @click="$emit('reload')"
+      />
+    </div>
     <template v-if="mode === 'edit'">
       <div class="task-panel__references" role="region" aria-label="Task references">
         <p v-if="!references.length" class="muted">No references yet</p>
@@ -123,18 +139,70 @@
           </div>
         </Transition>
       </Teleport>
+
+      <Teleport to="body">
+        <div
+          v-if="addLinkDialogOpen"
+          class="task-panel-dialog__overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Add link reference"
+          data-testid="references-add-link-dialog"
+          @click.self="closeAddLinkDialog"
+        >
+          <UiCard class="task-panel-dialog__card">
+            <form class="task-panel-dialog__form" @submit.prevent="submitAddLink">
+              <header class="task-panel-dialog__header">
+                <h2>Add link reference</h2>
+                <UiButton
+                  variant="ghost"
+                  icon-only
+                  type="button"
+                  aria-label="Close dialog"
+                  title="Close dialog"
+                  :disabled="addLinkSubmitting"
+                  @click="closeAddLinkDialog"
+                >
+                  <IconGlyph name="close" />
+                </UiButton>
+              </header>
+              <label class="task-panel-dialog__field" for="task-panel-add-link-input">
+                <span class="muted">URL</span>
+                <UiInput
+                  id="task-panel-add-link-input"
+                  ref="addLinkInputRef"
+                  v-model="addLinkUrl"
+                  placeholder="https://example.com"
+                />
+              </label>
+              <footer class="task-panel-dialog__footer">
+                <UiButton variant="primary" type="submit" :disabled="addLinkSubmitting || !addLinkUrl.trim()">
+                  {{ addLinkSubmitting ? 'Adding…' : 'Add link' }}
+                </UiButton>
+                <UiButton variant="ghost" type="button" :disabled="addLinkSubmitting" @click="closeAddLinkDialog">
+                  Cancel
+                </UiButton>
+              </footer>
+            </form>
+          </UiCard>
+        </div>
+      </Teleport>
     </template>
     <p v-else class="task-panel__empty-hint">References appear after the task is created.</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Teleport, Transition, computed, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { Teleport, Transition, computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { api } from '../../api/client'
 import type { ReferenceSnippet } from '../../api/types'
 import IconGlyph from '../IconGlyph.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiButton from '../UiButton.vue'
+import UiCard from '../UiCard.vue'
+import UiInput from '../UiInput.vue'
 import UiLoader from '../UiLoader.vue'
+import { showToast } from '../toast'
 
 type ReferenceEntry = { code?: string | null; link?: string | null; file?: string | null }
 
@@ -159,13 +227,60 @@ const props = defineProps<{
   setReferencePreviewElement: (el: HTMLElement | null) => void
 }>()
 
-defineEmits<{ (e: 'reload'): void }>()
+const emit = defineEmits<{ (e: 'reload'): void; (e: 'updated', task: any): void }>()
+
+const taskId = computed(() => (props.task?.id || '').trim())
 
 const references = computed(() =>
   (props.task?.references || []).filter((reference) =>
     Boolean(reference && (reference.code || reference.link || reference.file)),
   ),
 )
+
+const addLinkDialogOpen = ref(false)
+const addLinkUrl = ref('')
+const addLinkSubmitting = ref(false)
+const addLinkInputRef = ref<HTMLElement | null>(null)
+
+function openAddLinkDialog() {
+  if (!taskId.value) return
+  addLinkUrl.value = ''
+  addLinkDialogOpen.value = true
+  nextTick(() => {
+    // UiInput renders an input internally; focus if possible.
+    ;(addLinkInputRef.value as any)?.focus?.()
+  })
+}
+
+function closeAddLinkDialog() {
+  if (addLinkSubmitting.value) return
+  addLinkDialogOpen.value = false
+}
+
+async function submitAddLink() {
+  const id = taskId.value
+  if (!id) return
+
+  const url = addLinkUrl.value.trim()
+  if (!url) return
+  if (!(url.startsWith('http://') || url.startsWith('https://'))) {
+    showToast('Link must start with http:// or https://')
+    return
+  }
+
+  addLinkSubmitting.value = true
+  try {
+    const response = await api.addTaskLinkReference({ id, url })
+    emit('updated', response.task)
+    showToast(response.added ? 'Link added' : 'Link already attached')
+    addLinkDialogOpen.value = false
+  } catch (error: any) {
+    console.warn('Failed to add link reference', error)
+    showToast(error?.message || 'Failed to add link')
+  } finally {
+    addLinkSubmitting.value = false
+  }
+}
 
 function attachmentUrl(relPath: string): string {
   const stored = (relPath || '').trim()

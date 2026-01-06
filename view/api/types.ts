@@ -56,6 +56,26 @@ export interface AttachmentRemoveResponse {
   still_referenced: boolean
 }
 
+export interface LinkReferenceAddRequest {
+  id: string
+  url: string
+}
+
+export interface LinkReferenceAddResponse {
+  task: TaskDTO
+  added: boolean
+}
+
+export interface LinkReferenceRemoveRequest {
+  id: string
+  url: string
+}
+
+export interface LinkReferenceRemoveResponse {
+  task: TaskDTO
+  removed: boolean
+}
+
 export interface ReferenceSnippetLine {
   number: number
   text: string

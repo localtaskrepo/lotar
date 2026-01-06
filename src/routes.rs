@@ -1930,6 +1930,81 @@ pub fn initialize(api_server: &mut ApiServer) {
         },
     );
 
+    // POST /api/tasks/references/link/add
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/references/link/add",
+        |req: &HttpRequest| {
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let payload: crate::api_types::LinkReferenceAddRequest =
+                match serde_json::from_value(body) {
+                    Ok(v) => v,
+                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
+                };
+
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            if payload.url.trim().is_empty() {
+                return bad_request("Missing url".into());
+            }
+
+            let resolver = match TasksDirectoryResolver::resolve(None, None) {
+                Ok(r) => r,
+                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            };
+
+            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
+                Ok((task, added)) => ok_json(
+                    200,
+                    json!({"data": crate::api_types::LinkReferenceAddResponse { task, added }}),
+                ),
+                Err(e) => match e {
+                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                    _ => bad_request(e.to_string()),
+                },
+            }
+        },
+    );
+
+    // POST /api/tasks/references/link/remove
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/references/link/remove",
+        |req: &HttpRequest| {
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let payload: crate::api_types::LinkReferenceRemoveRequest = match serde_json::from_value(body) {
+                Ok(v) => v,
+                Err(e) => return bad_request(format!("Invalid body: {}", e)),
+            };
+
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            if payload.url.trim().is_empty() {
+                return bad_request("Missing url".into());
+            }
+
+            let resolver = match TasksDirectoryResolver::resolve(None, None) {
+                Ok(r) => r,
+                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            };
+
+            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            match ReferenceService::detach_link_reference(&mut storage, &payload.id, &payload.url) {
+                Ok((task, removed)) => ok_json(
+                    200,
+                    json!({"data": crate::api_types::LinkReferenceRemoveResponse { task, removed }}),
+                ),
+                Err(e) => match e {
+                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                    _ => bad_request(e.to_string()),
+                },
+            }
+        },
+    );
+
     // GET /api/tasks/suggest?q=TEXT[&project=PREFIX][&limit=N]
     api_server.register_handler("GET", "/api/tasks/suggest", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {

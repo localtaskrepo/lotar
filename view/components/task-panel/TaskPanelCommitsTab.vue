@@ -1,14 +1,16 @@
 <template>
   <div class="task-panel__tab-panel">
-    <ReloadButton
-      class="task-panel__tab-action"
-      variant="ghost"
-      :disabled="commitsLoading || mode !== 'edit'"
-      :loading="commitsLoading"
-      :label="commitsLoading ? 'Refreshing commits…' : 'Refresh commits'"
-      :title="commitsLoading ? 'Refreshing commits…' : 'Refresh commits'"
-      @click="$emit('refresh')"
-    />
+    <div class="task-panel__tab-actions">
+      <ReloadButton
+        class="task-panel__tab-action"
+        variant="ghost"
+        :disabled="commitsLoading || mode !== 'edit'"
+        :loading="commitsLoading"
+        :label="commitsLoading ? 'Refreshing commits…' : 'Refresh commits'"
+        :title="commitsLoading ? 'Refreshing commits…' : 'Refresh commits'"
+        @click="$emit('refresh')"
+      />
+    </div>
     <template v-if="mode === 'edit'">
       <div class="task-panel__history-scroll" role="region" aria-label="Recent commits">
         <UiLoader v-if="commitsLoading && !commitHistory.length" size="sm">Loading commits…</UiLoader>

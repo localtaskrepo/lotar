@@ -65,6 +65,22 @@
           </div>
         </UiCard>
 
+        <UiCard>
+          <h3>Task panel</h3>
+          <div class="col" style="gap:10px;">
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="checkbox" v-model="showAttachments" /> Show attachments
+            </label>
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="checkbox" v-model="showLinksInAttachments" :disabled="!showAttachments" /> Show link references next to attachments
+            </label>
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="checkbox" v-model="autoDetectLinks" :disabled="!showAttachments || !showLinksInAttachments" /> Auto-detect links in title/description
+            </label>
+            <p class="muted" style="margin:0;">Link detection adds missing link references when you edit a task.</p>
+          </div>
+        </UiCard>
+
       </div>
     </div>
   </section>
@@ -80,8 +96,14 @@ import { getContrastingColor } from '../utils/color'
 import {
     DEFAULT_STARTUP_DESTINATION,
     readStartupDestination,
+    readTaskPanelAutoDetectLinksPreference,
+    readTaskPanelShowAttachmentsPreference,
+    readTaskPanelShowLinksInAttachmentsPreference,
     STARTUP_DESTINATION_OPTIONS,
     storeStartupDestination,
+    storeTaskPanelAutoDetectLinksPreference,
+    storeTaskPanelShowAttachmentsPreference,
+    storeTaskPanelShowLinksInAttachmentsPreference,
     type StartupDestination,
 } from '../utils/preferences'
 import {
@@ -102,6 +124,10 @@ const accentEnabled = ref(false)
 const startupDestination = ref<StartupDestination>(DEFAULT_STARTUP_DESTINATION)
 const startupDestinationOptions = STARTUP_DESTINATION_OPTIONS
 
+const showAttachments = ref(true)
+const showLinksInAttachments = ref(true)
+const autoDetectLinks = ref(true)
+
 onMounted(() => {
   const storedTheme = readThemePreference()
   theme.value = storedTheme
@@ -119,6 +145,10 @@ onMounted(() => {
   }
 
   startupDestination.value = readStartupDestination()
+
+  showAttachments.value = readTaskPanelShowAttachmentsPreference()
+  showLinksInAttachments.value = readTaskPanelShowLinksInAttachmentsPreference()
+  autoDetectLinks.value = readTaskPanelAutoDetectLinksPreference()
 })
 
 watch(theme, (value) => {
@@ -152,6 +182,25 @@ watch(accent, (value) => {
 
 watch(startupDestination, (value) => {
   storeStartupDestination(value)
+})
+
+watch(showAttachments, (value) => {
+  storeTaskPanelShowAttachmentsPreference(!!value)
+  if (!value) {
+    showLinksInAttachments.value = false
+    autoDetectLinks.value = false
+  }
+})
+
+watch(showLinksInAttachments, (value) => {
+  storeTaskPanelShowLinksInAttachmentsPreference(!!value)
+  if (!value) {
+    autoDetectLinks.value = false
+  }
+})
+
+watch(autoDetectLinks, (value) => {
+  storeTaskPanelAutoDetectLinksPreference(!!value)
 })
 
 const accentPreview = computed(() => (accentEnabled.value ? accent.value : DEFAULT_ACCENT))

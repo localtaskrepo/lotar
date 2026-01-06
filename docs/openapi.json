@@ -644,6 +644,80 @@
         }
       }
     },
+    "/api/tasks/references/link/add": {
+      "post": {
+        "summary": "Attach a link reference to a task",
+        "description": "Adds a link reference (http/https URL) to task.references unless it already exists.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkReferenceAddRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeLinkReferenceAddResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/references/link/remove": {
+      "post": {
+        "summary": "Remove a link reference from a task",
+        "description": "Removes a link reference (http/https URL) from task.references if present.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkReferenceRemoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeLinkReferenceRemoveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/projects/create": {
       "post": {
         "summary": "Create a new project configuration",
@@ -1685,6 +1759,68 @@
         },
         "required": [
           "id"
+        ]
+      },
+      "LinkReferenceAddRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "http/https URL"
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ]
+      },
+      "LinkReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "added": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "added"
+        ]
+      },
+      "LinkReferenceRemoveRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "http/https URL"
+          }
+        },
+        "required": [
+          "id",
+          "url"
+        ]
+      },
+      "LinkReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "removed"
         ]
       },
       "TaskRelationships": {
@@ -3521,6 +3657,28 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/TaskDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeLinkReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LinkReferenceAddResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeLinkReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/LinkReferenceRemoveResponse"
           }
         },
         "required": [

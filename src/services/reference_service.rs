@@ -1,10 +1,101 @@
-use crate::api_types::{ReferenceSnippetDTO, ReferenceSnippetLineDTO};
+use crate::api_types::{ReferenceSnippetDTO, ReferenceSnippetLineDTO, TaskDTO};
+use crate::errors::{LoTaRError, LoTaRResult};
+use crate::services::task_service::TaskService;
+use crate::storage::manager::Storage;
+use crate::types::ReferenceEntry;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct ReferenceService;
 
 impl ReferenceService {
+    pub fn attach_link_reference(
+        storage: &mut Storage,
+        task_id: &str,
+        url: &str,
+    ) -> LoTaRResult<(TaskDTO, bool)> {
+        let derived = task_id.split('-').next().unwrap_or("");
+        if derived.trim().is_empty() {
+            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
+        }
+
+        let trimmed = url.trim();
+        if trimmed.is_empty() {
+            return Err(LoTaRError::ValidationError("Missing url".to_string()));
+        }
+        if trimmed.len() > 4096 {
+            return Err(LoTaRError::ValidationError(
+                "Link reference is too long (max 4096 characters)".to_string(),
+            ));
+        }
+        let lower = trimmed.to_ascii_lowercase();
+        if lower.starts_with("javascript:")
+            || lower.starts_with("data:")
+            || lower.starts_with("vbscript:")
+        {
+            return Err(LoTaRError::ValidationError(
+                "Link reference protocol is not allowed".to_string(),
+            ));
+        }
+
+        let project = derived.to_string();
+        let mut task = storage
+            .get(task_id, project)
+            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
+
+        let already = task
+            .references
+            .iter()
+            .any(|r| r.link.as_deref() == Some(trimmed));
+
+        let mut added = false;
+        if !already {
+            task.references.push(ReferenceEntry {
+                code: None,
+                link: Some(trimmed.to_string()),
+                file: None,
+            });
+            task.modified = chrono::Utc::now().to_rfc3339();
+            storage.edit(task_id, &task)?;
+            added = true;
+        }
+
+        Ok((TaskService::get(storage, task_id, Some(derived))?, added))
+    }
+
+    pub fn detach_link_reference(
+        storage: &mut Storage,
+        task_id: &str,
+        url: &str,
+    ) -> LoTaRResult<(TaskDTO, bool)> {
+        let derived = task_id.split('-').next().unwrap_or("");
+        if derived.trim().is_empty() {
+            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
+        }
+
+        let trimmed = url.trim();
+        if trimmed.is_empty() {
+            return Err(LoTaRError::ValidationError("Missing url".to_string()));
+        }
+
+        let project = derived.to_string();
+        let mut task = storage
+            .get(task_id, project)
+            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
+
+        let before_len = task.references.len();
+        task.references
+            .retain(|r| r.link.as_deref() != Some(trimmed));
+
+        let removed = task.references.len() != before_len;
+        if removed {
+            task.modified = chrono::Utc::now().to_rfc3339();
+            storage.edit(task_id, &task)?;
+        }
+
+        Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
+    }
+
     pub fn snippet_for_code(
         repo_root: &Path,
         code: &str,
@@ -149,6 +240,8 @@ impl ReferenceService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api_types::TaskCreate;
+    use crate::services::task_service::TaskService;
     use std::fs;
     use std::path::Path;
 
@@ -215,5 +308,131 @@ mod tests {
         let path = Path::new("src\\example.rs");
         let normalized = ReferenceService::normalize_path_for_display(path);
         assert_eq!(normalized, "src/example.rs");
+    }
+
+    #[test]
+    fn attach_and_detach_link_reference_round_trip() {
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+
+        let mut storage = Storage::new(tasks_dir);
+        let task = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Link reference test".to_string(),
+                project: Some("DEMO".to_string()),
+                priority: None,
+                task_type: None,
+                reporter: None,
+                assignee: None,
+                due_date: None,
+                effort: None,
+                description: None,
+                tags: vec![],
+                relationships: None,
+                custom_fields: None,
+                sprints: vec![],
+            },
+        )
+        .unwrap();
+
+        let url = "https://example.com/docs";
+        let (updated, added) =
+            ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap();
+        assert!(added);
+        assert!(
+            updated
+                .references
+                .iter()
+                .any(|r| r.link.as_deref() == Some(url))
+        );
+
+        let (_updated2, added2) =
+            ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap();
+        assert!(!added2);
+
+        let (updated3, removed) =
+            ReferenceService::detach_link_reference(&mut storage, &task.id, url).unwrap();
+        assert!(removed);
+        assert!(
+            !updated3
+                .references
+                .iter()
+                .any(|r| r.link.as_deref() == Some(url))
+        );
+    }
+
+    #[test]
+    fn attach_link_reference_accepts_non_http_schemes() {
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+
+        let mut storage = Storage::new(tasks_dir);
+        let task = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Link reference scheme test".to_string(),
+                project: Some("DEMO".to_string()),
+                priority: None,
+                task_type: None,
+                reporter: None,
+                assignee: None,
+                due_date: None,
+                effort: None,
+                description: None,
+                tags: vec![],
+                relationships: None,
+                custom_fields: None,
+                sprints: vec![],
+            },
+        )
+        .unwrap();
+
+        let url = "ftp://example.com/path/to/file";
+        let (updated, added) =
+            ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap();
+        assert!(added);
+        assert!(
+            updated
+                .references
+                .iter()
+                .any(|r| r.link.as_deref() == Some(url))
+        );
+    }
+
+    #[test]
+    fn attach_link_reference_rejects_javascript_scheme() {
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        fs::create_dir_all(&tasks_dir).unwrap();
+
+        let mut storage = Storage::new(tasks_dir);
+        let task = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Link reference safety test".to_string(),
+                project: Some("DEMO".to_string()),
+                priority: None,
+                task_type: None,
+                reporter: None,
+                assignee: None,
+                due_date: None,
+                effort: None,
+                description: None,
+                tags: vec![],
+                relationships: None,
+                custom_fields: None,
+                sprints: vec![],
+            },
+        )
+        .unwrap();
+
+        let err =
+            ReferenceService::attach_link_reference(&mut storage, &task.id, "javascript:alert(1)")
+                .expect_err("expected validation error");
+
+        assert!(matches!(err, LoTaRError::ValidationError(_)));
     }
 }
