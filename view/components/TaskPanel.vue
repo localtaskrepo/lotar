@@ -1791,6 +1791,33 @@ details.task-panel__group:not([open]) {
   overflow-y: auto;
 }
 
+.task-panel__references-dialog {
+  padding: var(--space-3, 0.75rem);
+}
+
+.task-panel__references-dialog .task-panel-dialog__card {
+  transition: width 180ms ease, max-height 180ms ease;
+  will-change: width, max-height;
+}
+
+.task-panel__references-dialog--link .task-panel-dialog__card {
+  width: min(520px, 100%);
+}
+
+.task-panel__references-dialog--code .task-panel-dialog__card {
+  width: min(520px, 100%);
+  max-height: clamp(300px, 60vh, 520px);
+}
+
+.task-panel__references-dialog--code.task-panel__references-dialog--has-preview .task-panel-dialog__card {
+  width: min(980px, 100%);
+  max-height: clamp(360px, 92vh, 1200px);
+}
+
+.task-panel__references-dialog--code.task-panel__references-dialog--has-preview .task-panel__reference-snippet {
+  max-height: none;
+}
+
 .task-panel-dialog__form {
   display: flex;
   flex-direction: column;
@@ -2358,14 +2385,21 @@ textarea {
   text-decoration: underline;
 }
 
+.task-panel__reference-remove {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .task-panel__reference-preview {
   position: fixed;
   top: 0;
   left: 0;
   z-index: 90;
-  width: min(560px, calc(100vw - 3rem));
-  max-height: calc(100vh - 3rem);
+  width: max-content;
+  max-width: min(980px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: var(--space-4, 1rem);
   border-radius: var(--radius-lg, 0.75rem);
   border: 1px solid var(--color-border, var(--border));
@@ -2374,6 +2408,11 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__reference-preview .task-panel__reference-snippet {
+  max-height: none;
+  overflow: visible;
 }
 
 .task-panel__reference-meta {
@@ -2385,7 +2424,7 @@ textarea {
 }
 
 .task-panel__reference-snippet {
-  max-height: 320px;
+  max-height: 420px;
   overflow: auto;
   border-radius: var(--radius-md, 0.375rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 88%, transparent);
@@ -2458,6 +2497,16 @@ textarea {
   margin: 0;
   font-size: var(--text-sm, 0.875rem);
   color: var(--color-muted, var(--muted));
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 .task-panel-enter-from,

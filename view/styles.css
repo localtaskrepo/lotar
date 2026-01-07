@@ -163,6 +163,17 @@ p {
 	margin: var(--space-1) 0 var(--space-3);
 }
 
+/* Transitions --------------------------------------------------------- */
+.fade-enter-active,
+.fade-leave-active {
+	transition: opacity 120ms ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+	opacity: 0;
+}
+
 /* Utilities ------------------------------------------------------------ */
 .container {
 	max-width: min(1600px, 96vw);

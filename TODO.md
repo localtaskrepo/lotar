@@ -3,7 +3,6 @@ Features:
 - IntelliJ Plugin
 - Allow CLI list/search to filter by age older than N days
 - Allow ticket files to be stored in neseted folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
-- Add ability to add references to a ticket via CLI/WEB UI/MCP. Introduce a smart short format e.g. <filename>#<line(s)
 - Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
 - API pagination
 - Sync with Jira/Github (two-way ideally)
@@ -13,3 +12,6 @@ Features:
 - MCP errors config_show/project_list: TypeError: r.content is not iterable
 - History stored exact same content as comments when a new one is added
 - "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.
+- Support references to other tickets in the description when rendering markdown (e.g. "See TASK-1234 for more info" becomes a link with hover card). 
+- Option to automatically add ticket reference to relationships if they're not already in a more specific category.
+- Option to drag and drop tickets between relationship categories in the web UI.

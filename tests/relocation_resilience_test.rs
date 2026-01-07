@@ -65,7 +65,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
         yaml.contains("references:"),
         "expected references section in YAML after scan"
     );
-    assert_yaml_contains(&yaml, "code: main.rs#L1");
+    assert_yaml_contains(&yaml, "code: main.rs#1");
 
     // Move the comment down by inserting a blank line on top -> line becomes 2
     fs::write(&src_path, format!("\n// TODO {id}: do thing\n")).unwrap();
@@ -75,7 +75,7 @@ fn scan_adds_reference_for_existing_key_and_reanchors_on_move() {
     scan2.current_dir(root).arg("scan").assert().success();
 
     let yaml2 = fs::read_to_string(&task_file).unwrap();
-    assert_yaml_contains(&yaml2, "code: main.rs#L2");
+    assert_yaml_contains(&yaml2, "code: main.rs#2");
 }
 
 #[test]
@@ -99,7 +99,7 @@ fn scan_adds_reference_when_file_is_renamed() {
     let mut scan = crate::common::lotar_cmd().unwrap();
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
-    assert_yaml_contains(&yaml, "code: a.rs#L1");
+    assert_yaml_contains(&yaml, "code: a.rs#1");
 
     // Rename file; keep the same TODO line
     let src2 = root.join("src").join("b.rs");
@@ -110,5 +110,5 @@ fn scan_adds_reference_when_file_is_renamed() {
     let mut scan2 = crate::common::lotar_cmd().unwrap();
     scan2.current_dir(root).arg("scan").assert().success();
     let yaml2 = fs::read_to_string(&task_file).unwrap();
-    assert_yaml_contains(&yaml2, "code: src/b.rs#L1");
+    assert_yaml_contains(&yaml2, "code: src/b.rs#1");
 }

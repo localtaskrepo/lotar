@@ -16,7 +16,8 @@ mod mcp_server_tests;
 use handlers::{
     handle_config_set, handle_config_show, handle_project_list, handle_project_stats,
     handle_sprint_add, handle_sprint_backlog, handle_sprint_delete, handle_sprint_remove,
-    handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_update,
+    handle_task_create, handle_task_delete, handle_task_get, handle_task_list,
+    handle_task_reference_add, handle_task_reference_remove, handle_task_update,
 };
 use hints::gather_enum_hints;
 use tools::build_tool_definitions;
@@ -489,6 +490,10 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
         "config/set" => handle_config_set(req),
         // task/update({ id, patch }) -> { task }
         "task/update" => handle_task_update(req),
+        // task/reference_add({ id, project?, kind, value }) -> { task, changed }
+        "task/reference_add" => handle_task_reference_add(req),
+        // task/reference_remove({ id, project?, kind, value }) -> { task, changed }
+        "task/reference_remove" => handle_task_reference_remove(req),
         // task/delete({ id, project? }) -> { deleted }
         "task/delete" => handle_task_delete(req),
         // task/list(params: TaskListFilter) -> { tasks }

@@ -6,11 +6,14 @@ use super::super::{
     parse_cursor_value, parse_limit_value,
 };
 use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
+use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::manager::ConfigManager;
+use crate::services::reference_service::ReferenceService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
 use crate::types::{CustomFieldValue, TaskRelationships};
+use crate::utils::git::find_repo_root;
 use crate::utils::identity;
 use crate::workspace::TasksDirectoryResolver;
 use std::collections::BTreeMap;
@@ -516,6 +519,153 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
             -32005,
             "Task update failed",
             Some(json!({"message": e.to_string()})),
+        ),
+    }
+}
+
+pub(crate) fn handle_task_reference_add(req: JsonRpcRequest) -> JsonRpcResponse {
+    handle_task_reference_mutation(req, true)
+}
+
+pub(crate) fn handle_task_reference_remove(req: JsonRpcRequest) -> JsonRpcResponse {
+    handle_task_reference_mutation(req, false)
+}
+
+fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcResponse {
+    let id = match req.params.get("id").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing id", None),
+    };
+    let project = req.params.get("project").and_then(|v| v.as_str());
+    let kind = match req.params.get("kind").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_ascii_lowercase(),
+        _ => return err(req.id, -32602, "Missing kind", None),
+    };
+    let value = match req.params.get("value").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing value", None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let mut project_resolver = match ProjectResolver::new(&resolver) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to initialize project resolver: {}", e)})),
+            );
+        }
+    };
+
+    let full_id = match project_resolver.get_full_task_id(&id, project) {
+        Ok(v) => v,
+        Err(e) => {
+            return err(
+                req.id,
+                -32602,
+                "Invalid task id",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let mut storage = Storage::new(resolver.path);
+    let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
+        ("link", true) => ReferenceService::attach_link_reference(&mut storage, &full_id, &value),
+        ("link", false) => ReferenceService::detach_link_reference(&mut storage, &full_id, &value),
+        ("code", true) => {
+            let repo_root = match find_repo_root(storage.root_path.as_path()) {
+                Some(root) => root,
+                None => {
+                    return err(
+                        req.id,
+                        -32000,
+                        "Task reference add failed",
+                        Some(json!({"message": "Unable to locate git repository"})),
+                    );
+                }
+            };
+            ReferenceService::attach_code_reference(&mut storage, &repo_root, &full_id, &value)
+        }
+        ("code", false) => ReferenceService::detach_code_reference(&mut storage, &full_id, &value),
+        ("file", true) => {
+            let repo_root = match find_repo_root(storage.root_path.as_path()) {
+                Some(root) => root,
+                None => {
+                    return err(
+                        req.id,
+                        -32000,
+                        "Task reference add failed",
+                        Some(json!({"message": "Unable to locate git repository"})),
+                    );
+                }
+            };
+            ReferenceService::attach_file_reference(&mut storage, &repo_root, &full_id, &value)
+        }
+        ("file", false) => {
+            let repo_root = match find_repo_root(storage.root_path.as_path()) {
+                Some(root) => root,
+                None => {
+                    return err(
+                        req.id,
+                        -32000,
+                        "Task reference remove failed",
+                        Some(json!({"message": "Unable to locate git repository"})),
+                    );
+                }
+            };
+            ReferenceService::detach_file_reference(&mut storage, &repo_root, &full_id, &value)
+        }
+        _ => {
+            return err(
+                req.id,
+                -32602,
+                "Invalid kind",
+                Some(json!({"message": "kind must be one of: link, file, code"})),
+            );
+        }
+    }
+    .map_err(|e| e.to_string());
+
+    match result {
+        Ok((task, changed)) => {
+            let payload = json!({
+                "task": task,
+                "changed": changed,
+                "action": if is_add { "add" } else { "remove" },
+                "kind": kind,
+                "value": value,
+                "id": full_id,
+            });
+            ok(
+                req.id,
+                json!({
+                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+                }),
+            )
+        }
+        Err(message) => err(
+            req.id,
+            -32000,
+            if is_add {
+                "Task reference add failed"
+            } else {
+                "Task reference remove failed"
+            },
+            Some(json!({"message": message})),
         ),
     }
 }

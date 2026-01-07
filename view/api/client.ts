@@ -5,6 +5,10 @@ import type {
   AttachmentRemoveResponse,
   AttachmentUploadRequest,
   AttachmentUploadResponse,
+  CodeReferenceAddRequest,
+  CodeReferenceAddResponse,
+  CodeReferenceRemoveRequest,
+  CodeReferenceRemoveResponse,
   ConfigInspectResult,
   ConfigSetResponse,
   LinkReferenceAddRequest,
@@ -127,9 +131,12 @@ export const api = {
   removeTaskAttachment(payload: AttachmentRemoveRequest): Promise<AttachmentRemoveResponse> { return post('/api/tasks/attachments/remove', payload) },
   addTaskLinkReference(payload: LinkReferenceAddRequest): Promise<LinkReferenceAddResponse> { return post('/api/tasks/references/link/add', payload) },
   removeTaskLinkReference(payload: LinkReferenceRemoveRequest): Promise<LinkReferenceRemoveResponse> { return post('/api/tasks/references/link/remove', payload) },
+  addTaskCodeReference(payload: CodeReferenceAddRequest): Promise<CodeReferenceAddResponse> { return post('/api/tasks/references/code/add', payload) },
+  removeTaskCodeReference(payload: CodeReferenceRemoveRequest): Promise<CodeReferenceRemoveResponse> { return post('/api/tasks/references/code/remove', payload) },
   taskHistory(id: string, limit?: number): Promise<Array<{ commit: string; author: string; email: string; date: string; message: string }>> { return get('/api/tasks/history', { id, limit }) },
   taskCommitDiff(id: string, commit: string): Promise<string> { return get('/api/tasks/commit_diff', { id, commit }) },
   suggestTasks(q: string, project?: string, limit = 20): Promise<Array<{ id: string; title: string }>> { return get('/api/tasks/suggest', { q, project, limit }) },
+  suggestReferenceFiles(q: string, limit = 20): Promise<string[]> { return get('/api/references/files', { q, limit }) },
   referenceSnippet(code: string, context?: number | { before?: number; after?: number }): Promise<ReferenceSnippet> {
     const params: Record<string, unknown> = { code }
     if (typeof context === 'number') {

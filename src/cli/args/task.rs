@@ -303,6 +303,56 @@ pub enum TaskAction {
         #[arg(long, short = 'e')]
         explain: bool,
     },
+
+    /// Add or remove references for a task
+    #[command(alias = "references")]
+    Reference(TaskReferenceArgs),
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskReferenceArgs {
+    #[command(subcommand)]
+    pub action: TaskReferenceAction,
+}
+
+#[derive(Subcommand, Deserialize, Debug)]
+pub enum TaskReferenceAction {
+    /// Attach a reference to a task
+    Add(TaskReferenceAddArgs),
+    /// Detach a reference from a task
+    Remove(TaskReferenceRemoveArgs),
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskReferenceAddArgs {
+    #[command(subcommand)]
+    pub kind: TaskReferenceKindAdd,
+}
+
+#[derive(Subcommand, Deserialize, Debug)]
+pub enum TaskReferenceKindAdd {
+    /// Add a link reference (URL)
+    Link { id: String, url: String },
+    /// Add a file reference (repo-relative path)
+    File { id: String, path: String },
+    /// Add a code reference (e.g. src/lib.rs#10-12)
+    Code { id: String, code: String },
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskReferenceRemoveArgs {
+    #[command(subcommand)]
+    pub kind: TaskReferenceKindRemove,
+}
+
+#[derive(Subcommand, Deserialize, Debug)]
+pub enum TaskReferenceKindRemove {
+    /// Remove a link reference (URL)
+    Link { id: String, url: String },
+    /// Remove a file reference (repo-relative path)
+    File { id: String, path: String },
+    /// Remove a code reference (e.g. src/lib.rs#10-12)
+    Code { id: String, code: String },
 }
 
 #[derive(Args, Deserialize, Debug)]

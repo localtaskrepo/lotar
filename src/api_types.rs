@@ -169,6 +169,34 @@ pub struct LinkReferenceRemoveResponse {
     pub removed: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CodeReferenceAddRequest {
+    pub id: String,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CodeReferenceAddResponse {
+    pub task: TaskDTO,
+    pub added: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CodeReferenceRemoveRequest {
+    pub id: String,
+    pub code: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct CodeReferenceRemoveResponse {
+    pub task: TaskDTO,
+    pub removed: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskListFilter {

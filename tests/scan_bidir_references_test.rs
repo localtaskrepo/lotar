@@ -49,15 +49,15 @@ fn scan_creates_task_with_source_reference() {
     );
     let yaml = fs::read_to_string(&task_file).unwrap();
 
-    // Verify references contains a code entry with file path and #L1 anchor
+    // Verify references contains a code entry with file path and #1 anchor
     assert!(
         yaml.contains("references:"),
         "expected references in YAML: {yaml}"
     );
     // Path with anchor: accept canonical absolute form or just main.rs
-    let anchor1 = format!("code: {canon_str}#L1");
+    let anchor1 = format!("code: {canon_str}#1");
     assert!(
-        yaml.contains(&anchor1) || yaml.contains("code: main.rs#L1"),
-        "expected code reference with #L1 in YAML: {yaml}"
+        yaml.contains(&anchor1) || yaml.contains("code: main.rs#1"),
+        "expected code reference with #1 in YAML: {yaml}"
     );
 }

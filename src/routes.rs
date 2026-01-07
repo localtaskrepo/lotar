@@ -1528,7 +1528,7 @@ pub fn initialize(api_server: &mut ApiServer) {
         }
     });
 
-    // GET /api/references/snippet?code=<path#Lx>
+    // GET /api/references/snippet?code=<path#x>
     api_server.register_handler("GET", "/api/references/snippet", |req: &HttpRequest| {
         let code = match req.query.get("code") {
             Some(v) if !v.trim().is_empty() => v.trim().to_string(),
@@ -1561,6 +1561,34 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(snippet) => ok_json(200, json!({"data": snippet})),
             Err(msg) => bad_request(msg),
         }
+    });
+
+    // GET /api/references/files?q=TEXT[&limit=N]
+    api_server.register_handler("GET", "/api/references/files", |req: &HttpRequest| {
+        let q = req.query.get("q").cloned().unwrap_or_default();
+        let q = q.trim().to_string();
+        if q.is_empty() {
+            return ok_json(200, json!({"data": Vec::<String>::new()}));
+        }
+
+        let limit: usize = req
+            .query
+            .get("limit")
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(20);
+        let limit = limit.clamp(1, 200);
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
+            Some(root) => root,
+            None => return bad_request("Unable to locate git repository".into()),
+        };
+
+        let files = ReferenceService::suggest_repo_files(&repo_root, &q, limit);
+        ok_json(200, json!({"data": files}))
     });
 
     // GET /api/attachments/get?path=<relative>
@@ -1996,6 +2024,90 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Ok((task, removed)) => ok_json(
                     200,
                     json!({"data": crate::api_types::LinkReferenceRemoveResponse { task, removed }}),
+                ),
+                Err(e) => match e {
+                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                    _ => bad_request(e.to_string()),
+                },
+            }
+        },
+    );
+
+    // POST /api/tasks/references/code/add
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/references/code/add",
+        |req: &HttpRequest| {
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let payload: crate::api_types::CodeReferenceAddRequest =
+                match serde_json::from_value(body) {
+                    Ok(v) => v,
+                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
+                };
+
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            if payload.code.trim().is_empty() {
+                return bad_request("Missing code reference".into());
+            }
+
+            let resolver = match TasksDirectoryResolver::resolve(None, None) {
+                Ok(r) => r,
+                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            };
+            let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
+                Some(root) => root,
+                None => return bad_request("Unable to locate git repository".into()),
+            };
+
+            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            match ReferenceService::attach_code_reference(
+                &mut storage,
+                &repo_root,
+                &payload.id,
+                &payload.code,
+            ) {
+                Ok((task, added)) => ok_json(
+                    200,
+                    json!({"data": crate::api_types::CodeReferenceAddResponse { task, added }}),
+                ),
+                Err(e) => match e {
+                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                    _ => bad_request(e.to_string()),
+                },
+            }
+        },
+    );
+
+    // POST /api/tasks/references/code/remove
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/references/code/remove",
+        |req: &HttpRequest| {
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let payload: crate::api_types::CodeReferenceRemoveRequest = match serde_json::from_value(body) {
+                Ok(v) => v,
+                Err(e) => return bad_request(format!("Invalid body: {}", e)),
+            };
+
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            if payload.code.trim().is_empty() {
+                return bad_request("Missing code reference".into());
+            }
+
+            let resolver = match TasksDirectoryResolver::resolve(None, None) {
+                Ok(r) => r,
+                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            };
+
+            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            match ReferenceService::detach_code_reference(&mut storage, &payload.id, &payload.code) {
+                Ok((task, removed)) => ok_json(
+                    200,
+                    json!({"data": crate::api_types::CodeReferenceRemoveResponse { task, removed }}),
                 ),
                 Err(e) => match e {
                     LoTaRError::TaskNotFound(_) => not_found(e.to_string()),

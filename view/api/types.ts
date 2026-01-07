@@ -76,6 +76,26 @@ export interface LinkReferenceRemoveResponse {
   removed: boolean
 }
 
+export interface CodeReferenceAddRequest {
+  id: string
+  code: string
+}
+
+export interface CodeReferenceAddResponse {
+  task: TaskDTO
+  added: boolean
+}
+
+export interface CodeReferenceRemoveRequest {
+  id: string
+  code: string
+}
+
+export interface CodeReferenceRemoveResponse {
+  task: TaskDTO
+  removed: boolean
+}
+
 export interface ReferenceSnippetLine {
   number: number
   text: string

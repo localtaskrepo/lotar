@@ -9,5 +9,6 @@ pub(super) use sprints::{
     handle_sprint_add, handle_sprint_backlog, handle_sprint_delete, handle_sprint_remove,
 };
 pub(super) use tasks::{
-    handle_task_create, handle_task_delete, handle_task_get, handle_task_list, handle_task_update,
+    handle_task_create, handle_task_delete, handle_task_get, handle_task_list,
+    handle_task_reference_add, handle_task_reference_remove, handle_task_update,
 };

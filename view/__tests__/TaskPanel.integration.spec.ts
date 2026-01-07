@@ -627,12 +627,12 @@ describe('TaskPanel references manual link add', () => {
         await referencesTab!.trigger('click')
         await nextTick()
 
-        const addButton = wrapper.find('[data-testid="references-add-link"]')
+        const addButton = wrapper.find('[data-testid="references-add"]')
         expect(addButton.exists()).toBe(true)
         await addButton.trigger('click')
         await nextTick()
 
-        const dialog = wrapper.find('[data-testid="references-add-link-dialog"]')
+        const dialog = wrapper.find('[data-testid="references-add-dialog"]')
         expect(dialog.exists()).toBe(true)
 
         const input = dialog.find('#task-panel-add-link-input')
@@ -647,5 +647,42 @@ describe('TaskPanel references manual link add', () => {
 
         // Should show up in the references list.
         expect(wrapper.text()).toContain('https://example.com/manual')
+    })
+
+    it('removes a link reference via the references list', async () => {
+        localStorage.setItem('lotar.preferences.taskPanel.showAttachments', 'true')
+        localStorage.setItem('lotar.preferences.taskPanel.showLinksInAttachments', 'true')
+
+        apiFixtures.baseTask.references = [{ link: 'https://example.com/foo' }] as any
+        const wrapper = await mountTaskPanel()
+
+        const attachmentsArea = wrapper.find('.task-panel__attachments')
+        expect(attachmentsArea.exists()).toBe(true)
+        expect(attachmentsArea.text()).toContain('example.com')
+
+        const tabs = wrapper.findAll('button.task-panel__tab')
+        const referencesTab = tabs.find((tab) => tab.text().trim() === 'References')
+        expect(referencesTab).toBeTruthy()
+        await referencesTab!.trigger('click')
+        await nextTick()
+
+        const referenceItem = wrapper
+            .findAll('.task-panel__reference-item')
+            .find((item) => item.text().includes('https://example.com/foo'))
+        expect(referenceItem).toBeTruthy()
+
+        const removeButton = referenceItem!.find('button[aria-label="Remove link"]')
+        expect(removeButton.exists()).toBe(true)
+        await removeButton.trigger('click')
+        await flushPromises()
+
+        const { api } = await import('../api/client')
+        expect((api as any).removeTaskLinkReference).toHaveBeenCalledWith({ id: 'DEMO-123', url: 'https://example.com/foo' })
+
+        expect(wrapper.text()).not.toContain('https://example.com/foo')
+        const attachmentsAfter = wrapper.find('.task-panel__attachments')
+        if (attachmentsAfter.exists()) {
+            expect(attachmentsAfter.text()).not.toContain('example.com')
+        }
     })
 })

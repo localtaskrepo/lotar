@@ -309,7 +309,7 @@ impl CommandHandler for ScanHandler {
                                 let reanchor = args.reanchor;
                                 if let Err(err) =
                                     edit_task_with_context(_resolver, &task_id, None, |task| {
-                                        let code_ref = format!("{}#L{}", rel, line_number);
+                                        let code_ref = format!("{}#{}", rel, line_number);
                                         let has_exact = task
                                             .references
                                             .iter()
@@ -341,7 +341,7 @@ impl CommandHandler for ScanHandler {
                                         let file_key = rel.as_str();
                                         task.references.retain(|r| {
                                             if let Some(code) = &r.code
-                                                && let Some((file_part, _)) = code.split_once("#L")
+                                                && let Some((file_part, _)) = code.split_once('#')
                                                 && file_part == file_key
                                                 && code != code_ref.as_str()
                                             {
@@ -435,7 +435,7 @@ impl CommandHandler for ScanHandler {
                                 let reanchor = args.reanchor;
                                 if let Err(err) =
                                     edit_task_with_context(_resolver, &task_id, None, |task| {
-                                        let code_ref = format!("{}#L{}", rel, line_number);
+                                        let code_ref = format!("{}#{}", rel, line_number);
                                         let has_exact = task
                                             .references
                                             .iter()
@@ -467,7 +467,7 @@ impl CommandHandler for ScanHandler {
                                         let file_key = rel.as_str();
                                         task.references.retain(|r| {
                                             if let Some(code) = &r.code
-                                                && let Some((file_part, _)) = code.split_once("#L")
+                                                && let Some((file_part, _)) = code.split_once('#')
                                                 && file_part == file_key
                                                 && code != code_ref.as_str()
                                             {
@@ -816,7 +816,7 @@ impl ScanHandler {
                 {
                     // Ensure canonical formatting of code ref
                     let rel = crate::utils::paths::repo_relative_display(&abs_path);
-                    let new_code = format!("{}#L{}", rel, orig_line);
+                    let new_code = format!("{}#{}", rel, orig_line);
                     if r.code.as_deref() != Some(&new_code) {
                         r.code = Some(new_code.clone());
                         changed = true;
@@ -863,7 +863,7 @@ impl ScanHandler {
 
                 if let Some(new_line) = best_line {
                     let rel = crate::utils::paths::repo_relative_display(&abs_path);
-                    let new_code = format!("{}#L{}", rel, new_line);
+                    let new_code = format!("{}#{}", rel, new_line);
                     if r.code.as_deref() != Some(&new_code) {
                         r.code = Some(new_code.clone());
                         changed = true;
@@ -888,11 +888,20 @@ impl ScanHandler {
     }
 
     fn parse_code_ref(code: &str) -> (String, Option<usize>) {
-        if let Some((path, line_part)) = code.split_once("#L") {
-            let line = line_part
-                .split(['-', ':', '#'])
-                .next()
-                .and_then(|s| s.parse::<usize>().ok());
+        if let Some((path, anchor)) = code.split_once('#') {
+            let mut buffer = String::new();
+            let mut found = false;
+            for ch in anchor.chars() {
+                if ch.is_ascii_digit() {
+                    buffer.push(ch);
+                    found = true;
+                    continue;
+                }
+                if found {
+                    break;
+                }
+            }
+            let line = buffer.parse::<usize>().ok();
             (path.to_string(), line)
         } else {
             (code.to_string(), None)

@@ -34,6 +34,7 @@ export function useReferencePreview() {
 
     let referenceAnchorRaf: number | null = null
     let referencePreviewMeasureRaf: number | null = null
+    let referencePreviewResizeObserver: ResizeObserver | null = null
     let referenceDismissTimer: ReturnType<typeof setTimeout> | null = null
 
     const hoveredReferenceEntry = computed(() => {
@@ -125,55 +126,74 @@ export function useReferencePreview() {
         referencePreviewMeasureRaf = window.requestAnimationFrame(run)
     }
 
+    function attachReferencePreviewResizeObserver(element: HTMLElement | null) {
+        if (referencePreviewResizeObserver) {
+            referencePreviewResizeObserver.disconnect()
+            referencePreviewResizeObserver = null
+        }
+        if (!element) return
+        if (typeof window === 'undefined') return
+        if (typeof ResizeObserver === 'undefined') return
+        referencePreviewResizeObserver = new ResizeObserver(() => {
+            scheduleReferencePreviewMeasure()
+        })
+        referencePreviewResizeObserver.observe(element)
+    }
+
     const hoveredReferenceStyle = computed<Record<string, string>>(() => {
         if (!hoveredReferenceCode.value || typeof window === 'undefined') {
             return {
                 top: '-9999px',
                 left: '-9999px',
-                width: '0px',
+                maxWidth: '0px',
                 maxHeight: '0px',
             }
         }
         const viewportWidth = window.innerWidth || 0
         const viewportHeight = window.innerHeight || 0
         const rect = hoveredReferenceAnchorRect.value
-        const previewRectValue = referencePreviewRect.value
         const GAP = 12
         const HORIZONTAL_PADDING = 16
-        const width = Math.min(560, Math.max(260, viewportWidth - HORIZONTAL_PADDING * 2))
-        let left = rect ? rect.left - GAP - width : viewportWidth - width - HORIZONTAL_PADDING
+
+        const maxWidth = Math.max(260, viewportWidth - HORIZONTAL_PADDING * 2)
+        const desiredWidth = Math.min(560, maxWidth)
+
+        let left = rect ? rect.left - GAP - desiredWidth : viewportWidth - desiredWidth - HORIZONTAL_PADDING
         const minLeft = HORIZONTAL_PADDING
-        const maxLeft = Math.max(minLeft, viewportWidth - width - HORIZONTAL_PADDING)
+        const maxLeft = Math.max(minLeft, viewportWidth - desiredWidth - HORIZONTAL_PADDING)
         if (Number.isFinite(left)) {
             left = Math.min(Math.max(left, minLeft), maxLeft)
         } else {
             left = minLeft
         }
+
         const desiredHeight = Math.min(520, Math.max(240, viewportHeight - GAP * 2))
-        const measuredHeight = previewRectValue?.height ?? desiredHeight
         const minTop = GAP
-        const maxTop = Math.max(minTop, viewportHeight - GAP - Math.min(measuredHeight, desiredHeight))
-        let top = rect ? rect.top : minTop
-        if (!Number.isFinite(top)) {
-            top = minTop
+        const anchorTop = rect?.top ?? minTop
+        const normalizedAnchorTop = Number.isFinite(anchorTop) ? anchorTop : minTop
+
+        const spaceBelow = Math.max(0, viewportHeight - GAP - normalizedAnchorTop)
+        const spaceAbove = Math.max(0, normalizedAnchorTop - GAP)
+
+        const preferAbove = spaceBelow < 200 && spaceAbove > spaceBelow
+        let top = normalizedAnchorTop
+        if (preferAbove) {
+            top = Math.max(minTop, normalizedAnchorTop - GAP - desiredHeight)
+        } else {
+            const maxTop = Math.max(minTop, viewportHeight - GAP - desiredHeight)
+            top = Math.min(Math.max(normalizedAnchorTop, minTop), maxTop)
         }
-        top = Math.min(Math.max(top, minTop), maxTop)
-        let availableSpace = Math.max(0, viewportHeight - top - GAP)
-        if (availableSpace <= 0) {
-            top = Math.max(minTop, viewportHeight - GAP - measuredHeight)
-            availableSpace = Math.max(0, viewportHeight - top - GAP)
+
+        let maxHeight = Math.max(120, viewportHeight - GAP - top)
+        if (preferAbove) {
+            maxHeight = Math.min(maxHeight, Math.max(120, normalizedAnchorTop - GAP - top))
         }
-        let maxHeight = availableSpace > 0 ? Math.min(measuredHeight, availableSpace) : Math.min(measuredHeight, viewportHeight - GAP * 2)
-        if (availableSpace >= 160) {
-            maxHeight = Math.max(maxHeight, 160)
-        }
-        if (maxHeight <= 0) {
-            maxHeight = Math.min(measuredHeight, Math.max(120, viewportHeight - GAP * 2))
-        }
+        maxHeight = Math.min(maxHeight, viewportHeight - GAP * 2)
+
         return {
             top: `${Math.round(top)}px`,
             left: `${Math.round(left)}px`,
-            width: `${Math.round(width)}px`,
+            maxWidth: `${Math.round(maxWidth)}px`,
             maxHeight: `${Math.round(maxHeight)}px`,
         }
     })
@@ -358,8 +378,10 @@ export function useReferencePreview() {
         referencePreviewElement.value = el
         if (!el) {
             referencePreviewRect.value = null
+            attachReferencePreviewResizeObserver(null)
             return
         }
+        attachReferencePreviewResizeObserver(el)
         scheduleReferencePreviewMeasure(true)
     }
 
@@ -373,6 +395,7 @@ export function useReferencePreview() {
         setReferenceAnchor(null)
         clearReferenceDismissTimer()
         Object.keys(referencePreviewState).forEach((key) => delete referencePreviewState[key])
+        attachReferencePreviewResizeObserver(null)
     }
 
     function cleanupRafs() {
@@ -398,6 +421,7 @@ export function useReferencePreview() {
             window.removeEventListener('scroll', handleReferenceViewportChange, true)
         }
         clearReferenceDismissTimer()
+        attachReferencePreviewResizeObserver(null)
         cleanupRafs()
     })
 

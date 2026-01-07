@@ -28,7 +28,7 @@ const apiFixtures = vi.hoisted(() => {
         comments: [] as any[],
         references: [
             { code: 'src/lib.rs', link: 'https://example.com/lib.rs' },
-            { code: 'src/lib.rs#L10', link: 'https://example.com/lib.rs#L10' },
+            { code: 'src/lib.rs#10', link: 'https://example.com/lib.rs#10' },
         ],
         history: [],
         custom_fields: {},

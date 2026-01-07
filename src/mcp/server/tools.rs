@@ -32,6 +32,8 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_task_create_tool(enum_hints),
         make_task_get_tool(enum_hints),
         make_task_update_tool(enum_hints),
+        make_task_reference_add_tool(enum_hints),
+        make_task_reference_remove_tool(enum_hints),
         make_task_delete_tool(enum_hints),
         make_task_list_tool(enum_hints),
         make_sprint_add_tool(),
@@ -44,6 +46,66 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_config_set_tool(enum_hints),
         make_schema_discover_tool(),
     ]
+}
+
+fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_reference_add",
+        "description": "Attach a reference to a task. kind must be one of: link, file, code. For link, value is a URL. For file, value is a repo-relative file path. For code, value is a code reference like src/lib.rs#10-12. Returns {task, changed}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": ["string", "null"]},
+                "kind": {"type": "string"},
+                "value": {"type": "string"}
+            },
+            "required": ["id", "kind", "value"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    attach_field_hints(&mut tool, field_hints);
+    tool
+}
+
+fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_reference_remove",
+        "description": "Detach a reference from a task. kind must be one of: link, file, code. value should match the stored reference string. Returns {task, changed}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": ["string", "null"]},
+                "kind": {"type": "string"},
+                "value": {"type": "string"}
+            },
+            "required": ["id", "kind", "value"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    attach_field_hints(&mut tool, field_hints);
+    tool
 }
 
 fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {

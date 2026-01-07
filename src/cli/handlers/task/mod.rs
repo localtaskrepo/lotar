@@ -18,12 +18,14 @@ mod edit;
 pub(crate) mod errors;
 mod history;
 pub(crate) mod mutation;
+mod reference;
 pub(crate) mod render;
 mod search;
 
 use delete::DeleteHandler;
 use edit::EditHandler;
 use history::{handle_at, handle_diff, handle_history, handle_history_by_field};
+use reference::handle_reference;
 use search::SearchHandler;
 
 /// Handler for all task subcommands
@@ -178,6 +180,8 @@ impl CommandHandler for TaskHandler {
                 );
                 CommentHandler::execute(args, project, resolver, renderer)
             }
+
+            TaskAction::Reference(args) => handle_reference(args, project, resolver, renderer),
         }
     }
 }

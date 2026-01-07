@@ -105,8 +105,8 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
         .success();
     let yaml = fs::read_to_string(&task_file).unwrap();
     let yaml_norm = yaml.replace('\\', "/");
-    assert!(yaml_norm.contains("code: a.rs#L1"));
-    assert!(yaml_norm.contains("code: nested/b.rs#L1"));
+    assert!(yaml_norm.contains("code: a.rs#1"));
+    assert!(yaml_norm.contains("code: nested/b.rs#1"));
 
     // Now run with --reanchor: only the newest occurrence should remain
     crate::common::lotar_cmd()

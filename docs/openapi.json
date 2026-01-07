@@ -611,6 +611,54 @@
         }
       }
     },
+    "/api/references/files": {
+      "get": {
+        "summary": "Suggest repository file paths",
+        "description": "Returns a list of file paths in the current git repository matching the provided query.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Substring query to match against repository-relative file paths. If omitted or empty, returns an empty list."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 20
+            },
+            "description": "Maximum number of suggestions to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeReferenceFiles"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/tasks/delete": {
       "post": {
         "summary": "Delete a task by id",
@@ -702,6 +750,80 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeLinkReferenceRemoveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/references/code/add": {
+      "post": {
+        "summary": "Attach a code reference to a task",
+        "description": "Adds a code reference (path#Lstart-Lend) to task.references unless it already exists.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeReferenceAddRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeCodeReferenceAddResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/references/code/remove": {
+      "post": {
+        "summary": "Remove a code reference from a task",
+        "description": "Removes a code reference (path#Lstart-Lend) from task.references if present.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeReferenceRemoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeCodeReferenceRemoveResponse"
                 }
               }
             }
@@ -1809,6 +1931,68 @@
         ]
       },
       "LinkReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "removed"
+        ]
+      },
+      "CodeReferenceAddRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code reference token in the form path#Lstart-Lend."
+          }
+        },
+        "required": [
+          "id",
+          "code"
+        ]
+      },
+      "CodeReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "added": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "added"
+        ]
+      },
+      "CodeReferenceRemoveRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "description": "Code reference token in the form path#Lstart-Lend."
+          }
+        },
+        "required": [
+          "id",
+          "code"
+        ]
+      },
+      "CodeReferenceRemoveResponse": {
         "type": "object",
         "properties": {
           "task": {
@@ -3568,6 +3752,20 @@
           "data"
         ]
       },
+      "EnvelopeReferenceFiles": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "EnvelopeTaskSuggestions": {
         "type": "object",
         "properties": {
@@ -3679,6 +3877,28 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/LinkReferenceRemoveResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeCodeReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CodeReferenceAddResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeCodeReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CodeReferenceRemoveResponse"
           }
         },
         "required": [

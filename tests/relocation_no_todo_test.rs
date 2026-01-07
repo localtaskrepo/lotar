@@ -43,7 +43,7 @@ fn reanchor_runs_even_when_no_todos_found() {
     scan.current_dir(root).arg("scan").assert().success();
     let yaml = fs::read_to_string(&task_file).unwrap();
     assert!(
-        yaml.contains("code: file.rs#L1"),
+        yaml.contains("code: file.rs#1"),
         "expected initial anchor at L1"
     );
 
@@ -56,7 +56,7 @@ fn reanchor_runs_even_when_no_todos_found() {
 
     let yaml2 = fs::read_to_string(&task_file).unwrap();
     assert!(
-        yaml2.contains("code: file.rs#L2"),
+        yaml2.contains("code: file.rs#2"),
         "expected anchor updated to L2 after move without TODO"
     );
 }

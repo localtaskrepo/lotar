@@ -64,7 +64,7 @@ tests/integration.rs:56
 - Inline `[key=value]` attributes on the comment are parsed when no ticket ID exists. Recognized keys: `assignee`, `priority`, `type`, `effort`, `due`/`due_date`, `tag`/`tags`. Unknown keys become custom fields.
 - Mixed time/point effort values are rejected. Supported units include minutes/hours/days/weeks (`1h 30m`, `90m`) or points (`3pt`).
 - `--strip-attributes[=<bool>]` overrides `scan.strip_attributes` to decide whether `[key=value]` blocks stay in the source after LoTaR injects the new ID.
-- Each task receives a bidirectional reference entry: `code` anchors look like `path/to/file.rs#L118`. Existing anchors are refreshed whenever scan spots a known ID, even if no new TODOs are added.
+- Each task receives a bidirectional reference entry: `code` anchors look like `path/to/file.rs#118`. Existing anchors are refreshed whenever scan spots a known ID, even if no new TODOs are added.
 - `--reanchor` prunes older anchors for the same file so only the newest location remains. Without the flag, LoTaR still repairs drifted anchors during non-dry-run scans.
 
 ## Signal words & supported files

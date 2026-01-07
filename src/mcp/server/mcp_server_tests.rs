@@ -106,6 +106,149 @@ fn parse_tool_payload(resp: &JsonRpcResponse) -> serde_json::Value {
 }
 
 #[test]
+fn tools_call_reference_add_and_remove() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    seed_single_project_config(&tasks_dir);
+
+    // Make repo root discoverable for file/code references.
+    std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+    std::fs::create_dir_all(tmp.path().join("src")).unwrap();
+    std::fs::write(tmp.path().join("src/example.rs"), "fn main() {}\n").unwrap();
+
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
+    }
+
+    // Create a task
+    let create_args = json!({
+        "name": "task_create",
+        "arguments": { "title": "MCP References", "project": "MCP" }
+    });
+    let create_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(30)),
+        method: "tools/call".into(),
+        params: create_args,
+    };
+    let create_resp = dispatch(create_req);
+    assert!(create_resp.error.is_none(), "task_create failed");
+    let task_json = parse_tool_payload(&create_resp);
+    let id = task_json
+        .get("task")
+        .and_then(|task| task.get("id"))
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+
+    // Add link reference
+    let add_link_args = json!({
+        "name": "task_reference_add",
+        "arguments": { "id": id, "kind": "link", "value": "https://example.com" }
+    });
+    let add_link_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(31)),
+        method: "tools/call".into(),
+        params: add_link_args,
+    };
+    let add_link_resp = dispatch(add_link_req);
+    assert!(
+        add_link_resp.error.is_none(),
+        "task_reference_add link failed"
+    );
+    let payload = parse_tool_payload(&add_link_resp);
+    assert!(payload.get("changed").and_then(|v| v.as_bool()).unwrap());
+
+    // Add file reference
+    let add_file_args = json!({
+        "name": "task_reference_add",
+        "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "file", "value": "src/example.rs" }
+    });
+    let add_file_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(32)),
+        method: "tools/call".into(),
+        params: add_file_args,
+    };
+    let add_file_resp = dispatch(add_file_req);
+    assert!(
+        add_file_resp.error.is_none(),
+        "task_reference_add file failed"
+    );
+
+    // Add code reference
+    let add_code_args = json!({
+        "name": "task_reference_add",
+        "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
+    });
+    let add_code_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(33)),
+        method: "tools/call".into(),
+        params: add_code_args,
+    };
+    let add_code_resp = dispatch(add_code_req);
+    assert!(
+        add_code_resp.error.is_none(),
+        "task_reference_add code failed"
+    );
+    let payload = parse_tool_payload(&add_code_resp);
+    let refs = payload
+        .get("task")
+        .and_then(|t| t.get("references"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(refs.iter().any(|r| {
+        r.get("link")
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| s == "https://example.com")
+    }));
+    assert!(refs.iter().any(|r| {
+        r.get("file")
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| s == "src/example.rs")
+    }));
+    assert!(refs.iter().any(|r| {
+        r.get("code")
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| s == "src/example.rs#1")
+    }));
+
+    // Remove code reference
+    let remove_code_args = json!({
+        "name": "task_reference_remove",
+        "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
+    });
+    let remove_code_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(34)),
+        method: "tools/call".into(),
+        params: remove_code_args,
+    };
+    let remove_code_resp = dispatch(remove_code_req);
+    assert!(
+        remove_code_resp.error.is_none(),
+        "task_reference_remove code failed"
+    );
+    let payload = parse_tool_payload(&remove_code_resp);
+    let refs = payload
+        .get("task")
+        .and_then(|t| t.get("references"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(!refs.iter().any(|r| {
+        r.get("code")
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| s == "src/example.rs#1")
+    }));
+}
+
+#[test]
 fn tools_call_update_delete_list_and_invalid_enum() {
     let _lock = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();
