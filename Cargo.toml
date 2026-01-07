@@ -61,7 +61,7 @@ overflow-checks = true
 [dev-dependencies]
 assert_cmd = "2.1.1"
 predicates = "3.1.3"
-tempfile = "3.23.0"
+tempfile = "3.24.0"
 ctor = "0.6.1"
 once_cell = "1.21.3"
 
