@@ -50,13 +50,32 @@
           </UiButton>
           <div v-if="showColumnMenu" class="columns-popover card" @click.self="showColumnMenu=false">
             <div class="col" style="gap:6px;">
-              <label v-for="col in allColumns" :key="col" class="row" style="gap:6px; align-items:center;">
+              <label
+                v-for="col in columnOrder"
+                :key="col"
+                :class="[
+                  'row',
+                  'column-option',
+                  {
+                    'is-draggable': true,
+                    'is-drag-over': dragOverCol === col,
+                    'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                    'is-dragging': draggingCol === col,
+                  },
+                ]"
+                :draggable="true"
+                style="gap:6px; align-items:center;"
+                @dragstart="onColDragStart(col, $event)"
+                @dragend="onColDragEnd"
+                @dragover.prevent="onColDragOver(col, $event)"
+                @drop.prevent="onColDrop(col, $event)"
+              >
                 <input type="checkbox" :checked="columnsSet.has(col)" @change="toggleColumn(col, $event)" />
                 <span>{{ headerLabel(col) }}</span>
               </label>
               <div class="row" style="gap:6px; margin-top: 6px;">
-                <UiButton type="button" @click="showColumnMenu=false">Close</UiButton>
                 <UiButton type="button" @click="resetColumns">Reset</UiButton>
+                <UiButton type="button" @click="showColumnMenu=false">Close</UiButton>
               </div>
             </div>
           </div>
@@ -81,13 +100,25 @@
               :key="col"
               :class="['sortable', { active: sort.key === col }]"
               :aria-sort="sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'"
+              @dragover.prevent="onColDragOver(col, $event)"
+              @drop.prevent="onColDrop(col, $event)"
             >
               <button
-                class="header-button"
+                :class="[
+                  'header-button',
+                  {
+                    'is-drag-over': dragOverCol === col,
+                    'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                    'is-dragging': draggingCol === col,
+                  },
+                ]"
                 type="button"
-                @click="onSort(col)"
+                draggable="true"
+                @click="onHeaderActivate(col)"
                 @keydown.enter.prevent="onSort(col)"
                 @keydown.space.prevent="onSort(col)"
+                @dragstart="onColDragStart(col, $event)"
+                @dragend="onColDragEnd"
               >
                 <span class="header-button__label">{{ headerLabel(col) }}</span>
                 <span class="header-button__sort" aria-hidden="true">
@@ -233,6 +264,7 @@ const emit = defineEmits<TaskTableEmit>()
 
 const {
   allColumns,
+  columnOrder,
   columns,
   columnsSet,
   visibleColumns,
@@ -271,6 +303,76 @@ const {
   touchBadge,
   isOverdue,
 } = useTaskTableState(props, emit)
+
+type ColumnKey = (typeof allColumns)[number]
+
+const draggingCol = ref<ColumnKey | null>(null)
+const dragOverCol = ref<ColumnKey | null>(null)
+const dragOverPos = ref<'before' | 'after'>('before')
+const lastDragAt = ref(0)
+
+function onHeaderActivate(col: ColumnKey) {
+  if (Date.now() - lastDragAt.value < 250) return
+  onSort(col)
+}
+
+function moveColumn(from: ColumnKey, to: ColumnKey, pos: 'before' | 'after') {
+  if (from === to) return
+  const next = columnOrder.value.filter((c) => c !== from)
+  const idx = next.indexOf(to)
+  if (idx < 0) return
+  const insertAt = pos === 'after' ? idx + 1 : idx
+  next.splice(insertAt, 0, from)
+  columnOrder.value = next
+}
+
+function onColDragStart(col: ColumnKey, event: DragEvent) {
+  draggingCol.value = col
+  dragOverCol.value = null
+  dragOverPos.value = 'before'
+  lastDragAt.value = Date.now()
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    try {
+      event.dataTransfer.setData('application/x-lotar-col', col)
+      event.dataTransfer.setData('text/plain', col)
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function onColDragOver(col: ColumnKey, event: DragEvent) {
+  dragOverCol.value = col
+  const target = event.currentTarget as HTMLElement | null
+  if (!target) {
+    dragOverPos.value = 'before'
+    return
+  }
+  const rect = target.getBoundingClientRect?.()
+  if (!rect || !rect.width) {
+    dragOverPos.value = 'before'
+    return
+  }
+  const mid = rect.left + rect.width / 2
+  dragOverPos.value = event.clientX <= mid ? 'before' : 'after'
+}
+
+function onColDrop(target: ColumnKey, event: DragEvent) {
+  const source = (event.dataTransfer?.getData('application/x-lotar-col') || event.dataTransfer?.getData('text/plain') || '') as ColumnKey
+  if (source) moveColumn(source, target, dragOverPos.value)
+  draggingCol.value = null
+  dragOverCol.value = null
+  dragOverPos.value = 'before'
+  lastDragAt.value = Date.now()
+}
+
+function onColDragEnd() {
+  draggingCol.value = null
+  dragOverCol.value = null
+  dragOverPos.value = 'before'
+  lastDragAt.value = Date.now()
+}
 
 const sprintLookup = computed(() => props.sprintLookup ?? {})
 const hasSprintsLocal = computed(() => props.hasSprints ?? false)
@@ -416,8 +518,8 @@ onUnmounted(() => {
   background: transparent;
 }
 .table-scroll::-webkit-scrollbar-thumb {
-  background: color-mix(in oklab, var(--color-border, #e2e8f0) 70%, transparent);
-  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-pill);
 }
 .table {
   width: 100%;
@@ -462,9 +564,41 @@ th.active {
   white-space: nowrap;
 }
 
+.header-button.is-drag-over {
+  outline: 1px dashed var(--color-border, var(--border));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.header-button.is-drag-over.is-drag-over--after {
+  outline-style: solid;
+}
+
+.header-button.is-dragging {
+  opacity: 0.65;
+}
+
+.column-option.is-draggable {
+  cursor: grab;
+}
+
+.column-option.is-drag-over {
+  outline: 1px dashed var(--color-border, var(--border));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.column-option.is-drag-over.is-drag-over--after {
+  outline-style: solid;
+}
+
+.column-option.is-dragging {
+  opacity: 0.65;
+}
+
 .header-button:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring, 0 0 0 1px rgba(14,165,233,0.35), 0 0 0 4px rgba(14,165,233,0.2));
+  box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm, 0.25rem);
 }
 
@@ -479,7 +613,7 @@ th.active {
   line-height: 1;
   min-width: 1.5em;
   text-align: center;
-  color: var(--color-muted, #6b7280);
+  color: var(--color-muted);
 }
 
 th.active .header-button__sort {
@@ -514,7 +648,7 @@ th.active .header-button__sort {
 
 tbody tr {
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background var(--duration-fast) var(--ease-standard);
 }
 
 tbody tr:hover,
@@ -523,16 +657,16 @@ tbody tr:focus-within {
 }
 
 tbody tr.is-recent {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 12%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 12%, transparent);
 }
 
-.status { color: var(--color-muted, #6b7280); font-weight: 600; }
+.status { color: var(--color-muted); font-weight: 600; }
 
 .chip.small {
   font-size: var(--text-xs, 0.75rem);
   padding: calc(var(--space-1, 0.25rem)) var(--space-2, 0.5rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .chip.sprint-chip {
@@ -553,24 +687,24 @@ tbody tr.is-recent {
 }
 
 .chip.sprint--active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  color: var(--color-accent, #0ea5e9);
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
 }
 
 .chip.sprint--overdue {
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
-  color: var(--color-danger, #ef4444);
+  background: color-mix(in oklab, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
 }
 
 .chip.sprint--complete {
-  background: color-mix(in oklab, var(--color-success, #16a34a) 18%, transparent);
-  color: var(--color-success, #166534);
+  background: color-mix(in oklab, var(--color-success) 18%, transparent);
+  color: var(--color-success-strong);
 }
 
 .chip.sprint--pending,
 .chip.sprint--unknown {
-  background: color-mix(in oklab, var(--color-muted, #6b7280) 18%, transparent);
-  color: var(--color-muted, #6b7280);
+  background: color-mix(in oklab, var(--color-muted) 18%, transparent);
+  color: var(--color-muted);
 }
 
 .columns-button-wrapper {
@@ -591,7 +725,7 @@ tbody tr.is-recent {
   border: 1px solid var(--color-border, var(--border));
   border-radius: var(--radius-lg, 0.75rem);
   background: var(--color-bg, var(--bg));
-  box-shadow: var(--shadow-md, 0 4px 16px rgba(15,23,42,0.1));
+  box-shadow: var(--shadow-popover);
 }
 
 .table-toolbar {
@@ -603,7 +737,7 @@ tbody tr.is-recent {
 }
 
 .overdue {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
   font-weight: 600;
 }
 
@@ -611,7 +745,7 @@ tbody tr.is-recent {
 .columns-popover {
   top: calc(100% + var(--space-2, 0.5rem));
   right: 0;
-  z-index: 10;
+  z-index: var(--z-popover);
 }
 
 /* Row actions menu */
@@ -628,11 +762,11 @@ tbody tr.is-recent {
   border: 1px solid var(--color-border, var(--border));
   border-radius: var(--radius-md, 0.375rem);
   background: var(--color-bg, var(--bg));
-  box-shadow: var(--shadow-md, 0 4px 16px rgba(15,23,42,0.1));
+  box-shadow: var(--shadow-popover);
   display: flex;
   flex-direction: column;
   gap: var(--space-1, 0.25rem);
-  z-index: 10;
+  z-index: var(--z-popover);
 }
 
 .columns-control__selected {
@@ -656,7 +790,7 @@ tbody tr.is-recent {
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
   border-radius: var(--radius-md, 0.375rem);
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background var(--duration-fast) var(--ease-standard);
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
@@ -667,7 +801,7 @@ tbody tr.is-recent {
 }
 
 .menu-item.danger {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .menu-item__icon {
@@ -676,7 +810,7 @@ tbody tr.is-recent {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-muted, #6b7280);
+  color: var(--color-muted);
   font-size: 1.15rem;
 }
 
@@ -691,7 +825,7 @@ tbody tr.is-recent {
 .menu-separator {
   height: 1px;
   margin: var(--space-2, 0.5rem) 0;
-  background: color-mix(in oklab, var(--color-border, #e2e8f0) 80%, transparent);
+  background: color-mix(in oklab, var(--color-border) 80%, transparent);
 }
 
 .task-table__title-text {
@@ -712,7 +846,7 @@ tbody tr.is-recent {
   align-items: center;
   gap: var(--space-2, 0.5rem);
   font-size: var(--text-xs, 0.75rem);
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   margin-top: 0;
   max-width: 100%;
 }
@@ -721,26 +855,26 @@ tbody tr.is-recent {
   display: inline-flex;
   align-items: center;
   padding: 0 var(--space-1, 0.25rem);
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--color-border, #e2e8f0) 90%, transparent);
-  background: color-mix(in oklab, var(--color-surface, #f8fafc) 85%, transparent);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
+  background: color-mix(in oklab, var(--color-surface) 85%, transparent);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .session-touch__badge.created {
-  border-color: color-mix(in oklab, var(--color-success, #16a34a) 40%, transparent);
-  background: color-mix(in oklab, var(--color-success, #16a34a) 10%, transparent);
+  border-color: color-mix(in oklab, var(--color-success) 40%, transparent);
+  background: color-mix(in oklab, var(--color-success) 10%, transparent);
 }
 
 .session-touch__badge.updated {
-  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 40%, transparent);
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 12%, transparent);
+  border-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 12%, transparent);
 }
 
 .session-touch__badge.deleted {
-  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 40%, transparent);
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 12%, transparent);
+  border-color: color-mix(in oklab, var(--color-danger) 40%, transparent);
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
 }
 
 .controls .add-button {
@@ -755,8 +889,8 @@ tbody tr.is-recent {
 }
 
 .add-button:hover {
-  background: var(--color-accent, #0ea5e9);
-  color: var(--color-accent-contrast, #ffffff);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   border-color: transparent;
 }
 

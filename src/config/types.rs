@@ -329,6 +329,12 @@ pub struct GlobalConfig {
     /// - `-1`: unlimited
     #[serde(default = "default_attachments_max_upload_mb")]
     pub attachments_max_upload_mb: i64,
+
+    /// Optional path to a directory containing custom web UI assets.
+    /// When set and the path exists, the server will serve files from this directory
+    /// before falling back to the bundled UI. This allows using a custom or development UI.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub web_ui_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -548,6 +554,7 @@ impl Default for GlobalConfig {
             auto_identity_git: true,
             attachments_dir: default_attachments_dir(),
             attachments_max_upload_mb: default_attachments_max_upload_mb(),
+            web_ui_path: None,
         }
     }
 }

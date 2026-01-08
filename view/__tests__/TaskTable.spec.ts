@@ -42,6 +42,15 @@ const tasks = [
 describe('TaskTable', () => {
   beforeEach(() => { localStorage.clear() })
 
+  function makeDataTransfer() {
+    const store: Record<string, string> = {}
+    return {
+      effectAllowed: 'move',
+      setData: (type: string, value: string) => { store[type] = value },
+      getData: (type: string) => store[type] || '',
+    } as any
+  }
+
   it('sorts by title asc then desc when clicking header', async () => {
     const wrapper = mount(TaskTable, { props: { tasks, statuses: ['open', 'in-progress', 'done'] } })
     const headers = wrapper.findAll('th')
@@ -58,17 +67,104 @@ describe('TaskTable', () => {
   it('persists column toggles in localStorage', async () => {
     const wrapper = mount(TaskTable, { props: { tasks, projectKey: 'PRJ' } })
     // open popover
-    await wrapper.find('button.btn').trigger('click')
+    const columnsButton = wrapper.findAll('button.btn').find((b) => b.text().includes('Columns'))!
+    await columnsButton.trigger('click')
     const checks = wrapper.findAll('input[type="checkbox"]')
     // uncheck Tags column
     const tagsCheckbox = checks.find(c => c.element.nextSibling && (c.element.nextSibling as any).textContent?.includes('Tags'))!
     await tagsCheckbox.setValue(false)
     // close
-    const buttons = wrapper.findAll('button.btn')
-    await buttons[1].trigger('click')
+    const closeButton = wrapper.findAll('button.btn').find((b) => b.text().trim() === 'Close')!
+    await closeButton.trigger('click')
     const saved = JSON.parse(localStorage.getItem('lotar.taskTable.columns::PRJ') || '[]')
     expect(saved).toBeInstanceOf(Array)
     expect(saved).not.toContain('tags')
+  })
+
+  it('reorders columns via drag and drop and persists', async () => {
+    const wrapper = mount(TaskTable, { props: { tasks, projectKey: 'PRJ' } })
+
+    const labels = () =>
+      wrapper
+        .findAll('button.header-button .header-button__label')
+        .map((n) => n.text())
+
+    const before = labels()
+    expect(before).toContain('Priority')
+    expect(before).toContain('Status')
+
+    const buttons = wrapper.findAll('button.header-button')
+    const priorityButton = buttons.find((b) => b.text().includes('Priority'))!
+    const statusButton = buttons.find((b) => b.text().includes('Status'))!
+    const statusTh = wrapper.findAll('th').find((th) => th.text().includes('Status'))!
+
+    const dt = makeDataTransfer()
+    await priorityButton.trigger('dragstart', { dataTransfer: dt })
+    await statusTh.trigger('dragover', { dataTransfer: dt, clientX: 0 })
+    await statusTh.trigger('drop', { dataTransfer: dt, clientX: 0 })
+
+    const after = labels()
+    expect(after.indexOf('Priority')).toBeLessThan(after.indexOf('Status'))
+
+    const savedOrder = JSON.parse(localStorage.getItem('lotar.taskTable.columnOrder::PRJ') || '[]')
+    expect(savedOrder.indexOf('priority')).toBeGreaterThanOrEqual(0)
+    expect(savedOrder.indexOf('status')).toBeGreaterThanOrEqual(0)
+    expect(savedOrder.indexOf('priority')).toBeLessThan(savedOrder.indexOf('status'))
+  })
+
+  it('reorders columns via the columns menu drag and drop', async () => {
+    const wrapper = mount(TaskTable, { props: { tasks, projectKey: 'PRJ' } })
+
+    await wrapper.find('button.btn').trigger('click')
+    const rows = wrapper.findAll('.columns-popover label')
+
+    const priorityRow = rows.find((row) => row.text().includes('Priority'))!
+    const statusRow = rows.find((row) => row.text().includes('Status'))!
+
+    const dt = makeDataTransfer()
+    await priorityRow.trigger('dragstart', { dataTransfer: dt })
+    await statusRow.trigger('dragover', { dataTransfer: dt, clientX: 0 })
+    await statusRow.trigger('drop', { dataTransfer: dt, clientX: 0 })
+
+    const savedOrder = JSON.parse(localStorage.getItem('lotar.taskTable.columnOrder::PRJ') || '[]')
+    expect(savedOrder.indexOf('priority')).toBeLessThan(savedOrder.indexOf('status'))
+  })
+
+  it('keeps column order stable across toggles', async () => {
+    localStorage.setItem('lotar.taskTable.columnOrder::PRJ', JSON.stringify([
+      'id',
+      'title',
+      'priority',
+      'status',
+      'assignee',
+      'tags',
+      'modified',
+      'reporter',
+      'sprints',
+      'due_date',
+      'task_type',
+      'effort',
+    ]))
+
+    const wrapper = mount(TaskTable, { props: { tasks, projectKey: 'PRJ' } })
+
+    const labels = () =>
+      wrapper
+        .findAll('button.header-button .header-button__label')
+        .map((n) => n.text())
+
+    const before = labels()
+    expect(before.indexOf('Priority')).toBeLessThan(before.indexOf('Status'))
+
+    await wrapper.find('button.btn').trigger('click')
+    const checks = wrapper.findAll('input[type="checkbox"]')
+    const priorityCheckbox = checks.find(c => (c.element.nextSibling as any)?.textContent?.includes('Priority'))!
+
+    await priorityCheckbox.setValue(false)
+    await priorityCheckbox.setValue(true)
+
+    const after = labels()
+    expect(after.indexOf('Priority')).toBeLessThan(after.indexOf('Status'))
   })
 
   it('uses per-project sort keys', async () => {

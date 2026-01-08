@@ -23,14 +23,7 @@ defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 }
 
 .ui-select option {
-  color: var(--color-fg, #0f172a);
-  background: var(--color-bg, #ffffff);
-}
-
-@media (prefers-color-scheme: dark) {
-  .ui-select option {
-    color: var(--color-fg, #e5e7eb);
-    background: var(--color-bg, #111315);
-  }
+  color: var(--color-fg);
+  background: var(--color-bg);
 }
 </style>

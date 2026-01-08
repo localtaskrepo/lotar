@@ -577,6 +577,14 @@ pub fn apply_field_to_global_config(
         "sprints_notifications_enabled" => {
             config.sprints.notifications.enabled = parse_bool_flag(value, field)?;
         }
+        "web_ui_path" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                config.web_ui_path = None;
+            } else {
+                config.web_ui_path = Some(trimmed.to_string());
+            }
+        }
         _ => {
             return Err(ConfigError::ParseError(format!(
                 "Unknown global config field: {}",

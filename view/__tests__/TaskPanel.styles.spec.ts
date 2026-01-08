@@ -224,7 +224,9 @@ describe('TaskPanel layout styles', () => {
         expect(styleContent).toMatch(/\.task-panel__overlay[^{}]*\{[^}]*position:\s*fixed/)
         expect(styleContent).toMatch(/\.task-panel__overlay[^{}]*\{[^}]*display:\s*flex/)
         expect(styleContent).toMatch(/\.task-panel__overlay[^{}]*\{[^}]*justify-content:\s*flex-end/)
-        expect(styleContent).toMatch(/\.task-panel__overlay[^{}]*\{[^}]*background:\s*rgba\(15,\s*15,\s*15,\s*0\.55\)/)
+        expect(styleContent).toMatch(
+            /\.task-panel__overlay[^{}]*\{[^}]*background:\s*(rgba\(15,\s*15,\s*15,\s*0\.55\)|var\(--color-dialog-overlay\))/,
+        )
 
         expect(styleContent).toMatch(/\.task-panel[^{}]*\{[^}]*display:\s*flex/)
         expect(styleContent).toMatch(/\.task-panel[^{}]*\{[^}]*flex-direction:\s*column/)

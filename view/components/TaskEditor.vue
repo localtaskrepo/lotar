@@ -348,7 +348,7 @@ function pickTag(t: string){ if (!form.tags) form.tags = []; if (!form.tags.incl
 </script>
 
 <style scoped>
-.task-editor textarea { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); }
+.task-editor textarea { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); }
 .task-editor__tag-remove {
   border: none;
   background: none;
@@ -365,7 +365,7 @@ function pickTag(t: string){ if (!form.tags) form.tags = []; if (!form.tags.incl
 }
 .tag-input { min-width: 120px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
-.suggest { list-style: none; padding: 0; margin: 6px 0; border: 1px solid var(--border); border-radius: 6px; max-height: 160px; overflow: auto; }
+.suggest { list-style: none; padding: 0; margin: 6px 0; border: 1px solid var(--border); border-radius: var(--radius-md); max-height: 160px; overflow: auto; }
 .suggest li { padding: 6px 8px; cursor: pointer; }
 .suggest li:hover { background: var(--surface-2); }
 .muted.small { font-size: 12px; }

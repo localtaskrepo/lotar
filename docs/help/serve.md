@@ -30,6 +30,12 @@ lotar serve --tasks-dir=/custom/path --port=8080
 # Environment variable usage
 export LOTAR_TASKS_DIR=/project/tasks
 lotar serve  # Uses environment-configured directory
+
+# Custom web UI
+lotar serve --web-ui-path=/path/to/custom/ui
+
+# Force embedded UI (useful for testing)
+lotar serve --web-ui-embedded
 ```
 
 ## Options
@@ -37,6 +43,8 @@ lotar serve  # Uses environment-configured directory
 - `--port <PORT>` - Port to bind server to (default: 8080). The short `-p` flag is reserved for the global `--project` option, so always use the long form when setting the port.
 - `--host <HOST>` - Host address to bind to (default: localhost)
 - `--open` - Automatically open browser after starting server
+- `--web-ui-path <PATH>` - Path to a directory containing custom web UI assets. When set and the directory exists, files are served from here first, falling back to the bundled UI if not found.
+- `--web-ui-embedded` - Force serving only the embedded/bundled UI assets, ignoring any custom web UI path. Useful for CI testing to ensure the bundled UI works correctly.
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Override tasks directory resolution
@@ -45,6 +53,8 @@ lotar serve  # Uses environment-configured directory
 
 ## Environment Variables
 - `LOTAR_TASKS_DIR` - Default tasks directory location
+- `LOTAR_WEB_UI_PATH` - Path to custom web UI assets directory (same as `--web-ui-path`)
+- `LOTAR_WEB_UI_EMBEDDED` - When set to `1`, force embedded UI only (same as `--web-ui-embedded`)
 - `LOTAR_SSE_DEBOUNCE_MS` - Default debounce window for `/api/events` and `/api/tasks/stream` (overridden by the `debounce_ms` query parameter).
 - `LOTAR_SSE_READY` / `LOTAR_TEST_FAST_IO` - Testing hooks that control synthetic readiness events and heartbeat cadence.
 
@@ -110,7 +120,25 @@ Once started, the server provides:
 	- `Access-Control-Allow-Origin: *`
 	- `Access-Control-Allow-Methods: GET,POST,OPTIONS`
 	- `Access-Control-Allow-Headers: Content-Type`
-- Static files are served from `target/web` (built via `npm run build`), embedded at compile time through `include_dir!` for release builds with a filesystem fallback during development.
+- Static files are served with the following priority:
+	1. **Custom UI path** (if `--web-ui-path` or `LOTAR_WEB_UI_PATH` is set and the directory exists)
+	2. **Embedded assets** (bundled at compile time via `include_dir!`)
+	3. **Filesystem fallback** (`target/web/`, only when no custom path is configured)
+- Use `--web-ui-embedded` or `LOTAR_WEB_UI_EMBEDDED=1` to skip the custom path and only serve embedded assets.
+
+### Custom Web UI
+
+You can serve a custom or development UI by pointing to a directory containing web assets:
+
+```bash
+# Serve from a local development build
+lotar serve --web-ui-path=./my-custom-ui/dist
+
+# Or set in your global config (~/.lotar/config.yml or .tasks/config.yml)
+web_ui_path: /path/to/custom/ui
+```
+
+The custom UI path takes precedence over embedded assets. If a requested file is not found in the custom path, the server falls back to the bundled UI. This allows partial overrides or testing new UI builds without recompiling the Rust binary.
 
 ## Notes
 

@@ -257,20 +257,20 @@ const filteredSuggestions = computed(() => {
   gap: 6px;
   min-height: var(--config-control-height, var(--field-height, 40px));
   padding: calc(var(--space-2, 8px) - 4px) var(--space-3, 12px);
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
-  background: color-mix(in oklab, var(--color-surface, #111827) 96%, transparent);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
+  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .chip-field__control--open {
-  border-color: var(--color-accent, #0ea5e9);
-  box-shadow: var(--focus-ring, 0 0 0 2px color-mix(in srgb, var(--color-accent, #0ea5e9) 40%, transparent));
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
 }
 
 .chip-field__control:focus-within {
-  border-color: var(--color-accent, #0ea5e9);
-  box-shadow: var(--focus-ring, 0 0 0 2px color-mix(in srgb, var(--color-accent, #0ea5e9) 40%, transparent));
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
 }
 
 .chip-field__chip {
@@ -279,7 +279,7 @@ const filteredSuggestions = computed(() => {
   gap: 4px;
   padding: calc(var(--space-1, 4px) - 1px) var(--space-2, 8px);
   border-radius: var(--radius-md, 8px);
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
+  border: 1px solid var(--color-border);
   background: transparent;
   color: inherit;
   font-size: var(--text-xs, 12px);
@@ -310,7 +310,7 @@ const filteredSuggestions = computed(() => {
 
 .chip-field__empty {
   font-size: 13px;
-  color: var(--color-muted, rgba(255, 255, 255, 0.7));
+  color: var(--color-muted);
 }
 
 .chip-field__add {
@@ -318,18 +318,18 @@ const filteredSuggestions = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px dashed var(--color-border, rgba(255, 255, 255, 0.3));
-  border-radius: 999px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-pill);
   padding: 4px 10px;
   background: transparent;
-  color: var(--color-muted, rgba(255, 255, 255, 0.8));
+  color: var(--color-muted);
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+  transition: border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard);
 }
 
 .chip-field__add:hover:not(:disabled) {
-  border-color: var(--color-accent, #0ea5e9);
-  color: var(--color-accent, #0ea5e9);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .chip-field__add:disabled {
@@ -345,14 +345,14 @@ const filteredSuggestions = computed(() => {
 }
 
 .chip-field__composer {
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
-  background: color-mix(in oklab, var(--color-surface, #111827) 94%, transparent);
+  background: color-mix(in oklab, var(--color-surface) 94%, transparent);
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: var(--shadow-md, 0 8px 30px rgba(0, 0, 0, 0.35));
+  box-shadow: var(--shadow-popover);
 }
 
 .chip-field__composer-label {
@@ -375,7 +375,7 @@ const filteredSuggestions = computed(() => {
 
 .chip-field__suggestions-label {
   font-size: 12px;
-  color: var(--color-muted, rgba(255, 255, 255, 0.7));
+  color: var(--color-muted);
 }
 
 .chip-field__suggestion-list {
@@ -385,7 +385,7 @@ const filteredSuggestions = computed(() => {
 }
 
 .chip-field__suggestion {
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
   background: transparent;
   color: inherit;
@@ -395,12 +395,12 @@ const filteredSuggestions = computed(() => {
 }
 
 .chip-field__suggestion:hover {
-  border-color: var(--color-border-strong, rgba(255, 255, 255, 0.3));
+  border-color: var(--color-border-strong);
 }
 
 .chip-field__suggestion-empty {
   font-size: 12px;
-  color: var(--color-muted, rgba(255, 255, 255, 0.6));
+  color: var(--color-muted);
 }
 
 .chip-field--disabled .chip-field__control {
@@ -410,7 +410,7 @@ const filteredSuggestions = computed(() => {
 
 .chip-field-composer-enter-active,
 .chip-field-composer-leave-active {
-  transition: opacity 120ms ease;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .chip-field-composer-enter-from,

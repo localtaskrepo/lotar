@@ -144,12 +144,12 @@ function handleTagsUpdate() {
 }
 
 .field-error {
-  color: #ff8091;
+  color: var(--color-danger);
   font-size: 12px;
 }
 
 .field-hint {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-muted);
   font-size: 12px;
 }
 </style>

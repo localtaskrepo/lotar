@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
@@ -15,7 +15,43 @@ static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web");
 static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+/// Configuration for the web server's static file serving behavior.
+#[derive(Debug, Clone, Default)]
+pub struct WebServerConfig {
+    /// Optional path to a directory containing custom web UI assets.
+    /// When set and the directory exists, files are served from here first,
+    /// falling back to embedded assets if not found.
+    pub web_ui_path: Option<PathBuf>,
+
+    /// When true, only serve embedded assets (ignore web_ui_path).
+    /// Useful for CI testing to ensure the bundled UI works correctly.
+    pub embedded_only: bool,
+}
+
+impl WebServerConfig {
+    /// Resolve the effective web UI path, if any.
+    /// Returns None if embedded_only is set or the path doesn't exist.
+    pub fn effective_web_ui_path(&self) -> Option<&Path> {
+        if self.embedded_only {
+            return None;
+        }
+        self.web_ui_path
+            .as_ref()
+            .filter(|p| p.is_dir())
+            .map(|p| p.as_path())
+    }
+}
+
 pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16) {
+    serve_with_config(api_server, host, port, &WebServerConfig::default())
+}
+
+pub fn serve_with_config(
+    api_server: &api_server::ApiServer,
+    host: &str,
+    port: u16,
+    config: &WebServerConfig,
+) {
     let addr = format!("{}:{}", host, port);
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
@@ -187,9 +223,10 @@ pub fn serve_with_host(api_server: &api_server::ApiServer, host: &str, port: u16
                 } else {
                     let request_path = if path == "/" { "/index.html" } else { &path };
                     let rel_path = request_path.trim_start_matches('/');
-                    let mut served = try_serve_static(rel_path, &mut stream);
+                    let external_path = config.effective_web_ui_path();
+                    let mut served = try_serve_static(rel_path, &mut stream, external_path);
                     if !served && should_fallback_to_index(&path) {
-                        served = try_serve_static("index.html", &mut stream);
+                        served = try_serve_static("index.html", &mut stream, external_path);
                     }
                     if !served {
                         let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
@@ -212,39 +249,50 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
     serve_with_host(api_server, "127.0.0.1", port)
 }
 
-fn try_serve_static(rel_path: &str, stream: &mut TcpStream) -> bool {
-    // Try embedded first
-    if let Some(file) = STATIC_FILES.get_file(rel_path) {
-        let data = file.contents();
-        let content_type = content_type_for(rel_path);
-        let header = format!(
-            "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
-            content_type,
-            data.len()
-        );
-        let _ = stream.write_all(header.as_bytes());
-        let _ = stream.write_all(data);
-        let _ = stream.flush();
-        return true;
+/// Serve a static file from the configured sources.
+///
+/// Resolution order:
+/// 1. If `external_path` is Some, try to serve from that directory first
+/// 2. Try embedded assets (bundled at compile time)
+/// 3. Fallback to `target/web` on the filesystem (for development)
+fn try_serve_static(rel_path: &str, stream: &mut TcpStream, external_path: Option<&Path>) -> bool {
+    // 1. Try external/custom UI path first (if configured)
+    if let Some(ext_dir) = external_path {
+        let fs_path = ext_dir.join(rel_path);
+        if let Ok(bytes) = fs::read(&fs_path) {
+            return serve_bytes(rel_path, &bytes, stream);
+        }
     }
 
-    // Fallback to filesystem (useful during development)
-    let fs_path = Path::new("target/web").join(rel_path);
-    match fs::read(&fs_path) {
-        Ok(bytes) => {
-            let content_type = content_type_for(rel_path);
-            let header = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
-                content_type,
-                bytes.len()
-            );
-            let _ = stream.write_all(header.as_bytes());
-            let _ = stream.write_all(&bytes);
-            let _ = stream.flush();
-            true
-        }
-        Err(_) => false,
+    // 2. Try embedded assets
+    if let Some(file) = STATIC_FILES.get_file(rel_path) {
+        return serve_bytes(rel_path, file.contents(), stream);
     }
+
+    // 3. Fallback to target/web filesystem (development convenience)
+    // Skip this if we already tried an external path to avoid confusion
+    if external_path.is_none() {
+        let fs_path = Path::new("target/web").join(rel_path);
+        if let Ok(bytes) = fs::read(&fs_path) {
+            return serve_bytes(rel_path, &bytes, stream);
+        }
+    }
+
+    false
+}
+
+/// Write HTTP 200 response with the given bytes
+fn serve_bytes(rel_path: &str, bytes: &[u8], stream: &mut TcpStream) -> bool {
+    let content_type = content_type_for(rel_path);
+    let header = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+        content_type,
+        bytes.len()
+    );
+    let _ = stream.write_all(header.as_bytes());
+    let _ = stream.write_all(bytes);
+    let _ = stream.flush();
+    true
 }
 
 fn should_fallback_to_index(path: &str) -> bool {

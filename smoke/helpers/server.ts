@@ -44,6 +44,9 @@ export async function startLotarServer(
     const port = options.port ?? (await getPort());
     const env = {
         ...workspace.env,
+        // Default to embedded UI in smoke tests to ensure we test the bundled assets.
+        // Tests that specifically need to test custom UI paths can override this.
+        LOTAR_WEB_UI_EMBEDDED: '1',
         ...options.env,
     };
 

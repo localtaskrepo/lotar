@@ -49,6 +49,20 @@ describe('useTaskTableState', () => {
         expect(parsed).not.toContain('tags')
     })
 
+    it('allows hiding id and title', async () => {
+        const { wrapper } = mountHarness()
+        wrapper.vm.toggleColumn('id', { target: { checked: false } } as unknown as Event)
+        wrapper.vm.toggleColumn('title', { target: { checked: false } } as unknown as Event)
+        await nextTick()
+        expect(wrapper.vm.columns).not.toContain('id')
+        expect(wrapper.vm.columns).not.toContain('title')
+        const raw = localStorage.getItem('lotar.taskTable.columns::ACME')
+        expect(raw).toBeTruthy()
+        const parsed = JSON.parse(raw || '[]')
+        expect(parsed).not.toContain('id')
+        expect(parsed).not.toContain('title')
+    })
+
     it('tracks selection and emits updates', async () => {
         const { wrapper, calls } = mountHarness()
         wrapper.vm.toggleOne('ACME-1', { target: { checked: true } } as unknown as Event)

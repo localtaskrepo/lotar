@@ -50,7 +50,7 @@ The Docker image bundles the latest signed musl build, so Linux, macOS, and Wind
 
 **Rust developers (from source)**
 ```bash
-git clone https://github.com/mallox/lotar
+git clone https://github.com/localtaskrepo/lotar
 cd lotar
 cargo build --release
 export PATH="$PATH:$(pwd)/target/release"
@@ -92,6 +92,8 @@ lotar serve --open
 ## ✨ What is LoTaR?
 
 LoTaR is a **production-ready task management system** designed for developers who want their task tracking to live alongside their code. Instead of external tools that get out of sync, LoTaR stores tasks as human-readable YAML files in your repository.
+
+Think of it as a local-first, git-native issue tracker (and task tracker) built for developer workflows.
 
 ### Key Benefits
 - 🔒 **Git-native**: Tasks are version-controlled with your code
@@ -187,9 +189,18 @@ lotar --format json stats changed --since 7d
 
 ### Web Interface
 ```bash
-# Built-in web server with React frontend
+# Built-in web server with Vue frontend
 lotar serve --host 127.0.0.1 --port 8080
 ```
+
+### Screenshots
+
+A quick peek at the built-in web UI:
+
+| Tasks | Boards |
+| --- | --- |
+| ![Tasks list](docs/assets/screenshots/ui-tasks.png) | ![Boards](docs/assets/screenshots/ui-boards.png) |
+| ![Sprints](docs/assets/screenshots/ui-sprints.png) | ![Insights](docs/assets/screenshots/ui-insights.png) |
 
 ### Task History (read-only, from git)
 ```bash
@@ -324,6 +335,11 @@ lotar config templates
 
 **Advanced:**
 - [🔮 Future Features](docs/mcp-integration-specification.md) - Planned AI agent integration
+
+## 🆘 Support & Bug Reports
+
+- Support & bug reports: https://github.com/localtaskrepo/lotar/issues
+- Security issues: https://github.com/localtaskrepo/lotar/security/advisories/new
 
 ## 📝 Example Workflow
 

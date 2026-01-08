@@ -129,21 +129,21 @@ const dueInfo = computed(() => {
 .task-hover-card {
   position: absolute;
   top: calc(100% + 8px);
-  z-index: 40;
+  z-index: var(--z-tooltip);
   width: max-content;
   min-width: 260px;
   max-width: clamp(260px, 40vw, 360px);
   padding: 12px;
-  border-radius: 10px;
-  border: 1px solid color-mix(in oklab, var(--border, #e2e8f0) 80%, transparent);
-  background: var(--surface-contrast, #ffffff);
-  box-shadow: var(--shadow-md, 0 10px 30px rgba(15, 23, 42, 0.16));
+  border-radius: var(--radius-popover);
+  border: 1px solid color-mix(in oklab, var(--color-border) 80%, transparent);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-popover);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transform: translateY(4px);
-  transition: opacity 120ms ease, visibility 120ms ease, transform 120ms ease;
-  color: var(--fg, #0f172a);
+  transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  color: var(--color-fg);
 }
 
 .task-hover-card--left {
@@ -170,12 +170,17 @@ const dueInfo = computed(() => {
 }
 
 .task-hover-card__id {
+  flex: 0 0 auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.72rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
 }
 
 .task-hover-card__title {
+  min-width: 0;
   font-weight: 600;
   font-size: 0.95rem;
   line-height: 1.35;
@@ -183,7 +188,7 @@ const dueInfo = computed(() => {
 
 .task-hover-card__summary {
   margin: 0 0 8px;
-  color: color-mix(in oklab, var(--color-muted, #64748b) 75%, transparent);
+  color: color-mix(in oklab, var(--color-muted) 75%, transparent);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -205,7 +210,7 @@ const dueInfo = computed(() => {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: color-mix(in oklab, var(--color-muted, #64748b) 80%, transparent);
+  color: color-mix(in oklab, var(--color-muted) 80%, transparent);
 }
 
 .task-hover-card__row dd {
@@ -221,15 +226,15 @@ const dueInfo = computed(() => {
 }
 
 .task-hover-card__due.is-overdue {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .task-hover-card__due.is-due-today {
-  color: var(--color-warning, #f59e0b);
+  color: var(--color-warning);
 }
 
 .task-hover-card__due.is-soon {
-  color: var(--color-accent, #0ea5e9);
+  color: var(--color-accent);
 }
 
 .task-hover-card__due-context {

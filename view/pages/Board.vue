@@ -3,7 +3,7 @@
     <div class="row" style="justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
       <h1>Boards <span v-if="project" class="muted">— {{ project }}</span></h1>
       <div class="row board-controls">
-        <details class="wip-editor">
+        <details ref="wipEditorRef" class="wip-editor" @toggle="handleWipToggle">
           <summary class="btn">WIP limits</summary>
           <div class="card col" style="gap:8px; min-width: 260px;">
             <div class="row" v-for="st in columns" :key="st" style="gap:6px; align-items:center;">
@@ -13,7 +13,7 @@
             <small class="muted">Leave empty or 0 for no limit. Limits are saved locally per project.</small>
           </div>
         </details>
-        <details class="done-filter">
+        <details ref="filtersEditorRef" class="done-filter" @toggle="handleFiltersToggle">
           <summary class="btn">Filters</summary>
           <div class="card col done-filter__card">
             <div class="col" style="gap:4px;">
@@ -126,32 +126,31 @@
                    @dblclick="openTask(t.id)"
                    @keydown.enter.prevent="openTask(t.id)"
                    tabindex="0">
-            <TaskHoverCard :task="t" block>
-              <header class="row" style="justify-content: space-between; gap: 6px; align-items: baseline;">
-                <div>
-                  <span class="muted id">{{ t.id }}</span>
-                  <strong class="title">{{ t.title }}</strong>
-                </div>
-                <span class="priority">{{ t.priority }}</span>
-              </header>
-              <footer class="task-meta">
-                <div class="row task-meta__tags">
-                  <span v-if="t.assignee" class="muted">@{{ t.assignee }}</span>
-                  <span v-for="tag in t.tags" :key="tag" class="tag">{{ tag }}</span>
-                </div>
-                <div v-if="t.sprints?.length" class="row task-meta__sprints">
-                  <span
-                    v-for="sprintId in t.sprints"
-                    :key="`${t.id}-sprint-${sprintId}`"
-                    class="chip small sprint-chip"
-                    :class="sprintStateClass(sprintId)"
-                    :title="sprintTooltip(sprintId)"
-                  >
-                    {{ sprintLabel(sprintId) }}
-                  </span>
-                </div>
-              </footer>
-            </TaskHoverCard>
+            <header class="row" style="justify-content: space-between; gap: 6px; align-items: baseline;">
+              <div>
+                <span class="muted id">{{ t.id }}</span>
+                <strong class="title">{{ t.title }}</strong>
+              </div>
+              <span v-if="(t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+            </header>
+            <footer v-if="hasTaskMeta(t)" class="task-meta">
+              <div v-if="hasPrimaryMeta(t)" class="row task-meta__tags">
+                <span v-if="(t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
+                <span v-if="taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
+                <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+              </div>
+              <div v-if="t.sprints?.length" class="row task-meta__sprints">
+                <span
+                  v-for="sprintId in t.sprints"
+                  :key="`${t.id}-sprint-${sprintId}`"
+                  class="chip small sprint-chip"
+                  :class="sprintStateClass(sprintId)"
+                  :title="sprintTooltip(sprintId)"
+                >
+                  {{ sprintLabel(sprintId) }}
+                </span>
+              </div>
+            </footer>
           </article>
           <div v-if="!(grouped[st] && grouped[st].length)" class="muted" style="padding: 8px;">No tasks</div>
         </div>
@@ -167,32 +166,31 @@
                    @dragstart="onDragStart(t)"
                    @dblclick="openTask(t.id)"
                    tabindex="0">
-            <TaskHoverCard :task="t" block>
-              <header class="row" style="justify-content: space-between; gap: 6px; align-items: baseline;">
-                <div>
-                  <span class="muted id">{{ t.id }}</span>
-                  <strong class="title">{{ t.title }}</strong>
-                </div>
-                <span class="priority">{{ t.priority }}</span>
-              </header>
-              <footer class="task-meta">
-                <div class="row task-meta__tags">
-                  <span v-if="t.assignee" class="muted">@{{ t.assignee }}</span>
-                  <span v-for="tag in t.tags" :key="tag" class="tag">{{ tag }}</span>
-                </div>
-                <div v-if="t.sprints?.length" class="row task-meta__sprints">
-                  <span
-                    v-for="sprintId in t.sprints"
-                    :key="`${t.id}-other-sprint-${sprintId}`"
-                    class="chip small sprint-chip"
-                    :class="sprintStateClass(sprintId)"
-                    :title="sprintTooltip(sprintId)"
-                  >
-                    {{ sprintLabel(sprintId) }}
-                  </span>
-                </div>
-              </footer>
-            </TaskHoverCard>
+            <header class="row" style="justify-content: space-between; gap: 6px; align-items: baseline;">
+              <div>
+                <span class="muted id">{{ t.id }}</span>
+                <strong class="title">{{ t.title }}</strong>
+              </div>
+              <span v-if="(t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+            </header>
+            <footer v-if="hasTaskMeta(t)" class="task-meta">
+              <div v-if="hasPrimaryMeta(t)" class="row task-meta__tags">
+                <span v-if="(t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
+                <span v-if="taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
+                <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+              </div>
+              <div v-if="t.sprints?.length" class="row task-meta__sprints">
+                <span
+                  v-for="sprintId in t.sprints"
+                  :key="`${t.id}-other-sprint-${sprintId}`"
+                  class="chip small sprint-chip"
+                  :class="sprintStateClass(sprintId)"
+                  :title="sprintTooltip(sprintId)"
+                >
+                  {{ sprintLabel(sprintId) }}
+                </span>
+              </div>
+            </footer>
           </article>
         </div>
       </div>
@@ -209,7 +207,6 @@ import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import SmartListChips from '../components/SmartListChips.vue'
-import TaskHoverCard from '../components/TaskHoverCard.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
@@ -234,6 +231,8 @@ const project = ref<string>('')
 const draggingId = ref<string>('')
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
+const wipEditorRef = ref<HTMLDetailsElement | null>(null)
+const filtersEditorRef = ref<HTMLDetailsElement | null>(null)
 const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
@@ -289,6 +288,59 @@ function startOfDay(date: Date) {
 
 function parseDateLike(value?: string | null) {
   return parseTaskDate(value)
+}
+
+function handleWipToggle() {
+  if (wipEditorRef.value?.open) {
+    if (filtersEditorRef.value?.open) {
+      filtersEditorRef.value.open = false
+    }
+  }
+}
+
+function handleFiltersToggle() {
+  if (filtersEditorRef.value?.open) {
+    if (wipEditorRef.value?.open) {
+      wipEditorRef.value.open = false
+    }
+  }
+}
+
+function handleBoardPopoverClick(event: MouseEvent) {
+  const target = event.target as Node | null
+  if (!target) return
+
+  if (wipEditorRef.value?.open && !wipEditorRef.value.contains(target)) {
+    wipEditorRef.value.open = false
+  }
+  if (filtersEditorRef.value?.open && !filtersEditorRef.value.contains(target)) {
+    filtersEditorRef.value.open = false
+  }
+}
+
+function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
+  const raw = (task.due_date || '').trim()
+  if (!raw) return { label: '', overdue: false }
+  const parsed = parseDateLike(raw)
+  if (!parsed) return { label: raw, overdue: false }
+
+  const today = startOfDay(new Date())
+  const due = startOfDay(parsed)
+  const diffDays = Math.round((due.getTime() - today.getTime()) / MS_PER_DAY)
+  const sameYear = parsed.getFullYear() === today.getFullYear()
+  const dateLabel = parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
+  if (diffDays < 0) {
+    return { label: `Overdue ${dateLabel}`, overdue: true }
+  }
+  return { label: `Due ${dateLabel}`, overdue: false }
+}
+
+function hasPrimaryMeta(task: TaskDTO): boolean {
+  return Boolean((task.assignee || '').trim() || taskDueInfo(task).label || (task.tags || []).length)
+}
+
+function hasTaskMeta(task: TaskDTO): boolean {
+  return Boolean(hasPrimaryMeta(task) || (task.sprints || []).length)
 }
 
 function resolveProjectSelection(requested: string | undefined) {
@@ -712,6 +764,9 @@ watch(filter, (value) => {
 }, { deep: true })
 
 onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('click', handleBoardPopoverClick)
+  }
   await refreshProjects()
   project.value = route.query.project ? String(route.query.project) : (projects.value[0]?.prefix || '')
   await refreshSprints(true)
@@ -734,19 +789,22 @@ onUnmounted(() => {
     clearTimeout(filterDebounce)
     filterDebounce = null
   }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('click', handleBoardPopoverClick)
+  }
 })
 </script>
 
 <style scoped>
 .board { align-items: flex-start; }
-.column { border: 1px solid var(--border); border-radius: 8px; background: var(--bg); min-height: 200px; display: flex; flex-direction: column; }
-.column.over-limit { border-color: color-mix(in oklab, #ef4444 40%, var(--border)); }
-.col-header { position: sticky; top: 0; background: var(--bg); padding: 8px; border-bottom: 1px solid var(--border); border-top-left-radius: 8px; border-top-right-radius: 8px; z-index: 1; }
-.col-header .warn { color: #b91c1c; font-weight: 600; }
+.column { border: 1px solid var(--border); border-radius: var(--radius-base); background: var(--bg); min-height: 200px; display: flex; flex-direction: column; }
+.column.over-limit { border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border)); }
+.col-header { position: sticky; top: 0; background: var(--bg); padding: 8px; border-bottom: 1px solid var(--border); border-top-left-radius: var(--radius-base); border-top-right-radius: var(--radius-base); z-index: var(--z-sticky); }
+.col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
 .col-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-.task { padding: 8px; border: 1px solid var(--border); border-radius: 8px; cursor: grab; user-select: none; }
+.task { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-base); cursor: grab; user-select: none; }
 .task:active { cursor: grabbing; }
-.task .id { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; margin-right: 6px; }
+.task .id { font-family: var(--font-mono); margin-right: 6px; }
 .task .title { display: inline-block; max-width: 42ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .priority { font-size: 12px; color: var(--muted); }
 .column:focus { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
@@ -783,8 +841,8 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 20;
-  box-shadow: var(--shadow-md, 0 10px 30px rgba(15, 23, 42, 0.15));
+  z-index: var(--z-popover);
+  box-shadow: var(--shadow-popover);
 }
 
 .done-filter {
@@ -807,15 +865,15 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 20;
-  box-shadow: var(--shadow-md, 0 10px 30px rgba(15, 23, 42, 0.15));
+  z-index: var(--z-popover);
+  box-shadow: var(--shadow-popover);
 }
 .done-filter__statuses {
   gap: 4px;
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid var(--border, rgba(15,12,32,0.15));
-  border-radius: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   padding: 6px;
 }
 
@@ -839,31 +897,41 @@ onUnmounted(() => {
   align-items: center;
 }
 
+.task-meta__due {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.task-meta__due.is-overdue {
+  color: var(--color-danger-strong);
+  font-weight: 600;
+}
+
 .chip.sprint-chip {
   font-size: var(--text-xs, 0.75rem);
   padding: calc(var(--space-1, 0.25rem)) var(--space-2, 0.5rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .chip.sprint--active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  color: var(--color-accent, #0ea5e9);
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
 }
 
 .chip.sprint--overdue {
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
-  color: var(--color-danger, #ef4444);
+  background: color-mix(in oklab, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
 }
 
 .chip.sprint--complete {
-  background: color-mix(in oklab, var(--color-success, #16a34a) 18%, transparent);
-  color: var(--color-success, #166534);
+  background: color-mix(in oklab, var(--color-success) 18%, transparent);
+  color: var(--color-success-strong);
 }
 
 .chip.sprint--pending,
 .chip.sprint--unknown {
-  background: color-mix(in oklab, var(--color-muted, #6b7280) 18%, transparent);
-  color: var(--color-muted, #6b7280);
+  background: color-mix(in oklab, var(--color-muted) 18%, transparent);
+  color: var(--color-muted);
 }
 </style>

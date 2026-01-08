@@ -50,7 +50,7 @@ const sourceClass = computed(() => provenanceClass(props.source))
 
 .config-group__description {
   margin: 4px 0 0 0;
-  color: var(--muted-foreground, rgba(255, 255, 255, 0.6));
+  color: var(--color-muted);
   font-size: 13px;
   line-height: 1.4;
 }

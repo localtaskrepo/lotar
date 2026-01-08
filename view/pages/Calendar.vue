@@ -107,12 +107,10 @@
               @keydown.enter.prevent="openTask(t.id)"
               @keydown.space.prevent="openTask(t.id)"
             >
-              <TaskHoverCard :task="t" :placement="(idx % 7) >= 4 ? 'right' : 'left'">
-                <div class="task-inline">
-                  <span class="id">{{ t.id }}</span>
-                  <span class="title" :title="t.title">{{ shortTitle(t.title) }}</span>
-                </div>
-              </TaskHoverCard>
+              <div class="task-inline">
+                <span class="id">{{ t.id }}</span>
+                <span class="title" :title="t.title">{{ shortTitle(t.title) }}</span>
+              </div>
             </li>
             <li v-if="cell.tasks.length > 5" class="muted more" @click="openDay(cell.date)">+{{ cell.tasks.length - 5 }} more</li>
           </ul>
@@ -130,7 +128,6 @@ import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import SmartListChips from '../components/SmartListChips.vue'
-import TaskHoverCard from '../components/TaskHoverCard.vue'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useConfig } from '../composables/useConfig'
@@ -170,11 +167,11 @@ const customFilterPresets = computed(() => {
 
 type SprintState = SprintListItem['state']
 const sprintStateColors: Record<SprintState | 'default', string> = {
-  pending: 'var(--color-muted, #64748b)',
-  active: 'var(--color-accent, #0ea5e9)',
-  overdue: 'var(--color-danger, #ef4444)',
-  complete: 'var(--color-success, #16a34a)',
-  default: 'var(--color-muted, #64748b)',
+  pending: 'var(--color-muted)',
+  active: 'var(--color-accent)',
+  overdue: 'var(--color-danger)',
+  complete: 'var(--color-success)',
+  default: 'var(--color-muted)',
 }
 
 function sprintColorForState(state?: string | null): string {
@@ -506,7 +503,7 @@ watch(showSprints, (enabled, previous) => {
 <style scoped>
 .calendar { display: grid; gap: 8px; }
 .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-.cell { border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); min-height: 100px; }
+.cell { border: 1px solid var(--border); border-radius: var(--radius-base); padding: 8px; background: var(--bg); min-height: 100px; }
 .head { text-align: center; font-weight: 600; color: var(--muted); border: none; background: transparent; min-height: 20px; }
 .day.other { opacity: 0.6; }
 .day.today { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
@@ -519,8 +516,8 @@ watch(showSprints, (enabled, previous) => {
   position: relative;
   cursor: pointer;
   padding: 3px 4px;
-  border-radius: 6px;
-  transition: background 120ms ease, box-shadow 120ms ease;
+  border-radius: var(--radius-md);
+  transition: background var(--duration-fast) var(--ease-standard), box-shadow var(--duration-fast) var(--ease-standard);
   outline: none;
 }
 .tasks .task-item .task-inline {
@@ -532,15 +529,15 @@ watch(showSprints, (enabled, previous) => {
   min-height: 20px;
 }
 .tasks .task-item:hover {
-  background: color-mix(in oklab, var(--surface, #f8fafc) 82%, transparent);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
 }
 .tasks .task-item:focus-visible {
-  box-shadow: var(--focus-ring, 0 0 0 3px rgba(14, 165, 233, 0.3));
+  box-shadow: var(--focus-ring);
 }
 .tasks .task-item .id {
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   flex-shrink: 0;
 }
 .tasks .task-item .title {
@@ -553,8 +550,8 @@ watch(showSprints, (enabled, previous) => {
 }
 .tasks li.more { cursor: pointer; }
 .toggle-sprints.active {
-  background: color-mix(in oklab, var(--accent, #0ea5e9) 20%, transparent);
-  border-color: color-mix(in oklab, var(--accent, #0ea5e9) 35%, transparent);
+  background: color-mix(in oklab, var(--accent) 20%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 35%, transparent);
 }
 .sprints {
   display: flex;
@@ -563,13 +560,13 @@ watch(showSprints, (enabled, previous) => {
   margin-bottom: 6px;
 }
 .sprint-pill {
-  --_color: var(--sprint-color, #475569);
+  --_color: var(--sprint-color, var(--color-muted));
   background: color-mix(in oklab, var(--_color) 20%, transparent);
   border: 1px solid color-mix(in oklab, var(--_color) 40%, transparent);
-  color: color-mix(in oklab, var(--_color) 70%, black);
+  color: color-mix(in oklab, var(--_color) 70%, var(--color-fg) 30%);
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
   min-height: 18px;
@@ -587,7 +584,7 @@ watch(showSprints, (enabled, previous) => {
   height: 6px;
   border-radius: 50%;
   margin-left: 6px;
-  background: color-mix(in oklab, var(--_color) 85%, var(--bg, #fff));
+  background: color-mix(in oklab, var(--_color) 85%, var(--color-bg));
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--_color) 70%, transparent);
 }
 .sprint-pill.partial-start { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }

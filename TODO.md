@@ -7,7 +7,6 @@ Features:
 - API pagination
 - Sync with Jira/Github (two-way ideally)
 - Add ability to assign (and run) an LLM.
-- Allow reoreding columns in the web UI task list via drag and drop
 - Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
 - MCP errors config_show/project_list: TypeError: r.content is not iterable
 - History stored exact same content as comments when a new one is added

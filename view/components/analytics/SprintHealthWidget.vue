@@ -191,17 +191,17 @@ function formatDuration(days: number | null | undefined) {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   font-size: 0.95rem;
 }
 
 .sprint-health__error {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
   font-size: 0.95rem;
 }
 
 .sprint-health__section {
-  border: 1px solid var(--color-border, #e2e8f0);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 6px);
   padding: 12px 16px;
   display: flex;
@@ -224,7 +224,7 @@ function formatDuration(days: number | null | undefined) {
 .sprint-health__grid dt {
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .sprint-health__grid dd {
@@ -256,7 +256,7 @@ function formatDuration(days: number | null | undefined) {
 
 .metric {
   flex: 1 1 160px;
-  border: 1px solid var(--color-border, #e2e8f0);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm, 4px);
   padding: 8px 12px;
   display: flex;
@@ -273,23 +273,23 @@ function formatDuration(days: number | null | undefined) {
 .metric__meta {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .sprint-health__blocked-count {
   font-size: 0.9rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .sprint-health__placeholder {
-  border: 1px dashed var(--color-border, #e2e8f0);
+  border: 1px dashed var(--color-border);
   border-radius: var(--radius-md, 6px);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: var(--color-muted, #64748b);
-  background: color-mix(in oklab, var(--color-surface, #fff) 60%, transparent);
+  color: var(--color-muted);
+  background: color-mix(in oklab, var(--color-surface) 60%, transparent);
 }
 
 .sprint-health__placeholder h3 {
@@ -307,13 +307,13 @@ function formatDuration(days: number | null | undefined) {
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   text-transform: uppercase;
 }
 
-.badge--info { background: color-mix(in oklab, var(--color-accent, #6366f1) 15%, transparent); color: var(--color-accent, #6366f1); }
-.badge--danger { background: color-mix(in oklab, var(--color-danger, #ef4444) 15%, transparent); color: var(--color-danger, #ef4444); }
-.badge--success { background: color-mix(in oklab, var(--color-success, #10b981) 15%, transparent); color: var(--color-success, #10b981); }
-.badge--muted { background: color-mix(in oklab, var(--color-muted, #64748b) 15%, transparent); color: var(--color-muted, #64748b); }
+.badge--info { background: color-mix(in oklab, var(--color-accent) 15%, transparent); color: var(--color-accent); }
+.badge--danger { background: color-mix(in oklab, var(--color-danger) 15%, transparent); color: var(--color-danger); }
+.badge--success { background: color-mix(in oklab, var(--color-success) 15%, transparent); color: var(--color-success); }
+.badge--muted { background: color-mix(in oklab, var(--color-muted) 15%, transparent); color: var(--color-muted); }
 </style>

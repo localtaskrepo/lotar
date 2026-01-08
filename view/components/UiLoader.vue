@@ -14,7 +14,7 @@ const props = withDefaults(defineProps<{ size?: 'sm' | 'md' | 'lg' }>(), {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   font-size: var(--text-sm, 0.875rem);
 }
 
@@ -22,9 +22,9 @@ const props = withDefaults(defineProps<{ size?: 'sm' | 'md' | 'lg' }>(), {
   display: inline-block;
   width: 1rem;
   height: 1rem;
-  border-radius: 999px;
-  border: 2px solid color-mix(in oklab, var(--color-border, #e2e8f0) 70%, transparent);
-  border-top-color: var(--color-fg, #0f172a);
+  border-radius: var(--radius-pill);
+  border: 2px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+  border-top-color: var(--color-fg);
   animation: ui-loader-spin 0.9s linear infinite;
 }
 

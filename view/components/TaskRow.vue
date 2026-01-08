@@ -99,7 +99,7 @@ function cycleStatus(){
 <style scoped>
 .item { justify-content: space-between; cursor: pointer; padding: 8px 0; }
 .status-button {
-  color: var(--color-muted, #6b7280);
+  color: var(--color-muted);
   font-weight: 600;
   padding-inline: 0.5rem;
 }
