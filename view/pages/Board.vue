@@ -84,17 +84,40 @@
         @update:value="onChipsUpdate"
         @preset="handleCustomPreset"
       />
-      <FilterBar
-        ref="filterBarRef"
-        :statuses="statuses"
-        :priorities="priorities"
-        :types="types"
-        :value="filterPayload"
-        :show-status="false"
-        emit-project-key
-        storage-key="lotar.boards.filter"
-        @update:value="onFilterUpdate"
-      />
+      <div class="row board-filter-row">
+        <FilterBar
+          ref="filterBarRef"
+          class="board-filter-row__bar"
+          :statuses="statuses"
+          :priorities="priorities"
+          :types="types"
+          :value="filterPayload"
+          :show-status="false"
+          emit-project-key
+          storage-key="lotar.boards.filter"
+          @update:value="onFilterUpdate"
+        />
+
+        <details ref="fieldsEditorRef" class="board-fields" @toggle="handleFieldsToggle">
+          <summary class="btn">Fields</summary>
+          <div class="card col board-fields__card">
+            <div class="col" style="gap:4px;">
+              <span class="muted">Card fields</span>
+              <div class="col board-fields__items">
+                <label v-for="opt in boardFieldOptions" :key="`field-${opt.key}`" class="row" style="gap:6px; align-items:center;">
+                  <input type="checkbox" :checked="isBoardFieldVisible(opt.key)" @change="setBoardFieldVisible(opt.key, $event)" />
+                  <span>{{ opt.label }}</span>
+                </label>
+              </div>
+            </div>
+            <small class="muted">Saved locally per project.</small>
+            <div class="row" style="justify-content:flex-end; gap:8px;">
+              <UiButton variant="ghost" type="button" @click="resetBoardFields">Reset</UiButton>
+              <UiButton type="button" @click="closeBoardFields">Close</UiButton>
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
 
     <div v-if="loadingConfig || loadingTasks" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
@@ -126,20 +149,30 @@
                    @dblclick="openTask(t.id)"
                    @keydown.enter.prevent="openTask(t.id)"
                    tabindex="0">
-            <header class="row" style="justify-content: space-between; gap: 6px; align-items: baseline;">
-              <div>
-                <span class="muted id">{{ t.id }}</span>
-                <strong class="title">{{ t.title }}</strong>
-              </div>
-              <span v-if="(t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+            <header v-if="hasTaskHeader(t)" class="row task-header">
+              <template v-if="hasTaskIdentity(t)">
+                <div class="row task-header__left">
+                  <span v-if="isBoardFieldVisible('id') && (t.id || '').trim()" class="muted id">{{ t.id }}</span>
+                  <strong v-if="isBoardFieldVisible('title') && (t.title || '').trim()" class="title">{{ t.title }}</strong>
+                </div>
+                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+              </template>
+              <template v-else>
+                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+              </template>
             </header>
-            <footer v-if="hasTaskMeta(t)" class="task-meta">
+            <footer v-if="hasTaskMeta(t)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(t) }">
               <div v-if="hasPrimaryMeta(t)" class="row task-meta__tags">
-                <span v-if="(t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
-                <span v-if="taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
-                <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+                <span v-if="isBoardFieldVisible('status') && (t.status || '').trim()" class="muted">{{ t.status }}</span>
+                <span v-if="isBoardFieldVisible('task_type') && (t.task_type || '').trim()" class="muted">{{ t.task_type }}</span>
+                <span v-if="isBoardFieldVisible('effort') && (t.effort || '').trim()" class="muted">{{ t.effort }}</span>
+                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by @{{ t.reporter }}</span>
+                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
+                <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
+                <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(t)" class="muted">{{ taskModifiedInfo(t) }}</span>
+                <span v-if="isBoardFieldVisible('tags')" v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
               </div>
-              <div v-if="t.sprints?.length" class="row task-meta__sprints">
+              <div v-if="isBoardFieldVisible('sprints') && t.sprints?.length" class="row task-meta__sprints">
                 <span
                   v-for="sprintId in t.sprints"
                   :key="`${t.id}-sprint-${sprintId}`"
@@ -166,20 +199,30 @@
                    @dragstart="onDragStart(t)"
                    @dblclick="openTask(t.id)"
                    tabindex="0">
-            <header class="row" style="justify-content: space-between; gap: 6px; align-items: baseline;">
-              <div>
-                <span class="muted id">{{ t.id }}</span>
-                <strong class="title">{{ t.title }}</strong>
-              </div>
-              <span v-if="(t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+            <header v-if="hasTaskHeader(t)" class="row task-header">
+              <template v-if="hasTaskIdentity(t)">
+                <div class="row task-header__left">
+                  <span v-if="isBoardFieldVisible('id') && (t.id || '').trim()" class="muted id">{{ t.id }}</span>
+                  <strong v-if="isBoardFieldVisible('title') && (t.title || '').trim()" class="title">{{ t.title }}</strong>
+                </div>
+                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+              </template>
+              <template v-else>
+                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
+              </template>
             </header>
-            <footer v-if="hasTaskMeta(t)" class="task-meta">
+            <footer v-if="hasTaskMeta(t)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(t) }">
               <div v-if="hasPrimaryMeta(t)" class="row task-meta__tags">
-                <span v-if="(t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
-                <span v-if="taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
-                <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+                <span v-if="isBoardFieldVisible('status') && (t.status || '').trim()" class="muted">{{ t.status }}</span>
+                <span v-if="isBoardFieldVisible('task_type') && (t.task_type || '').trim()" class="muted">{{ t.task_type }}</span>
+                <span v-if="isBoardFieldVisible('effort') && (t.effort || '').trim()" class="muted">{{ t.effort }}</span>
+                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by @{{ t.reporter }}</span>
+                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
+                <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
+                <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(t)" class="muted">{{ taskModifiedInfo(t) }}</span>
+                <span v-if="isBoardFieldVisible('tags')" v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
               </div>
-              <div v-if="t.sprints?.length" class="row task-meta__sprints">
+              <div v-if="isBoardFieldVisible('sprints') && t.sprints?.length" class="row task-meta__sprints">
                 <span
                   v-for="sprintId in t.sprints"
                   :key="`${t.id}-other-sprint-${sprintId}`"
@@ -233,6 +276,7 @@ const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
 const wipEditorRef = ref<HTMLDetailsElement | null>(null)
 const filtersEditorRef = ref<HTMLDetailsElement | null>(null)
+const fieldsEditorRef = ref<HTMLDetailsElement | null>(null)
 const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
@@ -295,6 +339,9 @@ function handleWipToggle() {
     if (filtersEditorRef.value?.open) {
       filtersEditorRef.value.open = false
     }
+    if (fieldsEditorRef.value?.open) {
+      fieldsEditorRef.value.open = false
+    }
   }
 }
 
@@ -302,6 +349,20 @@ function handleFiltersToggle() {
   if (filtersEditorRef.value?.open) {
     if (wipEditorRef.value?.open) {
       wipEditorRef.value.open = false
+    }
+    if (fieldsEditorRef.value?.open) {
+      fieldsEditorRef.value.open = false
+    }
+  }
+}
+
+function handleFieldsToggle() {
+  if (fieldsEditorRef.value?.open) {
+    if (wipEditorRef.value?.open) {
+      wipEditorRef.value.open = false
+    }
+    if (filtersEditorRef.value?.open) {
+      filtersEditorRef.value.open = false
     }
   }
 }
@@ -315,6 +376,9 @@ function handleBoardPopoverClick(event: MouseEvent) {
   }
   if (filtersEditorRef.value?.open && !filtersEditorRef.value.contains(target)) {
     filtersEditorRef.value.open = false
+  }
+  if (fieldsEditorRef.value?.open && !fieldsEditorRef.value.contains(target)) {
+    fieldsEditorRef.value.open = false
   }
 }
 
@@ -335,12 +399,53 @@ function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   return { label: `Due ${dateLabel}`, overdue: false }
 }
 
+function taskModifiedInfo(task: TaskDTO): string {
+  const raw = (task.modified || '').trim()
+  if (!raw) return ''
+  let parsed: Date | null = null
+  try {
+    const d = new Date(raw)
+    parsed = Number.isFinite(d.getTime()) ? d : null
+  } catch {
+    parsed = null
+  }
+  if (!parsed) return `Updated ${raw}`
+  const now = new Date()
+  const sameYear = parsed.getFullYear() === now.getFullYear()
+  const dateLabel = parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
+  return `Updated ${dateLabel}`
+}
+
 function hasPrimaryMeta(task: TaskDTO): boolean {
-  return Boolean((task.assignee || '').trim() || taskDueInfo(task).label || (task.tags || []).length)
+  return Boolean(
+    (isBoardFieldVisible('status') && (task.status || '').trim())
+    || (isBoardFieldVisible('task_type') && (task.task_type || '').trim())
+    || (isBoardFieldVisible('effort') && (task.effort || '').trim())
+    || (isBoardFieldVisible('reporter') && (task.reporter || '').trim())
+    || (isBoardFieldVisible('assignee') && (task.assignee || '').trim())
+    || (isBoardFieldVisible('due_date') && taskDueInfo(task).label)
+    || (isBoardFieldVisible('modified') && (task.modified || '').trim())
+    || (isBoardFieldVisible('tags') && (task.tags || []).length)
+  )
 }
 
 function hasTaskMeta(task: TaskDTO): boolean {
-  return Boolean(hasPrimaryMeta(task) || (task.sprints || []).length)
+  return Boolean(hasPrimaryMeta(task) || (isBoardFieldVisible('sprints') && (task.sprints || []).length))
+}
+
+function hasTaskHeader(task: TaskDTO): boolean {
+  return Boolean(
+    (isBoardFieldVisible('id') && (task.id || '').trim())
+    || (isBoardFieldVisible('title') && (task.title || '').trim())
+    || (isBoardFieldVisible('priority') && (task.priority || '').trim())
+  )
+}
+
+function hasTaskIdentity(task: TaskDTO): boolean {
+  return Boolean(
+    (isBoardFieldVisible('id') && (task.id || '').trim())
+    || (isBoardFieldVisible('title') && (task.title || '').trim())
+  )
 }
 
 function resolveProjectSelection(requested: string | undefined) {
@@ -720,6 +825,104 @@ watch(doneFilters, () => {
   saveDoneFilters()
 }, { deep: true })
 
+type BoardFieldKey = 'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'modified'
+type BoardFieldSettings = Record<BoardFieldKey, boolean>
+
+const DEFAULT_BOARD_FIELDS: BoardFieldSettings = {
+  id: true,
+  title: true,
+  status: false,
+  priority: true,
+  task_type: false,
+  reporter: false,
+  assignee: true,
+  effort: false,
+  tags: true,
+  sprints: true,
+  due_date: true,
+  modified: false,
+}
+
+const boardFields = ref<BoardFieldSettings>({ ...DEFAULT_BOARD_FIELDS })
+
+const boardFieldOptions = computed(() => ([
+  { key: 'id', label: 'ID' },
+  { key: 'title', label: 'Title' },
+  { key: 'status', label: 'Status' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'task_type', label: 'Type' },
+  { key: 'effort', label: 'Effort' },
+  { key: 'reporter', label: 'Reporter' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'tags', label: 'Tags' },
+  { key: 'sprints', label: 'Sprints' },
+  { key: 'due_date', label: 'Due' },
+  { key: 'modified', label: 'Updated' },
+] as Array<{ key: BoardFieldKey; label: string }>))
+
+function boardFieldsKey(){ return project.value ? `lotar.boardFields::${project.value}` : 'lotar.boardFields' }
+
+function loadBoardFields() {
+  try {
+    const raw = localStorage.getItem(boardFieldsKey())
+    if (!raw) {
+      boardFields.value = { ...DEFAULT_BOARD_FIELDS }
+      return
+    }
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') {
+      boardFields.value = { ...DEFAULT_BOARD_FIELDS }
+      return
+    }
+    const next: BoardFieldSettings = { ...DEFAULT_BOARD_FIELDS }
+
+    // Migrate old key (kept for compatibility): due -> due_date
+    const legacyDue = (parsed as any).due
+    if (typeof legacyDue === 'boolean' && typeof (parsed as any).due_date !== 'boolean') {
+      next.due_date = legacyDue
+    }
+
+    for (const { key } of boardFieldOptions.value) {
+      const v = (parsed as any)[key]
+      if (typeof v === 'boolean') {
+        next[key] = v
+      }
+    }
+    boardFields.value = next
+  } catch {
+    boardFields.value = { ...DEFAULT_BOARD_FIELDS }
+  }
+}
+
+function saveBoardFields() {
+  try {
+    localStorage.setItem(boardFieldsKey(), JSON.stringify(boardFields.value))
+  } catch {}
+}
+
+function resetBoardFields() {
+  boardFields.value = { ...DEFAULT_BOARD_FIELDS }
+}
+
+function closeBoardFields() {
+  if (fieldsEditorRef.value) {
+    fieldsEditorRef.value.open = false
+  }
+}
+
+function isBoardFieldVisible(key: BoardFieldKey): boolean {
+  return boardFields.value[key] !== false
+}
+
+function setBoardFieldVisible(key: BoardFieldKey, ev: Event) {
+  const checked = Boolean((ev.target as HTMLInputElement | null)?.checked)
+  boardFields.value = { ...boardFields.value, [key]: checked }
+}
+
+watch(boardFields, () => {
+  saveBoardFields()
+}, { deep: true })
+
 function onDragStart(t: any) {
   draggingId.value = t.id
 }
@@ -774,6 +977,7 @@ onMounted(async () => {
   await refreshBoardTasks()
   loadWip()
   loadDoneFilters()
+  loadBoardFields()
 })
 
 watch(() => route.query, async (q) => {
@@ -782,6 +986,7 @@ watch(() => route.query, async (q) => {
   await refreshBoardTasks()
   loadWip()
   loadDoneFilters()
+  loadBoardFields()
 })
 
 onUnmounted(() => {
@@ -804,9 +1009,23 @@ onUnmounted(() => {
 .col-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
 .task { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-base); cursor: grab; user-select: none; }
 .task:active { cursor: grabbing; }
-.task .id { font-family: var(--font-mono); margin-right: 6px; }
-.task .title { display: inline-block; max-width: 42ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.priority { font-size: 12px; color: var(--muted); }
+.task .id {
+  font-family: var(--font-mono);
+  margin-right: 6px;
+  line-height: var(--line-tight);
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.task .title {
+  display: block;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+.priority { font-size: 12px; color: var(--muted); flex: 0 0 auto; white-space: nowrap; }
 .column:focus { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
 .board-controls {
   gap: 8px;
@@ -877,10 +1096,77 @@ onUnmounted(() => {
   padding: 6px;
 }
 
+.board-fields {
+  position: relative;
+}
+
+.board-fields > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.board-fields > summary::-webkit-details-marker {
+  display: none;
+}
+
+.board-fields__card {
+  gap: 8px;
+  min-width: 240px;
+  display: none;
+}
+
+.board-fields[open] > .board-fields__card {
+  display: flex;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-popover);
+  box-shadow: var(--shadow-popover);
+}
+
+.board-fields__items {
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px;
+}
+
 .filter-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.board-filter-row {
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.board-filter-row__bar {
+  flex: 1 1 auto;
+}
+
+.board-filter-row > .board-fields {
+  margin-left: auto;
+}
+
+.task-header {
+  justify-content: space-between;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.task-header__left {
+  gap: 6px;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.task-header__left .title {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .task-meta {
@@ -888,6 +1174,10 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 4px;
   margin-top: 6px;
+}
+
+.task-meta.task-meta--no-header {
+  margin-top: 0;
 }
 
 .task-meta__tags,

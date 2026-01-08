@@ -31,7 +31,10 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('../components/TaskHoverCard.vue', () => ({
-    default: { template: '<div class="task-hover"><slot /></div>' },
+    default: {
+        props: ['fields'],
+        template: '<div class="task-hover" :data-fields="JSON.stringify(fields || null)"><slot /></div>',
+    },
 }))
 
 vi.mock('../components/UiButton.vue', () => ({
@@ -202,5 +205,87 @@ describe('Calendar sprint overlay', () => {
         const afterActualEndPill = afterActualEndCell.find('[data-sprint-id="777"]')
         expect(afterActualEndPill.classes()).toContain('dim-after')
         expect(afterActualEndPill.attributes('data-actual-phase')).toBe('after-end')
+    })
+})
+
+describe('Calendar task hover cards', () => {
+    beforeEach(() => {
+        routeState.query = { month: '2024-02', project: 'ACME' }
+        localStorage.clear()
+        tasksStore.items.value = [
+            {
+                id: 'ACME-123',
+                title: 'Hover card title',
+                due_date: '2024-02-05',
+                modified: '2024-02-01T00:00:00Z',
+            },
+        ]
+        openTaskPanelMock.mockClear()
+    })
+
+    it('keeps inline rows single-line and opens a day dialog for overflow', async () => {
+        tasksStore.items.value = Array.from({ length: 7 }).map((_, idx) => ({
+            id: `ACME-${idx + 1}`,
+            title: `Task ${idx + 1} has a very long title that should be ellipsized`,
+            status: 'Todo',
+            due_date: '2024-02-05',
+            modified: '2024-02-01T00:00:00Z',
+        }))
+
+        const wrapper = mount(Calendar)
+        await flushPromises()
+
+        const cell = wrapper.find('[data-date="2024-02-05"]')
+        expect(cell.exists()).toBe(true)
+
+        // Inline calendar rows should not show meta like status.
+        expect(cell.text()).not.toContain('Todo')
+
+        const more = cell.find('li.more')
+        expect(more.exists()).toBe(true)
+        expect(more.text()).toMatch(/more ticket/)
+
+        await more.trigger('click')
+        await flushPromises()
+
+        const overlay = document.querySelector('.calendar-day-dialog__overlay') as HTMLElement | null
+        expect(overlay).not.toBeNull()
+        if (!overlay) return
+
+        const items = overlay.querySelectorAll('.calendar-day-dialog__item')
+        expect(items.length).toBe(7)
+
+            ; (items[0] as HTMLElement).click()
+        await flushPromises()
+
+        expect(openTaskPanelMock).toHaveBeenCalled()
+        expect(document.querySelector('.calendar-day-dialog__overlay')).toBeNull()
+    })
+
+    it('wraps due tasks in hover cards and keeps click-to-open behavior', async () => {
+        const wrapper = mount(Calendar)
+        await flushPromises()
+
+        const cell = wrapper.find('[data-date="2024-02-05"]')
+        expect(cell.exists()).toBe(true)
+
+        const taskItem = cell.find('.task-item')
+        expect(taskItem.exists()).toBe(true)
+        expect(taskItem.find('.task-hover').exists()).toBe(true)
+
+        await taskItem.trigger('click')
+        expect(openTaskPanelMock).toHaveBeenCalledWith({ taskId: 'ACME-123' })
+    })
+
+    it('loads persisted hover card field visibility per project', async () => {
+        localStorage.setItem('lotar.calendarHoverFields::ACME', JSON.stringify({ tags: false }))
+
+        const wrapper = mount(Calendar)
+        await flushPromises()
+
+        const hover = wrapper.find('.task-hover')
+        expect(hover.exists()).toBe(true)
+        const raw = hover.attributes('data-fields') || ''
+        expect(raw).toContain('"tags":false')
     })
 })

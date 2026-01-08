@@ -47,17 +47,40 @@
         @update:value="onChipsUpdate"
         @preset="handleCustomPreset"
       />
-      <FilterBar
-        ref="filterBarRef"
-        :statuses="statuses"
-        :priorities="priorities"
-        :types="types"
-        :value="filterPayload"
-        storage-key="lotar.calendar.filter"
-        emit-project-key
-        :show-order="false"
-        @update:value="onFilterUpdate"
-      />
+      <div class="row calendar-filter-row">
+        <FilterBar
+          ref="filterBarRef"
+          class="calendar-filter-row__bar"
+          :statuses="statuses"
+          :priorities="priorities"
+          :types="types"
+          :value="filterPayload"
+          storage-key="lotar.calendar.filter"
+          emit-project-key
+          :show-order="false"
+          @update:value="onFilterUpdate"
+        />
+
+        <details ref="fieldsEditorRef" class="calendar-fields" @toggle="handleFieldsToggle">
+          <summary class="btn">Fields</summary>
+          <div class="card col calendar-fields__card">
+            <div class="col" style="gap:4px;">
+              <span class="muted">Hover card fields</span>
+              <div class="col calendar-fields__items">
+                <label v-for="opt in calendarHoverFieldOptions" :key="`calendar-field-${opt.key}`" class="row" style="gap:6px; align-items:center;">
+                  <input type="checkbox" :checked="isCalendarHoverFieldVisible(opt.key)" @change="setCalendarHoverFieldVisible(opt.key, $event)" />
+                  <span>{{ opt.label }}</span>
+                </label>
+              </div>
+            </div>
+            <small class="muted">Saved locally per project.</small>
+            <div class="row" style="justify-content:flex-end; gap:8px;">
+              <UiButton variant="ghost" type="button" @click="resetCalendarHoverFields">Reset</UiButton>
+              <UiButton type="button" @click="closeCalendarFields">Close</UiButton>
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
 
     <div v-if="loadingTasks" style="margin: 12px 0;"><UiLoader>Loading calendar…</UiLoader></div>
@@ -96,9 +119,9 @@
               <span class="sprint-pill__label">{{ sprint.label }}</span>
             </div>
           </div>
-          <ul class="tasks">
+          <ul class="tasks" :ref="(el) => setTasksListRef(cell.dateKey, el)">
             <li
-              v-for="(t, i) in cell.tasks.slice(0, 5)"
+              v-for="t in cell.tasks.slice(0, visibleCountFor(cell))"
               :key="t.id"
               class="task-item"
               role="button"
@@ -107,27 +130,64 @@
               @keydown.enter.prevent="openTask(t.id)"
               @keydown.space.prevent="openTask(t.id)"
             >
-              <div class="task-inline">
-                <span class="id">{{ t.id }}</span>
-                <span class="title" :title="t.title">{{ shortTitle(t.title) }}</span>
-              </div>
+              <TaskHoverCard :task="t" :fields="calendarHoverFields" teleport-to-body :placement="(idx % 7) > 3 ? 'right' : 'left'">
+                <div class="task-inline">
+                  <span class="id">{{ t.id }}</span>
+                  <span class="title">{{ shortTitle(t.title) }}</span>
+                </div>
+              </TaskHoverCard>
             </li>
-            <li v-if="cell.tasks.length > 5" class="muted more" @click="openDay(cell.date)">+{{ cell.tasks.length - 5 }} more</li>
+            <li v-if="hiddenCountFor(cell) > 0" class="muted more" @click="openDay(cell.date)">{{ moreTicketsLabel(hiddenCountFor(cell)) }}</li>
           </ul>
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div v-if="dayDialogOpen" class="calendar-day-dialog__overlay" @click.self="closeDayDialog">
+        <div class="calendar-day-dialog__card card" role="dialog" aria-modal="true" aria-label="Day tasks">
+          <header class="calendar-day-dialog__header row" style="justify-content: space-between; align-items: center; gap: 8px;">
+            <strong>{{ dayDialogTitle }}</strong>
+            <UiButton icon-only type="button" aria-label="Close" title="Close" @click="closeDayDialog">
+              <IconGlyph name="close" />
+            </UiButton>
+          </header>
+          <div class="calendar-day-dialog__body">
+            <ul class="calendar-day-dialog__list">
+              <li
+                v-for="t in dayDialogTasks"
+                :key="t.id"
+                class="calendar-day-dialog__item"
+                role="button"
+                tabindex="0"
+                @click="openTaskFromDialog(t.id)"
+                @keydown.enter.prevent="openTaskFromDialog(t.id)"
+                @keydown.space.prevent="openTaskFromDialog(t.id)"
+              >
+                <TaskHoverCard :task="t" :fields="calendarHoverFields" teleport-to-body placement="left" block>
+                  <div class="calendar-day-dialog__inline">
+                    <span class="id">{{ t.id }}</span>
+                    <span class="title">{{ t.title }}</span>
+                  </div>
+                </TaskHoverCard>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { SprintListItem, TaskListFilter } from '../api/types'
+import type { SprintListItem, TaskDTO, TaskListFilter } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import SmartListChips from '../components/SmartListChips.vue'
+import TaskHoverCard from '../components/TaskHoverCard.vue'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useConfig } from '../composables/useConfig'
@@ -155,6 +215,192 @@ const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
 }))
+
+const fieldsEditorRef = ref<HTMLDetailsElement | null>(null)
+
+const dayDialogOpen = ref(false)
+const dayDialogDate = ref<Date | null>(null)
+const dayDialogTasks = ref<TaskDTO[]>([])
+
+const dayDialogTitle = computed(() => {
+  const d = dayDialogDate.value
+  if (!d) return 'Tasks'
+  return d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+})
+
+function closeDayDialog() {
+  dayDialogOpen.value = false
+}
+
+function openTaskFromDialog(id: string) {
+  closeDayDialog()
+  openTask(id)
+}
+
+type CalendarHoverFieldKey =
+  | 'id'
+  | 'title'
+  | 'status'
+  | 'priority'
+  | 'task_type'
+  | 'reporter'
+  | 'assignee'
+  | 'effort'
+  | 'tags'
+  | 'sprints'
+  | 'due_date'
+  | 'modified'
+type CalendarHoverFieldSettings = Record<CalendarHoverFieldKey, boolean>
+
+const DEFAULT_CALENDAR_HOVER_FIELDS: CalendarHoverFieldSettings = {
+  id: true,
+  title: true,
+  status: true,
+  priority: true,
+  task_type: false,
+  reporter: true,
+  assignee: true,
+  effort: false,
+  tags: true,
+  sprints: true,
+  due_date: true,
+  modified: true,
+}
+
+const calendarHoverFields = ref<CalendarHoverFieldSettings>({ ...DEFAULT_CALENDAR_HOVER_FIELDS })
+
+const calendarHoverFieldOptions = computed(() => ([
+  { key: 'id', label: 'ID' },
+  { key: 'title', label: 'Title' },
+  { key: 'status', label: 'Status' },
+  { key: 'task_type', label: 'Type' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'effort', label: 'Effort' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'reporter', label: 'Reporter' },
+  { key: 'sprints', label: 'Sprints' },
+  { key: 'due_date', label: 'Due' },
+  { key: 'modified', label: 'Updated' },
+  { key: 'tags', label: 'Tags' },
+] as Array<{ key: CalendarHoverFieldKey; label: string }>))
+
+function calendarHoverFieldsKey(){
+  return project.value ? `lotar.calendarHoverFields::${project.value}` : 'lotar.calendarHoverFields'
+}
+
+function loadCalendarHoverFields() {
+  try {
+    const raw = localStorage.getItem(calendarHoverFieldsKey())
+    if (!raw) {
+      calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
+      return
+    }
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') {
+      calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
+      return
+    }
+    const next: CalendarHoverFieldSettings = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
+
+    // Migrate old key (kept for compatibility): due -> due_date
+    const legacyDue = (parsed as any).due
+    if (typeof legacyDue === 'boolean' && typeof (parsed as any).due_date !== 'boolean') next.due_date = legacyDue
+
+    for (const { key } of calendarHoverFieldOptions.value) {
+      const v = (parsed as any)[key]
+      if (typeof v === 'boolean') {
+        next[key] = v
+      }
+    }
+    calendarHoverFields.value = next
+  } catch {
+    calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
+  }
+}
+
+function saveCalendarHoverFields() {
+  try {
+    localStorage.setItem(calendarHoverFieldsKey(), JSON.stringify(calendarHoverFields.value))
+  } catch {}
+}
+
+function resetCalendarHoverFields() {
+  calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
+}
+
+function closeCalendarFields() {
+  if (fieldsEditorRef.value) {
+    fieldsEditorRef.value.open = false
+  }
+}
+
+function isCalendarHoverFieldVisible(key: CalendarHoverFieldKey): boolean {
+  return calendarHoverFields.value[key] !== false
+}
+
+const taskListRefs = new Map<string, HTMLElement>()
+const taskListRowCapacities = ref<Record<string, number>>({})
+
+function setTasksListRef(dateKey: string, el: unknown) {
+  if (!dateKey) return
+  const html = typeof HTMLElement !== 'undefined' && el instanceof HTMLElement ? el : null
+  if (html) taskListRefs.set(dateKey, html)
+  else taskListRefs.delete(dateKey)
+}
+
+const EST_TASK_ROW_PX = 26
+const EST_TASK_GAP_PX = 4
+const DEFAULT_TASK_ROWS = 5
+
+function recalcTaskListRowCapacities() {
+  const next: Record<string, number> = {}
+  for (const [key, el] of taskListRefs.entries()) {
+    const height = el.clientHeight
+    if (!Number.isFinite(height) || height <= 0) {
+      next[key] = DEFAULT_TASK_ROWS
+      continue
+    }
+    const per = EST_TASK_ROW_PX + EST_TASK_GAP_PX
+    const rows = Math.max(1, Math.floor((height + EST_TASK_GAP_PX) / per))
+    next[key] = rows
+  }
+  taskListRowCapacities.value = next
+}
+
+function visibleCountFor(cell: { dateKey: string; tasks: TaskDTO[] }) {
+  const capacity = taskListRowCapacities.value[cell.dateKey] ?? 5
+  if (cell.tasks.length <= capacity) return cell.tasks.length
+  return Math.max(0, capacity - 1)
+}
+
+function hiddenCountFor(cell: { dateKey: string; tasks: TaskDTO[] }) {
+  return Math.max(0, cell.tasks.length - visibleCountFor(cell))
+}
+
+function moreTicketsLabel(count: number) {
+  return count === 1 ? '1 more ticket' : `${count} more tickets`
+}
+
+function setCalendarHoverFieldVisible(key: CalendarHoverFieldKey, ev: Event) {
+  const checked = Boolean((ev.target as HTMLInputElement | null)?.checked)
+  calendarHoverFields.value = { ...calendarHoverFields.value, [key]: checked }
+}
+
+watch(calendarHoverFields, () => {
+  saveCalendarHoverFields()
+}, { deep: true })
+
+function handleFieldsToggle() {
+  // no-op for now; exists to match Boards behavior and keep a stable hook if we add more popovers later.
+}
+
+function handleCalendarPopoverClick(event: MouseEvent) {
+  const target = event.target as Node | null
+  if (!target) return
+  if (fieldsEditorRef.value?.open && !fieldsEditorRef.value.contains(target)) {
+    fieldsEditorRef.value.open = false
+  }
+}
 const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 const customFilterPresets = computed(() => {
@@ -405,7 +651,13 @@ function pushRoute(){
 function openTask(id: string){
   openTaskPanel({ taskId: id })
 }
-function openDay(d: Date){ /* future: open a day view or filter tasks list */ }
+function openDay(d: Date){
+  const key = toDateKey(d)
+  const cell = cells.value.find((c) => c.dateKey === key)
+  dayDialogDate.value = new Date(d)
+  dayDialogTasks.value = (cell?.tasks || []).slice()
+  dayDialogOpen.value = true
+}
 
 function toggleSprints(){
   showSprints.value = !showSprints.value
@@ -458,9 +710,19 @@ onUnmounted(() => {
     clearTimeout(filterDebounce)
     filterDebounce = null
   }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('click', handleCalendarPopoverClick)
+    window.removeEventListener('resize', recalcTaskListRowCapacities)
+    window.removeEventListener('keydown', onCalendarKey)
+  }
 })
 
 onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('click', handleCalendarPopoverClick)
+    window.addEventListener('resize', recalcTaskListRowCapacities)
+    window.addEventListener('keydown', onCalendarKey)
+  }
   await Promise.all([refreshProjects(), refreshSprints(true)])
   const q = route.query as Record<string, any>
   project.value = q.project ? String(q.project) : ''
@@ -472,6 +734,9 @@ onMounted(async () => {
   showSprints.value = q.sprints === '1'
   await refreshConfig(project.value)
   await refreshCalendarTasks()
+  loadCalendarHoverFields()
+  await nextTick()
+  recalcTaskListRowCapacities()
 })
 
 watch(() => route.query, async (q) => {
@@ -481,6 +746,7 @@ watch(() => route.query, async (q) => {
     project.value = nextProject
     await refreshConfig(project.value)
     await refreshCalendarTasks()
+    loadCalendarHoverFields()
   }
   if (r.month && /^\d{4}-\d{2}$/.test(String(r.month))) {
     const [y, m] = String(r.month).split('-').map((s: string) => parseInt(s, 10))
@@ -492,6 +758,17 @@ watch(() => route.query, async (q) => {
     showSprints.value = show
   }
 })
+
+watch(cells, async () => {
+  await nextTick()
+  recalcTaskListRowCapacities()
+})
+
+function onCalendarKey(event: KeyboardEvent) {
+  if (event.key === 'Escape' && dayDialogOpen.value) {
+    closeDayDialog()
+  }
+}
 
 watch(showSprints, (enabled, previous) => {
   if (enabled && !previous) {
@@ -505,10 +782,25 @@ watch(showSprints, (enabled, previous) => {
 .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .cell { border: 1px solid var(--border); border-radius: var(--radius-base); padding: 8px; background: var(--bg); min-height: 100px; }
 .head { text-align: center; font-weight: 600; color: var(--muted); border: none; background: transparent; min-height: 20px; }
+.day {
+  display: flex;
+  flex-direction: column;
+  height: 160px;
+  overflow: hidden;
+}
 .day.other { opacity: 0.6; }
 .day.today { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
 .date { font-weight: 600; margin-bottom: 6px; }
-.tasks { display: flex; flex-direction: column; gap: 4px; list-style: none; padding: 0; margin: 0; }
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
 .tasks .task-item {
   display: flex;
   align-items: center;
@@ -549,6 +841,16 @@ watch(showSprints, (enabled, previous) => {
   line-height: 1.1;
 }
 .tasks li.more { cursor: pointer; }
+.tasks li.more {
+  padding: 2px 4px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tasks li.more:hover {
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+}
 .toggle-sprints.active {
   background: color-mix(in oklab, var(--accent) 20%, transparent);
   border-color: color-mix(in oklab, var(--accent) 35%, transparent);
@@ -616,5 +918,123 @@ watch(showSprints, (enabled, previous) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.calendar-day-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--color-dialog-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.calendar-day-dialog__card {
+  width: min(720px, 92vw);
+  max-height: min(80vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-day-dialog__header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.calendar-day-dialog__body {
+  padding: 12px;
+  overflow: auto;
+}
+
+.calendar-day-dialog__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calendar-day-dialog__item {
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.calendar-day-dialog__inline {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.calendar-day-dialog__item:hover {
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
+}
+
+.calendar-day-dialog__item:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.calendar-day-dialog__item .id {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.calendar-day-dialog__item .title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-filter-row {
+  gap: 8px;
+  align-items: center;
+}
+
+.calendar-filter-row__bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.calendar-fields {
+  position: relative;
+}
+
+.calendar-fields > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.calendar-fields > summary::-webkit-details-marker {
+  display: none;
+}
+
+.calendar-fields__card {
+  gap: 8px;
+  min-width: 240px;
+  display: none;
+}
+
+.calendar-fields[open] > .calendar-fields__card {
+  display: flex;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-popover);
+  box-shadow: var(--shadow-popover);
+}
+
+.calendar-fields__items {
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px;
 }
 </style>

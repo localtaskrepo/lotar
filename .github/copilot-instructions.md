@@ -23,7 +23,9 @@ Keep this file short and evergreen.
 
 - Rust-only tests: `npm run test:rust` (uses `cargo nextest`)
 - UI unit tests: `npm run test:ui`
+- UI-only convenience: `npm run test:ui:only`
 - Smoke without rebuilding: `npm run test:smoke:quick` (requires fresh artifacts)
+- UI-only smoke (no Rust rebuild): `npm run smoke:ui` (requires an existing `target/release/lotar`; builds web assets and serves them from `target/web`)
 
 ## Agent-friendly commands (reduced output noise)
 
