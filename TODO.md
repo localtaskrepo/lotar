@@ -14,3 +14,4 @@ Features:
 - Support references to other tickets in the description when rendering markdown (e.g. "See TASK-1234 for more info" becomes a link with hover card). 
 - Option to automatically add ticket reference to relationships if they're not already in a more specific category.
 - Option to drag and drop tickets between relationship categories in the web UI.
+- Dialogs are still different color on Board and Calendar compared to Tasks and Sprints.

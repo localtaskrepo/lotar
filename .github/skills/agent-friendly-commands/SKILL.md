@@ -24,5 +24,5 @@ Run the same checks as CI with less ANSI noise and more compact reporters.
 
 ## Notes
 
-- These scripts use `scripts/agent.mjs` to set `NO_COLOR=1`, disable forced color, and use dot reporters for Vitest.
+- These scripts are implemented inline in `package.json` using `bash -lc` to set `NO_COLOR=1`, disable forced color, and use dot reporters for Vitest.
 - Repo policy still applies: after code changes, the completion bar is `npm run lint`, `npm test`, `npm run smoke`.

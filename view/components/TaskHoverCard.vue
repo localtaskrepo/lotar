@@ -1,36 +1,124 @@
 <template>
-  <div :class="rootClasses">
+  <div
+    ref="triggerRef"
+    :class="rootClasses"
+    @mouseenter="handleTriggerEnter"
+    @mouseleave="handleTriggerLeave"
+    @focusin="handleTriggerEnter"
+    @focusout="handleTriggerLeave"
+  >
     <slot />
-    <div :class="cardClasses" role="tooltip">
-      <header class="task-hover-card__header">
-        <span class="task-hover-card__id">{{ task.id }}</span>
-        <span class="task-hover-card__title">{{ task.title }}</span>
-      </header>
-      <div v-if="summary" class="task-hover-card__summary">
-        <MarkdownContent :source="summary" />
+
+    <Teleport v-if="teleportToBody" to="body">
+      <div
+        ref="cardRef"
+        :class="cardClasses"
+        role="tooltip"
+        :style="teleportStyle"
+        :aria-hidden="open ? 'false' : 'true'"
+        @mouseenter="handleCardEnter"
+        @mouseleave="handleCardLeave"
+        @focusin="handleCardEnter"
+        @focusout="handleCardLeave"
+      >
+        <header v-if="hasHeader" class="task-hover-card__header">
+          <span v-if="showId" class="task-hover-card__id">{{ task.id }}</span>
+          <span v-if="showTitle" class="task-hover-card__title">{{ task.title }}</span>
+        </header>
+        <dl class="task-hover-card__meta">
+          <div v-if="showStatus && task.status" class="task-hover-card__row">
+            <dt>Status</dt>
+            <dd>{{ task.status }}</dd>
+          </div>
+          <div v-if="showTaskType && task.task_type" class="task-hover-card__row">
+            <dt>Type</dt>
+            <dd>{{ task.task_type }}</dd>
+          </div>
+          <div v-if="showPriority && task.priority" class="task-hover-card__row">
+            <dt>Priority</dt>
+            <dd>{{ task.priority }}</dd>
+          </div>
+          <div v-if="showEffort && task.effort" class="task-hover-card__row">
+            <dt>Effort</dt>
+            <dd>{{ task.effort }}</dd>
+          </div>
+          <div v-if="showAssignee && task.assignee" class="task-hover-card__row">
+            <dt>Assignee</dt>
+            <dd>@{{ task.assignee }}</dd>
+          </div>
+          <div v-if="showReporter && task.reporter" class="task-hover-card__row">
+            <dt>Reporter</dt>
+            <dd>@{{ task.reporter }}</dd>
+          </div>
+          <div v-if="showDueDate && dueInfo" class="task-hover-card__row">
+            <dt>Due</dt>
+            <dd :class="['task-hover-card__due', dueInfo.tone && `is-${dueInfo.tone}`]">
+              <span>{{ dueInfo.label }}</span>
+              <span v-if="dueInfo.context" class="task-hover-card__due-context">{{ dueInfo.context }}</span>
+            </dd>
+          </div>
+          <div v-if="showSprints && task.sprints?.length" class="task-hover-card__row">
+            <dt>Sprints</dt>
+            <dd>{{ task.sprints.map((id) => `#${id}`).join(', ') }}</dd>
+          </div>
+          <div v-if="showModified && modifiedInfo" class="task-hover-card__row">
+            <dt>Updated</dt>
+            <dd :title="modifiedInfo.title">{{ modifiedInfo.label }}</dd>
+          </div>
+        </dl>
+        <div v-if="showTags && tags.length" class="task-hover-card__tags">
+          <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
+        </div>
       </div>
+    </Teleport>
+
+    <div v-else :class="cardClasses" role="tooltip">
+      <header v-if="hasHeader" class="task-hover-card__header">
+        <span v-if="showId" class="task-hover-card__id">{{ task.id }}</span>
+        <span v-if="showTitle" class="task-hover-card__title">{{ task.title }}</span>
+      </header>
       <dl class="task-hover-card__meta">
-        <div v-if="task.status" class="task-hover-card__row">
+        <div v-if="showStatus && task.status" class="task-hover-card__row">
           <dt>Status</dt>
           <dd>{{ task.status }}</dd>
         </div>
-        <div v-if="task.priority" class="task-hover-card__row">
+        <div v-if="showTaskType && task.task_type" class="task-hover-card__row">
+          <dt>Type</dt>
+          <dd>{{ task.task_type }}</dd>
+        </div>
+        <div v-if="showPriority && task.priority" class="task-hover-card__row">
           <dt>Priority</dt>
           <dd>{{ task.priority }}</dd>
         </div>
-        <div v-if="task.assignee" class="task-hover-card__row">
+        <div v-if="showEffort && task.effort" class="task-hover-card__row">
+          <dt>Effort</dt>
+          <dd>{{ task.effort }}</dd>
+        </div>
+        <div v-if="showAssignee && task.assignee" class="task-hover-card__row">
           <dt>Assignee</dt>
           <dd>@{{ task.assignee }}</dd>
         </div>
-        <div v-if="dueInfo" class="task-hover-card__row">
+        <div v-if="showReporter && task.reporter" class="task-hover-card__row">
+          <dt>Reporter</dt>
+          <dd>@{{ task.reporter }}</dd>
+        </div>
+        <div v-if="showDueDate && dueInfo" class="task-hover-card__row">
           <dt>Due</dt>
           <dd :class="['task-hover-card__due', dueInfo.tone && `is-${dueInfo.tone}`]">
             <span>{{ dueInfo.label }}</span>
             <span v-if="dueInfo.context" class="task-hover-card__due-context">{{ dueInfo.context }}</span>
           </dd>
         </div>
+        <div v-if="showSprints && task.sprints?.length" class="task-hover-card__row">
+          <dt>Sprints</dt>
+          <dd>{{ task.sprints.map((id) => `#${id}`).join(', ') }}</dd>
+        </div>
+        <div v-if="showModified && modifiedInfo" class="task-hover-card__row">
+          <dt>Updated</dt>
+          <dd :title="modifiedInfo.title">{{ modifiedInfo.label }}</dd>
+        </div>
       </dl>
-      <div v-if="tags.length" class="task-hover-card__tags">
+      <div v-if="showTags && tags.length" class="task-hover-card__tags">
         <span v-for="tag in tags" :key="tag" class="tag">{{ tag }}</span>
       </div>
     </div>
@@ -38,19 +126,152 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import type { TaskDTO } from '../api/types';
 import { parseTaskDate, startOfLocalDay } from '../utils/date';
-import MarkdownContent from './MarkdownContent.vue';
 
 const props = withDefaults(defineProps<{
   task: TaskDTO
   placement?: 'left' | 'right'
   block?: boolean
+  teleportToBody?: boolean
+  fields?: Partial<Record<'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'modified', boolean>>
 }>(), {
   placement: 'left',
   block: false,
+  teleportToBody: false,
 })
+
+const triggerRef = ref<HTMLElement | null>(null)
+const cardRef = ref<HTMLElement | null>(null)
+const open = ref(false)
+const hoveringTrigger = ref(false)
+const hoveringCard = ref(false)
+let closeTimer: number | null = null
+
+const teleportToBody = computed(() => Boolean(props.teleportToBody))
+
+const teleportPos = ref<{ top: number; left: number }>({ top: 0, left: 0 })
+
+const teleportStyle = computed(() => {
+  if (!teleportToBody.value) return undefined
+  return {
+    top: `${teleportPos.value.top}px`,
+    left: `${teleportPos.value.left}px`,
+  } as Record<string, string>
+})
+
+function clearCloseTimer() {
+  if (closeTimer !== null) {
+    window.clearTimeout(closeTimer)
+    closeTimer = null
+  }
+}
+
+function scheduleClose() {
+  if (!teleportToBody.value) return
+  clearCloseTimer()
+  closeTimer = window.setTimeout(() => {
+    if (!hoveringTrigger.value && !hoveringCard.value) {
+      open.value = false
+    }
+  }, 80)
+}
+
+function updateTeleportPosition() {
+  if (!teleportToBody.value) return
+  const trigger = triggerRef.value
+  const card = cardRef.value
+  if (!trigger || !card) return
+
+  const margin = 8
+  const triggerRect = trigger.getBoundingClientRect()
+  const cardRect = card.getBoundingClientRect()
+
+  // Prefer placing beside the trigger so it doesn't cover list items above/below.
+  // `placement` here is interpreted as which side has room:
+  // - 'left' means "open to the right" (common when trigger is on the left half)
+  // - 'right' means "open to the left" (common when trigger is on the right half)
+  const preferRight = props.placement === 'left'
+  const rightX = triggerRect.right + margin
+  const leftX = triggerRect.left - margin - cardRect.width
+
+  let left = preferRight ? rightX : leftX
+  if (preferRight && left + cardRect.width > window.innerWidth - margin) {
+    left = leftX
+  } else if (!preferRight && left < margin) {
+    left = rightX
+  }
+  left = Math.min(Math.max(margin, left), window.innerWidth - margin - cardRect.width)
+
+  let top = triggerRect.top
+  top = Math.min(Math.max(margin, top), window.innerHeight - margin - cardRect.height)
+
+  teleportPos.value = { top, left }
+}
+
+async function handleTriggerEnter() {
+  if (!teleportToBody.value) return
+  hoveringTrigger.value = true
+  clearCloseTimer()
+  open.value = true
+  await nextTick()
+  updateTeleportPosition()
+}
+
+function handleTriggerLeave() {
+  if (!teleportToBody.value) return
+  hoveringTrigger.value = false
+  scheduleClose()
+}
+
+function handleCardEnter() {
+  if (!teleportToBody.value) return
+  hoveringCard.value = true
+  clearCloseTimer()
+}
+
+function handleCardLeave() {
+  if (!teleportToBody.value) return
+  hoveringCard.value = false
+  scheduleClose()
+}
+
+function handleWindowChange() {
+  if (!teleportToBody.value) return
+  if (!open.value) return
+  updateTeleportPosition()
+}
+
+onMounted(() => {
+  window.addEventListener('resize', handleWindowChange)
+  window.addEventListener('scroll', handleWindowChange, true)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleWindowChange)
+  window.removeEventListener('scroll', handleWindowChange, true)
+  clearCloseTimer()
+})
+
+function isFieldVisible(key: 'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'modified') {
+  return props.fields?.[key] !== false
+}
+
+const showId = computed(() => isFieldVisible('id'))
+const showTitle = computed(() => isFieldVisible('title'))
+const showStatus = computed(() => isFieldVisible('status'))
+const showTaskType = computed(() => isFieldVisible('task_type'))
+const showPriority = computed(() => isFieldVisible('priority'))
+const showEffort = computed(() => isFieldVisible('effort'))
+const showAssignee = computed(() => isFieldVisible('assignee'))
+const showReporter = computed(() => isFieldVisible('reporter'))
+const showDueDate = computed(() => isFieldVisible('due_date'))
+const showTags = computed(() => isFieldVisible('tags'))
+const showSprints = computed(() => isFieldVisible('sprints'))
+const showModified = computed(() => isFieldVisible('modified'))
+
+const hasHeader = computed(() => showId.value || showTitle.value)
 
 const rootClasses = computed(() => ({
   'task-hover': true,
@@ -59,21 +280,59 @@ const rootClasses = computed(() => ({
 
 const cardClasses = computed(() => [
   'task-hover-card',
-  props.placement === 'right' ? 'task-hover-card--right' : 'task-hover-card--left',
+  teleportToBody.value
+    ? 'task-hover-card--teleport'
+    : (props.placement === 'right' ? 'task-hover-card--right' : 'task-hover-card--left'),
+  teleportToBody.value && open.value ? 'is-open' : null,
 ])
 
 const tags = computed(() => {
   return (props.task.tags || []).slice(0, 12)
 })
 
-const summary = computed(() => {
-  const subtitle = (props.task.subtitle || '').trim()
-  if (subtitle) {
-    return subtitle.length > 160 ? `${subtitle.slice(0, 157).trimEnd()}…` : subtitle
+const relativeTimeFormatter =
+  typeof Intl !== 'undefined' && (Intl as any).RelativeTimeFormat
+    ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+    : null
+
+const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
+  { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
+  { unit: 'month', ms: 1000 * 60 * 60 * 24 * 30 },
+  { unit: 'week', ms: 1000 * 60 * 60 * 24 * 7 },
+  { unit: 'day', ms: 1000 * 60 * 60 * 24 },
+  { unit: 'hour', ms: 1000 * 60 * 60 },
+  { unit: 'minute', ms: 1000 * 60 },
+  { unit: 'second', ms: 1000 },
+]
+
+function relativeTime(value: string) {
+  if (!value) return ''
+  const target = new Date(value)
+  const timestamp = target.getTime()
+  if (!isFinite(timestamp)) return value
+  const diff = timestamp - Date.now()
+  if (!relativeTimeFormatter) return target.toLocaleString()
+  for (const { unit, ms } of relativeUnits) {
+    if (Math.abs(diff) >= ms || unit === 'second') {
+      const amount = Math.round(diff / ms)
+      return relativeTimeFormatter.format(amount, unit)
+    }
   }
-  const description = (props.task.description || '').split('\n').find(line => line.trim().length > 0)?.trim() || ''
-  if (!description) return ''
-  return description.length > 160 ? `${description.slice(0, 157).trimEnd()}…` : description
+  return target.toLocaleString()
+}
+
+const modifiedInfo = computed(() => {
+  const raw = (props.task.modified || '').trim()
+  if (!raw) return null
+  let parsed: Date | null = null
+  try {
+    const d = new Date(raw)
+    parsed = Number.isFinite(d.getTime()) ? d : null
+  } catch {
+    parsed = null
+  }
+  if (!parsed) return { label: raw, title: raw }
+  return { label: relativeTime(raw), title: parsed.toLocaleString() }
 })
 
 const dueInfo = computed(() => {
@@ -162,6 +421,25 @@ const dueInfo = computed(() => {
   transform: translateY(0);
 }
 
+.task-hover-card.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.task-hover-card--teleport {
+  position: fixed;
+  left: 0;
+  right: auto;
+  z-index: var(--z-modal-high);
+  pointer-events: none;
+}
+
+.task-hover-card--teleport.is-open {
+  pointer-events: none;
+}
+
 .task-hover-card__header {
   display: flex;
   gap: 8px;
@@ -184,6 +462,13 @@ const dueInfo = computed(() => {
   font-weight: 600;
   font-size: 0.95rem;
   line-height: 1.35;
+}
+
+.task-hover-card__subtitle {
+  margin: 0 0 8px;
+  color: color-mix(in oklab, var(--color-muted) 75%, transparent);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .task-hover-card__summary {

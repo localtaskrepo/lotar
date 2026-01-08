@@ -3,19 +3,19 @@ import { describe, expect, it } from 'vitest'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
 
 describe('TaskHoverCard', () => {
-    it('renders summary as markdown', () => {
+    it('renders updated and sprints when present', () => {
         const wrapper = mount(TaskHoverCard, {
             props: {
                 task: {
                     id: 'PRJ-1',
                     title: 'Demo',
-                    subtitle: '',
-                    description: 'Hello **world**',
                     tags: [],
                     status: '',
                     priority: '',
                     assignee: '',
                     due_date: '',
+                    sprints: [1, 2],
+                    modified: '2026-01-02T10:00:00Z',
                 } as any,
             },
             slots: {
@@ -23,11 +23,8 @@ describe('TaskHoverCard', () => {
             },
         })
 
-        const summary = wrapper.find('.task-hover-card__summary')
-        expect(summary.exists()).toBe(true)
-
-        const strong = summary.find('strong')
-        expect(strong.exists()).toBe(true)
-        expect(strong.text()).toBe('world')
+        expect(wrapper.text()).toContain('Updated')
+        expect(wrapper.text()).toContain('Sprints')
+        expect(wrapper.text()).toContain('#1')
     })
 })

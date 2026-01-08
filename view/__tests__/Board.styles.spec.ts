@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import TaskHoverCardSource from '../components/TaskHoverCard.vue?raw'
+import BoardSource from '../pages/Board.vue?raw'
 
 function extractStyle(source: string): string {
     const start = source.indexOf('<style')
@@ -11,9 +11,10 @@ function extractStyle(source: string): string {
     return source.slice(openEnd + 1, close)
 }
 
-describe('TaskHoverCard styles', () => {
+describe('Board styles', () => {
     it('keeps the task id on a single line', () => {
-        const style = extractStyle(TaskHoverCardSource)
-        expect(style).toMatch(/\.task-hover-card__id\s*\{[^}]*white-space\s*:\s*nowrap\s*;?/s)
+        const style = extractStyle(BoardSource)
+        expect(style).toMatch(/\.task\s+\.id\s*\{[^}]*white-space\s*:\s*nowrap\s*;?/s)
+        expect(style).toMatch(/\.task\s+\.id\s*\{[^}]*word-break\s*:\s*keep-all\s*;?/s)
     })
 })
