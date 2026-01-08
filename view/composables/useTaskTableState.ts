@@ -86,6 +86,7 @@ const defaultColumns: ColKey[] = [
 ]
 
 const COLS_KEY = 'lotar.taskTable.columns'
+const COL_ORDER_KEY = 'lotar.taskTable.columnOrder'
 const SORT_KEY = 'lotar.taskTable.sort'
 
 export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTableEmit) {
@@ -93,24 +94,90 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         return props.projectKey ? `${COLS_KEY}::${props.projectKey}` : COLS_KEY
     }
 
-    const initialColumns = (() => {
+    function colOrderKey() {
+        return props.projectKey ? `${COL_ORDER_KEY}::${props.projectKey}` : COL_ORDER_KEY
+    }
+
+    function normalizeColumns(value: unknown): ColKey[] | null {
+        if (!Array.isArray(value)) return null
+
+        const allowed = new Set(allColumns)
+        const seen = new Set<ColKey>()
+        const out: ColKey[] = []
+
+        for (const item of value) {
+            if (typeof item !== 'string') continue
+            if (!allowed.has(item as ColKey)) continue
+            const col = item as ColKey
+            if (seen.has(col)) continue
+            seen.add(col)
+            out.push(col)
+        }
+
+        return out
+    }
+
+    function normalizeColumnOrder(value: unknown): ColKey[] {
+        if (!Array.isArray(value)) return [...allColumns]
+        const allowed = new Set(allColumns)
+        const seen = new Set<ColKey>()
+        const out: ColKey[] = []
+        for (const item of value) {
+            if (typeof item !== 'string') continue
+            if (!allowed.has(item as ColKey)) continue
+            const col = item as ColKey
+            if (seen.has(col)) continue
+            seen.add(col)
+            out.push(col)
+        }
+        // Ensure all columns exist in the order list (stable across toggles)
+        for (const col of allColumns) {
+            if (!seen.has(col)) out.push(col)
+        }
+        return out.length ? out : [...allColumns]
+    }
+
+    const initialColumnsRaw = (() => {
         try {
             const raw = localStorage.getItem(colsKey()) ?? localStorage.getItem(COLS_KEY)
-            return JSON.parse(raw || 'null') as ColKey[] | null
+            return JSON.parse(raw || 'null') as unknown
         } catch {
             return null
         }
     })()
 
-    const columns = ref<ColKey[]>(Array.isArray(initialColumns) && initialColumns.length ? initialColumns : defaultColumns)
+    const initialColumns = normalizeColumns(initialColumnsRaw)
+
+    const initialOrderRaw = (() => {
+        try {
+            const raw = localStorage.getItem(colOrderKey()) ?? localStorage.getItem(COL_ORDER_KEY)
+            return JSON.parse(raw || 'null') as unknown
+        } catch {
+            return null
+        }
+    })()
+
+    const columnOrder = ref<ColKey[]>(normalizeColumnOrder(initialOrderRaw))
+
+    const columns = ref<ColKey[]>(Array.isArray(initialColumns) ? initialColumns : defaultColumns)
     const columnsSet = computed(() => new Set(columns.value))
-    const visibleColumns = computed(() => allColumns.filter((c) => columnsSet.value.has(c)))
+    const visibleColumns = computed(() => columnOrder.value.filter((c) => columnsSet.value.has(c)))
 
     watch(
         columns,
         (value) => {
             try {
                 localStorage.setItem(colsKey(), JSON.stringify(value))
+            } catch { }
+        },
+        { deep: true },
+    )
+
+    watch(
+        columnOrder,
+        (value) => {
+            try {
+                localStorage.setItem(colOrderKey(), JSON.stringify(value))
             } catch { }
         },
         { deep: true },
@@ -177,8 +244,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         const next = new Set(columns.value)
         if (checked) next.add(col)
         else next.delete(col)
-        if (!next.has('id')) next.add('id')
-        if (!next.has('title')) next.add('title')
         const arr = Array.from(next)
         columns.value = arr
         try {
@@ -188,6 +253,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     function resetColumns() {
         columns.value = [...defaultColumns]
+        columnOrder.value = [...allColumns]
     }
 
     function sortKey() {
@@ -460,6 +526,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     return {
         allColumns,
+        columnOrder,
         columns,
         columnsSet,
         visibleColumns,

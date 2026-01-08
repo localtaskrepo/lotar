@@ -1,6 +1,6 @@
 <template>
   <div v-if="open" class="backdrop" @click.self="$emit('close')">
-    <div class="card" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <UiCard class="quick-help__card" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div class="row" style="justify-content: space-between; align-items: center;">
         <h2 style="margin: 0;">Keyboard shortcuts</h2>
         <UiButton
@@ -22,12 +22,13 @@
   <li><strong>g i</strong> — Go to Insights</li>
       </ul>
       <small class="muted">More shortcuts coming soon (j/k selection, a add, e edit, etc.).</small>
-    </div>
+    </UiCard>
   </div>
 </template>
 <script setup lang="ts">
 import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
+import UiCard from './UiCard.vue';
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -36,20 +37,15 @@ const emit = defineEmits<{ (e: 'close'): void }>()
 .backdrop{
   position: fixed;
   inset: 0;
-  background: color-mix(in oklab, black 40%, transparent);
+  background: var(--color-dialog-overlay);
   display:flex;
   align-items: flex-start;
   justify-content: center;
   padding: 32px 16px;
-  z-index: 1200;
+  z-index: var(--z-modal-high);
 }
-.card{
+.quick-help__card{
   width: min(720px, 100%);
   margin-top: clamp(48px, 10vh, 120px);
-  padding: 16px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px color-mix(in oklab, black 18%, transparent);
 }
 </style>

@@ -553,12 +553,12 @@ onUnmounted(() => {
 .sprint-analytics__overlay {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, #0f172a 60%, transparent);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  z-index: 1100;
+  z-index: var(--z-modal-raised);
 }
 
 .sprint-analytics__card {
@@ -587,7 +587,7 @@ onUnmounted(() => {
 .sprint-analytics__title-sprint {
   font-size: 1rem;
   font-weight: 500;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   margin-left: 8px;
 }
 
@@ -603,24 +603,24 @@ onUnmounted(() => {
 }
 
 .sprint-analytics__error {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
   font-size: 0.85rem;
 }
 
 .sprint-analytics__tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 4px;
 }
 
 .sprint-analytics__empty {
   font-size: 0.95rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .sprint-analytics__chart-placeholder {
-  border: 1px dashed var(--color-border, #e2e8f0);
+  border: 1px dashed var(--color-border);
   border-radius: var(--radius-md, 6px);
   min-height: 220px;
   display: flex;
@@ -628,7 +628,7 @@ onUnmounted(() => {
   justify-content: center;
   text-align: center;
   padding: 24px;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .sprint-analytics__chart-area {
@@ -650,8 +650,8 @@ onUnmounted(() => {
 }
 
 .tab--active {
-  border-color: var(--color-border, #e2e8f0);
-  background: color-mix(in oklab, var(--color-accent, #6366f1) 12%, transparent);
+  border-color: var(--color-border);
+  background: color-mix(in oklab, var(--color-accent) 12%, transparent);
 }
 
 .sprint-analytics__panel {
@@ -699,13 +699,13 @@ onUnmounted(() => {
   height: 12px;
   border-radius: 50%;
   margin-top: 6px;
-  background: var(--color-border, #e2e8f0);
+  background: var(--color-border);
 }
 
-.timeline-item__dot--actual { background: color-mix(in oklab, var(--color-accent, #6366f1) 85%, #fff); }
-.timeline-item__dot--projected { background: color-mix(in oklab, var(--color-info, #0ea5e9) 70%, #fff); }
-.timeline-item__dot--warning { background: color-mix(in oklab, var(--color-danger, #ef4444) 85%, #fff); }
-.timeline-item__dot--plan { background: color-mix(in oklab, var(--color-muted, #64748b) 70%, #fff); }
+.timeline-item__dot--actual { background: color-mix(in oklab, var(--color-accent) 85%, var(--color-bg)); }
+.timeline-item__dot--projected { background: color-mix(in oklab, var(--color-info) 70%, var(--color-bg)); }
+.timeline-item__dot--warning { background: color-mix(in oklab, var(--color-danger) 85%, var(--color-bg)); }
+.timeline-item__dot--plan { background: color-mix(in oklab, var(--color-muted) 70%, var(--color-bg)); }
 
 .timeline-item__content {
   flex: 1;
@@ -725,13 +725,13 @@ onUnmounted(() => {
 
 .timeline-item__date {
   font-size: 0.85rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   font-weight: 500;
 }
 
 .timeline-item__description {
   font-size: 0.9rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -741,7 +741,7 @@ onUnmounted(() => {
 }
 
 .btn.small.active {
-  background: var(--color-accent, #6366f1);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 </style>

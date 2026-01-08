@@ -27,10 +27,12 @@ const props = withDefaults(defineProps<{
 const canvasEl = shallowRef<HTMLCanvasElement | null>(null)
 const chart = shallowRef<Chart<'line'> | null>(null)
 
-function resolveCssVar(name: string, fallback: string) {
-  if (typeof window === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name)
-  return value?.trim() || fallback
+function resolveCssVar(name: string, fallback?: string) {
+  if (typeof window === 'undefined') return fallback ?? ''
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name)?.trim()
+  if (value) return value
+  if (fallback) return fallback
+  return getComputedStyle(document.body).color
 }
 
 function formatLabel(value: string) {
@@ -63,10 +65,10 @@ const ideal = computed(() => props.series.map((point) => extractValue(point, pro
 
 function upsertChart() {
   if (!canvasEl.value) return
-  const accent = resolveCssVar('--color-accent', '#6366f1')
-  const accentSoft = resolveCssVar('--color-accent-soft', '#c7d2fe')
-  const border = resolveCssVar('--color-border', '#e2e8f0')
-  const muted = resolveCssVar('--color-muted', '#64748b')
+  const accent = resolveCssVar('--color-accent')
+  const accentSoft = resolveCssVar('--color-accent-soft')
+  const border = resolveCssVar('--color-border')
+  const muted = resolveCssVar('--color-muted')
 
   const datasets = [
     {

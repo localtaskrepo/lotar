@@ -109,7 +109,7 @@ function formatPercent(value?: number | null) {
 .velocity-trend__label {
   display: block;
   font-size: 0.75rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   text-transform: uppercase;
 }
 
@@ -119,11 +119,11 @@ function formatPercent(value?: number | null) {
 
 .velocity-trend__hint {
   font-size: 0.85rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .velocity-trend__empty {
   font-size: 0.95rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 </style>

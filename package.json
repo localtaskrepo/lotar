@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cargo build --release",
+    "build": "npm run build:web && npm run build:rust",
     "lint": "npm run lint:frontend && npm run lint:backend",
     "lint:frontend": "vue-tsc --project view/tsconfig.json --noEmit",
     "lint:backend": "cargo clippy --all-targets --all-features -- -D warnings",
     "lint:agent": "node scripts/agent.mjs lint",
     "build:web": "vite build",
+    "build:rust": "cargo build --release",
     "test": "npm run test:rust && npm run test:ui",
     "test:rust": "cargo nextest run --cargo-profile ci",
     "test:ui": "vitest run --config view/vitest.config.ts",
@@ -23,7 +24,7 @@
     "test:smoke:quick:agent": "node scripts/agent.mjs test:smoke:quick",
     "smoke": "npm run test:smoke",
     "playwright:install": "npx playwright install --with-deps chromium",
-    "clean": "cargo clean && rm -rf node_modules target/web"
+    "clean": "cargo clean && rm -rf node_modules"
   },
   "keywords": [
     "local",

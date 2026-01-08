@@ -22,14 +22,23 @@ const props = withDefaults(defineProps<{
   height?: number
   color?: string
   hoverColor?: string
-}>(), { width: 360, height: 160, color: '#4f46e5' })
+}>(), { width: 360, height: 160 })
 
 const emit = defineEmits<{ (e:'select', payload: { index: number; value: number }): void }>()
 
 const canvasEl = shallowRef<HTMLCanvasElement | null>(null)
 const chart = shallowRef<Chart<'bar'> | null>(null)
 
-const palette = ['#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#6366f1', '#f97316']
+const paletteCssVars = [
+  '--color-chart-1',
+  '--color-chart-2',
+  '--color-chart-3',
+  '--color-chart-4',
+  '--color-chart-5',
+  '--color-chart-6',
+  '--color-chart-7',
+  '--color-chart-8',
+]
 
 const labels = computed(() => props.series.map(s => s.key))
 const isStacked = computed(() => props.series.some(item => item.breakdown && Object.keys(item.breakdown).some(key => (item.breakdown![key] ?? 0) !== 0)))
@@ -54,10 +63,12 @@ const categories = computed(() => {
   return Array.from(set)
 })
 
-function resolveCssVar(name: string, fallback: string) {
-  if (typeof window === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name)
-  return value?.trim() || fallback
+function resolveCssVar(name: string, fallback?: string) {
+  if (typeof window === 'undefined') return fallback ?? ''
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name)?.trim()
+  if (value) return value
+  if (fallback) return fallback
+  return getComputedStyle(document.body).color
 }
 
 function formatCategoryLabel(key: string) {
@@ -70,8 +81,9 @@ function formatCategoryLabel(key: string) {
 }
 
 function datasetColor(index: number) {
-  if (!palette.length) return '#4f46e5'
-  return palette[index % palette.length]
+  if (!paletteCssVars.length) return resolveCssVar('--color-accent')
+  const name = paletteCssVars[index % paletteCssVars.length]
+  return resolveCssVar(name, resolveCssVar('--color-accent'))
 }
 
 function buildDatasets(baseColor: string, hoverColor: string) {
@@ -118,7 +130,7 @@ function buildDatasets(baseColor: string, hoverColor: string) {
 function upsertChart(resize = false) {
   if (!canvasEl.value) return
 
-  const baseColor = props.color || resolveCssVar('--color-accent', '#4f46e5')
+  const baseColor = props.color || resolveCssVar('--color-accent')
   const hoverColor = props.hoverColor || resolveCssVar('--color-accent-strong', baseColor)
   const config = buildDatasets(baseColor, hoverColor)
 
@@ -135,14 +147,14 @@ function upsertChart(resize = false) {
         animation: false,
         scales: {
           x: {
-            ticks: { color: resolveCssVar('--color-muted', '#64748b') },
+            ticks: { color: resolveCssVar('--color-muted') },
             grid: { display: false },
             stacked: isStacked.value,
           },
           y: {
-            ticks: { color: resolveCssVar('--color-muted', '#64748b') },
+            ticks: { color: resolveCssVar('--color-muted') },
             beginAtZero: true,
-            grid: { color: resolveCssVar('--color-border', '#e2e8f0') },
+            grid: { color: resolveCssVar('--color-border') },
             stacked: isStacked.value,
           },
         },

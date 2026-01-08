@@ -37,8 +37,16 @@ const emit = defineEmits<{ (e:'select', payload: unknown): void }>()
 const canvasEl = shallowRef<HTMLCanvasElement | null>(null)
 const chart = shallowRef<Chart<'doughnut'> | null>(null)
 
-const defaultPalette = ['#6366f1', '#a855f7', '#22d3ee', '#f59e0b', '#f97316', '#10b981', '#ef4444', '#f472b6']
-const palette = computed(() => (props.colors?.length ? props.colors : defaultPalette))
+const paletteCssVars = [
+  '--color-chart-1',
+  '--color-chart-2',
+  '--color-chart-3',
+  '--color-chart-4',
+  '--color-chart-5',
+  '--color-chart-6',
+  '--color-chart-7',
+  '--color-chart-8',
+]
 
 type Slice = { label: string; value: number; color?: string; raw: unknown }
 
@@ -52,10 +60,20 @@ const normalizedData = computed<Slice[]>(() => {
   return []
 })
 
-const slices = computed(() => normalizedData.value.map((item, index) => {
-  const color = item.color ?? palette.value[index % palette.value.length] ?? resolveCssVar('--color-accent', '#6366f1')
-  return { ...item, color }
-}))
+const slices = computed(() => {
+  const fallback = resolveCssVar('--color-accent')
+  const palette = (props.colors?.length ? props.colors : paletteCssVars.map((name) => resolveCssVar(name)))
+    .map((value) => value?.trim())
+    .filter((value): value is string => !!value)
+
+  const paletteFallback = palette.length ? palette : (fallback ? [fallback] : [])
+
+  return normalizedData.value.map((item, index) => {
+    const paletteColor = paletteFallback.length ? paletteFallback[index % paletteFallback.length] : fallback
+    const color = item.color ?? paletteColor ?? fallback
+    return { ...item, color }
+  })
+})
 
 const labels = computed(() => slices.value.map(item => item.label))
 const values = computed(() => slices.value.map(item => item.value))
@@ -70,15 +88,17 @@ const cutoutValue = computed(() => {
   return `${percent}%`
 })
 
-function resolveCssVar(name: string, fallback: string) {
-  if (typeof window === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name)
-  return value?.trim() || fallback
+function resolveCssVar(name: string, fallback?: string) {
+  if (typeof window === 'undefined') return fallback ?? ''
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name)?.trim()
+  if (value) return value
+  if (fallback) return fallback
+  return getComputedStyle(document.body).color
 }
 
 function upsertChart() {
   if (!canvasEl.value) return
-  const borderColor = resolveCssVar('--color-surface', '#0f172a')
+  const borderColor = resolveCssVar('--color-bg')
   if (!chart.value) {
     chart.value = new Chart(canvasEl.value.getContext('2d')!, {
       type: 'doughnut',
@@ -171,12 +191,12 @@ const legendItems = computed(() => slices.value)
 .swatch {
   width: 12px;
   height: 12px;
-  border-radius: 999px;
-  background: var(--color-accent, #6366f1);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
 }
 
 .legend-item .muted {
   margin-left: auto;
-  color: var(--color-muted, #94a3b8);
+  color: var(--color-muted);
 }
 </style>

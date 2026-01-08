@@ -1,6 +1,6 @@
 <template>
   <div v-if="open" class="backdrop" @click.self="$emit('close')">
-    <div class="card" role="dialog" aria-modal="true" aria-label="Recent activity">
+    <UiCard class="activity-drawer__card" role="dialog" aria-modal="true" aria-label="Recent activity">
       <div class="card-head">
         <div>
           <h2>Recent activity</h2>
@@ -64,7 +64,7 @@
         </li>
         <li v-if="!feed.length" class="muted">No recorded activity in the selected window.</li>
       </ul>
-    </div>
+    </UiCard>
   </div>
 </template>
 <script setup lang="ts">
@@ -75,6 +75,7 @@ import { startOfLocalDay } from '../utils/date'
 import IconGlyph from './IconGlyph.vue'
 import ReloadButton from './ReloadButton.vue'
 import UiButton from './UiButton.vue'
+import UiCard from './UiCard.vue'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -159,25 +160,20 @@ watch(
 .backdrop {
   position: fixed;
   inset: 0;
-  background: color-mix(in oklab, black 40%, transparent);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
   overflow-y: hidden;
-  z-index: 1000;
+  z-index: var(--z-modal);
 }
 
-.card {
+.activity-drawer__card {
   width: 100%;
   max-width: 880px;
   max-height: min(90vh, calc(100vh - 64px));
   margin: 0 auto;
-  padding: 20px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 12px 34px color-mix(in oklab, black 18%, transparent);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -220,7 +216,7 @@ watch(
 
 .feed-item {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   background: color-mix(in oklab, var(--bg) 92%, white 8%);
 }
@@ -237,24 +233,24 @@ watch(
   font-size: 12px;
   font-weight: 600;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border-strong, var(--border));
-  background: color-mix(in oklab, #16a34a 12%, transparent);
-  color: #065f46;
+  background: color-mix(in oklab, var(--color-success) 12%, transparent);
+  color: var(--color-success-strong);
   cursor: pointer;
 }
 
 .task-pill:hover {
-  background: color-mix(in oklab, #16a34a 18%, transparent);
+  background: color-mix(in oklab, var(--color-success) 18%, transparent);
 }
 
 .commit-hash {
-  font-family: var(--font-mono, ui-monospace);
+  font-family: var(--font-mono);
   font-size: 12px;
   padding: 2px 6px;
-  border-radius: 6px;
-  background: color-mix(in oklab, #1f2937 12%, transparent);
-  color: #1f2937;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--color-muted) 12%, transparent);
+  color: var(--color-muted);
 }
 
 .history {
@@ -293,70 +289,54 @@ watch(
 .change-kind {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
+  --change-kind-color: var(--color-muted);
   border: 1px solid var(--border);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  background: color-mix(in oklab, var(--change-kind-color) 12%, transparent);
+  border-color: color-mix(in oklab, var(--change-kind-color) 20%, transparent);
+  color: color-mix(in oklab, var(--change-kind-color) 78%, var(--color-fg) 22%);
 }
 
 .change-kind--created {
-  background: color-mix(in oklab, #16a34a 12%, transparent);
-  border-color: #16a34a33;
-  color: #166534;
+  --change-kind-color: var(--color-success);
 }
 
 .change-kind--status {
-  background: color-mix(in oklab, #2563eb 12%, transparent);
-  border-color: #2563eb33;
-  color: #1e3a8a;
+  --change-kind-color: var(--color-chart-7);
 }
 
 .change-kind--assignment {
-  background: color-mix(in oklab, #f59e0b 12%, transparent);
-  border-color: #f59e0b33;
-  color: #92400e;
+  --change-kind-color: var(--color-warning);
 }
 
 .change-kind--comment {
-  background: color-mix(in oklab, #0ea5e9 12%, transparent);
-  border-color: #0ea5e933;
-  color: #155e75;
+  --change-kind-color: var(--color-info);
 }
 
 .change-kind--tags {
-  background: color-mix(in oklab, #10b981 12%, transparent);
-  border-color: #10b98133;
-  color: #047857;
+  --change-kind-color: var(--color-chart-2);
 }
 
 .change-kind--relationships {
-  background: color-mix(in oklab, #a855f7 12%, transparent);
-  border-color: #a855f733;
-  color: #6b21a8;
+  --change-kind-color: var(--color-chart-5);
 }
 
 .change-kind--custom {
-  background: color-mix(in oklab, #f97316 12%, transparent);
-  border-color: #f9731633;
-  color: #9a3412;
+  --change-kind-color: var(--color-chart-8);
 }
 
 .change-kind--content {
-  background: color-mix(in oklab, #ec4899 12%, transparent);
-  border-color: #ec489933;
-  color: #9d174d;
+  --change-kind-color: var(--color-chart-4);
 }
 
 .change-kind--planning {
-  background: color-mix(in oklab, #14b8a6 12%, transparent);
-  border-color: #14b8a633;
-  color: #0f766e;
+  --change-kind-color: var(--color-chart-6);
 }
 
 .change-kind--other {
-  background: color-mix(in oklab, #6b7280 12%, transparent);
-  border-color: #6b728033;
-  color: #374151;
+  --change-kind-color: var(--color-muted);
 }
 
 .change-label {
@@ -364,15 +344,15 @@ watch(
 }
 
 .change-values {
-  color: var(--muted, #475569);
+  color: var(--color-muted);
 }
 
 .error {
-  color: #b91c1c;
+  color: var(--color-danger-strong);
   padding: 12px 0;
 }
 
 .muted {
-  color: var(--muted, #64748b);
+  color: var(--color-muted);
 }
 </style>

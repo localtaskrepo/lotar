@@ -802,8 +802,8 @@ watch(
 }
 
 .new-project-button:hover {
-  background: var(--color-accent, #0ea5e9);
-  color: var(--color-accent-contrast, #ffffff);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   border-color: transparent;
 }
 
@@ -821,27 +821,27 @@ watch(
 
 .alert {
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-base);
 }
 
 .alert-error {
-  background: rgba(255, 77, 109, 0.12);
-  border: 1px solid rgba(255, 77, 109, 0.45);
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-danger) 45%, transparent);
 }
 
 .alert-info {
-  background: rgba(0, 162, 255, 0.12);
-  border: 1px solid rgba(0, 162, 255, 0.35);
+  background: color-mix(in oklab, var(--color-info) 12%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-info) 35%, transparent);
 }
 
 .alert-info.subtle {
-  background: rgba(0, 162, 255, 0.08);
+  background: color-mix(in oklab, var(--color-info) 8%, transparent);
   border-style: dashed;
 }
 
 .alert-warning {
-  background: rgba(255, 199, 0, 0.14);
-  border: 1px solid rgba(255, 199, 0, 0.45);
+  background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-warning) 45%, transparent);
 }
 
 .alert-title {
@@ -942,12 +942,12 @@ watch(
 }
 
 .field-error {
-  color: #ff8091;
+  color: var(--color-danger);
   font-size: 12px;
 }
 
 .field-hint {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-muted);
   font-size: 12px;
 }
 
@@ -963,7 +963,7 @@ watch(
   border: 1px solid var(--color-border);
   background: color-mix(in oklab, var(--color-surface-contrast) 92%, transparent);
   box-shadow: var(--shadow-md);
-  z-index: 900;
+  z-index: var(--z-floating-actions);
 }
 
 .floating-actions__buttons {
@@ -974,7 +974,7 @@ watch(
 
 .floating-actions__meta {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-muted);
   white-space: nowrap;
 }
 
@@ -995,12 +995,12 @@ watch(
 .dialog-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 64px 16px;
-  z-index: 1300;
+  z-index: var(--z-modal-max);
 }
 
 .dialog-card {
@@ -1030,7 +1030,7 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 16px;
   background: color-mix(in oklab, var(--color-surface) 92%, transparent);
@@ -1076,12 +1076,12 @@ watch(
 .help-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 48px 16px;
-  z-index: 1200;
+  z-index: var(--z-modal-high);
 }
 
 .help-card {
@@ -1111,6 +1111,6 @@ watch(
 .help-content ul {
   margin: 0;
   padding-left: 18px;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--color-muted);
 }
 </style>

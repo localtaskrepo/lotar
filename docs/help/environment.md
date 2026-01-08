@@ -92,6 +92,13 @@ All rows below are defined inside the same override table and map directly to th
 | `sprints.defaults.overdue_after` | `LOTAR_SPRINTS_DEFAULT_OVERDUE_AFTER` | Integer days | When overdue counts begin. |
 | `sprints.notifications.enabled` | `LOTAR_SPRINTS_NOTIFICATIONS_ENABLED` | `true`/`false` | Toggles sprint reminder notifications. |
 
+### Web server
+
+| Config key | Env var(s) | Accepted values | Purpose |
+| --- | --- | --- | --- |
+| `web_ui_path` | `LOTAR_WEB_UI_PATH` | Path string | Directory containing custom web UI assets. When set and the directory exists, files are served from here before falling back to embedded assets. |
+| _(CLI only)_ | `LOTAR_WEB_UI_EMBEDDED` | `1` | Forces serving only embedded UI assets, ignoring any `web_ui_path`. Useful for CI testing. |
+
 ## Runtime Toggles & Services
 
 | Variable | Values | Effect |

@@ -85,6 +85,55 @@ describe.concurrent('UI sprints smoke scenarios', () => {
         }
     });
 
+    it('reorders sprint table columns via drag and drop', async () => {
+        const workspace = await SmokeWorkspace.create();
+
+        try {
+            await workspace.runLotar(['sprint', 'create', '--label', 'Columns Sprint']);
+            const task = await workspace.addTask('Column reorder task', { args: ['--project', 'WEB'] });
+            await workspace.runLotar(['sprint', 'add', task.id, '--sprint', '1']);
+
+            const server = await startLotarServer(workspace);
+
+            try {
+                await withPage(server.url, async (page) => {
+                    await page.waitForSelector('text=LoTaR', { timeout: 15_000 });
+                    await page.click('a[href="/sprints"]');
+                    await page.waitForSelector('[data-sprint-id="1"] .sprint-table', { timeout: 15_000 });
+
+                    const headerOrder = async () =>
+                        page.$$eval(
+                            '[data-sprint-id="1"] .sprint-table thead tr th',
+                            (nodes: Element[]) =>
+                                nodes.map((node) =>
+                                    (node as HTMLElement).dataset.column
+                                        ? (node as HTMLElement).dataset.column
+                                        : '',
+                                ),
+                        );
+
+                    const before = await headerOrder();
+                    expect(before.includes('status')).toBe(true);
+                    expect(before.includes('priority')).toBe(true);
+                    expect(before.indexOf('priority')).toBeGreaterThan(before.indexOf('status'));
+
+                    await page.dragAndDrop(
+                        '[data-sprint-id="1"] th[data-column="priority"] button.header-button',
+                        '[data-sprint-id="1"] th[data-column="status"] button.header-button',
+                    );
+
+                    await page.waitForTimeout(150);
+                    const after = await headerOrder();
+                    expect(after.indexOf('priority')).toBeLessThan(after.indexOf('status'));
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
     it('keeps the task in both sprints when copy modifier is active while dragging', async () => {
         const workspace = await SmokeWorkspace.create();
 

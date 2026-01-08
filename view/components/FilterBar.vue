@@ -645,7 +645,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   display: flex;
   flex-direction: column;
   gap: var(--space-1, 0.25rem);
-  z-index: 10;
+  z-index: var(--z-popover);
   min-width: 220px;
   max-height: 280px;
   overflow: auto;
@@ -667,7 +667,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
   color: var(--color-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 120ms ease, border 120ms ease;
+  transition: background var(--duration-fast) var(--ease-standard), border var(--duration-fast) var(--ease-standard);
 }
 
 .filter-bar__menu-action:hover {
@@ -709,7 +709,7 @@ defineExpose({ appendCustomFilter, clear: onClear })
 .filter-bar__custom-hint-btn {
   border: 1px solid var(--color-border);
   background: transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   width: 22px;
   height: 22px;
   font-size: var(--text-xs, 0.75rem);
@@ -737,15 +737,15 @@ defineExpose({ appendCustomFilter, clear: onClear })
   right: 0;
   max-width: 260px;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface, var(--bg));
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  box-shadow: var(--shadow-float);
   font-size: var(--text-xs, 0.75rem);
   color: var(--color-muted);
   line-height: 1.3;
   pointer-events: none;
-  z-index: 2;
+  z-index: var(--z-tooltip);
 }
 
 :global(.input.input--invalid) {

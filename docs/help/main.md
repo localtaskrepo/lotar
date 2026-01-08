@@ -41,7 +41,7 @@ lotar serve --open
 | --- | --- |
 | `--format text|table|json|markdown` | Pick an output style once and reuse it everywhere. |
 | `--log-level <level>` / `--verbose` | Control how chatty the command should be. |
-| `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. On `lotar serve`, use `--project` (the short `-p` is reserved for `--port`). |
+| `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. Note: `lotar serve` ignores the project flag on purpose; use `--port` to change the server port. |
 | `--tasks-dir <PATH>` | Point at a completely different workspace; the folder is created automatically when missing. |
 
 These flags stack with command-specific options. Example:

@@ -189,6 +189,7 @@ pub const ENV_OVERRIDE_DEFINITIONS: &[EnvOverrideDefinition] = &[
         "sprints_notifications_enabled",
         &["LOTAR_SPRINTS_NOTIFICATIONS_ENABLED"],
     ),
+    def("web_ui_path", "web_ui_path", &["LOTAR_WEB_UI_PATH"]),
 ];
 
 #[derive(Debug)]

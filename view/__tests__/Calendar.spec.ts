@@ -172,7 +172,7 @@ describe('Calendar sprint overlay', () => {
         const overduePill = wrapper.find('[data-sprint-id="999"]')
         expect(overduePill.exists()).toBe(true)
         expect(overduePill.attributes('data-sprint-state')).toBe('OVERDUE')
-        expect(overduePill.attributes('style') || '').toContain('var(--color-danger, #ef4444)')
+        expect(overduePill.attributes('style') || '').toContain('var(--color-danger)')
     })
 
     it('shows planned window even when actual dates differ and dims the overflow', async () => {

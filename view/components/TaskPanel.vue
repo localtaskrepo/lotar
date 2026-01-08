@@ -1408,10 +1408,10 @@ async function removeSprintChip(sprintId: number) {
 .task-panel__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 15, 15, 0.55);
+  background: var(--color-dialog-overlay);
   display: flex;
   justify-content: flex-end;
-  z-index: 40;
+  z-index: var(--z-drawer);
 }
 
 .task-panel {
@@ -1421,7 +1421,7 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   flex-direction: column;
   position: relative;
-  box-shadow: var(--shadow-lg, 0 10px 30px rgba(15, 23, 42, 0.3));
+  box-shadow: var(--shadow-dialog);
   border-left: 1px solid var(--color-border, var(--border));
 }
 
@@ -1453,29 +1453,29 @@ async function removeSprintChip(sprintId: number) {
 
 .badge {
   padding: 0.2rem 0.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--text-xs, 0.75rem);
   letter-spacing: 0.02em;
 }
 
 .badge--success {
-  background: color-mix(in oklab, #16a34a 14%, transparent);
-  color: #166534;
+  background: color-mix(in oklab, var(--color-success) 14%, transparent);
+  color: var(--color-success-strong);
 }
 
 .badge--info {
-  background: color-mix(in oklab, #2563eb 14%, transparent);
-  color: #1d4ed8;
+  background: color-mix(in oklab, var(--color-info) 14%, transparent);
+  color: var(--color-accent-strong);
 }
 
 .badge--danger {
-  background: color-mix(in oklab, #ef4444 14%, transparent);
-  color: #b91c1c;
+  background: color-mix(in oklab, var(--color-danger) 14%, transparent);
+  color: var(--color-danger-strong);
 }
 
 .badge--muted {
-  background: color-mix(in oklab, var(--color-muted, #6b7280) 16%, transparent);
-  color: var(--color-bg, #fff);
+  background: color-mix(in oklab, var(--color-muted) 16%, transparent);
+  color: var(--color-bg);
 }
 
 .task-panel__body {
@@ -1489,7 +1489,7 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
 }
 
 .task-panel__sprint-area {
@@ -1518,7 +1518,7 @@ async function removeSprintChip(sprintId: number) {
 
 .task-panel__sprint-chip-remove:hover:not(:disabled),
 .task-panel__sprint-chip-remove:focus-visible {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .task-panel__sprint-chip-remove:disabled {
@@ -1544,49 +1544,49 @@ async function removeSprintChip(sprintId: number) {
   display: inline-flex;
   align-items: center;
   padding: calc(var(--space-1, 0.25rem)) var(--space-2, 0.5rem);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--text-xs, 0.75rem);
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 85%, transparent);
-  color: var(--color-muted, #6b7280);
-  border: 1px solid color-mix(in oklab, var(--color-border, #e2e8f0) 70%, transparent);
+  color: var(--color-muted);
+  border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
 }
 
 .task-panel__sprint-chip--active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  color: var(--color-accent, #0ea5e9);
-  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 55%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
+  border-color: color-mix(in oklab, var(--color-accent) 55%, transparent);
 }
 
 .task-panel__sprint-chip--overdue {
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
-  color: var(--color-danger, #ef4444);
-  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 55%, transparent);
+  background: color-mix(in oklab, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+  border-color: color-mix(in oklab, var(--color-danger) 55%, transparent);
 }
 
 .task-panel__sprint-chip--complete {
-  background: color-mix(in oklab, var(--color-success, #16a34a) 18%, transparent);
-  color: var(--color-success, #166534);
-  border-color: color-mix(in oklab, var(--color-success, #16a34a) 55%, transparent);
+  background: color-mix(in oklab, var(--color-success) 18%, transparent);
+  color: var(--color-success-strong);
+  border-color: color-mix(in oklab, var(--color-success) 55%, transparent);
 }
 
 .task-panel__sprint-chip--pending,
 .task-panel__sprint-chip--unknown {
-  background: color-mix(in oklab, var(--color-muted, #6b7280) 18%, transparent);
-  color: var(--color-muted, #6b7280);
-  border-color: color-mix(in oklab, var(--color-muted, #6b7280) 55%, transparent);
+  background: color-mix(in oklab, var(--color-muted) 18%, transparent);
+  color: var(--color-muted);
+  border-color: color-mix(in oklab, var(--color-muted) 55%, transparent);
 }
 
 .task-panel__sprint-chip--missing {
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 12%, transparent);
-  color: var(--color-danger, #ef4444);
-  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 55%, transparent);
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  border-color: color-mix(in oklab, var(--color-danger) 55%, transparent);
   border-style: dashed;
 }
 
 .task-panel__sprint-warning {
   margin-top: var(--space-2, 0.5rem);
   font-size: var(--text-sm, 0.875rem);
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .task-panel__form {
@@ -1697,10 +1697,10 @@ details.task-panel__group:not([open]) {
   list-style: none;
   margin: 0;
   padding: var(--space-2, 0.5rem);
-  background: color-mix(in oklab, var(--color-surface, #1f2937) 96%, transparent);
+  background: color-mix(in oklab, var(--color-surface) 96%, transparent);
   border: 1px solid var(--color-border, var(--border));
   border-radius: var(--radius-md, 0.5rem);
-  box-shadow: var(--shadow-md, 0 10px 24px rgba(15, 23, 42, 0.25));
+  box-shadow: var(--shadow-popover);
   display: flex;
   flex-direction: column;
   gap: var(--space-1, 0.25rem);
@@ -1725,18 +1725,18 @@ details.task-panel__group:not([open]) {
   font-size: var(--text-sm, 0.875rem);
   text-align: left;
   cursor: pointer;
-  transition: background 0.16s ease, color 0.16s ease;
+  transition: background var(--duration-med) var(--ease-standard), color var(--duration-med) var(--ease-standard);
 }
 
 .task-panel__tag-suggestion:hover,
 .task-panel__tag-suggestion:focus-visible {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 12%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 12%, transparent);
 }
 
 .task-panel__tag-suggestion.active,
 .task-panel__tag-suggestion.active:hover,
 .task-panel__tag-suggestion.active:focus-visible {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 20%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 20%, transparent);
   color: var(--color-fg, var(--fg));
 }
 
@@ -1752,7 +1752,7 @@ details.task-panel__group:not([open]) {
 
 .task-panel__tag-suggestion-part--match {
   font-weight: 600;
-  color: color-mix(in oklab, var(--color-accent, #0ea5e9) 70%, var(--color-fg, var(--fg)) 30%);
+  color: color-mix(in oklab, var(--color-accent) 70%, var(--color-fg, var(--fg)) 30%);
 }
 
 .task-panel__tag-info {
@@ -1762,7 +1762,7 @@ details.task-panel__group:not([open]) {
 
 .task-panel__tag-hint {
   font-size: var(--text-xs, 0.75rem);
-  color: var(--color-danger, #b91c1c);
+  color: var(--color-danger-strong);
 }
 
 .task-panel__row--ownership {
@@ -1781,8 +1781,8 @@ details.task-panel__group:not([open]) {
   align-items: center;
   justify-content: center;
   padding: var(--space-5, 1.25rem);
-  background: color-mix(in oklab, var(--color-bg, #0f172a) 22%, transparent);
-  z-index: 1000;
+  background: var(--color-dialog-overlay);
+  z-index: var(--z-modal);
 }
 
 .task-panel-dialog__card {
@@ -1796,7 +1796,7 @@ details.task-panel__group:not([open]) {
 }
 
 .task-panel__references-dialog .task-panel-dialog__card {
-  transition: width 180ms ease, max-height 180ms ease;
+  transition: width var(--duration-med) var(--ease-standard), max-height var(--duration-med) var(--ease-standard);
   will-change: width, max-height;
 }
 
@@ -1869,20 +1869,20 @@ details.task-panel__group:not([open]) {
   background: transparent;
   color: var(--color-muted, var(--muted));
   padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 500;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
 }
 
 .task-panel__tab:hover {
-  color: var(--color-fg, #0f172a);
-  background: color-mix(in oklab, var(--color-surface, #f8fafc) 60%, transparent);
+  color: var(--color-fg);
+  background: color-mix(in oklab, var(--color-surface) 60%, transparent);
 }
 
 .task-panel__tab--active {
-  color: var(--color-fg, #0f172a);
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
+  color: var(--color-fg);
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
 }
 
 .task-panel__tab-panel {
@@ -1895,7 +1895,7 @@ details.task-panel__group:not([open]) {
   position: absolute;
   top: var(--space-2, 0.5rem);
   right: var(--space-2, 0.5rem);
-  z-index: 2;
+  z-index: var(--z-control);
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
@@ -1975,7 +1975,7 @@ textarea {
   position: absolute;
   top: var(--space-1, 0.25rem);
   right: var(--space-1, 0.25rem);
-  z-index: 2;
+  z-index: var(--z-control);
 }
 
 .task-panel__description-body {
@@ -2021,7 +2021,7 @@ textarea {
   align-items: center;
   justify-content: center;
   padding: var(--space-4, 1rem);
-  z-index: 10;
+  z-index: var(--z-sticky);
   background: color-mix(in oklab, var(--color-bg, var(--bg)) 35%, transparent);
   backdrop-filter: blur(1px);
 }
@@ -2035,7 +2035,7 @@ textarea {
   border: 1px dashed var(--color-border, var(--border));
   background: color-mix(in oklab, var(--color-surface, var(--bg)) 88%, transparent);
   text-align: center;
-  box-shadow: var(--shadow-lg, 0 10px 30px rgba(15, 23, 42, 0.3));
+  box-shadow: var(--shadow-dialog);
 }
 
 .task-panel__attachments {
@@ -2187,10 +2187,10 @@ textarea {
   border: 1px solid var(--color-border, var(--border));
   border-radius: var(--radius-md, 0.375rem);
   background: var(--color-bg, var(--bg));
-  box-shadow: var(--shadow-sm, 0 4px 12px rgba(15, 23, 42, 0.12));
+  box-shadow: var(--shadow-sm);
   max-height: 220px;
   overflow-y: auto;
-  z-index: 5;
+  z-index: var(--z-control-popover);
 }
 
 .task-panel__relation-suggest li {
@@ -2352,7 +2352,7 @@ textarea {
 }
 
 .task-panel__reference-item--interactive:focus {
-  outline: 2px solid color-mix(in oklab, var(--color-primary, #2563eb) 60%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--color-primary) 60%, transparent);
   outline-offset: 2px;
 }
 
@@ -2375,7 +2375,7 @@ textarea {
 
 .task-panel__reference-link {
   font-size: var(--text-sm, 0.875rem);
-  color: var(--color-primary, #2563eb);
+  color: var(--color-primary);
   text-decoration: none;
   word-break: break-word;
   min-width: 0;
@@ -2404,7 +2404,7 @@ textarea {
   border-radius: var(--radius-lg, 0.75rem);
   border: 1px solid var(--color-border, var(--border));
   background: var(--color-surface, var(--bg));
-  box-shadow: var(--shadow-lg, 0 18px 44px rgba(15, 23, 42, 0.22));
+  box-shadow: var(--shadow-dialog);
   display: flex;
   flex-direction: column;
   gap: var(--space-2, 0.5rem);
@@ -2465,13 +2465,13 @@ textarea {
 }
 
 .task-panel__reference-line--highlight {
-  background: color-mix(in oklab, var(--color-primary, #2563eb) 18%, transparent);
+  background: color-mix(in oklab, var(--color-primary) 18%, transparent);
 }
 
 .task-panel__reference-error {
   margin: 0;
   font-size: var(--text-xs, 0.75rem);
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .task-panel__footer {
@@ -2482,7 +2482,7 @@ textarea {
 }
 
 .task-panel__errors {
-  color: #b91c1c;
+  color: var(--color-danger-strong);
   font-size: var(--text-sm, 0.875rem);
 }
 
@@ -2501,7 +2501,7 @@ textarea {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 120ms ease;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
 .fade-enter-from,
@@ -2517,6 +2517,6 @@ textarea {
 
 .task-panel-enter-active,
 .task-panel-leave-active {
-  transition: all 180ms ease;
+  transition: all var(--duration-med) var(--ease-standard);
 }
 </style>

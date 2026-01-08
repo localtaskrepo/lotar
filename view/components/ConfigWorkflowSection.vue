@@ -129,7 +129,7 @@ function handleUpdate(field: 'issue_states' | 'issue_types' | 'issue_priorities'
 }
 
 .field-error {
-  color: #ff8091;
+  color: var(--color-danger);
   font-size: 12px;
 }
 

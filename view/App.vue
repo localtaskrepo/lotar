@@ -31,16 +31,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ActivityDrawer from './components/ActivityDrawer.vue'
 import TaskPanelHost from './components/TaskPanelHost.vue'
 import ToastHost from './components/ToastHost.vue'
 import UiButton from './components/UiButton.vue'
+import { useTaskPanelController } from './composables/useTaskPanelController'
 const version = (import.meta as any).env?.VITE_CARGO_VERSION || ''
 const router = useRouter()
 const route = useRoute()
 const activityOpen = ref(false)
+const { state: taskPanelState, closeTaskPanel } = useTaskPanelController()
 
 type NavItem = {
   label: string
@@ -66,6 +68,21 @@ function isActive(item: NavItem) {
 function go(path: string) {
   router.push(path)
 }
+
+watch(activityOpen, (open) => {
+  if (open) {
+    closeTaskPanel()
+  }
+})
+
+watch(
+  () => taskPanelState.open,
+  (open) => {
+    if (open) {
+      activityOpen.value = false
+    }
+  },
+)
 </script>
 
 <style>

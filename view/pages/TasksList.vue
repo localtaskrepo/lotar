@@ -1065,8 +1065,8 @@ const handleTaskUpdated = (task: TaskDTO) => {
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: color-mix(in oklab, var(--color-bg, #0f172a) 20%, transparent);
-  z-index: 1000;
+  background: var(--color-dialog-overlay);
+  z-index: var(--z-modal);
 }
 
 .tasks-modal__card {

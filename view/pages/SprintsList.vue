@@ -236,16 +236,53 @@
             Highlight tasks in multiple sprints
           </label>
           <div class="filter-meta__actions">
-            <UiButton
-              ref="columnMenuButtonRef"
-              type="button"
-              class="filter-columns-btn"
-              title="Configure columns"
-              @click="toggleColumnMenu"
-            >
-              <IconGlyph name="columns" aria-hidden="true" />
-              <span>Columns</span>
-            </UiButton>
+            <div class="columns-button-wrapper">
+              <UiButton
+                ref="columnMenuButtonRef"
+                type="button"
+                class="columns-button"
+                title="Configure columns"
+                @click="toggleColumnMenu"
+              >
+                <IconGlyph name="columns" aria-hidden="true" />
+                <span>Columns</span>
+              </UiButton>
+              <div v-if="columnMenuOpen" ref="columnMenuRef" class="columns-popover card" @click.self="closeColumnMenu">
+                <div class="col" style="gap: 8px;">
+                  <label
+                    v-for="col in columnOrder"
+                    :key="col"
+                    :class="[
+                      'row',
+                      'column-option',
+                      {
+                        'is-draggable': true,
+                        'is-drag-over': dragOverCol === col,
+                        'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                        'is-dragging': draggingCol === col,
+                      },
+                    ]"
+                    :draggable="true"
+                    style="gap: 6px; align-items: center;"
+                    @dragstart="onColDragStart(col, $event)"
+                    @dragend="onColDragEnd"
+                    @dragover.prevent="onColDragOver(col, $event)"
+                    @drop.prevent="onColDrop(col, $event)"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="columnsSet.has(col)"
+                      @change="toggleColumn(col, $event)"
+                    />
+                    <span>{{ headerLabel(col) }}</span>
+                  </label>
+                  <div class="row" style="gap: 8px; flex-wrap: wrap;">
+                    <UiButton type="button" @click="resetColumns">Reset</UiButton>
+                    <UiButton type="button" @click="closeColumnMenu">Close</UiButton>
+                  </div>
+                </div>
+              </div>
+            </div>
             <UiButton
               class="create-sprint-button"
               type="button"
@@ -256,23 +293,6 @@
               <IconGlyph name="plus" aria-hidden="true" />
               <span>Sprint</span>
             </UiButton>
-          </div>
-        </div>
-      </div>
-      <div v-if="columnMenuOpen" ref="columnMenuRef" class="columns-popover card">
-        <div class="col" style="gap: 8px;">
-          <label v-for="col in allColumns" :key="col" class="row" style="gap: 6px; align-items: center;">
-            <input
-              type="checkbox"
-              :checked="columnsSet.has(col)"
-              :disabled="col === 'id' || col === 'title'"
-              @change="toggleColumn(col, $event)"
-            />
-            <span>{{ headerLabel(col) }}</span>
-          </label>
-          <div class="row" style="gap: 8px; flex-wrap: wrap;">
-            <UiButton type="button" @click="resetColumns">Reset</UiButton>
-            <UiButton variant="ghost" type="button" @click="closeColumnMenu">Close</UiButton>
           </div>
         </div>
       </div>
@@ -510,8 +530,24 @@
                         :class="['sortable', { active: sort.key === col }]"
                         :aria-sort="ariaSort(col)"
                         :data-column="col"
+                        @dragover.prevent="onColDragOver(col, $event)"
+                        @drop.prevent="onColDrop(col, $event)"
                       >
-                        <button class="header-button" type="button" @click="onSort(col)">
+                        <button
+                          :class="[
+                            'header-button',
+                            {
+                              'is-drag-over': dragOverCol === col,
+                              'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                              'is-dragging': draggingCol === col,
+                            },
+                          ]"
+                          type="button"
+                          draggable="true"
+                          @click="onHeaderActivate(col)"
+                          @dragstart="onColDragStart(col, $event)"
+                          @dragend="onColDragEnd"
+                        >
                           {{ headerLabel(col) }}
                           <span class="sort-glyph" aria-hidden="true">{{ sortGlyph(col) }}</span>
                         </button>
@@ -653,8 +689,24 @@
                         :class="['sortable', { active: sort.key === col }]"
                         :aria-sort="ariaSort(col)"
                         :data-column="col"
+                        @dragover.prevent="onColDragOver(col, $event)"
+                        @drop.prevent="onColDrop(col, $event)"
                       >
-                        <button class="header-button" type="button" @click="onSort(col)">
+                        <button
+                          :class="[
+                            'header-button',
+                            {
+                              'is-drag-over': dragOverCol === col,
+                              'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                              'is-dragging': draggingCol === col,
+                            },
+                          ]"
+                          type="button"
+                          draggable="true"
+                          @click="onHeaderActivate(col)"
+                          @dragstart="onColDragStart(col, $event)"
+                          @dragend="onColDragEnd"
+                        >
                           {{ headerLabel(col) }}
                           <span class="sort-glyph" aria-hidden="true">{{ sortGlyph(col) }}</span>
                         </button>
@@ -760,13 +812,13 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type {
-    SprintBurndownResponse,
-    SprintCreateRequest,
-    SprintListItem,
-    SprintSummaryReportResponse,
-    SprintUpdateRequest,
-    SprintVelocityResponse,
-    TaskDTO,
+  SprintBurndownResponse,
+  SprintCreateRequest,
+  SprintListItem,
+  SprintSummaryReportResponse,
+  SprintUpdateRequest,
+  SprintVelocityResponse,
+  TaskDTO,
 } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -806,6 +858,7 @@ type AnalyticsTab = 'burndown' | 'velocity' | 'health' | 'history'
 type TimeRangeKey = 'current' | '30' | '90' | '180' | 'all'
 
 const columnStorageKey = 'lotar.sprints.columns'
+const columnOrderStorageKey = 'lotar.sprints.columnOrder'
 const sortStorageKey = 'lotar.sprints.sort'
 const timeRangeStorageKey = 'lotar.sprints.window.v2'
 const highlightPreferenceStorageKey = 'lotar.sprints.highlightMulti'
@@ -880,13 +933,62 @@ function loadStoredColumns(): ColumnKey[] | null {
     const raw = window.localStorage.getItem(columnStorageKey)
     if (!raw) return null
     const parsed = JSON.parse(raw) as unknown
-    if (!Array.isArray(parsed)) return null
-    const filtered = parsed.filter((item): item is ColumnKey => allColumns.includes(item as ColumnKey))
-    if (!filtered.length) return null
-    return filtered
+    return normalizeColumns(parsed)
   } catch {
     return null
   }
+}
+
+function loadStoredColumnOrder(): ColumnKey[] | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(columnOrderStorageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as unknown
+    return normalizeColumnOrder(parsed)
+  } catch {
+    return null
+  }
+}
+
+function normalizeColumns(value: unknown): ColumnKey[] | null {
+  if (!Array.isArray(value)) return null
+
+  const allowed = new Set(allColumns)
+  const seen = new Set<ColumnKey>()
+  const out: ColumnKey[] = []
+
+  for (const item of value) {
+    if (typeof item !== 'string') continue
+    if (!allowed.has(item as ColumnKey)) continue
+    const col = item as ColumnKey
+    if (seen.has(col)) continue
+    seen.add(col)
+    out.push(col)
+  }
+
+  return out
+}
+
+function normalizeColumnOrder(value: unknown): ColumnKey[] {
+  if (!Array.isArray(value)) return [...allColumns]
+  const allowed = new Set(allColumns)
+  const seen = new Set<ColumnKey>()
+  const out: ColumnKey[] = []
+
+  for (const item of value) {
+    if (typeof item !== 'string') continue
+    if (!allowed.has(item as ColumnKey)) continue
+    const col = item as ColumnKey
+    if (seen.has(col)) continue
+    seen.add(col)
+    out.push(col)
+  }
+
+  for (const col of allColumns) {
+    if (!seen.has(col)) out.push(col)
+  }
+  return out.length ? out : [...allColumns]
 }
 
 function loadStoredSort(): { key: ColumnKey | null; dir: 'asc' | 'desc' } | null {
@@ -1169,19 +1271,118 @@ const hoverSprintId = ref<number | null>(null)
 const hoverBacklog = ref(false)
 
 const columns = ref<ColumnKey[]>(loadStoredColumns() ?? [...defaultColumns])
+const columnOrder = ref<ColumnKey[]>(loadStoredColumnOrder() ?? [...allColumns])
 const columnsSet = computed(() => new Set(columns.value))
-const visibleColumns = computed(() => allColumns.filter((col) => columnsSet.value.has(col)))
+const visibleColumns = computed(() => columnOrder.value.filter((col) => columnsSet.value.has(col)))
+
+const draggingCol = ref<ColumnKey | null>(null)
+const dragOverCol = ref<ColumnKey | null>(null)
+const dragOverPos = ref<'before' | 'after'>('before')
+const lastColDragAt = ref(0)
+
+function onHeaderActivate(col: ColumnKey) {
+  if (Date.now() - lastColDragAt.value < 250) return
+  onSort(col)
+}
+
+function moveColumn(from: ColumnKey, to: ColumnKey, pos: 'before' | 'after') {
+  if (from === to) return
+  const next = columnOrder.value.filter((c) => c !== from)
+  const idx = next.indexOf(to)
+  if (idx < 0) return
+  const insertAt = pos === 'after' ? idx + 1 : idx
+  next.splice(insertAt, 0, from)
+  columnOrder.value = next
+}
+
+function onColDragStart(col: ColumnKey, event: DragEvent) {
+  draggingCol.value = col
+  dragOverCol.value = null
+  dragOverPos.value = 'before'
+  lastColDragAt.value = Date.now()
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    try {
+      event.dataTransfer.setData('application/x-lotar-sprints-col', col)
+      event.dataTransfer.setData('text/plain', col)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function onColDragOver(col: ColumnKey, event: DragEvent) {
+  dragOverCol.value = col
+  const target = event.currentTarget as HTMLElement | null
+  if (!target) {
+    dragOverPos.value = 'before'
+    return
+  }
+  const rect = target.getBoundingClientRect?.()
+  if (!rect || !rect.width) {
+    dragOverPos.value = 'before'
+    return
+  }
+  const mid = rect.left + rect.width / 2
+  dragOverPos.value = event.clientX <= mid ? 'before' : 'after'
+}
+
+function onColDrop(target: ColumnKey, event: DragEvent) {
+  const source = (event.dataTransfer?.getData('application/x-lotar-sprints-col') || event.dataTransfer?.getData('text/plain') || '') as ColumnKey
+  if (source) moveColumn(source, target, dragOverPos.value)
+  draggingCol.value = null
+  dragOverCol.value = null
+  dragOverPos.value = 'before'
+  lastColDragAt.value = Date.now()
+}
+
+function onColDragEnd() {
+  draggingCol.value = null
+  dragOverCol.value = null
+  dragOverPos.value = 'before'
+  lastColDragAt.value = Date.now()
+}
 
 watch(
   columns,
   (value) => {
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(columnStorageKey, JSON.stringify(value))
+    } catch {
+      /* ignore persistence errors */
+    }
+  },
+  { deep: true },
+)
+
+watch(
+  columnOrder,
+  (value) => {
     if (!value.length) {
-      columns.value = [...defaultColumns]
+      columnOrder.value = [...allColumns]
       return
     }
     if (typeof window === 'undefined') return
     try {
-      window.localStorage.setItem(columnStorageKey, JSON.stringify(value))
+      window.localStorage.setItem(columnOrderStorageKey, JSON.stringify(value))
+    } catch {
+      /* ignore persistence errors */
+    }
+  },
+  { deep: true },
+)
+
+watch(
+  columnOrder,
+  (value) => {
+    if (!value.length) {
+      columnOrder.value = [...allColumns]
+      return
+    }
+    if (typeof window === 'undefined') return
+    try {
+      window.localStorage.setItem(columnOrderStorageKey, JSON.stringify(value))
     } catch {
       /* ignore persistence errors */
     }
@@ -1213,18 +1414,24 @@ function toggleColumn(col: ColumnKey, event: Event) {
   const next = new Set(columns.value)
   if (checked) next.add(col)
   else next.delete(col)
-  next.add('id')
-  next.add('title')
   columns.value = Array.from(next)
 }
 
 function resetColumns() {
   columns.value = [...defaultColumns]
+  columnOrder.value = [...allColumns]
 }
 
 const columnMenuOpen = ref(false)
 const columnMenuRef = ref<HTMLElement | null>(null)
-const columnMenuButtonRef = ref<HTMLElement | null>(null)
+const columnMenuButtonRef = ref<HTMLElement | { $el: HTMLElement } | null>(null)
+
+function columnMenuButtonEl(): HTMLElement | null {
+  const refValue = columnMenuButtonRef.value
+  if (!refValue) return null
+  if (refValue instanceof HTMLElement) return refValue
+  return refValue.$el
+}
 
 function toggleColumnMenu() {
   columnMenuOpen.value = !columnMenuOpen.value
@@ -1239,7 +1446,8 @@ function handleColumnMenuClick(event: MouseEvent) {
   const target = event.target as Node | null
   if (!target) return
   if (columnMenuRef.value?.contains(target)) return
-  if (columnMenuButtonRef.value?.contains(target)) return
+  const buttonEl = columnMenuButtonEl()
+  if (buttonEl?.contains(target)) return
   closeColumnMenu()
 }
 
@@ -2902,8 +3110,8 @@ onUnmounted(() => {
 
 .alert.warn {
   padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
-  border-left: 4px solid var(--color-warning, #f59e0b);
-  background: color-mix(in oklab, var(--color-warning, #f59e0b) 12%, transparent);
+  border-left: 4px solid var(--color-warning);
+  background: color-mix(in oklab, var(--color-warning) 12%, transparent);
   border-radius: var(--radius-md, 0.375rem);
 }
 
@@ -2937,7 +3145,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 8px;
   font-size: var(--text-sm, 0.875rem);
-  color: var(--color-muted, #6b7280);
+  color: var(--color-muted);
 }
 
 .filter-meta__primary {
@@ -2968,22 +3176,29 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.filter-columns-btn {
+.columns-button-wrapper {
+  position: relative;
+}
+
+.columns-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2, 0.5rem);
   height: 2.25rem;
 }
 
 .columns-popover {
   position: absolute;
-  right: 16px;
-  top: 100%;
-  margin-top: 8px;
-  padding: 12px;
+  margin-top: var(--space-2, 0.5rem);
+  padding: var(--space-3, 0.75rem);
   min-width: 220px;
-  z-index: 20;
-  box-shadow: var(--shadow-md, 0 12px 30px rgba(15, 23, 42, 0.2));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 0.75rem);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-popover);
+  top: calc(100% + var(--space-2, 0.5rem));
+  right: 0;
+  z-index: var(--z-popover);
 }
 
 .hint {
@@ -2996,12 +3211,12 @@ onUnmounted(() => {
 
 .sprint-group {
   position: relative;
-  transition: border-color 0.16s ease, background 0.16s ease;
+  transition: border-color var(--duration-med) var(--ease-standard), background var(--duration-med) var(--ease-standard);
 }
 
 .sprint-group--drop {
-  border: 1px dashed var(--color-accent, #0ea5e9);
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 10%, transparent);
+  border: 1px dashed var(--color-accent);
+  background: color-mix(in oklab, var(--color-accent) 10%, transparent);
 }
 
 .group-header {
@@ -3062,18 +3277,18 @@ onUnmounted(() => {
 }
 
 .meta-item--warning .meta-label {
-  color: color-mix(in oklab, var(--color-warning, #f59e0b) 55%, transparent);
+  color: color-mix(in oklab, var(--color-warning) 55%, transparent);
 }
 
 .meta-item--danger .meta-label {
-  color: color-mix(in oklab, var(--color-danger, #ef4444) 65%, transparent);
+  color: color-mix(in oklab, var(--color-danger) 65%, transparent);
 }
 
 .meta-label {
   font-size: var(--text-xs, 0.75rem);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in oklab, var(--color-muted, #64748b) 90%, transparent);
+  color: color-mix(in oklab, var(--color-muted) 90%, transparent);
 }
 
 .meta-value {
@@ -3088,7 +3303,7 @@ onUnmounted(() => {
 }
 
 .meta-item--hover:focus-visible {
-  outline: 2px solid color-mix(in oklab, var(--color-accent, #0ea5e9) 60%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 60%, transparent);
   outline-offset: 2px;
 }
 
@@ -3101,10 +3316,10 @@ onUnmounted(() => {
   min-width: min(280px, 60vw);
   max-width: min(640px, 85vw);
   padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--surface, #ffffff);
-  border: 1px solid color-mix(in oklab, var(--color-border, #e2e8f0) 90%, transparent);
-  box-shadow: var(--shadow-md, 0 16px 32px rgba(15, 23, 42, 0.18));
+  border-radius: var(--radius-popover);
+  background: var(--surface);
+  border: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
+  box-shadow: var(--shadow-popover);
   color: var(--color-fg, var(--fg));
   font-size: var(--text-sm, 0.875rem);
   line-height: 1.45;
@@ -3115,8 +3330,8 @@ onUnmounted(() => {
   visibility: hidden;
   pointer-events: none;
   transform: translateY(6px);
-  transition: opacity 120ms ease, visibility 120ms ease, transform 120ms ease;
-  z-index: 32;
+  transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  z-index: var(--z-tooltip);
 }
 
 .meta-item--notes::after {
@@ -3131,14 +3346,14 @@ onUnmounted(() => {
   bottom: calc(100% + 6px);
   width: 10px;
   height: 10px;
-  background: var(--surface, #ffffff);
-  border-left: 1px solid color-mix(in oklab, var(--color-border, #e2e8f0) 90%, transparent);
-  border-top: 1px solid color-mix(in oklab, var(--color-border, #e2e8f0) 90%, transparent);
+  background: var(--surface);
+  border-left: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
   transform: rotate(45deg) translateY(6px);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 120ms ease, visibility 120ms ease, transform 120ms ease;
-  z-index: 31;
+  transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  z-index: calc(var(--z-tooltip) - 1);
 }
 
 .meta-item--hover:hover::after,
@@ -3165,15 +3380,15 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 2px;
-  color: var(--color-accent, #0ea5e9);
+  color: var(--color-accent);
 }
 
 .meta-value--warning {
-  color: var(--color-warning, #f59e0b);
+  color: var(--color-warning);
 }
 
 .meta-value--danger {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
 }
 
 .meta-icon {
@@ -3183,7 +3398,7 @@ onUnmounted(() => {
 .group-count {
   margin-left: auto;
   font-size: var(--text-sm, 0.875rem);
-  color: var(--color-muted, #6b7280);
+  color: var(--color-muted);
 }
 
 .group-actions {
@@ -3275,6 +3490,38 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.header-button.is-drag-over {
+  outline: 1px dashed var(--color-border, var(--border));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.header-button.is-drag-over.is-drag-over--after {
+  outline-style: solid;
+}
+
+.header-button.is-dragging {
+  opacity: 0.65;
+}
+
+.columns-popover .column-option.is-draggable {
+  cursor: grab;
+}
+
+.columns-popover .column-option.is-drag-over {
+  outline: 1px dashed var(--color-border, var(--border));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 0.25rem);
+}
+
+.columns-popover .column-option.is-drag-over.is-drag-over--after {
+  outline-style: solid;
+}
+
+.columns-popover .column-option.is-dragging {
+  opacity: 0.65;
+}
+
 .sort-glyph {
   font-size: 0.75rem;
   opacity: 0.8;
@@ -3286,11 +3533,11 @@ onUnmounted(() => {
 
 .task-row {
   cursor: grab;
-  transition: background 0.16s ease;
+  transition: background var(--duration-med) var(--ease-standard);
 }
 
 .task-row:hover {
-  background: color-mix(in oklab, var(--color-border, #e2e8f0) 40%, transparent);
+  background: color-mix(in oklab, var(--color-border) 40%, transparent);
 }
 
 .task-row--dragging {
@@ -3328,7 +3575,7 @@ onUnmounted(() => {
 }
 
 .text-overdue {
-  color: var(--color-danger, #ef4444);
+  color: var(--color-danger);
   font-weight: 600;
 }
 
@@ -3336,7 +3583,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   padding: 0.15rem 0.45rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--text-xs, 0.75rem);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -3347,23 +3594,23 @@ onUnmounted(() => {
 }
 
 .badge--info {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  color: var(--color-accent, #0ea5e9);
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+  color: var(--color-accent);
 }
 
 .badge--danger {
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
-  color: var(--color-danger, #ef4444);
+  background: color-mix(in oklab, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
 }
 
 .badge--success {
-  background: color-mix(in oklab, var(--color-success, #16a34a) 18%, transparent);
-  color: var(--color-success, #166534);
+  background: color-mix(in oklab, var(--color-success) 18%, transparent);
+  color: var(--color-success-strong);
 }
 
 .badge--muted {
-  background: color-mix(in oklab, var(--color-muted, #6b7280) 20%, transparent);
-  color: var(--color-muted, #6b7280);
+  background: color-mix(in oklab, var(--color-muted) 20%, transparent);
+  color: var(--color-muted);
 }
 
 .filter-meta__actions .create-sprint-button {
@@ -3374,8 +3621,8 @@ onUnmounted(() => {
 }
 
 .create-sprint-button:hover {
-  background: var(--color-accent, #0ea5e9);
-  color: var(--color-accent-contrast, #ffffff);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   border-color: transparent;
 }
 
@@ -3384,16 +3631,16 @@ onUnmounted(() => {
 }
 
 .sprint-delete-button {
-  background: color-mix(in oklab, var(--color-surface, #f8fafc) 94%, transparent);
-  border-color: color-mix(in oklab, var(--color-border, #e2e8f0) 85%, transparent);
-  color: var(--color-muted, #64748b);
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  background: color-mix(in oklab, var(--color-surface) 94%, transparent);
+  border-color: color-mix(in oklab, var(--color-border) 85%, transparent);
+  color: var(--color-muted);
+  transition: background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 
 .sprint-delete-button:hover {
-  background: color-mix(in oklab, var(--color-danger, #ef4444) 18%, transparent);
-  color: var(--color-danger, #ef4444);
-  border-color: color-mix(in oklab, var(--color-danger, #ef4444) 45%, transparent);
+  background: color-mix(in oklab, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+  border-color: color-mix(in oklab, var(--color-danger) 45%, transparent);
 }
 
 .sprint-delete-button:hover .icon-glyph {
@@ -3412,12 +3659,12 @@ onUnmounted(() => {
 .sprint-modal__overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.65);
+  background: var(--color-dialog-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-5, 2rem);
-  z-index: 50;
+  z-index: var(--z-modal);
 }
 
 .sprint-modal__card {
@@ -3425,7 +3672,7 @@ onUnmounted(() => {
   max-height: 90vh;
   overflow-y: auto;
   padding: var(--space-5, 2rem);
-  box-shadow: var(--shadow-lg, 0 20px 50px rgba(15, 23, 42, 0.35));
+  box-shadow: var(--shadow-dialog);
 }
 
 .sprint-modal__form {
@@ -3440,7 +3687,7 @@ onUnmounted(() => {
 
 .collapse-enter-active,
 .collapse-leave-active {
-  transition: opacity 0.16s ease;
+  transition: opacity var(--duration-med) var(--ease-standard);
 }
 
 .collapse-enter-from,

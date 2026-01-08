@@ -198,7 +198,6 @@
               :series="activitySeries"
               :width="activityChartRenderWidth"
               :height="180"
-              color="#0ea5e9"
               :key="activityChartKey"
             />
           </div>
@@ -1005,11 +1004,11 @@ onMounted(async () => {
   flex-direction: column;
   gap: 4px;
   padding: 12px;
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--bg, #f8fafc) 92%, transparent);
+  border-radius: var(--radius-base);
+  background: color-mix(in oklab, var(--bg) 92%, transparent);
 }
 .summary-tile.highlight {
-  border: 1px solid var(--color-danger, #ef4444);
+  border: 1px solid var(--color-danger);
 }
 .summary-label {
   font-size: 0.8rem;
@@ -1132,11 +1131,11 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 .chart-controls .ghost {
-  border: 1px solid color-mix(in oklab, var(--border, #e2e8f0) 80%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
 }
 .chart-controls .ghost.active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 20%, transparent);
-  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 60%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 20%, transparent);
+  border-color: color-mix(in oklab, var(--color-accent) 60%, transparent);
 }
 .distribution {
   width: 100%;
@@ -1146,10 +1145,10 @@ onMounted(async () => {
 .distribution td {
   padding: 6px 0;
   text-align: left;
-  border-bottom: 1px solid color-mix(in oklab, var(--border, #e2e8f0) 80%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
 }
 .distribution tr { cursor: pointer; }
-.distribution tr:hover { background: color-mix(in oklab, var(--bg, #f8fafc) 75%, transparent); }
+.distribution tr:hover { background: color-mix(in oklab, var(--bg) 75%, transparent); }
 .tag-cloud {
   display: flex;
   flex-wrap: wrap;
@@ -1160,17 +1159,17 @@ onMounted(async () => {
   gap: 6px;
   align-items: center;
   padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--border, #e2e8f0) 80%, transparent);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
   background: transparent;
   cursor: pointer;
 }
 .tag-chip:hover {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 12%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 12%, transparent);
 }
 .tag-chip.active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 18%, transparent);
-  border-color: color-mix(in oklab, var(--color-accent, #0ea5e9) 40%, transparent);
+  background: color-mix(in oklab, var(--color-accent) 18%, transparent);
+  border-color: color-mix(in oklab, var(--color-accent) 40%, transparent);
 }
 @media (max-width: 960px) {
   .insights-header {
@@ -1189,14 +1188,14 @@ onMounted(async () => {
 }
 .tag-suggestions {
   position: absolute;
-  z-index: 5;
+  z-index: var(--z-popover);
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: var(--surface, #ffffff);
-  border-radius: 8px;
-  border: 1px solid color-mix(in oklab, var(--border, #e2e8f0) 80%, transparent);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  background: var(--surface);
+  border-radius: var(--radius-base);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  box-shadow: var(--shadow-popover);
   margin: 0;
   padding: 4px;
   list-style: none;
@@ -1208,7 +1207,7 @@ onMounted(async () => {
   width: 100%;
   text-align: left;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: none;
   background: transparent;
   cursor: pointer;
@@ -1218,12 +1217,12 @@ onMounted(async () => {
 }
 .tag-suggestion:hover,
 .tag-suggestion.active {
-  background: color-mix(in oklab, var(--color-accent, #0ea5e9) 16%, transparent);
-  color: var(--color-strong, #0f172a);
+  background: color-mix(in oklab, var(--color-accent) 16%, transparent);
+  color: var(--color-strong);
 }
 .tag-suggestion__part.match {
   font-weight: 600;
-  color: var(--color-accent-strong, #0284c7);
+  color: var(--color-accent-strong);
 }
 .tag-suggestion__label {
   display: flex;
@@ -1235,7 +1234,7 @@ onMounted(async () => {
   border: none;
   padding: 0;
   font: inherit;
-  color: var(--color-accent, #0ea5e9);
+  color: var(--color-accent);
   cursor: pointer;
 }
 .link-btn:hover { text-decoration: underline; }

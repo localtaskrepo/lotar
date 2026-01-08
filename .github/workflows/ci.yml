@@ -42,6 +42,9 @@ jobs:
     - name: Build web assets
       run: npm run build:web
 
+    - name: Verify web assets exist
+      run: test -f target/web/index.html
+
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
@@ -122,12 +125,13 @@ jobs:
     - name: Run clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
       
-    - name: Build project (debug)
-      run: cargo build --all-features
+    - name: Build project (release)
+      run: cargo build --release --all-features
       
-    - name: Run tests (nextest, fast)
+    - name: Run tests (nextest, release)
       run: |
         cargo nextest run \
+          --release \
           --all-features \
           --failure-output=immediate-final \
           --retries 0 \
@@ -141,9 +145,6 @@ jobs:
         path: target/nextest/junit.xml
         if-no-files-found: ignore
         retention-days: 7
-        
-    - name: Build release (check only for speed)
-      run: cargo check --release --all-features
 
   ui_tests:
     name: UI Unit Tests
@@ -199,6 +200,9 @@ jobs:
     - name: Ensure binary is executable
       run: chmod +x target/release/lotar || true
 
+    - name: Verify web assets exist
+      run: test -f target/web/index.html
+
     - name: Determine Node version
       id: node_version
       shell: bash
@@ -224,6 +228,8 @@ jobs:
     - name: Run smoke suite
       env:
         LOTAR_BINARY_PATH: ${{ github.workspace }}/target/release/lotar
+        # Force embedded UI to ensure we test the bundled assets, not stale filesystem copies
+        LOTAR_WEB_UI_EMBEDDED: '1'
       run: npm run test:smoke:quick
 
   windows_checks:
@@ -277,11 +283,11 @@ jobs:
       with:
         tool: nextest
 
-    - name: Build project (debug)
-      run: cargo build --all-features
+    - name: Build project (release)
+      run: cargo build --release --all-features
 
-    - name: Run tests (nextest, fast)
-      run: cargo nextest run --all-features --failure-output=immediate-final --retries 0 --lib --bins --tests
+    - name: Run tests (nextest, release)
+      run: cargo nextest run --release --all-features --failure-output=immediate-final --retries 0 --lib --bins --tests
 
     - name: Run UI tests (Vitest)
       run: npm run test:ui

@@ -70,7 +70,7 @@ function goBack() {
 }
 
 .not-found__path {
-  font-family: var(--font-mono, 'SFMono-Regular', ui-monospace, monospace);
+  font-family: var(--font-mono);
   background: color-mix(in oklab, var(--color-surface) 65%, transparent);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
@@ -84,6 +84,6 @@ function goBack() {
 }
 
 .not-found__back {
-  border: 1px solid var(--color-border, #d4d4d8);
+  border: 1px solid var(--color-border);
 }
 </style>

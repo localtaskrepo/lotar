@@ -27,7 +27,7 @@
             </label>
             <div v-if="accentEnabled" class="accent-controls row" style="gap:12px; align-items:center; flex-wrap: wrap;">
               <input class="accent-color" type="color" v-model="accent" aria-label="Accent color" />
-              <UiInput class="accent-hex" v-model="accent" maxlength="7" placeholder="#0ea5e9" aria-label="Accent color hex" />
+              <UiInput class="accent-hex" v-model="accent" maxlength="7" placeholder="#rrggbb" aria-label="Accent color hex" />
               <span class="chip preview" :style="{ background: accentPreview, color: accentPreviewContrast }">Preview</span>
               <UiButton variant="ghost" @click="resetAccent">Reset</UiButton>
             </div>
@@ -214,7 +214,18 @@ function resetAccent() {
 function resetTables(){
   try {
     const keys = Object.keys(localStorage)
-    for (const k of keys) { if (k.startsWith('lotar.taskTable.columns') || k.startsWith('lotar.taskTable.sort')) localStorage.removeItem(k) }
+    for (const k of keys) {
+      if (
+        k.startsWith('lotar.taskTable.columns') ||
+        k.startsWith('lotar.taskTable.sort') ||
+        k.startsWith('lotar.taskTable.columnOrder') ||
+        k.startsWith('lotar.sprints.columns') ||
+        k.startsWith('lotar.sprints.sort') ||
+        k.startsWith('lotar.sprints.columnOrder')
+      ) {
+        localStorage.removeItem(k)
+      }
+    }
   } catch {}
 }
 

@@ -89,6 +89,7 @@ fn test_global_config_validation_valid() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        web_ui_path: None,
     };
 
     let result = validator.validate_global_config(&config);
@@ -149,6 +150,7 @@ fn test_global_config_validation_privileged_port_warning() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        web_ui_path: None,
     };
 
     let result = validator.validate_global_config(&config);
@@ -226,6 +228,7 @@ fn test_global_config_validation_empty_lists_error() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        web_ui_path: None,
     };
 
     let result = validator.validate_global_config(&config);
@@ -305,6 +308,7 @@ fn test_global_config_validation_invalid_defaults() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        web_ui_path: None,
     };
 
     let result = validator.validate_global_config(&config);
@@ -371,6 +375,7 @@ fn test_global_config_duplicate_entries_warning() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        web_ui_path: None,
     };
 
     let result = validator.validate_global_config(&config);

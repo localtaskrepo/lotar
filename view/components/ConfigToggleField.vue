@@ -97,7 +97,7 @@ function onCheckboxChange(event: Event) {
 }
 
 .field-hint {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-muted);
   font-size: 12px;
 }
 </style>

@@ -4,6 +4,12 @@
 
 LoTaR is an actively developed task management tool with a CLI, web server, and source code integration. It includes a comprehensive test suite and aims for stable, predictable behavior.
 
+## Support
+
+- Issues & feature requests: https://github.com/localtaskrepo/lotar/issues
+- Security issues: https://github.com/localtaskrepo/lotar/security/advisories/new
+- Not sure where to start? See the [Help Index](help/index.md) (especially [Errors](help/errors.md) and [Serve](help/serve.md)).
+
 ## Quick Start
 
 ### 1. Install the CLI
@@ -47,7 +53,7 @@ notes.
 
 **Build from source (Rust + Node)**
 ```bash
-git clone https://github.com/mallox/lotar
+git clone https://github.com/localtaskrepo/lotar
 cd lotar
 npm ci
 npm run build:web   # build Vue UI once
@@ -121,7 +127,7 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
     - Multi-value filters for list: `status`, `priority`, `type`, `tags`
     - Proper 404 for unknown resources
     - CORS preflight support for `/api/*`
-- **Configurable ports** (default 8080, use `-p` as a shorthand for `--port`)
+- **Configurable ports** (default 8080, use `--port` to override; `-p` is reserved for the global `--project` flag)
 - **Personalized chrome** — Preferences page lets each user choose system/light/dark themes and an optional custom accent color; browser chrome tint follows the active theme.
 - **SSE**: realtime events with `retry` hint and periodic heartbeats
 - **Productive task board UI**
@@ -129,12 +135,19 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
     - Smart filter chips toggle common slices like Mine, Unassigned, High, In progress, Blocked, Due soon (7d), Overdue, and No estimate without touching the full filter bar.
     - `?` opens an in-app keyboard overlay listing navigation shortcuts (`g t`, `g b`, `g i`, `/` to focus search), with more shortcuts landing soon.
 
+#### Screenshots
+
+| Tasks | Boards |
+| --- | --- |
+| ![Tasks list](assets/screenshots/ui-tasks.png) | ![Boards](assets/screenshots/ui-boards.png) |
+| ![Sprints](assets/screenshots/ui-sprints.png) | ![Insights](assets/screenshots/ui-insights.png) |
+
 ### Server flags and endpoints
 
 - `lotar serve --host 0.0.0.0 --port 8080 --open`
     - `--host` controls the bind address (default: 127.0.0.1). Use `0.0.0.0` to listen on all interfaces.
     - `--open` opens the default browser to the server URL, but does not change bind address.
-    - `-p` is accepted as a shorthand for `--port`; positional `lotar serve 8080` also continues to work for backward compatibility.
+    - Use `--port <n>` to set the server port. The short `-p` flag is reserved for the global `--project` flag (and `lotar serve` ignores `--project` on purpose).
 - Shutdown endpoint: `GET /shutdown` cleanly stops the server. For tests, `/__test/stop` remains available as an alias.
 
 ## Command Reference
@@ -148,7 +161,7 @@ lotar status PROJ-001 DONE
 lotar assignee PROJ-001 user@example.com
 
 # System Commands
-lotar serve -p 8080       # Start web server
+lotar serve --port 8080   # Start web server
 lotar scan ./src          # Scan for TODOs
 lotar stats changed --since 14d  # Tickets changed in a window
 lotar stats churn --since 30d    # Churn: commits per ticket (sorted)
@@ -217,14 +230,14 @@ npm run dev
 This serves the UI on http://localhost:5173 for fast iteration. In another terminal, run the server:
 
 ```bash
-cargo run -- serve -p 8080
+cargo run -- serve --port 8080
 ```
 
 Or build UI and run the server that serves embedded static files:
 
 ```bash
 npm run build
-cargo run -- serve -p 8080
+cargo run -- serve --port 8080
 ```
 
 Ready for production use with no known critical issues.
@@ -248,3 +261,9 @@ Need Rust doc tests? Run them explicitly:
 ```bash
 cargo test --doc --all-features
 ```
+
+## More screenshots
+
+| Calendar | Configuration |
+| --- | --- |
+| ![Sprint calendar](assets/screenshots/ui-calendar.png) | ![Configuration](assets/screenshots/ui-config.png) |
