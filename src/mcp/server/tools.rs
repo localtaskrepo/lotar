@@ -29,13 +29,27 @@ fn append_hint_descriptions(tool: &mut Value, sections: &[(&[String], &str)]) {
 
 pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Value> {
     vec![
+        make_whoami_tool(),
         make_task_create_tool(enum_hints),
         make_task_get_tool(enum_hints),
         make_task_update_tool(enum_hints),
+        make_task_comment_add_tool(enum_hints),
+        make_task_comment_update_tool(enum_hints),
+        make_task_bulk_update_tool(enum_hints),
+        make_task_bulk_comment_add_tool(enum_hints),
+        make_task_bulk_reference_add_tool(enum_hints),
+        make_task_bulk_reference_remove_tool(enum_hints),
         make_task_reference_add_tool(enum_hints),
         make_task_reference_remove_tool(enum_hints),
         make_task_delete_tool(enum_hints),
         make_task_list_tool(enum_hints),
+        make_sprint_list_tool(),
+        make_sprint_get_tool(),
+        make_sprint_create_tool(),
+        make_sprint_update_tool(),
+        make_sprint_summary_tool(),
+        make_sprint_burndown_tool(),
+        make_sprint_velocity_tool(),
         make_sprint_add_tool(),
         make_sprint_remove_tool(),
         make_sprint_delete_tool(),
@@ -376,7 +390,7 @@ fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "List tasks using optional filters. status/priority/type accept a single string or array and are validated via project config. assignee accepts '@me'. tag filters a single tag (repeat the tool to combine). search performs a text match across id/title/description/tags.".to_string();
+    let description = "List tasks using optional filters. status/priority/type accept a single string, comma-separated string, or array and are validated via project config. assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("project".into(), json!({"type": ["string", "null"]}));
@@ -385,7 +399,23 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
     properties.insert("priority".into(), multi_value_string_schema());
     properties.insert("type".into(), multi_value_string_schema());
     properties.insert("tag".into(), json!({"type": ["string", "null"]}));
+    properties.insert("tags".into(), multi_value_string_schema());
     properties.insert("search".into(), json!({"type": ["string", "null"]}));
+    properties.insert(
+        "custom_fields".into(),
+        json!({
+            "type": ["object", "null"],
+            "description": "Filter by custom_fields; values must be string or array-of-string. Example: {\"team\": [\"infra\"]}."
+        }),
+    );
+    properties.insert(
+        "sprints".into(),
+        json!({
+            "type": ["array", "string", "number", "null"],
+            "items": {"type": ["number", "string"]},
+            "description": "Filter by sprint ids. Accepts a single number/string, or an array. Strings may be '#<id>' or '<id>'."
+        }),
+    );
     properties.insert(
         "limit".into(),
         json!({
@@ -457,6 +487,18 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         enum_hints.map(|h| h.tags.as_slice()),
         false,
     );
+    insert_field_hint(
+        &mut field_hints,
+        "tags",
+        enum_hints.map(|h| h.tags.as_slice()),
+        true,
+    );
+    insert_field_hint(
+        &mut field_hints,
+        "custom_fields",
+        enum_hints.map(|h| h.custom_fields.as_slice()),
+        false,
+    );
     attach_field_hints(&mut tool, field_hints);
 
     if let Some(hints) = enum_hints {
@@ -474,6 +516,324 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
     }
 
     tool
+}
+
+fn make_whoami_tool() -> Value {
+    json!({
+        "name": "whoami",
+        "description": "Resolve the current user identity used for '@me' (default_reporter -> git config -> system username).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "explain": {
+                    "type": ["boolean", "null"],
+                    "description": "When true, include detection details (sources checked, chosen value)."
+                }
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_task_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
+    json!({
+        "name": "task_comment_add",
+        "description": "Append a comment to a task and record a history entry. Returns {task}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "text": {"type": "string"}
+            },
+            "required": ["id", "text"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_task_comment_update_tool(_enum_hints: Option<&EnumHints>) -> Value {
+    json!({
+        "name": "task_comment_update",
+        "description": "Update an existing task comment by 0-based index and record a history entry. Returns {task}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "index": {"type": "number", "description": "0-based comment index."},
+                "text": {"type": "string"}
+            },
+            "required": ["id", "index", "text"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut patch_properties = JsonMap::new();
+    patch_properties.insert("title".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("description".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("status".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("priority".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("type".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("reporter".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("due_date".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert("effort".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert(
+        "tags".into(),
+        json!({"type": ["array", "null"], "items": {"type": "string"}}),
+    );
+    patch_properties.insert("relationships".into(), json!({"type": ["object", "null"]}));
+    patch_properties.insert(
+        "custom_fields".into(),
+        json!({"type": ["object", "null"], "description": "Set/clear custom_fields. Null clears all."}),
+    );
+    patch_properties.insert(
+        "sprints".into(),
+        json!({"type": ["array", "null"], "items": {"type": "number"}}),
+    );
+
+    let mut tool = json!({
+        "name": "task_bulk_update",
+        "description": "Patch multiple tasks in one call. Returns {updated, failed}. stop_on_error=true aborts at first failure.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "string"}},
+                "patch": {"type": "object", "properties": Value::Object(patch_properties), "additionalProperties": false},
+                "stop_on_error": {"type": ["boolean", "null"]}
+            },
+            "required": ["ids", "patch"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    insert_field_hint(
+        &mut field_hints,
+        "status",
+        enum_hints.map(|h| h.statuses.as_slice()),
+        false,
+    );
+    insert_field_hint(
+        &mut field_hints,
+        "priority",
+        enum_hints.map(|h| h.priorities.as_slice()),
+        false,
+    );
+    insert_field_hint(
+        &mut field_hints,
+        "type",
+        enum_hints.map(|h| h.types.as_slice()),
+        false,
+    );
+    insert_field_hint(
+        &mut field_hints,
+        "reporter",
+        enum_hints.map(|h| h.members.as_slice()),
+        false,
+    );
+    insert_field_hint(
+        &mut field_hints,
+        "assignee",
+        enum_hints.map(|h| h.members.as_slice()),
+        false,
+    );
+    attach_field_hints(&mut tool, field_hints);
+
+    tool
+}
+
+fn make_task_bulk_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
+    json!({
+        "name": "task_bulk_comment_add",
+        "description": "Append the same comment to multiple tasks. Returns {updated, failed}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "string"}},
+                "text": {"type": "string"},
+                "stop_on_error": {"type": ["boolean", "null"]}
+            },
+            "required": ["ids", "text"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_task_bulk_reference_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_bulk_reference_add",
+        "description": "Attach the same reference to multiple tasks. Returns {updated, failed}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "string"}},
+                "kind": {"type": "string"},
+                "value": {"type": "string"},
+                "stop_on_error": {"type": ["boolean", "null"]}
+            },
+            "required": ["ids", "kind", "value"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    attach_field_hints(&mut tool, field_hints);
+    tool
+}
+
+fn make_task_bulk_reference_remove_tool(_enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_bulk_reference_remove",
+        "description": "Detach the same reference from multiple tasks. Returns {updated, failed}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ids": {"type": "array", "items": {"type": "string"}},
+                "kind": {"type": "string"},
+                "value": {"type": "string"},
+                "stop_on_error": {"type": ["boolean", "null"]}
+            },
+            "required": ["ids", "kind", "value"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
+    attach_field_hints(&mut tool, field_hints);
+    tool
+}
+
+fn make_sprint_list_tool() -> Value {
+    json!({
+        "name": "sprint_list",
+        "description": "List sprints. Pagination uses 0-based cursor offsets.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": ["number", "null"], "description": "Max sprints per page."},
+                "cursor": {"type": ["string", "number", "null"], "description": "Opaque cursor returned via nextCursor."},
+                "offset": {"type": ["number", "null"], "description": "Alias for cursor (0-based)."},
+                "include_integrity": {"type": ["boolean", "null"], "description": "When true (default), include missing_sprints/integrity diagnostics."}
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_sprint_get_tool() -> Value {
+    json!({
+        "name": "sprint_get",
+        "description": "Fetch a sprint by id (sprint_id preferred) and return its computed list item.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sprint": {"type": ["string", "null"], "description": "Sprint reference like '#1'."},
+                "sprint_id": {"type": ["number", "null"], "description": "Numeric sprint identifier."}
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_sprint_create_tool() -> Value {
+    json!({
+        "name": "sprint_create",
+        "description": "Create a sprint. Defaults may be applied unless skip_defaults=true.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "label": {"type": ["string", "null"]},
+                "goal": {"type": ["string", "null"]},
+                "plan_length": {"type": ["string", "null"]},
+                "ends_at": {"type": ["string", "null"]},
+                "starts_at": {"type": ["string", "null"]},
+                "capacity_points": {"type": ["number", "null"]},
+                "capacity_hours": {"type": ["number", "null"]},
+                "overdue_after": {"type": ["string", "null"]},
+                "notes": {"type": ["string", "null"]},
+                "skip_defaults": {"type": ["boolean", "null"]}
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_sprint_update_tool() -> Value {
+    json!({
+        "name": "sprint_update",
+        "description": "Update a sprint. Omit fields to keep unchanged; set fields to null to clear where supported.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or numeric id."},
+                "sprint_id": {"type": ["number", "null"], "description": "Numeric sprint id (preferred)."},
+                "label": {"type": ["string", "null"]},
+                "goal": {"type": ["string", "null"]},
+                "plan_length": {"type": ["string", "null"]},
+                "ends_at": {"type": ["string", "null"]},
+                "starts_at": {"type": ["string", "null"]},
+                "capacity_points": {"type": ["number", "null"], "description": "Number sets; null clears; omit leaves unchanged."},
+                "capacity_hours": {"type": ["number", "null"], "description": "Number sets; null clears; omit leaves unchanged."},
+                "overdue_after": {"type": ["string", "null"]},
+                "notes": {"type": ["string", "null"]},
+                "actual_started_at": {"type": ["string", "null"], "description": "RFC3339 timestamp, null clears."},
+                "actual_closed_at": {"type": ["string", "null"], "description": "RFC3339 timestamp, null clears."}
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_sprint_summary_tool() -> Value {
+    json!({
+        "name": "sprint_summary",
+        "description": "Compute sprint summary metrics for a sprint.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or numeric id."},
+                "sprint_id": {"type": ["number", "null"]}
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_sprint_burndown_tool() -> Value {
+    json!({
+        "name": "sprint_burndown",
+        "description": "Compute sprint burndown series for a sprint.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or numeric id."},
+                "sprint_id": {"type": ["number", "null"]}
+            },
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_sprint_velocity_tool() -> Value {
+    json!({
+        "name": "sprint_velocity",
+        "description": "Compute velocity across recent sprints.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "include_active": {"type": ["boolean", "null"]},
+                "limit": {"type": ["number", "null"], "description": "Window size (default 6)."},
+                "metric": {"type": ["string", "null"], "description": "tasks | points | hours"}
+            },
+            "additionalProperties": false
+        }
+    })
 }
 
 fn make_sprint_add_tool() -> Value {

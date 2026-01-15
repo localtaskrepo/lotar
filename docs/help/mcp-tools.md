@@ -13,6 +13,11 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ## Task Tools
 
+### `whoami`
+- **Params:** optional `explain` (bool).
+- **Behavior:** resolves the user identity used for `@me`.
+- **Response:** JSON with `status`, `user`, and optional `explain` metadata.
+
 ### `task_create`
 - **Params:** `title` (required), optional `description`, `project`, `priority`, `type`, `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `relationships`, `custom_fields` map, and `sprints[]` (numeric IDs).
 - **Behavior:** Validates enums via `CliValidator`; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
@@ -26,15 +31,73 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields and can be nulled/reset (e.g., `relationships: null` clears relationships).
 - **Response:** Updated `TaskDTO` serialized to JSON.
 
+### `task_comment_add`
+- **Params:** `id` (required), `text` (required).
+- **Behavior:** appends a new comment and records a history entry.
+- **Response:** Updated `TaskDTO`.
+
+### `task_comment_update`
+- **Params:** `id` (required), `index` (0-based, required), `text` (required).
+- **Behavior:** updates the comment at the specified index and records a history entry.
+- **Response:** Updated `TaskDTO`.
+
+### `task_bulk_update`
+- **Params:** `ids[]` (required), `patch` (required), optional `stop_on_error`.
+- **Behavior:** applies the same patch to multiple tasks. When `stop_on_error=true`, aborts after the first failure.
+- **Response:** JSON with `updated[]` and `failed[]` per task id.
+
+### `task_bulk_comment_add`
+- **Params:** `ids[]` (required), `text` (required), optional `stop_on_error`.
+- **Behavior:** appends the same comment to multiple tasks.
+- **Response:** JSON with `updated[]` and `failed[]`.
+
+### `task_bulk_reference_add`
+- **Params:** `ids[]` (required), `kind` (required: `link|file|code`), `value` (required), optional `stop_on_error`.
+- **Behavior:** attaches the same reference to multiple tasks.
+- **Response:** JSON with `updated[]` and `failed[]`.
+
+### `task_bulk_reference_remove`
+- **Params:** `ids[]` (required), `kind` (required: `link|file|code`), `value` (required), optional `stop_on_error`.
+- **Behavior:** detaches the same reference from multiple tasks.
+- **Response:** JSON with `updated[]` and `failed[]`.
+
 ### `task_delete`
 - **Params:** `id` (required) and optional `project`.
 - **Response:** Text payload like `deleted=true` or `deleted=false`.
 
 ### `task_list`
 - **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings.
-- **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor`, `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page.
+- **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page.
 
 ## Sprint Tools
+
+### `sprint_list`
+- **Params:** `limit` (default 50, max 200), `cursor`/`offset` (string/number), optional `include_integrity`.
+- **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `sprints[]`, and optional `missing_sprints`/`integrity`.
+
+### `sprint_get`
+- **Params:** `sprint` or `sprint_id`.
+- **Response:** JSON with `status` and a single `sprint` entry.
+
+### `sprint_create`
+- **Params:** `label`, `goal`, `plan_length`, `starts_at`, `ends_at`, `capacity_points`, `capacity_hours`, `overdue_after`, `notes`, `skip_defaults`.
+- **Response:** JSON with `status`, created `sprint`, plus any warnings/defaults applied.
+
+### `sprint_update`
+- **Params:** `sprint`/`sprint_id` plus any fields to update (supports clearing capacity/actual timestamps via `null`).
+- **Response:** JSON with `status`, updated `sprint`, and any warnings.
+
+### `sprint_summary`
+- **Params:** `sprint`/`sprint_id`.
+- **Response:** Same payload as the CLI sprint summary report (status, metrics, timeline).
+
+### `sprint_burndown`
+- **Params:** `sprint`/`sprint_id`.
+- **Response:** Same payload as the CLI sprint burndown report (`series[]` etc.).
+
+### `sprint_velocity`
+- **Params:** `limit` (default 6), `include_active` (default false), `metric` (`tasks|points|hours`).
+- **Response:** Same payload as the CLI sprint velocity report.
 
 ### `sprint_add`
 - **Params:** `tasks` (string or array, required), optional `sprint` (reference like `#1` or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (force reassignments), and `cleanup_missing` (remove dangling references first).
@@ -50,7 +113,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `sprint_backlog`
 - **Params:** `project`, `status` list (defaults come from config), `tag` filter, `assignee`, `limit` (default 20, max 100), `cursor` (<= 5000), and `cleanup_missing`.
-- **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `nextCursor`, `tasks[]`, `missing_sprints`, `enumHints`, and a `truncated`/`hasMore` flag.
+- **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `nextCursor` (number or null), `tasks[]`, `missing_sprints`, `enumHints`, and a `truncated`/`hasMore` flag.
 
 ## Project Tools
 
