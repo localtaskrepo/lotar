@@ -23,7 +23,7 @@ rayon = { version = "1.11.0", default-features = false, optional = true }
 ignore = { version = "0.4.25" }
 notify = "8.2.0"
 pulldown-cmark = { version = "0.13.0", default-features = false }
-blake3 = { version = "1.8.2", default-features = false, features = ["std"] }
+blake3 = { version = "1.8.3", default-features = false, features = ["std"] }
 base64 = { version = "0.22.1", default-features = false, features = ["std"] }
 
 # Production release profile optimized for minimal binary size
