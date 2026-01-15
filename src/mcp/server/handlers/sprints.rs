@@ -14,6 +14,46 @@ use crate::storage::manager::Storage;
 use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
 
+fn parse_sprint_reference(params: &Value) -> Result<Option<String>, &'static str> {
+    if let Some(raw) = params.get("sprint_id") {
+        match raw {
+            Value::Null => {}
+            Value::Number(num) => {
+                if let Some(value) = num.as_u64() {
+                    return Ok(Some(value.to_string()));
+                }
+                return Err("sprint_id must be a positive integer");
+            }
+            Value::String(text) => {
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    return Ok(None);
+                }
+                let normalized = trimmed.strip_prefix('#').unwrap_or(trimmed);
+                if normalized.parse::<u32>().is_ok() {
+                    return Ok(Some(normalized.to_string()));
+                }
+                return Err("sprint_id must be a positive integer");
+            }
+            _ => return Err("sprint_id must be a positive integer"),
+        }
+    }
+
+    match params.get("sprint") {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Number(num)) => Ok(Some(num.to_string())),
+        Some(Value::String(text)) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                Err("sprint must be a sprint reference like '#1' or keyword when provided")
+            } else {
+                Ok(Some(trimmed.to_string()))
+            }
+        }
+        _ => Err("sprint must be a sprint reference like '#1' or keyword when provided"),
+    }
+}
+
 pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
@@ -99,23 +139,10 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let sprint_ref = req.params.get("sprint").map(|value| match value {
-        Value::Number(num) => num.to_string(),
-        Value::String(text) => text.trim().to_string(),
-        _ => String::new(),
-    });
-
-    if sprint_ref
-        .as_ref()
-        .is_some_and(|reference| reference.is_empty())
-    {
-        return err(
-            req.id,
-            -32602,
-            "sprint must be a numeric id or keyword when provided",
-            None,
-        );
-    }
+    let sprint_ref = match parse_sprint_reference(&req.params) {
+        Ok(v) => v,
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
 
     let allow_closed = req
         .params
@@ -324,23 +351,10 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let sprint_ref = req.params.get("sprint").map(|value| match value {
-        Value::Number(num) => num.to_string(),
-        Value::String(text) => text.trim().to_string(),
-        _ => String::new(),
-    });
-
-    if sprint_ref
-        .as_ref()
-        .is_some_and(|reference| reference.is_empty())
-    {
-        return err(
-            req.id,
-            -32602,
-            "sprint must be a numeric id or keyword when provided",
-            None,
-        );
-    }
+    let sprint_ref = match parse_sprint_reference(&req.params) {
+        Ok(v) => v,
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
 
     let outcome = match sprint_assignment::remove_tasks(
         &mut storage,
@@ -425,12 +439,41 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
     };
     let mut storage = Storage::new(resolver.path.clone());
 
-    let sprint_val = req.params.get("sprint");
-    let sprint_id = match sprint_val {
+    let sprint_id = match req.params.get("sprint_id") {
         Some(Value::Number(num)) => num.as_u64().and_then(|value| u32::try_from(value).ok()),
-        Some(Value::String(text)) => text.trim().parse::<u32>().ok(),
+        Some(Value::String(text)) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                trimmed
+                    .strip_prefix('#')
+                    .unwrap_or(trimmed)
+                    .parse::<u32>()
+                    .ok()
+            }
+        }
+        Some(Value::Null) | None => None,
+        _ => return err(req.id, -32602, "sprint_id must be a positive integer", None),
+    }
+    .or_else(|| match req.params.get("sprint") {
+        Some(Value::Number(num)) => num.as_u64().and_then(|value| u32::try_from(value).ok()),
+        Some(Value::String(text)) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                trimmed
+                    .strip_prefix('#')
+                    .unwrap_or(trimmed)
+                    .parse::<u32>()
+                    .ok()
+            }
+        }
+        Some(Value::Null) | None => None,
         _ => None,
-    };
+    });
+
     let sprint_id = match sprint_id {
         Some(id) => id,
         None => return err(req.id, -32602, "Missing or invalid sprint id", None),

@@ -23,6 +23,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+
+    - name: Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+        shared-key: build-artifacts
+        save-if: ${{ github.ref == 'refs/heads/main' }}
+
     - name: Determine Node version
       id: node_version
       shell: bash
@@ -44,18 +56,6 @@ jobs:
 
     - name: Verify web assets exist
       run: test -f target/web/index.html
-
-    - name: Setup Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: stable
-
-    - name: Rust cache
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-on-failure: true
-        shared-key: build-artifacts
-        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Build release binary
       run: cargo build --release --all-features

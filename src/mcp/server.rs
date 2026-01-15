@@ -471,13 +471,37 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                     .and_then(|value| value.get("functionResponse"))
                     .is_some();
                 if !already_wrapped {
+                    // VS Code MCP expects tool responses to expose `result.content` as an array.
+                    // Gemini CLI expects `result.functionResponse.response` to contain the tool payload.
+                    // Provide both shapes to maximize compatibility.
                     let inner_result = response.result.take().unwrap_or_else(|| json!({}));
-                    response.result = Some(json!({
-                        "functionResponse": {
-                            "name": tool_name,
-                            "response": inner_result
+                    match inner_result {
+                        Value::Object(mut obj) => {
+                            let cloned = Value::Object(obj.clone());
+                            obj.insert(
+                                "functionResponse".to_string(),
+                                json!({
+                                    "name": tool_name,
+                                    "response": cloned,
+                                }),
+                            );
+                            response.result = Some(Value::Object(obj));
                         }
-                    }));
+                        other => {
+                            response.result = Some(json!({
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": other.to_string()
+                                    }
+                                ],
+                                "functionResponse": {
+                                    "name": tool_name,
+                                    "response": other
+                                }
+                            }));
+                        }
+                    }
                 }
             }
             response
