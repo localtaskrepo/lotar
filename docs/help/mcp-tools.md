@@ -37,15 +37,15 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ## Sprint Tools
 
 ### `sprint_add`
-- **Params:** `tasks` (string or array, required), `sprint` (numeric id or keyword), `allow_closed` (default `false`), `force_single`/`force` (force reassignments), and `cleanup_missing` (remove dangling references first).
+- **Params:** `tasks` (string or array, required), optional `sprint` (reference like `#1` or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (force reassignments), and `cleanup_missing` (remove dangling references first).
 - **Response:** JSON with `status`, `action` (`created|updated|moved`), `sprint_id`, `sprint_label`, lists of `modified`, `unchanged`, `replaced`, `missing_sprints`, and optional `integrity` metrics. If reassignments occur, an additional text content item lists the human-readable warnings.
 
 ### `sprint_remove`
-- **Params:** Same as `sprint_add` (`tasks`, optional `sprint`, optional `cleanup_missing`).
+- **Params:** Same as `sprint_add` (`tasks`, optional `sprint`, optional `sprint_id`, optional `cleanup_missing`).
 - **Response:** Mirrors `sprint_add` but describes removal results rather than assignments.
 
 ### `sprint_delete`
-- **Params:** `sprint` (numeric id, required) and optional `cleanup_missing` to scrub dangling references.
+- **Params:** `sprint` (reference like `#1`) or `sprint_id` (numeric id), plus optional `cleanup_missing` to scrub dangling references.
 - **Response:** Two content items: a summary sentence and a JSON object containing `deleted`, `sprint_id`, `sprint_label`, `removed_references`, `updated_tasks`, and optional `integrity` data.
 
 ### `sprint_backlog`
