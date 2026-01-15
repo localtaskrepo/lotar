@@ -390,6 +390,11 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
         let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+
+        let page = match crate::utils::pagination::parse_page(&req.query, 50, 200) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
         // Load config for validation of status/priority/type
         let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
             Ok(m) => m,
@@ -444,16 +449,37 @@ pub fn initialize(api_server: &mut ApiServer) {
         // API parity: accept additional query keys (built-ins or declared custom fields)
         // Build filters map from unknown keys and assignee
         let mut uf: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-        let known = ["project", "status", "priority", "type", "tags", "q"];
-        // Assignee (supports @me)
+        let known = [
+            "project",
+            "status",
+            "priority",
+            "type",
+            "tags",
+            "q",
+            "assignee",
+            "order",
+            "limit",
+            "offset",
+            "page_size",
+            "per_page",
+            "due",
+            "recent",
+            "needs",
+        ];
+        // Assignee (supports @me; __none__ means unassigned)
+        let mut wants_unassigned = false;
         if let Some(a) = req.query.get("assignee") {
-            let v = if a == "@me" {
-                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
-                    .unwrap_or_else(|| a.clone())
+            if a == "__none__" {
+                wants_unassigned = true;
             } else {
-                a.clone()
-            };
-            uf.entry("assignee".into()).or_default().insert(v);
+                let v = if a == "@me" {
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
+                        .unwrap_or_else(|| a.clone())
+                } else {
+                    a.clone()
+                };
+                uf.entry("assignee".into()).or_default().insert(v);
+            }
         }
         // Other keys
         for (k, v) in req.query.iter() {
@@ -547,20 +573,141 @@ pub fn initialize(api_server: &mut ApiServer) {
             });
         }
 
-        ok_json(
-            200,
-            json!({
-                "data": tasks.iter().map(|(_, t)| t).collect::<Vec<_>>(),
-                "meta": {"count": tasks.len()}
-            }),
-        )
+        if wants_unassigned {
+            tasks.retain(|(_, task)| {
+                task.assignee
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
+            });
+        }
+
+        let due = req.query.get("due").map(|s| s.as_str()).unwrap_or("");
+        let recent = req.query.get("recent").map(|s| s.as_str()).unwrap_or("");
+        let needs_raw = req.query.get("needs").map(|s| s.as_str()).unwrap_or("");
+        let needs: BTreeSet<&str> = needs_raw
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if !due.is_empty() || !recent.is_empty() || !needs.is_empty() {
+            use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
+
+            let today = Local::now().date_naive();
+            let tomorrow = today + Duration::days(1);
+            let soon_cutoff = today + Duration::days(7);
+            let recent_cutoff = Utc::now() - Duration::days(7);
+
+            tasks.retain(|(_, task)| {
+                if !due.is_empty() {
+                    let Some(raw_due) = task.due_date.as_deref() else {
+                        return false;
+                    };
+                    let Ok(due_date) = NaiveDate::parse_from_str(raw_due.trim(), "%Y-%m-%d") else {
+                        return false;
+                    };
+
+                    match due {
+                        "today" => {
+                            if due_date != today {
+                                return false;
+                            }
+                        }
+                        "soon" => {
+                            if due_date < tomorrow || due_date > soon_cutoff {
+                                return false;
+                            }
+                        }
+                        "later" => {
+                            if due_date <= soon_cutoff {
+                                return false;
+                            }
+                        }
+                        "overdue" => {
+                            if due_date >= today {
+                                return false;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                if recent == "7d" {
+                    let Ok(modified) = DateTime::parse_from_rfc3339(task.modified.as_str()) else {
+                        return false;
+                    };
+                    if modified.with_timezone(&Utc) < recent_cutoff {
+                        return false;
+                    }
+                }
+
+                if !needs.is_empty() {
+                    if needs.contains("effort") {
+                        let effort = task.effort.as_deref().unwrap_or("").trim();
+                        if !effort.is_empty() {
+                            return false;
+                        }
+                    }
+                    if needs.contains("due") {
+                        let due_val = task.due_date.as_deref().unwrap_or("").trim();
+                        if !due_val.is_empty() {
+                            return false;
+                        }
+                    }
+                }
+
+                true
+            });
+        }
+
+        let order = req.query.get("order").map(|s| s.as_str()).unwrap_or("desc");
+        let desc = order != "asc";
+        tasks.sort_by(|(ida, ta), (idb, tb)| {
+            use std::cmp::Ordering;
+
+            let mut cmp = ta.modified.cmp(&tb.modified);
+            if desc {
+                cmp = cmp.reverse();
+            }
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+            if desc {
+                idb.cmp(ida)
+            } else {
+                ida.cmp(idb)
+            }
+        });
+
+        let total = tasks.len();
+        let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
+        let page_tasks = tasks[start..end]
+            .iter()
+            .map(|(_, task)| task.clone())
+            .collect::<Vec<_>>();
+
+        let payload = crate::api_types::TaskListResponse {
+            total,
+            limit: page.limit,
+            offset: page.offset,
+            tasks: page_tasks,
+        };
+
+        ok_json(200, json!({"data": payload}))
     });
 
     // GET /api/sprints/list
-    api_server.register_handler("GET", "/api/sprints/list", |_req: &HttpRequest| {
+    api_server.register_handler("GET", "/api/sprints/list", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let page = match crate::utils::pagination::parse_page(&req.query, 200, 500) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
         };
 
         let storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
@@ -568,7 +715,10 @@ pub fn initialize(api_server: &mut ApiServer) {
             None => {
                 let payload = SprintListResponse {
                     status: "ok".to_string(),
+                    total: 0,
                     count: 0,
+                    limit: page.limit,
+                    offset: page.offset,
                     sprints: Vec::new(),
                     missing_sprints: Vec::new(),
                     integrity: None,
@@ -589,16 +739,24 @@ pub fn initialize(api_server: &mut ApiServer) {
         };
 
         let now = Utc::now();
-        let sprints: Vec<SprintListItem> = records
+        let mut sprints: Vec<SprintListItem> = records
             .iter()
             .map(|record| sprint_record_to_list_item(record, now))
             .collect();
 
+        sprints.sort_by(|a, b| a.id.cmp(&b.id));
+        let total = sprints.len();
+        let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
+        let page_sprints = sprints[start..end].to_vec();
+
         let integrity_report = sprint_integrity::detect_missing_sprints(&storage, &records);
         let payload = SprintListResponse {
             status: "ok".to_string(),
-            count: sprints.len(),
-            sprints,
+            total,
+            count: page_sprints.len(),
+            limit: page.limit,
+            offset: page.offset,
+            sprints: page_sprints,
             missing_sprints: integrity_report.missing_sprints.clone(),
             integrity: make_integrity_payload(&integrity_report, &integrity_report, None),
         };
@@ -2597,14 +2755,31 @@ pub fn initialize(api_server: &mut ApiServer) {
     });
 
     // GET /api/projects/list
-    api_server.register_handler("GET", "/api/projects/list", |_req: &HttpRequest| {
+    api_server.register_handler("GET", "/api/projects/list", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
+
+        let page = match crate::utils::pagination::parse_page(&req.query, 200, 500) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
         let storage = crate::storage::manager::Storage::new(resolver.path);
-        let projects = ProjectService::list(&storage);
-        ok_json(200, json!({"data": projects}))
+        let mut projects = ProjectService::list(&storage);
+        projects.sort_by(|a, b| a.prefix.cmp(&b.prefix));
+        let total = projects.len();
+        let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
+        let page_projects = projects[start..end].to_vec();
+
+        let payload = crate::api_types::ProjectListResponse {
+            total,
+            limit: page.limit,
+            offset: page.offset,
+            projects: page_projects,
+        };
+
+        ok_json(200, json!({"data": payload}))
     });
 
     // GET /api/projects/stats?project=PREFIX

@@ -404,6 +404,13 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Opaque cursor string returned via nextCursor. Use null/omit for the first page."
         }),
     );
+    properties.insert(
+        "offset".into(),
+        json!({
+            "type": ["number", "null"],
+            "description": "Alias for cursor (0-based)."
+        }),
+    );
 
     let mut tool = json!({
         "name": "task_list",
@@ -547,6 +554,13 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Opaque cursor string returned via nextCursor. Use null/omit for the first page."
         }),
     );
+    properties.insert(
+        "offset".into(),
+        json!({
+            "type": ["number", "null"],
+            "description": "Alias for cursor (0-based)."
+        }),
+    );
 
     let mut tool = json!({
         "name": "sprint_backlog",
@@ -601,10 +615,41 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_project_list_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut properties = JsonMap::new();
+    properties.insert(
+        "limit".into(),
+        json!({
+            "type": ["number", "null"],
+            "description": "Maximum number of projects to return per page (1-200). Defaults to 50."
+        }),
+    );
+    properties.insert(
+        "cursor".into(),
+        json!({
+            "oneOf": [
+                {"type": "string"},
+                {"type": "number"},
+                {"type": "null"}
+            ],
+            "description": "Opaque cursor string returned via nextCursor. Use null/omit for the first page."
+        }),
+    );
+    properties.insert(
+        "offset".into(),
+        json!({
+            "type": ["number", "null"],
+            "description": "Alias for cursor (0-based)."
+        }),
+    );
+
     let mut tool = json!({
         "name": "project_list",
         "description": "List known projects and their prefixes for the current workspace root.",
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false}
+        "inputSchema": {
+            "type": "object",
+            "properties": Value::Object(properties),
+            "additionalProperties": false
+        }
     });
 
     if let Some(hints) = enum_hints {

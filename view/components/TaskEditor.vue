@@ -303,13 +303,14 @@ async function preloadLists(){
   try {
     // Use current filter: for now, list tasks in the selected project to gather unique values
     const proj = form.project || (form.id ? String(form.id).split('-')[0] : undefined)
-    const list = await api.listTasks({ project: proj } as any)
+    const response = await api.listTasks({ project: proj, limit: 200, offset: 0 } as any)
+    const list = Array.isArray((response as any)?.tasks) ? (response as any).tasks : []
     const users = new Set<string>()
     const tags = new Set<string>()
     for (const t of list) {
       if (t.assignee) users.add(t.assignee)
       if ((t as any).reporter) users.add((t as any).reporter)
-      ;(t.tags || []).forEach(x => tags.add(x))
+      ;(t.tags || []).forEach((x: string) => tags.add(x))
     }
     allUsers.value = Array.from(users).sort((a,b) => a.localeCompare(b))
     allTags.value = Array.from(tags).sort((a,b) => a.localeCompare(b))

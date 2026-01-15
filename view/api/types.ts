@@ -204,6 +204,13 @@ export interface TaskListFilter {
   [key: string]: any
 }
 
+export interface TaskListResponse {
+  total: number
+  limit: number
+  offset: number
+  tasks: TaskDTO[]
+}
+
 export interface TaskSelection {
   filter?: TaskListFilter
   where?: Array<[string, string]>
@@ -332,10 +339,20 @@ export interface SprintListItem {
 
 export interface SprintListResponse {
   status: string
+  total: number
   count: number
+  limit: number
+  offset: number
   sprints: SprintListItem[]
   missing_sprints: number[]
   integrity?: SprintIntegrityDiagnostics
+}
+
+export interface ProjectListResponse {
+  total: number
+  limit: number
+  offset: number
+  projects: ProjectDTO[]
 }
 
 export interface SprintStatusWarningPayload {

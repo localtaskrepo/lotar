@@ -3,7 +3,12 @@ import { createUseTasks } from '../composables/useTasks'
 
 describe('useTasks', () => {
   const fake = {
-    listTasks: vi.fn(async () => [{ id: 'PRJ-1', title: 'A', status: 'open', priority: 'low', task_type: 'task', created: '', modified: '', tags: [], relationships: {}, comments: [], custom_fields: {} }]),
+    listTasks: vi.fn(async () => ({
+      total: 1,
+      limit: 50,
+      offset: 0,
+      tasks: [{ id: 'PRJ-1', title: 'A', status: 'open', priority: 'low', task_type: 'task', created: '', modified: '', tags: [], relationships: {}, comments: [], custom_fields: {} }],
+    })),
     addTask: vi.fn(async (p) => ({ id: 'PRJ-2', title: p.title, status: 'open', priority: 'low', task_type: 'task', created: '', modified: '', tags: [], relationships: {}, comments: [], custom_fields: {} })),
     updateTask: vi.fn(async (id, patch) => ({ id, title: patch.title || 'x', status: 'open', priority: 'low', task_type: 'task', created: '', modified: '', tags: [], relationships: {}, comments: [], custom_fields: {} })),
     deleteTask: vi.fn(async () => ({ deleted: true })),

@@ -176,15 +176,17 @@ describe.concurrent('UI advanced smoke scenarios', () => {
             try {
                 const listResponse = await fetch(`${server.url}/api/tasks/list?tags=export`);
                 expect(listResponse.ok).toBe(true);
-                const listPayload = (await listResponse.json()) as { data: Array<{ id: string }> };
-                expect(listPayload.data.length).toBeGreaterThanOrEqual(2);
+                const listPayload = (await listResponse.json()) as {
+                    data: { tasks: Array<{ id: string }>; total: number; limit: number; offset: number };
+                };
+                expect(listPayload.data.tasks.length).toBeGreaterThanOrEqual(2);
 
                 const exportResponse = await fetch(`${server.url}/api/tasks/export?tags=export`);
                 expect(exportResponse.ok).toBe(true);
                 const csv = await exportResponse.text();
                 const lines = csv.trim().split('\n').slice(1); // drop header
                 const csvIds = lines.map((line) => line.split(',')[0].replace(/"/g, ''));
-                const listIds = listPayload.data.map((entry) => entry.id);
+                const listIds = listPayload.data.tasks.map((entry) => entry.id);
                 listIds.forEach((id) => {
                     expect(csvIds).toContain(id);
                 });

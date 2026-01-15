@@ -66,6 +66,21 @@
         </UiCard>
 
         <UiCard>
+          <h3>Tasks list</h3>
+          <div class="col" style="gap:8px;">
+            <label class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
+              <span class="muted">Default page size</span>
+              <UiSelect v-model="tasksPageSize">
+                <option v-for="opt in tasksPageSizeOptions" :key="opt" :value="String(opt)">
+                  {{ opt }}
+                </option>
+              </UiSelect>
+            </label>
+            <p class="muted" style="margin:0;">Used when the Tasks list URL does not specify a page size.</p>
+          </div>
+        </UiCard>
+
+        <UiCard>
           <h3>Task panel</h3>
           <div class="col" style="gap:10px;">
             <label class="row" style="gap:8px; align-items:center;">
@@ -95,15 +110,18 @@ import UiSelect from '../components/UiSelect.vue'
 import { getContrastingColor } from '../utils/color'
 import {
     DEFAULT_STARTUP_DESTINATION,
+    DEFAULT_TASKS_PAGE_SIZE,
     readStartupDestination,
     readTaskPanelAutoDetectLinksPreference,
     readTaskPanelShowAttachmentsPreference,
     readTaskPanelShowLinksInAttachmentsPreference,
+    readTasksPageSizePreference,
     STARTUP_DESTINATION_OPTIONS,
     storeStartupDestination,
     storeTaskPanelAutoDetectLinksPreference,
     storeTaskPanelShowAttachmentsPreference,
     storeTaskPanelShowLinksInAttachmentsPreference,
+    storeTasksPageSizePreference,
     type StartupDestination,
 } from '../utils/preferences'
 import {
@@ -128,6 +146,9 @@ const showAttachments = ref(true)
 const showLinksInAttachments = ref(true)
 const autoDetectLinks = ref(true)
 
+const tasksPageSizeOptions = [25, 50, 100, 200]
+const tasksPageSize = ref(String(DEFAULT_TASKS_PAGE_SIZE))
+
 onMounted(() => {
   const storedTheme = readThemePreference()
   theme.value = storedTheme
@@ -145,6 +166,8 @@ onMounted(() => {
   }
 
   startupDestination.value = readStartupDestination()
+
+  tasksPageSize.value = String(readTasksPageSizePreference())
 
   showAttachments.value = readTaskPanelShowAttachmentsPreference()
   showLinksInAttachments.value = readTaskPanelShowLinksInAttachmentsPreference()
@@ -201,6 +224,11 @@ watch(showLinksInAttachments, (value) => {
 
 watch(autoDetectLinks, (value) => {
   storeTaskPanelAutoDetectLinksPreference(!!value)
+})
+
+watch(tasksPageSize, (value) => {
+  const parsed = Number.parseInt(value, 10)
+  storeTasksPageSizePreference(Number.isFinite(parsed) ? parsed : DEFAULT_TASKS_PAGE_SIZE)
 })
 
 const accentPreview = computed(() => (accentEnabled.value ? accent.value : DEFAULT_ACCENT))

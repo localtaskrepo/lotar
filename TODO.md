@@ -4,8 +4,7 @@ Features:
 - Allow CLI list/search to filter by age older than N days
 - Allow ticket files to be stored in neseted folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
 - Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
-- API pagination
-- Sync with Jira/Github (two-way ideally)
+- Sync with Jira/Github/etc. (two-way). Each direciton optional. Include mapping for properties & Project templates matching Jira/Github/etc. project templates.
 - Add ability to assign (and run) an LLM.
 - Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
 - MCP errors config_show/project_list: TypeError: r.content is not iterable

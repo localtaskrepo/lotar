@@ -8,6 +8,10 @@ const TASK_PANEL_SHOW_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showAttachm
 const TASK_PANEL_SHOW_LINKS_IN_ATTACHMENTS_KEY = 'lotar.preferences.taskPanel.showLinksInAttachments'
 const TASK_PANEL_AUTO_DETECT_LINKS_KEY = 'lotar.preferences.taskPanel.autoDetectLinks'
 
+const TASKS_PAGE_SIZE_KEY = 'lotar.preferences.tasks.pageSize'
+export const DEFAULT_TASKS_PAGE_SIZE = 50
+const TASKS_PAGE_SIZE_CHOICES = new Set([25, 50, 100, 200])
+
 const PREFERENCES_EVENT = 'lotar:preferences-changed'
 
 function emitPreferencesChanged(key: string) {
@@ -115,6 +119,31 @@ function storeBooleanPreference(key: string, value: boolean) {
     try {
         localStorage.setItem(key, value ? 'true' : 'false')
         emitPreferencesChanged(key)
+    } catch (err) {
+        console.warn('Unable to persist preference', err)
+    }
+}
+
+export function readTasksPageSizePreference(): number {
+    if (typeof window === 'undefined') return DEFAULT_TASKS_PAGE_SIZE
+    try {
+        const raw = localStorage.getItem(TASKS_PAGE_SIZE_KEY)
+        if (raw === null) return DEFAULT_TASKS_PAGE_SIZE
+        const parsed = Number.parseInt(raw, 10)
+        if (!Number.isFinite(parsed)) return DEFAULT_TASKS_PAGE_SIZE
+        if (TASKS_PAGE_SIZE_CHOICES.has(parsed)) return parsed
+        return DEFAULT_TASKS_PAGE_SIZE
+    } catch {
+        return DEFAULT_TASKS_PAGE_SIZE
+    }
+}
+
+export function storeTasksPageSizePreference(value: number) {
+    if (typeof window === 'undefined') return
+    const normalized = TASKS_PAGE_SIZE_CHOICES.has(value) ? value : DEFAULT_TASKS_PAGE_SIZE
+    try {
+        localStorage.setItem(TASKS_PAGE_SIZE_KEY, String(normalized))
+        emitPreferencesChanged(TASKS_PAGE_SIZE_KEY)
     } catch (err) {
         console.warn('Unable to persist preference', err)
     }

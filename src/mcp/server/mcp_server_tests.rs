@@ -438,6 +438,98 @@ fn tools_call_update_delete_list_and_invalid_enum() {
 }
 
 #[test]
+fn project_list_is_paginated() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    seed_single_project_config(&tasks_dir);
+
+    // Seed multiple project dirs so ProjectService::list has something to return.
+    std::fs::create_dir_all(tasks_dir.join("APP")).unwrap();
+    std::fs::create_dir_all(tasks_dir.join("CORE")).unwrap();
+
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
+    }
+
+    // First page
+    let list_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(201)),
+        method: "tools/call".into(),
+        params: json!({ "name": "project_list", "arguments": { "limit": 1 } }),
+    };
+    let list_resp = dispatch(list_req);
+    assert!(list_resp.error.is_none(), "project_list failed");
+    let payload = parse_tool_payload(&list_resp);
+    assert_eq!(payload.get("status").and_then(|v| v.as_str()), Some("ok"));
+    assert_eq!(payload.get("total").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(payload.get("count").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(payload.get("limit").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(payload.get("cursor").and_then(|v| v.as_u64()), Some(0));
+    assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(true));
+
+    let next_cursor = payload
+        .get("nextCursor")
+        .and_then(|v| v.as_str())
+        .expect("expected nextCursor");
+
+    let first_page = payload
+        .get("projects")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(first_page.len(), 1);
+
+    // Second page (use cursor)
+    let list_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(202)),
+        method: "tools/call".into(),
+        params: json!({ "name": "project_list", "arguments": { "limit": 1, "cursor": next_cursor } }),
+    };
+    let list_resp = dispatch(list_req);
+    assert!(list_resp.error.is_none(), "project_list second page failed");
+    let payload = parse_tool_payload(&list_resp);
+    assert_eq!(payload.get("total").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(payload.get("count").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(
+        payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert!(payload.get("nextCursor").is_some_and(|v| v.is_null()));
+
+    let second_page = payload
+        .get("projects")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(second_page.len(), 1);
+
+    // Offset alias should behave the same as cursor.
+    let list_req = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(203)),
+        method: "tools/call".into(),
+        params: json!({ "name": "project_list", "arguments": { "limit": 1, "offset": 1 } }),
+    };
+    let list_resp = dispatch(list_req);
+    assert!(
+        list_resp.error.is_none(),
+        "project_list offset alias failed"
+    );
+    let payload = parse_tool_payload(&list_resp);
+    assert_eq!(payload.get("cursor").and_then(|v| v.as_u64()), Some(1));
+    let page = payload
+        .get("projects")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(page.len(), 1);
+}
+
+#[test]
 fn tools_list_reports_enum_hints_with_single_project() {
     let _lock = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();

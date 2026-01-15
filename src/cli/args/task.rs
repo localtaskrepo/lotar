@@ -5,6 +5,14 @@ use serde_json::Value as JsonValue;
 
 use super::common::parse_key_value;
 
+fn parse_positive_usize(s: &str) -> Result<usize, String> {
+    let parsed: usize = s.parse().map_err(|_| format!("Invalid number: '{}'", s))?;
+    if parsed == 0 {
+        return Err("Value must be >= 1".to_string());
+    }
+    Ok(parsed)
+}
+
 /// Available fields for sorting tasks
 #[derive(Clone, Debug, ValueEnum, Deserialize)]
 pub enum SortField {
@@ -554,9 +562,29 @@ pub struct TaskSearchArgs {
     #[serde(default)]
     pub reverse: bool,
 
-    /// Limit results
-    #[arg(long, short = 'L', default_value = "20")]
-    pub limit: usize,
+    /// Page size (number of results to show)
+    #[arg(
+        long = "page-size",
+        short = 'L',
+        default_value = "20",
+        aliases = ["limit", "per-page"],
+        value_parser = parse_positive_usize
+    )]
+    #[serde(alias = "limit", alias = "page_size", alias = "per_page")]
+    pub page_size: usize,
+
+    /// Offset into the result set (0-based)
+    #[arg(long)]
+    #[serde(default)]
+    pub offset: Option<usize>,
+
+    /// Page number (1-based). Conflicts with --offset.
+    #[arg(
+        long,
+        conflicts_with = "offset",
+        value_parser = parse_positive_usize
+    )]
+    pub page: Option<usize>,
 
     /// Show only overdue tasks (due date strictly before now)
     #[arg(long)]

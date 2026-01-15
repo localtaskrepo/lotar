@@ -13,7 +13,7 @@ lotar list
 lotar list --mine --status in_progress
 
 # Use search text plus filters
-lotar list "login" --project AUTH --priority high --limit 50
+lotar list "login" --project AUTH --priority high --page-size 50
 
 # Pipe JSON into tools
 lotar --format json list --due-soon --tag release
@@ -31,7 +31,7 @@ lotar --format json list --due-soon --tag release
 | Dates | `--overdue`, `--due-soon[=days]` |
 | Custom data | `--where key=value` or `--where field:<name>=value` (repeat as needed) |
 | Effort windows | `--effort-min 2h`, `--effort-max 1d`, accepts time or points |
-| Sorting & size | `--sort-by due-date`, `--reverse`, `--limit 100` |
+| Sorting & size | `--sort-by due-date`, `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
 | Output | `--format text|json|table|markdown`, `--log-level info` |
 
 Tips:
@@ -60,7 +60,7 @@ lotar list --type bug --critical --where assignee!=""
 lotar list --where sprint=2025-W35 --sort-by field:sprint --reverse
 
 # Risk board for PMs
-lotar --format json list --project ENG --overdue --limit 100
+lotar --format json list --project ENG --overdue --page-size 100
 
 # QA ready column
 lotar list --status verify --tag release --sort-by due-date
@@ -71,9 +71,26 @@ lotar list --tasks-dir /repos/infra/.tasks --project INFRA
 
 ## Performance & etiquette
 
-- Start with a project filter or keep the default limit (20) so listing remains fast on giant repos.
+- Start with a project filter or keep the default page size (20) so listing remains fast on giant repos.
 - JSON mode skips banners, which helps tools parse output quickly.
 - If you script `lotar list`, prefer `--format json --log-level error` to keep stdout clean.
+
+## Pagination
+
+Use either of these patterns:
+
+```bash
+# Offset-based (0-based)
+lotar list --page-size 50 --offset 50
+
+# Page-based (1-based)
+lotar list --page-size 50 --page 2
+```
+
+Notes:
+
+- `--limit` is still supported as an alias for `--page-size`.
+- `--page` conflicts with `--offset` (pick one).
 
 ## Troubleshooting
 

@@ -11,9 +11,15 @@ interface TaskResponse {
     readonly tags?: string[];
 }
 
+interface TaskListEnvelope {
+    readonly total: number;
+    readonly limit: number;
+    readonly offset: number;
+    readonly tasks: TaskResponse[];
+}
+
 interface ListResponse {
-    readonly data: TaskResponse[];
-    readonly meta?: { readonly count?: number };
+    readonly data: TaskListEnvelope;
 }
 
 interface CreateResponse {
@@ -38,10 +44,10 @@ describe.concurrent('API smoke harness', () => {
                 expect(listResponse.ok).toBe(true);
 
                 const listPayload = (await listResponse.json()) as ListResponse;
-                expect(Array.isArray(listPayload.data)).toBe(true);
-                expect(listPayload.data.length).toBeGreaterThanOrEqual(2);
+                expect(Array.isArray(listPayload.data.tasks)).toBe(true);
+                expect(listPayload.data.tasks.length).toBeGreaterThanOrEqual(2);
 
-                const titles = listPayload.data.map((task) => task.title);
+                const titles = listPayload.data.tasks.map((task) => task.title);
                 expect(titles).toContain('API List Task A');
                 expect(titles).toContain('API List Task B');
 
@@ -49,12 +55,11 @@ describe.concurrent('API smoke harness', () => {
                 expect(doneResponse.ok).toBe(true);
 
                 const donePayload = (await doneResponse.json()) as ListResponse;
-                const doneTitles = donePayload.data.map((task) => task.title);
+                const doneTitles = donePayload.data.tasks.map((task) => task.title);
                 expect(doneTitles).toContain('API List Task B');
                 expect(doneTitles).not.toContain('API List Task A');
 
-                const metaCount = donePayload.meta?.count ?? donePayload.data.length;
-                expect(metaCount).toBeGreaterThanOrEqual(1);
+                expect(donePayload.data.total).toBeGreaterThanOrEqual(1);
             } finally {
                 await server.stop();
             }
@@ -91,7 +96,7 @@ describe.concurrent('API smoke harness', () => {
                 expect(listResponse.ok).toBe(true);
 
                 const listPayload = (await listResponse.json()) as ListResponse;
-                const createdTask = listPayload.data.find((task) => task.id === createdPayload.data.id);
+                const createdTask = listPayload.data.tasks.find((task) => task.id === createdPayload.data.id);
 
                 expect(createdTask).toBeDefined();
                 expect(createdTask?.assignee).toBe('api-smoke@example.com');

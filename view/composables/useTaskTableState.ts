@@ -11,6 +11,7 @@ export interface TaskTableProps {
     selectedIds?: string[]
     projectKey?: string
     bulk?: boolean
+    showBulkControls?: boolean
     touches?: Record<string, TaskTouch>
     sprintLookup?: Record<number, { label: string; state?: string }>
     sprintOptions?: Array<{ value: string; label: string }>

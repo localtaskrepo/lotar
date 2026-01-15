@@ -146,9 +146,12 @@ async function mountConfigView(initialRoute: string) {
 describe('ConfigView branch alias handling', () => {
     beforeEach(() => {
         vi.clearAllMocks()
-            ; (api.listProjects as any).mockResolvedValue([
-                { name: 'App', prefix: 'APP' },
-            ])
+            ; (api.listProjects as any).mockResolvedValue({
+                total: 1,
+                limit: 50,
+                offset: 0,
+                projects: [{ name: 'App', prefix: 'APP' }],
+            })
             ; (api.setConfig as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
     })
 

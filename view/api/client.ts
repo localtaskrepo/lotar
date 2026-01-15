@@ -17,6 +17,7 @@ import type {
   LinkReferenceRemoveResponse,
   ProjectCreateRequest,
   ProjectDTO,
+  ProjectListResponse,
   ProjectStatsDTO,
   ReferenceSnippet,
   SprintAssignmentRequest,
@@ -35,6 +36,7 @@ import type {
   TaskCreate,
   TaskDTO,
   TaskListFilter,
+  TaskListResponse,
   TaskUpdate,
 } from './types'
 
@@ -119,7 +121,7 @@ async function post<T>(path: string, body: any): Promise<T> {
 
 export const api = {
   // Tasks
-  listTasks(filter: TaskListFilter = {}): Promise<TaskDTO[]> { return get('/api/tasks/list', filter as any) },
+  listTasks(filter: TaskListFilter = {}): Promise<TaskListResponse> { return get('/api/tasks/list', filter as any) },
   getTask(id: string, project?: string): Promise<TaskDTO> { return get('/api/tasks/get', { id, project }) },
   addTask(payload: TaskCreate): Promise<TaskDTO> { return post('/api/tasks/add', payload) },
   updateTask(id: string, patch: TaskUpdate): Promise<TaskDTO> { return post('/api/tasks/update', { id, ...patch }) },
@@ -149,7 +151,7 @@ export const api = {
   },
 
   // Projects
-  listProjects(): Promise<ProjectDTO[]> { return get('/api/projects/list') },
+  listProjects(params: { limit?: number; offset?: number } = {}): Promise<ProjectListResponse> { return get('/api/projects/list', params as any) },
   createProject(payload: ProjectCreateRequest): Promise<ProjectDTO> { return post('/api/projects/create', payload) },
   projectStats(project: string): Promise<ProjectStatsDTO> { return get('/api/projects/stats', { project }) },
 

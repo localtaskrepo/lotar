@@ -1,140 +1,89 @@
 #!/usr/bin/env bash
-# Git pre-commit hook for Rust project
-set -e
+# Git pre-commit hook for LoTaR.
+#
+# Goals:
+# - Keep commits fast (avoid compiles/tests).
+# - Auto-fix formatting (no manual re-run loop).
+# - Never accidentally stage unrelated changes (preserve partial staging).
 
-# Set up PATH for Rust tools
+set -euo pipefail
+
 export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 
-# Allow slower machines or cold caches to extend the test timeout.
-TEST_TIMEOUT_SECONDS=${LOTAR_PRECOMMIT_TEST_TIMEOUT:-420}
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "$repo_root" ]; then
+  exit 0
+fi
 
-echo "🔧 Running pre-commit checks..."
+cd "$repo_root"
 
-# Check prerequisites
 if [ ! -f "Cargo.toml" ]; then
-    echo "❌ Not a Rust project"
-    exit 1
+  exit 0
 fi
 
 if ! command -v cargo >/dev/null 2>&1; then
-    echo "❌ cargo not found"
+  echo "❌ cargo not found in PATH"
+  echo "💡 Install Rust tooling: https://rustup.rs/"
+  exit 1
+fi
+
+tmpdir="$(mktemp -d 2>/dev/null || mktemp -d -t lotar-precommit)"
+cleanup() { rm -rf "$tmpdir"; }
+trap cleanup EXIT
+
+staged_rs_list="$tmpdir/staged-rs.txt"
+touch "$staged_rs_list"
+
+# Collect currently staged Rust files.
+while IFS= read -r -d '' file; do
+  case "$file" in
+    *.rs) printf '%s\n' "$file" >>"$staged_rs_list" ;;
+  esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+if [ ! -s "$staged_rs_list" ]; then
+  exit 0
+fi
+
+# If there are unstaged or untracked changes, stash them to preserve partial staging.
+need_stash=0
+if ! git diff --quiet --exit-code; then
+  need_stash=1
+elif [ -n "$(git ls-files --others --exclude-standard 2>/dev/null || true)" ]; then
+  need_stash=1
+fi
+
+if [ "$need_stash" -eq 1 ]; then
+  git stash push -q --keep-index -u -m "lotar pre-commit" || true
+fi
+
+# Format the workspace (should be quick).
+echo "Running cargo fmt --all..."
+cargo fmt --all
+
+# Stage only the Rust files that were staged before formatting.
+while IFS= read -r file; do
+  [ -n "$file" ] || continue
+  if [ -f "$file" ]; then
+    git add -- "$file"
+  fi
+done < "$staged_rs_list"
+
+# Revert any formatting-only changes to other files.
+while IFS= read -r -d '' changed; do
+  if grep -Fxq "$changed" "$staged_rs_list"; then
+    continue
+  fi
+  git checkout -- "$changed" >/dev/null 2>&1 || true
+done < <(git diff --name-only -z)
+
+if [ "$need_stash" -eq 1 ]; then
+  if ! git stash pop -q; then
+    echo ""
+    echo "❌ Failed to re-apply unstaged changes after formatting."
+    echo "💡 Resolve the conflicts, then commit again."
     exit 1
+  fi
 fi
 
-# Check for and clean up any stuck cargo processes
-echo "🧹 Checking for stuck cargo processes..."
-if pgrep -f "cargo.*clippy\|cargo.*check\|cargo.*build" >/dev/null 2>&1; then
-    echo "⚠️  Found stuck cargo processes, cleaning up..."
-    pkill -f "cargo.*clippy\|cargo.*check\|cargo.*build" >/dev/null 2>&1 || true
-    sleep 2
-fi
-
-# Function to check if files were modified
-files_modified() {
-    ! git diff --quiet --exit-code
-}
-
-# 1. Formatting
-echo "📝 Checking formatting..."
-if ! timeout 30 cargo fmt --all --check >/dev/null 2>&1; then
-    echo "⚠️  Fixing formatting..."
-    timeout 30 cargo fmt --all
-    if files_modified; then
-        git add -u
-        echo "✅ Formatting fixed and staged"
-    fi
-else
-    echo "✅ Formatting OK"
-fi
-
-# 2. Clippy check with auto-fixing
-echo "🔍 Checking and fixing clippy issues..."
-if ! timeout 30 cargo clippy --all-targets --all-features --quiet -- -D warnings >/dev/null 2>&1; then
-    echo "⚠️  Clippy issues found. Attempting auto-fix..."
-    
-    # Try to auto-fix clippy issues
-    if timeout 60 cargo clippy --fix --all-targets --all-features --allow-dirty --allow-staged >/dev/null 2>&1; then
-        echo "✅ Some clippy issues fixed automatically"
-        
-        if files_modified; then
-            # Stage the fixed files
-            git add -u
-            echo "� Fixed files have been staged for commit"
-        fi
-    fi
-    
-    # Check if there are still unfixable issues
-    if ! timeout 30 cargo clippy --all-targets --all-features --quiet -- -D warnings >/dev/null 2>&1; then
-        echo "❌ Clippy issues remain that require manual fixing"
-        echo "💡 Run: cargo clippy --all-targets --all-features"
-        exit 1
-    else
-        echo "✅ All clippy issues resolved"
-    fi
-else
-    echo "✅ Clippy OK"
-fi
-
-# 3. Build check
-echo "🔨 Checking build..."
-if timeout 60 cargo build --all-features --quiet >/dev/null 2>&1; then
-    echo "✅ Build OK"
-elif [ $? -eq 124 ]; then
-    echo "❌ Build timed out (may indicate compilation issues)"
-    exit 1
-else
-    echo "❌ Build failed"
-    exit 1
-fi
-
-# 4. Quick tests (nextest)
-echo "🧪 Running tests (nextest)..."
-echo "    (timeout: ${TEST_TIMEOUT_SECONDS}s; override via LOTAR_PRECOMMIT_TEST_TIMEOUT)"
-if command -v cargo-nextest >/dev/null 2>&1; then
-    tmp_nextest=$(mktemp -t lotar-nextest.XXXXXX)
-    trap 'rm -f "$tmp_nextest"' EXIT
-    if timeout "$TEST_TIMEOUT_SECONDS" cargo nextest run --all-features --failure-output immediate --status-level fail >"$tmp_nextest" 2>&1; then
-        echo "✅ Tests OK"
-        rm -f "$tmp_nextest"
-        trap - EXIT
-    elif [ $? -eq 124 ]; then
-        echo "❌ Tests timed out"
-        echo "--- cargo nextest output ---"
-        cat "$tmp_nextest"
-        rm -f "$tmp_nextest"
-        trap - EXIT
-        exit 1
-    else
-        echo "❌ Tests failed"
-        echo "--- cargo nextest output ---"
-        cat "$tmp_nextest"
-        rm -f "$tmp_nextest"
-        trap - EXIT
-        exit 1
-    fi
-else
-    echo "⚠️  cargo-nextest not installed; falling back to cargo test"
-    tmp_cargotest=$(mktemp -t lotar-cargotest.XXXXXX)
-    trap 'rm -f "$tmp_cargotest"' EXIT
-    if timeout "$TEST_TIMEOUT_SECONDS" cargo test --all-features >"$tmp_cargotest" 2>&1; then
-        echo "✅ Tests OK"
-        rm -f "$tmp_cargotest"
-        trap - EXIT
-    elif [ $? -eq 124 ]; then
-        echo "❌ Tests timed out"
-        echo "--- cargo test output ---"
-        cat "$tmp_cargotest"
-        rm -f "$tmp_cargotest"
-        trap - EXIT
-        exit 1
-    else
-        echo "❌ Tests failed"
-        echo "--- cargo test output ---"
-        cat "$tmp_cargotest"
-        rm -f "$tmp_cargotest"
-        trap - EXIT
-        exit 1
-    fi
-fi
-
-echo "🎉 All checks passed!"
+exit 0

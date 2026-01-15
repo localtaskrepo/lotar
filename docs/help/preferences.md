@@ -31,6 +31,10 @@ Use **Reset saved columns and sorting** to clear TaskTable preferences stored pe
 
 Select **Clear last used filter** to remove the saved filter state for the Tasks list (`sessionStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set.
 
+## Tasks List
+
+Use **Default page size** to control how many tasks the Tasks list shows per page by default. This setting is stored in `localStorage` and only applies to the current browser.
+
 ## Board Filters
 
 Boards now include a **Filters** popover next to the WIP controls. Use it to keep the final columns readable without touching server data:

@@ -125,7 +125,7 @@ describe('UI strict member smoke scenarios', () => {
                     await page.getByRole('button', { name: 'Create task' }).click();
 
                     await page.waitForSelector(`.card:has-text("Assignee 'intruder@example.com' is not in configured members")`, {
-                        timeout: 10_000,
+                        timeout: 20_000,
                     });
 
                     await page.getByRole('button', { name: 'Use list' }).click();

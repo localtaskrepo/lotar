@@ -200,7 +200,8 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
         const scope = project && project.trim() ? project.trim() : undefined
         const baseline = seedKnownUsers()
         try {
-            const list = await api.listTasks(scope ? ({ project: scope } as any) : ({} as any))
+            const response = await api.listTasks(scope ? ({ project: scope, limit: 200, offset: 0 } as any) : ({ limit: 200, offset: 0 } as any))
+            const list = Array.isArray(response.tasks) ? response.tasks : []
             const seen = new Set<string>()
             const tags = new Set<string>()
             list.forEach((item) => {

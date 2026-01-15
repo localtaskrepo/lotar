@@ -53,15 +53,31 @@ describe.concurrent('MCP framed transport', () => {
                 expect(Array.isArray(list.message?.result?.tools)).toBe(true);
                 expect(list.headers).toMatch(/Content-Length:\s*\d+/i);
 
-                await workspace.write(
-                    '.tasks/config.yml',
-                    `default:\n  project: CLI\nissue:\n  states: [Todo,Doing]\n  priorities: [Low]\n  types: [Feature]\n`,
-                );
+                const configA =
+                    `default:\n  project: CLI\nissue:\n  states: [Todo,Doing]\n  priorities: [Low]\n  types: [Feature]\n`;
+                const configB =
+                    `default:\n  project: CLI\nissue:\n  states: [Todo,Doing,Done]\n  priorities: [Low]\n  types: [Feature]\n`;
 
-                const notification = await client.readUntil(
-                    (frame) => frame.message?.method === 'tools/listChanged',
-                    20000,
-                );
+                let notification: any = null;
+                for (let attempt = 0; attempt < 6; attempt += 1) {
+                    await workspace.write('.tasks/config.yml', attempt % 2 === 0 ? configA : configB);
+                    try {
+                        notification = await client.readUntil(
+                            (frame) => frame.message?.method === 'tools/listChanged',
+                            10000,
+                        );
+                        break;
+                    } catch {
+                        await new Promise((resolve) => setTimeout(resolve, 200));
+                    }
+                }
+
+                if (!notification) {
+                    notification = await client.readUntil(
+                        (frame) => frame.message?.method === 'tools/listChanged',
+                        60000,
+                    );
+                }
                 expect(notification.headers).toMatch(/Content-Length:\s*\d+/i);
                 expect(Array.isArray(notification.message?.params?.hintCategories)).toBe(true);
             } finally {

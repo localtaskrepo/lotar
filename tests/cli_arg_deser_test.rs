@@ -100,7 +100,7 @@ fn task_search_args_aliases_and_defaults() {
     assert_eq!(args.task_type, vec!["Bug"]);
     assert_eq!(args.tag, vec!["api"]);
     assert!(args.reverse);
-    assert_eq!(args.limit, 5);
+    assert_eq!(args.page_size, 5);
 }
 
 // Merged from cli_handlers_unit_test.rs

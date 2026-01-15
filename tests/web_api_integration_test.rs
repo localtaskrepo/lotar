@@ -602,8 +602,8 @@ fn api_add_list_get_delete_roundtrip() {
     ));
     assert_eq!(resp.status, 200, "list status");
     let listed: Value = serde_json::from_slice(&resp.body).unwrap();
-    assert!(listed["data"].is_array());
-    assert!(listed["meta"]["count"].as_u64().unwrap() >= 1);
+    assert!(listed["data"]["tasks"].is_array());
+    assert!(listed["data"]["total"].as_u64().unwrap_or(0) >= 1);
 
     // Get
     let resp = api.handle_request(&mk_req("GET", "/api/tasks/get", &[("id", &id)], json!({})));
@@ -854,7 +854,14 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
     ));
     assert_eq!(resp.status, 200, "filtering by InProgress should succeed");
     let filtered: Value = serde_json::from_slice(&resp.body).unwrap();
-    assert_eq!(filtered["meta"]["count"].as_u64().unwrap_or(0), 1);
+    assert_eq!(filtered["data"]["total"].as_u64().unwrap_or(0), 1);
+    assert_eq!(
+        filtered["data"]["tasks"]
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0),
+        1
+    );
 
     // List by custom field directly: ?sprint=W35 should match case-insensitively
     let resp = api.handle_request(&mk_req(
@@ -865,7 +872,7 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
     ));
     assert_eq!(resp.status, 200);
     let list: Value = serde_json::from_slice(&resp.body).unwrap();
-    let count = list["meta"]["count"].as_u64().unwrap_or(0);
+    let count = list["data"]["total"].as_u64().unwrap_or(0);
     assert_eq!(count, 1, "expected one TEST task with sprint W35");
 
     // CSV and fuzzy matching: W35 should match w-35 via normalization
@@ -877,7 +884,7 @@ fn api_list_accepts_plain_custom_field_filters_and_me() {
     ));
     assert_eq!(resp.status, 200);
     let list2: Value = serde_json::from_slice(&resp.body).unwrap();
-    assert_eq!(list2["meta"]["count"].as_u64().unwrap_or(0), 1);
+    assert_eq!(list2["data"]["total"].as_u64().unwrap_or(0), 1);
 
     // Assignee @me resolution: set default reporter/assignee identity to alice by creating config
     // We'll simulate identity resolution falling back to system username by setting assignee explicitly and querying @me
@@ -924,10 +931,10 @@ fn api_list_supports_fuzzy_tag_filters() {
     assert_eq!(r3.status, 201);
 
     let ids_from = |resp: &serde_json::Value| -> Vec<String> {
-        resp["data"]
+        resp["data"]["tasks"]
             .as_array()
-            .unwrap()
-            .iter()
+            .into_iter()
+            .flatten()
             .filter_map(|v| v["id"].as_str().map(|s| s.to_string()))
             .collect()
     };
@@ -941,7 +948,7 @@ fn api_list_supports_fuzzy_tag_filters() {
     assert_eq!(resp_ops.status, 200);
     let parsed_ops: Value = serde_json::from_slice(&resp_ops.body).unwrap();
     let ops_ids = ids_from(&parsed_ops);
-    assert_eq!(parsed_ops["meta"]["count"].as_u64().unwrap_or(0), 1);
+    assert_eq!(parsed_ops["data"]["total"].as_u64().unwrap_or(0), 1);
     assert!(ops_ids.iter().any(|id| id.starts_with("TEST-")));
 
     let resp_case = api.handle_request(&mk_req(
@@ -963,7 +970,7 @@ fn api_list_supports_fuzzy_tag_filters() {
     ));
     assert_eq!(resp_partial.status, 200);
     let parsed_partial: Value = serde_json::from_slice(&resp_partial.body).unwrap();
-    assert_eq!(parsed_partial["meta"]["count"].as_u64().unwrap_or(0), 1);
+    assert_eq!(parsed_partial["data"]["total"].as_u64().unwrap_or(0), 1);
     let partial_ids = ids_from(&parsed_partial);
     assert_ne!(partial_ids, ops_ids);
 }

@@ -55,6 +55,8 @@ struct JsonRpcError {
 
 const MCP_DEFAULT_TASK_LIST_LIMIT: usize = 50;
 const MCP_MAX_TASK_LIST_LIMIT: usize = 200;
+const MCP_DEFAULT_PROJECT_LIST_LIMIT: usize = 50;
+const MCP_MAX_PROJECT_LIST_LIMIT: usize = 200;
 const MCP_DEFAULT_BACKLOG_LIMIT: usize = 20;
 const MCP_MAX_BACKLOG_LIMIT: usize = 100;
 const MCP_MAX_CURSOR: usize = 5000;
