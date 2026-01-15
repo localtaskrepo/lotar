@@ -26,11 +26,25 @@ The server registers these tools (see [MCP Tools Reference](./mcp-tools.md) for 
 
 | Tool | Purpose |
 |------|---------|
+| `whoami` | Resolve the identity used for `@me` (with optional explain output). |
 | `task_create` | Create a task with optional type/priority/status overrides and custom fields. |
 | `task_get` | Fetch a task by id (project inferred or provided). |
 | `task_update` | Patch mutable fields, relationships, and custom fields. |
+| `task_comment_add` | Append a comment to a task. |
+| `task_comment_update` | Update an existing comment on a task. |
+| `task_bulk_update` | Patch multiple tasks in one call. |
+| `task_bulk_comment_add` | Add the same comment to multiple tasks. |
+| `task_bulk_reference_add` | Add the same reference to multiple tasks. |
+| `task_bulk_reference_remove` | Remove the same reference from multiple tasks. |
 | `task_delete` | Delete by id/project, returning `deleted=true/false`. |
 | `task_list` | Filtered, paginated listing (limit default 50, max 200) with enum hints. |
+| `sprint_list` | List sprints with pagination + integrity hints. |
+| `sprint_get` | Fetch one sprint by id. |
+| `sprint_create` | Create a new sprint record. |
+| `sprint_update` | Update sprint plan/actual metadata. |
+| `sprint_summary` | Sprint summary report (metrics + timeline). |
+| `sprint_burndown` | Sprint burndown report (series). |
+| `sprint_velocity` | Sprint velocity report (rolling window). |
 | `sprint_add` | Assign tasks to a sprint with optional cleanup + force flags. |
 | `sprint_remove` | Remove tasks from a sprint (optionally scoped). |
 | `sprint_delete` | Delete a sprint by id and optionally clean dangling references. |

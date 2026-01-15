@@ -101,6 +101,27 @@ fn mcp_tools_list_includes_underscore_names() {
 }
 
 #[test]
+fn mcp_parse_error_sets_null_id() {
+    let resp_line = lotar::mcp::server::handle_json_line("{this is not json");
+    let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+    assert_eq!(resp.get("jsonrpc").and_then(|v| v.as_str()), Some("2.0"));
+    assert!(resp.get("result").is_none());
+    assert_eq!(resp.get("id"), Some(&serde_json::Value::Null));
+    assert_eq!(
+        resp.get("error")
+            .and_then(|e| e.get("code"))
+            .and_then(|v| v.as_i64()),
+        Some(-32700)
+    );
+    assert_eq!(
+        resp.get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(|v| v.as_str()),
+        Some("Parse error")
+    );
+}
+
+#[test]
 fn mcp_initialize_advertises_list_changed_capability() {
     let req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -589,9 +610,8 @@ fn mcp_task_list_supports_pagination() {
     );
     let cursor = first_payload
         .get("nextCursor")
-        .and_then(|v| v.as_str())
-        .expect("next cursor present")
-        .to_string();
+        .and_then(|v| v.as_u64())
+        .expect("next cursor present") as usize;
 
     let second_req = serde_json::json!({
         "jsonrpc": "2.0",
@@ -1041,9 +1061,8 @@ fn mcp_sprint_backlog_supports_pagination() {
     );
     let cursor = first_payload
         .get("nextCursor")
-        .and_then(|v| v.as_str())
-        .expect("next cursor present")
-        .to_string();
+        .and_then(|v| v.as_u64())
+        .expect("next cursor present") as usize;
 
     let second_req = serde_json::json!({
         "jsonrpc": "2.0",

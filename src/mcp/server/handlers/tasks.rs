@@ -12,11 +12,280 @@ use crate::config::manager::ConfigManager;
 use crate::services::reference_service::ReferenceService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
-use crate::types::{CustomFieldValue, TaskRelationships};
+use crate::types::{
+    CustomFieldValue, TaskChange, TaskChangeLogEntry, TaskComment, TaskRelationships,
+};
 use crate::utils::git::find_repo_root;
 use crate::utils::identity;
 use crate::workspace::TasksDirectoryResolver;
 use std::collections::BTreeMap;
+
+fn now_rfc3339() -> String {
+    chrono::Utc::now().to_rfc3339()
+}
+
+fn parse_sprint_ids(value: Option<&Value>) -> Result<Vec<u32>, &'static str> {
+    fn parse_one(raw: &Value) -> Option<u32> {
+        match raw {
+            Value::Number(num) => num.as_u64().and_then(|v| u32::try_from(v).ok()),
+            Value::String(text) => {
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    return None;
+                }
+                trimmed
+                    .strip_prefix('#')
+                    .unwrap_or(trimmed)
+                    .parse::<u32>()
+                    .ok()
+            }
+            _ => None,
+        }
+    }
+
+    let Some(v) = value else {
+        return Ok(Vec::new());
+    };
+
+    let mut out = Vec::new();
+    match v {
+        Value::Null => {}
+        Value::Array(items) => {
+            for item in items {
+                if let Some(id) = parse_one(item)
+                    && id > 0
+                {
+                    out.push(id);
+                }
+            }
+        }
+        Value::Number(_) | Value::String(_) => {
+            if let Some(id) = parse_one(v)
+                && id > 0
+            {
+                out.push(id);
+            }
+        }
+        _ => return Err("sprints must be a sprint id, '#<id>', or an array of them"),
+    }
+    out.sort_unstable();
+    out.dedup();
+    Ok(out)
+}
+
+fn parse_tags_params(params: &Value) -> Vec<String> {
+    fn parse_multi(value: Option<&Value>) -> Vec<String> {
+        match value {
+            Some(Value::String(s)) => s
+                .split(',')
+                .map(|token| token.trim())
+                .filter(|token| !token.is_empty())
+                .map(|token| token.to_string())
+                .collect(),
+            Some(Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    let mut tags = Vec::new();
+
+    if let Some(tag) = params.get("tag").and_then(|v| v.as_str()) {
+        let trimmed = tag.trim();
+        if !trimmed.is_empty() {
+            tags.push(trimmed.to_string());
+        }
+    }
+
+    tags.extend(parse_multi(params.get("tags")));
+    tags.sort();
+    tags.dedup();
+    tags
+}
+
+fn parse_task_update_patch(
+    req_id: Option<Value>,
+    tasks_root: &std::path::Path,
+    validator: &CliValidator,
+    enum_hints: Option<&EnumHints>,
+    patch_val: &Value,
+) -> Result<TaskUpdate, JsonRpcResponse> {
+    if !patch_val.is_object() {
+        return Err(err(req_id, -32602, "Invalid patch (expected object)", None));
+    }
+
+    let mut patch = TaskUpdate::default();
+
+    if let Some(s) = patch_val.get("title").and_then(|v| v.as_str()) {
+        patch.title = Some(s.to_string());
+    }
+
+    if let Some(s) = patch_val.get("status").and_then(|v| v.as_str()) {
+        match validator.validate_status(s) {
+            Ok(v) => patch.status = Some(v),
+            Err(e) => {
+                let data = enum_hints.and_then(|h| make_enum_error_data("status", s, &h.statuses));
+                return Err(err(
+                    req_id,
+                    -32602,
+                    &format!("Status validation failed: {}", e),
+                    data,
+                ));
+            }
+        }
+    }
+
+    if let Some(s) = patch_val.get("priority").and_then(|v| v.as_str()) {
+        match validator.validate_priority(s) {
+            Ok(v) => patch.priority = Some(v),
+            Err(e) => {
+                let data =
+                    enum_hints.and_then(|h| make_enum_error_data("priority", s, &h.priorities));
+                return Err(err(
+                    req_id,
+                    -32602,
+                    &format!("Priority validation failed: {}", e),
+                    data,
+                ));
+            }
+        }
+    }
+
+    if let Some(s) = patch_val
+        .get("type")
+        .or_else(|| patch_val.get("task_type"))
+        .and_then(|v| v.as_str())
+    {
+        match validator.validate_task_type(s) {
+            Ok(v) => patch.task_type = Some(v),
+            Err(e) => {
+                let data = enum_hints.and_then(|h| make_enum_error_data("type", s, &h.types));
+                return Err(err(
+                    req_id,
+                    -32602,
+                    &format!("Type validation failed: {}", e),
+                    data,
+                ));
+            }
+        }
+    }
+
+    if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
+        patch.reporter = identity::resolve_me_alias(s, Some(tasks_root));
+    }
+    if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
+        patch.assignee = identity::resolve_me_alias(s, Some(tasks_root));
+    }
+
+    if let Some(s) = patch_val.get("due_date").and_then(|v| v.as_str()) {
+        patch.due_date = Some(s.to_string());
+    }
+    if let Some(s) = patch_val.get("effort").and_then(|v| v.as_str()) {
+        patch.effort = Some(s.to_string());
+    }
+    if let Some(s) = patch_val.get("description").and_then(|v| v.as_str()) {
+        patch.description = Some(s.to_string());
+    }
+
+    if let Some(arr) = patch_val.get("tags").and_then(|v| v.as_array()) {
+        patch.tags = Some(
+            arr.iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect(),
+        );
+    }
+
+    if let Some(rel_val) = patch_val.get("relationships") {
+        if rel_val.is_null() {
+            patch.relationships = Some(TaskRelationships::default());
+        } else {
+            match serde_json::from_value::<TaskRelationships>(rel_val.clone()) {
+                Ok(rel) => {
+                    if rel.is_empty() {
+                        patch.relationships = Some(TaskRelationships::default());
+                    } else {
+                        patch.relationships = Some(rel);
+                    }
+                }
+                Err(e) => {
+                    return Err(err(
+                        req_id,
+                        -32602,
+                        &format!("Invalid relationships payload: {}", e),
+                        None,
+                    ));
+                }
+            }
+        }
+    }
+
+    if patch_val.get("custom_fields").is_some() {
+        let mut custom_fields_map = std::collections::HashMap::new();
+        let custom_fields_val = patch_val.get("custom_fields").unwrap();
+        if custom_fields_val.is_null() {
+            patch.custom_fields = Some(custom_fields_map);
+        } else {
+            let Some(obj) = custom_fields_val.as_object() else {
+                return Err(err(
+                    req_id,
+                    -32602,
+                    "custom_fields must be an object or null",
+                    None,
+                ));
+            };
+
+            fn json_to_custom(val: &serde_json::Value) -> CustomFieldValue {
+                #[cfg(feature = "schema")]
+                {
+                    val.clone()
+                }
+                #[cfg(not(feature = "schema"))]
+                {
+                    serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
+                }
+            }
+
+            for (k, v) in obj.iter() {
+                custom_fields_map.insert(k.clone(), json_to_custom(v));
+            }
+
+            patch.custom_fields = Some(custom_fields_map);
+        }
+    }
+
+    if patch_val.get("sprints").is_some() {
+        match patch_val.get("sprints") {
+            Some(Value::Null) => patch.sprints = Some(Vec::new()),
+            Some(Value::Array(items)) => {
+                let mut ids = Vec::new();
+                for item in items {
+                    if let Value::Number(num) = item
+                        && let Some(v) = num.as_u64().and_then(|v| u32::try_from(v).ok())
+                        && v > 0
+                    {
+                        ids.push(v);
+                    }
+                }
+                patch.sprints = Some(ids);
+            }
+            _ => {
+                return Err(err(
+                    req_id,
+                    -32602,
+                    "sprints must be an array of positive integers or null",
+                    None,
+                ));
+            }
+        }
+    }
+
+    Ok(patch)
+}
 
 pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
@@ -381,131 +650,16 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let validator = CliValidator::new(cfg);
     let enum_hints = EnumHints::from_resolved_config(cfg, &[]);
     let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
-    if !patch_val.is_object() {
-        return err(req.id, -32602, "Invalid patch (expected object)", None);
-    }
-    let mut patch = TaskUpdate::default();
-    if let Some(s) = patch_val.get("title").and_then(|v| v.as_str()) {
-        patch.title = Some(s.to_string());
-    }
-    if let Some(s) = patch_val.get("status").and_then(|v| v.as_str()) {
-        match validator.validate_status(s) {
-            Ok(v) => patch.status = Some(v),
-            Err(e) => {
-                let data = enum_hints
-                    .as_ref()
-                    .and_then(|h| make_enum_error_data("status", s, &h.statuses));
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Status validation failed: {}", e),
-                    data,
-                );
-            }
-        }
-    }
-    if let Some(s) = patch_val.get("priority").and_then(|v| v.as_str()) {
-        match validator.validate_priority(s) {
-            Ok(v) => patch.priority = Some(v),
-            Err(e) => {
-                let data = enum_hints
-                    .as_ref()
-                    .and_then(|h| make_enum_error_data("priority", s, &h.priorities));
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Priority validation failed: {}", e),
-                    data,
-                );
-            }
-        }
-    }
-    if let Some(s) = patch_val
-        .get("type")
-        .or_else(|| patch_val.get("task_type"))
-        .and_then(|v| v.as_str())
-    {
-        match validator.validate_task_type(s) {
-            Ok(v) => patch.task_type = Some(v),
-            Err(e) => {
-                let data = enum_hints
-                    .as_ref()
-                    .and_then(|h| make_enum_error_data("type", s, &h.types));
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Type validation failed: {}", e),
-                    data,
-                );
-            }
-        }
-    }
-    if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
-        patch.reporter = identity::resolve_me_alias(s, Some(resolver.path.as_path()));
-    }
-    if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
-        patch.assignee = identity::resolve_me_alias(s, Some(resolver.path.as_path()));
-    }
-    if let Some(s) = patch_val.get("due_date").and_then(|v| v.as_str()) {
-        patch.due_date = Some(s.to_string());
-    }
-    if let Some(s) = patch_val.get("effort").and_then(|v| v.as_str()) {
-        patch.effort = Some(s.to_string());
-    }
-    if let Some(s) = patch_val.get("description").and_then(|v| v.as_str()) {
-        patch.description = Some(s.to_string());
-    }
-    if let Some(arr) = patch_val.get("tags").and_then(|v| v.as_array()) {
-        patch.tags = Some(
-            arr.iter()
-                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                .collect(),
-        );
-    }
-    if let Some(rel_val) = patch_val.get("relationships") {
-        if rel_val.is_null() {
-            patch.relationships = Some(TaskRelationships::default());
-        } else {
-            match serde_json::from_value::<TaskRelationships>(rel_val.clone()) {
-                Ok(rel) => {
-                    if rel.is_empty() {
-                        patch.relationships = Some(TaskRelationships::default());
-                    } else {
-                        patch.relationships = Some(rel);
-                    }
-                }
-                Err(e) => {
-                    return err(
-                        req.id,
-                        -32602,
-                        &format!("Invalid relationships payload: {}", e),
-                        None,
-                    );
-                }
-            }
-        }
-    }
-    let mut custom_fields_map = patch.custom_fields.take().unwrap_or_default();
-    let mut custom_fields_provided = false;
-    if let Some(obj) = patch_val.get("custom_fields").and_then(|v| v.as_object()) {
-        custom_fields_provided = true;
-        fn json_to_custom(val: &serde_json::Value) -> CustomFieldValue {
-            #[cfg(feature = "schema")]
-            {
-                val.clone()
-            }
-            #[cfg(not(feature = "schema"))]
-            {
-                serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
-            }
-        }
-        for (k, v) in obj.iter() {
-            custom_fields_map.insert(k.clone(), json_to_custom(v));
-        }
-    }
-    if custom_fields_provided || !custom_fields_map.is_empty() {
-        patch.custom_fields = Some(custom_fields_map);
-    }
+    let patch = match parse_task_update_patch(
+        req.id.clone(),
+        resolver.path.as_path(),
+        &validator,
+        enum_hints.as_ref(),
+        &patch_val,
+    ) {
+        Ok(patch) => patch,
+        Err(resp) => return resp,
+    };
     let mut storage = Storage::new(resolver.path);
     match TaskService::update(&mut storage, &id.unwrap(), patch) {
         Ok(task) => ok(
@@ -521,6 +675,525 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
             Some(json!({"message": e.to_string()})),
         ),
     }
+}
+
+pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
+    let id = match req.params.get("id").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing id", None),
+    };
+    let text = match req.params.get("text").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing text", None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let project_prefix = id.split('-').next().unwrap_or("").to_string();
+    let mut storage = Storage::new(resolver.path.clone());
+
+    let mut task = match storage.get(&id, project_prefix.clone()) {
+        Some(task) => task,
+        None => {
+            return err(
+                req.id,
+                -32004,
+                "Task not found",
+                Some(json!({"message": format!("Task '{}' not found", id)})),
+            );
+        }
+    };
+
+    let now = now_rfc3339();
+    task.comments.push(TaskComment {
+        date: now.clone(),
+        text: text.clone(),
+    });
+    task.history.push(TaskChangeLogEntry {
+        at: now.clone(),
+        actor: identity::resolve_current_user(Some(resolver.path.as_path())),
+        changes: vec![TaskChange {
+            field: "comment".into(),
+            old: None,
+            new: Some(text.clone()),
+        }],
+    });
+    task.modified = now;
+
+    if let Err(error) = storage.edit(&id, &task) {
+        return err(
+            req.id,
+            -32603,
+            "Internal error",
+            Some(json!({"message": error.to_string()})),
+        );
+    }
+
+    let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+        Ok(dto) => dto,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let payload = json!({
+        "status": "ok",
+        "action": "comment_add",
+        "id": id,
+        "task": dto,
+    });
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse {
+    let id = match req.params.get("id").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing id", None),
+    };
+    let index = match req.params.get("index") {
+        Some(Value::Number(num)) => num.as_u64().and_then(|v| usize::try_from(v).ok()),
+        Some(Value::String(text)) => text.trim().parse::<usize>().ok(),
+        _ => None,
+    };
+    let Some(index) = index else {
+        return err(req.id, -32602, "Missing index", None);
+    };
+    let text = match req.params.get("text").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing text", None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let project_prefix = id.split('-').next().unwrap_or("").to_string();
+    let mut storage = Storage::new(resolver.path.clone());
+
+    let mut task = match storage.get(&id, project_prefix.clone()) {
+        Some(task) => task,
+        None => {
+            return err(
+                req.id,
+                -32004,
+                "Task not found",
+                Some(json!({"message": format!("Task '{}' not found", id)})),
+            );
+        }
+    };
+
+    if index >= task.comments.len() {
+        return err(req.id, -32602, "Invalid comment index", None);
+    }
+
+    let previous = task.comments[index].text.clone();
+    if previous != text {
+        task.comments[index].text = text.clone();
+        let now = now_rfc3339();
+        task.history.push(TaskChangeLogEntry {
+            at: now.clone(),
+            actor: identity::resolve_current_user(Some(resolver.path.as_path())),
+            changes: vec![TaskChange {
+                field: format!("comment#{}", index + 1),
+                old: Some(previous),
+                new: Some(text.clone()),
+            }],
+        });
+        task.modified = now;
+        if let Err(error) = storage.edit(&id, &task) {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    }
+
+    let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+        Ok(dto) => dto,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let payload = json!({
+        "status": "ok",
+        "action": "comment_update",
+        "id": id,
+        "index": index,
+        "task": dto,
+    });
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
+    let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        None => return err(req.id, -32602, "Missing ids", None),
+    };
+    if ids.is_empty() {
+        return err(req.id, -32602, "ids must not be empty", None);
+    }
+
+    let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
+
+    let stop_on_error = req
+        .params
+        .get("stop_on_error")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+    let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
+        Ok(m) => m,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load config: {}", e)})),
+            );
+        }
+    };
+    let cfg = cfg_mgr.get_resolved_config();
+    let validator = CliValidator::new(cfg);
+    let enum_hints = EnumHints::from_resolved_config(cfg, &[]);
+
+    let patch = match parse_task_update_patch(
+        req.id.clone(),
+        resolver.path.as_path(),
+        &validator,
+        enum_hints.as_ref(),
+        &patch_val,
+    ) {
+        Ok(patch) => patch,
+        Err(resp) => return resp,
+    };
+
+    let mut storage = Storage::new(resolver.path);
+    let mut updated: Vec<TaskDTO> = Vec::new();
+    let mut failed: Vec<Value> = Vec::new();
+
+    for id in ids {
+        match TaskService::update(&mut storage, &id, patch.clone()) {
+            Ok(task) => updated.push(task),
+            Err(e) => {
+                failed.push(json!({"id": id, "error": e.to_string()}));
+                if stop_on_error {
+                    break;
+                }
+            }
+        }
+    }
+
+    let payload = json!({
+        "status": "ok",
+        "updated": updated,
+        "failed": failed,
+    });
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
+    let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        None => return err(req.id, -32602, "Missing ids", None),
+    };
+    if ids.is_empty() {
+        return err(req.id, -32602, "ids must not be empty", None);
+    }
+    let text = match req.params.get("text").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing text", None),
+    };
+    let stop_on_error = req
+        .params
+        .get("stop_on_error")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let mut storage = Storage::new(resolver.path.clone());
+    let mut updated: Vec<TaskDTO> = Vec::new();
+    let mut failed: Vec<Value> = Vec::new();
+
+    for id in ids {
+        let project_prefix = id.split('-').next().unwrap_or("").to_string();
+        let mut task = match storage.get(&id, project_prefix.clone()) {
+            Some(task) => task,
+            None => {
+                failed.push(json!({"id": id, "error": "Task not found"}));
+                if stop_on_error {
+                    break;
+                }
+                continue;
+            }
+        };
+
+        let now = now_rfc3339();
+        task.comments.push(TaskComment {
+            date: now.clone(),
+            text: text.clone(),
+        });
+        task.history.push(TaskChangeLogEntry {
+            at: now.clone(),
+            actor: identity::resolve_current_user(Some(resolver.path.as_path())),
+            changes: vec![TaskChange {
+                field: "comment".into(),
+                old: None,
+                new: Some(text.clone()),
+            }],
+        });
+        task.modified = now;
+
+        if let Err(error) = storage.edit(&id, &task) {
+            failed.push(json!({"id": id, "error": error.to_string()}));
+            if stop_on_error {
+                break;
+            }
+            continue;
+        }
+
+        match TaskService::get(&storage, &id, Some(&project_prefix)) {
+            Ok(dto) => updated.push(dto),
+            Err(error) => {
+                failed.push(json!({"id": id, "error": error.to_string()}));
+                if stop_on_error {
+                    break;
+                }
+            }
+        }
+    }
+
+    let payload = json!({
+        "status": "ok",
+        "updated": updated,
+        "failed": failed,
+    });
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_task_bulk_reference_add(req: JsonRpcRequest) -> JsonRpcResponse {
+    handle_task_bulk_reference_mutation(req, true)
+}
+
+pub(crate) fn handle_task_bulk_reference_remove(req: JsonRpcRequest) -> JsonRpcResponse {
+    handle_task_bulk_reference_mutation(req, false)
+}
+
+fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcResponse {
+    let ids = match req.params.get("ids").and_then(|v| v.as_array()) {
+        Some(arr) => arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>(),
+        None => return err(req.id, -32602, "Missing ids", None),
+    };
+    if ids.is_empty() {
+        return err(req.id, -32602, "ids must not be empty", None);
+    }
+    let kind = match req.params.get("kind").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_ascii_lowercase(),
+        _ => return err(req.id, -32602, "Missing kind", None),
+    };
+    let value = match req.params.get("value").and_then(|v| v.as_str()) {
+        Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => return err(req.id, -32602, "Missing value", None),
+    };
+
+    let stop_on_error = req
+        .params
+        .get("stop_on_error")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let mut storage = Storage::new(resolver.path);
+    let repo_root = if kind == "code" || kind == "file" {
+        match find_repo_root(storage.root_path.as_path()) {
+            Some(root) => Some(root),
+            None => {
+                return err(
+                    req.id,
+                    -32000,
+                    if is_add {
+                        "Task reference add failed"
+                    } else {
+                        "Task reference remove failed"
+                    },
+                    Some(json!({"message": "Unable to locate git repository"})),
+                );
+            }
+        }
+    } else {
+        None
+    };
+
+    let mut updated: Vec<Value> = Vec::new();
+    let mut failed: Vec<Value> = Vec::new();
+
+    for id in ids {
+        let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
+            ("link", true) => ReferenceService::attach_link_reference(&mut storage, &id, &value),
+            ("link", false) => ReferenceService::detach_link_reference(&mut storage, &id, &value),
+            ("code", true) => ReferenceService::attach_code_reference(
+                &mut storage,
+                repo_root.as_ref().unwrap(),
+                &id,
+                &value,
+            ),
+            ("code", false) => ReferenceService::detach_code_reference(&mut storage, &id, &value),
+            ("file", true) => ReferenceService::attach_file_reference(
+                &mut storage,
+                repo_root.as_ref().unwrap(),
+                &id,
+                &value,
+            ),
+            ("file", false) => ReferenceService::detach_file_reference(
+                &mut storage,
+                repo_root.as_ref().unwrap(),
+                &id,
+                &value,
+            ),
+            _ => {
+                return err(
+                    req.id,
+                    -32602,
+                    "Invalid kind",
+                    Some(json!({"message": "kind must be one of: link, file, code"})),
+                );
+            }
+        }
+        .map_err(|e| e.to_string());
+
+        match result {
+            Ok((task, changed)) => {
+                updated.push(json!({"id": id, "changed": changed, "task": task}))
+            }
+            Err(error) => {
+                failed.push(json!({"id": id, "error": error}));
+                if stop_on_error {
+                    break;
+                }
+            }
+        }
+    }
+
+    let payload = json!({
+        "status": "ok",
+        "action": if is_add { "add" } else { "remove" },
+        "kind": kind,
+        "value": value,
+        "updated": updated,
+        "failed": failed,
+    });
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
 }
 
 pub(crate) fn handle_task_reference_add(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -761,15 +1434,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         .map(|s| s.to_string());
     let project_scope: Vec<String> = project.iter().cloned().collect();
     let enum_hints = EnumHints::from_resolved_config(cfg, &project_scope);
-    let tag = req
-        .params
-        .get("tag")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let mut tags: Vec<String> = vec![];
-    if let Some(t) = tag {
-        tags.push(t);
-    }
+    let tags = parse_tags_params(&req.params);
     let text_query = req
         .params
         .get("search")
@@ -828,7 +1493,10 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         project: project.clone(),
         tags,
         text_query,
-        sprints: Vec::new(),
+        sprints: match parse_sprint_ids(req.params.get("sprints")) {
+            Ok(v) => v,
+            Err(msg) => return err(req.id, -32602, msg, None),
+        },
         custom_fields,
     };
     let storage = Storage::new(resolver.path.clone());
@@ -889,7 +1557,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert(
         "nextCursor".into(),
         next_cursor
-            .map(|pos| Value::String(pos.to_string()))
+            .map(|pos| Value::from(pos as u64))
             .unwrap_or(Value::Null),
     );
     payload.insert(

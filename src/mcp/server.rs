@@ -15,9 +15,14 @@ mod mcp_server_tests;
 
 use handlers::{
     handle_config_set, handle_config_show, handle_project_list, handle_project_stats,
-    handle_sprint_add, handle_sprint_backlog, handle_sprint_delete, handle_sprint_remove,
-    handle_task_create, handle_task_delete, handle_task_get, handle_task_list,
-    handle_task_reference_add, handle_task_reference_remove, handle_task_update,
+    handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create,
+    handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove,
+    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
+    handle_task_bulk_comment_add, handle_task_bulk_reference_add,
+    handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add,
+    handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get,
+    handle_task_list, handle_task_reference_add, handle_task_reference_remove, handle_task_update,
+    handle_whoami,
 };
 use hints::gather_enum_hints;
 use tools::build_tool_definitions;
@@ -57,6 +62,8 @@ const MCP_DEFAULT_TASK_LIST_LIMIT: usize = 50;
 const MCP_MAX_TASK_LIST_LIMIT: usize = 200;
 const MCP_DEFAULT_PROJECT_LIST_LIMIT: usize = 50;
 const MCP_MAX_PROJECT_LIST_LIMIT: usize = 200;
+const MCP_DEFAULT_SPRINT_LIST_LIMIT: usize = 50;
+const MCP_MAX_SPRINT_LIST_LIMIT: usize = 200;
 const MCP_DEFAULT_BACKLOG_LIMIT: usize = 20;
 const MCP_MAX_BACKLOG_LIMIT: usize = 100;
 const MCP_MAX_CURSOR: usize = 5000;
@@ -524,6 +531,35 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
         "task/delete" => handle_task_delete(req),
         // task/list(params: TaskListFilter) -> { tasks }
         "task/list" => handle_task_list(req),
+        // whoami({ explain? }) -> { user }
+        "whoami" => handle_whoami(req),
+        // task/comment_add({ id, project?, body, actor?, at? }) -> { task }
+        "task/comment_add" => handle_task_comment_add(req),
+        // task/comment_update({ id, project?, index, body, actor?, at? }) -> { task }
+        "task/comment_update" => handle_task_comment_update(req),
+        // task/bulk_update({ ids, patch, stop_on_error? }) -> { updated, failed }
+        "task/bulk_update" => handle_task_bulk_update(req),
+        // task/bulk_comment_add({ ids, body, actor?, at?, stop_on_error? }) -> { updated, failed }
+        "task/bulk_comment_add" => handle_task_bulk_comment_add(req),
+        // task/bulk_reference_add({ ids, kind, value, stop_on_error? }) -> { updated, failed }
+        "task/bulk_reference_add" => handle_task_bulk_reference_add(req),
+        // task/bulk_reference_remove({ ids, kind, value, stop_on_error? }) -> { updated, failed }
+        "task/bulk_reference_remove" => handle_task_bulk_reference_remove(req),
+
+        // sprint/list({ cursor?, offset?, limit?, include_integrity? }) -> { sprints }
+        "sprint/list" => handle_sprint_list(req),
+        // sprint/get({ sprint_id? sprint }) -> { sprint }
+        "sprint/get" => handle_sprint_get(req),
+        // sprint/create(params: SprintCreateRequest) -> { sprint }
+        "sprint/create" => handle_sprint_create(req),
+        // sprint/update(params: SprintUpdateRequest) -> { sprint }
+        "sprint/update" => handle_sprint_update(req),
+        // sprint/summary({ sprint_id? sprint }) -> SprintSummaryReportResponse
+        "sprint/summary" => handle_sprint_summary(req),
+        // sprint/burndown({ sprint_id? sprint }) -> SprintBurndownResponse
+        "sprint/burndown" => handle_sprint_burndown(req),
+        // sprint/velocity({ limit?, include_active?, metric? }) -> SprintVelocityResponse
+        "sprint/velocity" => handle_sprint_velocity(req),
         "sprint/add" => handle_sprint_add(req),
         "sprint/remove" => handle_sprint_remove(req),
         "sprint/delete" => handle_sprint_delete(req),
@@ -587,7 +623,7 @@ pub fn handle_json_line(line: &str) -> String {
     let response = match req {
         Ok(r) => dispatch(r),
         Err(e) => err(
-            None,
+            Some(Value::Null),
             -32700,
             "Parse error",
             Some(json!({"details": e.to_string()})),
@@ -595,7 +631,7 @@ pub fn handle_json_line(line: &str) -> String {
     };
     serde_json::to_string(&response).unwrap_or_else(|_| {
         // Fall back to a minimal, valid JSON-RPC error line
-        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"}}"
+        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}"
             .to_string()
     })
 }

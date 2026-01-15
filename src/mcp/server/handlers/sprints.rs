@@ -3,16 +3,30 @@ use std::fmt::Write as _;
 
 use super::super::hints::{EnumHints, enum_hints_to_value};
 use super::super::{
-    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_MAX_BACKLOG_LIMIT,
-    MCP_MAX_CURSOR, err, make_mcp_integrity_payload, ok, parse_cursor_value, parse_limit_value,
+    JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_DEFAULT_SPRINT_LIST_LIMIT,
+    MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, err,
+    make_mcp_integrity_payload, ok, parse_cursor_value, parse_limit_value,
+};
+use crate::api_types::{
+    SprintCreateRequest, SprintCreateResponse, SprintListItem, SprintUpdateRequest,
+    SprintUpdateResponse,
 };
 use crate::config::manager::ConfigManager;
+use crate::config::resolution;
 use crate::services::sprint_assignment::{self, SprintBacklogOptions};
 use crate::services::sprint_integrity;
+use crate::services::sprint_metrics::SprintBurndownMetric;
+use crate::services::sprint_reports::{compute_sprint_burndown, compute_sprint_summary};
 use crate::services::sprint_service::SprintService;
+use crate::services::sprint_status;
+use crate::services::sprint_velocity::{
+    DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
+};
 use crate::storage::manager::Storage;
+use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
 use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
+use chrono::Utc;
 
 fn parse_sprint_reference(params: &Value) -> Result<Option<String>, &'static str> {
     if let Some(raw) = params.get("sprint_id") {
@@ -52,6 +66,797 @@ fn parse_sprint_reference(params: &Value) -> Result<Option<String>, &'static str
         }
         _ => Err("sprint must be a sprint reference like '#1' or keyword when provided"),
     }
+}
+
+fn parse_sprint_id(params: &Value) -> Result<u32, &'static str> {
+    if let Some(raw) = params.get("sprint_id") {
+        match raw {
+            Value::Null => {}
+            Value::Number(num) => {
+                if let Some(value) = num.as_u64().and_then(|v| u32::try_from(v).ok())
+                    && value > 0
+                {
+                    return Ok(value);
+                }
+                return Err("sprint_id must be a positive integer");
+            }
+            Value::String(text) => {
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    return Err("sprint_id must be a positive integer");
+                }
+                let normalized = trimmed.strip_prefix('#').unwrap_or(trimmed);
+                if let Ok(value) = normalized.parse::<u32>()
+                    && value > 0
+                {
+                    return Ok(value);
+                }
+                return Err("sprint_id must be a positive integer");
+            }
+            _ => return Err("sprint_id must be a positive integer"),
+        }
+    }
+
+    match params.get("sprint") {
+        Some(Value::Number(num)) => num
+            .as_u64()
+            .and_then(|v| u32::try_from(v).ok())
+            .filter(|v| *v > 0)
+            .ok_or("sprint must be a positive integer"),
+        Some(Value::String(text)) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Err("Missing sprint id");
+            }
+            trimmed
+                .strip_prefix('#')
+                .unwrap_or(trimmed)
+                .parse::<u32>()
+                .ok()
+                .filter(|v| *v > 0)
+                .ok_or("sprint must be a positive integer")
+        }
+        _ => Err("Missing sprint id"),
+    }
+}
+
+fn sprint_record_to_list_item(
+    record: &crate::services::sprint_service::SprintRecord,
+    reference: chrono::DateTime<Utc>,
+) -> SprintListItem {
+    let lifecycle = sprint_status::derive_status(&record.sprint, reference);
+    let plan = record.sprint.plan.as_ref();
+    let capacity = plan.and_then(|plan| plan.capacity.as_ref());
+    SprintListItem {
+        id: record.id,
+        label: record
+            .sprint
+            .plan
+            .as_ref()
+            .and_then(|plan| plan.label.clone()),
+        display_name: sprint_assignment::sprint_display_name(record),
+        created: record.sprint.created.clone(),
+        modified: record.sprint.modified.clone(),
+        state: lifecycle.state.as_str().to_string(),
+        planned_start: lifecycle.planned_start.map(|dt| dt.to_rfc3339()),
+        planned_end: lifecycle.planned_end.map(|dt| dt.to_rfc3339()),
+        actual_start: lifecycle.actual_start.map(|dt| dt.to_rfc3339()),
+        actual_end: lifecycle.actual_end.map(|dt| dt.to_rfc3339()),
+        computed_end: lifecycle.computed_end.map(|dt| dt.to_rfc3339()),
+        goal: plan.and_then(|plan| plan.goal.clone()),
+        plan_length: plan.and_then(|plan| plan.length.clone()),
+        overdue_after: plan.and_then(|plan| plan.overdue_after.clone()),
+        notes: plan.and_then(|plan| plan.notes.clone()),
+        capacity_points: capacity.and_then(|cap| cap.points),
+        capacity_hours: capacity.and_then(|cap| cap.hours),
+        warnings: lifecycle
+            .warnings
+            .iter()
+            .map(|warning| warning.message())
+            .collect(),
+    }
+}
+
+fn clean_opt_string(input: Option<String>) -> Option<String> {
+    input.and_then(|value| {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    })
+}
+
+fn sprint_from_create_request(payload: &SprintCreateRequest) -> Sprint {
+    let mut plan = SprintPlan::default();
+
+    if let Some(label) = clean_opt_string(payload.label.clone()) {
+        plan.label = Some(label);
+    }
+    if let Some(goal) = clean_opt_string(payload.goal.clone()) {
+        plan.goal = Some(goal);
+    }
+    if let Some(length) = clean_opt_string(payload.plan_length.clone()) {
+        plan.length = Some(length);
+    }
+    if let Some(ends_at) = clean_opt_string(payload.ends_at.clone()) {
+        plan.ends_at = Some(ends_at);
+    }
+    if let Some(starts_at) = clean_opt_string(payload.starts_at.clone()) {
+        plan.starts_at = Some(starts_at);
+    }
+    if payload.capacity_points.is_some() || payload.capacity_hours.is_some() {
+        plan.capacity = Some(SprintCapacity {
+            points: payload.capacity_points,
+            hours: payload.capacity_hours,
+        });
+    }
+    if let Some(overdue_after) = clean_opt_string(payload.overdue_after.clone()) {
+        plan.overdue_after = Some(overdue_after);
+    }
+    if let Some(notes) = clean_opt_string(payload.notes.clone()) {
+        plan.notes = Some(notes);
+    }
+
+    let mut sprint = Sprint::default();
+    if !plan_has_values(&plan) {
+        sprint.plan = None;
+    } else {
+        sprint.plan = Some(plan);
+    }
+    sprint
+}
+
+fn plan_has_values(plan: &SprintPlan) -> bool {
+    plan.label.is_some()
+        || plan.goal.is_some()
+        || plan.length.is_some()
+        || plan.ends_at.is_some()
+        || plan.starts_at.is_some()
+        || plan.capacity.is_some()
+        || plan.overdue_after.is_some()
+        || plan.notes.is_some()
+}
+
+fn apply_update_to_sprint(target: &mut Sprint, payload: &SprintUpdateRequest) {
+    let plan = target.plan.get_or_insert_with(SprintPlan::default);
+
+    if payload.label.is_some() {
+        plan.label = clean_opt_string(payload.label.clone());
+    }
+    if payload.goal.is_some() {
+        plan.goal = clean_opt_string(payload.goal.clone());
+    }
+    if payload.plan_length.is_some() {
+        plan.length = clean_opt_string(payload.plan_length.clone());
+    }
+    if payload.ends_at.is_some() {
+        plan.ends_at = clean_opt_string(payload.ends_at.clone());
+    }
+    if payload.starts_at.is_some() {
+        plan.starts_at = clean_opt_string(payload.starts_at.clone());
+    }
+    if payload.capacity_points.is_some() || payload.capacity_hours.is_some() {
+        let cap = plan.capacity.get_or_insert_with(SprintCapacity::default);
+        if let Some(value) = &payload.capacity_points {
+            cap.points = *value;
+        }
+        if let Some(value) = &payload.capacity_hours {
+            cap.hours = *value;
+        }
+        if cap.points.is_none() && cap.hours.is_none() {
+            plan.capacity = None;
+        }
+    }
+    if payload.overdue_after.is_some() {
+        plan.overdue_after = clean_opt_string(payload.overdue_after.clone());
+    }
+    if payload.notes.is_some() {
+        plan.notes = clean_opt_string(payload.notes.clone());
+    }
+
+    if payload.actual_started_at.is_some() || payload.actual_closed_at.is_some() {
+        let actual = target.actual.get_or_insert_with(SprintActual::default);
+        if let Some(value) = &payload.actual_started_at {
+            actual.started_at = value.clone();
+        }
+        if let Some(value) = &payload.actual_closed_at {
+            actual.closed_at = value.clone();
+        }
+
+        let should_clear_actual = matches!(
+            target.actual.as_ref(),
+            Some(actual) if actual.started_at.is_none() && actual.closed_at.is_none()
+        );
+        if should_clear_actual {
+            target.actual = None;
+        }
+    }
+
+    if let Some(plan) = target.plan.as_ref()
+        && !plan_has_values(plan)
+    {
+        target.plan = None;
+    }
+}
+
+pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let include_integrity = req
+        .params
+        .get("include_integrity")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+
+    let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_SPRINT_LIST_LIMIT) {
+        Ok(value) if (1..=MCP_MAX_SPRINT_LIST_LIMIT).contains(&value) => value,
+        Ok(_) => {
+            return err(
+                req.id,
+                -32602,
+                &format!("limit must be between 1 and {}", MCP_MAX_SPRINT_LIST_LIMIT),
+                None,
+            );
+        }
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
+
+    let cursor_value = req
+        .params
+        .get("cursor")
+        .or_else(|| req.params.get("offset"));
+    let cursor = match parse_cursor_value(cursor_value) {
+        Ok(value) if value <= MCP_MAX_CURSOR => value,
+        Ok(_) => {
+            return err(
+                req.id,
+                -32602,
+                &format!("cursor must be <= {}", MCP_MAX_CURSOR),
+                None,
+            );
+        }
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
+
+    let storage = match Storage::try_open(resolver.path.clone()) {
+        Some(storage) => storage,
+        None => {
+            let mut payload = serde_json::Map::new();
+            payload.insert("status".to_string(), Value::String("ok".to_string()));
+            payload.insert("count".to_string(), Value::from(0u64));
+            payload.insert("total".to_string(), Value::from(0u64));
+            payload.insert("cursor".to_string(), Value::from(0u64));
+            payload.insert("limit".to_string(), Value::from(limit as u64));
+            payload.insert("hasMore".to_string(), Value::Bool(false));
+            payload.insert("nextCursor".to_string(), Value::Null);
+            payload.insert("sprints".to_string(), Value::Array(Vec::new()));
+            if include_integrity {
+                payload.insert("missing_sprints".to_string(), Value::Array(Vec::new()));
+            }
+            let payload = Value::Object(payload);
+            return ok(
+                req.id,
+                json!({
+                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+                }),
+            );
+        }
+    };
+
+    let records = match SprintService::list(&storage) {
+        Ok(records) => records,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load sprints: {}", error)})),
+            );
+        }
+    };
+
+    let now = Utc::now();
+    let mut sprints: Vec<SprintListItem> = records
+        .iter()
+        .map(|record| sprint_record_to_list_item(record, now))
+        .collect();
+    sprints.sort_by(|a, b| a.id.cmp(&b.id));
+
+    let total = sprints.len();
+    let start = cursor.min(total);
+    let end = (start + limit).min(total);
+    let page = sprints[start..end].to_vec();
+    let has_more = end < total;
+    let next_cursor = if has_more { Some(end) } else { None };
+
+    let (missing_sprints, integrity) = if include_integrity {
+        let report = sprint_integrity::detect_missing_sprints(&storage, &records);
+        (
+            Value::Array(
+                report
+                    .missing_sprints
+                    .iter()
+                    .map(|id| Value::from(*id))
+                    .collect(),
+            ),
+            make_mcp_integrity_payload(&report, &report, None),
+        )
+    } else {
+        (Value::Null, None)
+    };
+
+    let mut payload = serde_json::Map::new();
+    payload.insert("status".to_string(), Value::String("ok".to_string()));
+    payload.insert("count".to_string(), Value::from(page.len() as u64));
+    payload.insert("total".to_string(), Value::from(total as u64));
+    payload.insert("cursor".to_string(), Value::from(start as u64));
+    payload.insert("limit".to_string(), Value::from(limit as u64));
+    payload.insert("hasMore".to_string(), Value::Bool(has_more));
+    payload.insert(
+        "nextCursor".to_string(),
+        next_cursor
+            .map(|pos| Value::from(pos as u64))
+            .unwrap_or(Value::Null),
+    );
+    payload.insert(
+        "sprints".to_string(),
+        serde_json::to_value(&page).unwrap_or_else(|_| Value::Array(Vec::new())),
+    );
+    if include_integrity {
+        payload.insert("missing_sprints".to_string(), missing_sprints);
+        if let Some(integrity) = integrity {
+            payload.insert("integrity".to_string(), integrity);
+        }
+    }
+
+    let payload = Value::Object(payload);
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_sprint_get(req: JsonRpcRequest) -> JsonRpcResponse {
+    let sprint_id = match parse_sprint_id(&req.params) {
+        Ok(id) => id,
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let storage = Storage::new(resolver.path);
+    let record = match SprintService::get(&storage, sprint_id) {
+        Ok(record) => record,
+        Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
+            return err(
+                req.id,
+                -32004,
+                &format!("Sprint #{} not found", sprint_id),
+                None,
+            );
+        }
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let item = sprint_record_to_list_item(&record, Utc::now());
+    let payload = json!({"status": "ok", "sprint": item});
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let body: SprintCreateRequest = match serde_json::from_value(req.params.clone()) {
+        Ok(payload) => payload,
+        Err(error) => return err(req.id, -32602, &format!("Invalid params: {}", error), None),
+    };
+
+    let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load config: {}", error)})),
+            );
+        }
+    };
+
+    let mut storage = Storage::new(resolver.path);
+    let sprint = sprint_from_create_request(&body);
+    let defaults = if body.skip_defaults {
+        None
+    } else {
+        Some(&resolved_config.sprint_defaults)
+    };
+
+    let outcome = match SprintService::create(&mut storage, sprint, defaults) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Failed to create sprint",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let response = SprintCreateResponse {
+        status: "ok".to_string(),
+        sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+        warnings: outcome
+            .warnings
+            .iter()
+            .map(|warning| warning.message().to_string())
+            .collect(),
+        applied_defaults: outcome.applied_defaults.clone(),
+    };
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
+    let sprint_id = match parse_sprint_id(&req.params) {
+        Ok(id) => id,
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let mut params = req.params.clone();
+    if let Value::Object(ref mut obj) = params {
+        obj.insert("sprint".to_string(), Value::from(sprint_id));
+    }
+    let body: SprintUpdateRequest = match serde_json::from_value(params) {
+        Ok(payload) => payload,
+        Err(error) => return err(req.id, -32602, &format!("Invalid params: {}", error), None),
+    };
+
+    let mut storage = Storage::new(resolver.path);
+    let existing = match SprintService::get(&storage, sprint_id) {
+        Ok(record) => record,
+        Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
+            return err(
+                req.id,
+                -32004,
+                &format!("Sprint #{} not found", sprint_id),
+                None,
+            );
+        }
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let mut sprint = existing.sprint.clone();
+    apply_update_to_sprint(&mut sprint, &body);
+
+    let outcome = match SprintService::update(&mut storage, sprint_id, sprint) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Failed to update sprint",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let response = SprintUpdateResponse {
+        status: "ok".to_string(),
+        sprint: sprint_record_to_list_item(&outcome.record, Utc::now()),
+        warnings: outcome
+            .warnings
+            .iter()
+            .map(|warning| warning.message().to_string())
+            .collect(),
+    };
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_sprint_summary(req: JsonRpcRequest) -> JsonRpcResponse {
+    let sprint_id = match parse_sprint_id(&req.params) {
+        Ok(id) => id,
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let storage = Storage::new(resolver.path.clone());
+    let record = match SprintService::get(&storage, sprint_id) {
+        Ok(record) => record,
+        Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
+            return err(
+                req.id,
+                -32004,
+                &format!("Sprint #{} not found", sprint_id),
+                None,
+            );
+        }
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load config: {}", error)})),
+            );
+        }
+    };
+
+    let summary = compute_sprint_summary(&storage, &record, &resolved_config, Utc::now());
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&summary.payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_sprint_burndown(req: JsonRpcRequest) -> JsonRpcResponse {
+    let sprint_id = match parse_sprint_id(&req.params) {
+        Ok(id) => id,
+        Err(msg) => return err(req.id, -32602, msg, None),
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let storage = Storage::new(resolver.path.clone());
+    let record = match SprintService::get(&storage, sprint_id) {
+        Ok(record) => record,
+        Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
+            return err(
+                req.id,
+                -32004,
+                &format!("Sprint #{} not found", sprint_id),
+                None,
+            );
+        }
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": error.to_string()})),
+            );
+        }
+    };
+
+    let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load config: {}", error)})),
+            );
+        }
+    };
+
+    let ctx = match compute_sprint_burndown(&storage, &record, &resolved_config, Utc::now()) {
+        Ok(ctx) => ctx,
+        Err(msg) => return err(req.id, -32602, msg.as_str(), None),
+    };
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&ctx.payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
+}
+
+pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
+    let include_active = req
+        .params
+        .get("include_active")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    let limit = match parse_limit_value(req.params.get("limit"), DEFAULT_VELOCITY_WINDOW) {
+        Ok(value) if value > 0 => value,
+        _ => DEFAULT_VELOCITY_WINDOW,
+    };
+
+    let metric = match req.params.get("metric").and_then(|v| v.as_str()) {
+        Some(raw) => {
+            let lowered = raw.trim().to_ascii_lowercase();
+            match lowered.as_str() {
+                "tasks" => SprintBurndownMetric::Tasks,
+                "points" => SprintBurndownMetric::Points,
+                "hours" => SprintBurndownMetric::Hours,
+                _ => {
+                    return err(
+                        req.id,
+                        -32602,
+                        &format!("Unsupported metric '{}'. Use tasks, points, or hours.", raw),
+                        None,
+                    );
+                }
+            }
+        }
+        None => SprintBurndownMetric::Points,
+    };
+
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+
+    let storage = match Storage::try_open(resolver.path.clone()) {
+        Some(storage) => storage,
+        None => {
+            let empty = VelocityComputation {
+                metric,
+                entries: Vec::new(),
+                total_matching: 0,
+                truncated: false,
+                skipped_incomplete: false,
+                average_velocity: None,
+                average_completion_ratio: None,
+            };
+            let payload = empty.to_payload(include_active);
+            return ok(
+                req.id,
+                json!({
+                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+                }),
+            );
+        }
+    };
+
+    let records = match SprintService::list(&storage) {
+        Ok(records) => records,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load sprints: {}", error)})),
+            );
+        }
+    };
+
+    let resolved_config = match resolution::load_and_merge_configs(Some(resolver.path.as_path())) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": format!("Failed to load config: {}", error)})),
+            );
+        }
+    };
+
+    let options = VelocityOptions {
+        limit,
+        include_active,
+        metric,
+    };
+    let computed = compute_velocity(&storage, records, &resolved_config, options, Utc::now());
+    let payload = computed.to_payload(include_active);
+
+    ok(
+        req.id,
+        json!({
+            "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+        }),
+    )
 }
 
 pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -820,7 +1625,7 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
     payload.insert(
         "nextCursor".to_string(),
         next_cursor
-            .map(|pos| Value::String(pos.to_string()))
+            .map(|pos| Value::from(pos as u64))
             .unwrap_or(Value::Null),
     );
     payload.insert(
