@@ -1,7 +1,13 @@
 <template>
   <section class="col" style="gap: 16px;">
     <div class="row" style="justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-      <h1>Tasks <span class="muted" v-if="count">({{ count }})</span></h1>
+      <h1>
+        Tasks
+        <span class="muted" v-if="totalCount">
+          <template v-if="pageOffset === 0 && pageEnd === totalCount">({{ totalCount }})</template>
+          <template v-else>({{ pageStart }}–{{ pageEnd }} / {{ totalCount }})</template>
+        </span>
+      </h1>
       <div class="row split-actions" style="gap: 8px; align-items: center;">
         <UiButton
           icon-only
@@ -23,23 +29,103 @@
       </div>
     </div>
     <div class="filter-card">
-      <SmartListChips
-        :statuses="statusOptions"
-        :priorities="priorityOptions"
-        :value="filter"
-        :custom-presets="customFilterPresets"
-        @update:value="onChipsUpdate"
-        @preset="handleCustomPreset"
-      />
-      <FilterBar
-        ref="filterBarRef"
-        :statuses="statuses"
-        :priorities="priorities"
-        :types="types"
-        :value="filter"
-        storage-key="lotar.tasks.filter"
-        @update:value="onFilterUpdate"
-      />
+      <div class="tasks-quick-row">
+        <div class="tasks-quick-row__chips">
+          <SmartListChips
+            :statuses="statusOptions"
+            :priorities="priorityOptions"
+            :value="filter"
+            :custom-presets="customFilterPresets"
+            @update:value="onChipsUpdate"
+            @preset="handleCustomPreset"
+          />
+        </div>
+        <div class="tasks-quick-row__controls">
+          <label class="tasks-quick-row__checkbox">
+            <input type="checkbox" :checked="bulk" @change="onToggleBulkFromToolbar($event)" />
+            Bulk select
+          </label>
+          <span v-if="bulk" class="muted tasks-quick-row__selected">Selected: {{ selectedIds.length }} / {{ shownTasks.length }}</span>
+          <div v-if="bulk" class="bulk-menu-wrapper">
+            <UiButton
+              icon-only
+              type="button"
+              aria-label="Bulk actions"
+              title="Bulk actions"
+              :disabled="disableBulkActions"
+              ref="bulkMenuButton"
+              @click.stop="toggleBulkMenu"
+            >
+              <IconGlyph name="dots-horizontal" />
+            </UiButton>
+            <div
+              v-if="showBulkMenu"
+              class="menu-popover card bulk-actions-menu"
+              ref="bulkMenuPopover"
+              role="menu"
+              @click.stop
+            >
+              <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
+                <span class="menu-item__label">Assign…</span>
+              </button>
+              <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
+                <span class="menu-item__label">Clear assignee</span>
+              </button>
+              <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                <span class="menu-item__label">Add to sprint…</span>
+              </button>
+              <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+                <span class="menu-item__label">Remove from sprint…</span>
+              </button>
+              <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">
+                <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                <span class="menu-item__label">Delete tasks…</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="tasks-filter-row">
+        <div class="tasks-filter-row__main">
+          <FilterBar
+            ref="filterBarRef"
+            :statuses="statuses"
+            :priorities="priorities"
+            :types="types"
+            :value="filter"
+            storage-key="lotar.tasks.filter"
+            @update:value="onFilterUpdate"
+          />
+        </div>
+        <div class="tasks-filter-row__paging">
+          <UiButton
+            variant="ghost"
+            type="button"
+            aria-label="Previous page"
+            title="Previous page"
+            :disabled="loading || !hasPrevPage"
+            @click="prevPage"
+          >
+            <IconGlyph name="chevron-left" />
+            <span>Prev</span>
+          </UiButton>
+          <UiButton
+            variant="ghost"
+            type="button"
+            aria-label="Next page"
+            title="Next page"
+            :disabled="loading || !hasNextPage"
+            @click="nextPage"
+          >
+            <span>Next</span>
+            <IconGlyph name="chevron-right" />
+          </UiButton>
+        </div>
+      </div>
     </div>
 
     <div class="col" style="gap: 16px;">
@@ -64,12 +150,13 @@
       />
       <TaskTable
         v-else
-        :tasks="tasks"
+        :tasks="shownTasks"
         :loading="loading"
         :statuses="statuses"
         :selectable="bulk"
         :selected-ids="selectedIds"
-        :project-key="filter.project || (tasks[0]?.id?.split('-')[0] || '')"
+        :show-bulk-controls="false"
+        :project-key="filter.project || (shownTasks[0]?.id?.split('-')[0] || '')"
         :touches="activityTouches"
         :sprint-lookup="sprintLookup"
         :has-sprints="hasSprints"
@@ -81,7 +168,7 @@
         @bulk-sprint-remove="openBulkSprintRemove"
         @bulk-delete="openBulkDelete"
         @add="openCreate"
-  @update:selected-ids="setSelectedIds"
+          @update:selected-ids="setSelectedIds"
         @open="view"
         @delete="openSingleDelete"
         @update-title="onUpdateTitle"
@@ -246,7 +333,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
@@ -267,13 +354,37 @@ import { useSprints } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTasks } from '../composables/useTasks'
-import { parseTaskDate, startOfLocalDay } from '../utils/date'
+import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 
 const router = useRouter()
-const { items, loading, error, count, refresh, remove } = useTasks()
+const { items, loading, error, refresh, remove, total } = useTasks()
 const { openTaskPanel } = useTaskPanelController()
-const hasTasks = computed(() => (items.value?.length ?? 0) > 0)
 const tasks = items
+
+const MAX_PAGE_LIMIT = 200
+const pageLimit = ref(readTasksPageSizePreference())
+const pageOffset = ref(0)
+
+function queryString(value: unknown): string {
+  if (Array.isArray(value)) return String(value[0] ?? '')
+  return value === undefined || value === null ? '' : String(value)
+}
+
+function queryInt(value: unknown, fallback: number): number {
+  const parsed = Number.parseInt(queryString(value), 10)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function clampPageLimit(value: number): number {
+  const fallback = readTasksPageSizePreference()
+  const normalized = Number.isFinite(value) ? Math.floor(value) : fallback
+  return Math.min(MAX_PAGE_LIMIT, Math.max(1, normalized))
+}
+
+function clampOffset(value: number): number {
+  const normalized = Number.isFinite(value) ? Math.floor(value) : 0
+  return Math.max(0, normalized)
+}
 
 const { add: addActivity, markTaskTouch, removeTaskTouch, touches: activityTouches } = useActivity()
 
@@ -343,6 +454,27 @@ const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: (
 const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
+const shownTasks = computed(() => tasks.value || [])
+const shownCount = computed(() => shownTasks.value.length)
+const totalCount = computed(() => total.value ?? 0)
+const pageStart = computed(() => (totalCount.value > 0 ? pageOffset.value + 1 : 0))
+const pageEnd = computed(() => Math.min(pageOffset.value + tasks.value.length, totalCount.value))
+const hasPrevPage = computed(() => pageOffset.value > 0)
+const hasNextPage = computed(() => pageOffset.value + tasks.value.length < totalCount.value)
+const hasTasks = computed(() => shownCount.value > 0)
+
+async function prevPage() {
+  if (!hasPrevPage.value) return
+  pageOffset.value = Math.max(0, pageOffset.value - pageLimit.value)
+  await applyFilter(filter.value)
+}
+
+async function nextPage() {
+  if (!hasNextPage.value) return
+  pageOffset.value = pageOffset.value + tasks.value.length
+  await applyFilter(filter.value)
+}
+
 function onFilterUpdate(v: Record<string,string>){ filter.value = v }
 function onChipsUpdate(v: Record<string,string>){ filter.value = { ...v } }
 function resetFilters(){
@@ -357,91 +489,24 @@ function handleCustomPreset(expression: string) {
 }
 
 type NavMode = 'push' | 'replace' | 'none'
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-function startOfDay(date: Date) {
-  return startOfLocalDay(date)
+type PagingUpdate = {
+  offset?: number
+  resetOffset?: boolean
 }
 
-function parseDateLike(value?: string | null) {
-  return parseTaskDate(value)
-}
-
-function applySmartFilters(q: Record<string, string>) {
-  const wantsUnassigned = q.assignee === '__none__'
-  const due = q.due || ''
-  const recent = q.recent || ''
-  const needsSet = new Set((q.needs || '').split(',').map(s => s.trim()).filter(Boolean))
-  const now = new Date()
-  const today = startOfDay(now)
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
-  const soonCutoff = new Date(today.getTime() + 7 * MS_PER_DAY)
-  const recentCutoff = new Date(now.getTime() - 7 * MS_PER_DAY)
-
-  const filtered = items.value.filter((task) => {
-    if (wantsUnassigned && (task.assignee || '').trim()) {
-      return false
-    }
-
-    if (due) {
-      const dueDate = parseDateLike(task.due_date)
-      if (!dueDate) {
-        return false
-      }
-      const dueTime = startOfDay(dueDate).getTime()
-      const todayStart = today.getTime()
-      const tomorrowStart = tomorrow.getTime()
-      const soonCutoffTime = startOfDay(soonCutoff).getTime()
-      if (due === 'today') {
-        if (dueTime < todayStart || dueTime >= tomorrowStart) {
-          return false
-        }
-      } else if (due === 'soon') {
-        if (dueTime < tomorrowStart || dueTime > soonCutoffTime) {
-          return false
-        }
-      } else if (due === 'later') {
-        if (dueTime <= soonCutoffTime) {
-          return false
-        }
-      } else if (due === 'overdue') {
-        if (dueTime >= todayStart) {
-          return false
-        }
-      }
-    }
-
-    if (recent === '7d') {
-      const modified = parseDateLike(task.modified)
-      if (!modified || modified.getTime() < recentCutoff.getTime()) {
-        return false
-      }
-    }
-
-    if (needsSet.size) {
-      if (needsSet.has('effort')) {
-        const effort = (task.effort || '').trim()
-        if (effort) {
-          return false
-        }
-      }
-      if (needsSet.has('due')) {
-        if ((task.due_date || '').trim()) {
-          return false
-        }
-      }
-    }
-
-    return true
-  })
-
-  items.value = filtered
-}
-
-async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
+async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', paging: PagingUpdate = {}) {
   if (disposed) return
   const onTasksRoute = router.currentRoute.value.path === '/'
   if (!onTasksRoute) return
+
+  if (paging.resetOffset) {
+    pageOffset.value = 0
+  }
+  if (paging.offset !== undefined) {
+    pageOffset.value = clampOffset(paging.offset)
+  }
+
   const q = { ...raw }
   const qnorm: Record<string, string> = {}
   const extraQuery: Record<string, string> = {}
@@ -454,14 +519,27 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
     }
   }
   qnorm.order = (q.order === 'asc' || q.order === 'desc') ? q.order : 'desc'
-  const nextQuery = { ...extraQuery, ...qnorm }
+  const nextQuery: Record<string, string> = { ...extraQuery, ...qnorm }
+  if (pageOffset.value > 0) {
+    nextQuery.offset = String(pageOffset.value)
+  }
 
   if (disposed) return
 
   if (nav === 'replace') {
-    if (!disposed) await router.replace({ path: '/', query: nextQuery })
+    suppressRouteSync = true
+    try {
+      if (!disposed) await router.replace({ path: '/', query: nextQuery })
+    } finally {
+      suppressRouteSync = false
+    }
   } else if (nav === 'push') {
-    if (!disposed) await router.push({ path: '/', query: nextQuery })
+    suppressRouteSync = true
+    try {
+      if (!disposed) await router.push({ path: '/', query: nextQuery })
+    } finally {
+      suppressRouteSync = false
+    }
   }
 
   const serverFilter: any = {}
@@ -470,8 +548,14 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
   if (qnorm.status) serverFilter.status = qnorm.status.split(',').map(s => s.trim()).filter(Boolean)
   if (qnorm.priority) serverFilter.priority = qnorm.priority.split(',').map(s => s.trim()).filter(Boolean)
   if (qnorm.type) serverFilter.type = qnorm.type.split(',').map(s => s.trim()).filter(Boolean)
-  if (qnorm.assignee && qnorm.assignee !== '__none__') serverFilter.assignee = qnorm.assignee
+  if (qnorm.assignee) serverFilter.assignee = qnorm.assignee
   if (qnorm.tags) serverFilter.tags = qnorm.tags.split(',').map(s => s.trim()).filter(Boolean)
+  if (qnorm.due) serverFilter.due = qnorm.due
+  if (qnorm.recent) serverFilter.recent = qnorm.recent
+  if (qnorm.needs) serverFilter.needs = qnorm.needs
+  serverFilter.order = qnorm.order
+  serverFilter.limit = pageLimit.value
+  serverFilter.offset = pageOffset.value
   Object.assign(serverFilter, extraQuery)
 
   if (disposed) return
@@ -481,12 +565,16 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push') {
   await refresh(serverFilter)
   if (disposed) return
 
-  applySmartFilters(qnorm)
+  const currentTotal = totalCount.value
+  if (currentTotal > 0 && pageOffset.value >= currentTotal) {
+    const lastOffset = Math.max(0, Math.floor((currentTotal - 1) / pageLimit.value) * pageLimit.value)
+    if (lastOffset !== pageOffset.value) {
+      await applyFilter(raw, 'replace', { offset: lastOffset })
+      return
+    }
+  }
 
   if (disposed) return
-
-  const dir = qnorm.order === 'asc' ? 'asc' : 'desc'
-  items.value.sort((a,b) => (dir === 'desc' ? b.modified.localeCompare(a.modified) : a.modified.localeCompare(b.modified)))
 }
 
 async function retry(){ await applyFilter(filter.value, 'none') }
@@ -537,6 +625,54 @@ async function onQuickStatus(payload: { id: string; status: string }){
 // Selection and bulk dialogs
 const bulk = ref(false)
 const selectedIds = ref<string[]>([])
+
+const showBulkMenu = ref(false)
+type BulkMenuAction = 'assign' | 'unassign' | 'sprint-add' | 'sprint-remove' | 'delete'
+type BulkMenuButtonRef = HTMLElement | (ComponentPublicInstance & { $el: HTMLElement })
+const bulkMenuButton = ref<BulkMenuButtonRef | null>(null)
+const bulkMenuPopover = ref<HTMLElement | null>(null)
+
+const disableBulkActions = computed(() => !selectedIds.value.length)
+const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoading.value || !hasSprints.value)
+
+function onToggleBulkFromToolbar(event: Event) {
+  const checked = (event.target as HTMLInputElement | null)?.checked ?? false
+  bulk.value = checked
+  if (!checked) {
+    selectedIds.value = []
+    showBulkMenu.value = false
+  }
+}
+
+function toggleBulkMenu() {
+  if (disableBulkActions.value) return
+  showBulkMenu.value = !showBulkMenu.value
+}
+
+function closeBulkMenu() {
+  showBulkMenu.value = false
+}
+
+function handleBulkAction(action: BulkMenuAction) {
+  closeBulkMenu()
+  switch (action) {
+    case 'assign':
+      openBulkAssign()
+      break
+    case 'unassign':
+      bulkUnassign()
+      break
+    case 'sprint-add':
+      openBulkSprintAdd()
+      break
+    case 'sprint-remove':
+      openBulkSprintRemove()
+      break
+    case 'delete':
+      openBulkDelete()
+      break
+  }
+}
 
 function setSelectedIds(value: string[]) {
   selectedIds.value = Array.isArray(value) ? [...value] : []
@@ -917,6 +1053,8 @@ let sse: { es: EventSource; close(): void; on(event: string, handler: (e: Messag
 const sseUnsubscribers: Array<() => void> = []
 let refreshTimer: any = null
 let disposed = false
+let suppressRouteSync = false
+let suppressFilterWatch = false
 
 function scheduleRefresh() {
   if (disposed) return
@@ -992,7 +1130,13 @@ function registerSseHandlers() {
   })
 }
 onMounted(async () => {
-  filter.value = Object.fromEntries(Object.entries(route.query).map(([k,v]) => [k, String(v)]))
+  pageLimit.value = clampPageLimit(readTasksPageSizePreference())
+  pageOffset.value = clampOffset(queryInt(route.query.offset, 0))
+  filter.value = Object.fromEntries(
+    Object.entries(route.query)
+      .filter(([key]) => key !== 'offset')
+      .map(([k, v]) => [k, queryString(v)]),
+  )
   await refreshProjects()
   await refreshSprints(true)
   await applyFilter(filter.value, 'replace')
@@ -1008,16 +1152,97 @@ onUnmounted(() => {
   }
   sseUnsubscribers.splice(0).forEach((fn) => fn())
   if (sse) sse.close()
+  if (stopPreferencesListener) stopPreferencesListener()
+  document.removeEventListener('click', onDocumentClickForBulkMenu)
+  document.removeEventListener('keydown', onDocumentKeydownForBulkMenu)
+})
+
+function onDocumentClickForBulkMenu(event: MouseEvent) {
+  if (!showBulkMenu.value) return
+  const target = event.target as Node | null
+  if (!target) return
+
+  const bulkButtonEl = bulkMenuButton.value
+    ? bulkMenuButton.value instanceof HTMLElement
+      ? bulkMenuButton.value
+      : bulkMenuButton.value.$el
+    : null
+
+  if (bulkButtonEl && bulkButtonEl.contains(target)) return
+  if (bulkMenuPopover.value && bulkMenuPopover.value.contains(target)) return
+  closeBulkMenu()
+}
+
+function onDocumentKeydownForBulkMenu(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeBulkMenu()
+}
+
+onMounted(() => {
+  document.addEventListener('click', onDocumentClickForBulkMenu)
+  document.addEventListener('keydown', onDocumentKeydownForBulkMenu)
+})
+
+watch(selectedIds, (value) => {
+  if (!value.length) closeBulkMenu()
+})
+
+watch(bulk, (value) => {
+  if (!value) {
+    selectedIds.value = []
+    closeBulkMenu()
+  }
+})
+
+watch(
+  () => route.query,
+  (query) => {
+    if (disposed || suppressRouteSync) return
+
+    const nextOffset = clampOffset(queryInt((query as any).offset, pageOffset.value))
+    const nextFilter = Object.fromEntries(
+      Object.entries(query)
+        .filter(([key]) => key !== 'offset')
+        .map(([k, v]) => [k, queryString(v)]),
+    )
+
+    suppressFilterWatch = true
+    try {
+      pageOffset.value = nextOffset
+      filter.value = nextFilter
+    } finally {
+      suppressFilterWatch = false
+    }
+
+    applyFilter(nextFilter, 'none').catch((err) => {
+      console.warn('Failed to apply route query filter', err)
+    })
+  },
+)
+
+let stopPreferencesListener: null | (() => void) = null
+
+onMounted(() => {
+  stopPreferencesListener = onPreferencesChanged((key) => {
+    if (key !== 'lotar.preferences.tasks.pageSize') return
+    const preferredLimit = clampPageLimit(readTasksPageSizePreference())
+    if (preferredLimit === pageLimit.value) return
+    pageLimit.value = preferredLimit
+    pageOffset.value = 0
+    applyFilter(filter.value, 'replace').catch((err) => {
+      console.warn('Failed to apply updated tasks page size preference', err)
+    })
+  })
 })
 
 // Debounced fetch on any filter change; also sync URL and config
 let debounceTimer: any = null
 
 watch(filter, (q) => {
+  if (suppressFilterWatch) return
   if (debounceTimer) clearTimeout(debounceTimer)
   const snapshot = { ...q }
   debounceTimer = setTimeout(() => {
-    applyFilter(snapshot).catch((err) => {
+    applyFilter(snapshot, 'push', { resetOffset: true }).catch((err) => {
       console.warn('Failed to apply filter', err)
     })
   }, 150)
@@ -1056,6 +1281,117 @@ const handleTaskUpdated = (task: TaskDTO) => {
   flex-direction: column;
   gap: 12px;
   padding: 0;
+}
+
+.tasks-quick-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tasks-quick-row__chips {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tasks-quick-row__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 2.25rem;
+}
+
+.tasks-quick-row__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 2.25rem;
+  line-height: 2.25rem;
+}
+
+.tasks-quick-row__selected {
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
+  line-height: 2.25rem;
+}
+
+.tasks-quick-row__checkbox input {
+  margin: 0;
+}
+
+.bulk-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
+}
+
+.menu-popover {
+  position: absolute;
+  top: calc(100% + var(--space-1, 0.25rem));
+  margin-top: 0;
+  left: 0;
+  right: auto;
+  z-index: var(--z-menu, 20);
+}
+
+.bulk-actions-menu {
+  min-width: 220px;
+  padding: 6px;
+}
+
+.menu-item {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 0.25rem);
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--duration-fast, 120ms) var(--ease-standard, ease);
+}
+
+.menu-item:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--color-surface, var(--bg)) 75%, transparent);
+}
+
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-item.danger {
+  color: var(--color-danger, #c62828);
+}
+
+.tasks-filter-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tasks-filter-row__main {
+  flex: 1;
+  min-width: min(640px, 100%);
+}
+
+.tasks-filter-row__paging {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .tasks-modal__overlay {

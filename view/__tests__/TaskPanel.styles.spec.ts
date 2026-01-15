@@ -33,8 +33,8 @@ vi.mock('../api/client', () => {
             getTask: vi.fn().mockResolvedValue(clone(baseTask)),
             taskHistory: vi.fn().mockResolvedValue([]),
             suggestTasks: vi.fn().mockResolvedValue([]),
-            listTasks: vi.fn().mockResolvedValue([]),
-            listProjects: vi.fn().mockResolvedValue([{ prefix: 'DEMO', name: 'Demo Project' }]),
+            listTasks: vi.fn().mockResolvedValue({ total: 0, limit: 50, offset: 0, tasks: [] }),
+            listProjects: vi.fn().mockResolvedValue({ total: 1, limit: 50, offset: 0, projects: [{ prefix: 'DEMO', name: 'Demo Project' }] }),
             projectStats: vi.fn(),
         },
     }

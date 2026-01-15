@@ -8,6 +8,7 @@ pub mod fuzzy_match;
 pub mod git;
 pub mod identity;
 pub mod identity_detectors;
+pub mod pagination;
 pub mod paths;
 pub mod project;
 pub mod tags;

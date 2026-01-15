@@ -2369,6 +2369,100 @@ mod list_features {
                 }
             }
         }
+
+        // Test offset/page pagination helpers
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let first_page = cmd
+            .current_dir(temp_dir)
+            .args(["list", "--page-size=2", "--sort-by=id", "--format=json"])
+            .assert()
+            .success();
+        let first_out = String::from_utf8_lossy(&first_page.get_output().stdout);
+        let first_json: serde_json::Value =
+            serde_json::from_str(&first_out).expect("Should return valid JSON");
+        let first_ids: Vec<String> = first_json
+            .get("tasks")
+            .and_then(|t| t.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|t| {
+                        t.get("id")
+                            .and_then(|id| id.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let second_page_by_offset = cmd
+            .current_dir(temp_dir)
+            .args([
+                "list",
+                "--page-size=2",
+                "--offset=2",
+                "--sort-by=id",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let second_out = String::from_utf8_lossy(&second_page_by_offset.get_output().stdout);
+        let second_json: serde_json::Value =
+            serde_json::from_str(&second_out).expect("Should return valid JSON");
+        let second_ids: Vec<String> = second_json
+            .get("tasks")
+            .and_then(|t| t.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|t| {
+                        t.get("id")
+                            .and_then(|id| id.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        assert!(first_ids.len() <= 2);
+        assert!(second_ids.len() <= 2);
+        assert!(
+            first_ids.iter().all(|id| !second_ids.contains(id)),
+            "second page (by offset) should not repeat first page"
+        );
+
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let second_page_by_page = cmd
+            .current_dir(temp_dir)
+            .args([
+                "list",
+                "--page-size=2",
+                "--page=2",
+                "--sort-by=id",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let second_page_out = String::from_utf8_lossy(&second_page_by_page.get_output().stdout);
+        let second_page_json: serde_json::Value =
+            serde_json::from_str(&second_page_out).expect("Should return valid JSON");
+        let second_page_ids: Vec<String> = second_page_json
+            .get("tasks")
+            .and_then(|t| t.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|t| {
+                        t.get("id")
+                            .and_then(|id| id.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        assert_eq!(
+            second_ids, second_page_ids,
+            "--page=2 should match --offset=2 when page-size=2"
+        );
     }
 
     #[test]

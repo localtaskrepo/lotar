@@ -658,7 +658,11 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
         }
         Err(msg) => return err(req.id, -32602, msg, None),
     };
-    let cursor = match parse_cursor_value(req.params.get("cursor")) {
+    let cursor_value = req
+        .params
+        .get("cursor")
+        .or_else(|| req.params.get("offset"));
+    let cursor = match parse_cursor_value(cursor_value) {
         Ok(value) if value <= MCP_MAX_CURSOR => value,
         Ok(_) => {
             return err(

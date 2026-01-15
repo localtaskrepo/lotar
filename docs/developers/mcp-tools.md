@@ -9,6 +9,7 @@ Every tool registered in `src/mcp/server/tools.rs` can be invoked directly (`met
 - Enum values (`status`, `priority`, etc.) are validated with the same `CliValidator` as the CLI; errors include `error.data.details` when enum hints are available.
 - `@me` is accepted anywhere a reporter/assignee is expected and resolves via `src/utils/identity.rs`.
 - Many responses include `enumHints` so hosts can surface the project’s allowed values.
+- List-style tools are paginated. Use `limit` plus `cursor` (0-based offset) to page; most handlers also accept `offset` as an alias for `cursor`. Pass the returned `nextCursor` to fetch the next page.
 
 ## Task Tools
 
@@ -54,8 +55,8 @@ Every tool registered in `src/mcp/server/tools.rs` can be invoked directly (`met
 ## Project Tools
 
 ### `project_list`
-- **Params:** none.
-- **Response:** Array of project metadata from `ProjectService::list`.
+- **Params:** `limit` (default per server, max per server), and `cursor` (string/number, 0-based). `offset` is accepted as an alias for `cursor`.
+- **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor`, and `projects[]`.
 
 ### `project_stats`
 - **Params:** `name` (project key).

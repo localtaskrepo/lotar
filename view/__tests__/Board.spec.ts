@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { h, ref } from 'vue'
 import type { SprintListItem, TaskDTO } from '../api/types'
 
@@ -155,6 +155,9 @@ function baseTask(overrides: Partial<TaskDTO>): TaskDTO {
 
 describe('Board field visibility', () => {
     beforeEach(() => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+
         routeState.query = { project: 'ACME' }
         tasksStore.items.value = []
         tasksStore.refresh.mockClear()
@@ -164,6 +167,10 @@ describe('Board field visibility', () => {
         routerPushMock.mockClear()
         openTaskPanelMock.mockClear()
         localStorage.clear()
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
     })
 
     it('hides card fields per-project and persists to localStorage', async () => {

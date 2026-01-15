@@ -183,6 +183,22 @@ describe('TaskTable', () => {
     expect(s2.key).toBe('status')
   })
 
+  it('shows selected count out of total when bulk is enabled', () => {
+    const wrapper = mount(TaskTable, {
+      props: {
+        tasks,
+        bulk: true,
+        selectable: true,
+        selectedIds: ['PRJ-1'],
+        statuses: ['open', 'in-progress', 'done'],
+      },
+    })
+
+    const label = wrapper.find('.columns-control__selected')
+    expect(label.exists()).toBe(true)
+    expect(label.text()).toBe('Selected: 1 / 2')
+  })
+
   it('renders sprint chips with non-breaking labels', () => {
     const sprintTasks = [
       {

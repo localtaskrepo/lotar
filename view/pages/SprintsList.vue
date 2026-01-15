@@ -197,25 +197,18 @@
     />
 
     <div class="filter-card">
-      <SmartListChips
-        :statuses="statusOptions"
-        :priorities="priorityOptions"
-        :value="filter"
-        :custom-presets="customFilterPresets"
-        @update:value="onChipsUpdate"
-        @preset="handleCustomPreset"
-      />
-      <FilterBar
-        ref="filterBarRef"
-        :statuses="statuses"
-        :priorities="priorities"
-        :types="types"
-        :value="filter"
-        storage-key="lotar.sprints.filter"
-        @update:value="onFilterUpdate"
-      />
-      <div class="filter-meta">
-        <div class="filter-meta__primary">
+      <div class="sprints-quick-row">
+        <div class="sprints-quick-row__chips">
+          <SmartListChips
+            :statuses="statusOptions"
+            :priorities="priorityOptions"
+            :value="filter"
+            :custom-presets="customFilterPresets"
+            @update:value="onChipsUpdate"
+            @preset="handleCustomPreset"
+          />
+        </div>
+        <div class="sprints-quick-row__controls">
           <label class="filter-field">
             <span class="muted">Sprint window</span>
             <UiSelect v-model="timeRange">
@@ -224,10 +217,7 @@
               </option>
             </UiSelect>
           </label>
-          <label
-            v-if="showAllowClosedControl"
-            class="filter-checkbox"
-          >
+          <label v-if="showAllowClosedControl" class="filter-checkbox">
             <input type="checkbox" v-model="allowClosed" />
             Allow editing closed sprints
           </label>
@@ -235,65 +225,78 @@
             <input type="checkbox" v-model="highlightMultiSprint" />
             Highlight tasks in multiple sprints
           </label>
-          <div class="filter-meta__actions">
-            <div class="columns-button-wrapper">
-              <UiButton
-                ref="columnMenuButtonRef"
-                type="button"
-                class="columns-button"
-                title="Configure columns"
-                @click="toggleColumnMenu"
-              >
-                <IconGlyph name="columns" aria-hidden="true" />
-                <span>Columns</span>
-              </UiButton>
-              <div v-if="columnMenuOpen" ref="columnMenuRef" class="columns-popover card" @click.self="closeColumnMenu">
-                <div class="col" style="gap: 8px;">
-                  <label
-                    v-for="col in columnOrder"
-                    :key="col"
-                    :class="[
-                      'row',
-                      'column-option',
-                      {
-                        'is-draggable': true,
-                        'is-drag-over': dragOverCol === col,
-                        'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
-                        'is-dragging': draggingCol === col,
-                      },
-                    ]"
-                    :draggable="true"
-                    style="gap: 6px; align-items: center;"
-                    @dragstart="onColDragStart(col, $event)"
-                    @dragend="onColDragEnd"
-                    @dragover.prevent="onColDragOver(col, $event)"
-                    @drop.prevent="onColDrop(col, $event)"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="columnsSet.has(col)"
-                      @change="toggleColumn(col, $event)"
-                    />
-                    <span>{{ headerLabel(col) }}</span>
-                  </label>
-                  <div class="row" style="gap: 8px; flex-wrap: wrap;">
-                    <UiButton type="button" @click="resetColumns">Reset</UiButton>
-                    <UiButton type="button" @click="closeColumnMenu">Close</UiButton>
-                  </div>
+        </div>
+      </div>
+      <div class="sprints-filter-row">
+        <div class="sprints-filter-row__main">
+          <FilterBar
+            ref="filterBarRef"
+            :statuses="statuses"
+            :priorities="priorities"
+            :types="types"
+            :value="filter"
+            storage-key="lotar.sprints.filter"
+            @update:value="onFilterUpdate"
+          />
+        </div>
+        <div class="filter-meta__actions">
+          <div class="columns-button-wrapper">
+            <UiButton
+              ref="columnMenuButtonRef"
+              type="button"
+              class="columns-button"
+              title="Configure columns"
+              @click="toggleColumnMenu"
+            >
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span>Columns</span>
+            </UiButton>
+            <div v-if="columnMenuOpen" ref="columnMenuRef" class="columns-popover card" @click.self="closeColumnMenu">
+              <div class="col" style="gap: 8px;">
+                <label
+                  v-for="col in columnOrder"
+                  :key="col"
+                  :class="[
+                    'row',
+                    'column-option',
+                    {
+                      'is-draggable': true,
+                      'is-drag-over': dragOverCol === col,
+                      'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+                      'is-dragging': draggingCol === col,
+                    },
+                  ]"
+                  :draggable="true"
+                  style="gap: 6px; align-items: center;"
+                  @dragstart="onColDragStart(col, $event)"
+                  @dragend="onColDragEnd"
+                  @dragover.prevent="onColDragOver(col, $event)"
+                  @drop.prevent="onColDrop(col, $event)"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="columnsSet.has(col)"
+                    @change="toggleColumn(col, $event)"
+                  />
+                  <span>{{ headerLabel(col) }}</span>
+                </label>
+                <div class="row" style="gap: 8px; flex-wrap: wrap;">
+                  <UiButton type="button" @click="resetColumns">Reset</UiButton>
+                  <UiButton type="button" @click="closeColumnMenu">Close</UiButton>
                 </div>
               </div>
             </div>
-            <UiButton
-              class="create-sprint-button"
-              type="button"
-              aria-label="Create sprint"
-              title="Create sprint"
-              @click="openCreate"
-            >
-              <IconGlyph name="plus" aria-hidden="true" />
-              <span>Sprint</span>
-            </UiButton>
           </div>
+          <UiButton
+            class="create-sprint-button"
+            type="button"
+            aria-label="Create sprint"
+            title="Create sprint"
+            @click="openCreate"
+          >
+            <IconGlyph name="plus" aria-hidden="true" />
+            <span>Sprint</span>
+          </UiButton>
         </div>
       </div>
     </div>
@@ -674,7 +677,37 @@
                 <span class="muted">Unassigned tasks</span>
               </div>
             </div>
-            <span class="group-count">{{ sortedBacklogTasks.length }} task{{ sortedBacklogTasks.length === 1 ? '' : 's' }}</span>
+            <div class="group-count backlog-count">
+              <span class="backlog-count__text">
+                <template v-if="backlogTotalCount === 0">0 tasks</template>
+                <template v-else-if="backlogOffset === 0 && backlogPageEnd === backlogTotalCount">
+                  {{ backlogTotalCount }} task{{ backlogTotalCount === 1 ? '' : 's' }}
+                </template>
+                <template v-else>{{ backlogPageStart }}–{{ backlogPageEnd }} / {{ backlogTotalCount }}</template>
+              </span>
+              <UiButton
+                variant="ghost"
+                type="button"
+                aria-label="Previous backlog page"
+                title="Previous backlog page"
+                :disabled="!backlogHasPrevPage"
+                @click="backlogPrevPage"
+              >
+                <IconGlyph name="chevron-left" />
+                <span>Prev</span>
+              </UiButton>
+              <UiButton
+                variant="ghost"
+                type="button"
+                aria-label="Next backlog page"
+                title="Next backlog page"
+                :disabled="!backlogHasNextPage"
+                @click="backlogNextPage"
+              >
+                <span>Next</span>
+                <IconGlyph name="chevron-right" />
+              </UiButton>
+            </div>
           </header>
           <transition name="collapse">
             <div v-show="isExpanded('backlog')" class="group-body">
@@ -715,7 +748,7 @@
                   </thead>
                   <tbody>
                     <tr
-                      v-for="task in sortedBacklogTasks"
+                      v-for="task in pagedBacklogTasks"
                       :key="task.id"
                       class="task-row"
                       :class="{
@@ -812,13 +845,13 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type {
-  SprintBurndownResponse,
-  SprintCreateRequest,
-  SprintListItem,
-  SprintSummaryReportResponse,
-  SprintUpdateRequest,
-  SprintVelocityResponse,
-  TaskDTO,
+    SprintBurndownResponse,
+    SprintCreateRequest,
+    SprintListItem,
+    SprintSummaryReportResponse,
+    SprintUpdateRequest,
+    SprintVelocityResponse,
+    TaskDTO,
 } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -837,6 +870,7 @@ import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useS
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
+import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 
 type ColumnKey =
   | 'id'
@@ -1661,14 +1695,6 @@ watch(
   { immediate: true },
 )
 
-watch(
-  () => [selectedAnalyticsSprintId.value, velocityHistoryLimit.value],
-  ([id]) => {
-    if (!id || !analyticsModal.open) return
-    void ensureVelocity(false)
-  },
-)
-
 const missingSprintMessage = computed(() => {
   if (!hasMissingSprints.value) return ''
   return missingSprints.value.map((id) => `#${id}`).join(', ')
@@ -1746,6 +1772,52 @@ const busy = computed(
 
 const sortedBacklogTasks = computed(() => sortTasks(backlogTasks.value))
 
+const backlogPageSize = ref(readTasksPageSizePreference())
+const backlogOffset = ref(0)
+
+const backlogTotalCount = computed(() => sortedBacklogTasks.value.length)
+const backlogPageStart = computed(() => (backlogTotalCount.value ? backlogOffset.value + 1 : 0))
+const backlogPageEnd = computed(() => Math.min(backlogOffset.value + backlogPageSize.value, backlogTotalCount.value))
+const backlogHasPrevPage = computed(() => backlogOffset.value > 0)
+const backlogHasNextPage = computed(() => backlogOffset.value + backlogPageSize.value < backlogTotalCount.value)
+
+const pagedBacklogTasks = computed(() => {
+  if (backlogOffset.value === 0 && backlogTotalCount.value <= backlogPageSize.value) {
+    return sortedBacklogTasks.value
+  }
+  return sortedBacklogTasks.value.slice(backlogOffset.value, backlogOffset.value + backlogPageSize.value)
+})
+
+let stopPreferencesListener: (() => void) | null = null
+
+function clampBacklogOffset() {
+  const size = Math.max(1, backlogPageSize.value)
+  const total = backlogTotalCount.value
+  if (total <= 0) {
+    backlogOffset.value = 0
+    return
+  }
+  const maxOffset = Math.max(0, Math.floor((total - 1) / size) * size)
+  backlogOffset.value = Math.min(Math.max(0, backlogOffset.value), maxOffset)
+}
+
+function backlogPrevPage() {
+  const next = Math.max(0, backlogOffset.value - backlogPageSize.value)
+  backlogOffset.value = next
+}
+
+function backlogNextPage() {
+  const total = backlogTotalCount.value
+  if (total <= 0) return
+  const next = backlogOffset.value + backlogPageSize.value
+  if (next >= total) return
+  backlogOffset.value = next
+}
+
+watch([sortedBacklogTasks, backlogPageSize], () => {
+  clampBacklogOffset()
+})
+
 const analyticsSummary = computed(
   () => sprintAnalytics.getSummary(selectedAnalyticsSprintId.value) as SprintSummaryReportResponse | undefined,
 )
@@ -1796,6 +1868,14 @@ const analyticsVelocity = computed(
 )
 const velocityLoading = computed(() => sprintAnalytics.isVelocityLoading(velocityParams.value))
 const velocityError = computed(() => sprintAnalytics.getVelocityError(velocityParams.value))
+
+watch(
+  () => [selectedAnalyticsSprintId.value, velocityHistoryLimit.value],
+  ([id]) => {
+    if (!id || !analyticsModal.open) return
+    void ensureVelocity(false)
+  },
+)
 
 watch(visibleSprints, (list) => {
   const keep = new Set(list.map((sprint) => sectionKey(sprint.id)))
@@ -2316,10 +2396,23 @@ async function refreshTasks() {
       payload[key] = value
     })
 
-    const response = (await api.listTasks(payload as any)) as TaskDTO[]
-    const normalized: TaskDTO[] = Array.isArray(response)
-      ? response.map((task) => normalizeTaskRecord(task))
-      : []
+    const collected: TaskDTO[] = []
+    let currentOffset = 0
+    let expectedTotal = 0
+    let pages = 0
+
+    while (pages < 10_000) {
+      pages += 1
+      const response = await api.listTasks({ ...payload, limit: 200, offset: currentOffset } as any)
+      const batch: TaskDTO[] = Array.isArray((response as any)?.tasks) ? (response as any).tasks : []
+      expectedTotal = (response as any)?.total ?? expectedTotal
+      if (batch.length === 0) break
+      collected.push(...batch)
+      currentOffset += batch.length
+      if (expectedTotal && collected.length >= expectedTotal) break
+    }
+
+    const normalized: TaskDTO[] = collected.map((task) => normalizeTaskRecord(task))
     const filtered = applySprintSmartFilters(normalized, qnorm)
     tasks.value = filtered
   } catch (error: any) {
@@ -3080,6 +3173,13 @@ onMounted(() => {
     window.addEventListener('click', handleColumnMenuClick)
     window.addEventListener('keydown', handleColumnMenuKey)
   }
+
+  stopPreferencesListener = onPreferencesChanged((key) => {
+    if (key !== 'lotar.preferences.tasks.pageSize') return
+    backlogPageSize.value = readTasksPageSizePreference()
+    backlogOffset.value = 0
+  })
+
   bindCopyModifierListeners()
   void (async () => {
     await refreshAll(true)
@@ -3096,6 +3196,8 @@ onUnmounted(() => {
       window.clearTimeout(filterTimer.value)
     }
   }
+  stopPreferencesListener?.()
+  stopPreferencesListener = null
   unbindCopyModifierListeners()
 })
 </script>
@@ -3121,6 +3223,38 @@ onUnmounted(() => {
   gap: 12px;
   padding: 0;
   position: relative;
+}
+
+.sprints-filter-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.sprints-quick-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.sprints-quick-row__chips {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sprints-quick-row__controls {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sprints-filter-row__main {
+  flex: 1;
+  min-width: min(640px, 100%);
 }
 
 .filter-field {
@@ -3399,6 +3533,14 @@ onUnmounted(() => {
   margin-left: auto;
   font-size: var(--text-sm, 0.875rem);
   color: var(--color-muted);
+}
+
+.backlog-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .group-actions {

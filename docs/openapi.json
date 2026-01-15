@@ -194,15 +194,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "CSV of types (feature, bug, epic, spike, chore)"
-          },
-          {
-            "name": "assignee",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            },
-            "description": "Assignee filter; supports @me to resolve the current user"
+            "description": "CSV of types"
           },
           {
             "name": "tags",
@@ -213,12 +205,74 @@
             "description": "CSV of tags"
           },
           {
+            "name": "assignee",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Assignee filter (supports @me; use __none__ for unassigned tasks)."
+          },
+          {
             "name": "q",
             "in": "query",
             "schema": {
               "type": "string"
             },
-            "description": "Free-text search"
+            "description": "Text search query"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "description": "Sort direction for the modified timestamp (default: desc)."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Page size (synonyms: page_size, per_page)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "Page offset (0-based)."
+          },
+          {
+            "name": "due",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Smart filter: today|soon|later|overdue"
+          },
+          {
+            "name": "recent",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Smart filter: 7d"
+          },
+          {
+            "name": "needs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Smart filter CSV: effort,due"
           }
         ],
         "responses": {
@@ -227,68 +281,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/TaskDTO"
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "count": {
-                          "type": "integer",
-                          "format": "int64"
-                        }
-                      },
-                      "required": [
-                        "count"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "data",
-                    "meta"
-                  ]
-                },
-                "examples": {
-                  "list": {
-                    "summary": "List response",
-                    "value": {
-                      "data": [
-                        {
-                          "id": "TEST-1",
-                          "title": "Implement search",
-                          "status": "TODO",
-                          "priority": "HIGH",
-                          "task_type": "feature",
-                          "reporter": "alice",
-                          "assignee": null,
-                          "created": "2025-08-13T10:00:00Z",
-                          "modified": "2025-08-13T10:00:00Z",
-                          "due_date": null,
-                          "effort": null,
-                          "subtitle": null,
-                          "description": null,
-                          "tags": [],
-                          "relationships": {
-                            "depends_on": [],
-                            "blocks": [],
-                            "related": [],
-                            "children": [],
-                            "fixes": []
-                          },
-                          "comments": [],
-                          "custom_fields": {}
-                        }
-                      ],
-                      "meta": {
-                        "count": 1
-                      }
-                    }
-                  }
+                  "$ref": "#/components/schemas/EnvelopeTaskList"
                 }
               }
             }
@@ -876,6 +869,24 @@
     "/api/projects/list": {
       "get": {
         "summary": "List projects",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -883,6 +894,44 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeProjects"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/list": {
+      "get": {
+        "summary": "List sprints",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintList"
                 }
               }
             }
@@ -1646,6 +1695,35 @@
           "task_type",
           "created",
           "modified"
+        ]
+      },
+      "TaskListResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskDTO"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "tasks"
         ]
       },
       "TaskCreate": {
@@ -2437,7 +2515,19 @@
           "status": {
             "type": "string"
           },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
           "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
             "type": "integer",
             "format": "int32"
           },
@@ -2461,7 +2551,39 @@
         },
         "required": [
           "status",
-          "count"
+          "total",
+          "count",
+          "limit",
+          "offset"
+        ]
+      },
+      "ProjectListResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectDTO"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "projects"
         ]
       },
       "SprintCreateRequest": {
@@ -3584,6 +3706,17 @@
           "data"
         ]
       },
+      "EnvelopeTaskList": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TaskListResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "EnvelopeSprintCreate": {
         "type": "object",
         "properties": {
@@ -3928,10 +4061,7 @@
         "type": "object",
         "properties": {
           "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProjectDTO"
-            }
+            "$ref": "#/components/schemas/ProjectListResponse"
           }
         },
         "required": [

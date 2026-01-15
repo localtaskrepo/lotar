@@ -33,8 +33,14 @@ impl CommandHandler for SearchHandler {
 
         TaskPostFilters::new(&args, &ctx.config, resolver, build.where_filters)
             .apply(&mut tasks)?;
-        Self::apply_sort_and_limit(&mut tasks, &args, &ctx.config);
-        Self::render_results(renderer, tasks);
+
+        let total_matching = tasks.len();
+        Self::apply_sort(tasks.as_mut_slice(), &args, &ctx.config);
+
+        let (offset, limit) = Self::resolve_pagination(&args)?;
+        Self::apply_offset_and_limit(&mut tasks, offset, limit);
+
+        Self::render_results(renderer, tasks, total_matching, offset, limit);
 
         Ok(())
     }
@@ -96,11 +102,7 @@ impl SearchHandler {
         })
     }
 
-    fn apply_sort_and_limit(
-        tasks: &mut Vec<(String, Task)>,
-        args: &TaskSearchArgs,
-        config: &ResolvedConfig,
-    ) {
+    fn apply_sort(tasks: &mut [(String, Task)], args: &TaskSearchArgs, config: &ResolvedConfig) {
         if let Some(sort_key) = args.sort_by.as_deref() {
             let key_raw = sort_key.trim();
             let key = key_raw.to_lowercase();
@@ -189,6 +191,12 @@ impl SearchHandler {
                     }
                 };
 
+                let ordering = if ordering == Equal {
+                    id_a.cmp(id_b)
+                } else {
+                    ordering
+                };
+
                 if args.reverse {
                     ordering.reverse()
                 } else {
@@ -196,11 +204,43 @@ impl SearchHandler {
                 }
             });
         }
-
-        tasks.truncate(args.limit);
     }
 
-    fn render_results(renderer: &crate::output::OutputRenderer, tasks: Vec<(String, Task)>) {
+    fn resolve_pagination(args: &TaskSearchArgs) -> Result<(usize, usize), String> {
+        let page_size = args.page_size;
+        let offset = if let Some(page) = args.page {
+            let page_index = page
+                .checked_sub(1)
+                .ok_or_else(|| "--page must be >= 1".to_string())?;
+            page_index
+                .checked_mul(page_size)
+                .ok_or_else(|| "--page is too large".to_string())?
+        } else {
+            args.offset.unwrap_or(0)
+        };
+
+        Ok((offset, page_size))
+    }
+
+    fn apply_offset_and_limit(tasks: &mut Vec<(String, Task)>, offset: usize, limit: usize) {
+        if offset > 0 {
+            if offset >= tasks.len() {
+                tasks.clear();
+                return;
+            }
+            tasks.drain(..offset);
+        }
+
+        tasks.truncate(limit);
+    }
+
+    fn render_results(
+        renderer: &crate::output::OutputRenderer,
+        tasks: Vec<(String, Task)>,
+        total_matching: usize,
+        offset: usize,
+        limit: usize,
+    ) {
         if tasks.is_empty() {
             renderer.log_info("list: no results");
             match renderer.format {
@@ -208,14 +248,31 @@ impl SearchHandler {
                     renderer.emit_raw_stdout(
                         serde_json::json!({
                             "status": "success",
-                            "message": "No tasks found",
-                            "tasks": []
+                            "message": if total_matching == 0 {
+                                "No tasks found".to_string()
+                            } else {
+                                format!(
+                                    "Found {} task(s) matching filters, showing 0 (offset {}, limit {})",
+                                    total_matching, offset, limit
+                                )
+                            },
+                            "tasks": [],
+                            "total": total_matching,
+                            "limit": limit,
+                            "offset": offset
                         })
                         .to_string(),
                     );
                 }
                 _ => {
-                    renderer.emit_warning("No tasks found matching the search criteria.");
+                    if total_matching == 0 {
+                        renderer.emit_warning("No tasks found matching the search criteria.");
+                    } else {
+                        renderer.emit_warning(format_args!(
+                            "No tasks on this page (offset {}, limit {}, total {}).",
+                            offset, limit, total_matching
+                        ));
+                    }
                 }
             }
             return;
@@ -249,19 +306,30 @@ impl SearchHandler {
             })
             .collect();
 
+        let shown = display_tasks.len();
+        let start = if shown == 0 { 0 } else { offset + 1 };
+        let end = offset + shown;
+
         match renderer.format {
             crate::output::OutputFormat::Json => {
                 renderer.emit_raw_stdout(
                     serde_json::json!({
                         "status": "success",
                         "message": format!("Found {} task(s)", display_tasks.len()),
-                        "tasks": display_tasks
+                        "tasks": display_tasks,
+                        "total": total_matching,
+                        "limit": limit,
+                        "offset": offset
                     })
                     .to_string(),
                 );
             }
             _ => {
                 renderer.emit_success(format_args!("Found {} task(s):", display_tasks.len()));
+                renderer.emit_raw_stdout(format_args!(
+                    "  (showing {}–{} of {}, offset {}, page-size {})",
+                    start, end, total_matching, offset, limit
+                ));
                 for task in display_tasks {
                     renderer.emit_raw_stdout(format_args!(
                         "  {} - {} [{}] ({})",

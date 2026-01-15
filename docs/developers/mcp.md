@@ -22,6 +22,7 @@
 
 - Every tool is defined once in `tools.rs` and bound to a handler module. The same definition feeds both the dispatcher and the schema/enum metadata returned by `schema_discover`.
 - When project config changes (e.g., adding a status) the watcher recomputes enum hints and pushes `tools/listChanged { hintCategories: [...] }`. Hosts should respond by calling `tools/list` or `schema/discover` to refresh their cached UI.
+- Pagination: list-style tools accept `limit` and `cursor` (0-based offset; `offset` alias is commonly supported) and return `hasMore` plus `nextCursor` for fetching the next page.
 - See [MCP Tools Reference](./mcp-tools.md) for per-tool parameters, validation notes, and payload examples. The CLI’s `lotar mcp` entry in [CLI Internals](./cli.md#lotar-mcp) lists the high-level behaviors/tests that protect the server.
 
 ## Hot reload + watchers

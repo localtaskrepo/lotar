@@ -49,11 +49,12 @@ lotar task add --title "Task title" [--type|-t] [--priority|-P] [--reporter|-R] 
 ### list
 
 ```bash
-lotar task list [QUERY] [--assignee|-a <VALUE>] [--mine|-m] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--high|-H] [--critical|-C] [--sort-by|-S FIELD] [--reverse|-R] [--limit|-L N] [--overdue] [--due-soon[=DAYS]] [--where key=value ...] [--effort-min VALUE] [--effort-max VALUE]
+lotar task list [QUERY] [--assignee|-a <VALUE>] [--mine|-m] [--status|-s <VALUE>...] [--priority|-P <VALUE>...] [--type|-t <VALUE>...] [--tag|-i <VALUE>...] [--high|-H] [--critical|-C] [--sort-by|-S FIELD] [--reverse|-R] [--page-size|-L N] [--offset N | --page N] [--overdue] [--due-soon[=DAYS]] [--where key=value ...] [--effort-min VALUE] [--effort-max VALUE]
 ```
 
 - Mirrors the filters documented in `docs/help/list.md`, including `@me`/`--mine`, overdue/due-soon windows, unified `--where` filters, and effort bounds.
 - Sorting accepts `priority|due-date|created|modified|status|assignee|type|project|id` and defaults to 20 results per page.
+- Use `--page-size` (alias: `--limit`) with `--offset` or `--page` to paginate.
 
 ### edit
 

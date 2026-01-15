@@ -42,8 +42,8 @@ vi.mock('../api/client', () => {
         has_more_after: false,
         total_lines: 1,
       })),
-      listTasks: vi.fn(async () => []),
-      listProjects: vi.fn(async () => []),
+      listTasks: vi.fn(async () => ({ total: 0, limit: 50, offset: 0, tasks: [] })),
+      listProjects: vi.fn(async () => ({ total: 0, limit: 50, offset: 0, projects: [] })),
     }
   }
 })

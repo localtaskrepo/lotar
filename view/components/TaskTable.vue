@@ -2,45 +2,50 @@
   <div class="table-wrap" ref="rootRef">
     <div class="table-toolbar row" style="justify-content: space-between; align-items: center; margin-bottom: 8px; position: relative;">
       <div class="row columns-control" style="gap:8px; align-items:center; position: relative;">
-        <label class="row" style="gap:6px; align-items:center;">
-          <input type="checkbox" :checked="bulk" @change="onToggleBulk($event)" /> Bulk select
-        </label>
-        <span v-if="bulk" class="muted columns-control__selected">Selected: {{ selected.length }}</span>
-        <div v-if="bulk" class="bulk-menu-wrapper">
-          <UiButton
-            icon-only
-            type="button"
-            aria-label="Bulk actions"
-            title="Bulk actions"
-            :disabled="disableBulkActions"
-            ref="bulkMenuButton"
-            @click.stop="toggleBulkMenu"
-          >
-            <IconGlyph name="dots-horizontal" />
-          </UiButton>
-          <div v-if="showBulkMenu" class="menu-popover card bulk-actions-menu" ref="bulkMenuPopover">
-            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
-              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
-              <span class="menu-item__label">Assign…</span>
-            </button>
-            <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">
-              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
-              <span class="menu-item__label">Clear assignee</span>
-            </button>
-            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">
-              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
-              <span class="menu-item__label">Add to sprint…</span>
-            </button>
-            <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">
-              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
-              <span class="menu-item__label">Remove from sprint…</span>
-            </button>
-            <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">
-              <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
-              <span class="menu-item__label">Delete tasks…</span>
-            </button>
+        <template v-if="props.showBulkControls">
+          <div class="bulk-controls">
+            <label class="bulk-controls__toggle columns-control__label">
+              <input type="checkbox" :checked="bulk" @change="onToggleBulk($event)" />
+              <span>Bulk select</span>
+            </label>
+            <span v-if="bulk" class="muted bulk-controls__count columns-control__selected">Selected: {{ selected.length }} / {{ sorted.length }}</span>
+            <div v-if="bulk" class="bulk-controls__menu" ref="bulkMenuPopover">
+              <UiButton
+                icon-only
+                type="button"
+                aria-label="Bulk actions"
+                title="Bulk actions"
+                :disabled="disableBulkActions"
+                ref="bulkMenuButton"
+                @click.stop="toggleBulkMenu"
+              >
+                <IconGlyph name="dots-horizontal" />
+              </UiButton>
+              <div v-if="showBulkMenu" class="menu-popover card bulk-actions-menu">
+                <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('assign')">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
+                  <span class="menu-item__label">Assign…</span>
+                </button>
+                <button class="menu-item" type="button" :disabled="disableBulkActions" @click="handleBulkAction('unassign')">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
+                  <span class="menu-item__label">Clear assignee</span>
+                </button>
+                <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-add')">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                  <span class="menu-item__label">Add to sprint…</span>
+                </button>
+                <button class="menu-item" type="button" :disabled="disableSprintActions" @click="handleBulkAction('sprint-remove')">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+                  <span class="menu-item__label">Remove from sprint…</span>
+                </button>
+                <button class="menu-item danger" type="button" :disabled="disableBulkActions" @click="handleBulkAction('delete')">
+                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                  <span class="menu-item__label">Delete tasks…</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
       <div class="row controls" style="gap:8px; align-items:center; flex-wrap: wrap;">
         <div class="columns-button-wrapper">
@@ -259,7 +264,9 @@ import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
 import UiCard from './UiCard.vue';
 
-const props = defineProps<TaskTableProps>()
+const props = withDefaults(defineProps<TaskTableProps>(), {
+  showBulkControls: true,
+})
 const emit = defineEmits<TaskTableEmit>()
 
 const {
@@ -769,12 +776,37 @@ tbody tr.is-recent {
   z-index: var(--z-popover);
 }
 
-.columns-control__selected {
-  font-size: var(--text-sm, 0.875rem);
+.columns-control {
+  align-items: center;
+  min-height: 2.25rem;
 }
 
-.bulk-menu-wrapper {
+.bulk-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 2.25rem;
+}
+
+.bulk-controls__toggle,
+.bulk-controls__count {
+  font-size: var(--text-sm, 0.875rem);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 2.25rem;
+  line-height: 2.25rem;
+}
+
+.bulk-controls__toggle input[type="checkbox"] {
+  margin: 0;
+}
+
+.bulk-controls__menu {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2.25rem;
 }
 
 .bulk-actions-menu {

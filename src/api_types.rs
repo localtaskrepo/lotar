@@ -211,6 +211,16 @@ pub struct TaskListFilter {
     pub custom_fields: BTreeMap<String, Vec<String>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskListResponse {
+    pub total: usize,
+    pub limit: usize,
+    pub offset: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub tasks: Vec<TaskDTO>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskSelection {
@@ -491,13 +501,26 @@ pub struct SprintListItem {
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SprintListResponse {
     pub status: String,
+    pub total: usize,
     pub count: usize,
+    pub limit: usize,
+    pub offset: usize,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sprints: Vec<SprintListItem>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub missing_sprints: Vec<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub integrity: Option<SprintIntegrityDiagnostics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ProjectListResponse {
+    pub total: usize,
+    pub limit: usize,
+    pub offset: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub projects: Vec<ProjectDTO>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

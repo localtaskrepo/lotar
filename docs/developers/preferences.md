@@ -22,6 +22,7 @@ All actions are browser-scoped; nothing in this flow touches `.tasks` or config 
 | `lotar.taskTable.columns.<PROJECT>` | `localStorage` | Column order per project. Reset button iterates through keys with that prefix. |
 | `lotar.taskTable.sort.<PROJECT>` | `localStorage` | Sort descriptor per project. |
 | `lotar.tasks.filter` | `sessionStorage` | Last task-list filter payload; cleared when the user requests a reset. |
+| `lotar.preferences.tasks.pageSize` | `localStorage` | Default Tasks list page size (25/50/100/200). |
 
 When `localStorage`/`sessionStorage` are unavailable (private mode, CSP), the UI falls back to defaults and logs a warning through `console.warn`. Feature detection happens in `view/utils/storage.ts`.
 
