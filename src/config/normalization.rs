@@ -1,7 +1,10 @@
 use serde::de::DeserializeOwned;
 use serde_yaml::Value;
 
-use crate::config::types::{ConfigError, GlobalConfig, ProjectConfig, StringConfigField};
+use crate::config::types::{
+    ConfigError, GlobalConfig, ProjectConfig, StringConfigField, SyncAuthProfile, SyncConfig,
+    SyncRemoteConfig,
+};
 use crate::types::{Priority, TaskStatus, TaskType};
 
 fn expand_dotted_keys(value: Value) -> Value {
@@ -10,6 +13,10 @@ fn expand_dotted_keys(value: Value) -> Value {
             let mut root = serde_yaml::Mapping::new();
             for (k, v) in map {
                 if let Value::String(key) = k {
+                    if key == "auth_profiles" || key == "remotes" {
+                        root.insert(Value::String(key), expand_dotted_keys_keep_keys(v));
+                        continue;
+                    }
                     if key.contains('.') {
                         let mut parts = key.split('.').collect::<Vec<_>>();
                         if parts.is_empty() {
@@ -36,6 +43,20 @@ fn expand_dotted_keys(value: Value) -> Value {
                 } else {
                     root.insert(k, expand_dotted_keys(v));
                 }
+            }
+            Value::Mapping(root)
+        }
+        Value::Sequence(seq) => Value::Sequence(seq.into_iter().map(expand_dotted_keys).collect()),
+        other => other,
+    }
+}
+
+fn expand_dotted_keys_keep_keys(value: Value) -> Value {
+    match value {
+        Value::Mapping(map) => {
+            let mut root = serde_yaml::Mapping::new();
+            for (k, v) in map {
+                root.insert(k, expand_dotted_keys(v));
             }
             Value::Mapping(root)
         }
@@ -336,6 +357,19 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         cfg.attachments_max_upload_mb = v;
     }
 
+    // sync.reports_dir
+    if let Some(v) = get_path(&data, &["sync", "reports_dir"]).and_then(cast::<String>) {
+        let trimmed = v.trim().to_string();
+        if !trimmed.is_empty() {
+            cfg.sync_reports_dir = trimmed;
+        }
+    }
+
+    // sync.write_reports
+    if let Some(v) = get_path(&data, &["sync", "write_reports"]).and_then(cast::<bool>) {
+        cfg.sync_write_reports = v;
+    }
+
     // sprints.defaults
     if let Some(value) =
         get_path(&data, &["sprints", "defaults", "capacity_points"]).and_then(cast::<u32>)
@@ -424,6 +458,25 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         && let Some(map) = parse_alias_map_tolerant::<Priority>(v, parse_priority_tolerant)
     {
         cfg.branch_priority_aliases = map;
+    }
+
+    if let Some(v) = get_path(&data, &["sync"]).cloned()
+        && let Ok(sync) = serde_yaml::from_value::<SyncConfig>(v)
+    {
+        cfg.remotes.extend(sync.remotes);
+        cfg.auth_profiles.extend(sync.auth_profiles);
+    }
+    if let Some(v) = get_path(&data, &["remotes"]).cloned()
+        && let Ok(remotes) =
+            serde_yaml::from_value::<std::collections::HashMap<String, SyncRemoteConfig>>(v)
+    {
+        cfg.remotes.extend(remotes);
+    }
+    if let Some(v) = get_path(&data, &["auth_profiles"]).cloned()
+        && let Ok(profiles) =
+            serde_yaml::from_value::<std::collections::HashMap<String, SyncAuthProfile>>(v)
+    {
+        cfg.auth_profiles.extend(profiles);
     }
 
     Ok(cfg)
@@ -588,6 +641,19 @@ pub fn parse_project_from_yaml_str(
         cfg.attachments_max_upload_mb = Some(v);
     }
 
+    // sync.reports_dir (project override)
+    if let Some(v) = get_path(&data, &["sync", "reports_dir"]).and_then(cast::<String>) {
+        let trimmed = v.trim().to_string();
+        if !trimmed.is_empty() {
+            cfg.sync_reports_dir = Some(trimmed);
+        }
+    }
+
+    // sync.write_reports (project override)
+    if let Some(v) = get_path(&data, &["sync", "write_reports"]).and_then(cast::<bool>) {
+        cfg.sync_write_reports = Some(v);
+    }
+
     // branch alias maps (project)
     if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
         cfg.branch_type_aliases = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant);
@@ -599,6 +665,25 @@ pub fn parse_project_from_yaml_str(
     if let Some(v) = get_path(&data, &["branch", "priority_aliases"]).cloned() {
         cfg.branch_priority_aliases =
             parse_alias_map_tolerant::<Priority>(v, parse_priority_tolerant);
+    }
+
+    if let Some(v) = get_path(&data, &["sync"]).cloned()
+        && let Ok(sync) = serde_yaml::from_value::<SyncConfig>(v)
+    {
+        cfg.remotes.extend(sync.remotes);
+        cfg.auth_profiles.extend(sync.auth_profiles);
+    }
+    if let Some(v) = get_path(&data, &["remotes"]).cloned()
+        && let Ok(remotes) =
+            serde_yaml::from_value::<std::collections::HashMap<String, SyncRemoteConfig>>(v)
+    {
+        cfg.remotes.extend(remotes);
+    }
+    if let Some(v) = get_path(&data, &["auth_profiles"]).cloned()
+        && let Ok(profiles) =
+            serde_yaml::from_value::<std::collections::HashMap<String, SyncAuthProfile>>(v)
+    {
+        cfg.auth_profiles.extend(profiles);
     }
 
     Ok(cfg)
@@ -764,6 +849,24 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
         }
     }
 
+    // sync reports
+    let mut sync = serde_yaml::Mapping::new();
+    if cfg.sync_reports_dir != defaults.sync_reports_dir && !cfg.sync_reports_dir.is_empty() {
+        sync.insert(
+            Y::String("reports_dir".into()),
+            Y::String(cfg.sync_reports_dir.clone()),
+        );
+    }
+    if cfg.sync_write_reports != defaults.sync_write_reports {
+        sync.insert(
+            Y::String("write_reports".into()),
+            Y::Bool(cfg.sync_write_reports),
+        );
+    }
+    if !sync.is_empty() {
+        root.insert(Y::String("sync".into()), Y::Mapping(sync));
+    }
+
     // sprints
     let mut sprints = serde_yaml::Mapping::new();
     let mut sprint_defaults = serde_yaml::Mapping::new();
@@ -890,6 +993,19 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             );
         }
         root.insert(Y::String("branch".into()), Y::Mapping(branch));
+    }
+
+    if !cfg.remotes.is_empty() {
+        root.insert(
+            Y::String("remotes".into()),
+            serde_yaml::to_value(&cfg.remotes).unwrap_or(Y::Null),
+        );
+    }
+    if !cfg.auth_profiles.is_empty() {
+        root.insert(
+            Y::String("auth_profiles".into()),
+            serde_yaml::to_value(&cfg.auth_profiles).unwrap_or(Y::Null),
+        );
     }
 
     if root.is_empty() {
@@ -1098,6 +1214,28 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         }
     }
 
+    // sync reports
+    let has_sync_reports = cfg
+        .sync_reports_dir
+        .as_ref()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+        || cfg.sync_write_reports.is_some();
+    if has_sync_reports {
+        let mut sync = serde_yaml::Mapping::new();
+        if let Some(dir) = &cfg.sync_reports_dir
+            && !dir.trim().is_empty()
+        {
+            sync.insert(Y::String("reports_dir".into()), Y::String(dir.clone()));
+        }
+        if let Some(enabled) = cfg.sync_write_reports {
+            sync.insert(Y::String("write_reports".into()), Y::Bool(enabled));
+        }
+        if !sync.is_empty() {
+            root.insert(Y::String("sync".into()), Y::Mapping(sync));
+        }
+    }
+
     // branch alias maps in project canonical YAML
     let has_branch = cfg
         .branch_type_aliases
@@ -1141,6 +1279,19 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             );
         }
         root.insert(Y::String("branch".into()), Y::Mapping(branch));
+    }
+
+    if !cfg.remotes.is_empty() {
+        root.insert(
+            Y::String("remotes".into()),
+            serde_yaml::to_value(&cfg.remotes).unwrap_or(Y::Null),
+        );
+    }
+    if !cfg.auth_profiles.is_empty() {
+        root.insert(
+            Y::String("auth_profiles".into()),
+            serde_yaml::to_value(&cfg.auth_profiles).unwrap_or(Y::Null),
+        );
     }
 
     serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())

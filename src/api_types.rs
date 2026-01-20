@@ -2,6 +2,8 @@ use serde::de::Deserializer;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 
+use crate::config::types::SyncRemoteConfig;
+
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
 
@@ -193,6 +195,36 @@ pub struct CodeReferenceRemoveRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct CodeReferenceRemoveResponse {
+    pub task: TaskDTO,
+    pub removed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct GenericReferenceAddRequest {
+    pub id: String,
+    pub kind: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct GenericReferenceAddResponse {
+    pub task: TaskDTO,
+    pub added: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct GenericReferenceRemoveRequest {
+    pub id: String,
+    pub kind: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct GenericReferenceRemoveResponse {
     pub task: TaskDTO,
     pub removed: bool,
 }
@@ -538,6 +570,159 @@ pub struct ProjectStatsDTO {
     pub done_count: u64,
     pub recent_modified: Option<String>,
     pub tags_top: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncRequest {
+    pub remote: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auth_profile: Option<String>,
+    #[serde(default)]
+    pub dry_run: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub include_report: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub write_report: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub client_run_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncValidateRequest {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub remote: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auth_profile: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub remote_config: Option<SyncRemoteConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncValidateResponse {
+    pub status: String,
+    pub provider: String,
+    pub remote: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub repo: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub filter: Option<String>,
+    pub checked_at: String,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub info: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncSummary {
+    pub created: usize,
+    pub updated: usize,
+    pub skipped: usize,
+    pub failed: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncReportEntry {
+    pub status: String,
+    pub at: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reference: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncReportMeta {
+    pub id: String,
+    pub created_at: String,
+    pub status: String,
+    pub direction: String,
+    pub provider: String,
+    pub remote: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    pub dry_run: bool,
+    pub summary: SyncSummary,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub info: Vec<String>,
+    pub entries_total: usize,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub stored_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncReport {
+    pub id: String,
+    pub created_at: String,
+    pub status: String,
+    pub direction: String,
+    pub provider: String,
+    pub remote: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    pub dry_run: bool,
+    pub summary: SyncSummary,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub info: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub entries: Vec<SyncReportEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncReportListResponse {
+    pub total: usize,
+    pub limit: usize,
+    pub offset: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub reports: Vec<SyncReportMeta>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncResponse {
+    pub status: String,
+    pub direction: String,
+    pub provider: String,
+    pub remote: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    pub dry_run: bool,
+    pub summary: SyncSummary,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub info: Vec<String>,
+    pub run_id: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub report: Option<SyncReportMeta>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub report_entries: Vec<SyncReportEntry>,
 }
 
 #[cfg(test)]

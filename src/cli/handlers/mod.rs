@@ -26,6 +26,7 @@ pub mod serve_handler;
 pub mod sprint;
 pub mod stats;
 pub mod status;
+pub mod sync;
 pub mod task;
 
 // Re-export handlers for easy access
@@ -36,6 +37,7 @@ pub use scan_handler::ScanHandler;
 pub use serve_handler::ServeHandler;
 pub use sprint::SprintHandler;
 pub use stats::StatsHandler;
+pub use sync::SyncHandler;
 pub use task::TaskHandler;
 // effort handler re-export not strictly needed, used via module path in task
 

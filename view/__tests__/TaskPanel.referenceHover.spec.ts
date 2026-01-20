@@ -161,6 +161,15 @@ vi.mock('../api/client', () => ({
         listTasks: apiFixtures.listTasksMock,
         listProjects: apiFixtures.listProjectsMock,
         showConfig: apiFixtures.showConfigMock,
+        inspectConfig: vi.fn(async () => ({
+            effective: { remotes: {} },
+            global_effective: { remotes: {} },
+            global_raw: {},
+            project_raw: null,
+            has_global_file: false,
+            project_exists: false,
+            sources: {},
+        })),
     },
 }))
 

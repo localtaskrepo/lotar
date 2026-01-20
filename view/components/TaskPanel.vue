@@ -20,6 +20,17 @@
             </div>
             <div class="task-panel__header-actions">
               <UiButton
+                v-if="mode === 'edit' && hasSyncRemotes"
+                class="task-panel__header-sync"
+                variant="ghost"
+                type="button"
+                :disabled="syncDialogSubmitting"
+                @click="openSyncDialog"
+              >
+                <IconGlyph name="refresh" />
+                <span>Sync issue</span>
+              </UiButton>
+              <UiButton
                 variant="ghost"
                 icon-only
                 type="button"
@@ -455,12 +466,75 @@
       </UiCard>
     </div>
   </Teleport>
+  <Teleport to="body">
+    <div
+      v-if="syncDialogOpen"
+      class="task-panel-dialog__overlay task-panel__sync-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sync issue"
+      @click.self="closeSyncDialog"
+    >
+      <UiCard class="task-panel-dialog__card">
+        <form class="task-panel-dialog__form" @submit.prevent="submitSyncDialog">
+          <header class="task-panel-dialog__header">
+            <h2>Sync issue</h2>
+            <UiButton
+              variant="ghost"
+              icon-only
+              type="button"
+              :disabled="syncDialogSubmitting"
+              aria-label="Close dialog"
+              title="Close dialog"
+              @click="closeSyncDialog"
+            >
+              <IconGlyph name="close" />
+            </UiButton>
+          </header>
+
+          <label class="task-panel-dialog__field">
+            <span class="muted">Remote</span>
+            <select
+              class="input"
+              v-model="syncDialogRemote"
+              :disabled="syncRemoteEntries.length <= 1"
+            >
+              <option v-for="entry in syncRemoteEntries" :key="entry.name" :value="entry.name">
+                {{ entry.name }} · {{ formatRemote(entry.remote) }}
+              </option>
+            </select>
+          </label>
+
+          <label class="task-panel-dialog__field">
+            <span class="muted">Direction</span>
+            <select class="input" v-model="syncDialogAction">
+              <option value="pull">Pull (update this task from remote)</option>
+              <option value="push">Push (update remote from this task)</option>
+            </select>
+          </label>
+
+          <label class="task-panel-dialog__checkbox">
+            <input type="checkbox" v-model="syncDialogWriteReport" /> Write report to disk
+          </label>
+
+          <footer class="task-panel-dialog__footer">
+            <UiButton variant="primary" type="submit" :disabled="syncDialogSubmitting || !syncDialogRemote">
+              {{ syncDialogSubmitting ? 'Syncing…' : syncDialogAction === 'pull' ? 'Run pull' : 'Run push' }}
+            </UiButton>
+            <UiButton variant="ghost" type="button" :disabled="syncDialogSubmitting" @click="closeSyncDialog">
+              Cancel
+            </UiButton>
+          </footer>
+        </form>
+      </UiCard>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { Teleport, Transition, computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api/client'
-import type { SprintIntegrityDiagnostics, TaskDTO } from '../api/types'
+import type { ConfigInspectResult, SprintIntegrityDiagnostics, SyncRemoteConfig, SyncRequest, TaskDTO } from '../api/types'
 import { useTaskPanelState } from '../composables/useTaskPanelState'
 import {
     onPreferencesChanged,
@@ -594,6 +668,8 @@ const {
   attachmentsDir,
 } = useTaskPanelState(props, emit)
 
+const taskId = computed(() => (task.id || '').trim())
+
 const sprintDialogOpen = ref(false)
 const sprintDialogSubmitting = ref(false)
 const sprintDialogMode = ref<'add' | 'remove'>('add')
@@ -601,6 +677,22 @@ const sprintDialogSelection = ref('active')
 const sprintDialogAllowClosed = ref(false)
 const removingSprintId = ref<number | null>(null)
 const sprintChipLabels = computed(() => assignedSprints.value.map((entry) => entry.label))
+
+const syncConfigInspect = ref<ConfigInspectResult | null>(null)
+const syncConfigProject = ref<string | null>(null)
+const syncRemotes = computed<Record<string, SyncRemoteConfig>>(() => syncConfigInspect.value?.effective?.remotes ?? {})
+const syncRemoteEntries = computed(() =>
+  Object.entries(syncRemotes.value)
+    .map(([name, remote]) => ({ name, remote }))
+    .sort((a, b) => a.name.localeCompare(b.name)),
+)
+const hasSyncRemotes = computed(() => syncRemoteEntries.value.length > 0)
+
+const syncDialogOpen = ref(false)
+const syncDialogSubmitting = ref(false)
+const syncDialogAction = ref<'pull' | 'push'>('pull')
+const syncDialogRemote = ref('')
+const syncDialogWriteReport = ref(true)
 
 const editingDescription = ref(false)
 const descriptionPreview = ref(false)
@@ -631,6 +723,38 @@ onUnmounted(() => {
   unsubscribePreferencesChanged?.()
   unsubscribePreferencesChanged = null
 })
+
+function projectPrefixFromTaskId(id: string): string | null {
+  const trimmed = id.trim()
+  if (!trimmed) return null
+  const dash = trimmed.indexOf('-')
+  if (dash <= 0) return null
+  return trimmed.slice(0, dash).toUpperCase()
+}
+
+async function loadSyncConfig(prefix: string | null) {
+  if (!prefix) {
+    syncConfigInspect.value = null
+    syncConfigProject.value = null
+    return
+  }
+  if (syncConfigProject.value === prefix) return
+  syncConfigProject.value = prefix
+  try {
+    syncConfigInspect.value = await api.inspectConfig(prefix)
+  } catch {
+    syncConfigInspect.value = null
+  }
+}
+
+watch(
+  taskId,
+  (value) => {
+    const prefix = projectPrefixFromTaskId(value)
+    loadSyncConfig(prefix)
+  },
+  { immediate: true },
+)
 
 const attachmentsDropLabel = computed(() => {
   if (attachmentsUploading.value) return 'Uploading attachments'
@@ -1258,6 +1382,9 @@ watch(
     if (!isOpen && sprintDialogOpen.value) {
       closeSprintDialog(true)
     }
+    if (!isOpen && syncDialogOpen.value) {
+      closeSyncDialog(true)
+    }
     if (!isOpen && removingSprintId.value !== null) {
       removingSprintId.value = null
     }
@@ -1371,6 +1498,73 @@ async function submitSprintDialog() {
   }
 }
 
+function formatRemote(remote: SyncRemoteConfig): string {
+  if (!remote) return 'Remote'
+  if (remote.provider === 'jira') {
+    return remote.project ? `Jira · ${remote.project}` : 'Jira'
+  }
+  if (remote.provider === 'github') {
+    return remote.repo ? `GitHub · ${remote.repo}` : 'GitHub'
+  }
+  return String(remote.provider)
+}
+
+function openSyncDialog() {
+  if (!hasSyncRemotes.value) {
+    showToast('No sync remotes configured for this project')
+    return
+  }
+  syncDialogAction.value = 'pull'
+  syncDialogRemote.value = syncRemoteEntries.value[0]?.name ?? ''
+  syncDialogWriteReport.value = syncConfigInspect.value?.effective?.sync_write_reports ?? true
+  syncDialogOpen.value = true
+}
+
+function closeSyncDialog(force?: boolean | Event) {
+  const forced = force === true
+  if (syncDialogSubmitting.value && !forced) return
+  syncDialogOpen.value = false
+}
+
+async function submitSyncDialog() {
+  if (syncDialogSubmitting.value) return
+  const id = taskId.value
+  if (!id) {
+    showToast('Save the task before syncing')
+    return
+  }
+  const remote = syncDialogRemote.value.trim()
+  if (!remote) {
+    showToast('Select a remote before syncing')
+    return
+  }
+  syncDialogSubmitting.value = true
+  try {
+    const request: SyncRequest = {
+      remote,
+      project: projectPrefixFromTaskId(id) ?? undefined,
+      task_id: id,
+      include_report: true,
+      write_report: syncDialogWriteReport.value,
+    }
+    const response = syncDialogAction.value === 'pull'
+      ? await api.syncPull(request)
+      : await api.syncPush(request)
+    const summary = response.summary
+    if (summary) {
+      showToast(`Sync ${syncDialogAction.value} complete: ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped, ${summary.failed} failed`)
+    } else {
+      showToast(`Sync ${syncDialogAction.value} complete`)
+    }
+    await reloadTask()
+    closeSyncDialog(true)
+  } catch (error: any) {
+    showToast(error?.message || `Failed to ${syncDialogAction.value} sync`)
+  } finally {
+    syncDialogSubmitting.value = false
+  }
+}
+
 async function removeSprintChip(sprintId: number) {
   if (removingSprintId.value !== null) return
   const taskId = form.id || props.taskId
@@ -1449,6 +1643,12 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
+}
+
+.task-panel__header-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .badge {
@@ -1789,6 +1989,10 @@ details.task-panel__group:not([open]) {
   width: min(440px, 100%);
   max-height: calc(100vh - var(--space-6, 1.5rem));
   overflow-y: auto;
+}
+
+.task-panel__sync-dialog .task-panel-dialog__card {
+  width: min(520px, 100%);
 }
 
 .task-panel__references-dialog {

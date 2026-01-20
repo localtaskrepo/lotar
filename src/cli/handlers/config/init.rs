@@ -112,6 +112,9 @@ impl ConfigHandler {
             "default" => include_str!("../../../config/templates/default.yml"),
             "agile" => include_str!("../../../config/templates/agile.yml"),
             "kanban" => include_str!("../../../config/templates/kanban.yml"),
+            "jira" => include_str!("../../../config/templates/jira.yml"),
+            "github" => include_str!("../../../config/templates/github.yml"),
+            "jira-github" => include_str!("../../../config/templates/jira-github.yml"),
             _ => return Err(format!("Unknown template: {}", template_name)),
         };
 

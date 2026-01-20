@@ -436,6 +436,14 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
                                 .and_then(|v| v.as_str())
                                 .map(|name| name == pf)
                                 .unwrap_or(false),
+                            // Sync events include { project: <PREFIX> }
+                            "sync_started" | "sync_progress" | "sync_completed" | "sync_failed" => {
+                                evt.data
+                                    .get("project")
+                                    .and_then(|v| v.as_str())
+                                    .map(|name| name == pf)
+                                    .unwrap_or(false)
+                            }
                             // Task events include { id: "PREFIX-N" }
                             _ => evt
                                 .data

@@ -35,9 +35,31 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - auto.branch_infer_status: boolean (default true)
 - auto.branch_infer_priority: boolean (default true)
 - auto.populate_members: boolean (default true)
+- remotes: map (named remotes)
+- remotes.<name>.provider: enum (jira|github)
+- remotes.<name>.project: string (Jira project key)
+- remotes.<name>.repo: string (GitHub owner/repo)
+- remotes.<name>.filter: string (JQL or GitHub qualifiers)
+- remotes.<name>.auth_profile: string (home profile name)
+- remotes.<name>.mapping: map (local field name -> mapping)
+- remotes.<name>.mapping.<field>.field: string (remote field name)
+- remotes.<name>.mapping.<field>.values: map (local value -> remote value)
+- remotes.<name>.mapping.<field>.set: string (force remote value)
+- remotes.<name>.mapping.<field>.default: string (apply when local value is empty)
+- remotes.<name>.mapping.<field>.add: string[] (append for list fields like tags/labels)
+- remotes.<name>.mapping.<field>.when_empty: enum (skip|clear)
+- auth_profiles: map (home config only; ignored in project configs)
+- auth_profiles.<name>.provider: enum (jira|github)
+- auth_profiles.<name>.method: string
+- auth_profiles.<name>.token_env: string (env var name or literal token)
+- auth_profiles.<name>.email_env: string (env var name or literal email)
+- auth_profiles.<name>.base_url: string
+- auth_profiles.<name>.api_url: string
 
 ## Home and Project keys
 Same shape as global; project values override global for that project. Use `project.name` for an optional human-readable label (the folder name remains the canonical identifier).
+
+Auth profiles are home-only: `auth_profiles` is ignored in project configs (secrets never live in the repo). Remotes can be configured globally or per-project; project remotes override/extend global remotes.
 
 Automation overrides mirror the global `auto.*` toggles when set at the project level. Acceptable keys: `auto.populate_members`, `auto.set_reporter`, `auto.assign_on_status`, `auto.codeowners_assign`, `auto.tags_from_path`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`, `auto.identity`, and `auto.identity_git`.
 
@@ -72,6 +94,19 @@ auto:
 	assign_on_status: true
 default:
 	tags: [oncall, sev]
+
+remotes:
+	jira-home:
+		provider: jira
+		project: DEMO
+		auth_profile: jira.default
+		mapping:
+			title: summary
+			status:
+				field: status
+				values:
+					Todo: to-do
+					Done: done
 ```
 
 ## Validation

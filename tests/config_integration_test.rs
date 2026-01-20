@@ -571,7 +571,10 @@ mod templates {
             ))
             .stdout(predicate::str::contains("default"))
             .stdout(predicate::str::contains("agile"))
-            .stdout(predicate::str::contains("kanban"));
+            .stdout(predicate::str::contains("kanban"))
+            .stdout(predicate::str::contains("jira"))
+            .stdout(predicate::str::contains("github"))
+            .stdout(predicate::str::contains("jira-github"));
     }
 }
 

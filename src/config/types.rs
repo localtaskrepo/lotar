@@ -1,4 +1,6 @@
 use crate::types::{Priority, TaskStatus, TaskType};
+#[cfg(feature = "schema")]
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -39,6 +41,96 @@ pub struct SprintConfig {
     pub defaults: SprintDefaultsConfig,
     #[serde(default)]
     pub notifications: SprintNotificationsConfig,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum SyncProvider {
+    #[default]
+    Jira,
+    Github,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum SyncWhenEmpty {
+    Skip,
+    Clear,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncFieldMappingDetail {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub field: Option<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub values: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub set: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub default: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub add: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub when_empty: Option<SyncWhenEmpty>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(untagged)]
+pub enum SyncFieldMapping {
+    Simple(String),
+    Detailed(SyncFieldMappingDetail),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncRemoteConfig {
+    pub provider: SyncProvider,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub repo: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub filter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub auth_profile: Option<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub mapping: HashMap<String, SyncFieldMapping>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncAuthProfile {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub provider: Option<SyncProvider>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub token_env: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub email_env: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub base_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub api_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct SyncConfig {
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub remotes: HashMap<String, SyncRemoteConfig>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub auth_profiles: HashMap<String, SyncAuthProfile>,
+}
+
+impl SyncConfig {
+    pub fn is_empty(&self) -> bool {
+        self.remotes.is_empty() && self.auth_profiles.is_empty()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +289,17 @@ pub struct ProjectConfig {
     pub attachments_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub attachments_max_upload_mb: Option<i64>,
+
+    // Sync reports (project-level override)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sync_reports_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sync_write_reports: Option<bool>,
+
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub remotes: HashMap<String, SyncRemoteConfig>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub auth_profiles: HashMap<String, SyncAuthProfile>,
 }
 
 impl ProjectConfig {
@@ -236,6 +339,10 @@ impl ProjectConfig {
 
             attachments_dir: None,
             attachments_max_upload_mb: None,
+            sync_reports_dir: None,
+            sync_write_reports: None,
+            remotes: HashMap::new(),
+            auth_profiles: HashMap::new(),
         }
     }
 }
@@ -330,11 +437,22 @@ pub struct GlobalConfig {
     #[serde(default = "default_attachments_max_upload_mb")]
     pub attachments_max_upload_mb: i64,
 
+    // Sync reports
+    #[serde(default = "default_sync_reports_dir")]
+    pub sync_reports_dir: String,
+    #[serde(default = "default_true")]
+    pub sync_write_reports: bool,
+
     /// Optional path to a directory containing custom web UI assets.
     /// When set and the path exists, the server will serve files from this directory
     /// before falling back to the bundled UI. This allows using a custom or development UI.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub web_ui_path: Option<String>,
+
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub remotes: HashMap<String, SyncRemoteConfig>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub auth_profiles: HashMap<String, SyncAuthProfile>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -383,6 +501,13 @@ pub struct ResolvedConfig {
     // Attachments
     pub attachments_dir: String,
     pub attachments_max_upload_mb: i64,
+
+    // Sync reports
+    pub sync_reports_dir: String,
+    pub sync_write_reports: bool,
+
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub remotes: HashMap<String, SyncRemoteConfig>,
 }
 
 impl ResolvedConfig {
@@ -511,6 +636,10 @@ fn default_attachments_dir() -> String {
     "@attachments".to_string()
 }
 
+fn default_sync_reports_dir() -> String {
+    "@reports".to_string()
+}
+
 fn default_attachments_max_upload_mb() -> i64 {
     10
 }
@@ -554,7 +683,11 @@ impl Default for GlobalConfig {
             auto_identity_git: true,
             attachments_dir: default_attachments_dir(),
             attachments_max_upload_mb: default_attachments_max_upload_mb(),
+            sync_reports_dir: default_sync_reports_dir(),
+            sync_write_reports: true,
             web_ui_path: None,
+            remotes: HashMap::new(),
+            auth_profiles: HashMap::new(),
         }
     }
 }

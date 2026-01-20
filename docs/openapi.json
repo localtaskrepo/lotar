@@ -833,6 +833,80 @@
         }
       }
     },
+    "/api/tasks/references/add": {
+      "post": {
+        "summary": "Attach a generic reference to a task",
+        "description": "Adds a platform reference (jira/github) to task.references unless it already exists.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenericReferenceAddRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeGenericReferenceAddResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/references/remove": {
+      "post": {
+        "summary": "Remove a generic reference from a task",
+        "description": "Removes a platform reference (jira/github) from task.references if present.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenericReferenceRemoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeGenericReferenceRemoveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/projects/create": {
       "post": {
         "summary": "Create a new project configuration",
@@ -1047,7 +1121,199 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EnvelopeUpdated"
+                  "$ref": "#/components/schemas/EnvelopeConfigSetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sync/pull": {
+      "post": {
+        "summary": "Pull from a sync remote",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sync/push": {
+      "post": {
+        "summary": "Push to a sync remote",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSyncResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sync/validate": {
+      "post": {
+        "summary": "Validate sync remote configuration",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncValidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSyncValidateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sync/reports/list": {
+      "get": {
+        "summary": "List sync reports",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional project prefix filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSyncReportListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sync/reports/get": {
+      "get": {
+        "summary": "Get a sync report",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Report path relative to the reports directory"
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional project prefix to resolve report directory"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSyncReport"
                 }
               }
             }
@@ -1532,7 +1798,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "CSV of kinds: task_created, task_updated, task_deleted, config_updated, project_changed"
+            "description": "CSV of kinds: task_created, task_updated, task_deleted, config_updated, project_changed, sync_started, sync_progress, sync_completed, sync_failed"
           },
           {
             "name": "project",
@@ -2085,6 +2351,84 @@
           "removed"
         ]
       },
+      "GenericReferenceAddRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Reference kind (jira|github)",
+            "enum": [
+              "jira",
+              "github"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "value"
+        ]
+      },
+      "GenericReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "added": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "added"
+        ]
+      },
+      "GenericReferenceRemoveRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Reference kind (jira|github)",
+            "enum": [
+              "jira",
+              "github"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "value"
+        ]
+      },
+      "GenericReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "removed"
+        ]
+      },
       "TaskRelationships": {
         "type": "object",
         "properties": {
@@ -2199,6 +2543,18 @@
             "nullable": true
           },
           "link": {
+            "type": "string",
+            "nullable": true
+          },
+          "file": {
+            "type": "string",
+            "nullable": true
+          },
+          "jira": {
+            "type": "string",
+            "nullable": true
+          },
+          "github": {
             "type": "string",
             "nullable": true
           }
@@ -2318,6 +2674,38 @@
             "nullable": true
           }
         }
+      },
+      "ConfigSetResponse": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "updated",
+          "warnings",
+          "info",
+          "errors"
+        ]
       },
       "SprintSelector": {
         "description": "Sprint reference by numeric identifier or keyword (e.g., next, active).",
@@ -3863,6 +4251,460 @@
           "tags_top"
         ]
       },
+      "SyncRemoteConfig": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "jira",
+              "github"
+            ]
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "repo": {
+            "type": "string",
+            "nullable": true
+          },
+          "filter": {
+            "type": "string",
+            "nullable": true
+          },
+          "auth_profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "mapping": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "provider"
+        ]
+      },
+      "SyncAuthProfile": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "jira",
+              "github"
+            ],
+            "nullable": true
+          },
+          "method": {
+            "type": "string",
+            "nullable": true
+          },
+          "token_env": {
+            "type": "string",
+            "nullable": true
+          },
+          "email_env": {
+            "type": "string",
+            "nullable": true
+          },
+          "base_url": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_url": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SyncRequest": {
+        "type": "object",
+        "properties": {
+          "remote": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "task_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "auth_profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "include_report": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "write_report": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "client_run_id": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "remote"
+        ]
+      },
+      "SyncValidateRequest": {
+        "type": "object",
+        "properties": {
+          "remote": {
+            "type": "string",
+            "nullable": true
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "auth_profile": {
+            "type": "string",
+            "nullable": true
+          },
+          "remote_config": {
+            "$ref": "#/components/schemas/SyncRemoteConfig",
+            "nullable": true
+          }
+        }
+      },
+      "SyncValidateResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "repo": {
+            "type": "string",
+            "nullable": true
+          },
+          "filter": {
+            "type": "string",
+            "nullable": true
+          },
+          "checked_at": {
+            "type": "string"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "provider",
+          "remote",
+          "checked_at"
+        ]
+      },
+      "SyncSummary": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "created",
+          "updated",
+          "skipped",
+          "failed"
+        ]
+      },
+      "SyncReportEntry": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ]
+      },
+      "SyncReportMeta": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SyncSummary"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entries_total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stored_path": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "status",
+          "direction",
+          "provider",
+          "remote",
+          "dry_run",
+          "summary",
+          "entries_total"
+        ]
+      },
+      "SyncReport": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SyncSummary"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncReportEntry"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "status",
+          "direction",
+          "provider",
+          "remote",
+          "dry_run",
+          "summary",
+          "entries"
+        ]
+      },
+      "SyncReportListResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncReportMeta"
+            }
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "reports"
+        ]
+      },
+      "SyncResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "remote": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/SyncSummary"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "report": {
+            "$ref": "#/components/schemas/SyncReportMeta",
+            "nullable": true
+          },
+          "report_entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SyncReportEntry"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "direction",
+          "provider",
+          "remote",
+          "dry_run",
+          "summary",
+          "run_id"
+        ]
+      },
       "EnvelopeProject": {
         "type": "object",
         "properties": {
@@ -4038,6 +4880,28 @@
           "data"
         ]
       },
+      "EnvelopeGenericReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/GenericReferenceAddResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeGenericReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/GenericReferenceRemoveResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "EnvelopeDeleted": {
         "type": "object",
         "properties": {
@@ -4079,12 +4943,67 @@
           "data"
         ]
       },
+      "EnvelopeSyncResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SyncResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSyncValidateResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SyncValidateResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSyncReportListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SyncReportListResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeSyncReport": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SyncReport"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "EnvelopeConfig": {
         "type": "object",
         "properties": {
           "data": {
             "type": "object",
             "additionalProperties": true
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeConfigSetResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConfigSetResponse"
           }
         },
         "required": [

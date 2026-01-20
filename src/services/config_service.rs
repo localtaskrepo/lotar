@@ -7,7 +7,6 @@ use crate::config::source_labels::{
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
-use serde_yaml;
 use std::collections::BTreeMap;
 
 pub struct ConfigSetOutcome {
@@ -32,8 +31,10 @@ impl ConfigService {
                     prefix, e
                 ))
             })?;
-            serde_json::to_value(project_cfg)
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))
+            let mut value = serde_json::to_value(project_cfg)
+                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            strip_auth_profiles(&mut value);
+            Ok(value)
         } else {
             serde_json::to_value(mgr.get_resolved_config())
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))
@@ -62,6 +63,7 @@ impl ConfigService {
 
         let mut project_exists = false;
         let mut project_raw_val = serde_json::json!({});
+        let mut project_cfg = None;
 
         let (effective_val, sources_by_path) = if let Some(prefix) = project_prefix {
             let resolved_project = mgr.get_project_config(prefix).map_err(|e| {
@@ -73,8 +75,7 @@ impl ConfigService {
             let effective_val = serde_json::to_value(&resolved_project)
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
 
-            let project_cfg =
-                persistence::load_project_config_from_dir(prefix, &resolver.path).ok();
+            project_cfg = persistence::load_project_config_from_dir(prefix, &resolver.path).ok();
             if let Some(cfg) = project_cfg.as_ref() {
                 project_exists = true;
                 project_raw_val = serde_json::to_value(cfg).unwrap_or(serde_json::json!({}));
@@ -124,12 +125,30 @@ impl ConfigService {
 
         let global_effective_val =
             serde_json::to_value(&resolved_global).unwrap_or(serde_json::json!({}));
-        let global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
+        let mut global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
+        strip_auth_profiles(&mut global_raw_val);
+        strip_auth_profiles(&mut project_raw_val);
+
+        let mut auth_profiles = global_raw.auth_profiles.clone();
+        if let Some(home) = home_cfg.as_ref() {
+            for (key, profile) in &home.auth_profiles {
+                auth_profiles.insert(key.clone(), profile.clone());
+            }
+        }
+        if let Some(cfg) = project_cfg.as_ref() {
+            for (key, profile) in &cfg.auth_profiles {
+                auth_profiles.insert(key.clone(), profile.clone());
+            }
+        }
+        let mut auth_profiles_val =
+            serde_json::to_value(&auth_profiles).unwrap_or(serde_json::json!({}));
+        strip_auth_profiles(&mut auth_profiles_val);
 
         Ok(serde_json::json!({
             "effective": effective_val,
             "global_effective": global_effective_val,
             "global_raw": global_raw_val,
+            "auth_profiles": auth_profiles_val,
             "sources": serde_json::Value::Object(sources),
             "has_global_file": has_global_file,
             "project_exists": project_exists,
@@ -471,5 +490,20 @@ impl ConfigService {
             updated,
             validation: combined,
         })
+    }
+}
+
+fn strip_auth_profiles(value: &mut serde_json::Value) {
+    let serde_json::Value::Object(map) = value else {
+        return;
+    };
+    let Some(serde_json::Value::Object(profiles)) = map.get_mut("auth_profiles") else {
+        return;
+    };
+    for profile in profiles.values_mut() {
+        if let serde_json::Value::Object(profile_map) = profile {
+            profile_map.remove("token_env");
+            profile_map.remove("email_env");
+        }
     }
 }

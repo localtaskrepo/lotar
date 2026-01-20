@@ -90,7 +90,7 @@ lotar serve --web-ui-embedded
 
 ### Real-time Updates
 - Server-Sent Events (SSE)
-	- `GET /api/events` — stream of events: `task_created`, `task_updated`, `task_deleted`, `config_updated`
+	- `GET /api/events` — stream of events: `task_created`, `task_updated`, `task_deleted`, `config_updated`, `sync_started`, `sync_progress`, `sync_completed`, `sync_failed`
 	- Alias: `GET /api/tasks/stream`
 	- Optional query params:
 		- `debounce_ms` — debounce window in ms (default 100; env fallback `LOTAR_SSE_DEBOUNCE_MS`)

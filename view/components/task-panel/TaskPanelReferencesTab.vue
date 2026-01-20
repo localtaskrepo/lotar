@@ -30,7 +30,7 @@
         <ul v-else class="task-panel__references-list">
           <li
             v-for="(reference, index) in references"
-            :key="reference.code || reference.link || reference.file || index"
+            :key="reference.code || reference.link || reference.file || reference.jira || reference.github || index"
             :class="[
               'task-panel__reference-item',
               { 'task-panel__reference-item--interactive': !!reference.code }
@@ -43,10 +43,10 @@
           >
             <span
               class="task-panel__reference-kind"
-              :title="reference.file ? 'File reference' : reference.link ? 'Link reference' : reference.code ? 'Code reference' : 'Reference'"
+              :title="reference.file ? 'File reference' : reference.link ? 'Link reference' : reference.github ? 'GitHub reference' : reference.jira ? 'Jira reference' : reference.code ? 'Code reference' : 'Reference'"
               aria-hidden="true"
             >
-              <IconGlyph :name="reference.file ? 'file' : 'list'" />
+              <IconGlyph :name="referenceIcon(reference)" />
             </span>
             <a
               v-if="reference.link"
@@ -67,6 +67,36 @@
             >
               {{ attachmentDisplayName(reference.file) }}
             </a>
+            <a
+              v-else-if="reference.github && referenceLink(reference)"
+              class="task-panel__reference-text"
+              :href="referenceLink(reference)"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {{ reference.github }}
+            </a>
+            <span
+              v-else-if="reference.github"
+              class="task-panel__reference-text"
+            >
+              {{ reference.github }}
+            </span>
+            <a
+              v-else-if="reference.jira && referenceLink(reference)"
+              class="task-panel__reference-text"
+              :href="referenceLink(reference)"
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              {{ reference.jira }}
+            </a>
+            <span
+              v-else-if="reference.jira"
+              class="task-panel__reference-text"
+            >
+              {{ reference.jira }}
+            </span>
             <span
               v-else-if="reference.code"
               class="task-panel__reference-text"
@@ -80,8 +110,8 @@
               variant="ghost"
               icon-only
               type="button"
-              :aria-label="reference.link ? 'Remove link' : reference.file ? 'Remove attachment' : reference.code ? 'Remove code reference' : 'Remove reference'"
-              :title="reference.link ? 'Remove link' : reference.file ? 'Remove attachment' : reference.code ? 'Remove code reference' : 'Remove reference'"
+              :aria-label="reference.link ? 'Remove link' : reference.file ? 'Remove attachment' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
+              :title="reference.link ? 'Remove link' : reference.file ? 'Remove attachment' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
               :disabled="!taskId || removingReferenceKey === referenceStableKey(reference)"
               @click.prevent.stop="removeReference(reference)"
             >
@@ -318,7 +348,7 @@
 <script setup lang="ts">
 import { Teleport, Transition, computed, nextTick, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import { api } from '../../api/client'
-import type { ReferenceSnippet } from '../../api/types'
+import type { ConfigInspectResult, ReferenceSnippet, SyncAuthProfile, SyncRemoteConfig } from '../../api/types'
 import IconGlyph from '../IconGlyph.vue'
 import ReloadButton from '../ReloadButton.vue'
 import UiButton from '../UiButton.vue'
@@ -327,7 +357,15 @@ import UiInput from '../UiInput.vue'
 import UiLoader from '../UiLoader.vue'
 import { showToast } from '../toast'
 
-type ReferenceEntry = { code?: string | null; link?: string | null; file?: string | null }
+type ReferenceEntry = {
+  code?: string | null
+  link?: string | null
+  file?: string | null
+  jira?: string | null
+  github?: string | null
+}
+
+type ReferenceIconName = 'file' | 'github' | 'jira' | 'send' | 'list'
 
 const props = defineProps<{
   mode: 'create' | 'edit'
@@ -354,9 +392,15 @@ const emit = defineEmits<{ (e: 'reload'): void; (e: 'updated', task: any): void 
 
 const taskId = computed(() => (props.task?.id || '').trim())
 
+const configInspect = ref<ConfigInspectResult | null>(null)
+const configInspectProject = ref<string | null>(null)
+
 const references = computed(() =>
   (props.task?.references || []).filter((reference) =>
-    Boolean(reference && (reference.code || reference.link || reference.file)),
+    Boolean(
+      reference &&
+        (reference.code || reference.link || reference.file || reference.github || reference.jira),
+    ),
   ),
 )
 
@@ -386,6 +430,34 @@ const addReferenceSubmitting = computed(() => addLinkSubmitting.value || addCode
 const codeFileDatalistId = 'task-panel-code-file-suggestions'
 let suggestFilesTimer: number | null = null
 let previewTimer: number | null = null
+
+function projectPrefixFromTaskId(id: string): string | null {
+  const trimmed = id.trim()
+  if (!trimmed) return null
+  const dash = trimmed.indexOf('-')
+  if (dash <= 0) return null
+  return trimmed.slice(0, dash).toUpperCase()
+}
+
+async function loadConfigInspect(prefix: string | null) {
+  if (!prefix) {
+    configInspect.value = null
+    configInspectProject.value = null
+    return
+  }
+  if (configInspectProject.value === prefix) return
+  configInspectProject.value = prefix
+  try {
+    configInspect.value = await api.inspectConfig(prefix)
+  } catch {
+    configInspect.value = null
+  }
+}
+
+watch(taskId, (value) => {
+  const prefix = projectPrefixFromTaskId(value)
+  loadConfigInspect(prefix)
+}, { immediate: true })
 
 function resetAddReferenceForm() {
   addLinkUrl.value = ''
@@ -625,9 +697,163 @@ function referenceStableKey(reference: ReferenceEntry): string {
   if (link) return `link:${link}`
   const file = typeof reference.file === 'string' ? reference.file.trim() : ''
   if (file) return `file:${file}`
+  const github = typeof reference.github === 'string' ? reference.github.trim() : ''
+  if (github) return `github:${github}`
+  const jira = typeof reference.jira === 'string' ? reference.jira.trim() : ''
+  if (jira) return `jira:${jira}`
   const code = typeof reference.code === 'string' ? reference.code.trim() : ''
   if (code) return `code:${code}`
   return ''
+}
+
+function referenceIcon(reference: ReferenceEntry): ReferenceIconName {
+  if (typeof reference.file === 'string' && reference.file.trim()) return 'file'
+  if (typeof reference.github === 'string' && reference.github.trim()) return 'github'
+  if (typeof reference.jira === 'string' && reference.jira.trim()) return 'jira'
+  if (typeof reference.link === 'string' && reference.link.trim()) return 'send'
+  return 'list'
+}
+
+function referenceLink(reference: ReferenceEntry): string | undefined {
+  const jira = typeof reference.jira === 'string' ? reference.jira.trim() : ''
+  if (jira) {
+    return buildJiraReferenceLink(jira)
+  }
+  const github = typeof reference.github === 'string' ? reference.github.trim() : ''
+  if (github) {
+    return buildGithubReferenceLink(github)
+  }
+  return undefined
+}
+
+function buildJiraReferenceLink(reference: string): string | undefined {
+  const remotes = currentRemotes()
+  const profiles = currentAuthProfiles()
+  const parsed = parseJiraReference(reference)
+  if (!parsed) return undefined
+
+  const remote = findJiraRemote(remotes, parsed.project)
+  const profile = findJiraAuthProfile(profiles, remote)
+  const baseUrl = jiraBaseUrlFromProfile(profile)
+  if (!baseUrl) return undefined
+
+  return `${stripTrailingSlash(baseUrl)}/browse/${encodeURIComponent(parsed.key)}`
+}
+
+function buildGithubReferenceLink(reference: string): string | undefined {
+  const remotes = currentRemotes()
+  const parsed = parseGithubReference(reference)
+  if (!parsed) return undefined
+
+  const remote = findGithubRemote(remotes, parsed.repo)
+  const repo = parsed.repo || remote?.repo
+  if (!repo) return undefined
+
+  const normalizedRepo = normalizeRepo(repo)
+  return `https://github.com/${normalizedRepo}/issues/${parsed.number}`
+}
+
+function currentRemotes(): Record<string, SyncRemoteConfig> {
+  return configInspect.value?.effective?.remotes ?? {}
+}
+
+function currentAuthProfiles(): Record<string, SyncAuthProfile> {
+  return configInspect.value?.auth_profiles ?? {}
+}
+
+function findGithubRemote(remotes: Record<string, SyncRemoteConfig>, repo: string | null): SyncRemoteConfig | null {
+  const candidates = Object.values(remotes).filter((remote) => remote?.provider === 'github')
+  if (repo) {
+    const normalized = normalizeRepo(repo)
+    const match = candidates.find((remote) => normalizeRepo(remote.repo || '') === normalized)
+    if (match) return match
+  }
+  if (candidates.length === 1) return candidates[0]
+  return null
+}
+
+function findJiraRemote(remotes: Record<string, SyncRemoteConfig>, project: string | null): SyncRemoteConfig | null {
+  const candidates = Object.values(remotes).filter((remote) => remote?.provider === 'jira')
+  if (project) {
+    const normalized = project.trim().toUpperCase()
+    const match = candidates.find((remote) => (remote.project || '').trim().toUpperCase() === normalized)
+    if (match) return match
+  }
+  if (candidates.length === 1) return candidates[0]
+  return null
+}
+
+function findJiraAuthProfile(
+  profiles: Record<string, SyncAuthProfile>,
+  remote: SyncRemoteConfig | null,
+): SyncAuthProfile | null {
+  if (remote?.auth_profile) {
+    return profiles[remote.auth_profile] ?? null
+  }
+  const entries = Object.values(profiles)
+  if (entries.length === 1) return entries[0] ?? null
+  const jiraProfiles = entries.filter((profile) => !profile.provider || profile.provider === 'jira')
+  if (jiraProfiles.length === 1) return jiraProfiles[0] ?? null
+  return null
+}
+
+function normalizeRepo(value: string): string {
+  return value.trim().replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase()
+}
+
+function parseGithubReference(value: string): { repo: string | null; number: string } | null {
+  const cleaned = trimPlatformPrefix(value, 'github')
+  const [repoPart, numPart] = cleaned.split('#')
+  if (!numPart) return null
+  const number = numPart.trim()
+  if (!number) return null
+  const repo = repoPart?.trim() ? repoPart.trim() : null
+  return { repo, number }
+}
+
+function parseJiraReference(value: string): { key: string; project: string | null } | null {
+  const cleaned = trimPlatformPrefix(value, 'jira')
+  const trimmed = cleaned.trim()
+  if (!trimmed) return null
+  if (!trimmed.includes('-')) {
+    return { key: trimmed, project: null }
+  }
+  const [projectPart, ...rest] = trimmed.split('-')
+  const project = projectPart.trim().toUpperCase()
+  const suffix = rest.join('-').trim()
+  if (!project || !suffix) {
+    return { key: trimmed, project: project || null }
+  }
+  return { key: `${project}-${suffix}`, project }
+}
+
+function jiraBaseUrlFromProfile(profile: SyncAuthProfile | null): string | null {
+  if (!profile) return null
+  const base = (profile.base_url || '').trim()
+  if (base) return stripTrailingSlash(base)
+  const api = (profile.api_url || '').trim()
+  if (!api) return null
+  const trimmed = stripTrailingSlash(api)
+  const lower = trimmed.toLowerCase()
+  const restIndex = lower.indexOf('/rest/api')
+  if (restIndex >= 0) {
+    return trimmed.slice(0, restIndex)
+  }
+  return trimmed
+}
+
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function trimPlatformPrefix(value: string, prefix: string): string {
+  const trimmed = value.trim()
+  const lower = trimmed.toLowerCase()
+  const needle = `${prefix.toLowerCase()}:`
+  if (lower.startsWith(needle)) {
+    return trimmed.slice(needle.length).trim()
+  }
+  return trimmed
 }
 
 async function removeReference(reference: ReferenceEntry) {
@@ -649,6 +875,8 @@ async function removeReference(reference: ReferenceEntry) {
     const link = typeof reference.link === 'string' ? reference.link.trim() : ''
     const file = typeof reference.file === 'string' ? reference.file.trim() : ''
     const code = typeof reference.code === 'string' ? reference.code.trim() : ''
+    const github = typeof reference.github === 'string' ? reference.github.trim() : ''
+    const jira = typeof reference.jira === 'string' ? reference.jira.trim() : ''
 
     if (link) {
       const response = await api.removeTaskLinkReference({ id, url: link })
@@ -674,6 +902,20 @@ async function removeReference(reference: ReferenceEntry) {
       const response = await api.removeTaskCodeReference({ id, code })
       emit('updated', response.task)
       showToast(response.removed ? 'Code reference removed' : 'Code reference already removed')
+      return
+    }
+
+    if (github) {
+      const response = await api.removeTaskReference({ id, kind: 'github', value: github })
+      emit('updated', response.task)
+      showToast(response.removed ? 'GitHub reference removed' : 'GitHub reference already removed')
+      return
+    }
+
+    if (jira) {
+      const response = await api.removeTaskReference({ id, kind: 'jira', value: jira })
+      emit('updated', response.task)
+      showToast(response.removed ? 'Jira reference removed' : 'Jira reference already removed')
       return
     }
   } catch (error: any) {

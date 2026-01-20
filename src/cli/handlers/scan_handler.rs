@@ -325,8 +325,7 @@ impl CommandHandler for ScanHandler {
                                                 task.references.push(
                                                     crate::types::ReferenceEntry {
                                                         code: Some(code_ref),
-                                                        link: None,
-                                                        file: None,
+                                                        ..Default::default()
                                                     },
                                                 );
                                                 changed = true;
@@ -351,8 +350,7 @@ impl CommandHandler for ScanHandler {
                                         });
                                         task.references.push(crate::types::ReferenceEntry {
                                             code: Some(code_ref),
-                                            link: None,
-                                            file: None,
+                                            ..Default::default()
                                         });
                                         true
                                     })
@@ -451,8 +449,7 @@ impl CommandHandler for ScanHandler {
                                                 task.references.push(
                                                     crate::types::ReferenceEntry {
                                                         code: Some(code_ref),
-                                                        link: None,
-                                                        file: None,
+                                                        ..Default::default()
                                                     },
                                                 );
                                                 changed = true;
@@ -477,8 +474,7 @@ impl CommandHandler for ScanHandler {
                                         });
                                         task.references.push(crate::types::ReferenceEntry {
                                             code: Some(code_ref),
-                                            link: None,
-                                            file: None,
+                                            ..Default::default()
                                         });
                                         true
                                     })

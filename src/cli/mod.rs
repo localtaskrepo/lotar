@@ -9,8 +9,8 @@ pub use args::{
     ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs, ConfigValidateArgs, GitAction,
     GitHooksAction, GitHooksInstallArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField,
     SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs,
-    TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs,
-    parse_key_value,
+    SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs, TaskAction, TaskAddArgs,
+    TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
 };
 pub mod preprocess;
 
@@ -167,6 +167,15 @@ pub enum Commands {
 
     /// Scan source files for TODO comments (existing)
     Scan(ScanArgs),
+
+    /// Pull tasks from a configured sync remote
+    Pull(SyncArgs),
+
+    /// Push tasks to a configured sync remote
+    Push(SyncArgs),
+
+    /// Sync utilities (validation, etc.)
+    Sync(SyncCommandArgs),
 
     /// Start web server (existing)
     Serve(ServeArgs),

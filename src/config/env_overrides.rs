@@ -150,6 +150,16 @@ pub const ENV_OVERRIDE_DEFINITIONS: &[EnvOverrideDefinition] = &[
         &["LOTAR_ATTACHMENTS_MAX_UPLOAD_MB"],
     ),
     def(
+        "sync_reports_dir",
+        "sync_reports_dir",
+        &["LOTAR_SYNC_REPORTS_DIR"],
+    ),
+    def(
+        "sync_write_reports",
+        "sync_write_reports",
+        &["LOTAR_SYNC_WRITE_REPORTS"],
+    ),
+    def(
         "branch_type_aliases",
         "branch_type_aliases",
         &["LOTAR_BRANCH_TYPE_ALIASES"],

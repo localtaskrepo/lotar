@@ -67,6 +67,9 @@ fn cfg() -> ResolvedConfig {
         sprint_notifications: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        sync_reports_dir: "@reports".to_string(),
+        sync_write_reports: true,
+        remotes: Default::default(),
     }
 }
 

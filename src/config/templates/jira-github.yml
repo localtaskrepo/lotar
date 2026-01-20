@@ -1,0 +1,94 @@
+# Jira + GitHub Project Template
+# Dual remote mapping for Jira and GitHub
+
+name: "Jira + GitHub"
+description: "Dual remote mapping for Jira and GitHub"
+config:
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo
+      - InProgress
+      - Done
+    types:
+      - Feature
+      - Bug
+      - Chore
+    priorities:
+      - Low
+      - Medium
+      - High
+      - Critical
+    tags:
+      - "*"
+  remotes:
+    jira:
+      provider: jira
+      project: DEMO
+      auth_profile: jira.default
+      mapping:
+        title: summary
+        description: description
+        status:
+          field: status
+          values:
+            Todo: "To Do"
+            InProgress: "In Progress"
+            Done: Done
+        task_type:
+          field: issuetype
+          values:
+            Feature: Story
+            Bug: Bug
+            Chore: Task
+        priority:
+          field: priority
+          values:
+            Low: Low
+            Medium: Medium
+            High: High
+            Critical: Highest
+        assignee:
+          field: assignee
+          when_empty: clear
+        reporter:
+          field: reporter
+          when_empty: clear
+        tags:
+          field: labels
+          add:
+            - lotar
+    github:
+      provider: github
+      repo: your-org/your-repo
+      auth_profile: github.default
+      mapping:
+        title: title
+        description: body
+        status:
+          field: state
+          values:
+            Todo: open
+            InProgress: open
+            Done: closed
+        task_type:
+          field: labels
+          values:
+            Feature: type:feature
+            Bug: type:bug
+            Chore: type:chore
+        priority:
+          field: labels
+          values:
+            Low: priority:low
+            Medium: priority:medium
+            High: priority:high
+            Critical: priority:critical
+        assignee:
+          field: assignees
+          when_empty: clear
+        tags:
+          field: labels
+          add:
+            - lotar

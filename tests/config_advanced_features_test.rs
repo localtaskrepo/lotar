@@ -370,7 +370,14 @@ fn test_config_template_validation() {
     let temp_dir = fixtures.temp_dir.path();
 
     // Test valid templates
-    let valid_templates = vec!["default", "agile", "kanban", "simple"];
+    let valid_templates = vec![
+        "default",
+        "agile",
+        "kanban",
+        "jira",
+        "github",
+        "jira-github",
+    ];
 
     for template in valid_templates {
         let mut cmd = crate::common::lotar_cmd().unwrap();

@@ -31,6 +31,8 @@ export interface ReferenceEntry {
   code?: string | null
   link?: string | null
   file?: string | null
+  jira?: string | null
+  github?: string | null
 }
 
 export interface AttachmentUploadRequest {
@@ -72,6 +74,30 @@ export interface LinkReferenceRemoveRequest {
 }
 
 export interface LinkReferenceRemoveResponse {
+  task: TaskDTO
+  removed: boolean
+}
+
+export type TaskReferenceKind = 'jira' | 'github'
+
+export interface GenericReferenceAddRequest {
+  id: string
+  kind: TaskReferenceKind
+  value: string
+}
+
+export interface GenericReferenceAddResponse {
+  task: TaskDTO
+  added: boolean
+}
+
+export interface GenericReferenceRemoveRequest {
+  id: string
+  kind: TaskReferenceKind
+  value: string
+}
+
+export interface GenericReferenceRemoveResponse {
   task: TaskDTO
   removed: boolean
 }
@@ -552,11 +578,46 @@ export interface ApiEnvelope<T> { data: T; meta?: any; error?: { code: string; m
 
 export type ConfigSource = 'project' | 'global' | 'built_in'
 
+export type SyncProvider = 'jira' | 'github'
+export type SyncWhenEmpty = 'skip' | 'clear'
+
+export interface SyncFieldMappingDetail {
+  field?: string | null
+  values?: Record<string, string>
+  set?: string | null
+  default?: string | null
+  add?: string[]
+  when_empty?: SyncWhenEmpty | null
+}
+
+export type SyncFieldMapping = string | SyncFieldMappingDetail
+
+export interface SyncRemoteConfig {
+  provider: SyncProvider
+  project?: string | null
+  repo?: string | null
+  filter?: string | null
+  auth_profile?: string | null
+  mapping?: Record<string, SyncFieldMapping>
+}
+
+export interface SyncAuthProfile {
+  provider?: SyncProvider | null
+  method?: string | null
+  token_env?: string | null
+  email_env?: string | null
+  base_url?: string | null
+  api_url?: string | null
+}
+
+
 export interface ResolvedConfigDTO {
   server_port: number
   default_project: string
   attachments_dir: string
   attachments_max_upload_mb: number
+  sync_reports_dir: string
+  sync_write_reports: boolean
   default_assignee?: string | null
   default_reporter?: string | null
   default_tags: string[]
@@ -584,6 +645,7 @@ export interface ResolvedConfigDTO {
   branch_type_aliases: Record<string, string>
   branch_status_aliases: Record<string, string>
   branch_priority_aliases: Record<string, string>
+  remotes?: Record<string, SyncRemoteConfig>
 }
 
 export interface GlobalConfigRaw {
@@ -591,6 +653,8 @@ export interface GlobalConfigRaw {
   default_project: string
   attachments_dir: string
   attachments_max_upload_mb: number
+  sync_reports_dir: string
+  sync_write_reports: boolean
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]
@@ -618,12 +682,16 @@ export interface GlobalConfigRaw {
   branch_type_aliases: Record<string, string>
   branch_status_aliases: Record<string, string>
   branch_priority_aliases: Record<string, string>
+  remotes?: Record<string, SyncRemoteConfig>
+  auth_profiles?: Record<string, SyncAuthProfile>
 }
 
 export interface ProjectConfigRaw {
   project_name?: string
   attachments_dir?: string
   attachments_max_upload_mb?: number
+  sync_reports_dir?: string
+  sync_write_reports?: boolean
   issue_states?: string[]
   issue_types?: string[]
   issue_priorities?: string[]
@@ -644,12 +712,15 @@ export interface ProjectConfigRaw {
   branch_type_aliases?: Record<string, string>
   branch_status_aliases?: Record<string, string>
   branch_priority_aliases?: Record<string, string>
+  remotes?: Record<string, SyncRemoteConfig>
+  auth_profiles?: Record<string, SyncAuthProfile>
 }
 
 export interface ConfigInspectResult {
   effective: ResolvedConfigDTO
   global_effective: ResolvedConfigDTO
   global_raw: GlobalConfigRaw
+  auth_profiles: Record<string, SyncAuthProfile>
   project_raw?: ProjectConfigRaw | null
   has_global_file: boolean
   project_exists: boolean
@@ -662,3 +733,106 @@ export interface ConfigSetResponse {
   info: string[]
   errors: string[]
 }
+
+export interface SyncRequest {
+  remote: string
+  project?: string
+  task_id?: string
+  auth_profile?: string
+  dry_run?: boolean
+  include_report?: boolean
+  write_report?: boolean
+  client_run_id?: string
+}
+
+export interface SyncValidateRequest {
+  remote?: string
+  project?: string
+  auth_profile?: string
+  remote_config?: SyncRemoteConfig
+}
+
+export interface SyncSummary {
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+}
+
+export type SyncReportStatus = 'created' | 'updated' | 'skipped' | 'failed'
+
+export interface SyncReportEntry {
+  status: SyncReportStatus
+  at: string
+  task_id?: string | null
+  reference?: string | null
+  title?: string | null
+  message?: string | null
+  fields?: string[]
+}
+
+export interface SyncReportMeta {
+  id: string
+  created_at: string
+  status: string
+  direction: 'push' | 'pull'
+  provider: SyncProvider
+  remote: string
+  project?: string | null
+  dry_run: boolean
+  summary: SyncSummary
+  warnings?: string[]
+  info?: string[]
+  entries_total: number
+  stored_path?: string | null
+}
+
+export interface SyncReport {
+  id: string
+  created_at: string
+  status: string
+  direction: 'push' | 'pull'
+  provider: SyncProvider
+  remote: string
+  project?: string | null
+  dry_run: boolean
+  summary: SyncSummary
+  warnings?: string[]
+  info?: string[]
+  entries: SyncReportEntry[]
+}
+
+export interface SyncReportListResponse {
+  total: number
+  limit: number
+  offset: number
+  reports: SyncReportMeta[]
+}
+
+export interface SyncResponse {
+  status: string
+  direction: 'push' | 'pull'
+  provider: SyncProvider
+  remote: string
+  project?: string | null
+  dry_run: boolean
+  summary: SyncSummary
+  warnings?: string[]
+  info?: string[]
+  run_id: string
+  report?: SyncReportMeta | null
+  report_entries?: SyncReportEntry[]
+}
+
+export interface SyncValidateResponse {
+  status: string
+  provider: SyncProvider
+  remote: string
+  project?: string | null
+  repo?: string | null
+  filter?: string | null
+  checked_at: string
+  warnings?: string[]
+  info?: string[]
+}
+

@@ -89,7 +89,11 @@ fn test_global_config_validation_valid() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        sync_reports_dir: "@reports".to_string(),
+        sync_write_reports: true,
         web_ui_path: None,
+        remotes: Default::default(),
+        auth_profiles: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -150,7 +154,11 @@ fn test_global_config_validation_privileged_port_warning() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        sync_reports_dir: "@reports".to_string(),
+        sync_write_reports: true,
         web_ui_path: None,
+        remotes: Default::default(),
+        auth_profiles: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -228,7 +236,11 @@ fn test_global_config_validation_empty_lists_error() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        sync_reports_dir: "@reports".to_string(),
+        sync_write_reports: true,
         web_ui_path: None,
+        remotes: Default::default(),
+        auth_profiles: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -308,7 +320,11 @@ fn test_global_config_validation_invalid_defaults() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        sync_reports_dir: "@reports".to_string(),
+        sync_write_reports: true,
         web_ui_path: None,
+        remotes: Default::default(),
+        auth_profiles: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);
@@ -375,7 +391,11 @@ fn test_global_config_duplicate_entries_warning() {
         sprints: Default::default(),
         attachments_dir: "@attachments".to_string(),
         attachments_max_upload_mb: 10,
+        sync_reports_dir: "@reports".to_string(),
+        sync_write_reports: true,
         web_ui_path: None,
+        remotes: Default::default(),
+        auth_profiles: Default::default(),
     };
 
     let result = validator.validate_global_config(&config);

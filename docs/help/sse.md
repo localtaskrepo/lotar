@@ -16,7 +16,7 @@ The server responds with `text/event-stream`, sends an initial `retry: 1000` hin
 | Parameter | Details |
 |-----------|---------|
 | `debounce_ms` | Debounce window (default 100 ms). Left blank, the server falls back to `LOTAR_SSE_DEBOUNCE_MS`. Values below 20 ms are clamped when fast-IO mode is enabled. |
-| `kinds` / `topic` | Comma-separated, case-insensitive list of kinds to keep. Valid kinds: `task_created`, `task_updated`, `task_deleted`, `config_updated`, `project_changed`. When omitted, all events flow through. `topic` is a legacy alias retained for compatibility. |
+| `kinds` / `topic` | Comma-separated, case-insensitive list of kinds to keep. Valid kinds: `task_created`, `task_updated`, `task_deleted`, `config_updated`, `project_changed`, `sync_started`, `sync_progress`, `sync_completed`, `sync_failed`. When omitted, all events flow through. `topic` is a legacy alias retained for compatibility. |
 | `project` | Filter events to a specific project prefix. Task events match when the task ID (e.g., `TEST-42`) shares that prefix; filesystem events match on their `{ "name": "<PROJECT>" }` payload. |
 | `ready` | `true`/`1` requests a one-time `ready` event. Only honored when `LOTAR_SSE_READY=1` is set on the server. |
 
@@ -28,6 +28,10 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 - `task_deleted` — `{ "id": "<PROJECT-N>", "triggered_by"?: string }`.
 - `config_updated` — `{ "triggered_by"?: string }`; emitted after `lotar config set`, REST config writes, or other config-mutating actions.
 - `project_changed` — `{ "name": "<PROJECT>" }`; raised by the `.tasks` watcher whenever YAML files are created, modified, or removed under that project.
+- `sync_started` — `{ "run_id": "sync-...", "direction": "pull|push", "provider": "jira|github", "remote": "<remote>", "project": "<PREFIX>", "dry_run": true|false, "started_at": "..." }`.
+- `sync_progress` — `{ "run_id": "sync-...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "entry": {"status":"created|updated|skipped|failed", "task_id": "PREFIX-1", "reference": "owner/repo#123", "message": "...", "at": "..."}, "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.
+- `sync_completed` — `{ "run_id": "sync-...", "report": { "id": "...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "stored_path": "sync-...json", ... }, "finished_at": "..." }`.
+- `sync_failed` — `{ "run_id": "sync-...", "error": "...", "finished_at": "...", "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.
 - `ready` — `{}`; only emitted when both `LOTAR_SSE_READY=1` and `ready=1` are in effect.
 
 Every event is written as:

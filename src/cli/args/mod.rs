@@ -7,6 +7,7 @@ pub mod scan;
 pub mod serve;
 pub mod sprint;
 pub mod stats;
+pub mod sync;
 pub mod task;
 
 // Re-exports for ergonomic imports from crate::cli::args
@@ -25,6 +26,7 @@ pub use sprint::{
     SprintStartArgs, SprintUpdateArgs,
 };
 pub use stats::{StatsAction, StatsArgs};
+pub use sync::{SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs};
 pub use task::{
     AddArgs, RelationshipKind, SortField, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs,
     TaskReferenceAction, TaskReferenceAddArgs, TaskReferenceArgs, TaskReferenceKindAdd,

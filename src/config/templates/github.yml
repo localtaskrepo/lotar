@@ -1,0 +1,58 @@
+# GitHub Project Template
+# GitHub issues workflow with a GitHub remote mapping
+
+name: "GitHub"
+description: "GitHub issues workflow with GitHub remote mapping"
+config:
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo
+      - InProgress
+      - Done
+    types:
+      - Feature
+      - Bug
+      - Chore
+    priorities:
+      - Low
+      - Medium
+      - High
+      - Critical
+    tags:
+      - "*"
+  remotes:
+    github:
+      provider: github
+      repo: your-org/your-repo
+      auth_profile: github.default
+      mapping:
+        title: title
+        description: body
+        status:
+          field: state
+          values:
+            Todo: open
+            InProgress: open
+            Done: closed
+        task_type:
+          field: labels
+          values:
+            Feature: type:feature
+            Bug: type:bug
+            Chore: type:chore
+        priority:
+          field: labels
+          values:
+            Low: priority:low
+            Medium: priority:medium
+            High: priority:high
+            Critical: priority:critical
+        assignee:
+          field: assignees
+          when_empty: clear
+        tags:
+          field: labels
+          add:
+            - lotar

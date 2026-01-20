@@ -12,6 +12,8 @@ pub mod sprint_service;
 pub mod sprint_status;
 pub mod sprint_timing;
 pub mod sprint_velocity;
+pub mod sync_report_service;
+pub mod sync_service;
 pub mod task_service;
 
 pub mod task_selection;

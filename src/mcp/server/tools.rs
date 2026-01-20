@@ -58,6 +58,8 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_project_stats_tool(enum_hints),
         make_config_show_tool(enum_hints),
         make_config_set_tool(enum_hints),
+        make_sync_pull_tool(enum_hints),
+        make_sync_push_tool(enum_hints),
         make_schema_discover_tool(),
     ]
 }
@@ -65,7 +67,7 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
 fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_reference_add",
-        "description": "Attach a reference to a task. kind must be one of: link, file, code. For link, value is a URL. For file, value is a repo-relative file path. For code, value is a code reference like src/lib.rs#10-12. Returns {task, changed}.",
+        "description": "Attach a reference to a task. kind must be one of: link, file, code, jira, github. For link, value is a URL. For file, value is a repo-relative file path. For code, value is a code reference like src/lib.rs#10-12. Returns {task, changed}.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -86,7 +88,13 @@ fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
         enum_hints.map(|h| h.projects.as_slice()),
         false,
     );
-    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    let kinds = vec![
+        "link".to_string(),
+        "file".to_string(),
+        "code".to_string(),
+        "jira".to_string(),
+        "github".to_string(),
+    ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
@@ -95,7 +103,7 @@ fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
 fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_reference_remove",
-        "description": "Detach a reference from a task. kind must be one of: link, file, code. value should match the stored reference string. Returns {task, changed}.",
+        "description": "Detach a reference from a task. kind must be one of: link, file, code, jira, github. value should match the stored reference string. Returns {task, changed}.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -116,7 +124,13 @@ fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
         enum_hints.map(|h| h.projects.as_slice()),
         false,
     );
-    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    let kinds = vec![
+        "link".to_string(),
+        "file".to_string(),
+        "code".to_string(),
+        "jira".to_string(),
+        "github".to_string(),
+    ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
@@ -661,7 +675,7 @@ fn make_task_bulk_comment_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
     })
 }
 
-fn make_task_bulk_reference_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
+fn make_task_bulk_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_bulk_reference_add",
         "description": "Attach the same reference to multiple tasks. Returns {updated, failed}.",
@@ -669,6 +683,7 @@ fn make_task_bulk_reference_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
             "type": "object",
             "properties": {
                 "ids": {"type": "array", "items": {"type": "string"}},
+                "project": {"type": ["string", "null"]},
                 "kind": {"type": "string"},
                 "value": {"type": "string"},
                 "stop_on_error": {"type": ["boolean", "null"]}
@@ -679,13 +694,25 @@ fn make_task_bulk_reference_add_tool(_enum_hints: Option<&EnumHints>) -> Value {
     });
 
     let mut field_hints = JsonMap::new();
-    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    let kinds = vec![
+        "link".to_string(),
+        "file".to_string(),
+        "code".to_string(),
+        "jira".to_string(),
+        "github".to_string(),
+    ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
 }
 
-fn make_task_bulk_reference_remove_tool(_enum_hints: Option<&EnumHints>) -> Value {
+fn make_task_bulk_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_bulk_reference_remove",
         "description": "Detach the same reference from multiple tasks. Returns {updated, failed}.",
@@ -693,6 +720,7 @@ fn make_task_bulk_reference_remove_tool(_enum_hints: Option<&EnumHints>) -> Valu
             "type": "object",
             "properties": {
                 "ids": {"type": "array", "items": {"type": "string"}},
+                "project": {"type": ["string", "null"]},
                 "kind": {"type": "string"},
                 "value": {"type": "string"},
                 "stop_on_error": {"type": ["boolean", "null"]}
@@ -703,7 +731,19 @@ fn make_task_bulk_reference_remove_tool(_enum_hints: Option<&EnumHints>) -> Valu
     });
 
     let mut field_hints = JsonMap::new();
-    let kinds = vec!["link".to_string(), "file".to_string(), "code".to_string()];
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    let kinds = vec![
+        "link".to_string(),
+        "file".to_string(),
+        "code".to_string(),
+        "jira".to_string(),
+        "github".to_string(),
+    ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
     tool
@@ -1116,6 +1156,68 @@ fn make_config_set_tool(enum_hints: Option<&EnumHints>) -> Value {
         append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
     }
 
+    tool
+}
+
+fn make_sync_pull_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "sync_pull",
+        "description": "Pull tasks from a configured sync remote. Returns a summary of planned changes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "remote": {"type": "string"},
+                "project": {"type": ["string", "null"]},
+                "auth_profile": {"type": ["string", "null"]},
+                "dry_run": {"type": ["boolean", "null"]},
+                "include_report": {"type": ["boolean", "null"]},
+                "write_report": {"type": ["boolean", "null"]},
+                "client_run_id": {"type": ["string", "null"]}
+            },
+            "required": ["remote"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    attach_field_hints(&mut tool, field_hints);
+    tool
+}
+
+fn make_sync_push_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "sync_push",
+        "description": "Push tasks to a configured sync remote. Returns a summary of planned changes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "remote": {"type": "string"},
+                "project": {"type": ["string", "null"]},
+                "auth_profile": {"type": ["string", "null"]},
+                "dry_run": {"type": ["boolean", "null"]},
+                "include_report": {"type": ["boolean", "null"]},
+                "write_report": {"type": ["boolean", "null"]},
+                "client_run_id": {"type": ["string", "null"]}
+            },
+            "required": ["remote"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    attach_field_hints(&mut tool, field_hints);
     tool
 }
 

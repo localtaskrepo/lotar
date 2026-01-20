@@ -90,9 +90,8 @@ impl ReferenceService {
         let mut added = false;
         if !already {
             task.references.push(ReferenceEntry {
-                code: None,
                 link: Some(trimmed.to_string()),
-                file: None,
+                ..Default::default()
             });
             task.modified = chrono::Utc::now().to_rfc3339();
             storage.edit(task_id, &task)?;
@@ -202,8 +201,7 @@ impl ReferenceService {
         if !already {
             task.references.push(ReferenceEntry {
                 code: Some(normalized),
-                link: None,
-                file: None,
+                ..Default::default()
             });
             task.modified = chrono::Utc::now().to_rfc3339();
             storage.edit(task_id, &task)?;
@@ -285,6 +283,137 @@ impl ReferenceService {
         Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
     }
 
+    pub fn attach_platform_reference(
+        storage: &mut Storage,
+        task_id: &str,
+        kind: &str,
+        value: &str,
+    ) -> LoTaRResult<(TaskDTO, bool)> {
+        let derived = task_id.split('-').next().unwrap_or("");
+        if derived.trim().is_empty() {
+            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
+        }
+
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Missing reference value".to_string(),
+            ));
+        }
+        if trimmed.len() > 4096 {
+            return Err(LoTaRError::ValidationError(
+                "Reference value is too long (max 4096 characters)".to_string(),
+            ));
+        }
+
+        let normalized = match kind.trim().to_ascii_lowercase().as_str() {
+            "jira" => normalize_jira_reference(trimmed),
+            "github" => normalize_github_reference(trimmed),
+            other => {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Unsupported reference kind: {}",
+                    other
+                )));
+            }
+        };
+
+        let project = derived.to_string();
+        let mut task = storage
+            .get(task_id, project)
+            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
+
+        let already = match kind.trim().to_ascii_lowercase().as_str() {
+            "jira" => task
+                .references
+                .iter()
+                .any(|r| r.jira.as_deref() == Some(normalized.as_str())),
+            "github" => task
+                .references
+                .iter()
+                .any(|r| r.github.as_deref() == Some(normalized.as_str())),
+            _ => false,
+        };
+
+        let mut added = false;
+        if !already {
+            let entry = match kind.trim().to_ascii_lowercase().as_str() {
+                "jira" => ReferenceEntry {
+                    jira: Some(normalized),
+                    ..Default::default()
+                },
+                "github" => ReferenceEntry {
+                    github: Some(normalized),
+                    ..Default::default()
+                },
+                _ => {
+                    return Err(LoTaRError::ValidationError(
+                        "Unsupported reference kind".to_string(),
+                    ));
+                }
+            };
+            task.references.push(entry);
+            task.modified = chrono::Utc::now().to_rfc3339();
+            storage.edit(task_id, &task)?;
+            added = true;
+        }
+
+        Ok((TaskService::get(storage, task_id, Some(derived))?, added))
+    }
+
+    pub fn detach_platform_reference(
+        storage: &mut Storage,
+        task_id: &str,
+        kind: &str,
+        value: &str,
+    ) -> LoTaRResult<(TaskDTO, bool)> {
+        let derived = task_id.split('-').next().unwrap_or("");
+        if derived.trim().is_empty() {
+            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
+        }
+
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Missing reference value".to_string(),
+            ));
+        }
+
+        let normalized = match kind.trim().to_ascii_lowercase().as_str() {
+            "jira" => normalize_jira_reference(trimmed),
+            "github" => normalize_github_reference(trimmed),
+            other => {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Unsupported reference kind: {}",
+                    other
+                )));
+            }
+        };
+
+        let project = derived.to_string();
+        let mut task = storage
+            .get(task_id, project)
+            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
+
+        let before_len = task.references.len();
+        match kind.trim().to_ascii_lowercase().as_str() {
+            "jira" => task
+                .references
+                .retain(|r| r.jira.as_deref() != Some(normalized.as_str())),
+            "github" => task
+                .references
+                .retain(|r| r.github.as_deref() != Some(normalized.as_str())),
+            _ => {}
+        }
+
+        let removed = task.references.len() != before_len;
+        if removed {
+            task.modified = chrono::Utc::now().to_rfc3339();
+            storage.edit(task_id, &task)?;
+        }
+
+        Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
+    }
+
     pub fn attach_file_reference(
         storage: &mut Storage,
         repo_root: &Path,
@@ -331,9 +460,8 @@ impl ReferenceService {
         let mut added = false;
         if !already {
             task.references.push(ReferenceEntry {
-                code: None,
-                link: None,
                 file: Some(normalized),
+                ..Default::default()
             });
             task.modified = chrono::Utc::now().to_rfc3339();
             storage.edit(task_id, &task)?;
@@ -531,6 +659,41 @@ impl ReferenceService {
         let raw = path.to_string_lossy();
         raw.replace('\\', "/")
     }
+}
+
+fn trim_platform_prefix(value: &str, prefix: &str) -> String {
+    let trimmed = value.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    let needle = format!("{}:", prefix.to_ascii_lowercase());
+    if lower.starts_with(&needle) {
+        trimmed[needle.len()..].trim().to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn normalize_jira_reference(value: &str) -> String {
+    let trimmed = trim_platform_prefix(value, "jira");
+    if let Some((prefix, rest)) = trimmed.split_once('-') {
+        let prefix = prefix.trim();
+        let rest = rest.trim();
+        if !prefix.is_empty() && !rest.is_empty() {
+            return format!("{}-{}", prefix.to_ascii_uppercase(), rest);
+        }
+    }
+    trimmed
+}
+
+fn normalize_github_reference(value: &str) -> String {
+    let trimmed = trim_platform_prefix(value, "github");
+    if let Some((repo, rest)) = trimmed.split_once('#') {
+        let repo = repo.trim().trim_matches('/').to_ascii_lowercase();
+        let rest = rest.trim();
+        if !repo.is_empty() && !rest.is_empty() {
+            return format!("{}#{}", repo, rest);
+        }
+    }
+    trimmed
 }
 
 #[cfg(test)]
@@ -894,5 +1057,22 @@ mod tests {
                 .iter()
                 .any(|r| r.code.as_deref() == Some(canonical))
         );
+    }
+
+    #[test]
+    fn normalize_jira_reference_uppercases_prefix() {
+        assert_eq!(normalize_jira_reference("jira:abc-123"), "ABC-123");
+        assert_eq!(normalize_jira_reference("AbC- 42"), "ABC-42");
+        assert_eq!(normalize_jira_reference("XYZ-9"), "XYZ-9");
+    }
+
+    #[test]
+    fn normalize_github_reference_lowercases_repo() {
+        assert_eq!(
+            normalize_github_reference("github:Org/Repo#1"),
+            "org/repo#1"
+        );
+        assert_eq!(normalize_github_reference("ORG/Repo#42"), "org/repo#42");
+        assert_eq!(normalize_github_reference("repo#7"), "repo#7");
     }
 }

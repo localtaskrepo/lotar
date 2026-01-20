@@ -1,4 +1,7 @@
-use crate::config::types::{GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField};
+use crate::config::types::{
+    GlobalConfig, ProjectConfig, ResolvedConfig, StringConfigField, SyncAuthProfile, SyncProvider,
+    SyncRemoteConfig,
+};
 use crate::config::validation::conflicts::PrefixConflictDetector;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
 use std::collections::{HashMap, HashSet};
@@ -162,6 +165,13 @@ impl ConfigValidator {
             );
         }
 
+        self.validate_remote_config(
+            &config.remotes,
+            &config.auth_profiles,
+            "project",
+            &mut result,
+        );
+
         result
     }
 
@@ -274,6 +284,13 @@ impl ConfigValidator {
             );
         }
 
+        self.validate_remote_config(
+            &config.remotes,
+            &config.auth_profiles,
+            "global",
+            &mut result,
+        );
+
         // Validate default values exist in lists
         if let Some(default_status) = &config.default_status
             && !config.issue_states.values.contains(default_status)
@@ -348,6 +365,14 @@ impl ConfigValidator {
             self.validate_ticket_patterns(patterns, &mut result);
         }
 
+        result
+    }
+
+    pub fn validate_home_config(&self, config: &GlobalConfig) -> ValidationResult {
+        let mut result = self.validate_global_config(config);
+        result
+            .warnings
+            .retain(|warning| warning.field.as_deref() != Some("auth_profiles"));
         result
     }
 
@@ -683,6 +708,72 @@ impl ConfigValidator {
                         "Consider making patterns mutually exclusive or ordering them".to_string(),
                     ),
                 );
+            }
+        }
+    }
+
+    fn validate_remote_config(
+        &self,
+        remotes: &std::collections::HashMap<String, SyncRemoteConfig>,
+        auth_profiles: &std::collections::HashMap<String, SyncAuthProfile>,
+        scope: &str,
+        result: &mut ValidationResult,
+    ) {
+        if remotes.is_empty() && auth_profiles.is_empty() {
+            return;
+        }
+
+        if !auth_profiles.is_empty() {
+            let message = match scope {
+                "project" => {
+                    "auth_profiles should live in home config and are ignored in project configs"
+                }
+                _ => "auth_profiles should live in home config (avoid committing secrets)",
+            };
+            result.add_error(ValidationError::warning(
+                Some("auth_profiles".to_string()),
+                message.to_string(),
+            ));
+        }
+
+        for (name, remote) in remotes {
+            let trimmed = name.trim();
+            if trimmed.is_empty() {
+                result.add_error(ValidationError::error(
+                    Some("remotes".to_string()),
+                    "Remote name cannot be empty".to_string(),
+                ));
+                continue;
+            }
+
+            match remote.provider {
+                SyncProvider::Jira => {
+                    let missing = remote
+                        .project
+                        .as_ref()
+                        .map(|v| v.trim().is_empty())
+                        .unwrap_or(true);
+                    if missing {
+                        result.add_error(ValidationError::warning(
+                            Some(format!("remotes.{trimmed}.project")),
+                            "Jira remotes should set a project key".to_string(),
+                        ));
+                    }
+                }
+                SyncProvider::Github => {
+                    let repo = remote.repo.as_ref().map(|v| v.trim()).unwrap_or("");
+                    if repo.is_empty() {
+                        result.add_error(ValidationError::warning(
+                            Some(format!("remotes.{trimmed}.repo")),
+                            "GitHub remotes should set repo as owner/repo".to_string(),
+                        ));
+                    } else if !repo.contains('/') {
+                        result.add_error(ValidationError::warning(
+                            Some(format!("remotes.{trimmed}.repo")),
+                            "GitHub repo should look like owner/repo".to_string(),
+                        ));
+                    }
+                }
             }
         }
     }

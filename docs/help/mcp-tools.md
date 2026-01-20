@@ -52,12 +52,12 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `updated[]` and `failed[]`.
 
 ### `task_bulk_reference_add`
-- **Params:** `ids[]` (required), `kind` (required: `link|file|code`), `value` (required), optional `stop_on_error`.
+- **Params:** `ids[]` (required), optional `project`, `kind` (required: `link|file|code|jira|github`), `value` (required), optional `stop_on_error`.
 - **Behavior:** attaches the same reference to multiple tasks.
 - **Response:** JSON with `updated[]` and `failed[]`.
 
 ### `task_bulk_reference_remove`
-- **Params:** `ids[]` (required), `kind` (required: `link|file|code`), `value` (required), optional `stop_on_error`.
+- **Params:** `ids[]` (required), optional `project`, `kind` (required: `link|file|code|jira|github`), `value` (required), optional `stop_on_error`.
 - **Behavior:** detaches the same reference from multiple tasks.
 - **Response:** JSON with `updated[]` and `failed[]`.
 
@@ -134,6 +134,16 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 ### `config_set`
 - **Params:** `values` map of key→string plus optional `global`/`project` selectors.
 - **Response:** Text summary indicating success along with any validation warnings/info from the config service.
+
+## Sync Tools
+
+### `sync_pull`
+- **Params:** `remote` (required), optional `project`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
+- **Response:** JSON summary plus report metadata; `include_report` returns per-item entries.
+
+### `sync_push`
+- **Params:** `remote` (required), optional `project`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
+- **Response:** JSON summary plus report metadata; `include_report` returns per-item entries.
 
 ## Schema Tool
 

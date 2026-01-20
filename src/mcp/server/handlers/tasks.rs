@@ -472,7 +472,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             .unwrap_or_default(),
     };
 
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(resolver.path.clone());
     match TaskService::create(&mut storage, dto) {
         Ok(task) => {
             let response_body = make_task_create_payload(&task, &req.params, enum_hints.as_ref());
@@ -660,7 +660,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Ok(patch) => patch,
         Err(resp) => return resp,
     };
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(resolver.path.clone());
     match TaskService::update(&mut storage, &id.unwrap(), patch) {
         Ok(task) => ok(
             req.id,
@@ -927,7 +927,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(resp) => return resp,
     };
 
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(resolver.path.clone());
     let mut updated: Vec<TaskDTO> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
 
@@ -1108,7 +1108,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         }
     };
 
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(resolver.path.clone());
     let repo_root = if kind == "code" || kind == "file" {
         match find_repo_root(storage.root_path.as_path()) {
             Some(root) => Some(root),
@@ -1133,26 +1133,83 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
     let mut failed: Vec<Value> = Vec::new();
 
     for id in ids {
+        let normalized_id = if let Some(project_override) =
+            req.params.get("project").and_then(|v| v.as_str())
+        {
+            let mut project_resolver = match ProjectResolver::new(&resolver) {
+                Ok(r) => r,
+                Err(e) => {
+                    failed.push(json!({"id": id, "error": format!("Failed to initialize project resolver: {}", e)}));
+                    if stop_on_error {
+                        break;
+                    }
+                    continue;
+                }
+            };
+            match project_resolver.get_full_task_id(&id, Some(project_override)) {
+                Ok(full) => full,
+                Err(e) => {
+                    failed.push(json!({"id": id, "error": e}));
+                    if stop_on_error {
+                        break;
+                    }
+                    continue;
+                }
+            }
+        } else {
+            id.clone()
+        };
+
         let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
-            ("link", true) => ReferenceService::attach_link_reference(&mut storage, &id, &value),
-            ("link", false) => ReferenceService::detach_link_reference(&mut storage, &id, &value),
+            ("link", true) => {
+                ReferenceService::attach_link_reference(&mut storage, &normalized_id, &value)
+            }
+            ("link", false) => {
+                ReferenceService::detach_link_reference(&mut storage, &normalized_id, &value)
+            }
             ("code", true) => ReferenceService::attach_code_reference(
                 &mut storage,
                 repo_root.as_ref().unwrap(),
-                &id,
+                &normalized_id,
                 &value,
             ),
-            ("code", false) => ReferenceService::detach_code_reference(&mut storage, &id, &value),
+            ("code", false) => {
+                ReferenceService::detach_code_reference(&mut storage, &normalized_id, &value)
+            }
             ("file", true) => ReferenceService::attach_file_reference(
                 &mut storage,
                 repo_root.as_ref().unwrap(),
-                &id,
+                &normalized_id,
                 &value,
             ),
             ("file", false) => ReferenceService::detach_file_reference(
                 &mut storage,
                 repo_root.as_ref().unwrap(),
-                &id,
+                &normalized_id,
+                &value,
+            ),
+            ("jira", true) => ReferenceService::attach_platform_reference(
+                &mut storage,
+                &normalized_id,
+                "jira",
+                &value,
+            ),
+            ("jira", false) => ReferenceService::detach_platform_reference(
+                &mut storage,
+                &normalized_id,
+                "jira",
+                &value,
+            ),
+            ("github", true) => ReferenceService::attach_platform_reference(
+                &mut storage,
+                &normalized_id,
+                "github",
+                &value,
+            ),
+            ("github", false) => ReferenceService::detach_platform_reference(
+                &mut storage,
+                &normalized_id,
+                "github",
                 &value,
             ),
             _ => {
@@ -1160,7 +1217,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
                     req.id,
                     -32602,
                     "Invalid kind",
-                    Some(json!({"message": "kind must be one of: link, file, code"})),
+                    Some(json!({"message": "kind must be one of: link, file, code, jira, github"})),
                 );
             }
         }
@@ -1168,10 +1225,10 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
 
         match result {
             Ok((task, changed)) => {
-                updated.push(json!({"id": id, "changed": changed, "task": task}))
+                updated.push(json!({"id": normalized_id, "changed": changed, "task": task}))
             }
             Err(error) => {
-                failed.push(json!({"id": id, "error": error}));
+                failed.push(json!({"id": normalized_id, "error": error}));
                 if stop_on_error {
                     break;
                 }
@@ -1302,12 +1359,24 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
             };
             ReferenceService::detach_file_reference(&mut storage, &repo_root, &full_id, &value)
         }
+        ("jira", true) => {
+            ReferenceService::attach_platform_reference(&mut storage, &full_id, "jira", &value)
+        }
+        ("jira", false) => {
+            ReferenceService::detach_platform_reference(&mut storage, &full_id, "jira", &value)
+        }
+        ("github", true) => {
+            ReferenceService::attach_platform_reference(&mut storage, &full_id, "github", &value)
+        }
+        ("github", false) => {
+            ReferenceService::detach_platform_reference(&mut storage, &full_id, "github", &value)
+        }
         _ => {
             return err(
                 req.id,
                 -32602,
                 "Invalid kind",
-                Some(json!({"message": "kind must be one of: link, file, code"})),
+                Some(json!({"message": "kind must be one of: link, file, code, jira, github"})),
             );
         }
     }

@@ -3,6 +3,11 @@ use crate::config::types::*;
 use std::fs;
 use std::path::Path;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use std::sync::OnceLock;
+
 /// Ensure global config exists, creating default if necessary
 pub fn ensure_global_config_exists(tasks_dir: Option<&Path>) -> Result<(), ConfigError> {
     let config_path = match tasks_dir {
@@ -50,6 +55,7 @@ pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
     let home_dir =
         dirs::home_dir().ok_or(ConfigError::IoError("Home directory not found".to_string()))?;
     let path = home_dir.join(".lotar");
+    warn_insecure_home_config_permissions(&path);
     load_config_file(&path)
 }
 
@@ -78,6 +84,7 @@ pub fn load_home_config_with_override(
             home_dir.join(".lotar")
         }
     };
+    warn_insecure_home_config_permissions(&path);
     load_config_file(&path)
 }
 
@@ -218,4 +225,33 @@ pub fn auto_detect_prefix(tasks_dir: &Path) -> Option<String> {
     // No existing project directories found
     // Return None so default_project remains empty until first project is created
     None
+}
+
+fn warn_insecure_home_config_permissions(path: &Path) {
+    #[cfg(unix)]
+    {
+        static WARNED: OnceLock<()> = OnceLock::new();
+        if WARNED.get().is_some() {
+            return;
+        }
+        let quiet = std::env::var("LOTAR_TEST_SILENT").unwrap_or_default() == "1";
+        if quiet || !path.exists() {
+            return;
+        }
+        if let Ok(meta) = fs::metadata(path) {
+            let mode = meta.permissions().mode() & 0o777;
+            if mode & 0o077 != 0 {
+                let renderer = crate::output::OutputRenderer::new(
+                    crate::output::OutputFormat::Text,
+                    crate::output::LogLevel::Warn,
+                );
+                renderer.emit_warning(format!(
+                    "Home config permissions are too open (mode {:o}). Run chmod 600 {}",
+                    mode,
+                    path.display()
+                ));
+                let _ = WARNED.set(());
+            }
+        }
+    }
 }

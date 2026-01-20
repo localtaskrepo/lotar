@@ -66,6 +66,12 @@ impl CommandHandler for ConfigHandler {
                 renderer.emit_raw_stdout("  • default - Basic task management setup");
                 renderer.emit_raw_stdout("  • agile - Agile/Scrum workflow configuration");
                 renderer.emit_raw_stdout("  • kanban - Kanban board style setup");
+                renderer
+                    .emit_raw_stdout("  • jira - Jira-aligned workflow with Jira remote mapping");
+                renderer.emit_raw_stdout(
+                    "  • github - GitHub issues workflow with GitHub remote mapping",
+                );
+                renderer.emit_raw_stdout("  • jira-github - Dual Jira + GitHub remote mapping");
                 renderer.emit_info(
                     "Use 'lotar config init --template=<n>' to initialize with a template.",
                 );

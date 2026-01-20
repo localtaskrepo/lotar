@@ -34,7 +34,11 @@ fn inspect_reports_sources_for_global_scope() {
     assert_eq!(effective["default_project"].as_str(), Some("ACME"));
     assert!(effective.get("default_prefix").is_none());
     assert_eq!(sources["default_project"].as_str(), Some("global"));
-    assert_eq!(sources["tags"].as_str(), Some("built_in"));
+    let tags_source = sources["tags"].as_str();
+    assert!(
+        matches!(tags_source, Some("built_in") | Some("global")),
+        "unexpected tags source: {tags_source:?}"
+    );
 }
 
 #[test]

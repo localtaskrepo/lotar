@@ -1,6 +1,7 @@
 pub(super) mod config;
 pub(super) mod projects;
 pub(super) mod sprints;
+pub(super) mod sync;
 pub(super) mod tasks;
 pub(super) mod whoami;
 
@@ -11,6 +12,7 @@ pub(super) use sprints::{
     handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove,
     handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
 };
+pub(super) use sync::{handle_sync_pull, handle_sync_push};
 pub(super) use tasks::{
     handle_task_bulk_comment_add, handle_task_bulk_reference_add,
     handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add,

@@ -17,8 +17,8 @@ use handlers::{
     handle_config_set, handle_config_show, handle_project_list, handle_project_stats,
     handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create,
     handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove,
-    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
-    handle_task_bulk_comment_add, handle_task_bulk_reference_add,
+    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull,
+    handle_sync_push, handle_task_bulk_comment_add, handle_task_bulk_reference_add,
     handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add,
     handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get,
     handle_task_list, handle_task_reference_add, handle_task_reference_remove, handle_task_update,
@@ -521,6 +521,10 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
         "config/show" => handle_config_show(req),
         // config/set({ global?, project?, values }) -> { updated }
         "config/set" => handle_config_set(req),
+        // sync/pull({ remote, project?, auth_profile?, dry_run? }) -> { summary }
+        "sync/pull" => handle_sync_pull(req),
+        // sync/push({ remote, project?, auth_profile?, dry_run? }) -> { summary }
+        "sync/push" => handle_sync_push(req),
         // task/update({ id, patch }) -> { task }
         "task/update" => handle_task_update(req),
         // task/reference_add({ id, project?, kind, value }) -> { task, changed }

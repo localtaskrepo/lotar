@@ -22,6 +22,30 @@ docker run --rm \
   mallox/lotar list --format table
 ```
 
+### Command Behavior
+The image sets `ENTRYPOINT` to `lotar`, so pass subcommands directly (for example, `mallox/lotar list`).
+Avoid prefixing the command with `lotar`, which would call `lotar` twice and fail.
+
+If you want to avoid retyping the image name, define a Compose service or a local shell alias.
+
+### Long-Running Server (Docker Compose)
+To run the web server in a container, bind to all interfaces and publish the port:
+
+```yaml
+services:
+  lotar:
+    image: mallox/lotar:latest
+    command: ["serve", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./:/workspace
+      - ./.tasks:/tasks
+    working_dir: /workspace
+```
+
+`--open` is intentionally omitted in containers. Use your browser to visit `http://localhost:8080`.
+
 The image sets `LOTAR_TASKS_DIR=/tasks`, so mapping any task directory to `/tasks` is the
 preferred workflow. Mounting the whole repository at `/workspace` keeps git metadata available
 for commands that need it.

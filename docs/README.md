@@ -48,6 +48,8 @@ lotar --version
 docker pull mallox/lotar
 docker run --rm mallox/lotar --version
 ```
+The image entrypoint is `lotar`, so pass subcommands directly (for example, `mallox/lotar list`).
+For a long-running server or Docker Compose examples, see [docs/docker.md](docker.md).
 See the [Docker Hub repository](https://hub.docker.com/r/mallox/lotar) for tags and usage
 notes.
 

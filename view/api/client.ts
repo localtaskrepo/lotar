@@ -11,6 +11,10 @@ import type {
   CodeReferenceRemoveResponse,
   ConfigInspectResult,
   ConfigSetResponse,
+  GenericReferenceAddRequest,
+  GenericReferenceAddResponse,
+  GenericReferenceRemoveRequest,
+  GenericReferenceRemoveResponse,
   LinkReferenceAddRequest,
   LinkReferenceAddResponse,
   LinkReferenceRemoveRequest,
@@ -33,6 +37,12 @@ import type {
   SprintUpdateRequest,
   SprintUpdateResponse,
   SprintVelocityResponse,
+  SyncReport,
+  SyncReportListResponse,
+  SyncRequest,
+  SyncResponse,
+  SyncValidateRequest,
+  SyncValidateResponse,
   TaskCreate,
   TaskDTO,
   TaskListFilter,
@@ -135,6 +145,8 @@ export const api = {
   removeTaskLinkReference(payload: LinkReferenceRemoveRequest): Promise<LinkReferenceRemoveResponse> { return post('/api/tasks/references/link/remove', payload) },
   addTaskCodeReference(payload: CodeReferenceAddRequest): Promise<CodeReferenceAddResponse> { return post('/api/tasks/references/code/add', payload) },
   removeTaskCodeReference(payload: CodeReferenceRemoveRequest): Promise<CodeReferenceRemoveResponse> { return post('/api/tasks/references/code/remove', payload) },
+  addTaskReference(payload: GenericReferenceAddRequest): Promise<GenericReferenceAddResponse> { return post('/api/tasks/references/add', payload) },
+  removeTaskReference(payload: GenericReferenceRemoveRequest): Promise<GenericReferenceRemoveResponse> { return post('/api/tasks/references/remove', payload) },
   taskHistory(id: string, limit?: number): Promise<Array<{ commit: string; author: string; email: string; date: string; message: string }>> { return get('/api/tasks/history', { id, limit }) },
   taskCommitDiff(id: string, commit: string): Promise<string> { return get('/api/tasks/commit_diff', { id, commit }) },
   suggestTasks(q: string, project?: string, limit = 20): Promise<Array<{ id: string; title: string }>> { return get('/api/tasks/suggest', { q, project, limit }) },
@@ -164,6 +176,15 @@ export const api = {
     if (payload.global) body.global = true
     return post('/api/config/set', body)
   },
+
+  // Sync
+  syncPull(payload: SyncRequest): Promise<SyncResponse> { return post('/api/sync/pull', payload) },
+  syncPush(payload: SyncRequest): Promise<SyncResponse> { return post('/api/sync/push', payload) },
+  syncValidate(payload: SyncValidateRequest): Promise<SyncValidateResponse> { return post('/api/sync/validate', payload) },
+  syncReportsList(params: { project?: string; limit?: number; offset?: number } = {}): Promise<SyncReportListResponse> {
+    return get('/api/sync/reports/list', params as any)
+  },
+  syncReportGet(path: string): Promise<SyncReport> { return get('/api/sync/reports/get', { path }) },
 
   // Activity
   activitySeries(group: 'author' | 'day' | 'week' | 'project', params: { since?: string; until?: string; project?: string } = {}): Promise<Array<{ key: string; count: number; last_date: string }>> {

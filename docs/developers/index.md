@@ -24,6 +24,7 @@ Use this page to jump into the implementation notes you need while building LoTa
 ## Integrations
 
 - [Serve/MCP/web server](./mcp.md) and [MCP tools](./mcp-tools.md)
+- [Manual sync (push/pull)](./sync.md)
 - [SSE events](./sse.md)
 - [API quick reference](./api-quick-reference.md) + `docs/openapi.json`
 - [Preferences](./preferences.md) for browser-only state management

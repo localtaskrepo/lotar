@@ -32,6 +32,20 @@ lotar config templates
   - `issue.tags`: ["*"]
   - `issue.categories`: *(not set)*
   - `custom_fields`: ["category"]
+- **jira** — Jira-aligned workflow with Jira remote mapping.
+  - `issue.states`: Todo, InProgress, Done
+  - `issue.types`: Feature, Bug, Chore
+  - `issue.priorities`: Low, Medium, High, Critical
+  - `remotes.jira`: summary/description/status/issuetype/priority/assignee/reporter/labels mappings
+  - `remotes.jira.filter`: `labels = lotar` to avoid pulling unrelated issues
+- **github** — GitHub issues workflow with GitHub remote mapping.
+  - `issue.states`: Todo, InProgress, Done
+  - `issue.types`: Feature, Bug, Chore
+  - `issue.priorities`: Low, Medium, High, Critical
+  - `remotes.github`: title/body/state/assignees/labels mappings
+  - `remotes.github.filter`: `label:lotar` to avoid pulling unrelated issues
+- **jira-github** — Dual Jira + GitHub remote mapping.
+  - `remotes.jira` + `remotes.github` configured together
 
 Each template file includes metadata (`name`, `description`) plus a `config:` block. Only the `config:` block is written to disk.
 

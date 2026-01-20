@@ -29,7 +29,7 @@ fn init_lotar_test_environment() {
     reset_lotar_test_environment();
 }
 
-/// Remove shared LOTAR environment variables so integration tests start clean.
+/// Remove shared LOTAR environment variables and ignore home config for deterministic tests.
 pub fn reset_lotar_test_environment() {
     // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny.
     unsafe {
@@ -37,7 +37,7 @@ pub fn reset_lotar_test_environment() {
         std::env::remove_var("LOTAR_HOME");
         std::env::remove_var("LOTAR_TEST_SILENT");
         std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
-        std::env::remove_var("LOTAR_IGNORE_HOME_CONFIG");
+        std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");
     }
 }
 

@@ -9,10 +9,11 @@ use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
     AddHandler, CommandHandler, CompletionsHandler, ConfigHandler, GitHandler, ScanHandler,
-    ServeHandler, SprintHandler, StatsHandler, TaskHandler,
+    ServeHandler, SprintHandler, StatsHandler, SyncHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
-use lotar::cli::{Cli, Commands, ConfigAction, TaskAction};
+use lotar::cli::{Cli, Commands, ConfigAction, SyncCommandAction, TaskAction};
+use lotar::services::sync_service::SyncDirection;
 use lotar::utils::resolve_project_input;
 use lotar::workspace::TasksDirectoryResolver;
 use lotar::{help, output};
@@ -44,6 +45,8 @@ fn is_valid_command(command: &str) -> bool {
             | "tasks"
             | "config"
             | "scan"
+            | "pull"
+            | "push"
             | "serve"
             | "whoami"
             | "stats"
@@ -53,9 +56,9 @@ fn is_valid_command(command: &str) -> bool {
             | "git"
             | "completions"
             | "init"
+            | "sync"
     )
 }
-
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -433,6 +436,62 @@ fn main() {
                 }
             }
         }
+        Commands::Pull(args) => {
+            renderer.log_info("BEGIN PULL");
+            match SyncHandler::execute(
+                SyncDirection::Pull,
+                args,
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
+                Ok(()) => {
+                    renderer.log_info("END PULL status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END PULL status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Push(args) => {
+            renderer.log_info("BEGIN PUSH");
+            match SyncHandler::execute(
+                SyncDirection::Push,
+                args,
+                cli.project.as_deref(),
+                &resolver,
+                &renderer,
+            ) {
+                Ok(()) => {
+                    renderer.log_info("END PUSH status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END PUSH status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Sync(args) => match args.action {
+            SyncCommandAction::Check(check_args) => {
+                renderer.log_info("BEGIN SYNC CHECK");
+                match SyncHandler::check(check_args, cli.project.as_deref(), &resolver, &renderer) {
+                    Ok(()) => {
+                        renderer.log_info("END SYNC CHECK status=ok");
+                        Ok(())
+                    }
+                    Err(e) => {
+                        renderer.emit_error(&e);
+                        renderer.log_info("END SYNC CHECK status=err");
+                        Err(e)
+                    }
+                }
+            }
+        },
         Commands::Serve(args) => {
             renderer.log_info("BEGIN SERVE");
             match ServeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {

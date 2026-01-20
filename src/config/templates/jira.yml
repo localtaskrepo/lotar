@@ -1,0 +1,61 @@
+# Jira Project Template
+# Jira-aligned workflow with a Jira remote mapping
+
+name: "Jira"
+description: "Jira-aligned workflow with Jira remote mapping"
+config:
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo
+      - InProgress
+      - Done
+    types:
+      - Feature
+      - Bug
+      - Chore
+    priorities:
+      - Low
+      - Medium
+      - High
+      - Critical
+    tags:
+      - "*"
+  remotes:
+    jira:
+      provider: jira
+      project: DEMO
+      auth_profile: jira.default
+      mapping:
+        title: summary
+        description: description
+        status:
+          field: status
+          values:
+            Todo: "To Do"
+            InProgress: "In Progress"
+            Done: Done
+        task_type:
+          field: issuetype
+          values:
+            Feature: Story
+            Bug: Bug
+            Chore: Task
+        priority:
+          field: priority
+          values:
+            Low: Low
+            Medium: Medium
+            High: High
+            Critical: Highest
+        assignee:
+          field: assignee
+          when_empty: clear
+        reporter:
+          field: reporter
+          when_empty: clear
+        tags:
+          field: labels
+          add:
+            - lotar

@@ -43,6 +43,16 @@ where
         .collect()
 }
 
+fn parse_sync_remotes(value: &str) -> Result<HashMap<String, SyncRemoteConfig>, ConfigError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    serde_yaml::from_str::<HashMap<String, SyncRemoteConfig>>(trimmed)
+        .map_err(|err| ConfigError::ParseError(format!("Invalid remotes value: {}", err)))
+}
+
 fn parse_bool_flag(value: &str, field: &str) -> Result<bool, ConfigError> {
     let normalized = value.trim().to_lowercase();
     match normalized.as_str() {
@@ -498,6 +508,15 @@ pub fn apply_field_to_global_config(
                 config.attachments_max_upload_mb = parsed;
             }
         }
+        "sync_reports_dir" => {
+            config.sync_reports_dir = value.trim().to_string();
+        }
+        "sync_write_reports" => {
+            config.sync_write_reports = parse_bool_flag(value, field)?;
+        }
+        "remotes" => {
+            config.remotes = parse_sync_remotes(value)?;
+        }
         "scan_signal_words" => {
             config.scan_signal_words = parse_simple_csv(value);
         }
@@ -767,6 +786,20 @@ fn apply_field_to_project_config(
                 config.attachments_max_upload_mb = Some(parsed);
             }
         }
+        "sync_reports_dir" => {
+            let trimmed = value.trim();
+            config.sync_reports_dir = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        "sync_write_reports" => {
+            config.sync_write_reports = parse_optional_bool_flag(value, field)?;
+        }
+        "remotes" => {
+            config.remotes = parse_sync_remotes(value)?;
+        }
         "branch_type_aliases" => {
             if value.trim().is_empty() {
                 config.branch_type_aliases = None;
@@ -838,6 +871,9 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "branch_priority_aliases",
         "attachments_dir",
         "attachments_max_upload_mb",
+        "sync_reports_dir",
+        "sync_write_reports",
+        "remotes",
         "sprints_defaults_capacity_points",
         "sprints_defaults_capacity_hours",
         "sprints_defaults_length",
@@ -878,6 +914,9 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "branch_priority_aliases",
         "attachments_dir",
         "attachments_max_upload_mb",
+        "sync_reports_dir",
+        "sync_write_reports",
+        "remotes",
     ];
 
     let valid_fields = if is_global {
@@ -991,6 +1030,19 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 ));
             }
         }
+        "sync_reports_dir" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Err(ConfigError::ParseError(
+                    "sync_reports_dir cannot be empty".to_string(),
+                ));
+            }
+            if trimmed.len() > 200 {
+                return Err(ConfigError::ParseError(
+                    "sync_reports_dir is too long".to_string(),
+                ));
+            }
+        }
         "attachments_max_upload_mb" => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
@@ -1007,6 +1059,12 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                     "attachments_max_upload_mb must be -1 (unlimited), 0 (disabled), or a positive integer".to_string(),
                 ));
             }
+        }
+        "sync_write_reports" => {
+            parse_bool_flag(value, field)?;
+        }
+        "remotes" => {
+            let _ = parse_sync_remotes(value)?;
         }
         "strict_members" => {
             if !value.trim().is_empty() {

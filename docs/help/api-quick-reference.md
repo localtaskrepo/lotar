@@ -7,8 +7,15 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/tasks/get?id=ID[&project=PREFIX] -> { data: TaskDTO }
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
 - POST /api/tasks/delete ({ id }) -> { data: { deleted: bool } }
+- POST /api/tasks/references/add (GenericReferenceAddRequest) -> { data: GenericReferenceAddResponse }
+- POST /api/tasks/references/remove (GenericReferenceRemoveRequest) -> { data: GenericReferenceRemoveResponse }
 - GET  /api/config/show[?project=PREFIX] -> { data: object }
-- POST /api/config/set ({ values, global?, project? }) -> { data: { updated: bool } }
+- POST /api/config/set ({ values, global?, project? }) -> { data: ConfigSetResponse }
+- POST /api/sync/pull (SyncRequest) -> { data: SyncResponse }
+- POST /api/sync/push (SyncRequest) -> { data: SyncResponse }
+- POST /api/sync/validate (SyncValidateRequest) -> { data: SyncValidateResponse }
+- GET  /api/sync/reports/list?project=PREFIX&limit=N&offset=N -> { data: SyncReportListResponse }
+- GET  /api/sync/reports/get?path=<relative>[&project=PREFIX] -> { data: SyncReport }
 - GET  /api/events -> text/event-stream (see SSE Events)
 
 Notes

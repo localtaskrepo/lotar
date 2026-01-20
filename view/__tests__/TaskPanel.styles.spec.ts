@@ -36,6 +36,15 @@ vi.mock('../api/client', () => {
             listTasks: vi.fn().mockResolvedValue({ total: 0, limit: 50, offset: 0, tasks: [] }),
             listProjects: vi.fn().mockResolvedValue({ total: 1, limit: 50, offset: 0, projects: [{ prefix: 'DEMO', name: 'Demo Project' }] }),
             projectStats: vi.fn(),
+            inspectConfig: vi.fn().mockResolvedValue({
+                effective: { remotes: {} },
+                global_effective: { remotes: {} },
+                global_raw: {},
+                project_raw: null,
+                has_global_file: false,
+                project_exists: false,
+                sources: {},
+            }),
         },
     }
 })

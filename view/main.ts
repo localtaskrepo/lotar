@@ -8,6 +8,7 @@ import NotFound from './pages/NotFound.vue'
 import Preferences from './pages/Preferences.vue'
 import ProjectInsights from './pages/ProjectInsights.vue'
 import SprintsList from './pages/SprintsList.vue'
+import SyncHub from './pages/SyncHub.vue'
 import TaskDetails from './pages/TaskDetails.vue'
 import TasksList from './pages/TasksList.vue'
 import './styles.css'
@@ -26,6 +27,7 @@ const router = createRouter({
     { path: '/boards', component: Board },
     { path: '/calendar', component: Calendar },
     { path: '/insights', component: ProjectInsights },
+    { path: '/sync', component: SyncHub },
     { path: '/task/:id', component: TaskDetails },
     { path: '/config', component: ConfigView },
     { path: '/preferences', component: Preferences },

@@ -46,6 +46,8 @@ Verify signatures/checksums from the same release before moving the binary into 
 docker pull mallox/lotar
 docker run --rm mallox/lotar --version
 ```
+The image entrypoint is `lotar`, so pass subcommands directly (for example, `mallox/lotar list`).
+See [docs/docker.md](docs/docker.md) for Docker Compose and long-running server examples.
 The Docker image bundles the latest signed musl build, so Linux, macOS, and Windows users can all run the same artifact.
 
 **Rust developers (from source)**
@@ -168,6 +170,37 @@ lotar list --format=markdown  # Markdown output
 # Scan for TODOs in 25+ programming languages
 lotar scan ./src
 ```
+
+### Sync Integrations (manual config)
+LoTaR sync is manual-only: configure remotes in your project config and auth profiles in your home config. The UI and CLI do not create or edit connections for you.
+
+Sync integrations are still in beta. Use least-privilege credentials and double-check the repositories or projects you target before running pull/push, since LoTaR can create and update issues.
+
+```yaml
+# .tasks/<PROJECT>/config.yml
+remotes:
+    jira-home:
+        provider: jira
+        project: ENG
+        auth_profile: jira.default
+```
+
+```yaml
+# ~/.lotar
+auth_profiles:
+    jira.default:
+        method: basic
+        email_env: LOTAR_JIRA_EMAIL
+        token_env: LOTAR_JIRA_TOKEN
+```
+
+```bash
+# Run sync manually
+lotar pull jira-home
+lotar push jira-home
+```
+
+See [docs/developers/sync.md](docs/developers/sync.md) and [docs/help/config-reference.md](docs/help/config-reference.md) for full configuration details.
 
 ### Git-derived Stats (read-only)
 ```bash

@@ -317,9 +317,8 @@ impl AttachmentService {
         let mut attached = false;
         if !already {
             task.references.push(ReferenceEntry {
-                code: None,
-                link: None,
                 file: Some(file_rel.to_string()),
+                ..Default::default()
             });
             task.modified = chrono::Utc::now().to_rfc3339();
             storage.edit(task_id, &task)?;

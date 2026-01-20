@@ -245,6 +245,12 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
         base.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
+    if override_config.sync_reports_dir != defaults.sync_reports_dir {
+        base.sync_reports_dir = override_config.sync_reports_dir;
+    }
+    if override_config.sync_write_reports != defaults.sync_write_reports {
+        base.sync_write_reports = override_config.sync_write_reports;
+    }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
@@ -277,6 +283,13 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     }
     if override_config.auto_identity_git != defaults.auto_identity_git {
         base.auto_identity_git = override_config.auto_identity_git;
+    }
+
+    if !override_config.remotes.is_empty() {
+        base.remotes.extend(override_config.remotes);
+    }
+    if !override_config.auth_profiles.is_empty() {
+        base.auth_profiles.extend(override_config.auth_profiles);
     }
 }
 
@@ -361,6 +374,12 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     if override_config.attachments_max_upload_mb != defaults.attachments_max_upload_mb {
         resolved.attachments_max_upload_mb = override_config.attachments_max_upload_mb;
     }
+    if override_config.sync_reports_dir != defaults.sync_reports_dir {
+        resolved.sync_reports_dir = override_config.sync_reports_dir;
+    }
+    if override_config.sync_write_reports != defaults.sync_write_reports {
+        resolved.sync_write_reports = override_config.sync_write_reports;
+    }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
     }
@@ -394,6 +413,10 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.auto_identity_git != defaults.auto_identity_git {
         resolved.auto_identity_git = override_config.auto_identity_git;
+    }
+
+    if !override_config.remotes.is_empty() {
+        resolved.remotes.extend(override_config.remotes);
     }
 }
 
@@ -523,6 +546,14 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(strip) = project_config.scan_strip_attributes {
         resolved.scan_strip_attributes = strip;
     }
+    if let Some(dir) = project_config.sync_reports_dir
+        && !dir.trim().is_empty()
+    {
+        resolved.sync_reports_dir = dir;
+    }
+    if let Some(enabled) = project_config.sync_write_reports {
+        resolved.sync_write_reports = enabled;
+    }
     // Overlay project-level branch alias maps (if provided)
     if let Some(m) = project_config.branch_type_aliases
         && !m.is_empty()
@@ -540,6 +571,9 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     {
         resolved.branch_priority_aliases =
             m.into_iter().map(|(k, v)| (k.to_lowercase(), v)).collect();
+    }
+    if !project_config.remotes.is_empty() {
+        resolved.remotes.extend(project_config.remotes);
     }
     // Smart toggles for branch/codeowners remain global/home/env scoped for now.
 }
@@ -591,6 +625,9 @@ impl ResolvedConfig {
             branch_priority_aliases: global.branch_priority_aliases,
             attachments_dir: global.attachments_dir,
             attachments_max_upload_mb: global.attachments_max_upload_mb,
+            sync_reports_dir: global.sync_reports_dir,
+            sync_write_reports: global.sync_write_reports,
+            remotes: global.remotes,
         }
     }
 }
