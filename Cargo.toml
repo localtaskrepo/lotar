@@ -25,7 +25,7 @@ notify = "8.2.0"
 pulldown-cmark = { version = "0.13.0", default-features = false }
 blake3 = { version = "1.8.3", default-features = false, features = ["std"] }
 base64 = { version = "0.22.1", default-features = false, features = ["std"] }
-ureq = { version = "2.10.1", features = ["json"] }
+ureq = { version = "3.1.4", features = ["json"] }
 
 # Production release profile optimized for minimal binary size
 [profile.release]
