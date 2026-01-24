@@ -624,6 +624,82 @@ pub struct SyncValidateResponse {
     pub info: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ScanTarget {
+    pub file: String,
+    pub line: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ScanRequest {
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub paths: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub include: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub exclude: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    #[serde(default)]
+    pub dry_run: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub strip_attributes: Option<bool>,
+    #[serde(default)]
+    pub reanchor: bool,
+    #[serde(default)]
+    pub modified_only: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub targets: Vec<ScanTarget>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ScanSummary {
+    pub created: usize,
+    pub updated: usize,
+    pub skipped: usize,
+    pub failed: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ScanEntry {
+    pub status: String,
+    pub action: String,
+    pub file: String,
+    pub line: usize,
+    pub title: String,
+    pub annotation: String,
+    pub code_reference: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub existing_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub original_line: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub updated_line: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct ScanResponse {
+    pub status: String,
+    pub dry_run: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+    pub summary: ScanSummary,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub warnings: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub info: Vec<String>,
+    pub entries: Vec<ScanEntry>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct SyncSummary {

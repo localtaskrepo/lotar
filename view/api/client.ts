@@ -24,6 +24,8 @@ import type {
   ProjectListResponse,
   ProjectStatsDTO,
   ReferenceSnippet,
+  ScanRequest,
+  ScanResponse,
   SprintAssignmentRequest,
   SprintAssignmentResponse,
   SprintBacklogResponse,
@@ -185,6 +187,9 @@ export const api = {
     return get('/api/sync/reports/list', params as any)
   },
   syncReportGet(path: string): Promise<SyncReport> { return get('/api/sync/reports/get', { path }) },
+
+  // Scan
+  scanRun(payload: ScanRequest): Promise<ScanResponse> { return post('/api/scan/run', payload) },
 
   // Activity
   activitySeries(group: 'author' | 'day' | 'week' | 'project', params: { since?: string; until?: string; project?: string } = {}): Promise<Array<{ key: string; count: number; last_date: string }>> {

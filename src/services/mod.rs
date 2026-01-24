@@ -3,6 +3,7 @@ pub mod audit_service;
 pub mod config_service;
 pub mod project_service;
 pub mod reference_service;
+pub mod scan_service;
 pub mod sprint_analytics;
 pub mod sprint_assignment;
 pub mod sprint_integrity;

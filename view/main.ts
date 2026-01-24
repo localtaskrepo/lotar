@@ -7,6 +7,7 @@ import ConfigView from './pages/ConfigView.vue'
 import NotFound from './pages/NotFound.vue'
 import Preferences from './pages/Preferences.vue'
 import ProjectInsights from './pages/ProjectInsights.vue'
+import ScanView from './pages/ScanView.vue'
 import SprintsList from './pages/SprintsList.vue'
 import SyncHub from './pages/SyncHub.vue'
 import TaskDetails from './pages/TaskDetails.vue'
@@ -28,6 +29,7 @@ const router = createRouter({
     { path: '/calendar', component: Calendar },
     { path: '/insights', component: ProjectInsights },
     { path: '/sync', component: SyncHub },
+    { path: '/scan', component: ScanView },
     { path: '/task/:id', component: TaskDetails },
     { path: '/config', component: ConfigView },
     { path: '/preferences', component: Preferences },

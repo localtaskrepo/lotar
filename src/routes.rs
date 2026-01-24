@@ -12,13 +12,14 @@ use crate::services::sprint_velocity::{
 use crate::services::{
     attachment_service::AttachmentService, config_service::ConfigService,
     project_service::ProjectService, reference_service::ReferenceService,
-    sprint_service::SprintService, sync_service::SyncService, task_service::TaskService,
+    scan_service::ScanService, sprint_service::SprintService, sync_service::SyncService,
+    task_service::TaskService,
 };
 use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
 use crate::workspace::TasksDirectoryResolver;
 use crate::{
     api_types::{
-        SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
+        ScanRequest, SprintAssignmentRequest, SprintAssignmentResponse, SprintBacklogItem,
         SprintBacklogResponse, SprintCleanupMetric, SprintCleanupSummary, SprintCreateRequest,
         SprintCreateResponse, SprintDeleteRequest, SprintDeleteResponse,
         SprintIntegrityDiagnostics, SprintListItem, SprintListResponse, SprintUpdateRequest,
@@ -2799,6 +2800,28 @@ pub fn initialize(api_server: &mut ApiServer) {
                 )
             }
             Err(e) => bad_request(e.to_string()),
+        }
+    });
+
+    // POST /api/scan/run
+    api_server.register_handler("POST", "/api/scan/run", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let payload: ScanRequest = match serde_json::from_value(body) {
+            Ok(v) => v,
+            Err(e) => return bad_request(format!("Invalid body: {}", e)),
+        };
+
+        match ScanService::run(&resolver, payload) {
+            Ok(result) => ok_json(200, json!({"data": result})),
+            Err(err) => match err {
+                LoTaRError::ValidationError(_) => bad_request(err.to_string()),
+                _ => internal(json!({"error": {"code": "INTERNAL", "message": err.to_string()}})),
+            },
         }
     });
 

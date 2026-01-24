@@ -11,6 +11,7 @@ pub mod identity_detectors;
 pub mod pagination;
 pub mod paths;
 pub mod project;
+pub mod scan;
 pub mod tags;
 pub mod task_intel;
 pub mod time;

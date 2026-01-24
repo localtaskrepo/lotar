@@ -18,6 +18,12 @@ lotar scan --modified-only
 lotar scan --dry-run --detailed --context 2
 ```
 
+## Scan UI
+
+Use the Scan page in the web UI (`/scan`) to preview results, inspect code references, and apply
+targeted actions from a dry run. The UI mirrors the CLI flags (paths, include/exclude extensions,
+modified-only, strip attributes, and re-anchor), but lets you pick individual findings to apply.
+
 `lotar scan [PATH ...]` accepts zero or more paths. With none, it walks from the repository root using the same workspace detection as other commands.
 
 ## When to reach for scan

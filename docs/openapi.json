@@ -1135,6 +1135,39 @@
         }
       }
     },
+    "/api/scan/run": {
+      "post": {
+        "summary": "Run a scan preview or apply updates",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeScanResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/sync/pull": {
       "post": {
         "summary": "Pull from a sync remote",
@@ -4425,6 +4458,193 @@
           "checked_at"
         ]
       },
+      "ScanTarget": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "file",
+          "line"
+        ]
+      },
+      "ScanRequest": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "strip_attributes": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "reanchor": {
+            "type": "boolean"
+          },
+          "modified_only": {
+            "type": "boolean"
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanTarget"
+            }
+          }
+        }
+      },
+      "ScanSummary": {
+        "type": "object",
+        "properties": {
+          "created": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "created",
+          "updated",
+          "skipped",
+          "failed"
+        ]
+      },
+      "ScanEntry": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "title": {
+            "type": "string"
+          },
+          "annotation": {
+            "type": "string"
+          },
+          "code_reference": {
+            "type": "string"
+          },
+          "existing_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "task_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "original_line": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_line": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "action",
+          "file",
+          "line",
+          "title",
+          "annotation",
+          "code_reference"
+        ]
+      },
+      "ScanResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "dry_run": {
+            "type": "boolean"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ScanSummary"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScanEntry"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "dry_run",
+          "summary",
+          "entries"
+        ]
+      },
       "SyncSummary": {
         "type": "object",
         "properties": {
@@ -4710,6 +4930,17 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/ProjectDTO"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeScanResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ScanResponse"
           }
         },
         "required": [

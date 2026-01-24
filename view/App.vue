@@ -57,6 +57,7 @@ const navItems: NavItem[] = [
   { label: 'Calendar', path: '/calendar' },
   { label: 'Insights', path: '/insights' },
   { label: 'Sync', path: '/sync' },
+  { label: 'Scan', path: '/scan' },
   { label: 'Config', path: '/config' },
   { label: 'Preferences', path: '/preferences' },
 ]

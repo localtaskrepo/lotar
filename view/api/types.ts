@@ -734,6 +734,55 @@ export interface ConfigSetResponse {
   errors: string[]
 }
 
+export interface ScanTarget {
+  file: string
+  line: number
+}
+
+export interface ScanRequest {
+  paths?: string[]
+  include?: string[]
+  exclude?: string[]
+  project?: string
+  dry_run?: boolean
+  strip_attributes?: boolean
+  reanchor?: boolean
+  modified_only?: boolean
+  targets?: ScanTarget[]
+}
+
+export interface ScanSummary {
+  created: number
+  updated: number
+  skipped: number
+  failed: number
+}
+
+export interface ScanEntry {
+  status: 'created' | 'updated' | 'skipped' | 'failed' | string
+  action: 'create' | 'refresh' | 'skip' | string
+  file: string
+  line: number
+  title: string
+  annotation: string
+  code_reference: string
+  existing_key?: string | null
+  task_id?: string | null
+  original_line?: string | null
+  updated_line?: string | null
+  message?: string | null
+}
+
+export interface ScanResponse {
+  status: string
+  dry_run: boolean
+  project?: string | null
+  summary: ScanSummary
+  warnings: string[]
+  info: string[]
+  entries: ScanEntry[]
+}
+
 export interface SyncRequest {
   remote: string
   project?: string

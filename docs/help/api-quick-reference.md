@@ -11,6 +11,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/tasks/references/remove (GenericReferenceRemoveRequest) -> { data: GenericReferenceRemoveResponse }
 - GET  /api/config/show[?project=PREFIX] -> { data: object }
 - POST /api/config/set ({ values, global?, project? }) -> { data: ConfigSetResponse }
+- POST /api/scan/run (ScanRequest) -> { data: ScanResponse }
 - POST /api/sync/pull (SyncRequest) -> { data: SyncResponse }
 - POST /api/sync/push (SyncRequest) -> { data: SyncResponse }
 - POST /api/sync/validate (SyncValidateRequest) -> { data: SyncValidateResponse }

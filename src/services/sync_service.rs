@@ -2489,6 +2489,29 @@ fn map_issue_to_local_fields(
     existing: Option<&TaskDTO>,
 ) -> LocalFieldValues {
     let mut out = LocalFieldValues::default();
+
+    // Collect label values consumed by scalar field mappings (type, priority, status)
+    // so we can exclude them when mapping labels to tags
+    let mut consumed_labels: HashSet<String> = HashSet::new();
+    for (local_key, mapping) in &remote.mapping {
+        if !is_scalar_local_field(local_key) {
+            continue;
+        }
+        let detail = normalize_mapping_detail(local_key, mapping);
+        let remote_field = detail
+            .field
+            .clone()
+            .unwrap_or_else(|| local_key.to_string());
+        // Only track consumption from labels field
+        if !matches!(remote_field.to_ascii_lowercase().as_str(), "labels") {
+            continue;
+        }
+        // All mapped remote values are consumed
+        for remote_val in detail.values.values() {
+            consumed_labels.insert(remote_val.to_ascii_lowercase());
+        }
+    }
+
     for (local_key, mapping) in &remote.mapping {
         let detail = normalize_mapping_detail(local_key, mapping);
         let remote_field = detail
@@ -2497,6 +2520,17 @@ fn map_issue_to_local_fields(
             .unwrap_or_else(|| local_key.to_string());
         let remote_value = read_remote_value(provider, issue, &remote_field);
         let existing_value = existing.and_then(|task| local_value_for_field(task, local_key));
+
+        // When mapping tags from labels, filter out consumed label values
+        let remote_value = if local_key == "tags"
+            && matches!(remote_field.to_ascii_lowercase().as_str(), "labels")
+            && !consumed_labels.is_empty()
+        {
+            remote_value.map(|v| filter_consumed_labels(v, &consumed_labels))
+        } else {
+            remote_value
+        };
+
         let mapped =
             apply_mapping_for_pull(local_key, &detail, remote_value, existing_value.as_ref());
         if let Some(value) = mapped {
@@ -2504,6 +2538,18 @@ fn map_issue_to_local_fields(
         }
     }
     out
+}
+
+fn filter_consumed_labels(value: FieldValue, consumed: &HashSet<String>) -> FieldValue {
+    match value {
+        FieldValue::List(values) => FieldValue::List(
+            values
+                .into_iter()
+                .filter(|v| !consumed.contains(&v.to_ascii_lowercase()))
+                .collect(),
+        ),
+        other => other,
+    }
 }
 
 fn default_title_from_issue(provider: SyncProvider, issue: &JsonValue) -> Option<String> {
