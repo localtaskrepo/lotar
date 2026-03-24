@@ -1,6 +1,5 @@
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
-use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
     PropertyCurrent, PropertyNoop, PropertySuccess, render_property_current, render_property_noop,
@@ -59,7 +58,7 @@ impl CommandHandler for PriorityHandler {
 fn handle_set_priority(
     candidate: String,
     full_id: String,
-    mut task: Task,
+    task: Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
@@ -79,12 +78,13 @@ fn handle_set_priority(
         return Ok(());
     }
 
-    task.priority = validated_priority.clone();
-
-    renderer.log_debug("priority: persisting change to storage");
-    ctx.storage
-        .edit(&full_id, &task)
-        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
+    renderer.log_debug("priority: persisting change via TaskService");
+    let patch = crate::api_types::TaskUpdate {
+        priority: Some(validated_priority.clone()),
+        ..Default::default()
+    };
+    crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
+        .map_err(|e| e.to_string())?;
     renderer.log_info("priority: updated successfully");
 
     render_priority_success(renderer, &full_id, &old_priority, &validated_priority);

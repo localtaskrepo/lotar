@@ -56,6 +56,9 @@ export class SmokeWorkspace {
         return {
             ...process.env,
             LOTAR_TEST_SILENT: '1',
+            LOTAR_IGNORE_HOME_CONFIG: '1',
+            LOTAR_IGNORE_ENV_TASKS_DIR: '0',
+            LOTAR_TEST_MODE: '0',
             LOTAR_TASKS_DIR: this.tasksDir,
             LOTAR_HOME: this.root,
         };

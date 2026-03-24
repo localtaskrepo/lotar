@@ -77,6 +77,22 @@ fn tool_description(tool: &Value) -> &str {
         .unwrap_or_else(|| panic!("Missing description for tool"))
 }
 
+fn set_tasks_dir_env(tasks_dir: &Path) {
+    unsafe {
+        std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
+        std::env::remove_var("LOTAR_TEST_MODE");
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir);
+    }
+}
+
+fn clear_tasks_dir_env() {
+    unsafe {
+        std::env::remove_var("LOTAR_TASKS_DIR");
+        std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
+        std::env::remove_var("LOTAR_TEST_MODE");
+    }
+}
+
 fn tool_response_payload(resp: &JsonRpcResponse) -> &Value {
     resp.result
         .as_ref()
@@ -118,9 +134,7 @@ fn tools_call_reference_add_and_remove() {
     std::fs::create_dir_all(tmp.path().join("src")).unwrap();
     std::fs::write(tmp.path().join("src/example.rs"), "fn main() {}\n").unwrap();
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    set_tasks_dir_env(&tasks_dir);
 
     // Create a task
     let create_args = json!({
@@ -432,9 +446,7 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     let data = error.data.as_ref().expect("status error data");
     assert_eq!(data.get("field").and_then(|v| v.as_str()), Some("status"));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    clear_tasks_dir_env();
 }
 
 #[test]
@@ -449,9 +461,7 @@ fn project_list_is_paginated() {
     std::fs::create_dir_all(tasks_dir.join("APP")).unwrap();
     std::fs::create_dir_all(tasks_dir.join("CORE")).unwrap();
 
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    set_tasks_dir_env(&tasks_dir);
 
     // First page
     let list_req = JsonRpcRequest {
@@ -527,6 +537,8 @@ fn project_list_is_paginated() {
         .cloned()
         .unwrap_or_default();
     assert_eq!(page.len(), 1);
+
+    clear_tasks_dir_env();
 }
 
 #[test]
@@ -552,9 +564,7 @@ custom:
         - impact
 "#;
     std::fs::write(tasks_dir.join("config.yml"), config_yaml).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    set_tasks_dir_env(&tasks_dir);
 
     let req = JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -599,7 +609,7 @@ custom:
         .expect("task_list tool present");
     assert_eq!(
         field_values(task_list, "status"),
-        vec!["Todo", "InProgress", "Done"]
+        vec!["Todo", "InProgress", "NeedsReview", "Done"]
     );
     assert_eq!(accepts_multiple(task_list, "status"), Some(true));
     assert_eq!(field_values(task_list, "assignee"), vec!["alice", "bob"]);
@@ -620,9 +630,7 @@ custom:
         .expect("config_show tool present");
     assert_eq!(field_values(config_show, "project"), vec!["MCP"]);
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    clear_tasks_dir_env();
 }
 
 #[test]
@@ -632,9 +640,7 @@ fn tools_list_skips_enum_hints_with_multiple_projects() {
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(tasks_dir.join("AAA")).unwrap();
     std::fs::create_dir_all(tasks_dir.join("BBB")).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    set_tasks_dir_env(&tasks_dir);
 
     let req = JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -669,9 +675,7 @@ fn tools_list_skips_enum_hints_with_multiple_projects() {
         "task_list hints should be absent when multiple projects"
     );
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    clear_tasks_dir_env();
 }
 
 #[test]
@@ -697,9 +701,7 @@ custom:
     - impact
 "#;
     std::fs::write(tasks_dir.join("config.yml"), config_yaml).unwrap();
-    unsafe {
-        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
-    }
+    set_tasks_dir_env(&tasks_dir);
 
     let req = JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -723,14 +725,12 @@ custom:
     assert!(task_create_desc.contains("Available tags: cli, infra."));
 
     let task_list_desc = tool_description(tool_by_name(tools, "task_list"));
-    assert!(task_list_desc.contains("Available statuses: Todo, InProgress, Done."));
+    assert!(task_list_desc.contains("Available statuses: Todo, InProgress, NeedsReview, Done."));
 
     let config_show_desc = tool_description(tool_by_name(tools, "config_show"));
     assert!(config_show_desc.contains("Available projects: MCP."));
 
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-    }
+    clear_tasks_dir_env();
 }
 
 #[test]

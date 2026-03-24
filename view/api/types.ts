@@ -734,6 +734,26 @@ export interface ConfigSetResponse {
   errors: string[]
 }
 
+export interface AutomationInspectResponse {
+  scope: string
+  source: string
+  scope_exists: boolean
+  scope_yaml: string
+  effective_yaml: string
+}
+
+export interface AutomationSetRequest {
+  yaml: string
+  project?: string
+}
+
+export interface AutomationSetResponse {
+  updated: boolean
+  warnings: string[]
+  info: string[]
+  errors: string[]
+}
+
 export interface ScanTarget {
   file: string
   line: number
@@ -883,5 +903,114 @@ export interface SyncValidateResponse {
   checked_at: string
   warnings?: string[]
   info?: string[]
+}
+
+export interface AgentJob {
+  id: string
+  ticket_id: string
+  runner: string
+  agent?: string | null
+  status: string
+  created_at: string
+  started_at?: string | null
+  finished_at?: string | null
+  exit_code?: number | null
+  last_message?: string | null
+  summary?: string | null
+  session_id?: string | null
+  worktree_path?: string | null
+  worktree_branch?: string | null
+}
+
+export interface AgentJobCreateRequest {
+  ticket_id: string
+  prompt: string
+  runner?: string
+  agent?: string
+}
+
+export interface AgentJobCreateResponse {
+  job: AgentJob
+}
+
+export interface AgentJobStatusResponse {
+  job: AgentJob
+}
+
+export interface AgentQueueStats {
+  running: number
+  queued: number
+  max_parallel?: number | null
+}
+
+export interface AgentJobListResponse {
+  jobs: AgentJob[]
+  queue_stats?: AgentQueueStats | null
+}
+
+export interface AgentJobCancelRequest {
+  id: string
+}
+
+export interface AgentJobCancelResponse {
+  cancelled: boolean
+  job?: AgentJob | null
+}
+
+export interface AgentJobCancelAllResponse {
+  cancelled: number
+  jobs: AgentJob[]
+}
+
+export interface AgentJobLogEntry {
+  kind: string
+  at: string
+  message?: string | null
+}
+
+export interface AgentJobLogsResponse {
+  job: AgentJob
+  events: AgentJobLogEntry[]
+}
+
+export interface AgentJobMessageRequest {
+  id: string
+  message: string
+}
+
+export interface AgentJobMessageResponse {
+  accepted: boolean
+  job: AgentJob
+}
+
+// Agent profiles
+export interface AgentProfileInfo {
+  name: string
+  runner: string
+  description?: string | null
+}
+
+export interface AgentProfilesResponse {
+  profiles: AgentProfileInfo[]
+}
+
+// Automation simulation
+export interface AutomationSimulateRequest {
+  ticket_id: string
+  event: string
+  project?: string
+}
+
+export interface AutomationSimulatedAction {
+  action: string
+  description: string
+}
+
+export interface AutomationSimulateResponse {
+  matched: boolean
+  rule_name?: string | null
+  actions: AutomationSimulatedAction[]
+  task_before?: TaskDTO | null
+  task_after?: TaskDTO | null
 }
 

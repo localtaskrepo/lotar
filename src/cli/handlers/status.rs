@@ -1,4 +1,6 @@
+use crate::api_types::TaskUpdate;
 use crate::cli::handlers::CommandHandler;
+use crate::cli::handlers::agent::running_job_for_ticket;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
@@ -10,6 +12,7 @@ use crate::cli::handlers::task::render::{
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
 use crate::output::OutputRenderer;
+use crate::services::task_service::TaskService;
 use crate::types::TaskStatus;
 use crate::workspace::TasksDirectoryResolver;
 use serde_json::Value;
@@ -137,10 +140,44 @@ fn handle_set_status(
         task.assignee = Some(assignee);
     }
 
-    renderer.log_debug("status: persisting change to storage");
-    ctx.storage
-        .edit(&full_id, &task)
+    // If an agent job is already running for this ticket, changing status would
+    // disrupt the automation lifecycle. Require the user to cancel the job first.
+    if let Some(job) = running_job_for_ticket(&full_id)
+        && !current_agent_job_matches_ticket(&full_id)
+    {
+        if let Some(job_id) = job.job_id.as_deref() {
+            return Err(format!(
+                "Ticket '{}' has an active agent job ({}). Cancel it first: lotar agent cancel {}",
+                full_id, job_id, job_id
+            ));
+        }
+        return Err(format!(
+            "Ticket '{}' has an active agent job (pid {}). Cancel it before changing status.",
+            full_id, job.pid
+        ));
+    }
+
+    renderer.log_debug("status: persisting change via TaskService");
+
+    let patch = TaskUpdate {
+        title: None,
+        status: Some(validated_status.clone()),
+        priority: None,
+        task_type: None,
+        reporter: None,
+        assignee: task.assignee.clone(),
+        due_date: None,
+        effort: None,
+        description: None,
+        tags: None,
+        relationships: None,
+        custom_fields: None,
+        sprints: None,
+    };
+
+    let updated = TaskService::update(&mut ctx.storage, &full_id, patch)
         .map_err(TaskStorageAction::Update.map_err(&full_id))?;
+
     renderer.log_info("status: updated successfully");
 
     render_status_success(
@@ -148,9 +185,20 @@ fn handle_set_status(
         &full_id,
         &old_status,
         &validated_status,
-        task.assignee.as_deref(),
+        updated.assignee.as_deref(),
     );
     Ok(())
+}
+
+fn current_agent_job_matches_ticket(ticket_id: &str) -> bool {
+    let Ok(job_id) = std::env::var("LOTAR_AGENT_JOB_ID") else {
+        return false;
+    };
+    let Ok(current_ticket) = std::env::var("LOTAR_TICKET_ID") else {
+        return false;
+    };
+
+    current_ticket.trim() == ticket_id && !job_id.trim().is_empty()
 }
 
 fn render_current_status(renderer: &OutputRenderer, task_id: &str, status: &TaskStatus) {

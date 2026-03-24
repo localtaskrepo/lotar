@@ -20,6 +20,14 @@ Notes:
 - Automation toggles (`auto.set_reporter`, `auto.assign_on_status`, `auto.identity`, `auto.identity_git`, `auto.branch_infer_*`, etc.) default to true when unspecified and honor the same precedence chain.
 - When a field cannot be expressed per-project (for example `tasks_folder`), only the global/home/env layers are considered.
 
+Automation rules (`automation.yml`) are resolved separately from config values:
+1. Project automation file (`.tasks/<PROJECT>/automation.yml`)
+2. Home automation file (`~/.lotar.automation.yml` or `~/.lotar/automation.yml` when the home config is a directory)
+3. Global automation file (`.tasks/automation.yml`)
+4. Built-in defaults
+
+Rules do not merge across scopes; the first file found wins.
+
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. Detectors run in this order:

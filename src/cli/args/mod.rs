@@ -1,3 +1,5 @@
+pub mod agent;
+pub mod automation;
 pub mod common;
 pub mod completions;
 pub mod config;
@@ -11,6 +13,11 @@ pub mod sync;
 pub mod task;
 
 // Re-exports for ergonomic imports from crate::cli::args
+pub use agent::{
+    AgentAction, AgentArgs, AgentCheckArgs, AgentListJobsArgs, AgentQueueAction, AgentQueueArgs,
+    AgentRunArgs, AgentWorkerArgs, WorktreeAction, WorktreeArgs, WorktreeCleanupArgs,
+};
+pub use automation::{AutomationAction, AutomationArgs, AutomationSimulateArgs};
 pub use common::parse_key_value;
 pub use completions::{CompletionShell, CompletionsAction, CompletionsArgs};
 pub use config::{

@@ -1,0 +1,189 @@
+# Agent Pipeline Project Template
+# Fully automated multi-phase agent workflow with worktrees
+# Phases: Implementation → Testing → Merging → Done
+# Merge requires worktrees/branches and is serialized one-at-a-time by the job service.
+#
+# AUTOMATION SETUP:
+# After initializing this template, copy the 'automation:' section below
+# to .tasks/automation.yml (or .tasks/<PREFIX>/automation.yml for project-specific rules)
+
+name: "Agent Pipeline"
+description: "Automated agent workflow with implementation, testing, and merge phases"
+config:
+  project:
+    name: "{{project_name}}"
+  issue:
+    states:
+      - Todo              # Backlog
+      - InProgress        # Agent working on the task
+      - Testing           # Agent running tests
+      - Merging           # Agent merging changes
+      - Done              # Complete
+      - HelpNeeded        # Agent encountered an issue
+    types:
+      - Feature
+      - Bug
+      - Chore
+      - Refactor
+    priorities:
+      - Low
+      - Medium
+      - High
+      - Critical
+    tags:
+      - "*"
+
+  # Agent profiles for each phase
+  # Each agent has phase-specific instructions. Customize or provide files in your repo.
+  agents:
+    implement:
+      runner: copilot
+      instructions: |
+        You are in the IMPLEMENTATION phase. Your job is to write working code that satisfies the ticket requirements.
+
+        Follow repository guidance (AGENTS.md, .github/instructions/*, docs/help/*). If none exist, use these rules:
+        - Read the full ticket description and relationships before editing.
+        - If this ticket is blocked by dependencies, stop and ask for help.
+        - If requirements are ambiguous or a product decision is needed, add a comment with the question, reassign the ticket to the reporter, set status to HelpNeeded, and stop until clarification arrives.
+        - Inspect the codebase to understand structure and conventions.
+        - Make concrete code changes (not just commentary) that satisfy the ticket.
+        - Add or update tests when behavior changes.
+        - Commit changes with a focused message (unless repo policy forbids commits).
+        - Summarize changes and tests in the final response.
+
+    test:
+      runner: copilot
+      instructions: |
+        You are in the TESTING phase. Your job is to prove the implementation works.
+
+        Follow repository testing guidance. If none exist:
+        - Run the relevant tests or a focused test command first.
+        - If you discover a requirement gap or need a human decision before test expectations are clear, comment on the ticket, reassign it to the reporter, set status to HelpNeeded, and stop.
+        - Verify the ticket requirements are met by running the code.
+        - Add missing tests when coverage is absent.
+        - Fix or report failures; do not silently ignore them.
+        - Commit any new tests (unless repo policy forbids commits).
+
+    merge:
+      runner: copilot
+      instructions: |
+        You are in the MERGING phase. Your job is to integrate the branch into the mainline.
+
+        Follow repository merge guidance. If none exist:
+        - Sync with the latest main branch before merging.
+        - If merge policy or release intent is unclear, comment on the ticket, reassign it to the reporter, set status to HelpNeeded, and stop rather than guessing.
+        - Resolve conflicts carefully and keep history clean.
+        - Re-run any required tests.
+        - Merge into main and push.
+        - If merge fails, exit non-zero and explain the blocker.
+
+        If worktree cleanup is not automated, run:
+        - lotar agent worktree cleanup --delete-branches
+
+    merge-retry:
+      runner: copilot
+      instructions: |
+        You are in the MERGE RETRY phase. Reattempt the merge once.
+
+        - Pull the latest main branch.
+        - If you still need a human decision, comment on the ticket, reassign it to the reporter, set status to HelpNeeded, and stop.
+        - Resolve conflicts and re-run required tests.
+        - If the merge still fails, exit non-zero and explain the blocker.
+
+  # Agent worktree configuration - each ticket gets its own worktree
+  # All phases (implement → test → merge) work in the same worktree on the same branch
+  agent:
+    worktree:
+      enabled: true
+      branch_prefix: "agent/"
+      cleanup_on_done: true
+      cleanup_delete_branches: true
+      # Maximum parallel agent jobs. Omit or set to null for unlimited.
+      # Jobs beyond the limit are queued and started when slots become available.
+      # max_parallel_jobs: 4
+
+automation:
+  rules:
+    # Phase 1: Implementation
+    - name: Implementation phase
+      when:
+        assignee: "@implement"
+      on:
+        job_start:
+          set:
+            status: InProgress
+        complete:
+          set:
+            status: Testing
+            assignee: "@test"
+        error:
+          set:
+            status: HelpNeeded
+            assignee: "@me"
+          add:
+            tags: [agent-error, needs-review]
+
+    # Phase 2: Testing
+    - name: Testing phase
+      when:
+        assignee: "@test"
+      on:
+        job_start:
+          set:
+            status: Testing
+        complete:
+          set:
+            status: Merging
+            assignee: "@merge"
+        error:
+          set:
+            status: InProgress
+            assignee: "@implement"
+          add:
+            tags: [test-failure, needs-review]
+
+    # Phase 3: Merging
+    - name: Merging phase
+      when:
+        assignee: "@merge"
+      on:
+        job_start:
+          set:
+            status: Merging
+        complete:
+          set:
+            status: Done
+            assignee: "@reporter"
+          remove:
+            tags: [merge-retry]
+          # Optional: run a cleanup command after merge completes.
+          # run:
+          #   command: lotar
+          #   args: [agent, worktree, cleanup, --delete-branches]
+        error:
+          set:
+            status: HelpNeeded
+            assignee: "@merge-retry"
+          add:
+            tags: [merge-conflict, needs-review, merge-retry]
+
+    # Phase 3b: Merge retry (single retry with breaker)
+    - name: Merge retry phase
+      when:
+        assignee: "@merge-retry"
+      on:
+        job_start:
+          set:
+            status: Merging
+        complete:
+          set:
+            status: Done
+            assignee: "@reporter"
+          remove:
+            tags: [merge-retry]
+        error:
+          set:
+            status: HelpNeeded
+            assignee: "@me"
+          add:
+            tags: [merge-conflict, needs-review]

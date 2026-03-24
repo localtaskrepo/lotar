@@ -21,7 +21,10 @@ pub struct TestFixtures {
 
 #[allow(dead_code)]
 pub fn lotar_cmd() -> Result<Command, CargoError> {
-    Ok(cargo_bin_cmd!("lotar"))
+    let mut cmd = cargo_bin_cmd!("lotar");
+    cmd.env_remove("RUST_TEST_THREADS");
+    cmd.env("LOTAR_IGNORE_HOME_CONFIG", "1");
+    Ok(cmd)
 }
 
 #[ctor]

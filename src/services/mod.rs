@@ -1,5 +1,13 @@
+pub mod agent_context_service;
+pub mod agent_job_service;
+pub mod agent_log_service;
+pub mod agent_queue_service;
+pub mod agent_runner;
 pub mod attachment_service;
 pub mod audit_service;
+pub mod automation_matching;
+pub mod automation_service;
+pub mod automation_validation;
 pub mod config_service;
 pub mod project_service;
 pub mod reference_service;

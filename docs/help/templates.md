@@ -12,7 +12,7 @@ lotar config templates
 ```
 
 - **default** — Basic backlog/bug triage.
-  - `issue.states`: Todo, InProgress, Done
+  - `issue.states`: Todo, InProgress, NeedsReview, Done
   - `issue.types`: Feature, Bug, Chore
   - `issue.priorities`: Low, Medium, High
   - `issue.tags`: ["*"] (wildcard means "accept anything")
@@ -33,19 +33,29 @@ lotar config templates
   - `issue.categories`: *(not set)*
   - `custom_fields`: ["category"]
 - **jira** — Jira-aligned workflow with Jira remote mapping.
-  - `issue.states`: Todo, InProgress, Done
+  - `issue.states`: Todo, InProgress, NeedsReview, Done
   - `issue.types`: Feature, Bug, Chore
   - `issue.priorities`: Low, Medium, High, Critical
   - `remotes.jira`: summary/description/status/issuetype/priority/assignee/reporter/labels mappings
   - `remotes.jira.filter`: `labels = lotar` to avoid pulling unrelated issues
 - **github** — GitHub issues workflow with GitHub remote mapping.
-  - `issue.states`: Todo, InProgress, Done
+  - `issue.states`: Todo, InProgress, NeedsReview, Done
   - `issue.types`: Feature, Bug, Chore
   - `issue.priorities`: Low, Medium, High, Critical
   - `remotes.github`: title/body/state/assignees/labels mappings
   - `remotes.github.filter`: `label:lotar` to avoid pulling unrelated issues
 - **jira-github** — Dual Jira + GitHub remote mapping.
   - `remotes.jira` + `remotes.github` configured together
+- **agent-pipeline** — Fully automated multi-phase agent workflow.
+  - `issue.states`: Todo, Implementation, Testing, Merging, Done, HelpNeeded
+  - Agent profiles: `@implement`, `@test`, `@merge`
+  - Worktree enabled with `agent/` branch prefix
+  - Includes automation rules for phase transitions (copy to `automation.yml`)
+- **agent-reviewed** — Agent workflow with human review before merge.
+  - `issue.states`: Todo, Implementation, Testing, NeedsReview, Merging, Done, HelpNeeded
+  - Agent profiles: `@implement`, `@test`, `@merge`
+  - After testing, assigns to `@reporter` for human review
+  - Human approves by assigning to `@merge` to continue
 
 Each template file includes metadata (`name`, `description`) plus a `config:` block. Only the `config:` block is written to disk.
 
@@ -70,9 +80,25 @@ Every `init` call serializes the merged YAML, validates it, and writes the canon
 - Wildcards (`"*"`) mean "allow any value" and map to `StringConfigField::new_wildcard()` internally.
 - Template metadata such as `project_name`, `prefix`, or `issue_states` is also accepted for backward compatibility. The loader rewrites those keys into the modern nested `project.*` and `issue.*` structure so you never have to.
 
-## Automation defaults
+## Automation
 
-Templates intentionally omit automation blocks because the global defaults already enable them:
+Templates contain only the `config:` section by default. The agent templates (`agent-pipeline`, `agent-reviewed`) include an `automation:` section at the end of the template file that you should copy to `.tasks/automation.yml` after initialization.
+
+These automation rules define phase transitions:
+- **agent-pipeline**: Automatic flow from Implementation → Testing → Merging → Done
+- **agent-reviewed**: Implementation → Testing → NeedsReview (human) → Merging → Done
+
+When a task is assigned to an agent profile (e.g., `@implement`), the agent automatically picks up the work. On completion, automation rules transition the task to the next phase.
+
+If an agent needs clarification, the default agent instructions tell it to comment on the ticket, set the task to `HelpNeeded`, and hand it back to `@reporter` so the author can clarify the request before the agent resumes.
+
+Generic runner failures are still handled by the automation rules in the template.
+
+See [automation.md](automation.md) for the full automation rule syntax.
+
+## Auto-assignment defaults
+
+The following auto-assignment behaviors are enabled by default (not via automation rules):
 
 - `auto.set_reporter`
 - `auto.assign_on_status`
@@ -110,7 +136,7 @@ Canonical project config produced by the default template:
 project:
   name: Demo Service
 issue:
-  states: [Todo, InProgress, Done]
+  states: [Todo, InProgress, NeedsReview, Done]
   types: [Feature, Bug, Chore]
   priorities: [Low, Medium, High]
   tags: ["*"]

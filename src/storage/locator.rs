@@ -40,11 +40,12 @@ impl StorageLocator {
 
     /// Identify project folders matching the provided identifier (typically a prefix).
     pub fn project_folders_for_name(root_path: &Path, project_name: &str) -> Vec<String> {
-        let mut folders = Vec::new();
-        let candidate = root_path.join(project_name);
+        let resolved = crate::utils::project::resolve_project_input(project_name, root_path);
+        let candidate = root_path.join(&resolved);
         if candidate.exists() {
-            folders.push(project_name.to_string());
+            vec![resolved]
+        } else {
+            Vec::new()
         }
-        folders
     }
 }

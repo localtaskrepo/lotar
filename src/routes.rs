@@ -2,6 +2,7 @@ use crate::LoTaRError;
 use crate::api_server::{ApiServer, HttpRequest, HttpResponse};
 use crate::config::manager::ConfigManager;
 use crate::config::resolution;
+use crate::services::automation_service::AutomationEvent;
 use crate::services::sprint_assignment;
 use crate::services::sprint_integrity;
 use crate::services::sprint_metrics::SprintBurndownMetric;
@@ -10,10 +11,10 @@ use crate::services::sprint_velocity::{
     DEFAULT_VELOCITY_WINDOW, VelocityComputation, VelocityOptions, compute_velocity,
 };
 use crate::services::{
-    attachment_service::AttachmentService, config_service::ConfigService,
-    project_service::ProjectService, reference_service::ReferenceService,
-    scan_service::ScanService, sprint_service::SprintService, sync_service::SyncService,
-    task_service::TaskService,
+    attachment_service::AttachmentService, automation_service::AutomationService,
+    config_service::ConfigService, project_service::ProjectService,
+    reference_service::ReferenceService, scan_service::ScanService, sprint_service::SprintService,
+    sync_service::SyncService, task_service::TaskService,
 };
 use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
 use crate::workspace::TasksDirectoryResolver;
@@ -290,6 +291,106 @@ pub fn initialize(api_server: &mut ApiServer) {
     api_server.register_handler("GET", "/api/whoami", |_req: &HttpRequest| {
         let who = crate::utils::identity::resolve_current_user(None).unwrap_or_default();
         ok_json(200, json!({"data": who}))
+    });
+
+    // POST /api/jobs -> create agent job
+    api_server.register_handler("POST", "/api/jobs", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let payload: crate::api_types::AgentJobCreateRequest =
+            match serde_json::from_slice(&req.body) {
+                Ok(value) => value,
+                Err(err) => return bad_request(format!("Invalid body: {}", err)),
+            };
+
+        match crate::services::agent_job_service::AgentJobService::start_job(payload, &resolver) {
+            Ok(job) => ok_json(201, json!({"data": {"job": job}})),
+            Err(err) => bad_request(err.to_string()),
+        }
+    });
+
+    // GET /api/jobs -> list agent jobs
+    api_server.register_handler("GET", "/api/jobs", |req: &HttpRequest| {
+        let mut jobs = crate::services::agent_job_service::AgentJobService::list_jobs();
+        if let Some(ticket_id) = req.query.get("ticket_id") {
+            jobs.retain(|job| job.ticket_id == *ticket_id);
+        }
+        if let Some(status) = req.query.get("status") {
+            jobs.retain(|job| job.status.eq_ignore_ascii_case(status));
+        }
+        let queue_stats = crate::services::agent_job_service::AgentJobService::queue_stats();
+        ok_json(
+            200,
+            json!({"data": {"jobs": jobs, "queue_stats": queue_stats}}),
+        )
+    });
+
+    // GET /api/jobs/get -> fetch agent job status
+    api_server.register_handler("GET", "/api/jobs/get", |req: &HttpRequest| {
+        let id = match req.query.get("id") {
+            Some(v) if !v.trim().is_empty() => v.clone(),
+            _ => return bad_request("Missing job id".into()),
+        };
+        match crate::services::agent_job_service::AgentJobService::get_job(&id) {
+            Some(job) => ok_json(200, json!({"data": {"job": job}})),
+            None => not_found(format!("Job '{}' not found", id)),
+        }
+    });
+
+    // GET /api/jobs/logs -> fetch agent job logs
+    api_server.register_handler("GET", "/api/jobs/logs", |req: &HttpRequest| {
+        let id = match req.query.get("id") {
+            Some(v) if !v.trim().is_empty() => v.clone(),
+            _ => return bad_request("Missing job id".into()),
+        };
+        let Some(job) = crate::services::agent_job_service::AgentJobService::get_job(&id) else {
+            return not_found(format!("Job '{}' not found", id));
+        };
+        let events = crate::services::agent_job_service::AgentJobService::events_for(&id);
+        ok_json(200, json!({"data": {"job": job, "events": events}}))
+    });
+
+    // POST /api/jobs/cancel -> cancel agent job
+    api_server.register_handler("POST", "/api/jobs/cancel", |req: &HttpRequest| {
+        let payload: crate::api_types::AgentJobCancelRequest =
+            match serde_json::from_slice(&req.body) {
+                Ok(value) => value,
+                Err(err) => return bad_request(format!("Invalid body: {}", err)),
+            };
+        match crate::services::agent_job_service::AgentJobService::cancel_job(&payload.id) {
+            Ok(Some(job)) => ok_json(200, json!({"data": {"cancelled": true, "job": job}})),
+            Ok(None) => not_found(format!("Job '{}' not found", payload.id)),
+            Err(err) => bad_request(err.to_string()),
+        }
+    });
+
+    // POST /api/jobs/cancel-all -> cancel all queued/running agent jobs
+    api_server.register_handler("POST", "/api/jobs/cancel-all", |_req: &HttpRequest| {
+        match crate::services::agent_job_service::AgentJobService::cancel_all_jobs() {
+            Ok(jobs) => ok_json(
+                200,
+                json!({"data": {"cancelled": jobs.len(), "jobs": jobs}}),
+            ),
+            Err(err) => bad_request(err.to_string()),
+        }
+    });
+
+    // POST /api/jobs/message -> send message to agent job
+    api_server.register_handler("POST", "/api/jobs/message", |req: &HttpRequest| {
+        let payload: crate::api_types::AgentJobMessageRequest =
+            match serde_json::from_slice(&req.body) {
+                Ok(value) => value,
+                Err(err) => return bad_request(format!("Invalid body: {}", err)),
+            };
+        match crate::services::agent_job_service::AgentJobService::send_message(
+            &payload.id,
+            &payload.message,
+        ) {
+            Ok(job) => ok_json(200, json!({"data": {"accepted": true, "job": job}})),
+            Err(err) => bad_request(err.to_string()),
+        }
     });
     // POST /api/tasks/add
     api_server.register_handler("POST", "/api/tasks/add", |req: &HttpRequest| {
@@ -2558,44 +2659,16 @@ pub fn initialize(api_server: &mut ApiServer) {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => return bad_request("Missing text".into()),
         };
-        let project_prefix = id.split('-').next().unwrap_or("").to_string();
-        let mut task = match storage.get(&id, project_prefix.clone()) {
-            Some(t) => t,
-            None => return not_found(format!("Task '{}' not found", id)),
-        };
-        let comment = crate::types::TaskComment {
-            date: chrono::Utc::now().to_rfc3339(),
-            text,
-        };
-        task.comments.push(comment);
-        task.history.push(crate::types::TaskChangeLogEntry {
-            at: task
-                .comments
-                .last()
-                .map(|c| c.date.clone())
-                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-            actor: crate::utils::identity::resolve_current_user(Some(resolver.path.as_path())),
-            changes: vec![crate::types::TaskChange {
-                field: "comment".into(),
-                old: None,
-                new: task.comments.last().map(|c| c.text.clone()),
-            }],
-        });
-        task.modified = chrono::Utc::now().to_rfc3339();
-        if let Err(err) = storage.edit(&id, &task) {
-            return internal(json!({
-                "error": {
-                    "code": "INTERNAL",
-                    "message": err.to_string(),
-                }
-            }));
-        }
-        let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+        let dto = match TaskService::add_comment(&mut storage, &id, text) {
             Ok(dto) => dto,
             Err(err) => {
-                return internal(
-                    json!({"error": {"code": "INTERNAL", "message": err.to_string()}}),
-                );
+                let msg = err.to_string();
+                if msg.contains("not found") {
+                    return not_found(format!("Task '{}' not found", id));
+                }
+                return internal(json!({
+                    "error": { "code": "INTERNAL", "message": msg }
+                }));
             }
         };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
@@ -2739,6 +2812,182 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(val) => ok_json(200, json!({"data": val})),
             Err(e) => internal(json!({"error": {"code":"INTERNAL", "message": e.to_string()}})),
         }
+    });
+
+    // GET /api/automation/show
+    api_server.register_handler("GET", "/api/automation/show", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let project = req.query.get("project").map(|s| s.as_str());
+        match AutomationService::inspect(resolver.path.as_path(), project) {
+            Ok(val) => ok_json(
+                200,
+                json!({
+                    "data": {
+                        "scope": val.scope.as_str(),
+                        "source": val.source.as_str(),
+                        "scope_exists": val.scope_exists,
+                        "scope_yaml": val.scope_yaml,
+                        "effective_yaml": val.effective_yaml,
+                    }
+                }),
+            ),
+            Err(e) => internal(json!({"error": {"code":"INTERNAL", "message": e.to_string()}})),
+        }
+    });
+
+    // POST /api/automation/set
+    api_server.register_handler("POST", "/api/automation/set", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let yaml = match body.get("yaml").and_then(|v| v.as_str()) {
+            Some(value) => value,
+            None => return bad_request("Missing yaml payload".to_string()),
+        };
+        let project = body.get("project").and_then(|v| v.as_str());
+        match AutomationService::set(resolver.path.as_path(), project, yaml) {
+            Ok(outcome) => {
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_config_updated(actor.as_deref());
+
+                let warnings: Vec<String> = outcome
+                    .validation
+                    .warnings
+                    .iter()
+                    .map(|w| w.to_string())
+                    .collect();
+                let info: Vec<String> = outcome
+                    .validation
+                    .info
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect();
+                let errors: Vec<String> = outcome
+                    .validation
+                    .errors
+                    .iter()
+                    .map(|err| err.to_string())
+                    .collect();
+
+                ok_json(
+                    200,
+                    json!({
+                        "data": {
+                            "updated": outcome.updated,
+                            "warnings": warnings,
+                            "info": info,
+                            "errors": errors,
+                        }
+                    }),
+                )
+            }
+            Err(e) => bad_request(e.to_string()),
+        }
+    });
+
+    // POST /api/automation/simulate - Preview what automation rules would do
+    api_server.register_handler("POST", "/api/automation/simulate", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let body: crate::api_types::AutomationSimulateRequest =
+            match serde_json::from_slice(&req.body) {
+                Ok(b) => b,
+                Err(e) => return bad_request(format!("Invalid request: {}", e)),
+            };
+
+        let ticket_id = body.ticket_id.trim();
+        if ticket_id.is_empty() {
+            return bad_request("Missing ticket_id".to_string());
+        }
+
+        // Parse the event
+        let event: AutomationEvent = match body.event.parse() {
+            Ok(e) => e,
+            Err(msg) => return bad_request(msg),
+        };
+
+        // Load the task
+        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let task_before =
+            match crate::services::task_service::TaskService::get(&storage, ticket_id, None) {
+                Ok(t) => t,
+                Err(e) => return bad_request(format!("Task not found: {}", e)),
+            };
+
+        // Simulate automation
+        match AutomationService::simulate(resolver.path.as_path(), ticket_id, event) {
+            Ok(result) => {
+                let actions: Vec<crate::api_types::AutomationSimulatedAction> = result
+                    .actions
+                    .iter()
+                    .map(|a| crate::api_types::AutomationSimulatedAction {
+                        action: a.action.clone(),
+                        description: a.description.clone(),
+                    })
+                    .collect();
+
+                ok_json(
+                    200,
+                    json!({
+                        "data": {
+                            "matched": result.matched,
+                            "rule_name": result.rule_name,
+                            "actions": actions,
+                            "task_before": task_before,
+                            "task_after": result.task_after,
+                        }
+                    }),
+                )
+            }
+            Err(e) => bad_request(e.to_string()),
+        }
+    });
+
+    // GET /api/agents/profiles - List available agent profiles
+    api_server.register_handler("GET", "/api/agents/profiles", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let project = req.query.get("project").map(|s| s.as_str());
+        let cfg_mgr =
+            match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
+                &resolver.path,
+            ) {
+                Ok(m) => m,
+                Err(e) => {
+                    return internal(
+                        json!({"error": {"code": "INTERNAL", "message": e.to_string()}}),
+                    );
+                }
+            };
+        let config = if let Some(prefix) = project {
+            cfg_mgr
+                .get_project_config(prefix)
+                .unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone())
+        } else {
+            cfg_mgr.get_resolved_config().clone()
+        };
+
+        let profiles: Vec<crate::api_types::AgentProfileInfo> = config
+            .agent_profiles
+            .iter()
+            .map(|(name, profile)| crate::api_types::AgentProfileInfo {
+                name: name.clone(),
+                runner: profile.runner.clone(),
+                description: None,
+            })
+            .collect();
+
+        ok_json(200, json!({"data": {"profiles": profiles}}))
     });
 
     // POST /api/config/set

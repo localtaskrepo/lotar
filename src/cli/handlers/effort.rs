@@ -1,7 +1,6 @@
 use crate::api_types::TaskUpdate;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
-use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
     ExplainPlacement, PropertyCurrent, PropertyExplain, PropertyNoop, PropertyPreview,
@@ -138,10 +137,12 @@ fn handle_clear_effort(
         return Ok(());
     }
 
-    task.effort = None;
-    ctx.storage
-        .edit(&full_id, &task)
-        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
+    let patch = crate::api_types::TaskUpdate {
+        effort: Some(String::new()), // empty string = clear
+        ..Default::default()
+    };
+    crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
+        .map_err(|e| e.to_string())?;
     render_effort_clear_success(renderer, &full_id, previous.as_deref());
     Ok(())
 }

@@ -74,6 +74,27 @@ fn parse_optional_bool_flag(value: &str, field: &str) -> Result<Option<bool>, Co
     }
 }
 
+fn parse_optional_status(value: &str, field: &str) -> Result<Option<TaskStatus>, ConfigError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+        Ok(None)
+    } else {
+        let status = trimmed.parse::<TaskStatus>().map_err(|err| {
+            ConfigError::ParseError(format!("{} must be a valid status: {}", field, err))
+        })?;
+        Ok(Some(status))
+    }
+}
+
+fn parse_optional_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
 fn parse_simple_csv(value: &str) -> Vec<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -514,6 +535,88 @@ pub fn apply_field_to_global_config(
         "sync_write_reports" => {
             config.sync_write_reports = parse_bool_flag(value, field)?;
         }
+        "agent_context_enabled" => {
+            config.agent_context_enabled = parse_bool_flag(value, field)?;
+        }
+        "agent_context_extension" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Err(ConfigError::ParseError(
+                    "agent_context_extension cannot be empty".to_string(),
+                ));
+            }
+            config.agent_context_extension = trimmed.to_string();
+        }
+        "agent_logs_dir" => {
+            let trimmed = value.trim();
+            config.agent_logs_dir = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        "agent_instructions" => {
+            let trimmed = value.trim();
+            config.agent_instructions = if trimmed.is_empty() {
+                None
+            } else {
+                Some(AgentInstructionsConfig::Inline(trimmed.to_string()))
+            };
+        }
+        "agent_instructions_file" => {
+            let trimmed = value.trim();
+            config.agent_instructions = if trimmed.is_empty() {
+                None
+            } else {
+                Some(AgentInstructionsConfig::File {
+                    file: trimmed.to_string(),
+                })
+            };
+        }
+        "agent_on_start_status" => {
+            config.agent_automation.on_start.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_success_status" => {
+            config.agent_automation.on_success.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_failure_status" => {
+            config.agent_automation.on_failure.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_cancel_status" => {
+            config.agent_automation.on_cancel.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_start_reassign_to" => {
+            config.agent_automation.on_start.reassign_to = parse_optional_string(value);
+        }
+        "agent_on_success_reassign_to" => {
+            config.agent_automation.on_success.reassign_to = parse_optional_string(value);
+        }
+        "agent_on_failure_reassign_to" => {
+            config.agent_automation.on_failure.reassign_to = parse_optional_string(value);
+        }
+        "agent_on_cancel_reassign_to" => {
+            config.agent_automation.on_cancel.reassign_to = parse_optional_string(value);
+        }
+        "agent_worktree_enabled" => {
+            config.agent_worktree.enabled = parse_bool_flag(value, field)?;
+        }
+        "agent_worktree_dir" => {
+            let trimmed = value.trim();
+            config.agent_worktree.dir = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        "agent_worktree_branch_prefix" => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Err(ConfigError::ParseError(
+                    "agent_worktree_branch_prefix cannot be empty".to_string(),
+                ));
+            }
+            config.agent_worktree.branch_prefix = trimmed.to_string();
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -797,6 +900,99 @@ fn apply_field_to_project_config(
         "sync_write_reports" => {
             config.sync_write_reports = parse_optional_bool_flag(value, field)?;
         }
+        "agent_context_enabled" => {
+            config.agent_context_enabled = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_context_extension" => {
+            let trimmed = value.trim();
+            config.agent_context_extension =
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                };
+        }
+        "agent_logs_dir" => {
+            let trimmed = value.trim();
+            config.agent_logs_dir = if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit")
+            {
+                None
+            } else {
+                Some(trimmed.to_string())
+            };
+        }
+        "agent_instructions" => {
+            let trimmed = value.trim();
+            config.agent_instructions =
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+                    None
+                } else {
+                    Some(AgentInstructionsConfig::Inline(trimmed.to_string()))
+                };
+        }
+        "agent_instructions_file" => {
+            let trimmed = value.trim();
+            config.agent_instructions =
+                if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("inherit") {
+                    None
+                } else {
+                    Some(AgentInstructionsConfig::File {
+                        file: trimmed.to_string(),
+                    })
+                };
+        }
+        "agent_on_start_status" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_start.get_or_insert_with(Default::default);
+            action.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_success_status" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_success.get_or_insert_with(Default::default);
+            action.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_failure_status" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_failure.get_or_insert_with(Default::default);
+            action.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_cancel_status" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_cancel.get_or_insert_with(Default::default);
+            action.set_status = parse_optional_status(value, field)?;
+        }
+        "agent_on_start_reassign_to" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_start.get_or_insert_with(Default::default);
+            action.reassign_to = parse_optional_string(value);
+        }
+        "agent_on_success_reassign_to" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_success.get_or_insert_with(Default::default);
+            action.reassign_to = parse_optional_string(value);
+        }
+        "agent_on_failure_reassign_to" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_failure.get_or_insert_with(Default::default);
+            action.reassign_to = parse_optional_string(value);
+        }
+        "agent_on_cancel_reassign_to" => {
+            let automation = config.agent_automation.get_or_insert_with(Default::default);
+            let action = automation.on_cancel.get_or_insert_with(Default::default);
+            action.reassign_to = parse_optional_string(value);
+        }
+        "agent_worktree_enabled" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.enabled = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_worktree_dir" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.dir = parse_optional_string(value);
+        }
+        "agent_worktree_branch_prefix" => {
+            let worktree = config.agent_worktree.get_or_insert_with(Default::default);
+            worktree.branch_prefix = parse_optional_string(value);
+        }
         "remotes" => {
             config.remotes = parse_sync_remotes(value)?;
         }
@@ -873,6 +1069,22 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "attachments_max_upload_mb",
         "sync_reports_dir",
         "sync_write_reports",
+        "agent_context_enabled",
+        "agent_context_extension",
+        "agent_logs_dir",
+        "agent_instructions",
+        "agent_instructions_file",
+        "agent_on_start_status",
+        "agent_on_success_status",
+        "agent_on_failure_status",
+        "agent_on_cancel_status",
+        "agent_on_start_reassign_to",
+        "agent_on_success_reassign_to",
+        "agent_on_failure_reassign_to",
+        "agent_on_cancel_reassign_to",
+        "agent_worktree_enabled",
+        "agent_worktree_dir",
+        "agent_worktree_branch_prefix",
         "remotes",
         "sprints_defaults_capacity_points",
         "sprints_defaults_capacity_hours",
@@ -916,6 +1128,22 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
         "attachments_max_upload_mb",
         "sync_reports_dir",
         "sync_write_reports",
+        "agent_context_enabled",
+        "agent_context_extension",
+        "agent_logs_dir",
+        "agent_instructions",
+        "agent_instructions_file",
+        "agent_on_start_status",
+        "agent_on_success_status",
+        "agent_on_failure_status",
+        "agent_on_cancel_status",
+        "agent_on_start_reassign_to",
+        "agent_on_success_reassign_to",
+        "agent_on_failure_reassign_to",
+        "agent_on_cancel_reassign_to",
+        "agent_worktree_enabled",
+        "agent_worktree_dir",
+        "agent_worktree_branch_prefix",
         "remotes",
     ];
 
@@ -1063,6 +1291,43 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "sync_write_reports" => {
             parse_bool_flag(value, field)?;
         }
+        "agent_context_enabled" => {
+            parse_bool_flag(value, field)?;
+        }
+        "agent_context_extension" => {
+            if value.trim().is_empty() {
+                return Err(ConfigError::ParseError(
+                    "agent_context_extension cannot be empty".to_string(),
+                ));
+            }
+        }
+        "agent_logs_dir" => {
+            // Accept any string; empty clears the setting.
+        }
+        "agent_instructions" | "agent_instructions_file" => {
+            // Accept any string; empty values clear the override.
+        }
+        "agent_on_start_status"
+        | "agent_on_success_status"
+        | "agent_on_failure_status"
+        | "agent_on_cancel_status" => {
+            let _ = parse_optional_status(value, field)?;
+        }
+        "agent_on_start_reassign_to"
+        | "agent_on_success_reassign_to"
+        | "agent_on_failure_reassign_to"
+        | "agent_on_cancel_reassign_to" => {
+            let _ = parse_optional_string(value);
+        }
+        "agent_worktree_enabled" => {
+            let _ = parse_optional_bool_flag(value, field)?;
+        }
+        "agent_worktree_dir" => {
+            let _ = parse_optional_string(value);
+        }
+        "agent_worktree_branch_prefix" => {
+            let _ = parse_optional_string(value);
+        }
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
         }
@@ -1185,6 +1450,23 @@ pub fn clear_project_field(
         "branch_type_aliases" => project_config.branch_type_aliases = None,
         "branch_status_aliases" => project_config.branch_status_aliases = None,
         "branch_priority_aliases" => project_config.branch_priority_aliases = None,
+        "agent_context_enabled" => project_config.agent_context_enabled = None,
+        "agent_context_extension" => project_config.agent_context_extension = None,
+        "agent_logs_dir" => project_config.agent_logs_dir = None,
+        "agent_instructions" | "agent_instructions_file" => {
+            project_config.agent_instructions = None;
+        }
+        "agent_on_start_status"
+        | "agent_on_success_status"
+        | "agent_on_failure_status"
+        | "agent_on_cancel_status"
+        | "agent_on_start_reassign_to"
+        | "agent_on_success_reassign_to"
+        | "agent_on_failure_reassign_to"
+        | "agent_on_cancel_reassign_to" => project_config.agent_automation = None,
+        "agent_worktree_enabled" | "agent_worktree_dir" | "agent_worktree_branch_prefix" => {
+            project_config.agent_worktree = None
+        }
         // Project name is not optional; do not clear it silently
         "project_name" => { /* no-op: cannot clear non-optional */ }
         other => {

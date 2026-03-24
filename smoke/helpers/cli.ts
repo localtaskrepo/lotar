@@ -22,6 +22,7 @@ export async function runLotar(
         cwd: options.cwd,
         env: {
             LOTAR_TEST_SILENT: '1',
+            RUST_TEST_THREADS: undefined,
             ...process.env,
             ...options.env,
         },
@@ -53,6 +54,7 @@ export async function spawnLotar(
         cwd: options.cwd,
         env: {
             LOTAR_TEST_SILENT: '1',
+            RUST_TEST_THREADS: undefined,
             ...process.env,
             ...options.env,
         },

@@ -64,6 +64,17 @@ All rows below are defined inside the same override table and map directly to th
 | `sync_reports_dir` | `LOTAR_SYNC_REPORTS_DIR` | Path string | Directory for sync report JSON files. Relative paths resolve under the tasks directory; `..` is rejected. |
 | `sync_write_reports` | `LOTAR_SYNC_WRITE_REPORTS` | `true`/`false` | Toggle writing sync reports to disk. |
 
+### Agent integration
+
+| Config key | Env var(s) | Accepted values | Purpose |
+| --- | --- | --- | --- |
+| `agent.context_extension` | `LOTAR_AGENT_CONTEXT_EXTENSION` | Extension string | File extension for context files stored next to tickets (default `.context`). |
+| `agent.logs_dir` | `LOTAR_AGENT_LOGS_DIR` | Path string | Directory for debug logs. When set, job events are persisted to `<logs_dir>/<JOB_ID>.jsonl`. Relative paths resolve under the tasks directory. |
+
+| Variable | Values | Effect |
+| --- | --- | --- |
+| `LOTAR_AGENT_WRAPPER` | Absolute path | Overrides the wrapper binary used to launch agent CLIs for `list-running` discovery. |
+
 ### Automation & branching behavior
 
 | Config key | Env var(s) | Accepted values | Purpose |

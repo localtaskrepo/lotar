@@ -1,13 +1,117 @@
-#![allow(clippy::redundant_pattern_matching, clippy::needless_if)]
+#![allow(
+    renamed_and_removed_lints,
+    clippy::redundant_pattern_matching,
+    clippy::needless_if
+)]
 
 mod common;
 
 use crate::common::cargo_bin_silent;
 use common::TestFixtures;
+use std::fs;
+use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::process::{Child, Command, Stdio};
+use std::thread;
 use std::time::Duration;
 
-/// Phase 2.4 - Serve Command Advanced Features Testing
-/// Tests web server functionality including startup, options, lifecycle, and error handling.
+// Phase 2.4 - Serve Command Advanced Features Testing.
+// Tests web server functionality including startup, options, lifecycle, and error handling.
+
+fn find_free_port() -> u16 {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    port
+}
+
+fn wait_for_server(port: u16) {
+    for _ in 0..80 {
+        if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    panic!("server did not start on port {port}");
+}
+
+fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>) {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_millis(1_500)))
+        .unwrap();
+    let req = format!(
+        "POST {} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+        path_and_query,
+        body.len(),
+        body
+    );
+    stream.write_all(req.as_bytes()).unwrap();
+    stream.flush().unwrap();
+
+    let mut header_buf = Vec::new();
+    let mut tmp = [0u8; 1024];
+    loop {
+        let n = stream.read(&mut tmp).unwrap_or(0);
+        if n == 0 {
+            break;
+        }
+        header_buf.extend_from_slice(&tmp[..n]);
+        if let Some(pos) = header_buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            let body_leftover = header_buf.split_off(pos + 4);
+            let headers_text = String::from_utf8_lossy(&header_buf);
+            let status = headers_text
+                .lines()
+                .next()
+                .and_then(|line| line.split_whitespace().nth(1))
+                .and_then(|value| value.parse::<u16>().ok())
+                .unwrap_or(0);
+            let content_length = headers_text
+                .lines()
+                .filter_map(|line| {
+                    line.split_once(':')
+                        .map(|(key, value)| (key.trim(), value.trim()))
+                })
+                .find(|(key, _)| key.eq_ignore_ascii_case("Content-Length"))
+                .and_then(|(_, value)| value.parse::<usize>().ok())
+                .unwrap_or(0);
+
+            let mut body_bytes = body_leftover;
+            while body_bytes.len() < content_length {
+                let n = stream.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                body_bytes.extend_from_slice(&tmp[..n]);
+            }
+            body_bytes.truncate(content_length);
+            return (status, body_bytes);
+        }
+    }
+
+    (0, Vec::new())
+}
+
+fn stop_server(port: u16, child: &mut Child) {
+    if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(250)));
+        let req = "GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
+        let _ = stream.write_all(req.as_bytes());
+        let _ = stream.flush();
+        let mut tmp = [0u8; 128];
+        let _ = stream.read(&mut tmp);
+    }
+
+    for _ in 0..40 {
+        if child.try_wait().unwrap().is_some() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+
+    let _ = child.kill();
+    let _ = child.wait();
+}
 
 #[test]
 fn test_serve_command_basic_functionality() {
@@ -275,4 +379,59 @@ fn test_serve_implementation_summary() {
 
         if output.contains("host") {}
     }
+}
+
+#[test]
+fn test_serve_honors_explicit_tasks_dir_for_api_requests() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+    let custom_tasks_dir = temp_dir.join("sandbox-data").join(".tasks");
+    fs::create_dir_all(&custom_tasks_dir).unwrap();
+    fs::write(
+        custom_tasks_dir.join("config.yml"),
+        "default:\n  project: SAN\nissue:\n  states: [Todo, InProgress, Done]\n  priorities: [Low, Medium, High]\n  types: [Feature, Bug]\n",
+    )
+    .unwrap();
+
+    let port = find_free_port();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lotar"))
+        .current_dir(temp_dir)
+        .env_remove("LOTAR_TASKS_DIR")
+        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .arg("--tasks-dir")
+        .arg(&custom_tasks_dir)
+        .arg("serve")
+        .arg("--host")
+        .arg("127.0.0.1")
+        .arg("--port")
+        .arg(port.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+
+    wait_for_server(port);
+
+    let (status, body) = http_post_json(
+        port,
+        "/api/tasks/add?project=SAN",
+        r#"{"title":"Sandbox task"}"#,
+    );
+
+    stop_server(port, &mut child);
+
+    assert_eq!(
+        status,
+        201,
+        "unexpected response: {}",
+        String::from_utf8_lossy(&body)
+    );
+    assert!(
+        custom_tasks_dir.join("SAN").join("1.yml").exists(),
+        "task should be created in explicit tasks dir"
+    );
+    assert!(
+        !temp_dir.join(".tasks").join("SAN").join("1.yml").exists(),
+        "task should not be created under cwd/.tasks when --tasks-dir is set"
+    );
 }

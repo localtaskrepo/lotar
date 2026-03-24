@@ -20,6 +20,16 @@ pub fn global_config_path(tasks_root: &Path) -> PathBuf {
     tasks_root.join("config.yml")
 }
 
+/// Return the path to the global automation.yml under a tasks root
+pub fn global_automation_path(tasks_root: &Path) -> PathBuf {
+    tasks_root.join("automation.yml")
+}
+
+/// Return the path to a project automation.yml under a tasks root
+pub fn project_automation_path(tasks_root: &Path, project_prefix: &str) -> PathBuf {
+    project_dir(tasks_root, project_prefix).join("automation.yml")
+}
+
 /// Try to produce a path string relative to the git repo root, else to cwd, else absolute.
 pub fn repo_relative_display(path: &Path) -> String {
     let repo_rel = path

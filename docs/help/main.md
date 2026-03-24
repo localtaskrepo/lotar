@@ -33,7 +33,10 @@ lotar serve --open
 | Update ownership | `lotar assignee <id> <name|@me>` |
 | Track deadlines and estimates | `lotar due-date`, `lotar effort` |
 | Capture discussion | `lotar comment` or use the web UI task panel |
+| Run agent jobs | `lotar agent run`, `lotar agent list-running` |
 | Watch metrics | `lotar stats`, `lotar sprint ...`, or the Insights tab in the browser |
+
+See [Agent Jobs](./agent.md) for the full CLI workflow and wrapper requirements.
 
 ## Global CLI Flags
 

@@ -75,6 +75,7 @@ impl TaskStatus {
             "todo",
             "inprogress",
             "verify",
+            "needsreview",
             "blocked",
             "done",
             "canceled",

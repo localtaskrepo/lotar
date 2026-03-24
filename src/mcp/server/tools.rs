@@ -61,6 +61,11 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_sync_pull_tool(enum_hints),
         make_sync_push_tool(enum_hints),
         make_schema_discover_tool(),
+        make_agent_run_tool(),
+        make_agent_status_tool(),
+        make_agent_list_jobs_tool(),
+        make_agent_cancel_tool(),
+        make_agent_send_message_tool(),
     ]
 }
 
@@ -1244,5 +1249,81 @@ fn multi_value_string_schema() -> Value {
             {"type": "string"},
             {"type": "array", "items": {"type": "string"}}
         ]
+    })
+}
+
+fn make_agent_run_tool() -> Value {
+    json!({
+        "name": "agent_run",
+        "description": "Start an agent job for a ticket. The agent will execute the prompt in a worktree (if enabled). Returns job details including the job ID for status tracking.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ticket_id": {"type": "string", "description": "The ticket ID to run the agent on (e.g. PROJ-1)"},
+                "prompt": {"type": "string", "description": "Instructions for the agent"},
+                "runner": {"type": ["string", "null"], "description": "Runner type: copilot, claude, codex, gemini, or command"},
+                "agent": {"type": ["string", "null"], "description": "Agent profile name from config"}
+            },
+            "required": ["ticket_id", "prompt"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_agent_status_tool() -> Value {
+    json!({
+        "name": "agent_status",
+        "description": "Get the status of an agent job by ID. Returns job details including status, exit code, last message, and timing.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "The job ID to check"}
+            },
+            "required": ["id"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_agent_list_jobs_tool() -> Value {
+    json!({
+        "name": "agent_list_jobs",
+        "description": "List all agent jobs with queue statistics. Jobs are sorted newest first. Returns running, queued, completed, failed, and cancelled jobs.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_agent_cancel_tool() -> Value {
+    json!({
+        "name": "agent_cancel",
+        "description": "Cancel a running or queued agent job. Returns whether the job was cancelled.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "The job ID to cancel"}
+            },
+            "required": ["id"],
+            "additionalProperties": false
+        }
+    })
+}
+
+fn make_agent_send_message_tool() -> Value {
+    json!({
+        "name": "agent_send_message",
+        "description": "Send a follow-up message to a running agent job via stdin. Only supported for runners that accept stdin input (Claude, Copilot). Returns updated job details.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string", "description": "The running job ID"},
+                "message": {"type": "string", "description": "The message to send to the agent"}
+            },
+            "required": ["id", "message"],
+            "additionalProperties": false
+        }
     })
 }

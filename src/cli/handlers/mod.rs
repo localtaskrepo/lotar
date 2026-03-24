@@ -12,7 +12,9 @@ use serde_json;
 use std::collections::HashSet;
 use std::io::Write;
 
+pub mod agent;
 pub mod assignee;
+pub mod automation;
 pub mod comment;
 pub mod completions;
 pub mod config;
@@ -30,6 +32,8 @@ pub mod sync;
 pub mod task;
 
 // Re-export handlers for easy access
+pub use agent::AgentHandler;
+pub use automation::AutomationHandler;
 pub use completions::CompletionsHandler;
 pub use config::ConfigHandler;
 pub use git::GitHandler;
@@ -109,6 +113,17 @@ impl CommandHandler for AddHandler {
         // Create project resolver and validator
         let mut project_resolver = ProjectResolver::new(resolver)
             .map_err(|e| format!("Failed to initialize project resolver: {}", e))?;
+        let had_configured_default_project = !project_resolver
+            .get_config()
+            .default_project
+            .trim()
+            .is_empty();
+
+        let detected_name = if project.is_none() {
+            crate::project::detect_project_context_name()
+        } else {
+            None
+        };
 
         // Resolve project first (needed for project-specific config)
         let effective_project = match project_resolver.resolve_project("", project) {
@@ -347,13 +362,6 @@ impl CommandHandler for AddHandler {
         // Determine storage roots and project identifiers prior to any mutation of the config
         let write_root = resolver.path.clone();
 
-        let detected_name = if project.is_none() {
-            // Only detect project name if user didn't explicitly specify one
-            crate::project::detect_project_name()
-        } else {
-            None
-        };
-
         let (project_for_storage, original_project_name) = if let Some(explicit_project) = project {
             // If we have an explicit project from command line, resolve it to its prefix
             let prefix = resolve_project_input(explicit_project, resolver.path.as_path());
@@ -362,15 +370,25 @@ impl CommandHandler for AddHandler {
             // Auto-detected project name - generate prefix but keep the human-readable name for config creation
             let prefix = generate_project_prefix(detected);
             (prefix, Some(detected.clone()))
-        } else {
-            // Fall back to effective project logic (from global config default)
-            let prefix = if let Some(project) = effective_project.as_deref() {
-                project.to_string()
+        } else if let Some(project_name) = effective_project.as_deref() {
+            let descriptive_name = if had_configured_default_project {
+                None
             } else {
-                crate::project::get_effective_project_name(resolver)
+                crate::project::detect_project_name()
             };
+            (project_name.to_string(), descriptive_name)
+        } else {
+            let prefix = crate::project::get_effective_project_name(resolver);
             (prefix, None)
         };
+
+        if original_project_name.is_some()
+            && effective_project.as_deref() != Some(project_for_storage.as_str())
+        {
+            config = project_resolver
+                .get_project_config(&project_for_storage)
+                .unwrap_or(config);
+        }
 
         if autop_members_enabled {
             let mut pending: Vec<String> = Vec::new();
@@ -535,6 +553,30 @@ impl CommandHandler for AddHandler {
             .map_err(TaskStorageAction::Create.map_err(&project_for_storage))?;
         renderer.log_info(format_args!("add: created id={}", task_id));
 
+        // Fire automation rules for the `created` event.
+        // Skipped under RUST_TEST_THREADS to avoid interference with integration
+        // tests that share the workspace's .tasks directory.
+        if std::env::var("RUST_TEST_THREADS").is_err()
+            && let Ok(dto) = crate::services::task_service::TaskService::get(
+                &storage,
+                &task_id,
+                Some(&project_for_storage),
+            )
+            && let Err(err) =
+                crate::services::automation_service::AutomationService::apply_task_update(
+                    &mut storage,
+                    None,
+                    &dto,
+                    &config,
+                )
+            && std::env::var("LOTAR_DEBUG_STATUS").is_ok()
+        {
+            eprintln!(
+                "[lotar][debug] add automation apply failed for {}: {}",
+                task_id, err
+            );
+        }
+
         Ok(task_id)
     }
 }
@@ -552,6 +594,7 @@ impl AddHandler {
         };
         OutputRenderer::new(OutputFormat::Text, level)
     }
+
     /// Render the output for a successfully created task
     pub fn render_add_success(
         task_id: &str,

@@ -1,10 +1,25 @@
 import type {
   ActivityFeedItem,
+  AgentJobCancelAllResponse,
+  AgentJobCancelResponse,
+  AgentJobCreateRequest,
+  AgentJobCreateResponse,
+  AgentJobListResponse,
+  AgentJobLogsResponse,
+  AgentJobMessageRequest,
+  AgentJobMessageResponse,
+  AgentJobStatusResponse,
+  AgentProfilesResponse,
   ApiEnvelope,
   AttachmentRemoveRequest,
   AttachmentRemoveResponse,
   AttachmentUploadRequest,
   AttachmentUploadResponse,
+  AutomationInspectResponse,
+  AutomationSetRequest,
+  AutomationSetResponse,
+  AutomationSimulateRequest,
+  AutomationSimulateResponse,
   CodeReferenceAddRequest,
   CodeReferenceAddResponse,
   CodeReferenceRemoveRequest,
@@ -190,6 +205,35 @@ export const api = {
 
   // Scan
   scanRun(payload: ScanRequest): Promise<ScanResponse> { return post('/api/scan/run', payload) },
+
+  // Agent jobs
+  listAgentJobs(params: { status?: string; ticket_id?: string } = {}): Promise<AgentJobListResponse> {
+    return get('/api/jobs', params as any)
+  },
+  getAgentJob(id: string): Promise<AgentJobStatusResponse> { return get('/api/jobs/get', { id }) },
+  runAgentJob(payload: AgentJobCreateRequest): Promise<AgentJobCreateResponse> { return post('/api/jobs', payload) },
+  cancelAgentJob(id: string): Promise<AgentJobCancelResponse> { return post('/api/jobs/cancel', { id }) },
+  cancelAllAgentJobs(): Promise<AgentJobCancelAllResponse> { return post('/api/jobs/cancel-all', {}) },
+
+  // Automations
+  inspectAutomation(project?: string): Promise<AutomationInspectResponse> {
+    return get('/api/automation/show', project ? { project } : undefined)
+  },
+  setAutomation(payload: AutomationSetRequest): Promise<AutomationSetResponse> {
+    return post('/api/automation/set', payload)
+  },
+  simulateAutomation(payload: AutomationSimulateRequest): Promise<AutomationSimulateResponse> {
+    return post('/api/automation/simulate', payload)
+  },
+  getAgentJobLogs(id: string): Promise<AgentJobLogsResponse> { return get('/api/jobs/logs', { id }) },
+  sendAgentJobMessage(payload: AgentJobMessageRequest): Promise<AgentJobMessageResponse> {
+    return post('/api/jobs/message', payload)
+  },
+
+  // Agent profiles
+  listAgentProfiles(project?: string): Promise<AgentProfilesResponse> {
+    return get('/api/agents/profiles', project ? { project } : undefined)
+  },
 
   // Activity
   activitySeries(group: 'author' | 'day' | 'week' | 'project', params: { since?: string; until?: string; project?: string } = {}): Promise<Array<{ key: string; count: number; last_date: string }>> {

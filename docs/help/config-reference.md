@@ -15,7 +15,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - default.tags: string[]
 - default.strict_members: boolean (default false)
 - members: string[]
-- issue.states: string[] (e.g., [Todo, InProgress, Done])
+- issue.states: string[] (e.g., [Todo, InProgress, NeedsReview, Done])
 - issue.types: string[] (feature, bug, epic, spike, chore)
 - issue.priorities: string[] (Low, Medium, High, Critical)
 - issue.tags: string[]
@@ -24,6 +24,12 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - attachments.max_upload_mb: number (default 10) — `0` disables uploads; `-1` is unlimited; positive values are MiB
 - sync.reports_dir: string (default "@reports")
 - sync.write_reports: boolean (default true)
+- agent.context_enabled: boolean (default true) — when true, LoTaR stores per-ticket `.context` files to support agent resume/continue; disable for stateless runs. If you don’t want to share context files, add `.context` to `.gitignore`.
+- agent.instructions: string | { file: string } (default: built-in) — prepended to agent prompts. Inline strings are used directly; file paths can be absolute or relative to the tasks directory.
+- agent.worktree.enabled: boolean (default false) — when true, agent jobs run inside a git worktree.
+- agent.worktree.dir: string (default computed) — optional worktree root directory; relative paths resolve from the repo’s parent directory.
+- agent.worktree.branch_prefix: string (default "agent/") — prefix used when creating agent branches.
+- agents: map (named agent CLI profiles; values may be a runner string or a full object)
 - scan.signal_words: string[] (default: [TODO, FIXME, HACK, BUG, NOTE])
 - scan.ticket_patterns: string[] (regex patterns to detect ticket keys)
 - scan.enable_ticket_words: boolean (default: false) — when true, issue-type words (like Feature/Bug/Chore) act as signal words in addition to TODO/FIXME/etc. Note: bare ticket keys alone do not trigger creation.
@@ -77,7 +83,7 @@ default:
 
 # .tasks/config.yml (global)
 issue:
-	states: [Todo, InProgress, Done]
+	states: [Todo, InProgress, NeedsReview, Done]
 	priorities: [Low, Medium, High]
 scan:
 	signal_words: [TODO, FIXME]
@@ -95,6 +101,32 @@ sync:
 	# Sync reports (stored under .tasks/@reports by default)
 	reports_dir: "@reports"
 	write_reports: true
+
+agent:
+	# Disable .context persistence (stateless mode)
+	context_enabled: false
+	# Default agent instructions (inline or file)
+	instructions:
+		file: "@agent-instructions.md"
+	# Optional worktree support for agent jobs
+	worktree:
+		enabled: true
+		branch_prefix: "agent/"
+
+# Automation rules live in a separate file:
+# - Global: .tasks/automation.yml
+# - Project: .tasks/<PROJECT>/automation.yml
+# - Home: ~/.lotar.automation.yml
+
+agents:
+	# Short form
+	myclaude: claude
+	# Long form
+	copilot-default:
+		runner: copilot
+	codex-default:
+		runner: codex
+		args: ["--model", "o3"]
 
 # .tasks/DEMO/config.yml (project)
 project:

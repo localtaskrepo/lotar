@@ -1,5 +1,6 @@
 use crate::api_server::{self, HttpRequest};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
+use crate::workspace::TasksDirectoryResolver;
 use include_dir::{Dir, include_dir};
 use notify::event::EventKind;
 use notify::{Config as NotifyConfig, PollWatcher, RecursiveMode, Watcher, recommended_watcher};
@@ -368,23 +369,20 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
                     .iter()
                     .any(|k| k.eq_ignore_ascii_case("project_changed")),
             };
-            if wants_project_changed {
-                let cwd_ok = std::env::current_dir().ok();
-                if let Some(cwd) = cwd_ok {
-                    let proj_dir = cwd.join(".tasks").join(proj_name);
-                    if proj_dir.exists() {
-                        // Emit via bus (picked up by forwarder) and also write one immediate event inline
-                        crate::api_events::emit(crate::api_events::ApiEvent {
-                            kind: "project_changed".to_string(),
-                            data: serde_json::json!({ "name": proj_name }),
-                        });
-                        let inline = format!(
-                            "event: project_changed\ndata: {{\"name\":\"{}\"}}\n\n",
-                            proj_name
-                        );
-                        let _ = stream.write_all(inline.as_bytes());
-                        let _ = stream.flush();
-                    }
+            if wants_project_changed && let Some(tasks_dir) = resolve_server_tasks_dir() {
+                let proj_dir = tasks_dir.join(proj_name);
+                if proj_dir.exists() {
+                    // Emit via bus (picked up by forwarder) and also write one immediate event inline
+                    crate::api_events::emit(crate::api_events::ApiEvent {
+                        kind: "project_changed".to_string(),
+                        data: serde_json::json!({ "name": proj_name }),
+                    });
+                    let inline = format!(
+                        "event: project_changed\ndata: {{\"name\":\"{}\"}}\n\n",
+                        proj_name
+                    );
+                    let _ = stream.write_all(inline.as_bytes());
+                    let _ = stream.flush();
                 }
             }
         }
@@ -542,14 +540,19 @@ fn url_decode(s: &str) -> String {
     out
 }
 
-// Lightweight watcher that monitors the nearest .tasks directory under CWD and emits project_changed
+fn resolve_server_tasks_dir() -> Option<PathBuf> {
+    TasksDirectoryResolver::resolve(None, None)
+        .ok()
+        .and_then(|resolver| resolver.absolute_path().ok())
+}
+
+// Lightweight watcher that monitors the resolved tasks directory and emits project_changed
 fn start_tasks_watcher() {
     // Don't crash server if watcher setup fails
-    let cwd = match std::env::current_dir() {
-        Ok(c) => c,
-        Err(_) => return,
+    let tasks_dir = match resolve_server_tasks_dir() {
+        Some(path) => path,
+        None => return,
     };
-    let tasks_dir = cwd.join(".tasks");
     if !tasks_dir.exists() {
         return;
     }
@@ -618,6 +621,7 @@ fn start_tasks_watcher() {
                         for p in paths {
                             // Walk ancestors to locate the ".tasks" directory and take the next component as project
                             let mut proj: Option<String> = None;
+                            let mut task_id: Option<String> = None;
                             for anc in p.ancestors() {
                                 if let Some(name) = anc.file_name().and_then(|s| s.to_str())
                                     && name == ".tasks"
@@ -633,10 +637,35 @@ fn start_tasks_watcher() {
                                         })
                                     {
                                         proj = Some(project.to_string());
+                                        // Detect task file changes: .tasks/<PROJECT>/<NUM>.yml
+                                        // Emit task_updated/task_deleted with an id hint so UIs can refresh the single ticket.
+                                        if let Some(file) = p.file_name().and_then(|s| s.to_str())
+                                            && file.ends_with(".yml")
+                                        {
+                                            let stem = file.trim_end_matches(".yml");
+                                            if stem.chars().all(|c| c.is_ascii_digit()) {
+                                                task_id = Some(format!("{}-{}", project, stem));
+                                            }
+                                        }
                                     }
                                     break;
                                 }
                             }
+                            if let Some(task_id) = task_id.clone() {
+                                match event.kind {
+                                    EventKind::Remove(_) => {
+                                        crate::api_events::emit(crate::api_events::ApiEvent {
+                                            kind: "task_deleted".to_string(),
+                                            data: serde_json::json!({ "id": task_id }),
+                                        })
+                                    }
+                                    _ => crate::api_events::emit(crate::api_events::ApiEvent {
+                                        kind: "task_updated".to_string(),
+                                        data: serde_json::json!({ "id": task_id }),
+                                    }),
+                                }
+                            }
+
                             if let Some(project) = proj
                                 && emitted.insert(project.clone())
                             {

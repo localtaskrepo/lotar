@@ -34,10 +34,13 @@ impl ConfigService {
             let mut value = serde_json::to_value(project_cfg)
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
             strip_auth_profiles(&mut value);
+            strip_agent_env(&mut value);
             Ok(value)
         } else {
-            serde_json::to_value(mgr.get_resolved_config())
-                .map_err(|e| LoTaRError::SerializationError(e.to_string()))
+            let mut value = serde_json::to_value(mgr.get_resolved_config())
+                .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            strip_agent_env(&mut value);
+            Ok(value)
         }
     }
 
@@ -128,6 +131,8 @@ impl ConfigService {
         let mut global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
         strip_auth_profiles(&mut global_raw_val);
         strip_auth_profiles(&mut project_raw_val);
+        strip_agent_env(&mut global_raw_val);
+        strip_agent_env(&mut project_raw_val);
 
         let mut auth_profiles = global_raw.auth_profiles.clone();
         if let Some(home) = home_cfg.as_ref() {
@@ -504,6 +509,23 @@ fn strip_auth_profiles(value: &mut serde_json::Value) {
         if let serde_json::Value::Object(profile_map) = profile {
             profile_map.remove("token_env");
             profile_map.remove("email_env");
+        }
+    }
+}
+
+fn strip_agent_env(value: &mut serde_json::Value) {
+    let serde_json::Value::Object(map) = value else {
+        return;
+    };
+    let keys = ["agents", "agent_profiles"];
+    for key in keys {
+        let Some(serde_json::Value::Object(profiles)) = map.get_mut(key) else {
+            continue;
+        };
+        for profile in profiles.values_mut() {
+            if let serde_json::Value::Object(profile_map) = profile {
+                profile_map.remove("env");
+            }
         }
     }
 }

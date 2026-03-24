@@ -699,54 +699,25 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let project_prefix = id.split('-').next().unwrap_or("").to_string();
     let mut storage = Storage::new(resolver.path.clone());
 
-    let mut task = match storage.get(&id, project_prefix.clone()) {
-        Some(task) => task,
-        None => {
-            return err(
-                req.id,
-                -32004,
-                "Task not found",
-                Some(json!({"message": format!("Task '{}' not found", id)})),
-            );
-        }
-    };
-
-    let now = now_rfc3339();
-    task.comments.push(TaskComment {
-        date: now.clone(),
-        text: text.clone(),
-    });
-    task.history.push(TaskChangeLogEntry {
-        at: now.clone(),
-        actor: identity::resolve_current_user(Some(resolver.path.as_path())),
-        changes: vec![TaskChange {
-            field: "comment".into(),
-            old: None,
-            new: Some(text.clone()),
-        }],
-    });
-    task.modified = now;
-
-    if let Err(error) = storage.edit(&id, &task) {
-        return err(
-            req.id,
-            -32603,
-            "Internal error",
-            Some(json!({"message": error.to_string()})),
-        );
-    }
-
-    let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+    let dto = match TaskService::add_comment(&mut storage, &id, text) {
         Ok(dto) => dto,
         Err(error) => {
+            let msg = error.to_string();
+            if msg.contains("not found") {
+                return err(
+                    req.id,
+                    -32004,
+                    "Task not found",
+                    Some(json!({"message": format!("Task '{}' not found", id)})),
+                );
+            }
             return err(
                 req.id,
                 -32603,
                 "Internal error",
-                Some(json!({"message": error.to_string()})),
+                Some(json!({"message": msg})),
             );
         }
     };

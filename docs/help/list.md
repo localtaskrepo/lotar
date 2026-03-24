@@ -32,7 +32,7 @@ lotar --format json list --due-soon --tag release
 | Custom data | `--where key=value` or `--where field:<name>=value` (repeat as needed) |
 | Effort windows | `--effort-min 2h`, `--effort-max 1d`, accepts time or points |
 | Sorting & size | `--sort-by due-date`, `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
-| Output | `--format text|json|table|markdown`, `--log-level info` |
+| Output | `--format text|json|table|markdown`, `--log-level info`, `--details` |
 
 Tips:
 
@@ -49,6 +49,8 @@ Tips:
 | `json` | Trigger automation or feed dashboards. |
 
 All formats show canonical IDs (`AUTH-12`), even if you entered `12`.
+
+Use `--details` to include task descriptions in text output.
 
 ## Recipes
 

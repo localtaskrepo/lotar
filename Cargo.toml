@@ -2,30 +2,46 @@
 name = "lotar"
 version = "0.7.5"
 edition = "2024"
+authors = ["Ravi Gairola <mallox@pyxzl.net>"]
+description = "A git-native task management CLI that stores issues as YAML files in your repository"
+license = "MIT"
+repository = "https://github.com/localtaskrepo/lotar"
+homepage = "https://github.com/localtaskrepo/lotar"
+documentation = "https://github.com/localtaskrepo/lotar/tree/main/docs"
+readme = "README.md"
+keywords = ["cli", "task-management", "git", "yaml", "issue-tracker"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "lotar"
 path = "src/main.rs"
 
+[[bin]]
+name = "lotar-agent-wrapper"
+path = "src/bin/lotar_agent_wrapper.rs"
+
 # Optimize dependencies for smaller binaries
 [dependencies]
-regex = { version = "1.12.2", default-features = false, features = ["std", "unicode", "unicode-perl"] }
+regex = { version = "1.12.3", default-features = false, features = ["std", "unicode", "unicode-perl"] }
 include_dir = "0.7.4"
-chrono = { version = "0.4.42", features = ["serde", "clock"], default-features = false }
+chrono = { version = "0.4.44", features = ["serde", "clock"], default-features = false }
 serde = { version = "1.0.228", features = ["derive"], default-features = false }
 serde_yaml = { version = "0.9.34", default-features = false }
-serde_json = { version = "1.0.145", features = ["std"], default-features = false }
-thiserror = "2.0.17"
+serde_json = { version = "1.0.149", features = ["std"], default-features = false }
+thiserror = "2.0.18"
 dirs = "6.0.0"
-clap = { version = "4.5.51", features = ["derive", "std", "env"], default-features = false }
-clap_complete = "4.5.65"
+clap = { version = "4.6.0", features = ["derive", "std", "env"], default-features = false }
+clap_complete = "4.6.0"
 rayon = { version = "1.11.0", default-features = false, optional = true }
 ignore = { version = "0.4.25" }
 notify = "8.2.0"
-pulldown-cmark = { version = "0.13.0", default-features = false }
+pulldown-cmark = { version = "0.13.3", default-features = false }
 blake3 = { version = "1.8.3", default-features = false, features = ["std"] }
 base64 = { version = "0.22.1", default-features = false, features = ["std"] }
 ureq = { version = "2.10.1", features = ["json"] }
+libc = "0.2.183"
+sysinfo = "0.30.13"
+fs2 = "0.4.3"
 
 # Production release profile optimized for minimal binary size
 [profile.release]
@@ -60,11 +76,11 @@ debug-assertions = true
 overflow-checks = true
 
 [dev-dependencies]
-assert_cmd = "2.1.2"
-predicates = "3.1.3"
-tempfile = "3.23.0"
-ctor = "0.6.3"
-once_cell = "1.21.3"
+assert_cmd = "2.2.0"
+predicates = "3.1.4"
+tempfile = "3.27.0"
+ctor = "0.7.0"
+once_cell = "1.21.4"
 
 [features]
 default = ["parallel"]
@@ -74,5 +90,5 @@ schema = ["schemars"]
 parallel = ["dep:rayon"]
 
 [dependencies.schemars]
-version = "1.1.0"
+version = "1.2.1"
 optional = true

@@ -5,12 +5,14 @@ use std::sync::LazyLock;
 // CLI argument modules consolidated under cli/args
 pub mod args;
 pub use args::{
-    AddArgs, CompletionShell, CompletionsAction, CompletionsArgs, ConfigAction, ConfigInitArgs,
-    ConfigNormalizeArgs, ConfigSetArgs, ConfigShowArgs, ConfigValidateArgs, GitAction,
-    GitHooksAction, GitHooksInstallArgs, IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField,
-    SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs,
-    SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs, TaskAction, TaskAddArgs,
-    TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    AddArgs, AgentAction, AgentArgs, AgentCheckArgs, AgentRunArgs, AgentWorkerArgs,
+    AutomationAction, AutomationArgs, AutomationSimulateArgs, CompletionShell, CompletionsAction,
+    CompletionsArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs,
+    ConfigShowArgs, ConfigValidateArgs, GitAction, GitHooksAction, GitHooksInstallArgs,
+    IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, SprintAction, SprintArgs,
+    SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs, SyncArgs, SyncCheckArgs,
+    SyncCommandAction, SyncCommandArgs, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs,
+    TaskSearchArgs, TaskStatusArgs, parse_key_value,
 };
 pub mod preprocess;
 
@@ -176,6 +178,12 @@ pub enum Commands {
 
     /// Sync utilities (validation, etc.)
     Sync(SyncCommandArgs),
+
+    /// Agent job orchestration
+    Agent(AgentArgs),
+
+    /// Automation rules management (simulate, inspect)
+    Automation(AutomationArgs),
 
     /// Start web server (existing)
     Serve(ServeArgs),

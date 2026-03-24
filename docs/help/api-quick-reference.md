@@ -17,6 +17,15 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - POST /api/sync/validate (SyncValidateRequest) -> { data: SyncValidateResponse }
 - GET  /api/sync/reports/list?project=PREFIX&limit=N&offset=N -> { data: SyncReportListResponse }
 - GET  /api/sync/reports/get?path=<relative>[&project=PREFIX] -> { data: SyncReport }
+- POST /api/jobs (AgentJobCreateRequest) -> { data: AgentJobCreateResponse }
+- GET  /api/jobs?ticket_id=ID&status=STATUS -> { data: AgentJobListResponse }
+- GET  /api/jobs/get?id=JOB_ID -> { data: AgentJobStatusResponse }
+- POST /api/jobs/cancel ({ id }) -> { data: AgentJobCancelResponse }
+- POST /api/jobs/cancel-all -> { data: AgentJobCancelAllResponse }
+- GET  /api/jobs/logs?id=JOB_ID -> { data: AgentJobLogsResponse }
+- GET  /api/automation/show[?project=PREFIX] -> { data: AutomationInspectResponse }
+- POST /api/automation/set (AutomationSetRequest) -> { data: AutomationSetResponse }
+- POST /api/jobs/message (AgentJobMessageRequest) -> { data: AgentJobMessageResponse }
 - GET  /api/events -> text/event-stream (see SSE Events)
 
 Notes
