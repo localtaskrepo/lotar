@@ -218,7 +218,10 @@ mod global_config {
 
         let states = doc["issue"]["states"].as_array().expect("states array");
         let states_as_str: Vec<&str> = states.iter().filter_map(|v| v.as_str()).collect();
-        assert_eq!(states_as_str, vec!["Todo", "InProgress", "Done"]);
+        assert_eq!(
+            states_as_str,
+            vec!["Todo", "InProgress", "NeedsReview", "Done"]
+        );
 
         assert_eq!(doc["auto"]["identity"], serde_json::Value::Bool(true));
         let custom_fields = doc["custom"]["fields"]

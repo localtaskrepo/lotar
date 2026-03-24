@@ -3,11 +3,26 @@
 - Allow CLI list/search to filter by age older than N days
 - Allow ticket files to be stored in nested folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
 - Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
-- Add ability to assign (and run) an LLM.
 - Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
 - History stored exact same content as comments when a new one is added
 - "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.
 - Support references to other tickets in the description when rendering markdown (e.g. "See TASK-1234 for more info" becomes a link with hover card). 
 - Option to automatically add ticket reference to relationships if they're not already in a more specific category.
 - Option to drag and drop tickets between relationship categories in the web UI.
+- Dependency graph visualization for related/blocked tickets (e.g., graph view in TODO.md or UI).
 - Dialogs are still different color on Board and Calendar compared to Tasks and Sprints.
+- Add a filter field for sprints to the board page and tasks list
+- Extend agent based project to include product development. Should include e.g. perplexity or similar research agents to gather requirements, write specs, etc.
+- Allow to trigger on ticket events like "created", "updated", "comment added", "description changed", etc.
+- Template variables for agent instructions and script that get filled in at runtime. Should follow env/bash syntax for both inline and file-based instructions. This allows for dynamic instructions that can reference ticket fields, context variables, etc. Should support lists for properties like "references". Bash/env syntax allows to address both simple values and complex structures (e.g., `${{references[*].id}}` to get a list of all reference IDs).
+- --group-by <field> flag on lotar list that groups output by any top-level or custom field AND/OR --sum <field> flag that adds per-group and grand totals for numeric fields (effort being the obvious one)
+- Add an agent skill template that helps agents how to use lotar
+- Add dependency concistency check command
+- Should a depends_on autimatically create blocks reference on the other ticket?
+- Rework the project init function to create configs dynamically instead of using template files. Implement an interactive dialog on CLI (with -yes flag support to auto create with flags specifying choices) and the WebUI.
+- Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system))
+- Update dependencies
+
+Bugs:
+- @implement (agent) was added to member list of projects (which it shouldn't)
+- lotar init --project'"..." doesn't work properly. Configs are generated in the project, not global, and the globalm default project isn't set to the first new project.

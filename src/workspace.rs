@@ -61,11 +61,11 @@ impl TasksDirectoryResolver {
             });
         }
 
-        // 2. Environment variable LOTAR_TASKS_DIR takes precedence (unless tests explicitly disable it)
-        let test_env = env::var("RUST_TEST_THREADS").is_ok()
-            || env::var("LOTAR_TEST_MODE")
-                .map(|v| v == "1")
-                .unwrap_or(false)
+        // 2. Environment variable LOTAR_TASKS_DIR takes precedence unless env-based
+        // resolution is explicitly disabled for the current process.
+        let test_env = env::var("LOTAR_TEST_MODE")
+            .map(|v| v == "1")
+            .unwrap_or(false)
             || env::var("LOTAR_IGNORE_ENV_TASKS_DIR")
                 .map(|v| v == "1")
                 .unwrap_or(false);
@@ -216,6 +216,16 @@ impl TasksDirectoryResolver {
 
         // Default to ~/.lotar for Unix-like systems and fallback for Windows
         Ok(home_dir.join(".lotar"))
+    }
+
+    pub fn absolute_path(&self) -> Result<PathBuf, String> {
+        if self.path.is_absolute() {
+            return Ok(self.path.clone());
+        }
+
+        let current_dir =
+            env::current_dir().map_err(|e| format!("Failed to get current directory: {}", e))?;
+        Ok(current_dir.join(&self.path))
     }
 
     /// Search up the directory tree for a tasks folder

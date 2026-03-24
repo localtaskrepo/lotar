@@ -29,6 +29,16 @@ pub fn get_project_name() -> Option<String> {
     detect_project_name()
 }
 
+pub fn detect_project_context_name() -> Option<String> {
+    if let Ok(project) = std::env::var("LOTAR_PROJECT")
+        && !project.is_empty()
+    {
+        return Some(project);
+    }
+
+    detect_from_project_files()
+}
+
 pub fn detect_project_name() -> Option<String> {
     // 1. Check environment variable first
     if let Ok(project) = std::env::var("LOTAR_PROJECT")

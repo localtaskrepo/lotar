@@ -8,11 +8,12 @@ use lotar::cli::handlers::duedate::{DueDateArgs, DueDateHandler};
 use lotar::cli::handlers::priority::{PriorityArgs, PriorityHandler};
 use lotar::cli::handlers::status::{StatusArgs, StatusHandler};
 use lotar::cli::handlers::{
-    AddHandler, CommandHandler, CompletionsHandler, ConfigHandler, GitHandler, ScanHandler,
-    ServeHandler, SprintHandler, StatsHandler, SyncHandler, TaskHandler,
+    AddHandler, AgentHandler, AutomationHandler, CommandHandler, CompletionsHandler, ConfigHandler,
+    GitHandler, ScanHandler, ServeHandler, SprintHandler, StatsHandler, SyncHandler, TaskHandler,
 };
 use lotar::cli::preprocess::normalize_args;
 use lotar::cli::{Cli, Commands, ConfigAction, SyncCommandAction, TaskAction};
+use lotar::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use lotar::services::sync_service::SyncDirection;
 use lotar::utils::resolve_project_input;
 use lotar::workspace::TasksDirectoryResolver;
@@ -57,6 +58,7 @@ fn is_valid_command(command: &str) -> bool {
             | "completions"
             | "init"
             | "sync"
+            | "agent"
     )
 }
 fn main() {
@@ -181,6 +183,34 @@ fn main() {
                 Err(e) => {
                     renderer.emit_error(&e);
                     renderer.log_info("END ADD status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Agent(args) => {
+            renderer.log_info("BEGIN AGENT");
+            match AgentHandler::execute(args.action, cli.project.as_deref(), &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END AGENT status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END AGENT status=err");
+                    Err(e)
+                }
+            }
+        }
+        Commands::Automation(args) => {
+            renderer.log_info("BEGIN AUTOMATION");
+            match AutomationHandler::execute(args.action, &resolver, &renderer) {
+                Ok(()) => {
+                    renderer.log_info("END AUTOMATION status=ok");
+                    Ok(())
+                }
+                Err(e) => {
+                    renderer.emit_error(&e);
+                    renderer.log_info("END AUTOMATION status=err");
                     Err(e)
                 }
             }
@@ -493,6 +523,7 @@ fn main() {
             }
         },
         Commands::Serve(args) => {
+            AgentJobService::set_orchestrator_mode(AgentOrchestratorMode::Server);
             renderer.log_info("BEGIN SERVE");
             match ServeHandler::execute(args, cli.project.as_deref(), &resolver, &renderer) {
                 Ok(()) => {

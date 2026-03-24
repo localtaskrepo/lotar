@@ -1,7 +1,6 @@
 use crate::cli::TaskEditArgs;
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
-use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{
     LoadedTask, apply_auto_populate_members, ensure_membership, load_task, render_edit_preview,
 };
@@ -48,26 +47,36 @@ impl CommandHandler for EditHandler {
 
         let autop_members_enabled = ctx.config.auto_populate_members;
         let validator = CliValidator::new(&ctx.config);
+
+        // Build a TaskUpdate from validated args
+        let mut patch = crate::api_types::TaskUpdate::default();
+
         if let Some(title) = title {
-            task.title = title;
+            task.title = title.clone();
+            patch.title = Some(title);
         }
 
         if let Some(task_type) = task_type {
-            task.task_type = validator
+            let validated = validator
                 .validate_task_type(&task_type)
                 .map_err(|e| format!("Task type validation failed: {}", e))?;
+            task.task_type = validated.clone();
+            patch.task_type = Some(validated);
         }
 
         if let Some(priority) = priority {
-            task.priority = validator
+            let validated = validator
                 .validate_priority(&priority)
                 .map_err(|e| format!("Priority validation failed: {}", e))?;
+            task.priority = validated.clone();
+            patch.priority = Some(validated);
         }
 
         if let Some(reporter) = reporter {
             let trimmed = reporter.trim();
             if trimmed.is_empty() {
                 task.reporter = None;
+                patch.reporter = Some(String::new());
             } else {
                 let validation = if autop_members_enabled {
                     validator.validate_reporter_allow_unknown(trimmed)
@@ -76,7 +85,9 @@ impl CommandHandler for EditHandler {
                 };
                 let validated =
                     validation.map_err(|e| format!("Reporter validation failed: {}", e))?;
-                task.reporter = resolve_me_alias(&validated, Some(ctx.tasks_dir.path.as_path()));
+                let resolved = resolve_me_alias(&validated, Some(ctx.tasks_dir.path.as_path()));
+                task.reporter = resolved.clone();
+                patch.reporter = resolved;
             }
         }
 
@@ -84,6 +95,7 @@ impl CommandHandler for EditHandler {
             let trimmed = assignee.trim();
             if trimmed.is_empty() {
                 task.assignee = None;
+                patch.assignee = Some(String::new());
             } else {
                 let validation = if autop_members_enabled {
                     validator.validate_assignee_allow_unknown(trimmed)
@@ -92,36 +104,49 @@ impl CommandHandler for EditHandler {
                 };
                 let validated =
                     validation.map_err(|e| format!("Assignee validation failed: {}", e))?;
-                task.assignee = resolve_me_alias(&validated, Some(ctx.tasks_dir.path.as_path()));
+                let resolved = resolve_me_alias(&validated, Some(ctx.tasks_dir.path.as_path()));
+                task.assignee = resolved.clone();
+                patch.assignee = resolved;
             }
         }
 
         if let Some(effort) = effort {
-            task.effort = match crate::utils::effort::parse_effort(&effort) {
-                Ok(parsed) => Some(parsed.canonical),
-                Err(_) => Some(effort),
+            let normalized = match crate::utils::effort::parse_effort(&effort) {
+                Ok(parsed) => parsed.canonical,
+                Err(_) => effort,
             };
+            task.effort = Some(normalized.clone());
+            patch.effort = Some(normalized);
         }
 
         if let Some(due) = due {
             let value = validator
                 .parse_due_date(&due)
                 .map_err(|e| format!("Due date validation failed: {}", e))?;
-            task.due_date = Some(value);
+            task.due_date = Some(value.clone());
+            patch.due_date = Some(value);
         }
 
         if let Some(description) = description {
-            task.description = Some(description);
+            task.description = Some(description.clone());
+            patch.description = Some(description);
         }
 
-        for tag in tags {
-            if !task.tags.contains(&tag) {
-                task.tags.push(tag);
+        if !tags.is_empty() {
+            for tag in &tags {
+                if !task.tags.contains(tag) {
+                    task.tags.push(tag.clone());
+                }
             }
+            patch.tags = Some(task.tags.clone());
         }
 
-        for (key, value) in fields {
-            task.custom_fields.insert(key, custom_value_string(value));
+        if !fields.is_empty() {
+            for (key, value) in &fields {
+                task.custom_fields
+                    .insert(key.clone(), custom_value_string(value.clone()));
+            }
+            patch.custom_fields = Some(task.custom_fields.clone());
         }
 
         #[allow(clippy::drop_non_drop)]
@@ -135,10 +160,9 @@ impl CommandHandler for EditHandler {
             return Ok(());
         }
 
-        renderer.log_debug("edit: persisting edits");
-        ctx.storage
-            .edit(&full_id, &task)
-            .map_err(TaskStorageAction::Update.map_err(&full_id))?;
+        renderer.log_debug("edit: persisting edits via TaskService");
+        crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
+            .map_err(|e| e.to_string())?;
         renderer.emit_success(format_args!("Task '{}' updated successfully", id));
         Ok(())
     }

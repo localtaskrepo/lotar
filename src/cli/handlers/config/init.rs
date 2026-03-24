@@ -115,6 +115,8 @@ impl ConfigHandler {
             "jira" => include_str!("../../../config/templates/jira.yml"),
             "github" => include_str!("../../../config/templates/github.yml"),
             "jira-github" => include_str!("../../../config/templates/jira-github.yml"),
+            "agent-pipeline" => include_str!("../../../config/templates/agent-pipeline.yml"),
+            "agent-reviewed" => include_str!("../../../config/templates/agent-reviewed.yml"),
             _ => return Err(format!("Unknown template: {}", template_name)),
         };
 

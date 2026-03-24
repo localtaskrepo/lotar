@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
+import AgentJobs from './pages/AgentJobs.vue'
+import AutomationView from './pages/AutomationView.vue'
 import Board from './pages/Board.vue'
 import Calendar from './pages/Calendar.vue'
 import ConfigView from './pages/ConfigView.vue'
@@ -28,6 +30,8 @@ const router = createRouter({
     { path: '/boards', component: Board },
     { path: '/calendar', component: Calendar },
     { path: '/insights', component: ProjectInsights },
+    { path: '/agents', component: AgentJobs },
+    { path: '/automations', component: AutomationView },
     { path: '/sync', component: SyncHub },
     { path: '/scan', component: ScanView },
     { path: '/task/:id', component: TaskDetails },

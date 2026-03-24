@@ -1,3 +1,4 @@
+pub(super) mod agent;
 pub(super) mod config;
 pub(super) mod projects;
 pub(super) mod sprints;
@@ -5,6 +6,10 @@ pub(super) mod sync;
 pub(super) mod tasks;
 pub(super) mod whoami;
 
+pub(super) use agent::{
+    handle_agent_cancel, handle_agent_list_jobs, handle_agent_run, handle_agent_send_message,
+    handle_agent_status,
+};
 pub(super) use config::{handle_config_set, handle_config_show};
 pub(super) use projects::{handle_project_list, handle_project_stats};
 pub(super) use sprints::{

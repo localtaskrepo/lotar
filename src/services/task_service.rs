@@ -1,6 +1,8 @@
 use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
 use crate::config::types::{GlobalConfig, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
+use crate::services::agent_job_service::AgentJobService;
+use crate::services::automation_service::AutomationService;
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::storage::manager::Storage;
 use crate::storage::sprint::SprintTaskEntry;
@@ -13,6 +15,40 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
 pub struct TaskService;
+
+#[derive(Debug, Clone, Copy)]
+pub struct TaskUpdateContext {
+    pub allow_agent_automation: bool,
+    /// Internal bypass used by automation/job lifecycle handlers so they can
+    /// mutate assignee/status while a job is active.
+    pub bypass_active_job_lock: bool,
+    /// External callers must respect review ownership checks.
+    pub enforce_review_owner: bool,
+    /// Internal automation updates can emit API task events for live UI refresh.
+    pub emit_api_event: bool,
+}
+
+impl TaskUpdateContext {
+    pub fn automation_disabled() -> Self {
+        Self {
+            allow_agent_automation: false,
+            bypass_active_job_lock: true,
+            enforce_review_owner: false,
+            emit_api_event: true,
+        }
+    }
+}
+
+impl Default for TaskUpdateContext {
+    fn default() -> Self {
+        Self {
+            allow_agent_automation: true,
+            bypass_active_job_lock: false,
+            enforce_review_owner: true,
+            emit_api_event: false,
+        }
+    }
+}
 
 impl TaskService {
     pub fn create(storage: &mut Storage, req: TaskCreate) -> LoTaRResult<TaskDTO> {
@@ -159,7 +195,13 @@ impl TaskService {
             Self::replace_sprint_memberships(storage, &id, &normalized_sprints)?;
         }
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Ok(Self::to_dto(&id, t, Some(&sprint_lookup)))
+        let dto = Self::to_dto(&id, t, Some(&sprint_lookup));
+
+        let _ = AutomationService::apply_task_update(storage, None, &dto, &config);
+
+        // Re-fetch after automation may have mutated the task
+        let dto = Self::get(storage, &id, Some(&project)).unwrap_or(dto);
+        Ok(dto)
     }
 
     pub fn get(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
@@ -177,12 +219,89 @@ impl TaskService {
         }
     }
 
+    /// Add a comment to a task and fire `on.commented` automation rules.
+    pub fn add_comment(storage: &mut Storage, id: &str, text: String) -> LoTaRResult<TaskDTO> {
+        let derived = id.split('-').next().unwrap_or("");
+        let mut task = storage
+            .get(id, derived.to_string())
+            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+
+        let now = chrono::Utc::now().to_rfc3339();
+        let actor = resolve_current_user(Some(storage.root_path.as_path()));
+        task.comments.push(crate::types::TaskComment {
+            date: now.clone(),
+            text: text.clone(),
+        });
+        task.history.push(TaskChangeLogEntry {
+            at: now.clone(),
+            actor,
+            changes: vec![TaskChange {
+                field: "comment".into(),
+                old: None,
+                new: Some(text.clone()),
+            }],
+        });
+        task.modified = now;
+        storage.edit(id, &task)?;
+
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        let dto = Self::to_dto(id, task, Some(&sprint_lookup));
+        let _ = AutomationService::apply_comment_event(storage, &dto, &text, &config);
+        Ok(dto)
+    }
+
     pub fn update(storage: &mut Storage, id: &str, patch: TaskUpdate) -> LoTaRResult<TaskDTO> {
+        Self::update_with_context(storage, id, patch, TaskUpdateContext::default())
+    }
+
+    pub fn update_with_context(
+        storage: &mut Storage,
+        id: &str,
+        patch: TaskUpdate,
+        context: TaskUpdateContext,
+    ) -> LoTaRResult<TaskDTO> {
         // Derive project prefix from ID (e.g., ABCD-1 -> ABCD) to locate the task
         let derived = id.split('-').next().unwrap_or("");
         let existing = storage
             .get(id, derived.to_string())
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+
+        if context.enforce_review_owner {
+            Self::enforce_review_owner_transition(storage, id, &existing, &patch)?;
+        }
+
+        let current_job_can_mutate = Self::current_job_matches_ticket(id);
+
+        if AgentJobService::has_active_job(id)
+            && !context.bypass_active_job_lock
+            && !current_job_can_mutate
+        {
+            // Block assignee/status changes while a job is active for external callers.
+            // Other fields remain editable so the user can communicate with the agent (e.g. description/links).
+            if let Some(next) = patch.assignee.as_ref() {
+                let trimmed = next.trim();
+                let next_value = if trimmed.is_empty() {
+                    None
+                } else {
+                    resolve_me_alias(trimmed, Some(&storage.root_path))
+                };
+                if existing.assignee != next_value {
+                    return Err(LoTaRError::ValidationError(format!(
+                        "Ticket '{}' has an active agent job. Stop/cancel the running job before changing assignee.",
+                        id
+                    )));
+                }
+            }
+            if let Some(next_status) = patch.status.as_ref()
+                && &existing.status != next_status
+            {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Ticket '{}' has an active agent job. Stop/cancel the running job before changing status.",
+                    id
+                )));
+            }
+        }
         let mut t = existing.clone();
         let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
         let mut changes: Vec<TaskChange> = Vec::new();
@@ -276,9 +395,13 @@ impl TaskService {
             }
         }
         if let Some(v) = patch.effort {
-            let parsed = match crate::utils::effort::parse_effort(&v) {
-                Ok(parsed) => Some(parsed.canonical),
-                Err(_) => Some(v),
+            let parsed = if v.is_empty() {
+                None // empty string means "clear effort"
+            } else {
+                match crate::utils::effort::parse_effort(&v) {
+                    Ok(parsed) => Some(parsed.canonical),
+                    Err(_) => Some(v),
+                }
             };
             let previous = t.effort.clone();
             if previous != parsed {
@@ -356,7 +479,87 @@ impl TaskService {
         storage.edit(id, &t)?;
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Ok(Self::to_dto(id, t, Some(&sprint_lookup)))
+        let previous_dto = Self::to_dto(id, existing, Some(&sprint_lookup));
+        let dto = Self::to_dto(id, t, Some(&sprint_lookup));
+
+        if context.emit_api_event {
+            let actor = resolve_current_user(Some(storage.root_path.as_path()));
+            crate::api_events::emit_task_updated(&dto, actor.as_deref());
+        }
+
+        if context.allow_agent_automation {
+            let _ =
+                AutomationService::apply_task_update(storage, Some(&previous_dto), &dto, &config);
+        }
+
+        Ok(dto)
+    }
+
+    fn current_job_matches_ticket(id: &str) -> bool {
+        let Ok(job_id) = std::env::var("LOTAR_AGENT_JOB_ID") else {
+            return false;
+        };
+        let Ok(ticket_id) = std::env::var("LOTAR_TICKET_ID") else {
+            return false;
+        };
+        let trimmed_job_id = job_id.trim();
+        if trimmed_job_id.is_empty() || ticket_id.trim() != id {
+            return false;
+        }
+
+        AgentJobService::get_job(trimmed_job_id).is_some_and(|job| {
+            job.ticket_id == id && matches!(job.status.as_str(), "queued" | "running")
+        })
+    }
+
+    fn enforce_review_owner_transition(
+        storage: &Storage,
+        id: &str,
+        existing: &Task,
+        patch: &TaskUpdate,
+    ) -> LoTaRResult<()> {
+        if !matches_review_state(&existing.status) {
+            return Ok(());
+        }
+
+        let status_changed = patch
+            .status
+            .as_ref()
+            .is_some_and(|next| next != &existing.status);
+        let assignee_changed = patch.assignee.as_ref().is_some_and(|next| {
+            let trimmed = next.trim();
+            let next_value = if trimmed.is_empty() {
+                None
+            } else {
+                resolve_me_alias(trimmed, Some(&storage.root_path))
+            };
+            existing.assignee != next_value
+        });
+
+        if !status_changed && !assignee_changed {
+            return Ok(());
+        }
+
+        let Some(reporter) = existing.reporter.as_deref() else {
+            return Err(LoTaRError::ValidationError(format!(
+                "Ticket '{}' is awaiting review, but it has no reporter to authorize review transitions.",
+                id
+            )));
+        };
+
+        let actor = resolve_current_user(Some(storage.root_path.as_path()));
+        let is_reporter = actor
+            .as_deref()
+            .is_some_and(|current| current.eq_ignore_ascii_case(reporter));
+
+        if is_reporter {
+            return Ok(());
+        }
+
+        Err(LoTaRError::ValidationError(format!(
+            "Ticket '{}' is awaiting review. Only reporter '{}' can change status or assignee until review is resolved.",
+            id, reporter
+        )))
     }
 
     pub fn delete(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<bool> {
@@ -591,13 +794,13 @@ impl TaskService {
         let mut candidates: Vec<String> = Vec::new();
         if let Some(reporter) = task.reporter.as_deref() {
             let trimmed = reporter.trim();
-            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+            if !trimmed.is_empty() && !trimmed.starts_with('@') {
                 candidates.push(trimmed.to_string());
             }
         }
         if let Some(assignee) = task.assignee.as_deref() {
             let trimmed = assignee.trim();
-            if !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("@me") {
+            if !trimmed.is_empty() && !trimmed.starts_with('@') {
                 candidates.push(trimmed.to_string());
             }
         }
@@ -751,4 +954,9 @@ impl TaskService {
             field_label, trimmed, project, preview
         )))
     }
+}
+
+fn matches_review_state(status: &TaskStatus) -> bool {
+    let value = status.as_str();
+    value.eq_ignore_ascii_case("NeedsReview") || value.eq_ignore_ascii_case("Review")
 }

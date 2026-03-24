@@ -127,6 +127,193 @@ pub struct SyncConfig {
     pub auth_profiles: HashMap<String, SyncAuthProfile>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentToolsConfig {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disallowed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentMcpConfig {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allow: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentProfileDetail {
+    pub runner: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub env: HashMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tools: Option<AgentToolsConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub mcp: Option<AgentMcpConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub instructions: Option<AgentInstructionsConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(untagged)]
+pub enum AgentInstructionsConfig {
+    Inline(String),
+    File { file: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(untagged)]
+pub enum AgentProfileConfig {
+    Runner(String),
+    Detailed(AgentProfileDetail),
+}
+
+impl AgentProfileConfig {
+    pub fn to_detail(&self) -> AgentProfileDetail {
+        match self {
+            AgentProfileConfig::Runner(runner) => AgentProfileDetail {
+                runner: runner.clone(),
+                command: None,
+                args: Vec::new(),
+                env: HashMap::new(),
+                tools: None,
+                mcp: None,
+                instructions: None,
+            },
+            AgentProfileConfig::Detailed(detail) => detail.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentAutomationAction {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub set_status: Option<TaskStatus>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reassign_to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentAutomationActionOverride {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub set_status: Option<TaskStatus>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub reassign_to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentAutomationConfig {
+    #[serde(default = "default_agent_on_start_action")]
+    pub on_start: AgentAutomationAction,
+    #[serde(default = "default_agent_on_success_action")]
+    pub on_success: AgentAutomationAction,
+    #[serde(default)]
+    pub on_failure: AgentAutomationAction,
+    #[serde(default)]
+    pub on_cancel: AgentAutomationAction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentAutomationConfigOverride {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub on_start: Option<AgentAutomationActionOverride>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub on_success: Option<AgentAutomationActionOverride>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub on_failure: Option<AgentAutomationActionOverride>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub on_cancel: Option<AgentAutomationActionOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentWorktreeConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dir: Option<String>,
+    #[serde(default = "default_agent_worktree_branch_prefix")]
+    pub branch_prefix: String,
+    /// Maximum number of agent jobs that can run in parallel.
+    /// When set, new jobs are queued if the limit is reached.
+    /// None means unlimited.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_parallel_jobs: Option<usize>,
+    /// Automatically remove the worktree when the ticket is in a done state
+    /// after a successful job.
+    #[serde(default)]
+    pub cleanup_on_done: bool,
+    /// Remove the worktree after a failed job.
+    #[serde(default)]
+    pub cleanup_on_failure: bool,
+    /// Remove the worktree after a cancelled job.
+    #[serde(default)]
+    pub cleanup_on_cancel: bool,
+    /// Delete the worktree branch when cleanup runs.
+    #[serde(default)]
+    pub cleanup_delete_branches: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentWorktreeConfigOverride {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub branch_prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_parallel_jobs: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cleanup_on_done: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cleanup_on_failure: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cleanup_on_cancel: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cleanup_delete_branches: Option<bool>,
+}
+
+impl Default for AgentWorktreeConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            dir: None,
+            branch_prefix: default_agent_worktree_branch_prefix(),
+            max_parallel_jobs: None,
+            cleanup_on_done: false,
+            cleanup_on_failure: false,
+            cleanup_on_cancel: false,
+            cleanup_delete_branches: false,
+        }
+    }
+}
+
+impl Default for AgentAutomationConfig {
+    fn default() -> Self {
+        Self {
+            on_start: default_agent_on_start_action(),
+            on_success: default_agent_on_success_action(),
+            on_failure: AgentAutomationAction::default(),
+            on_cancel: AgentAutomationAction::default(),
+        }
+    }
+}
+
 impl SyncConfig {
     pub fn is_empty(&self) -> bool {
         self.remotes.is_empty() && self.auth_profiles.is_empty()
@@ -296,6 +483,22 @@ pub struct ProjectConfig {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub sync_write_reports: Option<bool>,
 
+    // Agent context + profiles (project-level override)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_context_enabled: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_context_extension: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_logs_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_instructions: Option<AgentInstructionsConfig>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agents: Option<HashMap<String, AgentProfileConfig>>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_automation: Option<AgentAutomationConfigOverride>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_worktree: Option<AgentWorktreeConfigOverride>,
+
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub remotes: HashMap<String, SyncRemoteConfig>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
@@ -341,6 +544,13 @@ impl ProjectConfig {
             attachments_max_upload_mb: None,
             sync_reports_dir: None,
             sync_write_reports: None,
+            agent_context_enabled: None,
+            agent_context_extension: None,
+            agent_logs_dir: None,
+            agent_instructions: None,
+            agents: None,
+            agent_automation: None,
+            agent_worktree: None,
             remotes: HashMap::new(),
             auth_profiles: HashMap::new(),
         }
@@ -443,6 +653,26 @@ pub struct GlobalConfig {
     #[serde(default = "default_true")]
     pub sync_write_reports: bool,
 
+    // Agent context + profiles
+    #[serde(default = "default_true")]
+    pub agent_context_enabled: bool,
+    /// Extension for context files stored alongside tickets (e.g. ".context").
+    #[serde(default = "default_agent_context_extension")]
+    pub agent_context_extension: String,
+    /// Optional directory for verbose agent debug logs. When set, logs are written
+    /// to this directory. Supports relative (to workspace) or absolute paths.
+    /// If unset, no debug logs are written.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_logs_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_instructions: Option<AgentInstructionsConfig>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub agents: HashMap<String, AgentProfileConfig>,
+    #[serde(default)]
+    pub agent_automation: AgentAutomationConfig,
+    #[serde(default)]
+    pub agent_worktree: AgentWorktreeConfig,
+
     /// Optional path to a directory containing custom web UI assets.
     /// When set and the path exists, the server will serve files from this directory
     /// before falling back to the bundled UI. This allows using a custom or development UI.
@@ -505,6 +735,17 @@ pub struct ResolvedConfig {
     // Sync reports
     pub sync_reports_dir: String,
     pub sync_write_reports: bool,
+
+    pub agent_context_enabled: bool,
+    pub agent_context_extension: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_logs_dir: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_instructions: Option<AgentInstructionsConfig>,
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub agent_profiles: HashMap<String, AgentProfileDetail>,
+    pub agent_automation: AgentAutomationConfig,
+    pub agent_worktree: AgentWorktreeConfig,
 
     #[serde(skip_serializing_if = "HashMap::is_empty", default)]
     pub remotes: HashMap<String, SyncRemoteConfig>,
@@ -589,6 +830,7 @@ fn default_issue_states() -> ConfigurableField<TaskStatus> {
         values: vec![
             TaskStatus::from("Todo"),
             TaskStatus::from("InProgress"),
+            TaskStatus::from("NeedsReview"),
             TaskStatus::from("Done"),
         ],
     }
@@ -644,6 +886,28 @@ fn default_attachments_max_upload_mb() -> i64 {
     10
 }
 
+fn default_agent_on_start_action() -> AgentAutomationAction {
+    AgentAutomationAction {
+        set_status: Some(TaskStatus::from("InProgress")),
+        reassign_to: None,
+    }
+}
+
+fn default_agent_on_success_action() -> AgentAutomationAction {
+    AgentAutomationAction {
+        set_status: Some(TaskStatus::from("NeedsReview")),
+        reassign_to: Some("assignee_or_reporter".to_string()),
+    }
+}
+
+fn default_agent_worktree_branch_prefix() -> String {
+    "agent/".to_string()
+}
+
+fn default_agent_context_extension() -> String {
+    ".context".to_string()
+}
+
 impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
@@ -685,6 +949,13 @@ impl Default for GlobalConfig {
             attachments_max_upload_mb: default_attachments_max_upload_mb(),
             sync_reports_dir: default_sync_reports_dir(),
             sync_write_reports: true,
+            agent_context_enabled: true,
+            agent_context_extension: default_agent_context_extension(),
+            agent_logs_dir: None,
+            agent_instructions: None,
+            agents: HashMap::new(),
+            agent_automation: AgentAutomationConfig::default(),
+            agent_worktree: AgentWorktreeConfig::default(),
             web_ui_path: None,
             remotes: HashMap::new(),
             auth_profiles: HashMap::new(),

@@ -2,8 +2,9 @@ use serde::de::DeserializeOwned;
 use serde_yaml::Value;
 
 use crate::config::types::{
-    ConfigError, GlobalConfig, ProjectConfig, StringConfigField, SyncAuthProfile, SyncConfig,
-    SyncRemoteConfig,
+    AgentAutomationConfig, AgentAutomationConfigOverride, AgentInstructionsConfig,
+    AgentProfileConfig, AgentWorktreeConfig, AgentWorktreeConfigOverride, ConfigError,
+    GlobalConfig, ProjectConfig, StringConfigField, SyncAuthProfile, SyncConfig, SyncRemoteConfig,
 };
 use crate::types::{Priority, TaskStatus, TaskType};
 
@@ -370,6 +371,54 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         cfg.sync_write_reports = v;
     }
 
+    // agent.context_enabled
+    if let Some(v) = get_path(&data, &["agent", "context_enabled"]).and_then(cast::<bool>) {
+        cfg.agent_context_enabled = v;
+    }
+    // agent.context_extension
+    if let Some(v) = get_path(&data, &["agent", "context_extension"])
+        .or_else(|| get_path(&data, &["agent_context_extension"]))
+        .and_then(cast::<String>)
+    {
+        cfg.agent_context_extension = v;
+    }
+    // agent.logs_dir
+    if let Some(v) = get_path(&data, &["agent", "logs_dir"])
+        .or_else(|| get_path(&data, &["agent_logs_dir"]))
+        .and_then(cast::<String>)
+    {
+        cfg.agent_logs_dir = Some(v);
+    }
+
+    // agent.instructions
+    if let Some(v) = get_path(&data, &["agent", "instructions"]).cloned()
+        && let Ok(instructions) = serde_yaml::from_value::<AgentInstructionsConfig>(v)
+    {
+        cfg.agent_instructions = Some(instructions);
+    }
+
+    // agents (named profiles)
+    if let Some(v) = get_path(&data, &["agents"]).cloned()
+        && let Ok(profiles) =
+            serde_yaml::from_value::<std::collections::HashMap<String, AgentProfileConfig>>(v)
+    {
+        cfg.agents = profiles;
+    }
+
+    // agent.automation
+    if let Some(v) = get_path(&data, &["agent", "automation"]).cloned()
+        && let Ok(automation) = serde_yaml::from_value::<AgentAutomationConfig>(v)
+    {
+        cfg.agent_automation = automation;
+    }
+
+    // agent.worktree
+    if let Some(v) = get_path(&data, &["agent", "worktree"]).cloned()
+        && let Ok(worktree) = serde_yaml::from_value::<AgentWorktreeConfig>(v)
+    {
+        cfg.agent_worktree = worktree;
+    }
+
     // sprints.defaults
     if let Some(value) =
         get_path(&data, &["sprints", "defaults", "capacity_points"]).and_then(cast::<u32>)
@@ -654,6 +703,54 @@ pub fn parse_project_from_yaml_str(
         cfg.sync_write_reports = Some(v);
     }
 
+    // agent.context_enabled (project override)
+    if let Some(v) = get_path(&data, &["agent", "context_enabled"]).and_then(cast::<bool>) {
+        cfg.agent_context_enabled = Some(v);
+    }
+    // agent.context_extension (project override)
+    if let Some(v) = get_path(&data, &["agent", "context_extension"])
+        .or_else(|| get_path(&data, &["agent_context_extension"]))
+        .and_then(cast::<String>)
+    {
+        cfg.agent_context_extension = Some(v);
+    }
+    // agent.logs_dir (project override)
+    if let Some(v) = get_path(&data, &["agent", "logs_dir"])
+        .or_else(|| get_path(&data, &["agent_logs_dir"]))
+        .and_then(cast::<String>)
+    {
+        cfg.agent_logs_dir = Some(v);
+    }
+
+    // agent.instructions (project override)
+    if let Some(v) = get_path(&data, &["agent", "instructions"]).cloned()
+        && let Ok(instructions) = serde_yaml::from_value::<AgentInstructionsConfig>(v)
+    {
+        cfg.agent_instructions = Some(instructions);
+    }
+
+    // agents (project override)
+    if let Some(v) = get_path(&data, &["agents"]).cloned()
+        && let Ok(profiles) =
+            serde_yaml::from_value::<std::collections::HashMap<String, AgentProfileConfig>>(v)
+    {
+        cfg.agents = Some(profiles);
+    }
+
+    // agent.automation (project override)
+    if let Some(v) = get_path(&data, &["agent", "automation"]).cloned()
+        && let Ok(automation) = serde_yaml::from_value::<AgentAutomationConfigOverride>(v)
+    {
+        cfg.agent_automation = Some(automation);
+    }
+
+    // agent.worktree (project override)
+    if let Some(v) = get_path(&data, &["agent", "worktree"]).cloned()
+        && let Ok(worktree) = serde_yaml::from_value::<AgentWorktreeConfigOverride>(v)
+    {
+        cfg.agent_worktree = Some(worktree);
+    }
+
     // branch alias maps (project)
     if let Some(v) = get_path(&data, &["branch", "type_aliases"]).cloned() {
         cfg.branch_type_aliases = parse_alias_map_tolerant::<TaskType>(v, parse_task_type_tolerant);
@@ -865,6 +962,42 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
     if !sync.is_empty() {
         root.insert(Y::String("sync".into()), Y::Mapping(sync));
+    }
+
+    // agent
+    let mut agent = serde_yaml::Mapping::new();
+    if cfg.agent_context_enabled != defaults.agent_context_enabled {
+        agent.insert(
+            Y::String("context_enabled".into()),
+            Y::Bool(cfg.agent_context_enabled),
+        );
+    }
+    if let Some(instructions) = &cfg.agent_instructions {
+        agent.insert(
+            Y::String("instructions".into()),
+            serde_yaml::to_value(instructions).unwrap_or(Y::Null),
+        );
+    }
+    if cfg.agent_automation != defaults.agent_automation {
+        agent.insert(
+            Y::String("automation".into()),
+            serde_yaml::to_value(&cfg.agent_automation).unwrap_or(Y::Null),
+        );
+    }
+    if cfg.agent_worktree != defaults.agent_worktree {
+        agent.insert(
+            Y::String("worktree".into()),
+            serde_yaml::to_value(&cfg.agent_worktree).unwrap_or(Y::Null),
+        );
+    }
+    if !agent.is_empty() {
+        root.insert(Y::String("agent".into()), Y::Mapping(agent));
+    }
+    if !cfg.agents.is_empty() {
+        root.insert(
+            Y::String("agents".into()),
+            serde_yaml::to_value(&cfg.agents).unwrap_or(Y::Null),
+        );
     }
 
     // sprints
@@ -1234,6 +1367,54 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         if !sync.is_empty() {
             root.insert(Y::String("sync".into()), Y::Mapping(sync));
         }
+    }
+
+    // agent
+    if let Some(enabled) = cfg.agent_context_enabled {
+        let mut agent = serde_yaml::Mapping::new();
+        agent.insert(Y::String("context_enabled".into()), Y::Bool(enabled));
+        root.insert(Y::String("agent".into()), Y::Mapping(agent));
+    }
+    if let Some(instructions) = &cfg.agent_instructions {
+        let entry = root
+            .entry(Y::String("agent".into()))
+            .or_insert_with(|| Y::Mapping(serde_yaml::Mapping::new()));
+        if let Y::Mapping(map) = entry {
+            map.insert(
+                Y::String("instructions".into()),
+                serde_yaml::to_value(instructions).unwrap_or(Y::Null),
+            );
+        }
+    }
+    if let Some(automation) = &cfg.agent_automation {
+        let entry = root
+            .entry(Y::String("agent".into()))
+            .or_insert_with(|| Y::Mapping(serde_yaml::Mapping::new()));
+        if let Y::Mapping(map) = entry {
+            map.insert(
+                Y::String("automation".into()),
+                serde_yaml::to_value(automation).unwrap_or(Y::Null),
+            );
+        }
+    }
+    if let Some(worktree) = &cfg.agent_worktree {
+        let entry = root
+            .entry(Y::String("agent".into()))
+            .or_insert_with(|| Y::Mapping(serde_yaml::Mapping::new()));
+        if let Y::Mapping(map) = entry {
+            map.insert(
+                Y::String("worktree".into()),
+                serde_yaml::to_value(worktree).unwrap_or(Y::Null),
+            );
+        }
+    }
+    if let Some(profiles) = &cfg.agents
+        && !profiles.is_empty()
+    {
+        root.insert(
+            Y::String("agents".into()),
+            serde_yaml::to_value(profiles).unwrap_or(Y::Null),
+        );
     }
 
     // branch alias maps in project canonical YAML

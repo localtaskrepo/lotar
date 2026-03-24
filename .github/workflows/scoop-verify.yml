@@ -15,6 +15,9 @@ on:
         description: "Optional lotar version to install (defaults to latest manifest)"
         required: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   scoop-install-test:
     runs-on: windows-latest

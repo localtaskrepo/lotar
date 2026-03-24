@@ -270,6 +270,10 @@ mod output_formatting {
     fn project_label_falls_back_to_prefix_when_name_missing() {
         let temp = TempDir::new().unwrap();
 
+        // Ensure no other tests are concurrently setting LOTAR_TASKS_DIR.
+        // This test relies on default tasks dir behavior in the temp workspace.
+        let _tasks_guard = super::common::env_mutex::EnvVarGuard::clear("LOTAR_TASKS_DIR");
+
         // Initialize project with a display name
         crate::common::lotar_cmd()
             .unwrap()
@@ -377,13 +381,15 @@ mod argument_normalization {
 
     #[test]
     fn short_format_flag_after_subcommand_emits_json() {
-        let temp = TempDir::new().unwrap();
-        create_task_in(temp.path(), "Inline Format Flag");
+        let fixtures = TestFixtures::new();
+        create_task_in(fixtures.temp_dir.path(), "Inline Format Flag");
+        let run_dir = TempDir::new().unwrap();
+        let tasks_dir = fixtures.tasks_root.to_string_lossy().to_string();
 
         let output = crate::common::lotar_cmd()
             .unwrap()
-            .current_dir(temp.path())
-            .args(["task", "list", "-fjson"])
+            .current_dir(run_dir.path())
+            .args(["task", "list", "--tasks-dir", &tasks_dir, "-fjson"])
             .output()
             .unwrap();
         assert!(
@@ -428,13 +434,22 @@ mod argument_normalization {
 
     #[test]
     fn inline_log_level_and_format_flags_after_subcommand_work() {
-        let temp = TempDir::new().unwrap();
-        create_task_in(temp.path(), "Inline Log Level");
+        let fixtures = TestFixtures::new();
+        create_task_in(fixtures.temp_dir.path(), "Inline Log Level");
+        let run_dir = TempDir::new().unwrap();
+        let tasks_dir = fixtures.tasks_root.to_string_lossy().to_string();
 
         let output = crate::common::lotar_cmd()
             .unwrap()
-            .current_dir(temp.path())
-            .args(["task", "list", "-linfo", "-fjson"])
+            .current_dir(run_dir.path())
+            .args([
+                "task",
+                "list",
+                "--tasks-dir",
+                &tasks_dir,
+                "-linfo",
+                "-fjson",
+            ])
             .output()
             .unwrap();
         assert!(
@@ -2307,6 +2322,9 @@ mod list_features {
     fn test_search_performance_and_limits() {
         let fixtures = TestFixtures::new();
         let temp_dir = fixtures.temp_dir.path();
+
+        // Ensure no other tests are concurrently setting LOTAR_TASKS_DIR.
+        let _tasks_guard = super::common::env_mutex::EnvVarGuard::clear("LOTAR_TASKS_DIR");
 
         // Create multiple tasks to test performance and limits
 

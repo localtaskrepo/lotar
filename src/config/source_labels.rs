@@ -139,6 +139,51 @@ pub const CONFIG_SOURCE_ENTRIES: &[ConfigSourceEntry] = &[
         "sprints_notifications_enabled",
     ),
     entry(
+        "agent.context-enabled",
+        "agent_context_enabled",
+        "agent_context_enabled",
+    ),
+    entry(
+        "agent.instructions",
+        "agent_instructions",
+        "agent_instructions",
+    ),
+    entry(
+        "agent.worktree.enabled",
+        "agent_worktree_enabled",
+        "agent_worktree_enabled",
+    ),
+    entry(
+        "agent.worktree.dir",
+        "agent_worktree_dir",
+        "agent_worktree_dir",
+    ),
+    entry(
+        "agent.worktree.branch_prefix",
+        "agent_worktree_branch_prefix",
+        "agent_worktree_branch_prefix",
+    ),
+    entry(
+        "agent.worktree.cleanup_on_done",
+        "agent_worktree_cleanup_on_done",
+        "agent_worktree_cleanup_on_done",
+    ),
+    entry(
+        "agent.worktree.cleanup_on_failure",
+        "agent_worktree_cleanup_on_failure",
+        "agent_worktree_cleanup_on_failure",
+    ),
+    entry(
+        "agent.worktree.cleanup_on_cancel",
+        "agent_worktree_cleanup_on_cancel",
+        "agent_worktree_cleanup_on_cancel",
+    ),
+    entry(
+        "agent.worktree.cleanup_delete_branches",
+        "agent_worktree_cleanup_delete_branches",
+        "agent_worktree_cleanup_delete_branches",
+    ),
+    entry(
         "branch.type-aliases",
         "branch_type_aliases",
         "branch_type_aliases",
@@ -347,6 +392,15 @@ fn source_label_for_global(
         "auto_identity_git" => scope_field!(auto_identity_git),
         "attachments_dir" => scope_field!(attachments_dir),
         "attachments_max_upload_mb" => scope_field!(attachments_max_upload_mb),
+        "agent_context_enabled" => scope_field!(agent_context_enabled),
+        "agent_instructions" => scope_field!(agent_instructions),
+        "agent_worktree_enabled" => scope_field!(agent_worktree),
+        "agent_worktree_dir" => scope_field!(agent_worktree),
+        "agent_worktree_branch_prefix" => scope_field!(agent_worktree),
+        "agent_worktree_cleanup_on_done" => scope_field!(agent_worktree),
+        "agent_worktree_cleanup_on_failure" => scope_field!(agent_worktree),
+        "agent_worktree_cleanup_on_cancel" => scope_field!(agent_worktree),
+        "agent_worktree_cleanup_delete_branches" => scope_field!(agent_worktree),
         "sprints_defaults_capacity_points" => scope_for_global_value(
             &resolved.sprint_defaults.capacity_points,
             home.map(|cfg| &cfg.sprints.defaults.capacity_points),
@@ -426,6 +480,15 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "auto_identity_git" => env_equal!(auto_identity_git),
         "attachments_dir" => env_equal!(attachments_dir),
         "attachments_max_upload_mb" => env_equal!(attachments_max_upload_mb),
+        "agent_context_enabled" => env_equal!(agent_context_enabled),
+        "agent_instructions" => env_equal!(agent_instructions),
+        "agent_worktree_enabled" => env_equal!(agent_worktree),
+        "agent_worktree_dir" => env_equal!(agent_worktree),
+        "agent_worktree_branch_prefix" => env_equal!(agent_worktree),
+        "agent_worktree_cleanup_on_done" => env_equal!(agent_worktree),
+        "agent_worktree_cleanup_on_failure" => env_equal!(agent_worktree),
+        "agent_worktree_cleanup_on_cancel" => env_equal!(agent_worktree),
+        "agent_worktree_cleanup_delete_branches" => env_equal!(agent_worktree),
         "branch_type_aliases" => env_equal!(branch_type_aliases),
         "branch_status_aliases" => env_equal!(branch_status_aliases),
         "branch_priority_aliases" => env_equal!(branch_priority_aliases),
@@ -652,6 +715,33 @@ fn source_label_for_project(
             let diff =
                 resolved_project.attachments_max_upload_mb != base_config.attachments_max_upload_mb;
             project_scope!("attachments_max_upload_mb", has_override, diff)
+        }
+        "agent_context_enabled" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.agent_context_enabled)
+                .is_some();
+            let diff = resolved_project.agent_context_enabled != base_config.agent_context_enabled;
+            project_scope!("agent_context_enabled", has_override, diff)
+        }
+        "agent_instructions" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.agent_instructions.as_ref())
+                .is_some();
+            let diff = resolved_project.agent_instructions != base_config.agent_instructions;
+            project_scope!("agent_instructions", has_override, diff)
+        }
+        "agent_worktree_enabled"
+        | "agent_worktree_dir"
+        | "agent_worktree_branch_prefix"
+        | "agent_worktree_cleanup_on_done"
+        | "agent_worktree_cleanup_on_failure"
+        | "agent_worktree_cleanup_on_cancel"
+        | "agent_worktree_cleanup_delete_branches" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.agent_worktree.as_ref())
+                .is_some();
+            let diff = resolved_project.agent_worktree != base_config.agent_worktree;
+            project_scope!("agent_worktree", has_override, diff)
         }
         "server_port" => source_label_for_global(
             base_config,

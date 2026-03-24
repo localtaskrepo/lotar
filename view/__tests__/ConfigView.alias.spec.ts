@@ -8,7 +8,9 @@ import ConfigView from '../pages/ConfigView.vue'
 vi.mock('../api/client', () => ({
     api: {
         inspectConfig: vi.fn(),
+        inspectAutomation: vi.fn(),
         setConfig: vi.fn(),
+        setAutomation: vi.fn(),
         listProjects: vi.fn(),
     },
 }))
@@ -157,7 +159,14 @@ describe('ConfigView branch alias handling', () => {
                 offset: 0,
                 projects: [{ name: 'App', prefix: 'APP' }],
             })
+            ; (api.inspectAutomation as any).mockResolvedValue({
+                source: 'global',
+                scope_exists: true,
+                scope_yaml: '',
+                effective_yaml: '',
+            })
             ; (api.setConfig as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
+            ; (api.setAutomation as any).mockResolvedValue({ updated: true, warnings: [], info: [], errors: [] })
     })
 
     afterEach(() => {

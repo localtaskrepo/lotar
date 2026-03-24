@@ -309,7 +309,7 @@ Canonical YAML example:
 
 ```yaml
 issue:
-    states: [Todo, InProgress, Done]
+    states: [Todo, InProgress, NeedsReview, Done]
     types: [Feature, Bug, Chore]
     priorities: [Low, Medium, High, Critical]
 auto:

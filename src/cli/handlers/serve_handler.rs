@@ -78,6 +78,8 @@ impl CommandHandler for ServeHandler {
 
         renderer.emit_warning("Press Ctrl+C to stop the server");
 
+        pin_process_tasks_dir(resolver)?;
+
         let mut api_server = api_server::ApiServer::new();
         routes::initialize(&mut api_server);
         // Bind to provided host; API and UI served together
@@ -85,6 +87,15 @@ impl CommandHandler for ServeHandler {
 
         Ok(())
     }
+}
+
+fn pin_process_tasks_dir(resolver: &TasksDirectoryResolver) -> Result<(), String> {
+    let tasks_dir = resolver.absolute_path()?;
+    let tasks_dir_value = tasks_dir.to_string_lossy().into_owned();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir_value);
+    }
+    Ok(())
 }
 
 /// Helper function to open browser (cross-platform)

@@ -205,9 +205,9 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             const seen = new Set<string>()
             const tags = new Set<string>()
             list.forEach((item) => {
-                if (item.assignee) seen.add(item.assignee)
+                if (item.assignee && !item.assignee.startsWith('@')) seen.add(item.assignee)
                 const reporter = (item as any).reporter
-                if (reporter) seen.add(String(reporter))
+                if (reporter && !String(reporter).startsWith('@')) seen.add(String(reporter))
                     ; (item.tags || []).forEach((tag) => {
                         if (!tag) return
                         const trimmed = tag.trim()

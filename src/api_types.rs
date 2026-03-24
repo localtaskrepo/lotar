@@ -114,6 +114,215 @@ pub struct TaskUpdate {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJob {
+    pub id: String,
+    pub ticket_id: String,
+    pub runner: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent: Option<String>,
+    pub status: String,
+    pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub started_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub finished_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub exit_code: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub last_message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub worktree_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub worktree_branch: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobCreateRequest {
+    pub ticket_id: String,
+    pub prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub runner: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobCreateResponse {
+    pub job: AgentJob,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobStatusResponse {
+    pub job: AgentJob,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobListResponse {
+    pub jobs: Vec<AgentJob>,
+    /// Queue statistics
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub queue_stats: Option<AgentQueueStats>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobCancelRequest {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobCancelResponse {
+    pub cancelled: bool,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub job: Option<AgentJob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobCancelAllResponse {
+    pub cancelled: usize,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub jobs: Vec<AgentJob>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationInspectResponse {
+    pub scope: String,
+    pub source: String,
+    pub scope_exists: bool,
+    pub scope_yaml: String,
+    pub effective_yaml: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationSetRequest {
+    pub yaml: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationSetResponse {
+    pub updated: bool,
+    pub warnings: Vec<String>,
+    pub info: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+/// Request to simulate automation rules for a given event
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationSimulateRequest {
+    /// The task ID to simulate against
+    pub ticket_id: String,
+    /// The event to simulate: "job_start", "complete", "error"
+    pub event: String,
+    /// Optional project scope
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub project: Option<String>,
+}
+
+/// Response showing what would happen when automation rules are applied
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationSimulateResponse {
+    /// Whether any rules matched
+    pub matched: bool,
+    /// Name of the matched rule, if any
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub rule_name: Option<String>,
+    /// Actions that would be performed
+    pub actions: Vec<AutomationSimulatedAction>,
+    /// Current task state (before automation)
+    pub task_before: Option<TaskDTO>,
+    /// Simulated task state (after automation)
+    pub task_after: Option<TaskDTO>,
+}
+
+/// A single action that would be performed by automation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AutomationSimulatedAction {
+    /// Action type: "set_status", "set_assignee", "add_tag", etc.
+    pub action: String,
+    /// Description of what would change
+    pub description: String,
+}
+
+/// Queue statistics for agent jobs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentQueueStats {
+    /// Number of jobs currently running
+    pub running: usize,
+    /// Number of jobs waiting in queue
+    pub queued: usize,
+    /// Maximum parallel jobs (None = unlimited)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_parallel: Option<usize>,
+}
+
+/// List of available agent profiles
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentProfilesResponse {
+    pub profiles: Vec<AgentProfileInfo>,
+}
+
+/// Basic info about an agent profile
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentProfileInfo {
+    pub name: String,
+    pub runner: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobLogEntry {
+    pub kind: String,
+    pub at: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobLogsResponse {
+    pub job: AgentJob,
+    pub events: Vec<AgentJobLogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobMessageRequest {
+    pub id: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct AgentJobMessageResponse {
+    pub accepted: bool,
+    pub job: AgentJob,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct AttachmentUploadRequest {
     pub id: String,
     pub filename: String,

@@ -160,6 +160,21 @@ pub const ENV_OVERRIDE_DEFINITIONS: &[EnvOverrideDefinition] = &[
         &["LOTAR_SYNC_WRITE_REPORTS"],
     ),
     def(
+        "agent_context_enabled",
+        "agent_context_enabled",
+        &["LOTAR_AGENT_CONTEXT_ENABLED"],
+    ),
+    def(
+        "agent_context_extension",
+        "agent_context_extension",
+        &["LOTAR_AGENT_CONTEXT_EXTENSION"],
+    ),
+    def(
+        "agent_logs_dir",
+        "agent_logs_dir",
+        &["LOTAR_AGENT_LOGS_DIR"],
+    ),
+    def(
         "branch_type_aliases",
         "branch_type_aliases",
         &["LOTAR_BRANCH_TYPE_ALIASES"],

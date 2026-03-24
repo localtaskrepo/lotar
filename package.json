@@ -39,7 +39,7 @@
   "author": "Ravi Gairola <mallox@pyxzl.net>",
   "license": "ISC",
   "engines": {
-    "node": "24.x"
+    "node": ">=24"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

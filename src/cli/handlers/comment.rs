@@ -1,6 +1,5 @@
 use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
-use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::types::TaskComment;
@@ -142,13 +141,13 @@ fn handle_add_comment(
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
     full_id: String,
-    mut inputs: CommentAddInputs,
+    inputs: CommentAddInputs,
 ) -> Result<(), String> {
     renderer.log_debug("comment: preparing new comment entry");
     let timestamp = chrono::Utc::now().to_rfc3339();
     let entry = TaskComment {
         date: timestamp,
-        text: inputs.text,
+        text: inputs.text.clone(),
     };
 
     if inputs.dry_run {
@@ -163,12 +162,12 @@ fn handle_add_comment(
         return Ok(());
     }
 
-    inputs.task.comments.push(entry.clone());
-    inputs.task.modified = chrono::Utc::now().to_rfc3339();
-
-    ctx.storage
-        .edit(&full_id, &inputs.task)
-        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
+    let dto = crate::services::task_service::TaskService::add_comment(
+        &mut ctx.storage,
+        &full_id,
+        inputs.text,
+    )
+    .map_err(|e| e.to_string())?;
     renderer.log_info("comment: comment persisted");
 
     render_comment_success(
@@ -176,7 +175,7 @@ fn handle_add_comment(
         &full_id,
         inputs.project.as_deref(),
         &entry,
-        inputs.task.comments.len(),
+        dto.comments.len(),
     );
     Ok(())
 }

@@ -9,6 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 # Cancel in-progress runs when a new commit is pushed
 concurrency:
@@ -218,8 +219,8 @@ jobs:
         rsync -a artifact-cache/target/ target/
         rm -rf artifact-cache
 
-    - name: Ensure binary is executable
-      run: chmod +x target/release/lotar || true
+    - name: Ensure binaries are executable
+      run: chmod +x target/release/lotar target/release/lotar-agent-wrapper 2>/dev/null || true
 
     - name: Verify web assets exist
       run: test -f target/web/index.html

@@ -25,6 +25,11 @@ fn base_project_config() -> ProjectConfig {
     config.issue_priorities = Some(ConfigurableField {
         values: vec![Priority::from("Low"), Priority::from("High")],
     });
+    config.agent_context_enabled = Some(true);
+    config.agent_instructions = None;
+    config.agents = None;
+    config.agent_automation = None;
+    config.agent_worktree = None;
     config
 }
 
@@ -91,6 +96,13 @@ fn test_global_config_validation_valid() {
         attachments_max_upload_mb: 10,
         sync_reports_dir: "@reports".to_string(),
         sync_write_reports: true,
+        agent_context_enabled: true,
+        agent_context_extension: ".context".to_string(),
+        agent_logs_dir: None,
+        agent_instructions: None,
+        agents: Default::default(),
+        agent_automation: Default::default(),
+        agent_worktree: Default::default(),
         web_ui_path: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
@@ -156,6 +168,13 @@ fn test_global_config_validation_privileged_port_warning() {
         attachments_max_upload_mb: 10,
         sync_reports_dir: "@reports".to_string(),
         sync_write_reports: true,
+        agent_context_enabled: true,
+        agent_context_extension: ".context".to_string(),
+        agent_logs_dir: None,
+        agent_instructions: None,
+        agents: Default::default(),
+        agent_automation: Default::default(),
+        agent_worktree: Default::default(),
         web_ui_path: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
@@ -238,6 +257,13 @@ fn test_global_config_validation_empty_lists_error() {
         attachments_max_upload_mb: 10,
         sync_reports_dir: "@reports".to_string(),
         sync_write_reports: true,
+        agent_context_enabled: true,
+        agent_context_extension: ".context".to_string(),
+        agent_logs_dir: None,
+        agent_instructions: None,
+        agents: Default::default(),
+        agent_automation: Default::default(),
+        agent_worktree: Default::default(),
         web_ui_path: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
@@ -322,6 +348,13 @@ fn test_global_config_validation_invalid_defaults() {
         attachments_max_upload_mb: 10,
         sync_reports_dir: "@reports".to_string(),
         sync_write_reports: true,
+        agent_context_enabled: true,
+        agent_context_extension: ".context".to_string(),
+        agent_logs_dir: None,
+        agent_instructions: None,
+        agents: Default::default(),
+        agent_automation: Default::default(),
+        agent_worktree: Default::default(),
         web_ui_path: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),
@@ -393,6 +426,13 @@ fn test_global_config_duplicate_entries_warning() {
         attachments_max_upload_mb: 10,
         sync_reports_dir: "@reports".to_string(),
         sync_write_reports: true,
+        agent_context_enabled: true,
+        agent_context_extension: ".context".to_string(),
+        agent_logs_dir: None,
+        agent_instructions: None,
+        agents: Default::default(),
+        agent_automation: Default::default(),
+        agent_worktree: Default::default(),
         web_ui_path: None,
         remotes: Default::default(),
         auth_profiles: Default::default(),

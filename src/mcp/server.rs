@@ -14,15 +14,16 @@ mod watchers;
 mod mcp_server_tests;
 
 use handlers::{
-    handle_config_set, handle_config_show, handle_project_list, handle_project_stats,
-    handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown, handle_sprint_create,
-    handle_sprint_delete, handle_sprint_get, handle_sprint_list, handle_sprint_remove,
-    handle_sprint_summary, handle_sprint_update, handle_sprint_velocity, handle_sync_pull,
-    handle_sync_push, handle_task_bulk_comment_add, handle_task_bulk_reference_add,
-    handle_task_bulk_reference_remove, handle_task_bulk_update, handle_task_comment_add,
-    handle_task_comment_update, handle_task_create, handle_task_delete, handle_task_get,
-    handle_task_list, handle_task_reference_add, handle_task_reference_remove, handle_task_update,
-    handle_whoami,
+    handle_agent_cancel, handle_agent_list_jobs, handle_agent_run, handle_agent_send_message,
+    handle_agent_status, handle_config_set, handle_config_show, handle_project_list,
+    handle_project_stats, handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown,
+    handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list,
+    handle_sprint_remove, handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
+    handle_sync_pull, handle_sync_push, handle_task_bulk_comment_add,
+    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
+    handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete,
+    handle_task_get, handle_task_list, handle_task_reference_add, handle_task_reference_remove,
+    handle_task_update, handle_whoami,
 };
 use hints::gather_enum_hints;
 use tools::build_tool_definitions;
@@ -398,7 +399,7 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
                         "name": "lotar-mcp",
                         "version": env!("CARGO_PKG_VERSION")
                     },
-                    "instructions": "Lotar MCP server exposes task, project, and config tools."
+                    "instructions": "Lotar MCP server exposes task, project, config, and agent tools."
                 }),
             )
         }
@@ -572,6 +573,16 @@ fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
         "project/list" => handle_project_list(req),
         // project/stats({ name }) -> { stats }
         "project/stats" => handle_project_stats(req),
+        // agent/run({ ticket_id, prompt, runner?, agent? }) -> { job }
+        "agent/run" => handle_agent_run(req),
+        // agent/status({ id }) -> { job }
+        "agent/status" => handle_agent_status(req),
+        // agent/list_jobs({}) -> { jobs, queue_stats }
+        "agent/list_jobs" => handle_agent_list_jobs(req),
+        // agent/cancel({ id }) -> { cancelled, job }
+        "agent/cancel" => handle_agent_cancel(req),
+        // agent/send_message({ id, message }) -> { job }
+        "agent/send_message" => handle_agent_send_message(req),
         _ => err(req.id, -32601, "Method not found", None),
     }
 }

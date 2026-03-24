@@ -1,5 +1,6 @@
 use crate::api_types::TaskUpdate;
 use crate::cli::handlers::CommandHandler;
+use crate::cli::handlers::agent::running_job_for_ticket;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::cli::handlers::task::render::{
@@ -123,6 +124,23 @@ fn handle_set_assignee(
         return Ok(());
     }
 
+    // If an agent job is already running for this ticket, changing assignee would
+    // disrupt the automation lifecycle. Require the user to cancel the job first.
+    if let Some(job) = running_job_for_ticket(&full_id)
+        && !current_agent_job_matches_ticket(&full_id)
+    {
+        if let Some(job_id) = job.job_id.as_deref() {
+            return Err(format!(
+                "Ticket '{}' has an active agent job ({}). Cancel it first: lotar agent cancel {}",
+                full_id, job_id, job_id
+            ));
+        }
+        return Err(format!(
+            "Ticket '{}' has an active agent job (pid {}). Cancel it before changing assignee.",
+            full_id, job.pid
+        ));
+    }
+
     if dry_run {
         render_assignee_dry_run(
             renderer,
@@ -133,7 +151,6 @@ fn handle_set_assignee(
         );
         return Ok(());
     }
-
     task.assignee = Some(validated.clone());
 
     let patch = TaskUpdate {
@@ -161,6 +178,17 @@ fn handle_set_assignee(
         updated.assignee.as_deref(),
     );
     Ok(())
+}
+
+fn current_agent_job_matches_ticket(ticket_id: &str) -> bool {
+    let Ok(job_id) = std::env::var("LOTAR_AGENT_JOB_ID") else {
+        return false;
+    };
+    let Ok(current_ticket) = std::env::var("LOTAR_TICKET_ID") else {
+        return false;
+    };
+
+    current_ticket.trim() == ticket_id && !job_id.trim().is_empty()
 }
 
 fn render_current_assignee(

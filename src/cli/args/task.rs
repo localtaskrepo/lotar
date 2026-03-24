@@ -607,6 +607,11 @@ pub struct TaskSearchArgs {
     /// Maximum effort (accepts effort format e.g., 2h, 1d, or points number)
     #[arg(long = "effort-max")]
     pub effort_max: Option<String>,
+
+    /// Show task descriptions in text output
+    #[arg(long)]
+    #[serde(default)]
+    pub details: bool,
 }
 
 #[derive(Args, Deserialize, Debug)]

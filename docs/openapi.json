@@ -160,6 +160,226 @@
         }
       }
     },
+    "/api/jobs": {
+      "post": {
+        "summary": "Create agent job",
+        "description": "Starts an agent CLI job for a ticket. Provide either runner or agent profile.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentJobCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      },
+      "get": {
+        "summary": "List agent jobs",
+        "parameters": [
+          {
+            "name": "ticket_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobListResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/jobs/get": {
+      "get": {
+        "summary": "Get agent job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobStatusResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/jobs/logs": {
+      "get": {
+        "summary": "Get agent job logs",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobLogsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/jobs/cancel": {
+      "post": {
+        "summary": "Cancel agent job",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentJobCancelRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobCancelResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/jobs/cancel-all": {
+      "post": {
+        "summary": "Cancel all queued or running agent jobs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobCancelAllResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/jobs/message": {
+      "post": {
+        "summary": "Send agent job message",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentJobMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAgentJobMessageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
@@ -1122,6 +1342,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeConfigSetResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/automation/show": {
+      "get": {
+        "summary": "Show automation rules",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAutomationInspectResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/automation/set": {
+      "post": {
+        "summary": "Set automation rules",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutomationSetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAutomationSetResponse"
                 }
               }
             }
@@ -5067,6 +5350,102 @@
           "data"
         ]
       },
+      "AutomationInspectResponse": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "scope_exists": {
+            "type": "boolean"
+          },
+          "scope_yaml": {
+            "type": "string"
+          },
+          "effective_yaml": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "source",
+          "scope_exists",
+          "scope_yaml",
+          "effective_yaml"
+        ]
+      },
+      "AutomationSetRequest": {
+        "type": "object",
+        "properties": {
+          "yaml": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "yaml"
+        ]
+      },
+      "AutomationSetResponse": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "info": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "updated",
+          "warnings",
+          "info",
+          "errors"
+        ]
+      },
+      "EnvelopeAutomationInspectResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AutomationInspectResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAutomationSetResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AutomationSetResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "EnvelopeLinkReferenceAddResponse": {
         "type": "object",
         "properties": {
@@ -5212,6 +5591,317 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SyncReport"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "AgentJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ticket_id": {
+            "type": "string"
+          },
+          "runner": {
+            "type": "string"
+          },
+          "agent": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "finished_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "exit_code": {
+            "type": "integer",
+            "nullable": true
+          },
+          "last_message": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "worktree_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "worktree_branch": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "ticket_id",
+          "runner",
+          "status",
+          "created_at"
+        ]
+      },
+      "AgentJobCreateRequest": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "runner": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "ticket_id",
+          "prompt"
+        ]
+      },
+      "AgentJobCreateResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/AgentJob"
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "AgentJobStatusResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/AgentJob"
+          }
+        },
+        "required": [
+          "job"
+        ]
+      },
+      "AgentJobListResponse": {
+        "type": "object",
+        "properties": {
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentJob"
+            }
+          }
+        },
+        "required": [
+          "jobs"
+        ]
+      },
+      "AgentJobCancelRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "AgentJobCancelResponse": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean"
+          },
+          "job": {
+            "$ref": "#/components/schemas/AgentJob",
+            "nullable": true
+          }
+        },
+        "required": [
+          "cancelled"
+        ]
+      },
+      "AgentJobCancelAllResponse": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "integer",
+            "format": "uint"
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentJob"
+            }
+          }
+        },
+        "required": [
+          "cancelled",
+          "jobs"
+        ]
+      },
+      "AgentJobLogEntry": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "at"
+        ]
+      },
+      "AgentJobLogsResponse": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/AgentJob"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentJobLogEntry"
+            }
+          }
+        },
+        "required": [
+          "job",
+          "events"
+        ]
+      },
+      "AgentJobMessageRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "message"
+        ]
+      },
+      "AgentJobMessageResponse": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "job": {
+            "$ref": "#/components/schemas/AgentJob"
+          }
+        },
+        "required": [
+          "accepted",
+          "job"
+        ]
+      },
+      "EnvelopeAgentJobCreateResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobCreateResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobStatusResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobStatusResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobListResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobCancelResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobCancelResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobCancelAllResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobCancelAllResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobLogsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobLogsResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAgentJobMessageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AgentJobMessageResponse"
           }
         },
         "required": [

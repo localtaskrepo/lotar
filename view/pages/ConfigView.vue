@@ -247,6 +247,19 @@
           </div>
 
           <div class="config-grid__item">
+            <ConfigGroup title="Automation rules" :description="automationRulesDescription">
+              <AutomationRulesEditor
+                v-model="automationScopeYaml"
+                :effective-yaml="automationEffectiveYaml"
+                :loading="automationLoading"
+                :error="automationError"
+                :source-label="automationSourceLabel"
+                :scope-hint="isGlobal ? 'Edit .tasks/automation.yml. Leave it empty to clear the scoped file.' : `Edit .tasks/${project}/automation.yml. Leave it empty to inherit from higher scopes.`"
+              />
+            </ConfigGroup>
+          </div>
+
+          <div class="config-grid__item">
             <ConfigScanningSection
               :description="scanningDescription"
               :is-global="isGlobal"
@@ -299,16 +312,16 @@
       aria-label="Save controls"
     >
       <div class="floating-actions__buttons">
-        <UiButton variant="primary" type="button" @click="save" :disabled="saveDisabled">
+        <UiButton variant="primary" type="button" @click="save" :disabled="saveDisabledCombined">
           Save changes
         </UiButton>
-        <UiButton variant="ghost" type="button" @click="resetForm" :disabled="!isDirty">
+        <UiButton variant="ghost" type="button" @click="resetAll" :disabled="resetDisabled">
           Reset
         </UiButton>
       </div>
       <div class="floating-actions__meta" aria-live="polite">
         <span v-if="saving" class="muted">Saving…</span>
-        <span v-else-if="isDirty" class="muted">You have unsaved changes.</span>
+        <span v-else-if="hasChanges" class="muted">You have unsaved changes.</span>
         <span v-else class="muted">Last updated {{ lastLoaded }}</span>
       </div>
     </div>
@@ -406,6 +419,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
+import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
 import ConfigBranchAliasSection from '../components/ConfigBranchAliasSection.vue'
 import ConfigGroup from '../components/ConfigGroup.vue'
@@ -431,7 +445,15 @@ const helpOpen = ref(false)
 const saveError = ref<string | null>(null)
 const saveWarnings = ref<string[]>([])
 const saveInfoMessages = ref<string[]>([])
+const automationError = ref<string | null>(null)
 const error = computed(() => saveError.value ?? loadError.value)
+
+const automationScopeYaml = ref('')
+const automationEffectiveYaml = ref('')
+const automationBaselineYaml = ref('')
+const automationSource = ref('built_in')
+const automationScopeExists = ref(false)
+const automationLoading = ref(false)
 
 const createOpen = ref(false)
 const creatingProject = ref(false)
@@ -564,7 +586,6 @@ const {
   scanningDescription,
   branchAliasDescription,
   isDirty,
-  saveDisabled,
   toggleSelectOptions,
   globalToggleSummary,
   provenanceLabel,
@@ -581,6 +602,9 @@ const {
   resetForm,
   buildPayload,
 } = useConfigForm({ project, projects, inspectData, saving })
+
+const saveDisabledCombined = computed(() => saving.value || !hasChanges.value)
+const resetDisabled = computed(() => !hasChanges.value)
 
 function formatValue(value: string | null | undefined): string {
   if (value === undefined || value === null) return '—'
@@ -704,15 +728,62 @@ async function handleReload() {
   saveWarnings.value = []
   saveInfoMessages.value = []
   await reload()
+  await loadAutomation()
+}
+
+async function loadAutomation() {
+  automationLoading.value = true
+  automationError.value = null
+  try {
+    const response = await api.inspectAutomation(isGlobal.value ? undefined : project.value)
+    automationScopeYaml.value = response.scope_yaml || ''
+    automationEffectiveYaml.value = response.effective_yaml || ''
+    automationBaselineYaml.value = response.scope_yaml || ''
+    automationSource.value = response.source
+    automationScopeExists.value = response.scope_exists
+  } catch (err: any) {
+    automationError.value = err?.message ?? String(err)
+  } finally {
+    automationLoading.value = false
+  }
+}
+
+const automationDirty = computed(() => automationScopeYaml.value !== automationBaselineYaml.value)
+const hasChanges = computed(() => isDirty.value || automationDirty.value)
+
+const automationSourceLabel = computed(() => {
+  switch (automationSource.value) {
+    case 'project':
+      return 'project automation.yml'
+    case 'home':
+      return 'home automation.yml'
+    case 'global':
+      return 'global automation.yml'
+    default:
+      return 'built-in defaults'
+  }
+})
+
+const automationRulesDescription = computed(() =>
+  isGlobal.value
+    ? 'Automation rules live in automation.yml alongside your global config.'
+    : 'Project rules override global and home automation rules for this project.',
+)
+
+function resetAll() {
+  resetForm()
+  automationScopeYaml.value = automationBaselineYaml.value
+  automationError.value = null
 }
 
 async function save() {
-  if (!validateAll()) {
+  const payload = buildPayload()
+  const hasConfigChanges = Object.keys(payload).length > 0
+  if (hasConfigChanges && !validateAll()) {
     showToast('Fix validation errors before saving.')
     return
   }
-  const payload = buildPayload()
-  if (!Object.keys(payload).length) {
+  if (!hasConfigChanges && !automationDirty.value) {
     showToast('No changes to save.')
     return
   }
@@ -721,12 +792,26 @@ async function save() {
   saveWarnings.value = []
   saveInfoMessages.value = []
   try {
-    const result = await api.setConfig({ values: payload, project: isGlobal.value ? undefined : project.value, global: isGlobal.value })
-    saveWarnings.value = result.warnings || []
-    saveInfoMessages.value = result.info || []
+    if (hasConfigChanges) {
+      const result = await api.setConfig({ values: payload, project: isGlobal.value ? undefined : project.value, global: isGlobal.value })
+      saveWarnings.value.push(...(result.warnings || []))
+      saveInfoMessages.value.push(...(result.info || []))
 
-    if (result.errors && result.errors.length) {
-      throw new Error(result.errors.join('\n'))
+      if (result.errors && result.errors.length) {
+        throw new Error(result.errors.join('\n'))
+      }
+    }
+
+    if (automationDirty.value) {
+      const result = await api.setAutomation({
+        yaml: automationScopeYaml.value,
+        project: isGlobal.value ? undefined : project.value,
+      })
+      saveWarnings.value.push(...(result.warnings || []))
+      saveInfoMessages.value.push(...(result.info || []))
+      if (result.errors && result.errors.length) {
+        throw new Error(result.errors.join('\n'))
+      }
     }
 
     if (saveWarnings.value.length) {
@@ -736,6 +821,7 @@ async function save() {
     }
 
     await reload()
+    await loadAutomation()
     saveError.value = null
   } catch (err: any) {
     saveError.value = err?.message ?? String(err)
@@ -753,12 +839,13 @@ const lastLoaded = computed(() => {
 
 watch(
   inspectData,
-  (data) => {
+  async (data) => {
     if (!data) return
     populateForm(data)
     baseline.value = snapshotForm()
     clearErrors()
     saveError.value = null
+    await loadAutomation()
   },
   { immediate: true },
 )

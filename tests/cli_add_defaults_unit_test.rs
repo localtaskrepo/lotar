@@ -66,6 +66,13 @@ fn make_cfg(
         attachments_max_upload_mb: 10,
         sync_reports_dir: "@reports".to_string(),
         sync_write_reports: true,
+        agent_context_enabled: true,
+        agent_context_extension: ".context".to_string(),
+        agent_logs_dir: None,
+        agent_instructions: None,
+        agent_profiles: Default::default(),
+        agent_automation: Default::default(),
+        agent_worktree: Default::default(),
         remotes: Default::default(),
     }
 }

@@ -251,6 +251,27 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     if override_config.sync_write_reports != defaults.sync_write_reports {
         base.sync_write_reports = override_config.sync_write_reports;
     }
+    if override_config.agent_context_enabled != defaults.agent_context_enabled {
+        base.agent_context_enabled = override_config.agent_context_enabled;
+    }
+    if override_config.agent_context_extension != defaults.agent_context_extension {
+        base.agent_context_extension = override_config.agent_context_extension;
+    }
+    if override_config.agent_logs_dir.is_some() {
+        base.agent_logs_dir = override_config.agent_logs_dir;
+    }
+    if override_config.agent_instructions.is_some() {
+        base.agent_instructions = override_config.agent_instructions;
+    }
+    if !override_config.agents.is_empty() {
+        base.agents.extend(override_config.agents);
+    }
+    if override_config.agent_automation != defaults.agent_automation {
+        base.agent_automation = override_config.agent_automation;
+    }
+    if override_config.agent_worktree != defaults.agent_worktree {
+        base.agent_worktree = override_config.agent_worktree;
+    }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         base.scan_signal_words = override_config.scan_signal_words;
     }
@@ -379,6 +400,32 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
     }
     if override_config.sync_write_reports != defaults.sync_write_reports {
         resolved.sync_write_reports = override_config.sync_write_reports;
+    }
+    if override_config.agent_context_enabled != defaults.agent_context_enabled {
+        resolved.agent_context_enabled = override_config.agent_context_enabled;
+    }
+    if override_config.agent_context_extension != defaults.agent_context_extension {
+        resolved.agent_context_extension = override_config.agent_context_extension;
+    }
+    if override_config.agent_logs_dir.is_some() {
+        resolved.agent_logs_dir = override_config.agent_logs_dir;
+    }
+    if override_config.agent_instructions.is_some() {
+        resolved.agent_instructions = override_config.agent_instructions;
+    }
+    if !override_config.agents.is_empty() {
+        resolved.agent_profiles.extend(
+            override_config
+                .agents
+                .into_iter()
+                .map(|(k, v)| (k, v.to_detail())),
+        );
+    }
+    if override_config.agent_automation != defaults.agent_automation {
+        resolved.agent_automation = override_config.agent_automation;
+    }
+    if override_config.agent_worktree != defaults.agent_worktree {
+        resolved.agent_worktree = override_config.agent_worktree;
     }
     if override_config.scan_signal_words != defaults.scan_signal_words {
         resolved.scan_signal_words = override_config.scan_signal_words;
@@ -554,6 +601,33 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
     if let Some(enabled) = project_config.sync_write_reports {
         resolved.sync_write_reports = enabled;
     }
+    if let Some(enabled) = project_config.agent_context_enabled {
+        resolved.agent_context_enabled = enabled;
+    }
+    if let Some(ext) = project_config.agent_context_extension
+        && !ext.trim().is_empty()
+    {
+        resolved.agent_context_extension = ext;
+    }
+    if let Some(dir) = project_config.agent_logs_dir
+        && !dir.trim().is_empty()
+    {
+        resolved.agent_logs_dir = Some(dir);
+    }
+    if let Some(instructions) = project_config.agent_instructions {
+        resolved.agent_instructions = Some(instructions);
+    }
+    if let Some(profiles) = project_config.agents {
+        for (name, profile) in profiles {
+            resolved.agent_profiles.insert(name, profile.to_detail());
+        }
+    }
+    if let Some(automation) = project_config.agent_automation {
+        apply_agent_automation_override(&mut resolved.agent_automation, automation);
+    }
+    if let Some(worktree) = project_config.agent_worktree {
+        apply_agent_worktree_override(&mut resolved.agent_worktree, worktree);
+    }
     // Overlay project-level branch alias maps (if provided)
     if let Some(m) = project_config.branch_type_aliases
         && !m.is_empty()
@@ -576,6 +650,74 @@ fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config:
         resolved.remotes.extend(project_config.remotes);
     }
     // Smart toggles for branch/codeowners remain global/home/env scoped for now.
+}
+
+fn apply_agent_automation_override(
+    target: &mut crate::config::types::AgentAutomationConfig,
+    override_config: crate::config::types::AgentAutomationConfigOverride,
+) {
+    if let Some(action) = override_config.on_start {
+        if action.set_status.is_some() {
+            target.on_start.set_status = action.set_status;
+        }
+        if action.reassign_to.is_some() {
+            target.on_start.reassign_to = action.reassign_to;
+        }
+    }
+    if let Some(action) = override_config.on_success {
+        if action.set_status.is_some() {
+            target.on_success.set_status = action.set_status;
+        }
+        if action.reassign_to.is_some() {
+            target.on_success.reassign_to = action.reassign_to;
+        }
+    }
+    if let Some(action) = override_config.on_failure {
+        if action.set_status.is_some() {
+            target.on_failure.set_status = action.set_status;
+        }
+        if action.reassign_to.is_some() {
+            target.on_failure.reassign_to = action.reassign_to;
+        }
+    }
+    if let Some(action) = override_config.on_cancel {
+        if action.set_status.is_some() {
+            target.on_cancel.set_status = action.set_status;
+        }
+        if action.reassign_to.is_some() {
+            target.on_cancel.reassign_to = action.reassign_to;
+        }
+    }
+}
+
+fn apply_agent_worktree_override(
+    target: &mut crate::config::types::AgentWorktreeConfig,
+    override_config: crate::config::types::AgentWorktreeConfigOverride,
+) {
+    if let Some(enabled) = override_config.enabled {
+        target.enabled = enabled;
+    }
+    if let Some(dir) = override_config.dir {
+        target.dir = Some(dir);
+    }
+    if let Some(prefix) = override_config.branch_prefix {
+        target.branch_prefix = prefix;
+    }
+    if let Some(max_jobs) = override_config.max_parallel_jobs {
+        target.max_parallel_jobs = Some(max_jobs);
+    }
+    if let Some(cleanup_on_done) = override_config.cleanup_on_done {
+        target.cleanup_on_done = cleanup_on_done;
+    }
+    if let Some(cleanup_on_failure) = override_config.cleanup_on_failure {
+        target.cleanup_on_failure = cleanup_on_failure;
+    }
+    if let Some(cleanup_on_cancel) = override_config.cleanup_on_cancel {
+        target.cleanup_on_cancel = cleanup_on_cancel;
+    }
+    if let Some(cleanup_delete_branches) = override_config.cleanup_delete_branches {
+        target.cleanup_delete_branches = cleanup_delete_branches;
+    }
 }
 
 /// Invalidate the cached resolved configuration for a specific tasks_dir
@@ -627,6 +769,17 @@ impl ResolvedConfig {
             attachments_max_upload_mb: global.attachments_max_upload_mb,
             sync_reports_dir: global.sync_reports_dir,
             sync_write_reports: global.sync_write_reports,
+            agent_context_enabled: global.agent_context_enabled,
+            agent_context_extension: global.agent_context_extension,
+            agent_logs_dir: global.agent_logs_dir,
+            agent_instructions: global.agent_instructions,
+            agent_profiles: global
+                .agents
+                .into_iter()
+                .map(|(k, v)| (k, v.to_detail()))
+                .collect(),
+            agent_automation: global.agent_automation,
+            agent_worktree: global.agent_worktree,
             remotes: global.remotes,
         }
     }

@@ -7,6 +7,7 @@
 pub mod api_events;
 pub mod api_server;
 pub mod api_types;
+pub mod automation;
 pub mod cli;
 pub mod config;
 pub mod errors;

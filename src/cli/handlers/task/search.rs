@@ -40,7 +40,7 @@ impl CommandHandler for SearchHandler {
         let (offset, limit) = Self::resolve_pagination(&args)?;
         Self::apply_offset_and_limit(&mut tasks, offset, limit);
 
-        Self::render_results(renderer, tasks, total_matching, offset, limit);
+        Self::render_results(renderer, tasks, total_matching, offset, limit, args.details);
 
         Ok(())
     }
@@ -240,6 +240,7 @@ impl SearchHandler {
         total_matching: usize,
         offset: usize,
         limit: usize,
+        show_details: bool,
     ) {
         if tasks.is_empty() {
             renderer.log_info("list: no results");
@@ -331,11 +332,24 @@ impl SearchHandler {
                     start, end, total_matching, offset, limit
                 ));
                 for task in display_tasks {
-                    renderer.emit_raw_stdout(format_args!(
-                        "  {} - {} [{}] ({})",
-                        task.id, task.title, task.status, task.priority
-                    ));
-                    if let Some(description) = &task.description
+                    let assignee = task.assignee.as_deref().unwrap_or("unassigned");
+                    let mut line = format!(
+                        "  {} - {} [{}] ({}) | type: {} | assignee: {}",
+                        task.id, task.title, task.status, task.priority, task.task_type, assignee
+                    );
+
+                    if let Some(due_date) = task.due_date.as_deref() {
+                        line.push_str(&format!(" | due: {}", due_date));
+                    }
+
+                    if let Some(effort) = task.effort.as_deref() {
+                        line.push_str(&format!(" | effort: {}", effort));
+                    }
+
+                    renderer.emit_raw_stdout(line);
+
+                    if show_details
+                        && let Some(description) = &task.description
                         && !description.is_empty()
                     {
                         renderer.emit_raw_stdout(format_args!("    {}", description));

@@ -72,6 +72,12 @@ impl CommandHandler for ConfigHandler {
                     "  • github - GitHub issues workflow with GitHub remote mapping",
                 );
                 renderer.emit_raw_stdout("  • jira-github - Dual Jira + GitHub remote mapping");
+                renderer.emit_raw_stdout(
+                    "  • agent-pipeline - Fully automated agent workflow (implement → test → merge)",
+                );
+                renderer.emit_raw_stdout(
+                    "  • agent-reviewed - Agent workflow with human review before merge",
+                );
                 renderer.emit_info(
                     "Use 'lotar config init --template=<n>' to initialize with a template.",
                 );
