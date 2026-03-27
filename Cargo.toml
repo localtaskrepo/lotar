@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.7.5"
+version = "0.7.6"
 edition = "2024"
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
 description = "A git-native task management CLI that stores issues as YAML files in your repository"
@@ -38,9 +38,9 @@ notify = "8.2.0"
 pulldown-cmark = { version = "0.13.3", default-features = false }
 blake3 = { version = "1.8.3", default-features = false, features = ["std"] }
 base64 = { version = "0.22.1", default-features = false, features = ["std"] }
-ureq = { version = "2.10.1", features = ["json"] }
+ureq = { version = "3.3.0", features = ["json"] }
 libc = "0.2.183"
-sysinfo = "0.30.13"
+sysinfo = "0.38.4"
 fs2 = "0.4.3"
 
 # Production release profile optimized for minimal binary size

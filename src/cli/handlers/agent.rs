@@ -16,7 +16,7 @@ use serde::Serialize;
 use std::fmt::Write as _;
 use std::thread;
 use std::time::{Duration, Instant};
-use sysinfo::System;
+use sysinfo::{ProcessesToUpdate, System};
 
 /// Get the logs directory and workspace root from config.
 /// Returns (workspace_root, logs_dir) where logs_dir may be None if not configured.
@@ -833,7 +833,7 @@ pub(crate) fn running_job_for_ticket(ticket_id: &str) -> Option<RunningAgentJob>
 
 fn list_running_jobs() -> Vec<RunningAgentJob> {
     let mut system = System::new_all();
-    system.refresh_processes();
+    system.refresh_processes(ProcessesToUpdate::All, true);
 
     system
         .processes()
@@ -845,7 +845,12 @@ fn list_running_jobs() -> Vec<RunningAgentJob> {
             if is_zombie_process(process) {
                 return None;
             }
-            let (job_id, ticket_id, runner) = parse_wrapper_metadata(process.cmd());
+            let cmd: Vec<String> = process
+                .cmd()
+                .iter()
+                .filter_map(|s| s.to_str().map(String::from))
+                .collect();
+            let (job_id, ticket_id, runner) = parse_wrapper_metadata(&cmd);
             Some(RunningAgentJob {
                 pid: pid.as_u32(),
                 job_id,
@@ -925,8 +930,9 @@ fn is_zombie_process(process: &sysinfo::Process) -> bool {
 }
 
 fn is_wrapper_process(process: &sysinfo::Process) -> bool {
-    let name = process.name();
-    if is_wrapper_name(name) {
+    if let Some(name) = process.name().to_str()
+        && is_wrapper_name(name)
+    {
         return true;
     }
     if let Some(exe_name) = process

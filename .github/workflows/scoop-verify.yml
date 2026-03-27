@@ -23,7 +23,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout bucket (for reference)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ inputs.bucket_repo }}
           ref: ${{ inputs.bucket_branch }}
@@ -75,7 +75,7 @@ jobs:
 
       - name: Cache artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: scoop-logs
           path: |

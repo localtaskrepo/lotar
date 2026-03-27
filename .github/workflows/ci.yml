@@ -25,7 +25,7 @@ jobs:
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -45,7 +45,7 @@ jobs:
         tool: sccache
 
     - name: Cache sccache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
@@ -60,7 +60,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -95,7 +95,7 @@ jobs:
         fi
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: lotar-build-artifacts
         path: ci-artifacts/
@@ -111,7 +111,7 @@ jobs:
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -120,7 +120,7 @@ jobs:
         components: rustfmt, clippy
         
     - name: Rust Cache
-      uses: Swatinem/rust-cache@v2  # Latest version (v2.8.0)
+      uses: Swatinem/rust-cache@v2
       with:
         cache-on-failure: true
         shared-key: ci-${{ runner.os }}
@@ -132,7 +132,7 @@ jobs:
         tool: sccache
 
     - name: Cache sccache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
@@ -161,7 +161,7 @@ jobs:
 
     - name: Upload nextest report
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: nextest-report
         path: target/nextest/junit.xml
@@ -173,7 +173,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Determine Node version
       id: node_version
@@ -183,7 +183,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -200,10 +200,10 @@ jobs:
     needs: [build_artifacts]
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Download build artifacts
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v7
       with:
         name: lotar-build-artifacts
         path: artifact-cache
@@ -233,7 +233,7 @@ jobs:
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ steps.node_version.outputs.version }}
         cache: npm
@@ -264,7 +264,7 @@ jobs:
       RUSTC_WRAPPER: sccache
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -277,7 +277,7 @@ jobs:
         tool: sccache
 
     - name: Cache sccache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .sccache
         key: sccache-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
@@ -337,13 +337,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
       
     - name: Cache cargo-audit
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.cargo/bin/cargo-audit
         key: cargo-audit-${{ runner.os }}

@@ -691,10 +691,11 @@ struct SyncClient {
 impl SyncClient {
     fn new(auth: AuthContext) -> Self {
         Self {
-            agent: ureq::AgentBuilder::new()
-                .timeout_read(Duration::from_secs(30))
-                .timeout_write(Duration::from_secs(30))
-                .build(),
+            agent: ureq::Agent::config_builder()
+                .timeout_global(Some(Duration::from_secs(30)))
+                .http_status_as_error(false)
+                .build()
+                .into(),
             auth,
         }
     }
@@ -1809,51 +1810,57 @@ fn strip_trailing_slash(raw: &str) -> String {
     raw.trim_end_matches('/').to_string()
 }
 
-fn request_with_headers(client: &SyncClient, req: ureq::Request) -> ureq::Request {
-    let mut req = req.set("Accept", "application/json");
-    req = req.set("Content-Type", "application/json");
-    req = req.set("User-Agent", &client.auth.user_agent);
+fn request_with_headers<B>(
+    client: &SyncClient,
+    req: ureq::RequestBuilder<B>,
+) -> ureq::RequestBuilder<B> {
+    let mut req = req.header("Accept", "application/json");
+    req = req.header("Content-Type", "application/json");
+    req = req.header("User-Agent", &client.auth.user_agent);
     if client.auth.provider == SyncProvider::Github {
-        req = req.set("Accept", "application/vnd.github+json");
-        req = req.set("X-GitHub-Api-Version", "2022-11-28");
+        req = req.header("Accept", "application/vnd.github+json");
+        req = req.header("X-GitHub-Api-Version", "2022-11-28");
     }
     if let Some(auth) = client.auth.auth_header.as_ref() {
-        req = req.set("Authorization", auth);
+        req = req.header("Authorization", auth);
     }
     req
 }
 
 fn send_json_request(
     client: &SyncClient,
-    req: ureq::Request,
+    req: ureq::RequestBuilder<ureq::typestate::WithBody>,
     body: Option<JsonValue>,
 ) -> LoTaRResult<JsonValue> {
-    let response = match body {
-        Some(payload) => request_with_headers(client, req).send_json(payload),
-        None => request_with_headers(client, req).call(),
-    };
-
-    match response {
-        Ok(resp) => parse_json_response(resp),
-        Err(ureq::Error::Status(code, resp)) => {
-            let payload = resp.into_string().unwrap_or_default();
-            let message = payload.trim();
-            let detail = if message.is_empty() {
-                format!("Remote API error (HTTP {})", code)
-            } else {
-                format!("Remote API error (HTTP {}): {}", code, message)
-            };
-            Err(LoTaRError::ValidationError(detail))
-        }
-        Err(err) => Err(LoTaRError::ValidationError(format!(
-            "Remote API request failed: {}",
-            err
-        ))),
+    let req = request_with_headers(client, req);
+    let mut resp = match body {
+        Some(payload) => req.send_json(payload),
+        None => req.send_empty(),
     }
+    .map_err(|e| LoTaRError::ValidationError(format!("Remote API request failed: {}", e)))?;
+
+    let code = resp.status().as_u16();
+    if code >= 400 {
+        let payload = resp
+            .body_mut()
+            .read_to_string()
+            .unwrap_or_else(|_| String::new());
+        let message = payload.trim();
+        let detail = if message.is_empty() {
+            format!("Remote API error (HTTP {})", code)
+        } else {
+            format!("Remote API error (HTTP {}): {}", code, message)
+        };
+        return Err(LoTaRError::ValidationError(detail));
+    }
+
+    parse_json_response(resp.body_mut())
 }
 
-fn parse_json_response(resp: ureq::Response) -> LoTaRResult<JsonValue> {
-    let payload = resp.into_string().unwrap_or_default();
+fn parse_json_response(body: &mut ureq::Body) -> LoTaRResult<JsonValue> {
+    let payload = body.read_to_string().map_err(|e| {
+        LoTaRError::SerializationError(format!("Failed to read response body: {}", e))
+    })?;
     if payload.trim().is_empty() {
         return Ok(JsonValue::Null);
     }
@@ -1896,14 +1903,15 @@ fn jira_validate_query(client: &SyncClient, jql: &str) -> LoTaRResult<()> {
         .query("jql", jql)
         .query("startAt", "0")
         .query("maxResults", "1")
-        .query("fields", "summary");
+        .query("fields", "summary")
+        .force_send_body();
     let _ = send_json_request(client, req, None)?;
     Ok(())
 }
 
 fn jira_fetch_project(client: &SyncClient, key: &str) -> LoTaRResult<JsonValue> {
     let url = format!("{}/rest/api/3/project/{}", client.auth.api_base, key);
-    let req = client.agent.get(&url);
+    let req = client.agent.get(&url).force_send_body();
     send_json_request(client, req, None)
 }
 
@@ -1922,12 +1930,13 @@ fn jira_search_issues(
             .agent
             .get(&url)
             .query("jql", &jql)
-            .query("startAt", &start_at.to_string())
-            .query("maxResults", &max_results.to_string())
+            .query("startAt", start_at.to_string())
+            .query("maxResults", max_results.to_string())
             .query(
                 "fields",
                 "summary,description,status,issuetype,priority,assignee,reporter,labels",
-            );
+            )
+            .force_send_body();
         let payload = send_json_request(client, req, None)?;
         let total = payload.get("total").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
         let batch = payload
@@ -1951,9 +1960,9 @@ fn jira_fetch_issue(client: &SyncClient, key: &str, fields: &[String]) -> LoTaRR
     let url = format!("{}/rest/api/3/issue/{}", client.auth.api_base, key);
     let mut req = client.agent.get(&url);
     if !fields.is_empty() {
-        req = req.query("fields", &fields.join(","));
+        req = req.query("fields", fields.join(","));
     }
-    send_json_request(client, req, None)
+    send_json_request(client, req.force_send_body(), None)
 }
 
 fn jira_create_issue(
@@ -1998,7 +2007,7 @@ fn jira_transition_issue(client: &SyncClient, key: &str, status: &str) -> LoTaRR
         "{}/rest/api/3/issue/{}/transitions",
         client.auth.api_base, key
     );
-    let req = client.agent.get(&url);
+    let req = client.agent.get(&url).force_send_body();
     let payload = send_json_request(client, req, None)?;
     let transitions = payload
         .get("transitions")
@@ -2060,7 +2069,8 @@ fn github_list_issues(
             .get(&url)
             .query("state", "all")
             .query("per_page", "100")
-            .query("page", &page.to_string());
+            .query("page", page.to_string())
+            .force_send_body();
         let payload = send_json_request(client, req, None)?;
         let batch = payload.as_array().cloned().unwrap_or_default();
         if batch.is_empty() {
@@ -2086,7 +2096,7 @@ fn github_fetch_repo(client: &SyncClient, repo: &str) -> LoTaRResult<JsonValue> 
         client.auth.api_base,
         normalize_github_repo(repo)
     );
-    let req = client.agent.get(&url);
+    let req = client.agent.get(&url).force_send_body();
     send_json_request(client, req, None)
 }
 
@@ -2120,7 +2130,8 @@ fn github_validate_search(
         .get(&url)
         .query("q", &query)
         .query("per_page", "1")
-        .query("page", "1");
+        .query("page", "1")
+        .force_send_body();
     let _ = send_json_request(client, req, None)?;
     Ok(())
 }
@@ -2143,7 +2154,8 @@ fn github_search_issues(
             .get(&url)
             .query("q", &query)
             .query("per_page", "100")
-            .query("page", &page.to_string());
+            .query("page", page.to_string())
+            .force_send_body();
         let payload = send_json_request(client, req, None)?;
         let batch = payload
             .get("items")
@@ -2233,7 +2245,7 @@ fn github_fetch_issue(client: &SyncClient, repo: &str, number: u64) -> LoTaRResu
         normalize_github_repo(repo),
         number
     );
-    let req = client.agent.get(&url);
+    let req = client.agent.get(&url).force_send_body();
     send_json_request(client, req, None)
 }
 
@@ -3484,7 +3496,8 @@ fn jira_search_account_id(client: &SyncClient, query: &str) -> LoTaRResult<Optio
         .agent
         .get(&url)
         .query("query", query)
-        .query("maxResults", "1");
+        .query("maxResults", "1")
+        .force_send_body();
     let payload = send_json_request(client, req, None)?;
     let entries = payload.as_array().cloned().unwrap_or_default();
     Ok(entries
@@ -3581,7 +3594,11 @@ fn ensure_jira_issue_types(
 fn jira_fetch_issue_types(client: &SyncClient, project: &str) -> LoTaRResult<Vec<String>> {
     let project_id = jira_resolve_project_id(client, project)?;
     let url = format!("{}/rest/api/3/issuetype/project", client.auth.api_base);
-    let req = client.agent.get(&url).query("projectId", &project_id);
+    let req = client
+        .agent
+        .get(&url)
+        .query("projectId", &project_id)
+        .force_send_body();
     let payload = send_json_request(client, req, None)?;
     let entries = payload.as_array().cloned().unwrap_or_default();
     let mut types: Vec<String> = entries
@@ -3608,7 +3625,7 @@ fn jira_resolve_project_id(client: &SyncClient, project: &str) -> LoTaRResult<St
         ));
     }
     let url = format!("{}/rest/api/3/project/{}", client.auth.api_base, trimmed);
-    let req = client.agent.get(&url);
+    let req = client.agent.get(&url).force_send_body();
     let payload = send_json_request(client, req, None)?;
     payload
         .get("id")
