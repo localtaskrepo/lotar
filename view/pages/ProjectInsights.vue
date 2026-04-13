@@ -275,8 +275,9 @@ import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useActivity } from '../composables/useActivity'
 import { useProjects } from '../composables/useProjects'
-import { useTasks } from '../composables/useTasks'
+import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
+import { formatMember } from '../utils/member'
 import { formatProjectLabel } from '../utils/projectLabels'
 
 defineOptions({ name: 'ProjectInsights' })
@@ -285,7 +286,8 @@ const router = useRouter()
 const route = useRoute()
 
 const { projects, refresh: refreshProjects } = useProjects()
-const { items: tasks, refresh: refreshTasks, loading: tasksLoading } = useTasks()
+const store = useTaskStore()
+const tasksLoading = computed(() => store.status.value === 'loading')
 
 const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
 const hasSingleProject = computed(() => !!singleProject.value)
@@ -307,7 +309,7 @@ const refreshing = ref(false)
 const lastUpdated = ref<Date | null>(null)
 const mounted = ref(false)
 
-const tasksBase = computed<TaskDTO[]>(() => tasks.value ?? [])
+const tasksBase = computed<TaskDTO[]>(() => store.items.value ?? [])
 const tagFilters = computed<string[]>(() => parseTagInput(tagFilterInput.value))
 const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map(tag => normaliseTag(tag)))
 
@@ -451,7 +453,7 @@ const noDueDateTasks = computed(() => filteredTasks.value.filter(t => !t.due_dat
 const statusBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => normaliseLabel(t.status), t => t.status || ''))
 const priorityBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => normaliseLabel(t.priority), t => t.priority || ''))
 const typeBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => normaliseLabel(t.task_type), t => t.task_type || ''))
-const assigneeBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => (t.assignee ? formatAssignee(t.assignee) : 'Unassigned'), t => t.assignee || ''))
+const assigneeBreakdown = computed(() => buildBreakdown(filteredTasks.value, t => (t.assignee ? formatMember(t.assignee) : 'Unassigned'), t => t.assignee || ''))
 
 const statusPieData = computed(() => statusBreakdown.value.map(item => ({ label: item.label, value: item.count, raw: item.raw })))
 
@@ -702,11 +704,6 @@ function normaliseLabel(value?: string | null) {
   return value.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-function formatAssignee(value: string) {
-  const trimmed = value.startsWith('@') ? value : `@${value}`
-  return trimmed
-}
-
 function isoDay(date: Date) {
   return date.toISOString().slice(0, 10)
 }
@@ -780,7 +777,7 @@ async function refreshData() {
   const filter: Record<string, string> = {}
   if (selectedProject.value) filter.project = selectedProject.value
   try {
-    await refreshTasks(filter)
+    await store.hydrateAll(filter, { clear: true })
     await loadSelectedProjectStats()
     if (!selectedProject.value) await ensureProjectStatsMap()
     await refreshActivityFeedWindow()

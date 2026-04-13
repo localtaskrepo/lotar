@@ -1772,7 +1772,7 @@ fn agent_assignee_does_not_leak_into_members() {
     enable_server_mode();
     let fixtures = TestFixtures::new();
 
-    fixtures.create_config_in_dir(&fixtures.tasks_root, "auto:\n  populate_members: true\n");
+    fixtures.create_config_in_dir(&fixtures.tasks_root, "auto:\n  populate_members: true\nagents:\n  implement:\n    runner: claude\n    command: echo\n");
 
     let mut storage = fixtures.create_storage();
     let created = TaskService::create(

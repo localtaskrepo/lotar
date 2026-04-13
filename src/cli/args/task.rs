@@ -149,11 +149,11 @@ pub struct AddArgs {
     #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
-    /// Reporter (email or @username)
+    /// Reporter (username, email, or @directive like @me)
     #[arg(long, short = 'R')]
     pub reporter: Option<String>,
 
-    /// Assignee (email or @username)
+    /// Assignee (username, email, or @directive like @me)
     #[arg(long, short = 'a', alias = "assign")]
     pub assignee: Option<String>,
 
@@ -413,11 +413,11 @@ pub struct TaskAddArgs {
     #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
-    /// Reporter (email or @username)
+    /// Reporter (username, email, or @directive like @me)
     #[arg(long, short = 'R')]
     pub reporter: Option<String>,
 
-    /// Assignee (email or @username)
+    /// Assignee (username, email, or @directive like @me)
     #[arg(long, short = 'a', alias = "assign")]
     pub assignee: Option<String>,
 

@@ -13,8 +13,8 @@ const projectsStore = {
 
 const tasksStore = {
     items: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
-    loading: ref(false),
+    hydrateAll: vi.fn(async () => { }),
+    status: ref('idle' as string),
 }
 
 const sprintsStore = {
@@ -68,8 +68,8 @@ vi.mock('../composables/useProjects', () => ({
     useProjects: () => projectsStore,
 }))
 
-vi.mock('../composables/useTasks', () => ({
-    useTasks: () => tasksStore,
+vi.mock('../composables/useTaskStore', () => ({
+    useTaskStore: () => tasksStore,
 }))
 
 vi.mock('../composables/useSprints', () => ({
@@ -113,8 +113,8 @@ describe('Calendar sprint overlay', () => {
         routeState.query = { month: '2024-02', sprints: '1' }
         projectsStore.projects.value = [{ prefix: 'ACME', name: 'Acme Co' }]
         tasksStore.items.value = []
-        tasksStore.loading.value = false
-        tasksStore.refresh.mockClear()
+        tasksStore.status.value = 'idle'
+        tasksStore.hydrateAll.mockClear()
         projectsStore.refresh.mockClear()
         sprintsStore.refresh.mockClear()
         routerPushMock.mockClear()
@@ -248,7 +248,7 @@ describe('Calendar task hover cards', () => {
         await more.trigger('click')
         await flushPromises()
 
-        const overlay = document.querySelector('.calendar-day-dialog__overlay') as HTMLElement | null
+        const overlay = document.querySelector('.ui-modal__overlay') as HTMLElement | null
         expect(overlay).not.toBeNull()
         if (!overlay) return
 
@@ -259,7 +259,7 @@ describe('Calendar task hover cards', () => {
         await flushPromises()
 
         expect(openTaskPanelMock).toHaveBeenCalled()
-        expect(document.querySelector('.calendar-day-dialog__overlay')).toBeNull()
+        expect(document.querySelector('.ui-modal__overlay')).toBeNull()
     })
 
     it('wraps due tasks in hover cards and keeps click-to-open behavior', async () => {

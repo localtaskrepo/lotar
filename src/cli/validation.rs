@@ -13,6 +13,10 @@ impl<'a> CliValidator<'a> {
         Self { config }
     }
 
+    pub fn config(&self) -> &ResolvedConfig {
+        self.config
+    }
+
     /// Validate status against project configuration (case-insensitive, returns canonical form)
     pub fn validate_status(&self, status: &str) -> Result<TaskStatus, String> {
         TaskStatus::parse_with_config(status, self.config)
@@ -251,44 +255,54 @@ impl<'a> CliValidator<'a> {
         raw_value: &str,
         allow_unknown: bool,
     ) -> Result<String, String> {
-        let normalized = raw_value.trim();
+        use crate::utils::member::{
+            is_builtin_directive, is_email_like, is_valid_username, normalize_member_value,
+        };
 
-        if normalized.is_empty() {
+        let trimmed = raw_value.trim();
+
+        if trimmed.is_empty() {
             return Err(format!("{} cannot be empty or whitespace", field_label));
         }
 
-        if normalized == "@me" {
-            return Ok(normalized.to_string());
+        // Built-in directives (@me) are returned as-is.
+        if is_builtin_directive(trimmed) {
+            return Ok(trimmed.to_string());
         }
 
-        if let Some(username) = normalized.strip_prefix('@') {
-            if username.is_empty()
-                || !username
-                    .chars()
-                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-            {
-                return Err("Invalid username format. Usernames can only contain letters, numbers, underscore, and dash.".to_string());
+        // @-prefixed: validate the name portion, then normalize.
+        if let Some(username) = trimmed.strip_prefix('@') {
+            if username.is_empty() || !is_valid_username(username) {
+                return Err("Invalid username format. Usernames can only contain letters, numbers, underscore, dash, and period.".to_string());
             }
+            // Normalize: strip @ for non-directive / non-agent values.
+            let result = normalize_member_value(trimmed, |name| {
+                self.config.agent_profiles.contains_key(name)
+            });
             if !allow_unknown {
-                self.enforce_member_for_value(field_label, normalized)?;
+                self.enforce_member_for_value(field_label, &result)?;
             }
-            return Ok(normalized.to_string());
+            return Ok(result);
         }
 
-        if normalized.contains('@')
-            && normalized.matches('@').count() == 1
-            && normalized.contains('.')
-            && !normalized.starts_with('@')
-            && !normalized.ends_with('@')
-        {
+        // Email addresses pass through unchanged.
+        if is_email_like(trimmed) {
             if !allow_unknown {
-                self.enforce_member_for_value(field_label, normalized)?;
+                self.enforce_member_for_value(field_label, trimmed)?;
             }
-            return Ok(normalized.to_string());
+            return Ok(trimmed.to_string());
+        }
+
+        // Bare usernames (no @ prefix, no email @).
+        if is_valid_username(trimmed) {
+            if !allow_unknown {
+                self.enforce_member_for_value(field_label, trimmed)?;
+            }
+            return Ok(trimmed.to_string());
         }
 
         Err(format!(
-            "{} must be an email address or username starting with @",
+            "{} must be a username, email address, or @directive",
             field_label
         ))
     }
@@ -308,10 +322,10 @@ impl<'a> CliValidator<'a> {
             return Ok(());
         }
 
-        let normalized = trimmed.to_ascii_lowercase();
+        let norm_val = crate::utils::member::member_for_comparison(trimmed);
         let permitted = allowed
             .iter()
-            .any(|candidate| candidate.to_ascii_lowercase() == normalized);
+            .any(|candidate| crate::utils::member::member_for_comparison(candidate) == norm_val);
 
         if permitted {
             return Ok(());

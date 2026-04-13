@@ -57,10 +57,12 @@ describe('TaskTable', () => {
     const titleHeader = headers.find(h => h.text().toLowerCase().includes('title'))!
     const titleButton = titleHeader.find('button.header-button')
     await titleButton.trigger('click') // asc
-    const firstRow = wrapper.findAll('tbody tr')[0]
+    await wrapper.vm.$nextTick()
+    const firstRow = wrapper.findAll('tr').filter(r => r.find('td').exists())[0]
     expect(firstRow.text()).toContain('Alpha')
     await titleButton.trigger('click') // desc
-    const firstRowDesc = wrapper.findAll('tbody tr')[0]
+    await wrapper.vm.$nextTick()
+    const firstRowDesc = wrapper.findAll('tr').filter(r => r.find('td').exists())[0]
     expect(firstRowDesc.text()).toContain('Bravo')
   })
 

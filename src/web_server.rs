@@ -615,43 +615,35 @@ fn start_tasks_watcher() {
             };
             match event.kind {
                 EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
-                    // Derive project(s) from paths by finding the component under ".tasks"
+                    // Derive project(s) from paths relative to the tasks directory root
                     if let Some(paths) = (!event.paths.is_empty()).then_some(event.paths) {
                         let mut emitted: HashSet<String> = HashSet::new();
                         for p in paths {
-                            // Walk ancestors to locate the ".tasks" directory and take the next component as project
                             let mut proj: Option<String> = None;
                             let mut task_id: Option<String> = None;
-                            for anc in p.ancestors() {
-                                if let Some(name) = anc.file_name().and_then(|s| s.to_str())
-                                    && name == ".tasks"
+
+                            // Strip the tasks directory prefix to get the relative path
+                            // e.g. /path/to/.tasks/PROJECT/NUM.yml → PROJECT/NUM.yml
+                            if let Ok(relative) = p.strip_prefix(&tasks_dir) {
+                                let mut components = relative.components();
+                                if let Some(std::path::Component::Normal(project_os)) =
+                                    components.next()
+                                    && let Some(project) = project_os.to_str()
                                 {
-                                    // The path immediately under .tasks is the project directory
-                                    if let Some(project) = p
-                                        .strip_prefix(anc)
-                                        .ok()
-                                        .and_then(|rest| rest.components().next())
-                                        .and_then(|c| match c {
-                                            std::path::Component::Normal(os) => os.to_str(),
-                                            _ => None,
-                                        })
+                                    proj = Some(project.to_string());
+                                    // Detect task file changes: <PROJECT>/<NUM>.yml
+                                    if let Some(file) = p.file_name().and_then(|s| s.to_str())
+                                        && file.ends_with(".yml")
                                     {
-                                        proj = Some(project.to_string());
-                                        // Detect task file changes: .tasks/<PROJECT>/<NUM>.yml
-                                        // Emit task_updated/task_deleted with an id hint so UIs can refresh the single ticket.
-                                        if let Some(file) = p.file_name().and_then(|s| s.to_str())
-                                            && file.ends_with(".yml")
-                                        {
-                                            let stem = file.trim_end_matches(".yml");
-                                            if stem.chars().all(|c| c.is_ascii_digit()) {
-                                                task_id = Some(format!("{}-{}", project, stem));
-                                            }
+                                        let stem = file.trim_end_matches(".yml");
+                                        if stem.chars().all(|c| c.is_ascii_digit()) {
+                                            task_id = Some(format!("{}-{}", project, stem));
                                         }
                                     }
-                                    break;
                                 }
                             }
                             if let Some(task_id) = task_id.clone() {
+                                crate::utils::query_cache::invalidate_all();
                                 match event.kind {
                                     EventKind::Remove(_) => {
                                         crate::api_events::emit(crate::api_events::ApiEvent {
@@ -659,10 +651,48 @@ fn start_tasks_watcher() {
                                             data: serde_json::json!({ "id": task_id }),
                                         })
                                     }
-                                    _ => crate::api_events::emit(crate::api_events::ApiEvent {
-                                        kind: "task_updated".to_string(),
-                                        data: serde_json::json!({ "id": task_id }),
-                                    }),
+                                    _ => {
+                                        // Try to load the task to check for parse errors
+                                        if let Ok(resolver) =
+                                            crate::workspace::TasksDirectoryResolver::resolve(
+                                                None, None,
+                                            )
+                                        {
+                                            let storage = crate::storage::manager::Storage::new(
+                                                resolver.path,
+                                            );
+                                            match crate::services::task_service::TaskService::get(
+                                                &storage, &task_id, None,
+                                            ) {
+                                                Ok(_) => {
+                                                    crate::api_events::emit(
+                                                        crate::api_events::ApiEvent {
+                                                            kind: "task_updated".to_string(),
+                                                            data: serde_json::json!({ "id": task_id }),
+                                                        },
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    // Emit both: task_error for the notification, task_updated so UIs can try to refresh
+                                                    crate::api_events::emit_task_error(
+                                                        &task_id,
+                                                        &e.to_string(),
+                                                    );
+                                                    crate::api_events::emit(
+                                                        crate::api_events::ApiEvent {
+                                                            kind: "task_updated".to_string(),
+                                                            data: serde_json::json!({ "id": task_id }),
+                                                        },
+                                                    );
+                                                }
+                                            }
+                                        } else {
+                                            crate::api_events::emit(crate::api_events::ApiEvent {
+                                                kind: "task_updated".to_string(),
+                                                data: serde_json::json!({ "id": task_id }),
+                                            });
+                                        }
+                                    }
                                 }
                             }
 

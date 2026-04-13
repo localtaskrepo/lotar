@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
-import { withPage } from '../helpers/ui.js';
+import { html5DragAndDrop, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 describe.concurrent('UI sprints smoke scenarios', () => {
@@ -65,7 +65,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     await page.waitForSelector(sourceSelector, { timeout: 15_000 });
                     await page.waitForSelector(targetSelector, { timeout: 15_000 });
 
-                    await page.dragAndDrop(sourceSelector, targetSelector);
+                    await html5DragAndDrop(page, sourceSelector, targetSelector);
 
                     await page.waitForSelector('[data-sprint-id="2"] tr.task-row[data-task-id="' + task.id + '"]', {
                         timeout: 10_000,
@@ -117,7 +117,8 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     expect(before.includes('priority')).toBe(true);
                     expect(before.indexOf('priority')).toBeGreaterThan(before.indexOf('status'));
 
-                    await page.dragAndDrop(
+                    await html5DragAndDrop(
+                        page,
                         '[data-sprint-id="1"] th[data-column="priority"] button.header-button',
                         '[data-sprint-id="1"] th[data-column="status"] button.header-button',
                     );
@@ -165,7 +166,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     await page.keyboard.down(modifierKey);
 
                     try {
-                        await page.dragAndDrop(sourceSelector, targetSelector);
+                        await html5DragAndDrop(page, sourceSelector, targetSelector, { altKey: true });
                     } finally {
                         await page.keyboard.up(modifierKey);
                     }
@@ -264,10 +265,10 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                     await page.waitForSelector('[data-sprint-id="1"]', { timeout: 15_000 });
 
                     await page.click('[data-sprint-id="1"] button[data-testid="sprint-delete"]');
-                    await page.waitForSelector('.sprint-delete__overlay', { timeout: 10_000 });
+                    await page.waitForSelector('.ui-modal__overlay', { timeout: 10_000 });
                     await page.click('.sprint-delete__actions .btn.danger');
 
-                    await page.waitForSelector('.sprint-delete__overlay', {
+                    await page.waitForSelector('.ui-modal__overlay', {
                         state: 'detached',
                         timeout: 15_000,
                     });

@@ -575,12 +575,16 @@ pub fn initialize(api_server: &mut ApiServer) {
             if a == "__none__" {
                 wants_unassigned = true;
             } else {
-                let v = if a == "@me" {
+                let resolved = if a == "@me" {
                     crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
                         .unwrap_or_else(|| a.clone())
                 } else {
                     a.clone()
                 };
+                // Normalize: strip @ prefix from regular names for consistent matching.
+                let v = crate::utils::member::normalize_member_value(&resolved, |name| {
+                    cfg.agent_profiles.contains_key(name)
+                });
                 uf.entry("assignee".into()).or_default().insert(v);
             }
         }
@@ -605,6 +609,11 @@ pub fn initialize(api_server: &mut ApiServer) {
             }
         }
 
+        let qc_key = crate::utils::query_cache::cache_key(&req.query);
+        let tasks = if let Some(cached) = crate::utils::query_cache::get(qc_key) {
+            cached
+        } else {
+
         let tasks = TaskService::list(&storage, &filter);
 
         // Apply in-memory filters if any
@@ -619,8 +628,14 @@ pub fn initialize(api_server: &mut ApiServer) {
                 let k = raw.to_lowercase();
                 if let Some(canon) = crate::utils::fields::is_reserved_field(raw) {
                     match canon {
-                        "assignee" => return Some(vec![t.assignee.clone().unwrap_or_default()]),
-                        "reporter" => return Some(vec![t.reporter.clone().unwrap_or_default()]),
+                        "assignee" => {
+                            let v = t.assignee.as_deref().unwrap_or("");
+                            return Some(vec![v.trim_start_matches('@').to_string()]);
+                        }
+                        "reporter" => {
+                            let v = t.reporter.as_deref().unwrap_or("");
+                            return Some(vec![v.trim_start_matches('@').to_string()]);
+                        }
                         "type" => return Some(vec![t.task_type.to_string()]),
                         "status" => return Some(vec![t.status.to_string()]),
                         "priority" => return Some(vec![t.priority.to_string()]),
@@ -783,6 +798,10 @@ pub fn initialize(api_server: &mut ApiServer) {
                 ida.cmp(idb)
             }
         });
+
+        crate::utils::query_cache::put(qc_key, tasks.clone());
+        tasks
+        }; // end query cache miss block
 
         let total = tasks.len();
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);

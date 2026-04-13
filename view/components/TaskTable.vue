@@ -139,7 +139,7 @@
             <th style="width: 1%; white-space: nowrap;">Actions</th>
           </tr>
         </thead>
-        <tbody>
+        <TransitionGroup name="task-list" tag="tbody">
           <tr v-for="t in sorted" :key="t.id" :class="{ 'is-recent': !!touchesMap[t.id] }" @click="$emit('open', t.id)">
             <td v-if="selectable" @click.stop style="text-align:center;">
               <input type="checkbox" :checked="isSelected(t.id)" @change="toggleOne(t.id, $event)" />
@@ -169,11 +169,11 @@
                 <span>{{ t.task_type }}</span>
               </template>
               <template v-else-if="col === 'reporter'">
-                <span v-if="t.reporter">@{{ t.reporter }}</span>
+                <span v-if="t.reporter">{{ formatMember(t.reporter) }}</span>
                 <span v-else class="muted">—</span>
               </template>
               <template v-else-if="col === 'assignee'">
-                <span v-if="t.assignee">@{{ t.assignee }}</span>
+                <span v-if="t.assignee">{{ formatMember(t.assignee) }}</span>
                 <span v-else class="muted">—</span>
               </template>
               <template v-else-if="col === 'effort'">
@@ -248,8 +248,8 @@
               </div>
             </td>
           </tr>
-          <tr v-if="!loading && (!tasks || tasks.length === 0)"><td :colspan="visibleColumns.length + (selectable ? 2 : 1)" class="muted">No tasks</td></tr>
-        </tbody>
+          <tr v-if="!loading && (!tasks || tasks.length === 0)" key="__empty__"><td :colspan="visibleColumns.length + (selectable ? 2 : 1)" class="muted">No tasks</td></tr>
+        </TransitionGroup>
         </table>
       </div>
     </UiCard>
@@ -260,6 +260,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
+import { formatMember } from '../utils/member';
 import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
 import UiCard from './UiCard.vue';

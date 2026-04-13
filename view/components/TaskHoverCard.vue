@@ -44,11 +44,11 @@
           </div>
           <div v-if="showAssignee && task.assignee" class="task-hover-card__row">
             <dt>Assignee</dt>
-            <dd>@{{ task.assignee }}</dd>
+            <dd>{{ formatMember(task.assignee) }}</dd>
           </div>
           <div v-if="showReporter && task.reporter" class="task-hover-card__row">
             <dt>Reporter</dt>
-            <dd>@{{ task.reporter }}</dd>
+            <dd>{{ formatMember(task.reporter) }}</dd>
           </div>
           <div v-if="showDueDate && dueInfo" class="task-hover-card__row">
             <dt>Due</dt>
@@ -96,11 +96,11 @@
         </div>
         <div v-if="showAssignee && task.assignee" class="task-hover-card__row">
           <dt>Assignee</dt>
-          <dd>@{{ task.assignee }}</dd>
+          <dd>{{ formatMember(task.assignee) }}</dd>
         </div>
         <div v-if="showReporter && task.reporter" class="task-hover-card__row">
           <dt>Reporter</dt>
-          <dd>@{{ task.reporter }}</dd>
+          <dd>{{ formatMember(task.reporter) }}</dd>
         </div>
         <div v-if="showDueDate && dueInfo" class="task-hover-card__row">
           <dt>Due</dt>
@@ -129,6 +129,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import type { TaskDTO } from '../api/types';
 import { parseTaskDate, startOfLocalDay } from '../utils/date';
+import { formatMember } from '../utils/member';
 
 const props = withDefaults(defineProps<{
   task: TaskDTO

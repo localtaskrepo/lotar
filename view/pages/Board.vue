@@ -81,7 +81,7 @@
         :priorities="priorities"
         :value="filter"
         :custom-presets="customFilterPresets"
-        @update:value="onChipsUpdate"
+        @update:value="boardOnChipsUpdate"
         @preset="handleCustomPreset"
       />
       <div class="row board-filter-row">
@@ -95,7 +95,7 @@
           :show-status="false"
           emit-project-key
           storage-key="lotar.boards.filter"
-          @update:value="onFilterUpdate"
+          @update:value="boardOnFilterUpdate"
         />
 
         <details ref="fieldsEditorRef" class="board-fields" @toggle="handleFieldsToggle">
@@ -142,7 +142,7 @@
             <template v-else>{{ countOf(st) }}</template>
           </span>
         </div>
-        <div class="col-cards">
+        <TransitionGroup name="task-list" tag="div" class="col-cards">
           <article v-for="t in (grouped[st] || [])" :key="t.id" class="card task"
                    draggable="true"
                    @dragstart="onDragStart(t)"
@@ -166,8 +166,8 @@
                 <span v-if="isBoardFieldVisible('status') && (t.status || '').trim()" class="muted">{{ t.status }}</span>
                 <span v-if="isBoardFieldVisible('task_type') && (t.task_type || '').trim()" class="muted">{{ t.task_type }}</span>
                 <span v-if="isBoardFieldVisible('effort') && (t.effort || '').trim()" class="muted">{{ t.effort }}</span>
-                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by @{{ t.reporter }}</span>
-                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
+                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by {{ formatMember(t.reporter) }}</span>
+                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">{{ formatMember(t.assignee) }}</span>
                 <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
                 <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(t)" class="muted">{{ taskModifiedInfo(t) }}</span>
                 <span v-if="isBoardFieldVisible('tags')" v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
@@ -185,15 +185,15 @@
               </div>
             </footer>
           </article>
-          <div v-if="!(grouped[st] && grouped[st].length)" class="muted" style="padding: 8px;">No tasks</div>
-        </div>
+          <div v-if="!(grouped[st] && grouped[st].length)" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
+        </TransitionGroup>
       </div>
       <div v-if="other.length" class="col column" data-status="__other__">
         <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
           <strong>Other</strong>
           <span class="muted">{{ other.length }}</span>
         </div>
-        <div class="col-cards">
+        <TransitionGroup name="task-list" tag="div" class="col-cards">
           <article v-for="t in other" :key="t.id" class="card task"
                    draggable="true"
                    @dragstart="onDragStart(t)"
@@ -216,8 +216,8 @@
                 <span v-if="isBoardFieldVisible('status') && (t.status || '').trim()" class="muted">{{ t.status }}</span>
                 <span v-if="isBoardFieldVisible('task_type') && (t.task_type || '').trim()" class="muted">{{ t.task_type }}</span>
                 <span v-if="isBoardFieldVisible('effort') && (t.effort || '').trim()" class="muted">{{ t.effort }}</span>
-                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by @{{ t.reporter }}</span>
-                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">@{{ t.assignee }}</span>
+                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by {{ formatMember(t.reporter) }}</span>
+                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">{{ formatMember(t.assignee) }}</span>
                 <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
                 <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(t)" class="muted">{{ taskModifiedInfo(t) }}</span>
                 <span v-if="isBoardFieldVisible('tags')" v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
@@ -235,7 +235,7 @@
               </div>
             </footer>
           </article>
-        </div>
+        </TransitionGroup>
       </div>
     </div>
   </section>
@@ -245,7 +245,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type { TaskDTO, TaskListFilter } from '../api/types'
+import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -255,11 +255,15 @@ import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useConfig } from '../composables/useConfig'
+import { useFieldVisibility } from '../composables/useFieldVisibility'
+import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
+import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTasks } from '../composables/useTasks'
+import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
+import { formatMember } from '../utils/member'
 import { findLastStatusChangeAt } from '../utils/taskHistory'
 
 const router = useRouter()
@@ -267,7 +271,9 @@ const route = useRoute()
 const { projects, refresh: refreshProjects } = useProjects()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
-const { items, refresh, loading: loadingTasks } = useTasks()
+const store = useTaskStore()
+const loadingTasks = computed(() => store.status.value === 'loading')
+const items = computed(() => store.items.value)
 const { openTaskPanel } = useTaskPanelController()
 
 const project = ref<string>('')
@@ -281,50 +287,12 @@ const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
 }))
-const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
-const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
-const customFilterPresets = computed(() => {
-  const names = (availableCustomFields.value || []).filter((name) => name !== '*')
-  return names.slice(0, 6).map((name) => ({
-    label: name,
-    expression: `field:${name}=`,
-  }))
-})
+const { hasFilters, sanitizeFilterInput, onFilterUpdate, onChipsUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
+const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
-const sprintLookup = computed<Record<number, { label: string; state?: string }>>(() => {
-  const lookup: Record<number, { label: string; state?: string }> = {}
-  for (const sprint of sprints.value) {
-    const base = sprint.display_name || sprint.label || `Sprint ${sprint.id}`
-    lookup[sprint.id] = {
-      label: `#${sprint.id} ${base}`.trim(),
-      state: sprint.state,
-    }
-  }
-  return lookup
-})
+const { sprintLookup, sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
-
-function sprintLabel(id: number) {
-  const entry = sprintLookup.value[id]
-  const raw = (entry?.label || `#${id}`).trim()
-  const firstSpace = raw.indexOf(' ')
-  if (firstSpace === -1) return raw
-  const head = raw.slice(0, firstSpace)
-  const tail = raw.slice(firstSpace + 1).trim()
-  if (!tail) return head
-  return `${head} ${tail}`
-}
-
-function sprintStateClass(id: number) {
-  const state = sprintLookup.value[id]?.state?.toLowerCase()
-  if (!state) return 'sprint--unknown'
-  return `sprint--${state}`
-}
-
-function sprintTooltip(id: number) {
-  return sprintLabel(id)
-}
 
 function startOfDay(date: Date) {
   return startOfLocalDay(date)
@@ -448,35 +416,6 @@ function hasTaskIdentity(task: TaskDTO): boolean {
   )
 }
 
-function resolveProjectSelection(requested: string | undefined) {
-  const trimmed = (requested || '').trim()
-  return trimmed
-}
-
-function sanitizeFilterInput(payload: Record<string, string>) {
-  const next: Record<string, string> = {}
-  const hasProjectKey = payload && Object.prototype.hasOwnProperty.call(payload, 'project')
-  if (hasProjectKey) {
-    const nextProject = resolveProjectSelection(payload.project)
-    if (nextProject !== project.value) {
-      project.value = nextProject
-    }
-    syncProjectRoute(nextProject)
-  }
-  Object.entries(payload || {}).forEach(([key, value]) => {
-    if (key === 'project') return
-    if (value === undefined || value === null) return
-    next[key] = value
-  })
-  const prev = filter.value
-  const sameSize = Object.keys(next).length === Object.keys(prev).length
-  if (sameSize) {
-    const unchanged = Object.entries(next).every(([key, value]) => prev[key] === value)
-    if (unchanged) return prev
-  }
-  return next
-}
-
 function syncProjectRoute(nextProject: string) {
   const desired = nextProject || ''
   const current = typeof route.query.project === 'string' ? route.query.project : ''
@@ -484,12 +423,17 @@ function syncProjectRoute(nextProject: string) {
   router.push({ path: '/boards', query: desired ? { project: desired } : {} })
 }
 
-function onFilterUpdate(v: Record<string, string>) {
-  filter.value = sanitizeFilterInput(v)
+// Extend the generic filter sync to also sync the route
+function boardOnFilterUpdate(v: Record<string, string>) {
+  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
+  onFilterUpdate(v)
 }
 
-function onChipsUpdate(v: Record<string, string>) {
-  filter.value = sanitizeFilterInput(v)
+function boardOnChipsUpdate(v: Record<string, string>) {
+  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
+  onChipsUpdate(v)
 }
 
 function handleCustomPreset(expression: string) {
@@ -497,125 +441,17 @@ function handleCustomPreset(expression: string) {
 }
 
 function clearFilters() {
-  filter.value = {}
-  filterBarRef.value?.clear?.()
-}
-
-function listFromCsv(value: string): string[] {
-  return value.split(',').map((entry) => entry.trim()).filter(Boolean)
-}
-
-function normalizeFilter(raw: Record<string, string>) {
-  const normalized: Record<string, string> = {}
-  const extras: Record<string, string> = {}
-  const source = raw || {}
-  for (const [key, value] of Object.entries(source)) {
-    if (!value || key === 'order') continue
-    if (BUILTIN_QUERY_KEYS.has(key)) {
-      normalized[key] = value
-    } else {
-      extras[key] = value
-    }
-  }
-  normalized.order = source.order === 'asc' ? 'asc' : 'desc'
-  return { normalized, extras }
-}
-
-function buildServerFilter(raw: Record<string, string>) {
-  const { normalized, extras } = normalizeFilter(raw)
-  const serverFilter: TaskListFilter = {}
-  if (project.value) serverFilter.project = project.value
-  if (normalized.q) serverFilter.q = normalized.q
-  if (normalized.status) serverFilter.status = listFromCsv(normalized.status)
-  if (normalized.priority) serverFilter.priority = listFromCsv(normalized.priority)
-  if (normalized.type) serverFilter.type = listFromCsv(normalized.type)
-  if (normalized.assignee && normalized.assignee !== '__none__') serverFilter.assignee = normalized.assignee
-  if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
-  Object.assign(serverFilter, extras)
-  return { serverFilter, normalized }
-}
-
-function applySmartFilters(q: Record<string, string>) {
-  const wantsUnassigned = q.assignee === '__none__'
-  const due = q.due || ''
-  const recent = q.recent || ''
-  const needsSet = new Set((q.needs || '').split(',').map((s) => s.trim()).filter(Boolean))
-  const now = new Date()
-  const today = startOfDay(now)
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
-  const soonCutoff = new Date(today.getTime() + 7 * MS_PER_DAY)
-  const recentCutoff = new Date(now.getTime() - 7 * MS_PER_DAY)
-
-  const list = Array.isArray(items.value) ? items.value : []
-  const filtered = list.filter((task) => {
-    if (wantsUnassigned && (task.assignee || '').trim()) {
-      return false
-    }
-
-    if (due) {
-      const dueDate = parseDateLike(task.due_date)
-      if (!dueDate) {
-        return false
-      }
-      const dueTime = startOfDay(dueDate).getTime()
-      const todayStart = today.getTime()
-      const tomorrowStart = tomorrow.getTime()
-      const soonCutoffTime = startOfDay(soonCutoff).getTime()
-      if (due === 'today' && (dueTime < todayStart || dueTime >= tomorrowStart)) {
-        return false
-      }
-      if (due === 'soon' && (dueTime < tomorrowStart || dueTime > soonCutoffTime)) {
-        return false
-      }
-      if (due === 'later' && dueTime <= soonCutoffTime) {
-        return false
-      }
-      if (due === 'overdue' && dueTime >= todayStart) {
-        return false
-      }
-    }
-
-    if (recent === '7d') {
-      const modified = parseDateLike(task.modified)
-      if (!modified || modified.getTime() < recentCutoff.getTime()) {
-        return false
-      }
-    }
-
-    if (needsSet.size) {
-      if (needsSet.has('effort')) {
-        const effort = (task.effort || '').trim()
-        if (effort) {
-          return false
-        }
-      }
-      if (needsSet.has('due')) {
-        if ((task.due_date || '').trim()) {
-          return false
-        }
-      }
-    }
-
-    return true
-  })
-
-  items.value = filtered
+  clearFiltersAction(filterBarRef)
 }
 
 async function refreshBoardTasks(snapshot?: Record<string, string>) {
   if (!project.value) {
-    items.value = []
     return
   }
   const raw = snapshot ?? filter.value
-  const { serverFilter, normalized } = buildServerFilter(raw)
+  const { serverFilter, normalized } = buildServerFilter(raw, project.value)
   try {
-    await refresh(serverFilter)
-    applySmartFilters(normalized)
-    const dir = normalized.order === 'asc' ? 'asc' : 'desc'
-    if (Array.isArray(items.value)) {
-      items.value.sort((a, b) => (dir === 'desc' ? b.modified.localeCompare(a.modified) : a.modified.localeCompare(b.modified)))
-    }
+    await store.hydrateAll(serverFilter, { clear: true })
   } catch (err: any) {
     showToast(err?.message || 'Failed to load board tasks')
   }
@@ -671,7 +507,12 @@ const rawGrouped = computed<Record<string, TaskDTO[]>>(() => {
   const lookup = columnLookup.value
   const activeProject = project.value
   for (const { label } of columnsData.value) g[label] = []
-  for (const t of items.value || []) {
+  // Apply smart filters (client-side) before grouping
+  const { normalized } = buildServerFilter(filter.value, activeProject)
+  const filtered = applySmartFilters(items.value || [], normalized)
+  const dir = normalized.order === 'asc' ? 'asc' : 'desc'
+  filtered.sort((a, b) => (dir === 'desc' ? b.modified.localeCompare(a.modified) : a.modified.localeCompare(b.modified)))
+  for (const t of filtered) {
     if (!activeProject || !t.id.startsWith(`${activeProject}-`)) continue
     const key = lookup.get(normalizeStatusKey(t.status))
     if (key) {
@@ -825,10 +666,7 @@ watch(doneFilters, () => {
   saveDoneFilters()
 }, { deep: true })
 
-type BoardFieldKey = 'id' | 'title' | 'status' | 'priority' | 'task_type' | 'reporter' | 'assignee' | 'effort' | 'tags' | 'sprints' | 'due_date' | 'modified'
-type BoardFieldSettings = Record<BoardFieldKey, boolean>
-
-const DEFAULT_BOARD_FIELDS: BoardFieldSettings = {
+const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   id: true,
   title: true,
   status: false,
@@ -843,85 +681,18 @@ const DEFAULT_BOARD_FIELDS: BoardFieldSettings = {
   modified: false,
 }
 
-const boardFields = ref<BoardFieldSettings>({ ...DEFAULT_BOARD_FIELDS })
-
-const boardFieldOptions = computed(() => ([
-  { key: 'id', label: 'ID' },
-  { key: 'title', label: 'Title' },
-  { key: 'status', label: 'Status' },
-  { key: 'priority', label: 'Priority' },
-  { key: 'task_type', label: 'Type' },
-  { key: 'effort', label: 'Effort' },
-  { key: 'reporter', label: 'Reporter' },
-  { key: 'assignee', label: 'Assignee' },
-  { key: 'tags', label: 'Tags' },
-  { key: 'sprints', label: 'Sprints' },
-  { key: 'due_date', label: 'Due' },
-  { key: 'modified', label: 'Updated' },
-] as Array<{ key: BoardFieldKey; label: string }>))
-
-function boardFieldsKey(){ return project.value ? `lotar.boardFields::${project.value}` : 'lotar.boardFields' }
-
-function loadBoardFields() {
-  try {
-    const raw = localStorage.getItem(boardFieldsKey())
-    if (!raw) {
-      boardFields.value = { ...DEFAULT_BOARD_FIELDS }
-      return
-    }
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') {
-      boardFields.value = { ...DEFAULT_BOARD_FIELDS }
-      return
-    }
-    const next: BoardFieldSettings = { ...DEFAULT_BOARD_FIELDS }
-
-    // Migrate old key (kept for compatibility): due -> due_date
-    const legacyDue = (parsed as any).due
-    if (typeof legacyDue === 'boolean' && typeof (parsed as any).due_date !== 'boolean') {
-      next.due_date = legacyDue
-    }
-
-    for (const { key } of boardFieldOptions.value) {
-      const v = (parsed as any)[key]
-      if (typeof v === 'boolean') {
-        next[key] = v
-      }
-    }
-    boardFields.value = next
-  } catch {
-    boardFields.value = { ...DEFAULT_BOARD_FIELDS }
-  }
-}
-
-function saveBoardFields() {
-  try {
-    localStorage.setItem(boardFieldsKey(), JSON.stringify(boardFields.value))
-  } catch {}
-}
-
-function resetBoardFields() {
-  boardFields.value = { ...DEFAULT_BOARD_FIELDS }
-}
+const { fields: boardFields, fieldOptions: boardFieldOptions, load: loadBoardFields, reset: resetBoardFields, isVisible: isBoardFieldVisible, setVisible: setBoardFieldVisible } = useFieldVisibility(
+  'lotar.boardFields',
+  project,
+  DEFAULT_BOARD_FIELDS,
+  availableCustomFields,
+)
 
 function closeBoardFields() {
   if (fieldsEditorRef.value) {
     fieldsEditorRef.value.open = false
   }
 }
-
-function isBoardFieldVisible(key: BoardFieldKey): boolean {
-  return boardFields.value[key] !== false
-}
-
-function setBoardFieldVisible(key: BoardFieldKey, ev: Event) {
-  const checked = Boolean((ev.target as HTMLInputElement | null)?.checked)
-  boardFields.value = { ...boardFields.value, [key]: checked }
-}
-
-watch(boardFields, () => {
-  saveBoardFields()
-}, { deep: true })
 
 function onDragStart(t: any) {
   draggingId.value = t.id
@@ -932,9 +703,11 @@ async function onDrop(targetStatus: string) {
   if (!id || !targetStatus || targetStatus === '__other__') return
   draggingId.value = ''
   try {
-    // Optimistic move
-    const idx = items.value.findIndex(x => x.id === id)
-    if (idx >= 0) (items.value[idx] as any).status = targetStatus
+    // Optimistic move via store
+    const existing = store.items.value.find(t => t.id === id)
+    if (existing) {
+      store.upsert({ ...existing, status: targetStatus })
+    }
     await api.setStatus(id, targetStatus)
     showToast(`Moved ${id} → ${targetStatus}`)
     await refreshBoardTasks()
@@ -962,7 +735,9 @@ watch(filter, (value) => {
   if (filterDebounce) clearTimeout(filterDebounce)
   const snapshot = { ...value }
   filterDebounce = setTimeout(() => {
-    refreshBoardTasks(snapshot).catch(() => {})
+    refreshBoardTasks(snapshot).catch((err) => {
+      console.warn('Failed to refresh board after filter change', err)
+    })
   }, 150)
 }, { deep: true })
 
@@ -1006,7 +781,7 @@ onUnmounted(() => {
 .column.over-limit { border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border)); }
 .col-header { position: sticky; top: 0; background: var(--bg); padding: 8px; border-bottom: 1px solid var(--border); border-top-left-radius: var(--radius-base); border-top-right-radius: var(--radius-base); z-index: var(--z-sticky); }
 .col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
-.col-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.col-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; position: relative; }
 .task { padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-base); cursor: grab; user-select: none; }
 .task:active { cursor: grabbing; }
 .task .id {

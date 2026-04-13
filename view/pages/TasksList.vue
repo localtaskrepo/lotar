@@ -181,16 +181,7 @@
       />
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="assignDialogOpen"
-        class="tasks-modal__overlay"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="assignDialogTitle"
-        @click.self="closeAssignDialog"
-      >
-        <UiCard class="tasks-modal__card">
+    <UiModal :open="assignDialogOpen" :aria-label="assignDialogTitle" @close="closeAssignDialog">
           <form class="col tasks-modal__form" @submit.prevent="submitAssignDialog">
             <header class="row tasks-modal__header">
               <div class="col" style="gap: 4px;">
@@ -229,20 +220,9 @@
               <UiButton variant="ghost" type="button" :disabled="assignDialogSubmitting" @click="closeAssignDialog">Cancel</UiButton>
             </footer>
           </form>
-        </UiCard>
-      </div>
-    </Teleport>
+    </UiModal>
 
-    <Teleport to="body">
-      <div
-        v-if="sprintDialogOpen"
-        class="tasks-modal__overlay"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="sprintDialogTitle"
-        @click.self="closeSprintDialog"
-      >
-        <UiCard class="tasks-modal__card">
+    <UiModal :open="sprintDialogOpen" :aria-label="sprintDialogTitle" @close="closeSprintDialog">
           <form class="col tasks-modal__form" @submit.prevent="submitSprintDialog">
             <header class="row tasks-modal__header">
               <div class="col" style="gap: 4px;">
@@ -285,20 +265,9 @@
               <UiButton variant="ghost" type="button" :disabled="sprintDialogSubmitting" @click="closeSprintDialog">Cancel</UiButton>
             </footer>
           </form>
-        </UiCard>
-      </div>
-    </Teleport>
+    </UiModal>
 
-    <Teleport to="body">
-      <div
-        v-if="deleteDialogOpen"
-        class="tasks-modal__overlay"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="deleteDialogTitle"
-        @click.self="closeDeleteDialog"
-      >
-        <UiCard class="tasks-modal__card">
+    <UiModal :open="deleteDialogOpen" :aria-label="deleteDialogTitle" @close="closeDeleteDialog">
           <div class="col tasks-modal__form">
             <header class="row tasks-modal__header">
               <div class="col" style="gap: 4px;">
@@ -325,9 +294,7 @@
               <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
             </footer>
           </div>
-        </UiCard>
-      </div>
-    </Teleport>
+    </UiModal>
 
   </section>
 </template>
@@ -344,22 +311,25 @@ import SmartListChips from '../components/SmartListChips.vue'
 import TaskTable from '../components/TaskTable.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
-import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiModal from '../components/UiModal.vue'
 import { useActivity } from '../composables/useActivity'
 import { useConfig } from '../composables/useConfig'
+import { useCustomFilterPresets } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
+import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTasks } from '../composables/useTasks'
+import { useTaskStore } from '../composables/useTaskStore'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 
 const router = useRouter()
-const { items, loading, error, refresh, remove, total } = useTasks()
+const store = useTaskStore()
+const loading = computed(() => store.status.value === 'loading')
+const error = computed(() => store.error.value)
 const { openTaskPanel } = useTaskPanelController()
-const tasks = items
 
 const MAX_PAGE_LIMIT = 200
 const pageLimit = ref(readTasksPageSizePreference())
@@ -392,26 +362,10 @@ const route = useRoute()
 const { statuses, priorities, types, refresh: refreshConfig, customFields: availableCustomFields } = useConfig()
 const statusOptions = computed(() => [...(statuses.value || [])])
 const priorityOptions = computed(() => [...(priorities.value || [])])
-const customFilterPresets = computed(() => {
-  const names = (availableCustomFields.value || []).filter((name) => name !== '*')
-  return names.slice(0, 6).map((name) => ({
-    label: name,
-    expression: `field:${name}=`,
-  }))
-})
+const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
-const sprintLookup = computed<Record<number, { label: string; state?: string }>>(() => {
-  const lookup: Record<number, { label: string; state?: string }> = {}
-  for (const sprint of sprints.value) {
-    const base = sprint.display_name || sprint.label || `Sprint ${sprint.id}`
-    lookup[sprint.id] = {
-      label: `#${sprint.id} ${base}`.trim(),
-      state: sprint.state,
-    }
-  }
-  return lookup
-})
+const { sprintLookup } = useSprintFormatting(sprints)
 const sprintSelection = ref('active')
 const allowClosedSprint = ref(false)
 const sprintOptions = computed(() => {
@@ -454,25 +408,43 @@ const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: (
 const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
-const shownTasks = computed(() => tasks.value || [])
+const shownTasks = computed(() => {
+  const all = store.items.value || []
+  const start = pageOffset.value
+  const end = start + pageLimit.value
+  return all.slice(start, end)
+})
 const shownCount = computed(() => shownTasks.value.length)
-const totalCount = computed(() => total.value ?? 0)
+const totalCount = computed(() => store.count.value)
 const pageStart = computed(() => (totalCount.value > 0 ? pageOffset.value + 1 : 0))
-const pageEnd = computed(() => Math.min(pageOffset.value + tasks.value.length, totalCount.value))
+const pageEnd = computed(() => Math.min(pageOffset.value + shownCount.value, totalCount.value))
 const hasPrevPage = computed(() => pageOffset.value > 0)
-const hasNextPage = computed(() => pageOffset.value + tasks.value.length < totalCount.value)
+const hasNextPage = computed(() => pageOffset.value + shownCount.value < totalCount.value)
 const hasTasks = computed(() => shownCount.value > 0)
+
+async function syncPaginationUrl(nav: 'push' | 'replace' = 'push') {
+  const q: Record<string, string> = { ...filter.value }
+  if (pageOffset.value > 0) q.offset = String(pageOffset.value)
+  else delete q.offset
+  suppressRouteSync = true
+  try {
+    if (nav === 'replace') await router.replace({ path: '/', query: q })
+    else await router.push({ path: '/', query: q })
+  } finally {
+    suppressRouteSync = false
+  }
+}
 
 async function prevPage() {
   if (!hasPrevPage.value) return
   pageOffset.value = Math.max(0, pageOffset.value - pageLimit.value)
-  await applyFilter(filter.value)
+  await syncPaginationUrl()
 }
 
 async function nextPage() {
   if (!hasNextPage.value) return
-  pageOffset.value = pageOffset.value + tasks.value.length
-  await applyFilter(filter.value)
+  pageOffset.value = pageOffset.value + pageLimit.value
+  await syncPaginationUrl()
 }
 
 function onFilterUpdate(v: Record<string,string>){ filter.value = v }
@@ -554,15 +526,13 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   if (qnorm.recent) serverFilter.recent = qnorm.recent
   if (qnorm.needs) serverFilter.needs = qnorm.needs
   serverFilter.order = qnorm.order
-  serverFilter.limit = pageLimit.value
-  serverFilter.offset = pageOffset.value
   Object.assign(serverFilter, extraQuery)
 
   if (disposed) return
 
   await refreshConfig(serverFilter.project)
   if (disposed) return
-  await refresh(serverFilter)
+  await store.hydrateAll(serverFilter, { clear: true })
   if (disposed) return
 
   const currentTotal = totalCount.value
@@ -584,17 +554,12 @@ const view = (id: string) => openTask(id)
 
 async function onUpdateTitle(payload: { id: string; title: string }){
   const { id, title } = payload
-  const before = tasks.value.find(t => t.id === id)?.title || ''
   try {
     const updated = await api.updateTask(id, { title })
-    const idx = tasks.value.findIndex(t => t.id === id)
-    if (idx >= 0) tasks.value[idx] = updated
+    store.upsert(updated)
     showToast('Title updated')
   } catch (e: any) {
-    // revert optimistic change if we ever add it
     showToast(e.message || 'Failed to update title')
-    const idx = tasks.value.findIndex(t => t.id === id)
-    if (idx >= 0) tasks.value[idx].title = before
   }
 }
 
@@ -602,8 +567,7 @@ async function onUpdateTags(payload: { id: string; tags: string[] }){
   const { id, tags } = payload
   try {
     const updated = await api.updateTask(id, { tags })
-    const idx = tasks.value.findIndex(t => t.id === id)
-    if (idx >= 0) tasks.value[idx] = updated
+    store.upsert(updated)
     showToast('Tags updated')
   } catch (e: any) {
     showToast(e.message || 'Failed to update tags')
@@ -614,8 +578,7 @@ async function onQuickStatus(payload: { id: string; status: string }){
   const { id, status } = payload
   try {
     const updated = await api.setStatus(id, status)
-    const idx = tasks.value.findIndex(t => t.id === id)
-    if (idx >= 0) tasks.value[idx] = updated
+    store.upsert(updated)
     showToast('Status updated')
   } catch (e: any) {
     showToast(e.message || 'Failed to update status')
@@ -738,8 +701,7 @@ async function applyAssignment(ids: string[], assignee: string) {
   for (const id of unique) {
     try {
       const updated = await api.updateTask(id, { assignee })
-      const idx = tasks.value.findIndex((t) => t.id === id)
-      if (idx >= 0) tasks.value[idx] = updated
+      store.upsert(updated)
       success += 1
     } catch (error) {
       failures.push({ id, error })
@@ -798,8 +760,7 @@ async function unassignTasks(ids: string[]) {
   for (const id of unique) {
     try {
       const updated = await api.updateTask(id, { assignee: '' as any })
-      const idx = tasks.value.findIndex((t) => t.id === id)
-      if (idx >= 0) tasks.value[idx] = updated
+      store.upsert(updated)
       success += 1
     } catch (error) {
       failures.push({ id, error })
@@ -1011,7 +972,7 @@ async function deleteTasks(ids: string[]) {
   let success = 0
   for (const id of unique) {
     try {
-      await remove(id)
+      await store.remove(id)
       success += 1
       selectedIds.value = selectedIds.value.filter((value) => value !== id)
     } catch (error) {
@@ -1228,8 +1189,8 @@ onMounted(() => {
     if (preferredLimit === pageLimit.value) return
     pageLimit.value = preferredLimit
     pageOffset.value = 0
-    applyFilter(filter.value, 'replace').catch((err) => {
-      console.warn('Failed to apply updated tasks page size preference', err)
+    syncPaginationUrl('replace').catch((err) => {
+      console.warn('Failed to sync URL after page size change', err)
     })
   })
 })
@@ -1264,14 +1225,14 @@ const openTask = (id: string) => {
 }
 
 const handleTaskCreated = (task: TaskDTO) => {
-  applyFilter(filter.value, 'none').catch(() => {})
+  store.upsert(task)
+  applyFilter(filter.value, 'none').catch((err) => {
+    console.warn('Failed to refresh after task creation', err)
+  })
 }
 
 const handleTaskUpdated = (task: TaskDTO) => {
-  const idx = tasks.value.findIndex(t => t.id === task.id)
-  if (idx >= 0) {
-    tasks.value[idx] = task
-  }
+  store.upsert(task)
 }
 </script>
 
@@ -1392,23 +1353,6 @@ const handleTaskUpdated = (task: TaskDTO) => {
   margin-left: auto;
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-
-.tasks-modal__overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--color-dialog-overlay);
-  z-index: var(--z-modal);
-}
-
-.tasks-modal__card {
-  width: min(520px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
 }
 
 .tasks-modal__form {

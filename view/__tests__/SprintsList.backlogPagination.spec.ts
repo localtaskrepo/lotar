@@ -6,6 +6,10 @@ const routeState: { query: Record<string, any>; hash: string } = { query: {}, ha
 
 vi.mock('vue-router', () => ({
     useRoute: () => routeState,
+    useRouter: () => ({
+        push: vi.fn(),
+        replace: vi.fn(),
+    }),
 }))
 
 vi.mock('../api/client', () => ({

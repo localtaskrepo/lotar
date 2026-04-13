@@ -31,16 +31,7 @@
       </p>
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="modal.open"
-        class="sprint-modal__overlay"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="modal.mode === 'create' ? 'Create sprint' : 'Edit sprint'"
-        @click.self="closeModal"
-      >
-        <UiCard class="sprint-modal__card">
+    <UiModal :open="modal.open" :aria-label="modal.mode === 'create' ? 'Create sprint' : 'Edit sprint'" size="lg" @close="closeModal">
           <form class="col sprint-modal__form" @submit.prevent="submitModal">
             <header class="row sprint-modal__header">
               <div class="col" style="gap: 4px;">
@@ -121,20 +112,9 @@
               />
             </footer>
           </form>
-        </UiCard>
-      </div>
-    </Teleport>
+    </UiModal>
 
-    <Teleport to="body">
-      <div
-        v-if="deleteDialog.open"
-        class="sprint-modal__overlay sprint-delete__overlay"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="deleteDialogTitle"
-        @click.self="closeDeleteDialog"
-      >
-        <UiCard class="sprint-delete__card">
+    <UiModal :open="deleteDialog.open" :aria-label="deleteDialogTitle" @close="closeDeleteDialog">
           <div class="col sprint-delete__content">
             <header class="row sprint-delete__header">
               <div class="col" style="gap: 4px;">
@@ -166,9 +146,7 @@
               <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
             </footer>
           </div>
-        </UiCard>
-      </div>
-    </Teleport>
+    </UiModal>
 
     <SprintAnalyticsDialog
       :open="analyticsModal.open"
@@ -234,7 +212,8 @@
             :statuses="statuses"
             :priorities="priorities"
             :types="types"
-            :value="filter"
+            :value="filterPayload"
+            emit-project-key
             storage-key="lotar.sprints.filter"
             @update:value="onFilterUpdate"
           />
@@ -599,11 +578,11 @@
                           <span>{{ task.task_type || '—' }}</span>
                         </template>
                         <template v-else-if="col === 'reporter'">
-                          <span v-if="task.reporter">@{{ task.reporter }}</span>
+                          <span v-if="task.reporter">{{ formatMember(task.reporter) }}</span>
                           <span v-else class="muted">—</span>
                         </template>
                         <template v-else-if="col === 'assignee'">
-                          <span v-if="task.assignee">@{{ task.assignee }}</span>
+                          <span v-if="task.assignee">{{ formatMember(task.assignee) }}</span>
                           <span v-else class="muted">—</span>
                         </template>
                         <template v-else-if="col === 'effort'">
@@ -788,11 +767,11 @@
                           <span>{{ task.task_type || '—' }}</span>
                         </template>
                         <template v-else-if="col === 'reporter'">
-                          <span v-if="task.reporter">@{{ task.reporter }}</span>
+                          <span v-if="task.reporter">{{ formatMember(task.reporter) }}</span>
                           <span v-else class="muted">—</span>
                         </template>
                         <template v-else-if="col === 'assignee'">
-                          <span v-if="task.assignee">@{{ task.assignee }}</span>
+                          <span v-if="task.assignee">{{ formatMember(task.assignee) }}</span>
                           <span v-else class="muted">—</span>
                         </template>
                         <template v-else-if="col === 'effort'">
@@ -842,7 +821,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type {
     SprintBurndownResponse,
@@ -861,15 +840,18 @@ import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog.vue'
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
 import { useCopyModifier } from '../composables/useCopyModifier'
+import { useProjectFilterSync } from '../composables/useFilterBuilder'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
+import { formatMember } from '../utils/member'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 
 type ColumnKey =
@@ -1069,6 +1051,7 @@ function loadHighlightPreference(): boolean {
 }
 
 const route = useRoute()
+const router = useRouter()
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, missingSprints, hasMissing: hasMissingSprints } = useSprints()
 const { openTaskPanel } = useTaskPanelController()
@@ -1159,9 +1142,15 @@ const form = reactive({
   skip_defaults: false,
 })
 const filter = ref<Record<string, string>>({})
+const project = ref<string>('')
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
 const statusOptions = computed(() => [...(statuses.value || [])])
 const priorityOptions = computed(() => [...(priorities.value || [])])
+const filterPayload = computed(() => ({
+  ...filter.value,
+  project: project.value || '',
+}))
+const { onFilterUpdate: filterSyncUpdate, onChipsUpdate: chipsSyncUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
 const customFilterPresets = computed(() => {
   const names = (availableCustomFields.value || []).filter((name) => name !== '*')
   return names.slice(0, 6).map((name) => ({
@@ -1170,12 +1159,23 @@ const customFilterPresets = computed(() => {
   }))
 })
 
+function syncProjectRoute(nextProject: string) {
+  const desired = nextProject || ''
+  const current = typeof route.query.project === 'string' ? route.query.project : ''
+  if (current === desired) return
+  router.push({ path: '/sprints', query: desired ? { project: desired } : {} })
+}
+
 function onFilterUpdate(value: Record<string, string>) {
-  filter.value = { ...value }
+  const hasProjectKey = value && Object.prototype.hasOwnProperty.call(value, 'project')
+  if (hasProjectKey) syncProjectRoute((value.project || '').trim())
+  filterSyncUpdate(value)
 }
 
 function onChipsUpdate(value: Record<string, string>) {
-  filter.value = { ...value }
+  const hasProjectKey = value && Object.prototype.hasOwnProperty.call(value, 'project')
+  if (hasProjectKey) syncProjectRoute((value.project || '').trim())
+  chipsSyncUpdate(value)
 }
 
 function handleCustomPreset(expression: string) {
@@ -1900,9 +1900,9 @@ watch(
 )
 
 watch(
-  () => filter.value.project || '',
-  (project) => {
-    refreshConfigDefaults(project || undefined).catch((error) => {
+  () => project.value,
+  (p) => {
+    refreshConfigDefaults(p || undefined).catch((error) => {
       console.warn('Failed to refresh sprint defaults', error)
     })
   },
@@ -2068,8 +2068,7 @@ watch(
 )
 
 function clearFilters() {
-  filter.value = {}
-  filterBarRef.value?.clear?.()
+  clearFiltersAction(filterBarRef)
 }
 
 function toStringValue(value: unknown) {
@@ -2383,6 +2382,7 @@ async function refreshTasks() {
     const payload: Record<string, unknown> = {}
     if (qnorm.q) payload.q = qnorm.q
     if (qnorm.project) payload.project = qnorm.project
+    else if (project.value) payload.project = project.value
     const statusList = parseList(qnorm.status || '')
     if (statusList.length) payload.status = statusList
     const priorityList = parseList(qnorm.priority || '')
@@ -3180,11 +3180,21 @@ onMounted(() => {
     backlogOffset.value = 0
   })
 
+  project.value = route.query.project ? String(route.query.project) : ''
+
   bindCopyModifierListeners()
   void (async () => {
     await refreshAll(true)
     focusBacklogIfRequested()
   })()
+})
+
+watch(() => route.query, async (q) => {
+  const nextProject = (q as any).project ? String((q as any).project) : ''
+  if (nextProject !== project.value) {
+    project.value = nextProject
+    await refreshAll(true)
+  }
 })
 
 onUnmounted(() => {
@@ -3796,25 +3806,6 @@ onUnmounted(() => {
 .btn.small {
   padding: 4px 10px;
   font-size: var(--text-sm, 0.875rem);
-}
-
-.sprint-modal__overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-dialog-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-5, 2rem);
-  z-index: var(--z-modal);
-}
-
-.sprint-modal__card {
-  width: min(720px, 100%);
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: var(--space-5, 2rem);
-  box-shadow: var(--shadow-dialog);
 }
 
 .sprint-modal__form {

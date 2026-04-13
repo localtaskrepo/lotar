@@ -158,6 +158,16 @@ impl TaskService {
                 })
             });
         t.due_date = due_date;
+
+        // Normalize member values: strip @ from non-directive usernames.
+        let is_agent = |name: &str| config.agent_profiles.contains_key(name);
+        t.reporter = t
+            .reporter
+            .map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
+        t.assignee = t
+            .assignee
+            .map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
+
         // Normalize effort on write
         t.effort = effort.map(|e| match crate::utils::effort::parse_effort(&e) {
             Ok(parsed) => parsed.canonical,
@@ -286,7 +296,15 @@ impl TaskService {
                 } else {
                     resolve_me_alias(trimmed, Some(&storage.root_path))
                 };
-                if existing.assignee != next_value {
+                let same = match (&existing.assignee, &next_value) {
+                    (Some(a), Some(b)) => {
+                        crate::utils::member::member_for_comparison(a)
+                            == crate::utils::member::member_for_comparison(b)
+                    }
+                    (None, None) => true,
+                    _ => false,
+                };
+                if !same {
                     return Err(LoTaRError::ValidationError(format!(
                         "Ticket '{}' has an active agent job. Stop/cancel the running job before changing assignee.",
                         id
@@ -365,7 +383,11 @@ impl TaskService {
             let new_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path))
+                resolve_me_alias(trimmed, Some(&storage.root_path)).map(|resolved| {
+                    crate::utils::member::normalize_member_value(&resolved, |name| {
+                        config.agent_profiles.contains_key(name)
+                    })
+                })
             };
             let previous = t.reporter.clone();
             if previous != new_value {
@@ -378,7 +400,11 @@ impl TaskService {
             let new_value = if trimmed.is_empty() {
                 None
             } else {
-                resolve_me_alias(trimmed, Some(&storage.root_path))
+                resolve_me_alias(trimmed, Some(&storage.root_path)).map(|resolved| {
+                    crate::utils::member::normalize_member_value(&resolved, |name| {
+                        config.agent_profiles.contains_key(name)
+                    })
+                })
             };
             let previous = t.assignee.clone();
             if previous != new_value {
@@ -533,7 +559,14 @@ impl TaskService {
             } else {
                 resolve_me_alias(trimmed, Some(&storage.root_path))
             };
-            existing.assignee != next_value
+            match (&existing.assignee, &next_value) {
+                (Some(a), Some(b)) => {
+                    crate::utils::member::member_for_comparison(a)
+                        != crate::utils::member::member_for_comparison(b)
+                }
+                (None, None) => false,
+                _ => true,
+            }
         });
 
         if !status_changed && !assignee_changed {
@@ -929,10 +962,10 @@ impl TaskService {
             return Ok(());
         }
 
-        let normalized = trimmed.to_ascii_lowercase();
+        let norm_val = crate::utils::member::member_for_comparison(trimmed);
         let permitted = allowed
             .iter()
-            .any(|candidate| candidate.to_ascii_lowercase() == normalized);
+            .any(|candidate| crate::utils::member::member_for_comparison(candidate) == norm_val);
 
         if permitted {
             return Ok(());

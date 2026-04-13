@@ -12,32 +12,23 @@
 <script setup lang="ts">
 import type { TaskDTO } from '../api/types'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTasks } from '../composables/useTasks'
+import { useTaskStore } from '../composables/useTaskStore'
 import TaskPanel from './TaskPanel.vue'
 
 const { state: panelState, closeTaskPanel, notifyCreated, notifyUpdated } = useTaskPanelController()
-const { items } = useTasks()
-
-function upsertTask(taskId: string, task: TaskDTO) {
-  const idx = items.value.findIndex((t) => t.id === taskId)
-  if (idx >= 0) {
-    items.value[idx] = task
-  } else {
-    items.value.unshift(task)
-  }
-}
+const store = useTaskStore()
 
 function handleClose() {
   closeTaskPanel()
 }
 
 function handleCreated(task: TaskDTO) {
-  upsertTask(task.id, task)
+  store.upsert(task)
   notifyCreated(task)
 }
 
 function handleUpdated(task: TaskDTO) {
-  upsertTask(task.id, task)
+  store.upsert(task)
   notifyUpdated(task)
 }
 </script>

@@ -99,9 +99,16 @@ fn validate_assignee_formats() {
     let conf = cfg();
     let validator = CliValidator::new(&conf);
     assert!(validator.validate_assignee("@me").is_ok());
-    assert!(validator.validate_assignee("@john").is_ok());
+    // @username normalizes to bare username
+    assert_eq!(validator.validate_assignee("@john").unwrap(), "john");
     assert!(validator.validate_assignee("john@example.com").is_ok());
-    assert!(validator.validate_assignee("not-an-email").is_err());
+    // Bare usernames are now accepted
+    assert_eq!(validator.validate_assignee("alice").unwrap(), "alice");
+    assert_eq!(validator.validate_assignee("john.doe").unwrap(), "john.doe");
+    assert_eq!(
+        validator.validate_assignee("not-an-email").unwrap(),
+        "not-an-email"
+    );
     assert!(validator.validate_assignee("@").is_err());
     assert!(validator.validate_assignee("john@").is_err());
 }
@@ -125,11 +132,31 @@ fn validate_reporter_formats() {
     let conf = cfg();
     let validator = CliValidator::new(&conf);
     assert!(validator.validate_reporter("@me").is_ok());
-    assert!(validator.validate_reporter("@john").is_ok());
+    // @username normalizes to bare username
+    assert_eq!(validator.validate_reporter("@john").unwrap(), "john");
     assert!(validator.validate_reporter("john@example.com").is_ok());
-    assert!(validator.validate_reporter("not-an-email").is_err());
+    // Bare usernames are now accepted
+    assert_eq!(validator.validate_reporter("alice").unwrap(), "alice");
+    assert_eq!(
+        validator.validate_reporter("not-an-email").unwrap(),
+        "not-an-email"
+    );
     assert!(validator.validate_reporter("@").is_err());
     assert!(validator.validate_reporter("john@").is_err());
+}
+
+#[test]
+fn validate_assignee_bare_username_matches_at_prefixed_member() {
+    let mut conf = cfg();
+    conf.strict_members = true;
+    // Old-style @-prefixed member in config
+    conf.members = vec!["@alice".to_string()];
+    let validator = CliValidator::new(&conf);
+
+    // Bare username matches member with @ prefix (backward compat)
+    assert!(validator.validate_assignee("alice").is_ok());
+    // @-prefixed input also matches
+    assert!(validator.validate_assignee("@alice").is_ok());
 }
 
 #[test]

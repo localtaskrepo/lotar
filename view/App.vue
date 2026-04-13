@@ -31,13 +31,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ActivityDrawer from './components/ActivityDrawer.vue'
 import TaskPanelHost from './components/TaskPanelHost.vue'
 import ToastHost from './components/ToastHost.vue'
 import UiButton from './components/UiButton.vue'
+import { showToast } from './components/toast'
 import { useTaskPanelController } from './composables/useTaskPanelController'
+import { useTaskStore } from './composables/useTaskStore'
+
+const store = useTaskStore()
+let unsubError: (() => void) | null = null
+onMounted(() => {
+  store.connectSse()
+  unsubError = store.onTaskError(({ id, message }) => {
+    showToast(`⚠ Task ${id}: ${message}`, 'File Error', 8000)
+  })
+})
+onUnmounted(() => {
+  store.disconnectSse()
+  unsubError?.()
+})
 const version = (import.meta as any).env?.VITE_CARGO_VERSION || ''
 const router = useRouter()
 const route = useRoute()

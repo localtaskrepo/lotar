@@ -82,12 +82,20 @@ fn try_hoist_global_flag(
         "--verbose" => {
             return Ok(Some((1, vec!["--verbose".to_string()])));
         }
+        "--project" => {
+            let value = args
+                .get(idx + 1)
+                .ok_or_else(|| "Option '--project' requires a value".to_string())?
+                .clone();
+            return Ok(Some((2, vec!["--project".to_string(), value])));
+        }
         _ => {}
     }
 
     if token.starts_with("--format=")
         || token.starts_with("--log-level=")
         || token.starts_with("--tasks-dir=")
+        || token.starts_with("--project=")
     {
         return Ok(Some((1, vec![token.clone()])));
     }
@@ -119,6 +127,9 @@ fn try_hoist_global_flag(
     if token == "-v" {
         return Ok(Some((1, vec!["-v".to_string()])));
     }
+
+    // `-p` is NOT hoisted here because the short form is ambiguous with
+    // `serve -p <port>` which `normalize_serve_args` handles separately.
 
     Ok(None)
 }
@@ -443,10 +454,13 @@ mod tests {
     }
 
     #[test]
-    fn leaves_project_flag_for_subcommand() {
+    fn hoists_project_flag_for_subcommand() {
         let args = to_vec(&["lotar", "sprint", "list", "--project", "APP"]);
         let normalized = normalize_args(&args).unwrap();
-        assert_eq!(normalized, args);
+        assert_eq!(
+            normalized,
+            to_vec(&["lotar", "--project", "APP", "sprint", "list"])
+        );
     }
 
     #[test]
@@ -461,5 +475,70 @@ mod tests {
         let args = to_vec(&["lotar", "task", "list", "-v"]);
         let normalized = normalize_args(&args).unwrap();
         assert_eq!(normalized, to_vec(&["lotar", "-v", "task", "list"]));
+    }
+
+    #[test]
+    fn hoists_project_equals_form() {
+        let args = to_vec(&[
+            "lotar",
+            "sprint",
+            "add",
+            "--project=TEST",
+            "--sprint",
+            "8",
+            "TEST-1",
+        ]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(
+            normalized,
+            to_vec(&[
+                "lotar",
+                "--project=TEST",
+                "sprint",
+                "add",
+                "--sprint",
+                "8",
+                "TEST-1"
+            ])
+        );
+    }
+
+    #[test]
+    fn hoists_project_with_positional_args() {
+        let args = to_vec(&[
+            "lotar",
+            "sprint",
+            "add",
+            "--sprint",
+            "8",
+            "--project",
+            "TEST",
+            "TEST-1",
+            "TEST-2",
+        ]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(
+            normalized,
+            to_vec(&[
+                "lotar",
+                "--project",
+                "TEST",
+                "sprint",
+                "add",
+                "--sprint",
+                "8",
+                "TEST-1",
+                "TEST-2"
+            ])
+        );
+    }
+
+    #[test]
+    fn does_not_hoist_short_p_to_avoid_serve_conflict() {
+        // -p is ambiguous: it means --project globally but --port in serve.
+        // Hoisting runs before serve normalization, so -p must NOT be hoisted.
+        let args = to_vec(&["lotar", "sprint", "add", "-p", "TEST", "TEST-1"]);
+        let normalized = normalize_args(&args).unwrap();
+        assert_eq!(normalized, args);
     }
 }

@@ -1,8 +1,16 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import App from '../App.vue'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
+
+vi.mock('../composables/useTaskStore', () => ({
+  useTaskStore: () => ({
+    connectSse: vi.fn(),
+    disconnectSse: vi.fn(),
+    onTaskError: vi.fn(() => vi.fn()),
+  }),
+}))
 
 describe('App shell', () => {
   it('renders nav links', async () => {

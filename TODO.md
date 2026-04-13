@@ -22,7 +22,20 @@
 - Rework the project init function to create configs dynamically instead of using template files. Implement an interactive dialog on CLI (with -yes flag support to auto create with flags specifying choices) and the WebUI.
 - Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system))
 - Update dependencies
+- Add aliases for command commands so that LLMs don't get tripped up (e.g. it's often trying "lotar show <id>", and "lotar update <id>")
+- Config UI should be rebuilt using a submenu for each section, rather than one giant view with all configs tiled.
 
 Bugs:
 - @implement (agent) was added to member list of projects (which it shouldn't)
 - lotar init --project'"..." doesn't work properly. Configs are generated in the project, not global, and the globalm default project isn't set to the first new project.
+- Changelog includes the entire comment body as a copy when a comment is added, duplicating a spamming the file.
+- When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
+- The WebUI doesn't allow custom fields to be shown in the column options.
+- lotar list only shows 20 tasks by default, which is confusing when there are more. We should either show all or implement pagination.
+- Board view only shows up to 50 tickets
+- Board filters don't work
+- Insights are limited to 50 tickets and ignore the rest
+- Creating a new project doesn't update the UI until the page is reloaded
+- On the tasks list a prev/next button should also be shown at the end of the list, not just the beginning
+- Boards are global and not per project so sprints show up in all projects no matter the filter. While global sprints are okay we should also support and default to project-specific sprints that only show up when the project is selected.
+- Completed tickets should not be marked as overdue

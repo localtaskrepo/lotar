@@ -119,7 +119,7 @@
               <span class="sprint-pill__label">{{ sprint.label }}</span>
             </div>
           </div>
-          <ul class="tasks" :ref="(el) => setTasksListRef(cell.dateKey, el)">
+          <TransitionGroup name="task-list" tag="ul" class="tasks" :ref="(el) => setTasksListRef(cell.dateKey, el)">
             <li
               v-for="t in cell.tasks.slice(0, visibleCountFor(cell))"
               :key="t.id"
@@ -137,15 +137,13 @@
                 </div>
               </TaskHoverCard>
             </li>
-            <li v-if="hiddenCountFor(cell) > 0" class="muted more" @click="openDay(cell.date)">{{ moreTicketsLabel(hiddenCountFor(cell)) }}</li>
-          </ul>
+            <li v-if="hiddenCountFor(cell) > 0" key="__more__" class="muted more" @click="openDay(cell.date)">{{ moreTicketsLabel(hiddenCountFor(cell)) }}</li>
+          </TransitionGroup>
         </div>
       </div>
     </div>
 
-    <Teleport to="body">
-      <div v-if="dayDialogOpen" class="calendar-day-dialog__overlay" @click.self="closeDayDialog">
-        <div class="calendar-day-dialog__card card" role="dialog" aria-modal="true" aria-label="Day tasks">
+    <UiModal :open="dayDialogOpen" aria-label="Day tasks" size="sm" @close="closeDayDialog">
           <header class="calendar-day-dialog__header row" style="justify-content: space-between; align-items: center; gap: 8px;">
             <strong>{{ dayDialogTitle }}</strong>
             <UiButton icon-only type="button" aria-label="Close" title="Close" @click="closeDayDialog">
@@ -173,16 +171,14 @@
               </li>
             </ul>
           </div>
-        </div>
-      </div>
-    </Teleport>
+    </UiModal>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { SprintListItem, TaskDTO, TaskListFilter } from '../api/types'
+import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -190,21 +186,27 @@ import SmartListChips from '../components/SmartListChips.vue'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiModal from '../components/UiModal.vue'
 import { useConfig } from '../composables/useConfig'
+import { useFieldVisibility } from '../composables/useFieldVisibility'
+import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
+import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTasks } from '../composables/useTasks'
+import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay, toDateKey } from '../utils/date'
 import { buildSprintSchedule, type SprintCalendarDayEntry } from '../utils/sprintCalendar'
 
 const route = useRoute()
 const router = useRouter()
 const { refresh: refreshProjects } = useProjects()
-const { items, refresh: refreshTasks, loading: loadingTasks } = useTasks()
+const store = useTaskStore()
+const loadingTasks = computed(() => store.status.value === 'loading')
 const { sprints: sprintList, refresh: refreshSprints } = useSprints()
 const { openTaskPanel } = useTaskPanelController()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig } = useConfig()
+const { sprintColorForState } = useSprintFormatting(sprintList)
 
 const project = ref<string>('')
 const cursor = ref<Date>(new Date()) // month cursor
@@ -237,22 +239,7 @@ function openTaskFromDialog(id: string) {
   openTask(id)
 }
 
-type CalendarHoverFieldKey =
-  | 'id'
-  | 'title'
-  | 'status'
-  | 'priority'
-  | 'task_type'
-  | 'reporter'
-  | 'assignee'
-  | 'effort'
-  | 'tags'
-  | 'sprints'
-  | 'due_date'
-  | 'modified'
-type CalendarHoverFieldSettings = Record<CalendarHoverFieldKey, boolean>
-
-const DEFAULT_CALENDAR_HOVER_FIELDS: CalendarHoverFieldSettings = {
+const DEFAULT_CALENDAR_HOVER_FIELDS: Record<string, boolean> = {
   id: true,
   title: true,
   status: true,
@@ -267,75 +254,17 @@ const DEFAULT_CALENDAR_HOVER_FIELDS: CalendarHoverFieldSettings = {
   modified: true,
 }
 
-const calendarHoverFields = ref<CalendarHoverFieldSettings>({ ...DEFAULT_CALENDAR_HOVER_FIELDS })
-
-const calendarHoverFieldOptions = computed(() => ([
-  { key: 'id', label: 'ID' },
-  { key: 'title', label: 'Title' },
-  { key: 'status', label: 'Status' },
-  { key: 'task_type', label: 'Type' },
-  { key: 'priority', label: 'Priority' },
-  { key: 'effort', label: 'Effort' },
-  { key: 'assignee', label: 'Assignee' },
-  { key: 'reporter', label: 'Reporter' },
-  { key: 'sprints', label: 'Sprints' },
-  { key: 'due_date', label: 'Due' },
-  { key: 'modified', label: 'Updated' },
-  { key: 'tags', label: 'Tags' },
-] as Array<{ key: CalendarHoverFieldKey; label: string }>))
-
-function calendarHoverFieldsKey(){
-  return project.value ? `lotar.calendarHoverFields::${project.value}` : 'lotar.calendarHoverFields'
-}
-
-function loadCalendarHoverFields() {
-  try {
-    const raw = localStorage.getItem(calendarHoverFieldsKey())
-    if (!raw) {
-      calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
-      return
-    }
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') {
-      calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
-      return
-    }
-    const next: CalendarHoverFieldSettings = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
-
-    // Migrate old key (kept for compatibility): due -> due_date
-    const legacyDue = (parsed as any).due
-    if (typeof legacyDue === 'boolean' && typeof (parsed as any).due_date !== 'boolean') next.due_date = legacyDue
-
-    for (const { key } of calendarHoverFieldOptions.value) {
-      const v = (parsed as any)[key]
-      if (typeof v === 'boolean') {
-        next[key] = v
-      }
-    }
-    calendarHoverFields.value = next
-  } catch {
-    calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
-  }
-}
-
-function saveCalendarHoverFields() {
-  try {
-    localStorage.setItem(calendarHoverFieldsKey(), JSON.stringify(calendarHoverFields.value))
-  } catch {}
-}
-
-function resetCalendarHoverFields() {
-  calendarHoverFields.value = { ...DEFAULT_CALENDAR_HOVER_FIELDS }
-}
+const { fields: calendarHoverFields, fieldOptions: calendarHoverFieldOptions, load: loadCalendarHoverFields, reset: resetCalendarHoverFields, isVisible: isCalendarHoverFieldVisible, setVisible: setCalendarHoverFieldVisible } = useFieldVisibility(
+  'lotar.calendarHoverFields',
+  project,
+  DEFAULT_CALENDAR_HOVER_FIELDS,
+  availableCustomFields,
+)
 
 function closeCalendarFields() {
   if (fieldsEditorRef.value) {
     fieldsEditorRef.value.open = false
   }
-}
-
-function isCalendarHoverFieldVisible(key: CalendarHoverFieldKey): boolean {
-  return calendarHoverFields.value[key] !== false
 }
 
 const taskListRefs = new Map<string, HTMLElement>()
@@ -381,14 +310,9 @@ function moreTicketsLabel(count: number) {
   return count === 1 ? '1 more ticket' : `${count} more tickets`
 }
 
-function setCalendarHoverFieldVisible(key: CalendarHoverFieldKey, ev: Event) {
-  const checked = Boolean((ev.target as HTMLInputElement | null)?.checked)
-  calendarHoverFields.value = { ...calendarHoverFields.value, [key]: checked }
+function setCalendarHoverFieldVisible_internal(key: string, ev: Event) {
+  setCalendarHoverFieldVisible(key, ev)
 }
-
-watch(calendarHoverFields, () => {
-  saveCalendarHoverFields()
-}, { deep: true })
 
 function handleFieldsToggle() {
   // no-op for now; exists to match Boards behavior and keep a stable hook if we add more popovers later.
@@ -401,60 +325,11 @@ function handleCalendarPopoverClick(event: MouseEvent) {
     fieldsEditorRef.value.open = false
   }
 }
-const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
-const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
-const customFilterPresets = computed(() => {
-  const names = (availableCustomFields.value || []).filter((name) => name !== '*')
-  return names.slice(0, 6).map((name) => ({
-    label: name,
-    expression: `field:${name}=`,
-  }))
-})
-
-type SprintState = SprintListItem['state']
-const sprintStateColors: Record<SprintState | 'default', string> = {
-  pending: 'var(--color-muted)',
-  active: 'var(--color-accent)',
-  overdue: 'var(--color-danger)',
-  complete: 'var(--color-success)',
-  default: 'var(--color-muted)',
-}
-
-function sprintColorForState(state?: string | null): string {
-  const normalized = (state || '').toLowerCase() as SprintState
-  return sprintStateColors[normalized] || sprintStateColors.default
-}
+const { hasFilters, onFilterUpdate: baseOnFilterUpdate, onChipsUpdate: baseOnChipsUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
+const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 const MS_PER_DAY = 24 * 60 * 60 * 1000
-
-function resolveProjectSelection(requested: string | undefined) {
-  return (requested || '').trim()
-}
-
-function sanitizeFilterInput(payload: Record<string, string>) {
-  const next: Record<string, string> = {}
-  const hasProjectKey = payload && Object.prototype.hasOwnProperty.call(payload, 'project')
-  if (hasProjectKey) {
-    const nextProject = resolveProjectSelection(payload.project)
-    if (nextProject !== project.value) {
-      project.value = nextProject
-    }
-    syncProjectRoute(nextProject)
-  }
-  Object.entries(payload || {}).forEach(([key, value]) => {
-    if (key === 'project') return
-    if (value === undefined || value === null) return
-    next[key] = value
-  })
-  const prev = filter.value
-  const sameSize = Object.keys(next).length === Object.keys(prev).length
-  if (sameSize) {
-    const unchanged = Object.entries(next).every(([key, value]) => prev[key] === value)
-    if (unchanged) return prev
-  }
-  return next
-}
 
 function syncProjectRoute(nextProject: string) {
   const desired = nextProject || ''
@@ -464,11 +339,15 @@ function syncProjectRoute(nextProject: string) {
 }
 
 function onFilterUpdate(v: Record<string, string>) {
-  filter.value = sanitizeFilterInput(v)
+  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
+  baseOnFilterUpdate(v)
 }
 
 function onChipsUpdate(v: Record<string, string>) {
-  filter.value = sanitizeFilterInput(v)
+  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
+  baseOnChipsUpdate(v)
 }
 
 function handleCustomPreset(expression: string) {
@@ -476,42 +355,7 @@ function handleCustomPreset(expression: string) {
 }
 
 function clearFilters() {
-  filter.value = {}
-  filterBarRef.value?.clear?.()
-}
-
-function listFromCsv(value: string): string[] {
-  return value.split(',').map((entry) => entry.trim()).filter(Boolean)
-}
-
-function normalizeFilter(raw: Record<string, string>) {
-  const normalized: Record<string, string> = {}
-  const extras: Record<string, string> = {}
-  const source = raw || {}
-  for (const [key, value] of Object.entries(source)) {
-    if (!value || key === 'order') continue
-    if (BUILTIN_QUERY_KEYS.has(key)) {
-      normalized[key] = value
-    } else {
-      extras[key] = value
-    }
-  }
-  normalized.order = source.order === 'asc' ? 'asc' : 'desc'
-  return { normalized, extras }
-}
-
-function buildServerFilter(raw: Record<string, string>) {
-  const { normalized, extras } = normalizeFilter(raw)
-  const serverFilter: TaskListFilter = {}
-  if (project.value) serverFilter.project = project.value
-  if (normalized.q) serverFilter.q = normalized.q
-  if (normalized.status) serverFilter.status = listFromCsv(normalized.status)
-  if (normalized.priority) serverFilter.priority = listFromCsv(normalized.priority)
-  if (normalized.type) serverFilter.type = listFromCsv(normalized.type)
-  if (normalized.assignee && normalized.assignee !== '__none__') serverFilter.assignee = normalized.assignee
-  if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
-  Object.assign(serverFilter, extras)
-  return { serverFilter, normalized }
+  clearFiltersAction(filterBarRef)
 }
 
 const monthLabel = computed(() => cursor.value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
@@ -532,9 +376,13 @@ const cells = computed(() => {
   const days: Array<{ date: Date; dateKey: string; inMonth: boolean; tasks: any[]; sprints: SprintCalendarDayEntry[] }> = []
   const month = cursor.value.getMonth()
 
+  // Apply smart filters (client-side) to store items
+  const { normalized } = buildServerFilter(filter.value, project.value)
+  const smartFiltered = applySmartFilters(store.items.value || [], normalized)
+
   // Index tasks by due date for this window
   const byDate: Record<string, any[]> = {}
-  for (const t of items.value || []) {
+  for (const t of smartFiltered) {
     const due = (t as any).due_date
     if (!due) continue
     const parsed = parseTaskDate(due)
@@ -561,77 +409,10 @@ const cells = computed(() => {
   return days
 })
 
-function applySmartFilters(q: Record<string, string>) {
-  const wantsUnassigned = q.assignee === '__none__'
-  const due = q.due || ''
-  const recent = q.recent || ''
-  const needsSet = new Set((q.needs || '').split(',').map((s) => s.trim()).filter(Boolean))
-  const now = new Date()
-  const today = startOfDay(now)
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
-  const soonCutoff = new Date(today.getTime() + 7 * MS_PER_DAY)
-  const recentCutoff = new Date(now.getTime() - 7 * MS_PER_DAY)
-
-  const list = Array.isArray(items.value) ? items.value : []
-  const filtered = list.filter((task) => {
-    if (wantsUnassigned && (task.assignee || '').trim()) {
-      return false
-    }
-
-    if (due) {
-      const dueDate = parseDateLike(task.due_date)
-      if (!dueDate) {
-        return false
-      }
-      const dueTime = startOfDay(dueDate).getTime()
-      const todayStart = today.getTime()
-      const tomorrowStart = tomorrow.getTime()
-      const soonCutoffTime = startOfDay(soonCutoff).getTime()
-      if (due === 'today' && (dueTime < todayStart || dueTime >= tomorrowStart)) {
-        return false
-      }
-      if (due === 'soon' && (dueTime < tomorrowStart || dueTime > soonCutoffTime)) {
-        return false
-      }
-      if (due === 'later' && dueTime <= soonCutoffTime) {
-        return false
-      }
-      if (due === 'overdue' && dueTime >= todayStart) {
-        return false
-      }
-    }
-
-    if (recent === '7d') {
-      const modified = parseDateLike(task.modified)
-      if (!modified || modified.getTime() < recentCutoff.getTime()) {
-        return false
-      }
-    }
-
-    if (needsSet.size) {
-      if (needsSet.has('effort') && (task.effort || '').trim()) {
-        return false
-      }
-      if (needsSet.has('due') && (task.due_date || '').trim()) {
-        return false
-      }
-    }
-
-    return true
-  })
-
-  items.value = filtered
-}
-
 async function refreshCalendarTasks(snapshot?: Record<string, string>) {
   const raw = snapshot ?? filter.value
-  const { serverFilter, normalized } = buildServerFilter(raw)
-  await refreshTasks(serverFilter)
-  applySmartFilters(normalized)
-  const dir = normalized.order === 'asc' ? 'asc' : 'desc'
-  if (Array.isArray(items.value)) {
-    items.value.sort((a, b) => (dir === 'desc' ? b.modified.localeCompare(a.modified) : a.modified.localeCompare(b.modified)))
-  }
+  const { serverFilter } = buildServerFilter(raw, project.value)
+  await store.hydrateAll(serverFilter, { clear: true })
 }
 
 function prevMonth(){ cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()-1, 1); pushRoute() }
@@ -701,7 +482,9 @@ watch(filter, (value) => {
   if (filterDebounce) clearTimeout(filterDebounce)
   const snapshot = { ...value }
   filterDebounce = setTimeout(() => {
-    refreshCalendarTasks(snapshot).catch(() => {})
+    refreshCalendarTasks(snapshot).catch((err) => {
+      console.warn('Failed to refresh calendar after filter change', err)
+    })
   }, 150)
 }, { deep: true })
 
@@ -918,24 +701,6 @@ watch(showSprints, (enabled, previous) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.calendar-day-dialog__overlay {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  background: var(--color-dialog-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-
-.calendar-day-dialog__card {
-  width: min(720px, 92vw);
-  max-height: min(80vh, 720px);
-  display: flex;
-  flex-direction: column;
 }
 
 .calendar-day-dialog__header {

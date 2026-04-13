@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { h, ref } from 'vue'
+import { computed, h, ref, shallowRef } from 'vue'
 import type { SprintListItem, TaskDTO } from '../api/types'
 
 const routeState: { query: Record<string, any> } = { query: { project: 'ACME' } }
@@ -11,10 +11,30 @@ const projectsStore = {
     refresh: vi.fn(async () => { }),
 }
 
+const taskMap = shallowRef(new Map<string, TaskDTO>())
+const taskVersion = shallowRef(0)
 const tasksStore = {
-    items: ref<TaskDTO[]>([]),
-    refresh: vi.fn(async () => { }),
-    loading: ref(false),
+    _map: taskMap,
+    version: taskVersion,
+    items: computed(() => { void taskVersion.value; return Array.from(taskMap.value.values()) }),
+    count: computed(() => taskMap.value.size),
+    serverTotal: shallowRef(0),
+    status: shallowRef('ready' as const),
+    error: shallowRef(null as string | null),
+    lastSyncAt: shallowRef(0),
+    hasData: computed(() => taskMap.value.size > 0),
+    hydrateAll: vi.fn(async () => {}),
+    hydratePage: vi.fn(async () => ({ total: 0 })),
+    fetchOne: vi.fn(async () => null),
+    forceRefresh: vi.fn(async () => {}),
+    add: vi.fn(async (p: any) => p),
+    update: vi.fn(async (_id: string, p: any) => p),
+    remove: vi.fn(async () => {}),
+    upsert: vi.fn((task: TaskDTO) => { taskMap.value.set(task.id, task); taskVersion.value++; }),
+    evict: vi.fn((id: string) => { taskMap.value.delete(id); taskVersion.value++; }),
+    connectSse: vi.fn(),
+    disconnectSse: vi.fn(),
+    sseConnected: shallowRef(false),
 }
 
 const sprintsStore = {
@@ -100,8 +120,8 @@ vi.mock('../composables/useProjects', () => ({
     useProjects: () => projectsStore,
 }))
 
-vi.mock('../composables/useTasks', () => ({
-    useTasks: () => tasksStore,
+vi.mock('../composables/useTaskStore', () => ({
+    useTaskStore: () => tasksStore,
 }))
 
 vi.mock('../composables/useSprints', () => ({
@@ -159,14 +179,17 @@ describe('Board field visibility', () => {
         vi.setSystemTime(new Date('2026-01-05T12:00:00'))
 
         routeState.query = { project: 'ACME' }
-        tasksStore.items.value = []
-        tasksStore.refresh.mockClear()
+        taskMap.value = new Map()
+        taskVersion.value = 0
+        tasksStore.hydrateAll.mockClear()
         projectsStore.refresh.mockClear()
         sprintsStore.refresh.mockClear()
         configStore.refresh.mockClear()
         routerPushMock.mockClear()
         openTaskPanelMock.mockClear()
-        localStorage.clear()
+        if (typeof localStorage !== 'undefined' && localStorage.clear) {
+            localStorage.clear()
+        }
     })
 
     afterEach(() => {
@@ -174,10 +197,12 @@ describe('Board field visibility', () => {
     })
 
     it('hides card fields per-project and persists to localStorage', async () => {
-        tasksStore.items.value = [
+        const tasks = [
             baseTask({ id: 'ACME-1', title: 'Alpha' }),
             baseTask({ id: 'BETA-2', title: 'Beta', assignee: 'bob', status: 'Doing' }),
         ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
 
         const wrapper = mount(Board)
         await flushPromises()
@@ -186,7 +211,7 @@ describe('Board field visibility', () => {
         expect(firstCard.text()).toContain('ACME-1')
         expect(firstCard.text()).toContain('Alpha')
         expect(firstCard.text()).toContain('high')
-        expect(firstCard.text()).toContain('@alice')
+        expect(firstCard.text()).toContain('alice')
         expect(firstCard.text()).toContain('Due')
         expect(firstCard.text()).toContain('one')
 
@@ -211,7 +236,7 @@ describe('Board field visibility', () => {
         await byLabel('Sprints').setValue(false)
         await flushPromises()
 
-        expect(firstCard.text()).not.toContain('@alice')
+        expect(firstCard.text()).not.toContain('alice')
         expect(firstCard.text()).not.toContain('Due')
         expect(firstCard.text()).not.toContain('one')
 

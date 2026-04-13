@@ -36,7 +36,7 @@
         </UiButton>
         <span>• {{ task.priority }}</span>
         <span>• {{ task.task_type }}</span>
-        <span v-if="task.assignee">• @{{ task.assignee }}</span>
+        <span v-if="task.assignee">• {{ formatMember(task.assignee) }}</span>
         <span v-if="dueDateLabel">• due {{ dueDateLabel }}</span>
       </div>
       <div class="row" style="gap:6px; flex-wrap: wrap; margin-top: 4px; align-items: center;">
@@ -59,6 +59,7 @@
 import { computed, ref, watch } from 'vue';
 import type { TaskDTO } from '../api/types';
 import { formatTaskDate } from '../utils/date';
+import { formatMember } from '../utils/member';
 import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
 const props = defineProps<{ task: TaskDTO; statuses?: string[]; selectable?: boolean; selected?: boolean }>()

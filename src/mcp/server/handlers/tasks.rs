@@ -176,10 +176,18 @@ fn parse_task_update_patch(
     }
 
     if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
-        patch.reporter = identity::resolve_me_alias(s, Some(tasks_root));
+        patch.reporter = identity::resolve_me_alias(s, Some(tasks_root)).map(|v| {
+            crate::utils::member::normalize_member_value(&v, |name| {
+                validator.config().agent_profiles.contains_key(name)
+            })
+        });
     }
     if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
-        patch.assignee = identity::resolve_me_alias(s, Some(tasks_root));
+        patch.assignee = identity::resolve_me_alias(s, Some(tasks_root)).map(|v| {
+            crate::utils::member::normalize_member_value(&v, |name| {
+                validator.config().agent_profiles.contains_key(name)
+            })
+        });
     }
 
     if let Some(s) = patch_val.get("due_date").and_then(|v| v.as_str()) {
@@ -366,11 +374,18 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     } else {
         None
     };
+    let normalize = |s: &str| -> Option<String> {
+        identity::resolve_me_alias(s, Some(resolver.path.as_path())).map(|v| {
+            crate::utils::member::normalize_member_value(&v, |name| {
+                cfg.agent_profiles.contains_key(name)
+            })
+        })
+    };
     let assignee = req
         .params
         .get("assignee")
         .and_then(|v| v.as_str())
-        .and_then(|s| identity::resolve_me_alias(s, Some(resolver.path.as_path())));
+        .and_then(normalize);
     let due_date = req
         .params
         .get("due_date")
@@ -456,7 +471,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             .params
             .get("reporter")
             .and_then(|v| v.as_str())
-            .and_then(|s| identity::resolve_me_alias(s, Some(resolver.path.as_path()))),
+            .and_then(normalize),
         assignee,
         due_date,
         effort,
@@ -1555,7 +1570,12 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
             };
             match target {
                 Some(user) => {
-                    tasks.retain(|task| task.assignee.as_deref() == Some(user.as_str()));
+                    let norm_user = crate::utils::member::member_for_comparison(&user);
+                    tasks.retain(|task| {
+                        task.assignee.as_deref().is_some_and(|a| {
+                            crate::utils::member::member_for_comparison(a) == norm_user
+                        })
+                    });
                 }
                 None => tasks.clear(),
             }

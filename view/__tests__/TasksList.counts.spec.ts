@@ -10,14 +10,16 @@ const projectsStore = {
     refresh: vi.fn(async () => { }),
 }
 
+const _tasksItems = ref<any[]>([])
+
 const tasksStore = {
-    items: ref<any[]>([]),
-    refresh: vi.fn(async () => { }),
+    items: _tasksItems,
+    count: computed(() => _tasksItems.value.length),
+    status: ref('idle' as string),
+    error: ref(null as string | null),
+    hydrateAll: vi.fn(async () => { }),
+    upsert: vi.fn(),
     remove: vi.fn(async () => { }),
-    loading: ref(false),
-    total: ref(0),
-    limit: ref(50),
-    offset: ref(0),
 }
 
 const sprintsStore = {
@@ -115,18 +117,8 @@ vi.mock('../composables/useProjects', () => ({
     useProjects: () => projectsStore,
 }))
 
-vi.mock('../composables/useTasks', () => ({
-    useTasks: () => ({
-        items: tasksStore.items,
-        loading: tasksStore.loading,
-        error: computed(() => null),
-        count: computed(() => tasksStore.items.value.length),
-        total: tasksStore.total,
-        limit: tasksStore.limit,
-        offset: tasksStore.offset,
-        refresh: tasksStore.refresh,
-        remove: tasksStore.remove,
-    }),
+vi.mock('../composables/useTaskStore', () => ({
+    useTaskStore: () => tasksStore,
 }))
 
 vi.mock('../composables/useSprints', () => ({
@@ -203,11 +195,11 @@ describe('TasksList counts', () => {
 
         routeState.query = {}
         tasksStore.items.value = []
-        tasksStore.loading.value = false
+        tasksStore.status.value = 'idle'
 
         routerPushMock.mockClear()
         routerReplaceMock.mockClear()
-        tasksStore.refresh.mockClear()
+        tasksStore.hydrateAll.mockClear()
         projectsStore.refresh.mockClear()
         sprintsStore.refresh.mockClear()
         configStore.refresh.mockClear()
@@ -220,7 +212,6 @@ describe('TasksList counts', () => {
     it('shows total count for the current server-filtered result set', async () => {
         routeState.query = { due: 'today' }
         tasksStore.items.value = [baseTask({ id: 'PRJ-1', due_date: '2026-01-09' })]
-        tasksStore.total.value = 1
 
         const wrapper = mount(TasksList, {
             global: {
