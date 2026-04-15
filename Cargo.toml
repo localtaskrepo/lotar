@@ -31,7 +31,7 @@ serde_json = { version = "1.0.149", features = ["std"], default-features = false
 thiserror = "2.0.18"
 dirs = "6.0.0"
 clap = { version = "4.6.0", features = ["derive", "std", "env"], default-features = false }
-clap_complete = "4.6.0"
+clap_complete = "4.6.2"
 rayon = { version = "1.11.0", default-features = false, optional = true }
 ignore = { version = "0.4.25" }
 notify = "8.2.0"
