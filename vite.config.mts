@@ -34,6 +34,24 @@ const baseConfig: UserConfig = {
     server: {
         port: 5173,
         open: false,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+                // Don't proxy Vite module imports from view/api/ (*.ts etc.)
+                bypass: (req) => {
+                    if (req.url && /\.(ts|js|vue|css|json|mts)(\?|$)/.test(req.url)) {
+                        return req.url
+                    }
+                },
+                // Prevent response buffering so SSE (text/event-stream) works
+                configure: (proxy) => {
+                    proxy.on('proxyReq', (proxyReq) => {
+                        proxyReq.removeHeader('accept-encoding')
+                    })
+                },
+            },
+        },
     },
 }
 

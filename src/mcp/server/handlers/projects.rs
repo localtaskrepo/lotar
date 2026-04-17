@@ -19,7 +19,7 @@ pub(crate) fn handle_project_list(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let storage = crate::storage::manager::Storage::new(resolver.path);
+    let storage = crate::storage::manager::Storage::new(&resolver.path);
     let mut projects = ProjectService::list(&storage);
     projects.sort_by(|a, b| a.prefix.cmp(&b.prefix));
 
@@ -107,7 +107,7 @@ pub(crate) fn handle_project_stats(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let storage = crate::storage::manager::Storage::new(resolver.path);
+    let storage = crate::storage::manager::Storage::new(&resolver.path);
     let stats = ProjectService::stats(&storage, name.unwrap());
     ok(
         req.id,

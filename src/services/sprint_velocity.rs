@@ -165,9 +165,9 @@ impl VelocityComputation {
 
 pub fn compute_velocity(
     storage: &Storage,
-    records: Vec<SprintRecord>,
+    records: &[SprintRecord],
     config: &ResolvedConfig,
-    options: VelocityOptions,
+    options: &VelocityOptions,
     now: DateTime<Utc>,
 ) -> VelocityComputation {
     if records.is_empty() {
@@ -208,17 +208,17 @@ pub fn compute_velocity(
             continue;
         }
 
-        let summary = SprintSummary::from_record(&record, &lifecycle);
+        let summary = SprintSummary::from_record(record, &lifecycle);
         let lifecycle_payload = SprintReviewLifecyclePayload::from_status(&lifecycle);
-        let start = resolve_calendar_start(&record, &lifecycle);
-        let end = resolve_calendar_end(&record, &lifecycle);
+        let start = resolve_calendar_start(record, &lifecycle);
+        let end = resolve_calendar_end(record, &lifecycle);
         let duration = match (start, end) {
             (Some(begin), Some(finish)) if finish > begin => Some(finish - begin),
             _ => None,
         };
         let relative = format_calendar_relative(&lifecycle, start, end, now);
 
-        let tasks = SprintService::load_tasks_for_record(storage, &record);
+        let tasks = SprintService::load_tasks_for_record(storage, record);
         let totals = compute_velocity_totals(&tasks, &done_statuses);
 
         let (committed, completed, capacity) = match options.metric {
@@ -255,7 +255,7 @@ pub fn compute_velocity(
             .as_ref()
             .or(end.as_ref())
             .or(actual_start.as_ref())
-            .cloned()
+            .copied()
             .unwrap_or(now);
 
         entries.push(VelocityEntry {

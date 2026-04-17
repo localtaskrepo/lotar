@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -15,11 +15,11 @@ use super::support::{
 };
 
 pub(crate) fn handle_start(
-    start_args: SprintStartArgs,
-    tasks_root: PathBuf,
+    start_args: &SprintStartArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let start_instant = determine_start_timestamp(&start_args)?;
+    let start_instant = determine_start_timestamp(start_args)?;
 
     let mut context = resolve_sprint_records_context(tasks_root, "starting")?;
 
@@ -89,11 +89,11 @@ pub(crate) fn handle_start(
 }
 
 pub(crate) fn handle_close(
-    close_args: SprintCloseArgs,
-    tasks_root: PathBuf,
+    close_args: &SprintCloseArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let close_instant = determine_close_timestamp(&close_args)?;
+    let close_instant = determine_close_timestamp(close_args)?;
 
     let mut context = resolve_sprint_records_context(tasks_root, "closing")?;
 

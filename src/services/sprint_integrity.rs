@@ -85,12 +85,16 @@ pub fn cleanup_missing_sprint_refs(
             TaskService::apply_memberships_to_records(records.as_mut_slice(), &task_id, &desired)?;
         touched_sprints.extend(touched);
 
+        if removed_for_task.is_empty() {
+            continue;
+        }
+
         for sprint_id in removed_for_task {
             *removed_by_sprint.entry(sprint_id).or_insert(0) += 1;
             removed_references += 1;
         }
 
-        task.sprints.clear();
+        task.sprints = desired.into_iter().collect();
         task.modified = Utc::now().to_rfc3339();
         storage.edit(&task_id, &task)?;
         updated_tasks += 1;

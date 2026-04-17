@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cli::handlers::sprint::shared::{emit_cleanup_summary, emit_missing_report};
 use crate::output::OutputRenderer;
@@ -14,12 +14,12 @@ pub(crate) struct AssignmentContext {
 }
 
 impl AssignmentContext {
-    pub(crate) fn for_mutation(tasks_root: PathBuf) -> Result<Self, String> {
+    pub(crate) fn for_mutation(tasks_root: &Path) -> Result<Self, String> {
         let storage = Storage::new(tasks_root);
         Self::from_storage(storage)
     }
 
-    pub(crate) fn try_open(tasks_root: PathBuf) -> Result<Option<Self>, String> {
+    pub(crate) fn try_open(tasks_root: &Path) -> Result<Option<Self>, String> {
         match Storage::try_open(tasks_root) {
             Some(storage) => Self::from_storage(storage).map(Some),
             None => Ok(None),

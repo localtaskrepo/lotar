@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cli::args::sprint::{SprintCreateArgs, SprintUpdateArgs};
 use crate::output::OutputRenderer;
@@ -9,17 +9,16 @@ use crate::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
 use super::support::{SprintOperationKind, render_operation_response};
 
 pub(crate) fn handle_create(
-    create_args: SprintCreateArgs,
-    tasks_root: PathBuf,
+    create_args: &SprintCreateArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let mut storage = Storage::new(tasks_root.clone());
+    let mut storage = Storage::new(tasks_root);
 
-    let resolved_config =
-        crate::config::resolution::load_and_merge_configs(Some(tasks_root.as_path()))
-            .map_err(|err| err.to_string())?;
+    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
+        .map_err(|err| err.to_string())?;
 
-    let sprint = build_sprint_from_args(&create_args);
+    let sprint = build_sprint_from_args(create_args);
     let defaults = if create_args.no_defaults {
         None
     } else {
@@ -45,26 +44,25 @@ pub(crate) fn handle_create(
 }
 
 pub(crate) fn handle_update(
-    update_args: SprintUpdateArgs,
-    tasks_root: PathBuf,
+    update_args: &SprintUpdateArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     if !update_args.has_mutations() {
         return Err("No updates provided; specify fields to mutate.".to_string());
     }
 
-    let mut storage = Storage::new(tasks_root.clone());
+    let mut storage = Storage::new(tasks_root);
 
-    let resolved_config =
-        crate::config::resolution::load_and_merge_configs(Some(tasks_root.as_path()))
-            .map_err(|err| err.to_string())?;
+    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
+        .map_err(|err| err.to_string())?;
 
     let sprint_id = update_args.resolved_sprint_id();
 
     let existing = SprintService::get(&storage, sprint_id).map_err(|err| err.to_string())?;
 
     let mut sprint = existing.sprint.clone();
-    apply_update_to_sprint(&mut sprint, &update_args);
+    apply_update_to_sprint(&mut sprint, update_args);
 
     let warnings_enabled = resolved_config.sprint_notifications.enabled;
 

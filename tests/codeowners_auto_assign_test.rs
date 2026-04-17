@@ -46,7 +46,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     // Create a task with a custom field 'path' that matches CODEOWNERS
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir.clone());
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -83,7 +83,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
         .success();
 
     // Read back and verify assignee is CODEOWNERS owner 'alice'
-    let storage = Storage::new(tasks_dir.clone());
+    let storage = Storage::new(&tasks_dir);
     let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
         .expect("get task");
     // Path-based matching removed; default owner should be applied
@@ -110,7 +110,7 @@ fn codeowners_disabled_falls_back_to_identity() {
 
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir.clone());
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -145,7 +145,7 @@ fn codeowners_disabled_falls_back_to_identity() {
         .assert()
         .success();
 
-    let storage = Storage::new(tasks_dir.clone());
+    let storage = Storage::new(&tasks_dir);
     let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
         .expect("get task");
     // Should fall back to identity (default.reporter 'bob')
@@ -169,7 +169,7 @@ fn codeowners_default_multiple_owners_picks_first() {
 
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir.clone());
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -204,7 +204,7 @@ fn codeowners_default_multiple_owners_picks_first() {
         .assert()
         .success();
 
-    let storage = Storage::new(tasks_dir.clone());
+    let storage = Storage::new(&tasks_dir);
     let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
         .expect("get task");
     // Should pick the first owner from the default owner rule
@@ -232,7 +232,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
 
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir.clone());
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -267,7 +267,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
         .assert()
         .success();
 
-    let storage = Storage::new(tasks_dir.clone());
+    let storage = Storage::new(&tasks_dir);
     let fetched = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
         .expect("get task");
     // With no matching rule and no default owner, should fall back to identity (bob)

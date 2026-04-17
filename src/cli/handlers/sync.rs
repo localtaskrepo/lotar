@@ -9,7 +9,7 @@ pub struct SyncHandler;
 impl SyncHandler {
     pub fn execute(
         direction: SyncDirection,
-        args: SyncArgs,
+        args: &SyncArgs,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -93,7 +93,7 @@ impl SyncHandler {
     }
 
     pub fn check(
-        args: SyncCheckArgs,
+        args: &SyncCheckArgs,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,

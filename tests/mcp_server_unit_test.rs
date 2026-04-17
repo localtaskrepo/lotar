@@ -314,7 +314,7 @@ fn mcp_task_create_accepts_custom_fields() {
         .unwrap()
         .to_string();
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let storage = lotar::Storage::new(resolver.path.clone());
+    let storage = lotar::Storage::new(&resolver.path);
     let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None)
         .expect("stored task");
     let stored_product = stored
@@ -333,7 +333,7 @@ fn mcp_task_update_overwrites_custom_fields() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path.clone());
     let mut custom_fields: lotar::types::CustomFields = HashMap::new();
     custom_fields.insert(
         "product".to_string(),
@@ -381,7 +381,7 @@ fn mcp_task_update_overwrites_custom_fields() {
         Some("Docs")
     );
 
-    let storage = lotar::Storage::new(resolver.path.clone());
+    let storage = lotar::Storage::new(&resolver.path);
     let stored = lotar::services::task_service::TaskService::get(&storage, &created.id, None)
         .expect("stored task");
     assert_eq!(
@@ -401,7 +401,7 @@ fn mcp_task_list_includes_custom_fields() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path);
 
     let mut product_a: lotar::types::CustomFields = HashMap::new();
     product_a.insert(
@@ -497,7 +497,7 @@ fn mcp_task_list_filters_by_custom_fields() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path);
 
     for (title, product) in [("Platform", "Platform"), ("Docs", "Docs")] {
         let mut fields: lotar::types::CustomFields = HashMap::new();
@@ -568,7 +568,7 @@ fn mcp_task_list_supports_pagination() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path);
     for idx in 0..3 {
         lotar::services::task_service::TaskService::create(
             &mut storage,
@@ -748,7 +748,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
     )
     .unwrap();
 
-    let mut storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let mut storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let mut sprint = lotar::storage::sprint::Sprint::default();
     sprint.plan = Some(lotar::storage::sprint::SprintPlan {
         label: Some("Iteration".into()),
@@ -800,7 +800,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
             "name": "sprint_add",
             "arguments": {
                 "sprint": sprint_id,
-                "tasks": [task_a.id.clone(), task_b.id.clone()]
+                "tasks": [task_a.id, task_b.id]
             }
         }
     });
@@ -863,7 +863,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
             "name": "sprint_remove",
             "arguments": {
                 "sprint": sprint_id,
-                "tasks": [task_a.id.clone()]
+                "tasks": [task_a.id]
             }
         }
     });
@@ -875,7 +875,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
         "sprint_remove failed: {remove_resp:?}"
     );
 
-    let storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let storage = lotar::storage::manager::Storage::new(&tasks_dir);
     let task_a_post = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
         .expect("task a post remove");
     let task_b_post = lotar::services::task_service::TaskService::get(&storage, &task_b.id, None)
@@ -892,7 +892,7 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path);
     let ghost = lotar::services::task_service::TaskService::create(
         &mut storage,
         lotar::api_types::TaskCreate {
@@ -904,7 +904,7 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
     .expect("create ghost task");
     let project_prefix = ghost.id.split('-').next().unwrap_or_default().to_string();
     let mut ghost_record = storage
-        .get(&ghost.id, project_prefix.clone())
+        .get(&ghost.id, &project_prefix)
         .expect("ghost record on disk");
     ghost_record.sprints = vec![42];
     storage
@@ -962,9 +962,9 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
     );
     assert!(integrity_initial.get("auto_cleanup").is_none());
 
-    let storage = lotar::Storage::new(tasks_dir.clone());
+    let storage = lotar::Storage::new(&tasks_dir.clone());
     let ghost_before = storage
-        .get(&ghost.id, project_prefix.clone())
+        .get(&ghost.id, &project_prefix)
         .expect("ghost before cleanup");
     assert_eq!(ghost_before.sprints, vec![42]);
     drop(storage);
@@ -1008,9 +1008,9 @@ fn mcp_sprint_backlog_reports_missing_integrity_and_cleanup() {
         Some(1)
     );
 
-    let storage = lotar::Storage::new(tasks_dir);
+    let storage = lotar::Storage::new(&tasks_dir);
     let ghost_after = storage
-        .get(&ghost.id, project_prefix)
+        .get(&ghost.id, &project_prefix)
         .expect("ghost after cleanup");
     assert!(ghost_after.sprints.is_empty());
 }
@@ -1023,7 +1023,7 @@ fn mcp_sprint_backlog_supports_pagination() {
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path);
     for idx in 0..3 {
         lotar::services::task_service::TaskService::create(
             &mut storage,
@@ -1138,7 +1138,7 @@ fn mcp_task_create_honors_default_assignee() {
         .unwrap()
         .to_string();
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let storage = lotar::Storage::new(resolver.path.clone());
+    let storage = lotar::Storage::new(&resolver.path);
     let stored = lotar::services::task_service::TaskService::get(&storage, &task_id, None)
         .expect("stored task");
     assert_eq!(stored.assignee.as_deref(), Some("default-user@example.com"));
@@ -1211,12 +1211,12 @@ fn mcp_task_create_and_get() {
     let create =
         serde_json::json!({"title":"From MCP","project":"MCP","priority":"High","tags":[]});
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path.clone());
     let req: lotar::api_types::TaskCreate = serde_json::from_value(create).unwrap();
     let task = lotar::services::task_service::TaskService::create(&mut storage, req).unwrap();
     assert!(task.id.starts_with("MCP-"));
 
-    let storage = lotar::Storage::new(resolver.path);
+    let storage = lotar::Storage::new(&resolver.path);
     let got = lotar::services::task_service::TaskService::get(&storage, &task.id, None).unwrap();
     assert_eq!(got.id, task.id);
 
@@ -1327,7 +1327,7 @@ fn mcp_task_update_resolves_me_in_patch() {
 
     // Create a task (using service for convenience)
     let resolver = lotar::TasksDirectoryResolver::resolve(None, None).unwrap();
-    let mut storage = lotar::Storage::new(resolver.path.clone());
+    let mut storage = lotar::Storage::new(&resolver.path);
     let created = lotar::services::task_service::TaskService::create(
         &mut storage,
         lotar::api_types::TaskCreate {

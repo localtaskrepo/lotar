@@ -426,7 +426,7 @@ fn stats_changed_and_churn_and_authors() {
         &format!(
             "title: One\nstatus: TODO\npriority: MEDIUM\ncreated: {created}\nmodified: {modified}\n",
             created = created_one.clone(),
-            modified = created_one.clone(),
+            modified = created_one,
         ),
     );
     add_and_commit(
@@ -443,8 +443,8 @@ fn stats_changed_and_churn_and_authors() {
         ".tasks/TEST/1.yml",
         &format!(
             "title: One edited\nstatus: IN_PROGRESS\npriority: MEDIUM\ncreated: {created}\nmodified: {modified}\n",
-            created = created_one.clone(),
-            modified = edit_one.clone(),
+            created = created_one,
+            modified = edit_one,
         ),
     );
     add_and_commit(
@@ -462,7 +462,7 @@ fn stats_changed_and_churn_and_authors() {
         &format!(
             "title: Two\nstatus: TODO\npriority: LOW\ncreated: {created}\nmodified: {modified}\n",
             created = created_two.clone(),
-            modified = created_two.clone(),
+            modified = created_two,
         ),
     );
     add_and_commit(
@@ -479,8 +479,8 @@ fn stats_changed_and_churn_and_authors() {
         ".tasks/TEST/1.yml",
         &format!(
             "title: One edited again\nstatus: IN_PROGRESS\npriority: MEDIUM\ncreated: {created}\nmodified: {modified}\n",
-            created = created_one.clone(),
-            modified = edit_one_again.clone(),
+            created = created_one,
+            modified = edit_one_again,
         ),
     );
     add_and_commit(

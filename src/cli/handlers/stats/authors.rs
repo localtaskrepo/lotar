@@ -1,15 +1,14 @@
 // Auto-generated from stats_handler.rs.
 pub(crate) fn run(
-    since: Option<String>,
-    until: Option<String>,
+    since: Option<&str>,
+    until: Option<&str>,
     limit: usize,
     global: bool,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
-    let (since_dt, until_dt) =
-        crate::utils::time::parse_since_until(since.as_deref(), until.as_deref())?;
+    let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
     let scope_project = if global {
         None

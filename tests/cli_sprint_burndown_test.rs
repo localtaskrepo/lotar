@@ -26,7 +26,7 @@ issue.priorities: [Low, Medium, High]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -152,7 +152,7 @@ issue.priorities: [Low, High]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {

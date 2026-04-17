@@ -218,7 +218,7 @@ impl TaskService {
         // If project not provided, derive prefix from ID (e.g., ABCD-1 -> ABCD)
         let derived = id.split('-').next().unwrap_or("");
         let p = project.unwrap_or(derived).to_string();
-        match storage.get(id, p.clone()) {
+        match storage.get(id, &p) {
             Some(mut t) => {
                 let config = Self::resolve_config_for_project(storage.root_path.as_path(), &p);
                 Self::ensure_task_defaults(&mut t, &config);
@@ -230,17 +230,17 @@ impl TaskService {
     }
 
     /// Add a comment to a task and fire `on.commented` automation rules.
-    pub fn add_comment(storage: &mut Storage, id: &str, text: String) -> LoTaRResult<TaskDTO> {
+    pub fn add_comment(storage: &mut Storage, id: &str, text: &str) -> LoTaRResult<TaskDTO> {
         let derived = id.split('-').next().unwrap_or("");
         let mut task = storage
-            .get(id, derived.to_string())
+            .get(id, derived)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
         let now = chrono::Utc::now().to_rfc3339();
         let actor = resolve_current_user(Some(storage.root_path.as_path()));
         task.comments.push(crate::types::TaskComment {
             date: now.clone(),
-            text: text.clone(),
+            text: text.to_string(),
         });
         task.history.push(TaskChangeLogEntry {
             at: now.clone(),
@@ -248,7 +248,7 @@ impl TaskService {
             changes: vec![TaskChange {
                 field: "comment".into(),
                 old: None,
-                new: Some(text.clone()),
+                new: Some(text.to_string()),
             }],
         });
         task.modified = now;
@@ -257,7 +257,7 @@ impl TaskService {
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let dto = Self::to_dto(id, task, Some(&sprint_lookup));
-        let _ = AutomationService::apply_comment_event(storage, &dto, &text, &config);
+        let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
         Ok(dto)
     }
 
@@ -274,7 +274,7 @@ impl TaskService {
         // Derive project prefix from ID (e.g., ABCD-1 -> ABCD) to locate the task
         let derived = id.split('-').next().unwrap_or("");
         let existing = storage
-            .get(id, derived.to_string())
+            .get(id, derived)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
         if context.enforce_review_owner {
@@ -597,7 +597,7 @@ impl TaskService {
 
     pub fn delete(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<bool> {
         let derived = id.split('-').next().unwrap_or("");
-        let p = project.unwrap_or(derived).to_string();
+        let p = project.unwrap_or(derived);
         storage.delete(id, p)
     }
 
@@ -914,6 +914,20 @@ impl TaskService {
         }
         if task.tags.is_empty() && !config.default_tags.is_empty() {
             task.tags = config.default_tags.clone();
+        }
+        // Normalize legacy @-prefixed member values for display consistency.
+        let is_agent = |name: &str| config.agent_profiles.contains_key(name);
+        if let Some(ref a) = task.assignee {
+            let normalized = crate::utils::member::normalize_member_value(a, is_agent);
+            if normalized != *a {
+                task.assignee = Some(normalized);
+            }
+        }
+        if let Some(ref r) = task.reporter {
+            let normalized = crate::utils::member::normalize_member_value(r, is_agent);
+            if normalized != *r {
+                task.reporter = Some(normalized);
+            }
         }
     }
 

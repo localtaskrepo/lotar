@@ -824,13 +824,13 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type {
-    SprintBurndownResponse,
-    SprintCreateRequest,
-    SprintListItem,
-    SprintSummaryReportResponse,
-    SprintUpdateRequest,
-    SprintVelocityResponse,
-    TaskDTO,
+  SprintBurndownResponse,
+  SprintCreateRequest,
+  SprintListItem,
+  SprintSummaryReportResponse,
+  SprintUpdateRequest,
+  SprintVelocityResponse,
+  TaskDTO,
 } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -1901,10 +1901,11 @@ watch(
 
 watch(
   () => project.value,
-  (p) => {
+  (p, prev) => {
     refreshConfigDefaults(p || undefined).catch((error) => {
       console.warn('Failed to refresh sprint defaults', error)
     })
+    if (prev !== undefined) scheduleTasksRefresh()
   },
   { immediate: true },
 )
@@ -3215,9 +3216,13 @@ onUnmounted(() => {
 <style scoped>
 .header {
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.header h1 {
+  margin-bottom: 0;
 }
 
 .alert.warn {
@@ -3230,7 +3235,7 @@ onUnmounted(() => {
 .filter-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   padding: 0;
   position: relative;
 }
@@ -3238,15 +3243,17 @@ onUnmounted(() => {
 .sprints-filter-row {
   display: flex;
   gap: 12px;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
+  min-height: 36px;
 }
 
 .sprints-quick-row {
   display: flex;
   gap: 12px;
-  align-items: flex-end;
+  align-items: center;
   flex-wrap: wrap;
+  min-height: 36px;
 }
 
 .sprints-quick-row__chips {
@@ -3257,21 +3264,36 @@ onUnmounted(() => {
 
 .sprints-quick-row__controls {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
 }
 
 .sprints-filter-row__main {
   flex: 1;
-  min-width: min(640px, 100%);
+  min-width: 0;
+}
+
+.filter-field-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .filter-field {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   min-width: 160px;
+}
+
+.filter-field > .muted {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 2px);
+  font-size: var(--text-xs, 0.75rem);
+  line-height: 1.2;
+  pointer-events: none;
 }
 
 .icon-only {
@@ -3313,7 +3335,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   align-self: flex-end;
-  padding-bottom: 4px;
+  padding-bottom: 2px;
 }
 
 .filter-checkbox input {

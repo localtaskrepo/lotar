@@ -79,7 +79,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let already = task
@@ -118,7 +118,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let before_len = task.references.len();
@@ -189,7 +189,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let already = task
@@ -260,7 +260,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let before_len = task.references.len();
@@ -319,7 +319,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let already = match kind.trim().to_ascii_lowercase().as_str() {
@@ -391,7 +391,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let before_len = task.references.len();
@@ -449,7 +449,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let already = task
@@ -504,7 +504,7 @@ impl ReferenceService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let before_len = task.references.len();
@@ -775,7 +775,7 @@ mod tests {
         let tasks_dir = temp.path().join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let task = TaskService::create(
             &mut storage,
             TaskCreate {
@@ -831,7 +831,7 @@ mod tests {
 
         let storage_root = repo_root.join(".tasks");
         fs::create_dir_all(&storage_root).unwrap();
-        let mut storage = Storage::new(storage_root);
+        let mut storage = Storage::new(&storage_root);
 
         let task = TaskService::create(
             &mut storage,
@@ -879,7 +879,7 @@ mod tests {
         let tasks_dir = temp.path().join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let task = TaskService::create(
             &mut storage,
             TaskCreate {
@@ -918,7 +918,7 @@ mod tests {
         let tasks_dir = temp.path().join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let task = TaskService::create(
             &mut storage,
             TaskCreate {
@@ -960,7 +960,7 @@ mod tests {
         let tasks_dir = repo_root.join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let task = TaskService::create(
             &mut storage,
             TaskCreate {
@@ -1023,7 +1023,7 @@ mod tests {
         let tasks_dir = repo_root.join(".tasks");
         fs::create_dir_all(&tasks_dir).unwrap();
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let task = TaskService::create(
             &mut storage,
             TaskCreate {

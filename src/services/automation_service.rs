@@ -416,7 +416,7 @@ impl AutomationService {
     ) -> LoTaRResult<()> {
         let config =
             resolve_config_for_project(tasks_dir, Some(ticket_id.split('-').next().unwrap_or("")))?;
-        let mut storage = Storage::new(tasks_dir.to_path_buf());
+        let mut storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
         let (automation, _) = load_effective_automation(
             tasks_dir,
@@ -462,7 +462,7 @@ impl AutomationService {
     ) -> LoTaRResult<SimulateResult> {
         let config =
             resolve_config_for_project(tasks_dir, Some(ticket_id.split('-').next().unwrap_or("")))?;
-        let storage = Storage::new(tasks_dir.to_path_buf());
+        let storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
         let (automation, _) = load_effective_automation(
             tasks_dir,
@@ -1355,7 +1355,7 @@ fn apply_sprint_action(
 fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -> LoTaRResult<()> {
     let project_prefix = task_id.split('-').next().unwrap_or("");
     let mut task = storage
-        .get(task_id, project_prefix.to_string())
+        .get(task_id, project_prefix)
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
     let now = chrono::Utc::now().to_rfc3339();
     task.comments.push(crate::types::TaskComment {
@@ -1435,7 +1435,7 @@ fn maybe_queue_agent_on_assignment(
             .unwrap_or(DEFAULT_MAX_ITERATIONS);
         let terminal_count = count_terminal_jobs_for_ticket(&task.id);
         if terminal_count >= limit as usize {
-            let mut storage = Storage::new(tasks_dir.to_path_buf());
+            let mut storage = Storage::new(tasks_dir);
             let _ = TaskService::update_with_context(
                 &mut storage,
                 &task.id,
@@ -1455,7 +1455,7 @@ fn maybe_queue_agent_on_assignment(
         }
     }
 
-    let mut storage = Storage::new(tasks_dir.to_path_buf());
+    let mut storage = Storage::new(tasks_dir);
     let blocked_by = find_blocked_dependencies(&storage, task, config);
     if !blocked_by.is_empty() {
         let _ = mark_task_blocked(&mut storage, task, config, &blocked_by);
@@ -1506,7 +1506,7 @@ fn find_blocked_dependencies(
         }
         let prefix = trimmed.split('-').next().unwrap_or("");
         let status = storage
-            .get(trimmed, prefix.to_string())
+            .get(trimmed, prefix)
             .map(|task| task.status)
             .map(|status| status.as_str().to_ascii_lowercase());
 

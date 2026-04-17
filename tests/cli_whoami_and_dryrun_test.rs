@@ -122,7 +122,7 @@ fn status_dry_run_explain_previews_and_does_not_write() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Create a task via service to get a known ID
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir);
     let created = TaskService::create(
         &mut storage,
         TaskCreate {

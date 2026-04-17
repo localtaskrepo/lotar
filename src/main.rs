@@ -21,10 +21,10 @@ use lotar::{help, output};
 
 /// Resolve the tasks directory based on config and command line arguments
 fn resolve_tasks_directory_with_override(
-    override_path: Option<String>,
+    override_path: Option<&str>,
 ) -> Result<TasksDirectoryResolver, String> {
     TasksDirectoryResolver::resolve(
-        override_path.as_deref(),
+        override_path,
         None, // Use default .tasks folder name
     )
 }
@@ -142,7 +142,7 @@ fn main() {
     }
 
     // Resolve tasks directory
-    let resolver = match resolve_tasks_directory_with_override(cli.tasks_dir.clone()) {
+    let resolver = match resolve_tasks_directory_with_override(cli.tasks_dir.as_deref()) {
         Ok(resolver) => resolver,
         Err(error) => {
             let renderer =
@@ -470,7 +470,7 @@ fn main() {
             renderer.log_info("BEGIN PULL");
             match SyncHandler::execute(
                 SyncDirection::Pull,
-                args,
+                &args,
                 cli.project.as_deref(),
                 &resolver,
                 &renderer,
@@ -490,7 +490,7 @@ fn main() {
             renderer.log_info("BEGIN PUSH");
             match SyncHandler::execute(
                 SyncDirection::Push,
-                args,
+                &args,
                 cli.project.as_deref(),
                 &resolver,
                 &renderer,
@@ -509,7 +509,8 @@ fn main() {
         Commands::Sync(args) => match args.action {
             SyncCommandAction::Check(check_args) => {
                 renderer.log_info("BEGIN SYNC CHECK");
-                match SyncHandler::check(check_args, cli.project.as_deref(), &resolver, &renderer) {
+                match SyncHandler::check(&check_args, cli.project.as_deref(), &resolver, &renderer)
+                {
                     Ok(()) => {
                         renderer.log_info("END SYNC CHECK status=ok");
                         Ok(())
@@ -585,7 +586,7 @@ fn main() {
                                 )
                             })?
                     } else {
-                        tasks_abs.clone()
+                        tasks_abs
                     };
                     // Resolve project scoping
                     let project_filter: Option<String> = if global {
@@ -736,7 +737,7 @@ fn main() {
                                         .unwrap_or_default()
                                 };
 
-                                let title = get_str("title").unwrap_or_else(|| "".to_string());
+                                let title = get_str("title").unwrap_or_default();
 
                                 let status = get_str("status")
                                     .and_then(|s| lotar::types::TaskStatus::from_str(&s).ok())

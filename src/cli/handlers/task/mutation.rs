@@ -21,7 +21,7 @@ pub fn load_task(
     let mut full_id = ctx.resolve_full_task_id(raw_id, project)?;
     let mut project_prefix = full_id.split('-').next().unwrap_or("").to_string();
 
-    let mut task_opt = ctx.storage.get(&full_id, project_prefix.clone());
+    let mut task_opt = ctx.storage.get(&full_id, &project_prefix);
 
     if task_opt.is_none()
         && raw_id.chars().all(|c| c.is_ascii_digit())

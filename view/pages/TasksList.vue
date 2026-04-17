@@ -88,20 +88,7 @@
             </div>
           </div>
         </div>
-      </div>
-      <div class="tasks-filter-row">
-        <div class="tasks-filter-row__main">
-          <FilterBar
-            ref="filterBarRef"
-            :statuses="statuses"
-            :priorities="priorities"
-            :types="types"
-            :value="filter"
-            storage-key="lotar.tasks.filter"
-            @update:value="onFilterUpdate"
-          />
-        </div>
-        <div class="tasks-filter-row__paging">
+        <nav class="tasks-quick-row__paging" aria-label="Top pagination">
           <UiButton
             variant="ghost"
             type="button"
@@ -113,6 +100,20 @@
             <IconGlyph name="chevron-left" />
             <span>Prev</span>
           </UiButton>
+          <template v-for="(p, i) in visiblePageNumbers" :key="'top-' + i">
+            <span v-if="p === '...'" class="pagination-ellipsis muted">&hellip;</span>
+            <UiButton
+              v-else
+              :variant="p === currentPage ? 'primary' : 'ghost'"
+              type="button"
+              :aria-label="`Page ${p}`"
+              :aria-current="p === currentPage ? 'page' : undefined"
+              :disabled="loading"
+              @click="goToPage(p)"
+            >
+              {{ p }}
+            </UiButton>
+          </template>
           <UiButton
             variant="ghost"
             type="button"
@@ -123,6 +124,30 @@
           >
             <span>Next</span>
             <IconGlyph name="chevron-right" />
+          </UiButton>
+        </nav>
+      </div>
+      <div class="tasks-filter-row">
+        <div class="tasks-filter-row__main">
+          <FilterBar
+            ref="filterBarRef"
+            :statuses="statuses"
+            :priorities="priorities"
+            :types="types"
+            :sprint-options="sprintFilterOptions"
+            :value="filter"
+            storage-key="lotar.tasks.filter"
+            @update:value="onFilterUpdate"
+          />
+        </div>
+        <div class="tasks-filter-row__actions">
+          <UiButton type="button" title="Configure columns" @click="taskTableRef?.toggleColumnMenu()">
+            <IconGlyph name="columns" aria-hidden="true" />
+            <span>Columns</span>
+          </UiButton>
+          <UiButton type="button" aria-label="Add task" title="Add task" @click="openCreate">
+            <IconGlyph name="plus" aria-hidden="true" />
+            <span>Task</span>
           </UiButton>
         </div>
       </div>
@@ -150,12 +175,14 @@
       />
       <TaskTable
         v-else
+        ref="taskTableRef"
         :tasks="shownTasks"
         :loading="loading"
         :statuses="statuses"
         :selectable="bulk"
         :selected-ids="selectedIds"
         :show-bulk-controls="false"
+        :show-toolbar="false"
         :project-key="filter.project || (shownTasks[0]?.id?.split('-')[0] || '')"
         :touches="activityTouches"
         :sprint-lookup="sprintLookup"
@@ -180,6 +207,43 @@
         @sprint-remove="openSingleSprintRemove"
       />
     </div>
+
+    <nav v-if="hasTasks && totalPages > 1" class="pagination-bar" aria-label="Task list pagination">
+      <UiButton
+        variant="ghost"
+        type="button"
+        aria-label="Previous page"
+        :disabled="loading || !hasPrevPage"
+        @click="prevPage"
+      >
+        <IconGlyph name="chevron-left" />
+        <span>Prev</span>
+      </UiButton>
+      <template v-for="(p, i) in visiblePageNumbers" :key="i">
+        <span v-if="p === '...'" class="pagination-ellipsis muted">&hellip;</span>
+        <UiButton
+          v-else
+          :variant="p === currentPage ? 'primary' : 'ghost'"
+          type="button"
+          :aria-label="`Page ${p}`"
+          :aria-current="p === currentPage ? 'page' : undefined"
+          :disabled="loading"
+          @click="goToPage(p)"
+        >
+          {{ p }}
+        </UiButton>
+      </template>
+      <UiButton
+        variant="ghost"
+        type="button"
+        aria-label="Next page"
+        :disabled="loading || !hasNextPage"
+        @click="nextPage"
+      >
+        <span>Next</span>
+        <IconGlyph name="chevron-right" />
+      </UiButton>
+    </nav>
 
     <UiModal :open="assignDialogOpen" :aria-label="assignDialogTitle" @close="closeAssignDialog">
           <form class="col tasks-modal__form" @submit.prevent="submitAssignDialog">
@@ -366,6 +430,9 @@ const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
 const { sprintLookup } = useSprintFormatting(sprints)
+const sprintFilterOptions = computed(() =>
+  (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
+)
 const sprintSelection = ref('active')
 const allowClosedSprint = ref(false)
 const sprintOptions = computed(() => {
@@ -405,6 +472,7 @@ watch(
 
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
+const taskTableRef = ref<InstanceType<typeof TaskTable> | null>(null)
 const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
@@ -421,6 +489,22 @@ const pageEnd = computed(() => Math.min(pageOffset.value + shownCount.value, tot
 const hasPrevPage = computed(() => pageOffset.value > 0)
 const hasNextPage = computed(() => pageOffset.value + shownCount.value < totalCount.value)
 const hasTasks = computed(() => shownCount.value > 0)
+const currentPage = computed(() => Math.floor(pageOffset.value / pageLimit.value) + 1)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageLimit.value)))
+const visiblePageNumbers = computed(() => {
+  const total = totalPages.value
+  const current = currentPage.value
+  if (total <= 1) return []
+  const pages: (number | '...')[] = []
+  pages.push(1)
+  const rangeStart = Math.max(2, current - 3)
+  const rangeEnd = Math.min(total - 1, current + 3)
+  if (rangeStart > 2) pages.push('...')
+  for (let i = rangeStart; i <= rangeEnd; i++) pages.push(i)
+  if (rangeEnd < total - 1) pages.push('...')
+  if (total > 1) pages.push(total)
+  return pages
+})
 
 async function syncPaginationUrl(nav: 'push' | 'replace' = 'push') {
   const q: Record<string, string> = { ...filter.value }
@@ -444,6 +528,12 @@ async function prevPage() {
 async function nextPage() {
   if (!hasNextPage.value) return
   pageOffset.value = pageOffset.value + pageLimit.value
+  await syncPaginationUrl()
+}
+
+async function goToPage(page: number) {
+  const clamped = Math.max(1, Math.min(page, totalPages.value))
+  pageOffset.value = (clamped - 1) * pageLimit.value
   await syncPaginationUrl()
 }
 
@@ -1257,6 +1347,14 @@ const handleTaskUpdated = (task: TaskDTO) => {
   max-width: 100%;
 }
 
+.tasks-quick-row__paging {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .tasks-quick-row__controls {
   display: inline-flex;
   align-items: center;
@@ -1343,16 +1441,26 @@ const handleTaskUpdated = (task: TaskDTO) => {
 
 .tasks-filter-row__main {
   flex: 1;
-  min-width: min(640px, 100%);
+  min-width: 0;
 }
 
-.tasks-filter-row__paging {
-  display: inline-flex;
+.tasks-filter-row__actions {
+  display: flex;
   align-items: center;
   gap: 8px;
   margin-left: auto;
-  flex-wrap: wrap;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pagination-ellipsis {
+  padding: 0 4px;
 }
 
 .tasks-modal__form {

@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Serialize;
 
@@ -23,11 +23,11 @@ use crate::workspace::{TasksDirectoryResolver, TasksDirectorySource};
 use super::context::AssignmentContext;
 
 pub(crate) fn handle_add(
-    add_args: SprintAddArgs,
-    tasks_root: PathBuf,
+    add_args: &SprintAddArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let resolver = local_resolver(&tasks_root);
+    let resolver = local_resolver(tasks_root);
     let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
@@ -135,11 +135,11 @@ pub(crate) fn handle_add(
 }
 
 pub(crate) fn handle_move(
-    move_args: SprintMoveArgs,
-    tasks_root: PathBuf,
+    move_args: &SprintMoveArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let resolver = local_resolver(&tasks_root);
+    let resolver = local_resolver(tasks_root);
     let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 
@@ -247,11 +247,11 @@ pub(crate) fn handle_move(
 }
 
 pub(crate) fn handle_remove(
-    remove_args: SprintRemoveArgs,
-    tasks_root: PathBuf,
+    remove_args: &SprintRemoveArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let resolver = local_resolver(&tasks_root);
+    let resolver = local_resolver(tasks_root);
     let resolved_config = load_resolved_config(&resolver)?;
     let mut context = AssignmentContext::for_mutation(tasks_root)?;
 

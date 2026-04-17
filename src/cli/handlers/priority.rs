@@ -46,7 +46,7 @@ impl CommandHandler for PriorityHandler {
         let LoadedTask { full_id, task, .. } = load_task(&mut ctx, &task_id, project_hint)?;
 
         match new_priority {
-            Some(candidate) => handle_set_priority(candidate, full_id, task, &mut ctx, renderer),
+            Some(candidate) => handle_set_priority(&candidate, &full_id, &task, &mut ctx, renderer),
             None => {
                 render_current_priority(renderer, &full_id, &task.priority);
                 Ok(())
@@ -56,9 +56,9 @@ impl CommandHandler for PriorityHandler {
 }
 
 fn handle_set_priority(
-    candidate: String,
-    full_id: String,
-    task: Task,
+    candidate: &str,
+    full_id: &str,
+    task: &Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
@@ -69,12 +69,12 @@ fn handle_set_priority(
     ));
 
     let validated_priority = validator
-        .validate_priority(&candidate)
+        .validate_priority(candidate)
         .map_err(|e| format!("Priority validation failed: {}", e))?;
 
     let old_priority = task.priority.clone();
     if old_priority == validated_priority {
-        render_noop_priority(renderer, &full_id, &validated_priority);
+        render_noop_priority(renderer, full_id, &validated_priority);
         return Ok(());
     }
 
@@ -83,11 +83,11 @@ fn handle_set_priority(
         priority: Some(validated_priority.clone()),
         ..Default::default()
     };
-    crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
+    crate::services::task_service::TaskService::update(&mut ctx.storage, full_id, patch)
         .map_err(|e| e.to_string())?;
     renderer.log_info("priority: updated successfully");
 
-    render_priority_success(renderer, &full_id, &old_priority, &validated_priority);
+    render_priority_success(renderer, full_id, &old_priority, &validated_priority);
     Ok(())
 }
 

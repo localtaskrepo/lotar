@@ -80,7 +80,7 @@ impl CommandHandler for StatusHandler {
 
         if let Some(candidate) = new_status {
             return handle_set_status(
-                candidate, dry_run, explain, full_id, task, &mut ctx, renderer,
+                &candidate, dry_run, explain, &full_id, task, &mut ctx, renderer,
             );
         }
 
@@ -90,10 +90,10 @@ impl CommandHandler for StatusHandler {
 }
 
 fn handle_set_status(
-    candidate: String,
+    candidate: &str,
     dry_run: bool,
     explain: bool,
-    full_id: String,
+    full_id: &str,
     mut task: crate::storage::task::Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
@@ -104,13 +104,13 @@ fn handle_set_status(
         candidate
     ));
     let validated_status = validator
-        .validate_status(&candidate)
+        .validate_status(candidate)
         .map_err(|e| format!("Status validation failed: {}", e))?;
 
     let old_status = task.status.clone();
     if old_status == validated_status {
         renderer.log_info("status: no-op (old == new)");
-        render_status_noop(renderer, &full_id, &old_status);
+        render_status_noop(renderer, full_id, &old_status);
         return Ok(());
     }
 
@@ -126,7 +126,7 @@ fn handle_set_status(
     if dry_run {
         render_status_preview(
             renderer,
-            &full_id,
+            full_id,
             &old_status,
             &validated_status,
             resolved_assignee.as_deref(),
@@ -142,8 +142,8 @@ fn handle_set_status(
 
     // If an agent job is already running for this ticket, changing status would
     // disrupt the automation lifecycle. Require the user to cancel the job first.
-    if let Some(job) = running_job_for_ticket(&full_id)
-        && !current_agent_job_matches_ticket(&full_id)
+    if let Some(job) = running_job_for_ticket(full_id)
+        && !current_agent_job_matches_ticket(full_id)
     {
         if let Some(job_id) = job.job_id.as_deref() {
             return Err(format!(
@@ -175,14 +175,14 @@ fn handle_set_status(
         sprints: None,
     };
 
-    let updated = TaskService::update(&mut ctx.storage, &full_id, patch)
-        .map_err(TaskStorageAction::Update.map_err(&full_id))?;
+    let updated = TaskService::update(&mut ctx.storage, full_id, patch)
+        .map_err(TaskStorageAction::Update.map_err(full_id))?;
 
     renderer.log_info("status: updated successfully");
 
     render_status_success(
         renderer,
-        &full_id,
+        full_id,
         &old_status,
         &validated_status,
         updated.assignee.as_deref(),

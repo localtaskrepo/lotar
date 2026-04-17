@@ -13,7 +13,7 @@ pub(crate) fn run_keys(
             .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
             .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
     };
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()
@@ -53,7 +53,7 @@ pub(crate) fn run_keys(
 }
 
 pub(crate) fn run_field(
-    name: String,
+    name: &str,
     limit: usize,
     global: bool,
     project: Option<&str>,
@@ -67,7 +67,7 @@ pub(crate) fn run_field(
             .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
             .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
     };
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()
@@ -76,7 +76,7 @@ pub(crate) fn run_field(
     use std::collections::BTreeMap;
     let mut counts: BTreeMap<String, u64> = BTreeMap::new();
     for (_id, t) in tasks.into_iter() {
-        if let Some(v) = t.custom_fields.get(&name) {
+        if let Some(v) = t.custom_fields.get(name) {
             let key = crate::cli::handlers::stats::common::custom_value_key(v);
             *counts.entry(key).or_insert(0) += 1;
         }

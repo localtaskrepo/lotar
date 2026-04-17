@@ -18,6 +18,7 @@ impl TaskStorageAction {
     }
 
     /// Format a user-facing error message for a storage failure.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn format_error(self, subject: &str, err: LoTaRError) -> String {
         let permission_hint = match &err {
             LoTaRError::IoError(io_err)

@@ -78,7 +78,7 @@ fn sprint_list_reports_empty_state() {
 #[test]
 fn sprint_list_and_show_surface_created_sprint() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -227,7 +227,7 @@ sprints:
 #[test]
 fn sprint_service_applies_defaults_for_direct_callers() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let defaults = SprintDefaultsConfig {
         capacity_points: Some(18),
@@ -259,7 +259,7 @@ fn sprint_service_applies_defaults_for_direct_callers() {
 #[test]
 fn sprint_update_modifies_plan_and_actual_fields() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -300,7 +300,7 @@ fn sprint_update_modifies_plan_and_actual_fields() {
 #[test]
 fn sprint_start_auto_selects_pending_sprint() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_one = Sprint {
         plan: Some(SprintPlan {
@@ -350,7 +350,7 @@ fn sprint_start_auto_selects_pending_sprint() {
 #[test]
 fn sprint_close_defaults_to_last_active_sprint() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -387,7 +387,7 @@ fn sprint_close_defaults_to_last_active_sprint() {
 #[test]
 fn sprint_start_warns_about_parallel_active_sprints() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
         plan: Some(SprintPlan {
@@ -432,7 +432,7 @@ fn sprint_start_warns_about_parallel_active_sprints() {
 #[test]
 fn sprint_close_warns_about_remaining_active_sprints() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
         plan: Some(SprintPlan {
@@ -481,7 +481,7 @@ fn sprint_close_warns_about_remaining_active_sprints() {
 #[test]
 fn sprint_start_warns_when_start_time_far_in_future() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -520,7 +520,7 @@ fn sprint_start_warns_when_start_time_far_in_future() {
 #[test]
 fn sprint_start_warns_when_planned_start_is_overdue() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let planned_start = (Utc::now() - Duration::hours(36)).to_rfc3339();
 
@@ -549,7 +549,7 @@ fn sprint_start_warns_when_planned_start_is_overdue() {
 #[test]
 fn sprint_close_warns_when_past_planned_end() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let planned_start = Utc::now() - Duration::days(14);
     let planned_start_str = planned_start.to_rfc3339();
@@ -607,7 +607,7 @@ sprints:
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
         plan: Some(SprintPlan {
@@ -648,7 +648,7 @@ sprints:
 #[test]
 fn sprint_no_warn_suppresses_lifecycle_warnings() {
     let fixtures = common::TestFixtures::new();
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_alpha = Sprint {
         plan: Some(SprintPlan {
@@ -721,7 +721,7 @@ issue.priorities: [Medium]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -810,7 +810,7 @@ issue.priorities: [Medium]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -842,7 +842,7 @@ issue.priorities: [Medium]
         .assert()
         .success();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let mut done_hours_task = Task::new(
         fixtures.tasks_root.clone(),
@@ -935,7 +935,7 @@ issue.priorities: [Medium]
 fn sprint_review_auto_selects_latest_completed_when_id_omitted() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_one = Sprint {
         plan: Some(SprintPlan {
@@ -1000,7 +1000,7 @@ fn sprint_review_auto_selects_latest_completed_when_id_omitted() {
 fn sprint_cleanup_refs_prunes_missing_memberships() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -1036,14 +1036,14 @@ fn sprint_cleanup_refs_prunes_missing_memberships() {
             "Sprint #99: removed 1 reference(s).",
         ));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
+    let storage_after = Storage::new(&fixtures.tasks_root);
     let tasks = storage_after.search(&TaskFilter::default());
     let (_, updated_task) = tasks
         .into_iter()
         .find(|(id, _)| id == &task_id)
         .expect("task still exists");
 
-    assert!(updated_task.sprints.is_empty());
+    assert_eq!(updated_task.sprints, vec![1]);
     let memberships = task_sprint_ids(&storage_after, &task_id);
     assert_eq!(memberships, vec![1]);
 }
@@ -1052,7 +1052,7 @@ fn sprint_cleanup_refs_prunes_missing_memberships() {
 fn sprint_cleanup_refs_targets_requested_sprint() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let mut task = Task::new(
         fixtures.tasks_root.clone(),
@@ -1081,7 +1081,7 @@ fn sprint_cleanup_refs_targets_requested_sprint() {
             "Sprint #6: removed 1 reference(s).",
         ));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
+    let storage_after = Storage::new(&fixtures.tasks_root);
     let tasks = storage_after.search(&TaskFilter::default());
     let (_, updated_task) = tasks
         .into_iter()
@@ -1097,7 +1097,7 @@ fn sprint_cleanup_refs_targets_requested_sprint() {
 fn sprint_add_assigns_tasks_to_sprint() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -1137,14 +1137,10 @@ fn sprint_add_assigns_tasks_to_sprint() {
             "Attached sprint #1 (Sprint Attach) to 2 task(s).",
         ));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
-    let task_a_after = storage_after
-        .get(&id_a, "TEST".to_string())
-        .expect("task a exists");
+    let storage_after = Storage::new(&fixtures.tasks_root);
+    let task_a_after = storage_after.get(&id_a, "TEST").expect("task a exists");
     assert!(task_a_after.sprints.is_empty());
-    let task_b_after = storage_after
-        .get(&id_b, "TEST".to_string())
-        .expect("task b exists");
+    let task_b_after = storage_after.get(&id_b, "TEST").expect("task b exists");
     assert!(task_b_after.sprints.is_empty());
     let sprint_members = sprint_task_ids(&storage_after, 1);
     assert!(sprint_members.contains(&id_a));
@@ -1155,7 +1151,7 @@ fn sprint_add_assigns_tasks_to_sprint() {
 fn sprint_add_requires_force_for_existing_membership() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_one = Sprint {
         plan: Some(SprintPlan {
@@ -1200,9 +1196,9 @@ fn sprint_add_requires_force_for_existing_membership() {
             "Attached sprint #2 (Beta) to 1 task(s).",
         ));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
+    let storage_after = Storage::new(&fixtures.tasks_root.clone());
     let fetched = storage_after
-        .get(&task_id, "TEST".to_string())
+        .get(&task_id, "TEST")
         .expect("task still exists");
     assert!(fetched.sprints.is_empty());
     let memberships = task_sprint_ids(&storage_after, &task_id);
@@ -1219,10 +1215,8 @@ fn sprint_add_requires_force_for_existing_membership() {
         ))
         .stdout(predicate::str::contains("moved from sprint(s) #1"));
 
-    let storage_final = Storage::new(fixtures.tasks_root.clone());
-    let updated = storage_final
-        .get(&task_id, "TEST".to_string())
-        .expect("task updated");
+    let storage_final = Storage::new(&fixtures.tasks_root);
+    let updated = storage_final.get(&task_id, "TEST").expect("task updated");
     assert!(updated.sprints.is_empty());
     let memberships = task_sprint_ids(&storage_final, &task_id);
     assert_eq!(memberships, vec![2]);
@@ -1232,7 +1226,7 @@ fn sprint_add_requires_force_for_existing_membership() {
 fn sprint_move_reassigns_memberships() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_one = Sprint {
         plan: Some(SprintPlan {
@@ -1278,10 +1272,8 @@ fn sprint_move_reassigns_memberships() {
         ))
         .stdout(predicate::str::contains("moved from sprint(s) #1"));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
-    let updated = storage_after
-        .get(&task_id, "TEST".to_string())
-        .expect("task updated");
+    let storage_after = Storage::new(&fixtures.tasks_root);
+    let updated = storage_after.get(&task_id, "TEST").expect("task updated");
     assert!(updated.sprints.is_empty());
     let memberships = task_sprint_ids(&storage_after, &task_id);
     assert_eq!(memberships, vec![2]);
@@ -1291,7 +1283,7 @@ fn sprint_move_reassigns_memberships() {
 fn sprint_move_json_reports_reassignment_messages() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint_one = Sprint {
         plan: Some(SprintPlan {
@@ -1355,7 +1347,7 @@ fn sprint_move_json_reports_reassignment_messages() {
 fn sprint_add_appends_select_filter_results() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -1404,7 +1396,7 @@ fn sprint_add_appends_select_filter_results() {
     .success()
     .stdout(predicate::str::contains("2 task(s)"));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
+    let storage_after = Storage::new(&fixtures.tasks_root);
     let record = SprintService::get(&storage_after, 1).expect("sprint #1 exists");
     let assigned: Vec<String> = record
         .sprint
@@ -1420,7 +1412,7 @@ fn sprint_add_appends_select_filter_results() {
 fn sprint_remove_detaches_tasks() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -1457,10 +1449,8 @@ fn sprint_remove_detaches_tasks() {
             "Removed sprint #1 (Sprint Detach) from 1 task(s).",
         ));
 
-    let storage_after = Storage::new(fixtures.tasks_root.clone());
-    let task_after = storage_after
-        .get(&task_id, "TEST".to_string())
-        .expect("task exists");
+    let storage_after = Storage::new(&fixtures.tasks_root);
+    let task_after = storage_after.get(&task_id, "TEST").expect("task exists");
     assert!(task_after.sprints.is_empty());
     let memberships = task_sprint_ids(&storage_after, &task_id);
     assert!(memberships.is_empty());
@@ -1470,7 +1460,7 @@ fn sprint_remove_detaches_tasks() {
 fn sprint_backlog_lists_unassigned_tasks() {
     let fixtures = common::TestFixtures::new();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {

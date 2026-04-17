@@ -330,7 +330,7 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(msg) => return err(req.id, -32602, msg, None),
     };
 
-    let storage = match Storage::try_open(resolver.path.clone()) {
+    let storage = match Storage::try_open(&resolver.path.clone()) {
         Some(storage) => storage,
         None => {
             let mut payload = serde_json::Map::new();
@@ -448,7 +448,7 @@ pub(crate) fn handle_sprint_get(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let storage = Storage::new(resolver.path);
+    let storage = Storage::new(&resolver.path);
     let record = match SprintService::get(&storage, sprint_id) {
         Ok(record) => record,
         Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
@@ -509,7 +509,7 @@ pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(&resolver.path);
     let sprint = sprint_from_create_request(&body);
     let defaults = if body.skip_defaults {
         None
@@ -575,7 +575,7 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(error) => return err(req.id, -32602, &format!("Invalid params: {}", error), None),
     };
 
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(&resolver.path);
     let existing = match SprintService::get(&storage, sprint_id) {
         Ok(record) => record,
         Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
@@ -647,7 +647,7 @@ pub(crate) fn handle_sprint_summary(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let storage = Storage::new(resolver.path.clone());
+    let storage = Storage::new(&resolver.path.clone());
     let record = match SprintService::get(&storage, sprint_id) {
         Ok(record) => record,
         Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
@@ -707,7 +707,7 @@ pub(crate) fn handle_sprint_burndown(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let storage = Storage::new(resolver.path.clone());
+    let storage = Storage::new(&resolver.path.clone());
     let record = match SprintService::get(&storage, sprint_id) {
         Ok(record) => record,
         Err(crate::errors::LoTaRError::SprintNotFound(_)) => {
@@ -797,7 +797,7 @@ pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let storage = match Storage::try_open(resolver.path.clone()) {
+    let storage = match Storage::try_open(&resolver.path.clone()) {
         Some(storage) => storage,
         None => {
             let empty = VelocityComputation {
@@ -848,7 +848,7 @@ pub(crate) fn handle_sprint_velocity(req: JsonRpcRequest) -> JsonRpcResponse {
         include_active,
         metric,
     };
-    let computed = compute_velocity(&storage, records, &resolved_config, options, Utc::now());
+    let computed = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
     let payload = computed.to_payload(include_active);
 
     ok(
@@ -871,7 +871,7 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     let mut records = match SprintService::list(&storage) {
         Ok(records) => records,
         Err(e) => {
@@ -1083,7 +1083,7 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     let mut records = match SprintService::list(&storage) {
         Ok(records) => records,
         Err(e) => {
@@ -1242,7 +1242,7 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
 
     let sprint_id = match req.params.get("sprint_id") {
         Some(Value::Number(num)) => num.as_u64().and_then(|value| u32::try_from(value).ok()),
@@ -1473,7 +1473,7 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
             EnumHints::from_resolved_config(cfg, &project_scope)
         });
 
-    let mut storage = match Storage::try_open(resolver.path.clone()) {
+    let mut storage = match Storage::try_open(&resolver.path.clone()) {
         Some(storage) => storage,
         None => {
             let mut payload = serde_json::Map::new();
@@ -1604,7 +1604,7 @@ pub(crate) fn handle_sprint_backlog(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
-    let result = match sprint_assignment::fetch_backlog(&storage, options) {
+    let result = match sprint_assignment::fetch_backlog(&storage, &options) {
         Ok(result) => result,
         Err(msg) => return err(req.id, -32602, msg.as_str(), None),
     };

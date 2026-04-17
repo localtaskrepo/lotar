@@ -712,7 +712,7 @@ fn test_project_config_validation_empty_project_name() {
     let validator = ConfigValidator::new(temp_dir.path());
 
     let mut config = base_project_config();
-    config.project_name = "".to_string(); // Empty name should trigger error
+    config.project_name = String::new(); // Empty name should trigger error
 
     let result = validator.validate_project_config(&config);
     assert!(result.has_errors());

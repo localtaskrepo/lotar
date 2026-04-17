@@ -24,7 +24,7 @@ issue.priorities: [Low, Medium, High]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
     let now = Utc::now();
     let upcoming_start = now + Duration::days(21);
     let upcoming_end = upcoming_start + Duration::days(14);
@@ -59,7 +59,7 @@ issue.priorities: [Low, Medium, High]
     let active_created =
         SprintService::create(&mut storage, active, None).expect("create active sprint");
     let active_id = active_created.record.id;
-    let mut active_doc = active_created.record.sprint.clone();
+    let mut active_doc = active_created.record.sprint;
     active_doc.actual = Some(SprintActual {
         started_at: Some(active_start.to_rfc3339()),
         ..SprintActual::default()
@@ -80,7 +80,7 @@ issue.priorities: [Low, Medium, High]
     let completed_created =
         SprintService::create(&mut storage, completed, None).expect("create completed sprint");
     let completed_id = completed_created.record.id;
-    let mut completed_doc = completed_created.record.sprint.clone();
+    let mut completed_doc = completed_created.record.sprint;
     completed_doc.actual = Some(SprintActual {
         started_at: Some(completed_start.to_rfc3339()),
         closed_at: Some(completed_end.to_rfc3339()),
@@ -197,7 +197,7 @@ issue.priorities: [Low, High]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let now = Utc::now();
     let starts_at = now + Duration::days(2);

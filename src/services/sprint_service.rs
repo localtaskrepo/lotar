@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::config::types::SprintDefaultsConfig;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -37,7 +37,7 @@ impl SprintService {
             if !entry.path().is_file() {
                 continue;
             }
-            let (id, mut sprint) = Self::load_entry(entry.path())?;
+            let (id, mut sprint) = Self::load_entry(&entry.path())?;
             let _ = sprint.canonicalize();
             records.push(SprintRecord { id, sprint });
         }
@@ -50,7 +50,7 @@ impl SprintService {
         if !path.exists() {
             return Err(LoTaRError::SprintNotFound(id));
         }
-        let (loaded_id, mut sprint) = Self::load_entry(path)?;
+        let (loaded_id, mut sprint) = Self::load_entry(&path)?;
         let _ = sprint.canonicalize();
         Ok(SprintRecord {
             id: loaded_id,
@@ -131,7 +131,7 @@ impl SprintService {
             if project.is_empty() {
                 continue;
             }
-            if let Some(task) = storage.get(task_id, project) {
+            if let Some(task) = storage.get(task_id, &project) {
                 tasks.push((task_id.to_string(), task));
             }
         }
@@ -153,7 +153,7 @@ impl SprintService {
         Ok(max_id.saturating_add(1))
     }
 
-    fn load_entry(path: PathBuf) -> LoTaRResult<(u32, Sprint)> {
+    fn load_entry(path: &Path) -> LoTaRResult<(u32, Sprint)> {
         let stem = path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -161,7 +161,7 @@ impl SprintService {
         let id: u32 = stem
             .parse()
             .map_err(|_| LoTaRError::SerializationError("Invalid sprint identifier".into()))?;
-        let contents = fs::read_to_string(&path)?;
+        let contents = fs::read_to_string(path)?;
         let sprint: Sprint = serde_yaml::from_str(&contents)?;
         Ok((id, sprint))
     }

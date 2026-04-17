@@ -277,7 +277,7 @@ fn api_sprint_assignment_and_backlog() {
     )
     .unwrap();
 
-    let mut storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let mut storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let mut sprint = lotar::storage::sprint::Sprint::default();
     sprint.plan = Some(lotar::storage::sprint::SprintPlan {
         label: Some("Iteration 1".into()),
@@ -356,7 +356,7 @@ fn api_sprint_assignment_and_backlog() {
 
     let add_body = json!({
         "sprint": sprint_id,
-        "tasks": [task_a.id.clone(), task_b.id.clone()]
+        "tasks": [task_a.id, task_b.id]
     });
     let add_req = mk_req("POST", "/api/sprints/add", &[], add_body);
     let add_resp = api.handle_request(&add_req);
@@ -370,7 +370,7 @@ fn api_sprint_assignment_and_backlog() {
         .unwrap_or_default();
     assert_eq!(modified.len(), 2);
 
-    let storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let storage = lotar::storage::manager::Storage::new(&tasks_dir.clone());
     let assigned_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
         .expect("task a assigned");
     assert_eq!(assigned_a.sprints, vec![sprint_id]);
@@ -402,7 +402,7 @@ fn api_sprint_assignment_and_backlog() {
 
     let remove_body = json!({
         "sprint": sprint_id,
-        "tasks": [task_a.id.clone()]
+        "tasks": [task_a.id]
     });
     let remove_req = mk_req("POST", "/api/sprints/remove", &[], remove_body);
     let remove_resp = api.handle_request(&remove_req);
@@ -416,7 +416,7 @@ fn api_sprint_assignment_and_backlog() {
         .unwrap_or_default();
     assert_eq!(removed, vec![serde_json::Value::String(task_a.id.clone())]);
 
-    let storage = lotar::storage::manager::Storage::new(tasks_dir.clone());
+    let storage = lotar::storage::manager::Storage::new(&tasks_dir);
     let updated_a = lotar::services::task_service::TaskService::get(&storage, &task_a.id, None)
         .expect("task a after remove");
     assert!(updated_a.sprints.is_empty());
@@ -647,7 +647,7 @@ fn api_comment_update_edits_existing_comment() {
         "POST",
         "/api/tasks/comment",
         &[],
-        json!({ "id": id.clone(), "text": "Initial note" }),
+        json!({ "id": id, "text": "Initial note" }),
     ));
     assert_eq!(resp.status, 200, "add comment status");
     let with_comment: Value = serde_json::from_slice(&resp.body).unwrap();
@@ -661,7 +661,7 @@ fn api_comment_update_edits_existing_comment() {
         "POST",
         "/api/tasks/comment/update",
         &[],
-        json!({ "id": id.clone(), "index": 0, "text": " Edited note " }),
+        json!({ "id": id, "index": 0, "text": " Edited note " }),
     ));
     assert_eq!(resp.status, 200, "edit comment status");
     let updated: Value = serde_json::from_slice(&resp.body).unwrap();

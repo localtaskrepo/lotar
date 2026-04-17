@@ -83,17 +83,17 @@ impl CommandHandler for AssigneeHandler {
                 Ok(())
             }
             Some(candidate) => handle_set_assignee(
-                candidate, dry_run, explain, full_id, task, &mut ctx, renderer,
+                &candidate, dry_run, explain, &full_id, task, &mut ctx, renderer,
             ),
         }
     }
 }
 
 fn handle_set_assignee(
-    candidate: String,
+    candidate: &str,
     dry_run: bool,
     explain: bool,
-    full_id: String,
+    full_id: &str,
     mut task: crate::storage::task::Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
@@ -120,14 +120,14 @@ fn handle_set_assignee(
     let previous = task.assignee.clone();
 
     if previous.as_deref() == Some(validated.as_str()) {
-        render_assignee_noop(renderer, &full_id, previous.as_deref());
+        render_assignee_noop(renderer, full_id, previous.as_deref());
         return Ok(());
     }
 
     // If an agent job is already running for this ticket, changing assignee would
     // disrupt the automation lifecycle. Require the user to cancel the job first.
-    if let Some(job) = running_job_for_ticket(&full_id)
-        && !current_agent_job_matches_ticket(&full_id)
+    if let Some(job) = running_job_for_ticket(full_id)
+        && !current_agent_job_matches_ticket(full_id)
     {
         if let Some(job_id) = job.job_id.as_deref() {
             return Err(format!(
@@ -144,7 +144,7 @@ fn handle_set_assignee(
     if dry_run {
         render_assignee_dry_run(
             renderer,
-            &full_id,
+            full_id,
             previous.as_deref(),
             Some(validated.as_str()),
             explain,
@@ -169,11 +169,11 @@ fn handle_set_assignee(
         sprints: None,
     };
     let updated =
-        TaskService::update(&mut ctx.storage, &full_id, patch).map_err(|e| e.to_string())?;
+        TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
 
     render_assignee_success(
         renderer,
-        &full_id,
+        full_id,
         previous.as_deref(),
         updated.assignee.as_deref(),
     );

@@ -85,6 +85,7 @@ impl SyncReportRecorder {
         }
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn record(&mut self, status: SyncEntryStatus, entry: SyncReportEntry) {
         match status {
             SyncEntryStatus::Created => self.summary.created += 1,
@@ -152,7 +153,7 @@ impl SyncReportRecorder {
 }
 
 fn emit_sync_event(kind: &str, payload: JsonValue) {
-    crate::api_events::emit(crate::api_events::ApiEvent {
+    crate::api_events::emit(&crate::api_events::ApiEvent {
         kind: kind.to_string(),
         data: payload,
     });
@@ -883,7 +884,7 @@ fn perform_push(
         ));
     }
 
-    let storage = Storage::new(resolver.path.clone());
+    let storage = Storage::new(&resolver.path.clone());
     let tasks = if let Some(task_id) = task_id {
         let trimmed = task_id.trim();
         if trimmed.is_empty() {
@@ -1168,7 +1169,7 @@ fn perform_push(
                         "Auth profile is required for sync operations".to_string(),
                     )
                 })?;
-                let mut storage = Storage::new(resolver.path.clone());
+                let mut storage = Storage::new(&resolver.path.clone());
                 match remote.provider {
                     SyncProvider::Jira => {
                         ensure_jira_issue_types(&mut jira_lookup, Some(client), remote, warnings);
@@ -1360,7 +1361,7 @@ fn perform_pull(
             ));
         }
 
-        let storage = Storage::new(resolver.path.clone());
+        let storage = Storage::new(&resolver.path.clone());
         let existing = TaskService::get(&storage, trimmed, Some(project))?;
         let reference = match determine_reference_state(remote, &existing) {
             ReferenceState::Matching(value) => value,
@@ -1424,7 +1425,7 @@ fn perform_pull(
             return Ok(());
         }
 
-        let mut storage = Storage::new(resolver.path.clone());
+        let mut storage = Storage::new(&resolver.path.clone());
         if let Err(err) = TaskService::update(&mut storage, &existing.id, update) {
             recorder.record(
                 SyncEntryStatus::Failed,
@@ -1461,7 +1462,7 @@ fn perform_pull(
         SyncProvider::Github => github_list_issues(client, remote, warnings)?,
     };
 
-    let storage = Storage::new(resolver.path.clone());
+    let storage = Storage::new(&resolver.path.clone());
 
     let filter = TaskListFilter {
         project: Some(project.to_string()),
@@ -1476,7 +1477,7 @@ fn perform_pull(
 
     let mut failures = Vec::new();
 
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
 
     for issue in issues {
         let issue_title = default_title_from_issue(remote.provider, &issue);
@@ -2998,6 +2999,7 @@ fn apply_jira_field(
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn apply_github_field(payload: &mut GithubIssuePayload, field: &str, value: FieldValue) {
     let field_lower = field.to_ascii_lowercase();
     match field_lower.as_str() {

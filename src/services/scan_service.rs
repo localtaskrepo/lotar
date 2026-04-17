@@ -24,6 +24,7 @@ const ACTION_SKIP: &str = "skip";
 pub struct ScanService;
 
 impl ScanService {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn run(
         resolver: &TasksDirectoryResolver,
         request: ScanRequest,
@@ -120,7 +121,7 @@ impl ScanService {
         let mut storage = if dry_run {
             None
         } else {
-            Some(Storage::new(resolver.path.clone()))
+            Some(Storage::new(&resolver.path.clone()))
         };
 
         for entry in all_results {
@@ -498,7 +499,7 @@ fn update_task_code_reference(
     }
 
     let mut task = storage
-        .get(task_id, derived.to_string())
+        .get(task_id, derived)
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
     let has_exact = task

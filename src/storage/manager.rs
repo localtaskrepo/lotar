@@ -5,7 +5,7 @@ use crate::storage::locator::StorageLocator;
 use crate::storage::search::StorageSearch;
 use crate::storage::task::Task;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Main storage manager that orchestrates all storage operations
 pub struct Storage {
@@ -15,13 +15,14 @@ pub struct Storage {
 
 impl Storage {
     /// Create storage with default filesystem backend
-    pub fn new(root_path: PathBuf) -> Self {
+    pub fn new(root_path: &Path) -> Self {
         let backend: Box<dyn StorageBackend> = Box::new(FsBackend);
         Self::new_with_backend(root_path, backend)
     }
 
     /// Create storage with an explicit backend implementation
-    pub fn new_with_backend(root_path: PathBuf, backend: Box<dyn StorageBackend>) -> Self {
+    pub fn new_with_backend(root_path: &Path, backend: Box<dyn StorageBackend>) -> Self {
+        let root_path = root_path.to_path_buf();
         let _ = fs::create_dir_all(&root_path);
 
         // Ensure global config exists
@@ -30,8 +31,9 @@ impl Storage {
     }
 
     /// Create Storage with intelligent global config creation
-    pub fn new_with_context(root_path: PathBuf, project_context: Option<&str>) -> Self {
+    pub fn new_with_context(root_path: &Path, project_context: Option<&str>) -> Self {
         let backend: Box<dyn StorageBackend> = Box::new(FsBackend);
+        let root_path = root_path.to_path_buf();
         let _ = fs::create_dir_all(&root_path);
 
         // Ensure global config exists with smart default_project detection
@@ -41,13 +43,13 @@ impl Storage {
 
     /// Try to open existing storage without creating directories
     /// Returns None if the storage directory doesn't exist
-    pub fn try_open(root_path: PathBuf) -> Option<Self> {
+    pub fn try_open(root_path: &Path) -> Option<Self> {
         if !root_path.exists() {
             return None;
         }
 
         Some(Self {
-            root_path,
+            root_path: root_path.to_path_buf(),
             backend: Box::new(FsBackend),
         })
     }
@@ -63,8 +65,8 @@ impl Storage {
             .map_err(map_storage_error)
     }
 
-    pub fn get(&self, id: &str, project: String) -> Option<Task> {
-        self.backend.get(&self.root_path, id, &project)
+    pub fn get(&self, id: &str, project: &str) -> Option<Task> {
+        self.backend.get(&self.root_path, id, project)
     }
 
     pub fn find_task_by_numeric_id(&self, numeric_id: &str) -> Option<(String, Task)> {
@@ -143,9 +145,9 @@ impl Storage {
             .map_err(map_storage_error)
     }
 
-    pub fn delete(&mut self, id: &str, project: String) -> LoTaRResult<bool> {
+    pub fn delete(&mut self, id: &str, project: &str) -> LoTaRResult<bool> {
         self.backend
-            .delete(&self.root_path, id, &project)
+            .delete(&self.root_path, id, project)
             .map_err(map_storage_error)
     }
 

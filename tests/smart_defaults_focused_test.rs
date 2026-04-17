@@ -35,7 +35,7 @@ mod assignment {
         )
         .unwrap();
 
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir);
         let req = TaskCreate {
             title: "Auto reporter".to_string(),
             project: Some("TEST".to_string()),
@@ -60,7 +60,7 @@ mod assignment {
         )
         .unwrap();
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let req = TaskCreate {
             title: "No reporter".to_string(),
             project: Some("TEST".to_string()),
@@ -80,7 +80,7 @@ mod assignment {
         std::fs::create_dir_all(&tasks_dir).unwrap();
         let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let req = TaskCreate {
             title: "File reporter".to_string(),
             project: Some("TEST".to_string()),
@@ -108,7 +108,7 @@ mod assignment {
 
         lotar::utils::identity::invalidate_identity_cache(Some(&tasks_dir));
 
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir);
         let req = TaskCreate {
             title: "Alias reporter".to_string(),
             project: Some("TEST".to_string()),
@@ -136,7 +136,7 @@ mod assignment {
             .expect("load merged config");
         assert_eq!(merged.default_reporter.as_deref(), Some("bob"));
 
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir.clone());
         let create = TaskCreate {
             title: "Needs assignee".to_string(),
             project: Some("TEST".to_string()),
@@ -145,7 +145,7 @@ mod assignment {
         let created = TaskService::create(&mut storage, create).unwrap();
         assert!(created.assignee.is_none(), "assignee should start None");
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let updated = TaskService::update(
             &mut storage,
             &created.id,
@@ -170,7 +170,7 @@ mod assignment {
         )
         .unwrap();
 
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir.clone());
         let create = TaskCreate {
             title: "No auto assign".to_string(),
             project: Some("TEST".to_string()),
@@ -179,7 +179,7 @@ mod assignment {
         let created = TaskService::create(&mut storage, create).unwrap();
         assert!(created.assignee.is_none());
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let updated = TaskService::update(
             &mut storage,
             &created.id,
@@ -208,7 +208,7 @@ mod assignment {
         )
         .unwrap();
 
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir.clone());
         let created = TaskService::create(
             &mut storage,
             TaskCreate {
@@ -221,7 +221,7 @@ mod assignment {
         .unwrap();
 
         // Status change should not override existing assignee
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir);
         let updated = TaskService::update(
             &mut storage,
             &created.id,
@@ -242,7 +242,7 @@ mod assignment {
         let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
         let _guard_rep = EnvVarGuard::set("LOTAR_DEFAULT_REPORTER", "env-reporter@example.com");
 
-        let mut storage = Storage::new(tasks_dir);
+        let mut storage = Storage::new(&tasks_dir);
         let req = TaskCreate {
             title: "Env reporter".to_string(),
             project: Some("TEST".to_string()),

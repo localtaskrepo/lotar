@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::Utc;
 
@@ -13,16 +13,16 @@ use crate::storage::manager::Storage;
 use super::helpers::{format_float, select_sprint_id_for_review};
 
 pub(crate) fn handle_burndown(
-    burndown_args: SprintBurndownArgs,
-    tasks_root: PathBuf,
+    burndown_args: &SprintBurndownArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let config_root = tasks_root.clone();
+    let config_root = tasks_root;
     let storage = Storage::try_open(tasks_root)
         .ok_or_else(|| "No sprints found. Create one before running burndown.".to_string())?;
 
     let resolved_config =
-        load_and_merge_configs(Some(config_root.as_path())).map_err(|err| err.to_string())?;
+        load_and_merge_configs(Some(config_root)).map_err(|err| err.to_string())?;
 
     let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
     if records.is_empty() {

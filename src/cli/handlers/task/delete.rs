@@ -70,7 +70,7 @@ impl CommandHandler for DeleteHandler {
         // Delete the task
         let deleted = ctx
             .storage
-            .delete(&full_id, project_prefix.clone())
+            .delete(&full_id, &project_prefix)
             .map_err(TaskStorageAction::Delete.map_err(&full_id))?;
         if deleted {
             match renderer.format {

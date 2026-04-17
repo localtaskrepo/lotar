@@ -113,14 +113,16 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
   async function hydrateAll(filter: TaskListFilter = {}, opts: HydrateOptions = {}) {
     const pageSize = opts.pageSize ?? 200
-    if (opts.clear) {
-      _map.value.clear()
-      bump()
-    }
     status.value = 'loading'
     error.value = null
 
     try {
+      // Build into a NEW map so the swap is atomic — avoids the empty-then-fill
+      // flash that breaks TransitionGroup animations when clear === true.
+      const newMap: Map<string, TaskDTO> = opts.clear
+        ? new Map()
+        : new Map(_map.value)
+
       let currentOffset = 0
       let expectedTotal = 0
       let pages = 0
@@ -137,13 +139,15 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         if (batch.length === 0) break
 
         for (const task of batch) {
-          _map.value.set(task.id, task)
+          newMap.set(task.id, task)
         }
         currentOffset += batch.length
         if (expectedTotal && currentOffset >= expectedTotal) break
       }
 
-      serverTotal.value = expectedTotal || _map.value.size
+      // Atomic swap — TransitionGroup sees old items → new items in one tick.
+      _map.value = newMap
+      serverTotal.value = expectedTotal || newMap.size
       lastSyncAt.value = Date.now()
       status.value = 'ready'
       bump()

@@ -68,7 +68,7 @@ issue.priorities: [Low, Medium, High]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     // Older completed sprint
     let sprint_alpha = Sprint {
@@ -87,7 +87,7 @@ issue.priorities: [Low, Medium, High]
     let alpha_created =
         SprintService::create(&mut storage, sprint_alpha, None).expect("create sprint alpha");
     let alpha_id = alpha_created.record.id;
-    let mut alpha_doc = alpha_created.record.sprint.clone();
+    let mut alpha_doc = alpha_created.record.sprint;
     alpha_doc.actual = Some(SprintActual {
         started_at: Some("2025-09-01T09:00:00Z".to_string()),
         closed_at: Some("2025-09-12T17:00:00Z".to_string()),
@@ -126,7 +126,7 @@ issue.priorities: [Low, Medium, High]
     let beta_created =
         SprintService::create(&mut storage, sprint_beta, None).expect("create sprint beta");
     let beta_id = beta_created.record.id;
-    let mut beta_doc = beta_created.record.sprint.clone();
+    let mut beta_doc = beta_created.record.sprint;
     beta_doc.actual = Some(SprintActual {
         started_at: Some("2025-10-01T09:00:00Z".to_string()),
         closed_at: Some("2025-10-15T15:00:00Z".to_string()),
@@ -161,7 +161,7 @@ issue.priorities: [Low, Medium, High]
     let gamma_created =
         SprintService::create(&mut storage, sprint_gamma, None).expect("create sprint gamma");
     let gamma_id = gamma_created.record.id;
-    let mut gamma_doc = gamma_created.record.sprint.clone();
+    let mut gamma_doc = gamma_created.record.sprint;
     gamma_doc.actual = Some(SprintActual {
         started_at: Some("2025-10-20T09:00:00Z".to_string()),
         ..SprintActual::default()

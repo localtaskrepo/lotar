@@ -48,14 +48,14 @@ impl AgentHandler {
             AgentAction::Status { id } => Self::status(&id, resolver, renderer),
             AgentAction::Logs { id } => Self::logs(&id, resolver, renderer),
             AgentAction::Cancel { id } => Self::cancel(&id, renderer),
-            AgentAction::Check(args) => Self::check(args, project, resolver, renderer),
+            AgentAction::Check(args) => Self::check(&args, project, resolver, renderer),
             AgentAction::ListRunning => Self::list_running(renderer),
-            AgentAction::ListJobs(args) => Self::list_jobs(args, resolver, renderer),
+            AgentAction::ListJobs(args) => Self::list_jobs(&args, resolver, renderer),
             AgentAction::Queue(args) => Self::queue(args, resolver, renderer),
             AgentAction::Worktree(args) => match args.action {
                 WorktreeAction::List => Self::worktree_list(resolver, renderer),
                 WorktreeAction::Cleanup(cleanup_args) => {
-                    Self::worktree_cleanup(cleanup_args, resolver, renderer)
+                    Self::worktree_cleanup(&cleanup_args, resolver, renderer)
                 }
             },
             AgentAction::Worker(args) => Self::worker(args, resolver),
@@ -249,7 +249,7 @@ impl AgentHandler {
     }
 
     fn list_jobs(
-        args: AgentListJobsArgs,
+        args: &AgentListJobsArgs,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
@@ -407,7 +407,7 @@ impl AgentHandler {
     }
 
     fn check(
-        args: AgentCheckArgs,
+        args: &AgentCheckArgs,
         project: Option<&str>,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
@@ -444,7 +444,7 @@ impl AgentHandler {
             project: project.map(|p| p.to_string()),
             ..Default::default()
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let mut matches: Vec<crate::api_types::TaskDTO> = TaskService::list(&storage, &filter)
             .into_iter()
             .map(|(_, task)| task)
@@ -580,7 +580,7 @@ impl AgentHandler {
     }
 
     fn worktree_cleanup(
-        args: WorktreeCleanupArgs,
+        args: &WorktreeCleanupArgs,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
@@ -729,7 +729,7 @@ fn list_agent_worktrees(
     let worktrees = parse_git_worktree_list(&stdout, branch_prefix);
 
     // Enrich with task status information
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
     let mut results = Vec::new();
     for (path, branch) in worktrees {
@@ -799,7 +799,7 @@ fn extract_ticket_from_branch(branch: &str, prefix: &str) -> String {
 fn check_ticket_done(storage: &crate::storage::manager::Storage, ticket_id: &str) -> bool {
     // Derive project prefix from ID (e.g., ABCD-1 -> ABCD)
     let derived = ticket_id.split('-').next().unwrap_or("");
-    match storage.get(ticket_id, derived.to_string()) {
+    match storage.get(ticket_id, derived) {
         Some(task) => {
             let status_lower = task.status.as_str().to_lowercase();
             status_lower == "done" || status_lower == "closed" || status_lower == "completed"

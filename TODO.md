@@ -3,15 +3,11 @@
 - Allow CLI list/search to filter by age older than N days
 - Allow ticket files to be stored in nested folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
 - Extend custom fields to support more complex queries (AND/OR logic, NOT operations, etc.)
-- Bug: Tasks List list item action "edit tags" doesn't work when hiding the tags column
 - History stored exact same content as comments when a new one is added
-- "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.
 - Support references to other tickets in the description when rendering markdown (e.g. "See TASK-1234 for more info" becomes a link with hover card). 
 - Option to automatically add ticket reference to relationships if they're not already in a more specific category.
 - Option to drag and drop tickets between relationship categories in the web UI.
 - Dependency graph visualization for related/blocked tickets (e.g., graph view in TODO.md or UI).
-- Dialogs are still different color on Board and Calendar compared to Tasks and Sprints.
-- Add a filter field for sprints to the board page and tasks list
 - Extend agent based project to include product development. Should include e.g. perplexity or similar research agents to gather requirements, write specs, etc.
 - Allow to trigger on ticket events like "created", "updated", "comment added", "description changed", etc.
 - Template variables for agent instructions and script that get filled in at runtime. Should follow env/bash syntax for both inline and file-based instructions. This allows for dynamic instructions that can reference ticket fields, context variables, etc. Should support lists for properties like "references". Bash/env syntax allows to address both simple values and complex structures (e.g., `${{references[*].id}}` to get a list of all reference IDs).
@@ -20,22 +16,18 @@
 - Add dependency concistency check command
 - Should a depends_on autimatically create blocks reference on the other ticket?
 - Rework the project init function to create configs dynamically instead of using template files. Implement an interactive dialog on CLI (with -yes flag support to auto create with flags specifying choices) and the WebUI.
-- Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system))
-- Update dependencies
+- Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system)
 - Add aliases for command commands so that LLMs don't get tripped up (e.g. it's often trying "lotar show <id>", and "lotar update <id>")
 - Config UI should be rebuilt using a submenu for each section, rather than one giant view with all configs tiled.
+- Allow tags to be assigned a color (Store it in the project config under tags, but keep it backwards compatible)
+- Allow to define one or more done states in the config (right now defaults to last state in the list)
 
 Bugs:
-- @implement (agent) was added to member list of projects (which it shouldn't)
 - lotar init --project'"..." doesn't work properly. Configs are generated in the project, not global, and the globalm default project isn't set to the first new project.
 - Changelog includes the entire comment body as a copy when a comment is added, duplicating a spamming the file.
 - When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
 - The WebUI doesn't allow custom fields to be shown in the column options.
-- lotar list only shows 20 tasks by default, which is confusing when there are more. We should either show all or implement pagination.
-- Board view only shows up to 50 tickets
-- Board filters don't work
-- Insights are limited to 50 tickets and ignore the rest
 - Creating a new project doesn't update the UI until the page is reloaded
 - On the tasks list a prev/next button should also be shown at the end of the list, not just the beginning
-- Boards are global and not per project so sprints show up in all projects no matter the filter. While global sprints are okay we should also support and default to project-specific sprints that only show up when the project is selected.
-- Completed tickets should not be marked as overdue
+- Tasks List list item action "edit tags" doesn't work when hiding the tags column
+- "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.

@@ -819,7 +819,7 @@ fn default_port() -> u16 {
 fn default_project_name() -> String {
     // Don't default to "auto" - this should only be set during initial config creation
     // with actual auto-detection. Empty string means no default project is set.
-    "".to_string()
+    String::new()
 }
 fn default_priority() -> Priority {
     Priority::from("Medium")

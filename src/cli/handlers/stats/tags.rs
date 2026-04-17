@@ -16,7 +16,7 @@ pub(crate) fn run(
     };
 
     // Load all tasks (current snapshot)
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()

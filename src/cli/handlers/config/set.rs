@@ -10,8 +10,8 @@ impl ConfigHandler {
     pub(super) fn handle_config_set(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
-        field: String,
-        value: String,
+        field: &str,
+        value: &str,
         dry_run: bool,
         force: bool,
         mut global: bool,
@@ -19,7 +19,7 @@ impl ConfigHandler {
     ) -> Result<(), String> {
         // Auto-detect global-only fields
         let global_only_fields = ["server_port", "default_project"];
-        if global_only_fields.contains(&field.as_str()) && !global {
+        if global_only_fields.contains(&field) && !global {
             global = true;
             if !dry_run {
                 renderer.emit_info(format_args!(
@@ -33,7 +33,7 @@ impl ConfigHandler {
             renderer.emit_info(format_args!("DRY RUN: Would set {} = {}", field, value));
 
             // Check for validation conflicts
-            let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
+            let conflicts = Self::check_validation_conflicts(resolver, field, value, global)?;
             if !conflicts.is_empty() {
                 renderer.emit_warning("WARNING: This change would cause validation conflicts:");
                 for conflict in conflicts {
@@ -56,7 +56,7 @@ impl ConfigHandler {
 
         // Check for validation conflicts unless forced
         if !force {
-            let conflicts = Self::check_validation_conflicts(resolver, &field, &value, global)?;
+            let conflicts = Self::check_validation_conflicts(resolver, field, value, global)?;
             if !conflicts.is_empty() {
                 renderer.emit_warning("WARNING: This change would cause validation conflicts:");
                 for conflict in conflicts {
@@ -70,9 +70,9 @@ impl ConfigHandler {
         }
 
         // Validate field name and value
-        ConfigManager::validate_field_name(&field, global)
+        ConfigManager::validate_field_name(field, global)
             .map_err(|e| format!("Validation error: {}", e))?;
-        ConfigManager::validate_field_value(&field, &value)
+        ConfigManager::validate_field_value(field, value)
             .map_err(|e| format!("Validation error: {}", e))?;
 
         // Determine project prefix if not global
@@ -107,8 +107,8 @@ impl ConfigHandler {
 
         let validation = ConfigManager::update_config_field(
             &resolver.path,
-            &field,
-            &value,
+            field,
+            value,
             project_prefix.as_deref(),
         )
         .map_err(|e| format!("Failed to update config: {}", e))?;
@@ -116,7 +116,7 @@ impl ConfigHandler {
         validation_warnings.extend(validation.warnings.iter().map(|w| w.to_string()));
 
         if project_prefix.is_some()
-            && Self::check_matches_global_default(&field, &value, &resolver.path)
+            && Self::check_matches_global_default(field, value, &resolver.path)
         {
             renderer.emit_info(
                 "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field.",

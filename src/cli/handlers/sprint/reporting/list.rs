@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::Utc;
 use serde::Serialize;
@@ -34,8 +34,8 @@ const MIN_TABLE_TOTAL_WIDTH: usize = MIN_ID_COL_WIDTH
     + COLUMN_GAP_COUNT;
 
 pub(crate) fn handle_list(
-    list_args: SprintListArgs,
-    tasks_root: PathBuf,
+    list_args: &SprintListArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     if let Some(limit) = list_args.limit
@@ -44,7 +44,7 @@ pub(crate) fn handle_list(
         return Err("--limit must be greater than zero".to_string());
     }
 
-    let mut storage_opt = Storage::try_open(tasks_root.clone());
+    let mut storage_opt = Storage::try_open(tasks_root);
     let mut records: Vec<SprintRecord> = Vec::new();
     let mut integrity = MissingSprintReport::default();
     let mut baseline_integrity = integrity.clone();

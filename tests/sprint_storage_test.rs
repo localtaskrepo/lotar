@@ -10,7 +10,7 @@ fn sprint_create_canonicalizes_length_when_ends_at_present() {
     let tasks_dir = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir);
     let sprint = Sprint {
         plan: Some(SprintPlan {
             goal: Some("Ship new onboarding flow".to_string()),
@@ -50,7 +50,7 @@ fn sprint_create_and_list_trims_empty_sections() {
     let tasks_dir = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir);
     let sprint = Sprint {
         plan: Some(SprintPlan {
             label: Some("Sprint 42".to_string()),
@@ -58,11 +58,11 @@ fn sprint_create_and_list_trims_empty_sections() {
                 points: Some(0),
                 hours: None,
             }),
-            overdue_after: Some("".to_string()),
+            overdue_after: Some(String::new()),
             ..SprintPlan::default()
         }),
         actual: Some(SprintActual {
-            started_at: Some("".to_string()),
+            started_at: Some(String::new()),
             closed_at: None,
         }),
         ..Sprint::default()
@@ -101,7 +101,7 @@ fn sprint_service_migrates_legacy_directory() {
     )
     .unwrap();
 
-    let storage = Storage::new(tasks_dir.clone());
+    let storage = Storage::new(&tasks_dir.clone());
     let records = SprintService::list(&storage).expect("list legacy sprints");
 
     assert_eq!(records.len(), 1);

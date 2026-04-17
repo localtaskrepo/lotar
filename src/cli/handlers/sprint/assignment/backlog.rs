@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use serde::Serialize;
 
@@ -13,8 +13,8 @@ use crate::types::TaskStatus;
 use super::context::AssignmentContext;
 
 pub(crate) fn handle_backlog(
-    backlog_args: SprintBacklogArgs,
-    tasks_root: PathBuf,
+    backlog_args: &SprintBacklogArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     if backlog_args.limit == 0 {
@@ -60,7 +60,7 @@ pub(crate) fn handle_backlog(
         limit: backlog_args.limit,
     };
 
-    let result = sprint_assignment::fetch_backlog(&context.storage, options)?;
+    let result = sprint_assignment::fetch_backlog(&context.storage, &options)?;
     let entries = result.entries;
     let truncated = result.truncated;
 

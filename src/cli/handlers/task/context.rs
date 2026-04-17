@@ -81,9 +81,9 @@ impl TaskCommandContext {
         create_storage: bool,
     ) -> Result<Self, String> {
         let storage = if create_storage {
-            Storage::new(resolver.path.clone())
+            Storage::new(&resolver.path.clone())
         } else {
-            Storage::try_open(resolver.path.clone()).ok_or_else(|| {
+            Storage::try_open(&resolver.path.clone()).ok_or_else(|| {
                 "No tasks found. Use 'lotar add' to create tasks first.".to_string()
             })?
         };

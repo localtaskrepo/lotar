@@ -34,7 +34,7 @@ fn task_reference_add_and_remove_link_file_and_code() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
     // Create a task with a known ID.
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir.clone());
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
@@ -89,10 +89,8 @@ fn task_reference_add_and_remove_link_file_and_code() {
         .success();
 
     // Verify persisted
-    let storage = Storage::new(tasks_dir.clone());
-    let task = storage
-        .get(&created.id, "TEST".to_string())
-        .expect("task should exist");
+    let storage = Storage::new(&tasks_dir.clone());
+    let task = storage.get(&created.id, "TEST").expect("task should exist");
     assert!(
         task.references
             .iter()
@@ -152,10 +150,8 @@ fn task_reference_add_and_remove_link_file_and_code() {
         .success();
 
     // Verify removed
-    let storage = Storage::new(tasks_dir);
-    let task = storage
-        .get(&created.id, "TEST".to_string())
-        .expect("task should exist");
+    let storage = Storage::new(&tasks_dir);
+    let task = storage.get(&created.id, "TEST").expect("task should exist");
     assert!(
         !task
             .references

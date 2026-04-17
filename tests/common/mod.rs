@@ -28,7 +28,7 @@ pub fn lotar_cmd() -> Result<Command, CargoError> {
 }
 
 #[ctor]
-fn init_lotar_test_environment() {
+unsafe fn init_lotar_test_environment() {
     reset_lotar_test_environment();
 }
 
@@ -73,7 +73,7 @@ impl TestFixtures {
 
     #[allow(dead_code)] // Used across multiple test modules
     pub fn create_storage(&self) -> Storage {
-        Storage::new(self.tasks_root.clone())
+        Storage::new(&self.tasks_root.clone())
     }
 
     #[allow(dead_code)] // Used across multiple test modules

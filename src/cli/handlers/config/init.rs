@@ -12,10 +12,10 @@ impl ConfigHandler {
     pub(super) fn handle_config_init(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
-        template: String,
-        prefix: Option<String>,
-        project: Option<String>,
-        copy_from: Option<String>,
+        template: &str,
+        prefix: Option<&str>,
+        project: Option<&str>,
+        copy_from: Option<&str>,
         global: bool,
         dry_run: bool,
         force: bool,
@@ -27,7 +27,7 @@ impl ConfigHandler {
             ));
             if let Some(ref prefix) = prefix {
                 renderer.emit_raw_stdout(format_args!("  • Project prefix: {}", prefix));
-                if let Some(ref project_name) = project {
+                if let Some(project_name) = project {
                     if let Err(conflict) =
                         validate_explicit_prefix(prefix, project_name, &resolver.path)
                     {
@@ -68,9 +68,9 @@ impl ConfigHandler {
             if global {
                 renderer.emit_raw_stdout("  • Target: Global configuration (.tasks/config.yml)");
             } else {
-                let project_name = project.as_deref().unwrap_or("DEFAULT");
-                let project_prefix = if let Some(ref prefix) = prefix {
-                    prefix.clone()
+                let project_name = project.unwrap_or("DEFAULT");
+                let project_prefix = if let Some(prefix) = prefix {
+                    prefix.to_string()
                 } else {
                     match generate_unique_project_prefix(project_name, &resolver.path) {
                         Ok(prefix) => prefix,
@@ -93,7 +93,7 @@ impl ConfigHandler {
             template
         ));
 
-        let template_config = Self::load_template(&template)?;
+        let template_config = Self::load_template(template)?;
 
         Self::apply_template_config(
             resolver,
@@ -124,14 +124,14 @@ impl ConfigHandler {
             .map_err(|e| format!("Failed to parse template '{}': {}", template_name, e))
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
     fn apply_template_config(
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
         template: serde_yaml::Value,
-        prefix: Option<String>,
-        project: Option<String>,
-        copy_from: Option<String>,
+        prefix: Option<&str>,
+        project: Option<&str>,
+        copy_from: Option<&str>,
         global: bool,
         force: bool,
     ) -> Result<(), String> {
@@ -148,7 +148,7 @@ impl ConfigHandler {
         }
 
         if let Some(config_map) = config.as_mapping_mut() {
-            if let Some(source_project) = copy_from.as_deref() {
+            if let Some(source_project) = copy_from {
                 Self::merge_config_from_project(config_map, resolver, renderer, source_project)?;
                 Self::normalize_template_config(config_map);
             }
@@ -157,7 +157,7 @@ impl ConfigHandler {
                 Self::set_nested_value(
                     config_map,
                     &["project", "name"],
-                    serde_yaml::Value::String(project_name.clone()),
+                    serde_yaml::Value::String(project_name.to_string()),
                 );
             }
         }
@@ -169,14 +169,13 @@ impl ConfigHandler {
         } else {
             let detected_project_name = Self::extract_project_name(&config);
             let project_name_owned = project
-                .as_deref()
                 .map(|s| s.to_string())
                 .or_else(|| detected_project_name.clone())
                 .unwrap_or_else(|| "DEFAULT".to_string());
 
-            let project_prefix = if let Some(explicit_prefix) = &prefix {
+            let project_prefix = if let Some(explicit_prefix) = prefix {
                 validate_explicit_prefix(explicit_prefix, &project_name_owned, &resolver.path)?;
-                explicit_prefix.clone()
+                explicit_prefix.to_string()
             } else {
                 generate_unique_project_prefix(&project_name_owned, &resolver.path)?
             };
@@ -209,7 +208,6 @@ impl ConfigHandler {
                 .unwrap_or("");
             let detected_project_name = Self::extract_project_name(&config);
             let project_name_value = project
-                .as_deref()
                 .or(detected_project_name.as_deref())
                 .unwrap_or(prefix);
             let parsed = crate::config::normalization::parse_project_from_yaml_str(

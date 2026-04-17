@@ -1,9 +1,9 @@
 // Auto-generated from stats_handler.rs.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_changed(
-    since: Option<String>,
-    until: Option<String>,
-    author: Option<String>,
+    since: Option<&str>,
+    until: Option<&str>,
+    author: Option<&str>,
     limit: usize,
     global: bool,
     project: Option<&str>,
@@ -11,8 +11,7 @@ pub(crate) fn run_changed(
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
     // Resolve time window
-    let (since_dt, until_dt) =
-        crate::utils::time::parse_since_until(since.as_deref(), until.as_deref())?;
+    let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
     // Determine scope (project or global)
     let scope_project = if global {
@@ -69,7 +68,7 @@ pub(crate) fn run_changed(
         &tasks_rel,
         since_dt,
         until_dt,
-        author.as_deref(),
+        author,
         scope_project.as_deref(),
     )?;
 
@@ -127,17 +126,16 @@ pub(crate) fn run_changed(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_churn(
-    since: Option<String>,
-    until: Option<String>,
-    author: Option<String>,
+    since: Option<&str>,
+    until: Option<&str>,
+    author: Option<&str>,
     limit: usize,
     global: bool,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
-    let (since_dt, until_dt) =
-        crate::utils::time::parse_since_until(since.as_deref(), until.as_deref())?;
+    let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
     let mut scope_project = if global {
         None
@@ -198,7 +196,7 @@ pub(crate) fn run_churn(
         &tasks_rel,
         since_dt,
         until_dt,
-        author.as_deref(),
+        author,
         scope_project.as_deref(),
     )?;
     // Sort by commits desc (churn)

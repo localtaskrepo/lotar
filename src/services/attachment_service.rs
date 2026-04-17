@@ -134,7 +134,7 @@ impl AttachmentService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let before_len = task.references.len();
@@ -306,7 +306,7 @@ impl AttachmentService {
 
         let project = derived.to_string();
         let mut task = storage
-            .get(task_id, project)
+            .get(task_id, &project)
             .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
         let already = task

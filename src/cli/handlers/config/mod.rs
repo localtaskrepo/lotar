@@ -40,7 +40,7 @@ impl CommandHandler for ConfigHandler {
                 force,
                 global,
             }) => Self::handle_config_set(
-                resolver, renderer, field, value, dry_run, force, global, project,
+                resolver, renderer, &field, &value, dry_run, force, global, project,
             ),
             ConfigAction::Init(crate::cli::ConfigInitArgs {
                 template,
@@ -51,7 +51,15 @@ impl CommandHandler for ConfigHandler {
                 dry_run,
                 force,
             }) => Self::handle_config_init(
-                resolver, renderer, template, prefix, project, copy_from, global, dry_run, force,
+                resolver,
+                renderer,
+                &template,
+                prefix.as_deref(),
+                project.as_deref(),
+                copy_from.as_deref(),
+                global,
+                dry_run,
+                force,
             ),
             ConfigAction::Validate(ConfigValidateArgs {
                 project,

@@ -1,6 +1,6 @@
 <template>
   <div class="table-wrap" ref="rootRef">
-    <div class="table-toolbar row" style="justify-content: space-between; align-items: center; margin-bottom: 8px; position: relative;">
+    <div v-if="showToolbar" class="table-toolbar row" style="justify-content: space-between; align-items: center; margin-bottom: 8px; position: relative;">
       <div class="row columns-control" style="gap:8px; align-items:center; position: relative;">
         <template v-if="props.showBulkControls">
           <div class="bulk-controls">
@@ -53,42 +53,42 @@
             <IconGlyph name="columns" aria-hidden="true" />
             <span>Columns</span>
           </UiButton>
-          <div v-if="showColumnMenu" class="columns-popover card" @click.self="showColumnMenu=false">
-            <div class="col" style="gap:6px;">
-              <label
-                v-for="col in columnOrder"
-                :key="col"
-                :class="[
-                  'row',
-                  'column-option',
-                  {
-                    'is-draggable': true,
-                    'is-drag-over': dragOverCol === col,
-                    'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
-                    'is-dragging': draggingCol === col,
-                  },
-                ]"
-                :draggable="true"
-                style="gap:6px; align-items:center;"
-                @dragstart="onColDragStart(col, $event)"
-                @dragend="onColDragEnd"
-                @dragover.prevent="onColDragOver(col, $event)"
-                @drop.prevent="onColDrop(col, $event)"
-              >
-                <input type="checkbox" :checked="columnsSet.has(col)" @change="toggleColumn(col, $event)" />
-                <span>{{ headerLabel(col) }}</span>
-              </label>
-              <div class="row" style="gap:6px; margin-top: 6px;">
-                <UiButton type="button" @click="resetColumns">Reset</UiButton>
-                <UiButton type="button" @click="showColumnMenu=false">Close</UiButton>
-              </div>
-            </div>
-          </div>
         </div>
         <UiButton class="add-button" type="button" aria-label="Add task" title="Add task" @click="$emit('add')">
           <IconGlyph name="plus" aria-hidden="true" />
           <span>Task</span>
         </UiButton>
+      </div>
+    </div>
+    <div v-if="showColumnMenu" class="columns-popover card" @click.self="showColumnMenu=false">
+      <div class="col" style="gap:6px;">
+        <label
+          v-for="col in columnOrder"
+          :key="col"
+          :class="[
+            'row',
+            'column-option',
+            {
+              'is-draggable': true,
+              'is-drag-over': dragOverCol === col,
+              'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
+              'is-dragging': draggingCol === col,
+            },
+          ]"
+          :draggable="true"
+          style="gap:6px; align-items:center;"
+          @dragstart="onColDragStart(col, $event)"
+          @dragend="onColDragEnd"
+          @dragover.prevent="onColDragOver(col, $event)"
+          @drop.prevent="onColDrop(col, $event)"
+        >
+          <input type="checkbox" :checked="columnsSet.has(col)" @change="toggleColumn(col, $event)" />
+          <span>{{ headerLabel(col) }}</span>
+        </label>
+        <div class="row" style="gap:6px; margin-top: 6px;">
+          <UiButton type="button" @click="resetColumns">Reset</UiButton>
+          <UiButton type="button" @click="showColumnMenu=false">Close</UiButton>
+        </div>
       </div>
     </div>
 
@@ -139,7 +139,8 @@
             <th style="width: 1%; white-space: nowrap;">Actions</th>
           </tr>
         </thead>
-        <TransitionGroup name="task-list" tag="tbody">
+        <Transition name="task-rows" mode="out-in">
+        <tbody :key="rowsKey">
           <tr v-for="t in sorted" :key="t.id" :class="{ 'is-recent': !!touchesMap[t.id] }" @click="$emit('open', t.id)">
             <td v-if="selectable" @click.stop style="text-align:center;">
               <input type="checkbox" :checked="isSelected(t.id)" @change="toggleOne(t.id, $event)" />
@@ -249,7 +250,8 @@
             </td>
           </tr>
           <tr v-if="!loading && (!tasks || tasks.length === 0)" key="__empty__"><td :colspan="visibleColumns.length + (selectable ? 2 : 1)" class="muted">No tasks</td></tr>
-        </TransitionGroup>
+        </tbody>
+        </Transition>
         </table>
       </div>
     </UiCard>
@@ -265,8 +267,9 @@ import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
 import UiCard from './UiCard.vue';
 
-const props = withDefaults(defineProps<TaskTableProps>(), {
+const props = withDefaults(defineProps<TaskTableProps & { showToolbar?: boolean }>(), {
   showBulkControls: true,
+  showToolbar: true,
 })
 const emit = defineEmits<TaskTableEmit>()
 
@@ -311,6 +314,8 @@ const {
   touchBadge,
   isOverdue,
 } = useTaskTableState(props, emit)
+
+const rowsKey = computed(() => sorted.value.map(t => t.id).join('|'))
 
 type ColumnKey = (typeof allColumns)[number]
 
@@ -511,6 +516,8 @@ onUnmounted(() => {
     window.removeEventListener('keydown', handleEscape)
   }
 })
+
+defineExpose({ toggleColumnMenu })
 </script>
 
 <style scoped>
@@ -744,16 +751,16 @@ tbody tr.is-recent {
   margin-left: auto;
 }
 
+/* Popover anchored to top-right of table-wrap */
+.table-wrap > .columns-popover {
+  top: 0;
+  right: 0;
+  z-index: var(--z-popover);
+}
+
 .overdue {
   color: var(--color-danger);
   font-weight: 600;
-}
-
-/* Popover placement: under toolbar (top-right) */
-.columns-popover {
-  top: calc(100% + var(--space-2, 0.5rem));
-  right: 0;
-  z-index: var(--z-popover);
 }
 
 /* Row actions menu */

@@ -425,6 +425,14 @@
             "description": "CSV of tags"
           },
           {
+            "name": "sprints",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of sprint IDs (e.g. 1,2,3). Only return tasks assigned to these sprints."
+          },
+          {
             "name": "assignee",
             "in": "query",
             "schema": {

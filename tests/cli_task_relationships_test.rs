@@ -46,9 +46,9 @@ fn relationships_command_displays_all_relationships() {
         .expect("expected project prefix")
         .to_string();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
     let mut parent_task = storage
-        .get(&parent_id, prefix.clone())
+        .get(&parent_id, &prefix)
         .expect("expected parent task to exist");
     parent_task.relationships.depends_on = vec![child_one.clone(), "EXT-99".to_string()];
     parent_task.relationships.blocks = vec!["BLOCK-1".to_string()];
@@ -61,7 +61,7 @@ fn relationships_command_displays_all_relationships() {
         .expect("failed to persist parent task relationships");
 
     let mut child_task = storage
-        .get(&child_one, prefix.clone())
+        .get(&child_one, &prefix)
         .expect("expected child task to exist");
     child_task.relationships.parent = Some(parent_id.clone());
     storage
@@ -113,9 +113,9 @@ fn relationships_command_supports_json_filters() {
         .expect("expected project prefix")
         .to_string();
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
     let mut parent_task = storage
-        .get(&parent_id, prefix.clone())
+        .get(&parent_id, &prefix)
         .expect("expected parent task to exist");
     parent_task.relationships.children = vec![child_id.clone()];
     storage
@@ -123,7 +123,7 @@ fn relationships_command_supports_json_filters() {
         .expect("failed to persist parent task relationships");
 
     let mut child_task = storage
-        .get(&child_id, prefix.clone())
+        .get(&child_id, &prefix)
         .expect("expected child task to exist");
     child_task.relationships.parent = Some(parent_id.clone());
     storage

@@ -10,7 +10,7 @@ struct WrapperConfig {
     child_args: Vec<String>,
 }
 
-fn parse_args(args: Vec<String>) -> Result<WrapperConfig, String> {
+fn parse_args(args: &[String]) -> Result<WrapperConfig, String> {
     let mut cfg = WrapperConfig::default();
     let mut idx = 0;
     let mut seen_separator = false;
@@ -58,7 +58,7 @@ fn parse_args(args: Vec<String>) -> Result<WrapperConfig, String> {
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    let cfg = match parse_args(args) {
+    let cfg = match parse_args(&args) {
         Ok(cfg) => cfg,
         Err(err) => {
             eprintln!("lotar-agent-wrapper: {err}");
@@ -120,7 +120,7 @@ mod tests {
             "exec".to_string(),
             "--json".to_string(),
         ];
-        let cfg = parse_args(args).expect("parse args");
+        let cfg = parse_args(&args).expect("parse args");
         assert_eq!(cfg.job_id.as_deref(), Some("job-1"));
         assert_eq!(cfg.ticket_id.as_deref(), Some("TEST-1"));
         assert_eq!(cfg.runner.as_deref(), Some("codex"));

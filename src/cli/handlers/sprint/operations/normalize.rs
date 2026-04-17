@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cli::args::sprint::SprintNormalizeArgs;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -10,14 +10,14 @@ use crate::storage::sprint::Sprint;
 use serde::Serialize;
 
 pub(crate) fn handle_normalize(
-    normalize_args: SprintNormalizeArgs,
-    tasks_root: PathBuf,
+    normalize_args: &SprintNormalizeArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let mode = resolve_normalize_mode(&normalize_args)?;
+    let mode = resolve_normalize_mode(normalize_args)?;
     let is_json = matches!(renderer.format, OutputFormat::Json);
 
-    let storage = match Storage::try_open(tasks_root.clone()) {
+    let storage = match Storage::try_open(tasks_root) {
         Some(storage) => storage,
         None => {
             if is_json {

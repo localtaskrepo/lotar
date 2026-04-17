@@ -1,4 +1,5 @@
 // Auto-generated from stats_handler.rs.
+#[allow(clippy::needless_pass_by_value)]
 pub(crate) fn run(
     field: crate::cli::args::stats::StatsDistributionField,
     limit: usize,
@@ -17,7 +18,7 @@ pub(crate) fn run(
     };
 
     // Load tasks
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()
@@ -38,11 +39,11 @@ pub(crate) fn run(
                 *freq.entry(t.task_type.to_string()).or_insert(0) += 1;
             }
             crate::cli::args::stats::StatsDistributionField::Assignee => {
-                let key = t.assignee.unwrap_or_else(|| "".to_string());
+                let key = t.assignee.unwrap_or_default();
                 *freq.entry(key).or_insert(0) += 1;
             }
             crate::cli::args::stats::StatsDistributionField::Reporter => {
-                let key = t.reporter.unwrap_or_else(|| "".to_string());
+                let key = t.reporter.unwrap_or_default();
                 *freq.entry(key).or_insert(0) += 1;
             }
             crate::cli::args::stats::StatsDistributionField::Project => {

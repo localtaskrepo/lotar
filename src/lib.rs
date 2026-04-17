@@ -3,6 +3,7 @@
 // We'll remove them temporarily in CI so we can evaluate whether the warnings
 // still occur and address them individually. If necessary we can re-add a more
 // targeted allow later.
+#![warn(clippy::needless_pass_by_value)]
 
 pub mod api_events;
 pub mod api_server;

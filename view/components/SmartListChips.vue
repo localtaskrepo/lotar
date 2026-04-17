@@ -3,7 +3,6 @@
     <UiButton :variant="isMine ? 'primary' : ''" type="button" @click="toggleMine">Mine</UiButton>
     <UiButton :variant="isUnassigned ? 'primary' : ''" type="button" @click="toggleUnassigned">No assignee</UiButton>
     <UiButton v-if="blocked" :variant="isBlocked ? 'primary' : ''" type="button" @click="toggleBlocked">Blocked</UiButton>
-    <UiButton v-if="reviewList.length" :variant="isReview ? 'primary' : ''" type="button" @click="toggleReview">Review</UiButton>
     <UiButton v-if="showDueSoonChip" :variant="isDueSoon ? 'primary' : ''" type="button" @click="toggleDueSoon">Due soon</UiButton>
     <UiButton :variant="isOverdue ? 'primary' : ''" type="button" @click="toggleOverdue">Overdue</UiButton>
     <UiButton v-if="showRecentChip" :variant="isRecent ? 'primary' : ''" type="button" @click="toggleRecent">Recent</UiButton>

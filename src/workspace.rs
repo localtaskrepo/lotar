@@ -42,6 +42,7 @@ impl TasksDirectoryResolver {
     }
 
     /// Internal resolve with optional home config override (used in tests)
+    #[allow(clippy::needless_pass_by_value)]
     fn resolve_internal(
         explicit_path: Option<&str>,
         global_config_tasks_folder: Option<&str>,

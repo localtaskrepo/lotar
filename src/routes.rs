@@ -399,7 +399,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         // Map JSON to AddArgs, then reuse AddHandler flow by building Task via services
         let add: crate::cli::TaskAddArgs = match serde_json::from_value(body.clone()) {
@@ -492,7 +492,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
         let page = match crate::utils::pagination::parse_page(&req.query, 50, 200) {
             Ok(v) => v,
@@ -546,7 +546,15 @@ pub fn initialize(api_server: &mut ApiServer) {
                 .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
                 .unwrap_or_default(),
             text_query: req.query.get("q").cloned(),
-            sprints: vec![],
+            sprints: req
+                .query
+                .get("sprints")
+                .map(|s| {
+                    s.split(',')
+                        .filter_map(|p| p.trim().parse::<u32>().ok())
+                        .collect()
+                })
+                .unwrap_or_default(),
             custom_fields: BTreeMap::new(),
         };
         // API parity: accept additional query keys (built-ins or declared custom fields)
@@ -558,6 +566,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             "priority",
             "type",
             "tags",
+            "sprints",
             "q",
             "assignee",
             "order",
@@ -832,7 +841,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(msg) => return bad_request(msg),
         };
 
-        let storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
+        let storage = match crate::storage::manager::Storage::try_open(&resolver.path.clone()) {
             Some(storage) => storage,
             None => {
                 let payload = SprintListResponse {
@@ -893,7 +902,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
 
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
         let body: SprintCreateRequest = match serde_json::from_slice(&req.body) {
             Ok(payload) => payload,
@@ -952,7 +961,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
@@ -1034,6 +1043,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             ),
         };
 
+        crate::utils::query_cache::invalidate_all();
         ok_json(200, json!({"data": response}))
     });
 
@@ -1043,7 +1053,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let mut records = match SprintService::list(&storage) {
             Ok(records) => records,
             Err(err) => {
@@ -1123,6 +1133,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             ),
         };
 
+        crate::utils::query_cache::invalidate_all();
         ok_json(200, json!({"data": response}))
     });
 
@@ -1132,7 +1143,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
         let body: SprintDeleteRequest = match serde_json::from_slice(&req.body) {
             Ok(payload) => payload,
@@ -1232,6 +1243,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             ),
         };
 
+        crate::utils::query_cache::invalidate_all();
         ok_json(200, json!({"data": response}))
     });
 
@@ -1242,7 +1254,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
 
-        let mut storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
+        let mut storage = match crate::storage::manager::Storage::try_open(&resolver.path.clone()) {
             Some(storage) => storage,
             None => {
                 let payload = SprintBacklogResponse {
@@ -1343,7 +1355,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             limit,
         };
 
-        let result = match sprint_assignment::fetch_backlog(&storage, options) {
+        let result = match sprint_assignment::fetch_backlog(&storage, &options) {
             Ok(result) => result,
             Err(msg) => return bad_request(msg),
         };
@@ -1405,7 +1417,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             }
         };
 
-        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
         let record = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
@@ -1468,7 +1480,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             }
         };
 
-        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
         let record = match SprintService::get(&storage, sprint_id) {
             Ok(record) => record,
@@ -1516,7 +1528,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
 
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
         let body: SprintUpdateRequest = match serde_json::from_slice(&req.body) {
             Ok(payload) => payload,
@@ -1615,7 +1627,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             None => SprintBurndownMetric::Points,
         };
 
-        let storage = match crate::storage::manager::Storage::try_open(resolver.path.clone()) {
+        let storage = match crate::storage::manager::Storage::try_open(&resolver.path.clone()) {
             Some(storage) => storage,
             None => {
                 let empty = VelocityComputation {
@@ -1678,7 +1690,7 @@ pub fn initialize(api_server: &mut ApiServer) {
         };
 
         let computation =
-            compute_velocity(&storage, records, &resolved_config, options, Utc::now());
+            compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
         let payload = computation.to_payload(include_active);
 
         ok_json(200, json!({"data": payload}))
@@ -1690,7 +1702,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
             Ok(m) => m,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
@@ -1798,7 +1810,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path);
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
         match TaskService::get(&storage, &id, req.query.get("project").map(|s| s.as_str())) {
             Ok(task) => ok_json(200, json!({"data": task})),
             Err(e) => match e {
@@ -2144,7 +2156,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e.to_string()}})),
         };
 
-        let mut storage = crate::storage::manager::Storage::new(resolver.path);
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match AttachmentService::attach_file_reference(&mut storage, &payload.id, &stored) {
             Ok((task, attached)) => ok_json(
                 200,
@@ -2202,7 +2214,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Err(e) => return bad_request(e.to_string()),
             };
 
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match AttachmentService::detach_file_reference(
                 &mut storage,
                 &payload.id,
@@ -2262,7 +2274,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
             };
 
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
                 Ok((task, added)) => ok_json(
                     200,
@@ -2299,7 +2311,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
             };
 
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::detach_link_reference(&mut storage, &payload.id, &payload.url) {
                 Ok((task, removed)) => ok_json(
                     200,
@@ -2341,7 +2353,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 None => return bad_request("Unable to locate git repository".into()),
             };
 
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::attach_code_reference(
                 &mut storage,
                 &repo_root,
@@ -2383,7 +2395,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
             };
 
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::detach_code_reference(&mut storage, &payload.id, &payload.code) {
                 Ok((task, removed)) => ok_json(
                     200,
@@ -2426,7 +2438,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
 
-        let mut storage = crate::storage::manager::Storage::new(resolver.path);
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::attach_platform_reference(
             &mut storage,
             &payload.id,
@@ -2476,7 +2488,7 @@ pub fn initialize(api_server: &mut ApiServer) {
                 Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
             };
 
-            let mut storage = crate::storage::manager::Storage::new(resolver.path);
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::detach_platform_reference(
                 &mut storage,
                 &payload.id,
@@ -2501,7 +2513,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path);
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
         let q = req.query.get("q").cloned().unwrap_or_default();
         let project = req.query.get("project").cloned();
         let limit: usize = req
@@ -2530,7 +2542,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let edit: crate::cli::TaskEditArgs = match serde_json::from_value(body.clone()) {
             Ok(v) => v,
@@ -2616,7 +2628,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -2668,7 +2680,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -2678,7 +2690,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => return bad_request("Missing text".into()),
         };
-        let dto = match TaskService::add_comment(&mut storage, &id, text) {
+        let dto = match TaskService::add_comment(&mut storage, &id, &text) {
             Ok(dto) => dto,
             Err(err) => {
                 let msg = err.to_string();
@@ -2701,7 +2713,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let id = match body.get("id").and_then(|v| v.as_str()) {
             Some(s) if !s.is_empty() => s.to_string(),
@@ -2720,7 +2732,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             return bad_request("Missing text".into());
         }
         let project_prefix = id.split('-').next().unwrap_or("").to_string();
-        let mut task = match storage.get(&id, project_prefix.clone()) {
+        let mut task = match storage.get(&id, &project_prefix) {
             Some(t) => t,
             None => return not_found(format!("Task '{}' not found", id)),
         };
@@ -2779,7 +2791,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let mut storage = crate::storage::manager::Storage::new(resolver.path);
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
         let del: crate::cli::TaskDeleteArgs = match serde_json::from_value(body.clone()) {
             Ok(v) => v,
@@ -2934,7 +2946,7 @@ pub fn initialize(api_server: &mut ApiServer) {
         };
 
         // Load the task
-        let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+        let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
         let task_before =
             match crate::services::task_service::TaskService::get(&storage, ticket_id, None) {
                 Ok(t) => t,
@@ -3346,7 +3358,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(v) => v,
             Err(msg) => return bad_request(msg),
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path);
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
         let mut projects = ProjectService::list(&storage);
         projects.sort_by(|a, b| a.prefix.cmp(&b.prefix));
         let total = projects.len();
@@ -3373,7 +3385,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
-        let storage = crate::storage::manager::Storage::new(resolver.path);
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
         let stats = ProjectService::stats(&storage, &name);
         ok_json(200, json!({"data": stats}))
     });
@@ -3645,6 +3657,7 @@ fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
     json_response(status, v).unwrap_or_else(json_serialize_error)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn bad_request(msg: String) -> HttpResponse {
     ok_json(
         400,
@@ -3656,10 +3669,12 @@ fn internal(v: serde_json::Value) -> HttpResponse {
     ok_json(500, v)
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn not_found(msg: String) -> HttpResponse {
     ok_json(404, json!({"error": {"code": "NOT_FOUND", "message": msg}}))
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn json_response(status: u16, v: serde_json::Value) -> Result<HttpResponse, serde_json::Error> {
     let body = serde_json::to_vec(&v)?;
     Ok(HttpResponse {
@@ -3669,6 +3684,7 @@ fn json_response(status: u16, v: serde_json::Value) -> Result<HttpResponse, serd
     })
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn json_serialize_error(e: serde_json::Error) -> HttpResponse {
     let fallback = json!({"error": {"code": "SERIALIZE", "message": e.to_string()}});
     HttpResponse {

@@ -41,10 +41,10 @@ impl CommandHandler for StatsHandler {
                 since,
                 until,
             } => status::run_status(
-                id,
+                &id,
                 time_in_status,
-                since,
-                until,
+                since.as_deref(),
+                until.as_deref(),
                 project,
                 resolver,
                 renderer,
@@ -54,9 +54,15 @@ impl CommandHandler for StatsHandler {
                 until,
                 limit,
                 global,
-            } => {
-                status::run_time_in_status(since, until, limit, global, project, resolver, renderer)
-            }
+            } => status::run_time_in_status(
+                since.as_deref(),
+                until.as_deref(),
+                limit,
+                global,
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::Effort {
                 by,
                 r#where,
@@ -67,14 +73,14 @@ impl CommandHandler for StatsHandler {
                 until,
                 transitions,
             } => effort::run(
-                by,
+                &by,
                 r#where,
                 unit,
                 limit,
                 global,
-                since,
-                until,
-                transitions,
+                since.as_deref(),
+                until.as_deref(),
+                transitions.as_deref(),
                 project,
                 resolver,
                 renderer,
@@ -92,7 +98,7 @@ impl CommandHandler for StatsHandler {
                 name,
                 limit,
                 global,
-            } => custom::run_field(name, limit, global, project, resolver, renderer),
+            } => custom::run_field(&name, limit, global, project, resolver, renderer),
             StatsAction::Changed {
                 since,
                 until,
@@ -100,7 +106,14 @@ impl CommandHandler for StatsHandler {
                 limit,
                 global,
             } => history::run_changed(
-                since, until, author, limit, global, project, resolver, renderer,
+                since.as_deref(),
+                until.as_deref(),
+                author.as_deref(),
+                limit,
+                global,
+                project,
+                resolver,
+                renderer,
             ),
             StatsAction::Churn {
                 since,
@@ -109,14 +122,29 @@ impl CommandHandler for StatsHandler {
                 limit,
                 global,
             } => history::run_churn(
-                since, until, author, limit, global, project, resolver, renderer,
+                since.as_deref(),
+                until.as_deref(),
+                author.as_deref(),
+                limit,
+                global,
+                project,
+                resolver,
+                renderer,
             ),
             StatsAction::Authors {
                 since,
                 until,
                 limit,
                 global,
-            } => authors::run(since, until, limit, global, project, resolver, renderer),
+            } => authors::run(
+                since.as_deref(),
+                until.as_deref(),
+                limit,
+                global,
+                project,
+                resolver,
+                renderer,
+            ),
             StatsAction::Activity {
                 since,
                 until,
@@ -124,13 +152,20 @@ impl CommandHandler for StatsHandler {
                 limit,
                 global,
             } => activity::run(
-                since, until, group_by, limit, global, project, resolver, renderer,
+                since.as_deref(),
+                until.as_deref(),
+                &group_by,
+                limit,
+                global,
+                project,
+                resolver,
+                renderer,
             ),
             StatsAction::Stale {
                 threshold,
                 limit,
                 global,
-            } => stale::run(threshold, limit, global, project, resolver, renderer),
+            } => stale::run(&threshold, limit, global, project, resolver, renderer),
             StatsAction::Tags { limit, global } => {
                 tags::run(limit, global, project, resolver, renderer)
             }

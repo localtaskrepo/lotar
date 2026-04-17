@@ -1,6 +1,6 @@
 // Auto-generated from stats_handler.rs.
 pub(crate) fn run(
-    threshold: String,
+    threshold: &str,
     limit: usize,
     global: bool,
     project: Option<&str>,
@@ -72,7 +72,7 @@ pub(crate) fn run(
         ))
     }
 
-    let thr = parse_threshold_to_duration(&threshold)?;
+    let thr = parse_threshold_to_duration(threshold)?;
     let now = chrono::Utc::now();
 
     // Compute last change per task by scanning full history using existing aggregator

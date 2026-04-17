@@ -351,7 +351,7 @@ pub struct SprintBacklogResult {
 
 pub fn fetch_backlog(
     storage: &Storage,
-    options: SprintBacklogOptions,
+    options: &SprintBacklogOptions,
 ) -> Result<SprintBacklogResult, String> {
     let resolved_assignee = match options.assignee.as_ref() {
         Some(raw) => {
@@ -529,7 +529,7 @@ pub fn resolve_task_identifier(storage: &Storage, raw: &str) -> Result<String, S
         let mut splitter = token.splitn(2, '-');
         let project = splitter.next().unwrap_or("");
         let project = project.to_string();
-        if storage.get(token, project.clone()).is_some() {
+        if storage.get(token, &project).is_some() {
             return Ok(token.to_string());
         }
         return Err(format!("Task {} not found.", token));

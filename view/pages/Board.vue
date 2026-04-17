@@ -13,54 +13,12 @@
             <small class="muted">Leave empty or 0 for no limit. Limits are saved locally per project.</small>
           </div>
         </details>
-        <details ref="filtersEditorRef" class="done-filter" @toggle="handleFiltersToggle">
-          <summary class="btn">Filters</summary>
-          <div class="card col done-filter__card">
-            <div class="col" style="gap:4px;">
-              <span class="muted">Statuses</span>
-              <div class="col done-filter__statuses">
-                <label v-for="label in columns" :key="`done-${label}`" class="row" style="gap:6px; align-items:center;">
-                  <input type="checkbox" :checked="doneStatusSelected(label)" @change="toggleDoneStatus(label)" />
-                  <span>{{ label }}</span>
-                </label>
-                <p v-if="!columns.length" class="muted">No statuses available yet.</p>
-              </div>
-            </div>
-            <label class="col" style="gap:4px;">
-              <span class="muted">Hide cards older than (days)</span>
-              <input
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                :value="doneFilters.maxAgeDays ?? ''"
-                placeholder="e.g. 14"
-                @input="onDoneMaxAgeInput"
-              />
-            </label>
-            <label class="col" style="gap:4px;">
-              <span class="muted">Limit visible cards</span>
-              <input
-                class="input"
-                type="number"
-                min="0"
-                step="1"
-                :value="doneFilters.maxVisible ?? ''"
-                placeholder="e.g. 20"
-                @input="onDoneMaxVisibleInput"
-              />
-            </label>
-            <div class="row" style="justify-content:flex-end; gap:8px;">
-              <UiButton variant="ghost" type="button" @click="resetDoneFilters">Reset</UiButton>
-            </div>
-          </div>
-        </details>
         <UiButton
           icon-only
           type="button"
           aria-label="Clear filters"
           title="Clear filters"
-          :disabled="!hasFilters"
+          :disabled="!hasAnyFilters"
           @click="clearFilters"
         >
           <IconGlyph name="close" />
@@ -76,14 +34,66 @@
     </div>
 
     <div class="filter-card">
-      <SmartListChips
-        :statuses="statuses"
-        :priorities="priorities"
-        :value="filter"
-        :custom-presets="customFilterPresets"
-        @update:value="boardOnChipsUpdate"
-        @preset="handleCustomPreset"
-      />
+      <div class="row board-chips-row">
+        <SmartListChips
+          :statuses="statuses"
+          :priorities="priorities"
+          :value="filter"
+          :custom-presets="customFilterPresets"
+          @update:value="boardOnChipsUpdate"
+          @preset="handleCustomPreset"
+        />
+        <div class="row board-chips-row__right">
+          <select v-model="groupBy" class="input board-chips-row__groupby" aria-label="Group cards by" data-testid="board-groupby">
+            <option value="none">No grouping</option>
+            <option value="assignee">Group by assignee</option>
+            <option value="priority">Group by priority</option>
+            <option value="type">Group by type</option>
+          </select>
+          <details ref="filtersEditorRef" class="done-filter" @toggle="handleFiltersToggle">
+            <summary class="btn">Filters</summary>
+            <div class="card col done-filter__card">
+              <div class="col" style="gap:4px;">
+                <span class="muted">Statuses</span>
+                <div class="col done-filter__statuses">
+                  <label v-for="label in columns" :key="`done-${label}`" class="row" style="gap:6px; align-items:center;">
+                    <input type="checkbox" :checked="doneStatusSelected(label)" @change="toggleDoneStatus(label)" />
+                    <span>{{ label }}</span>
+                  </label>
+                  <p v-if="!columns.length" class="muted">No statuses available yet.</p>
+                </div>
+              </div>
+              <label class="col" style="gap:4px;">
+                <span class="muted">Hide cards older than (days)</span>
+                <input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  :value="doneFilters.maxAgeDays ?? ''"
+                  placeholder="e.g. 14"
+                  @input="onDoneMaxAgeInput"
+                />
+              </label>
+              <label class="col" style="gap:4px;">
+                <span class="muted">Limit visible cards</span>
+                <input
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  :value="doneFilters.maxVisible ?? ''"
+                  placeholder="e.g. 20"
+                  @input="onDoneMaxVisibleInput"
+                />
+              </label>
+              <div class="row" style="justify-content:flex-end; gap:8px;">
+                <UiButton variant="ghost" type="button" @click="resetDoneFilters">Reset</UiButton>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
       <div class="row board-filter-row">
         <FilterBar
           ref="filterBarRef"
@@ -91,6 +101,7 @@
           :statuses="statuses"
           :priorities="priorities"
           :types="types"
+          :sprint-options="sprintFilterOptions"
           :value="filterPayload"
           :show-status="false"
           emit-project-key
@@ -120,123 +131,216 @@
       </div>
     </div>
 
-    <div v-if="loadingConfig || loadingTasks" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
+    <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
 
     <div v-else-if="!project">
       <UiEmptyState title="Pick a project" description="Boards are per-project. Choose a project to view its board." />
     </div>
 
     <div v-else class="board grid" :style="gridStyle">
-      <div v-for="st in columns" :key="st" class="col column"
-           :data-status="st"
-           :class="{ 'over-limit': overLimit(st) }"
-           tabindex="0"
-           @dragover.prevent="onDragOver"
-           @drop.prevent="onDrop(st)"
-           @keydown.enter.prevent="onDrop(st)"
-      >
-        <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
+      <template v-if="groupBy !== 'none'">
+        <template v-for="group in allGroupLabels" :key="group">
+          <!-- Swimlane header spans all columns -->
+          <div class="swimlane-row" :style="{ gridColumn: `1 / -1` }">
+            <button type="button" class="swimlane-header" :class="{ collapsed: collapsedGroups.has(group) }" @click="toggleGroup(group)">
+              <span class="swimlane-chevron" :class="{ open: !collapsedGroups.has(group) }">▶</span>
+              <span v-if="groupBy === 'assignee'" class="member-badge" :style="{ background: memberColor(group === '(none)' ? '' : group) }" :title="group">{{ memberInitials(group === '(none)' ? '' : group) }}</span>
+              <span class="swimlane-label">{{ group }}</span>
+              <span class="muted swimlane-count">{{ groupTotalCount(group) }}</span>
+            </button>
+          </div>
+          <!-- Per-column tasks for this group -->
+          <template v-if="!collapsedGroups.has(group)">
+            <div v-for="st in columns" :key="`${group}::${st}`" class="col column-group-cell"
+                 :data-status="st"
+                 :class="{ 'over-limit': overLimit(st) }"
+                 @dragover.prevent="onDragOver"
+                 @drop.prevent="onDrop(st)"
+            >
+              <TransitionGroup name="task-list" tag="div" class="col-cards">
+                <article v-for="task in groupedColumnTasks(st, group)" :key="task.id"
+                         class="card task"
+                         :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                         draggable="true"
+                         @dragstart="onDragStart(task)"
+                         @dblclick="openTask(task.id)"
+                         @click.exact="selectTask(task.id)"
+                         @keydown.enter.prevent="openTask(task.id)"
+                         tabindex="0">
+                  <header v-if="hasTaskHeader(task)" class="row task-header">
+                    <template v-if="hasTaskIdentity(task)">
+                      <div class="row task-header__left">
+                        <span v-if="isBoardFieldVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                        <strong v-if="isBoardFieldVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                      </div>
+                      <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                    </template>
+                    <template v-else>
+                      <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                    </template>
+                  </header>
+                  <footer v-if="hasTaskMeta(task)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(task) }">
+                    <div v-if="hasPrimaryMeta(task)" class="row task-meta__tags">
+                      <span v-if="isBoardFieldVisible('status') && (task.status || '').trim()" class="muted">{{ task.status }}</span>
+                      <span v-if="isBoardFieldVisible('task_type') && (task.task_type || '').trim()" class="muted">{{ task.task_type }}</span>
+                      <span v-if="isBoardFieldVisible('effort') && (task.effort || '').trim()" class="muted">{{ task.effort }}</span>
+                      <span v-if="isBoardFieldVisible('reporter') && (task.reporter || '').trim()" class="muted">by {{ formatMember(task.reporter) }}</span>
+                      <span v-if="isBoardFieldVisible('assignee') && (task.assignee || '').trim()" class="member-inline">
+                        <span class="member-badge small" :style="{ background: memberColor(task.assignee) }" :title="task.assignee || ''">{{ memberInitials(task.assignee) }}</span>
+                        {{ formatMember(task.assignee) }}
+                      </span>
+                      <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(task).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(task).overdue }">{{ taskDueInfo(task).label }}</span>
+                      <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(task)" class="muted">{{ taskModifiedInfo(task) }}</span>
+                      <span v-if="isBoardFieldVisible('tags')" v-for="tag in (task.tags || [])" :key="tag" class="tag">{{ tag }}</span>
+                    </div>
+                    <div v-if="isBoardFieldVisible('sprints') && task.sprints?.length" class="row task-meta__sprints">
+                      <span v-for="sprintId in task.sprints" :key="`${task.id}-sprint-${sprintId}`" class="chip small sprint-chip" :class="sprintStateClass(sprintId)" :title="sprintTooltip(sprintId)">{{ sprintLabel(sprintId) }}</span>
+                    </div>
+                  </footer>
+                </article>
+                <div v-if="!groupedColumnTasks(st, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
+              </TransitionGroup>
+            </div>
+          </template>
+        </template>
+        <!-- Column headers at the very top (rendered first via CSS order) -->
+        <div v-for="st in columns" :key="`hdr-${st}`" class="col-header row board-col-header"
+             :data-status="st"
+             style="justify-content: space-between; align-items:center; gap:8px;">
           <strong>{{ st }}</strong>
           <span class="muted" :class="{ warn: overLimit(st) }">
             <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
             <template v-else>{{ countOf(st) }}</template>
           </span>
         </div>
-        <TransitionGroup name="task-list" tag="div" class="col-cards">
-          <article v-for="t in (grouped[st] || [])" :key="t.id" class="card task"
-                   draggable="true"
-                   @dragstart="onDragStart(t)"
-                   @dblclick="openTask(t.id)"
-                   @keydown.enter.prevent="openTask(t.id)"
-                   tabindex="0">
-            <header v-if="hasTaskHeader(t)" class="row task-header">
-              <template v-if="hasTaskIdentity(t)">
-                <div class="row task-header__left">
-                  <span v-if="isBoardFieldVisible('id') && (t.id || '').trim()" class="muted id">{{ t.id }}</span>
-                  <strong v-if="isBoardFieldVisible('title') && (t.title || '').trim()" class="title">{{ t.title }}</strong>
+      </template>
+      <template v-else>
+        <div v-for="st in columns" :key="st" class="col column"
+             :data-status="st"
+             :class="{ 'over-limit': overLimit(st) }"
+             tabindex="0"
+             @dragover.prevent="onDragOver"
+             @drop.prevent="onDrop(st)"
+             @keydown.enter.prevent="onDrop(st)"
+        >
+          <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
+            <strong>{{ st }}</strong>
+            <span class="muted" :class="{ warn: overLimit(st) }">
+              <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
+              <template v-else>{{ countOf(st) }}</template>
+            </span>
+          </div>
+          <TransitionGroup name="task-list" tag="div" class="col-cards">
+            <article v-for="task in visibleFlatTasks(st)" :key="task.id"
+                     class="card task"
+                     :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                     draggable="true"
+                     @dragstart="onDragStart(task)"
+                     @dblclick="openTask(task.id)"
+                     @click.exact="selectTask(task.id)"
+                     @keydown.enter.prevent="openTask(task.id)"
+                     tabindex="0">
+              <header v-if="hasTaskHeader(task)" class="row task-header">
+                <template v-if="hasTaskIdentity(task)">
+                  <div class="row task-header__left">
+                    <span v-if="isBoardFieldVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                    <strong v-if="isBoardFieldVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                  </div>
+                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                </template>
+                <template v-else>
+                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                </template>
+              </header>
+              <footer v-if="hasTaskMeta(task)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(task) }">
+                <div v-if="hasPrimaryMeta(task)" class="row task-meta__tags">
+                  <span v-if="isBoardFieldVisible('status') && (task.status || '').trim()" class="muted">{{ task.status }}</span>
+                  <span v-if="isBoardFieldVisible('task_type') && (task.task_type || '').trim()" class="muted">{{ task.task_type }}</span>
+                  <span v-if="isBoardFieldVisible('effort') && (task.effort || '').trim()" class="muted">{{ task.effort }}</span>
+                  <span v-if="isBoardFieldVisible('reporter') && (task.reporter || '').trim()" class="muted">by {{ formatMember(task.reporter) }}</span>
+                  <span v-if="isBoardFieldVisible('assignee') && (task.assignee || '').trim()" class="member-inline">
+                    <span class="member-badge small" :style="{ background: memberColor(task.assignee) }" :title="task.assignee || ''">{{ memberInitials(task.assignee) }}</span>
+                    {{ formatMember(task.assignee) }}
+                  </span>
+                  <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(task).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(task).overdue }">{{ taskDueInfo(task).label }}</span>
+                  <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(task)" class="muted">{{ taskModifiedInfo(task) }}</span>
+                  <span v-if="isBoardFieldVisible('tags')" v-for="tag in (task.tags || [])" :key="tag" class="tag">{{ tag }}</span>
                 </div>
-                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
-              </template>
-              <template v-else>
-                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
-              </template>
-            </header>
-            <footer v-if="hasTaskMeta(t)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(t) }">
-              <div v-if="hasPrimaryMeta(t)" class="row task-meta__tags">
-                <span v-if="isBoardFieldVisible('status') && (t.status || '').trim()" class="muted">{{ t.status }}</span>
-                <span v-if="isBoardFieldVisible('task_type') && (t.task_type || '').trim()" class="muted">{{ t.task_type }}</span>
-                <span v-if="isBoardFieldVisible('effort') && (t.effort || '').trim()" class="muted">{{ t.effort }}</span>
-                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by {{ formatMember(t.reporter) }}</span>
-                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">{{ formatMember(t.assignee) }}</span>
-                <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
-                <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(t)" class="muted">{{ taskModifiedInfo(t) }}</span>
-                <span v-if="isBoardFieldVisible('tags')" v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-              </div>
-              <div v-if="isBoardFieldVisible('sprints') && t.sprints?.length" class="row task-meta__sprints">
-                <span
-                  v-for="sprintId in t.sprints"
-                  :key="`${t.id}-sprint-${sprintId}`"
-                  class="chip small sprint-chip"
-                  :class="sprintStateClass(sprintId)"
-                  :title="sprintTooltip(sprintId)"
-                >
-                  {{ sprintLabel(sprintId) }}
-                </span>
-              </div>
-            </footer>
-          </article>
-          <div v-if="!(grouped[st] && grouped[st].length)" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
-        </TransitionGroup>
-      </div>
-      <div v-if="other.length" class="col column" data-status="__other__">
-        <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
-          <strong>Other</strong>
-          <span class="muted">{{ other.length }}</span>
+                <div v-if="isBoardFieldVisible('sprints') && task.sprints?.length" class="row task-meta__sprints">
+                  <span
+                    v-for="sprintId in task.sprints"
+                    :key="`${task.id}-sprint-${sprintId}`"
+                    class="chip small sprint-chip"
+                    :class="sprintStateClass(sprintId)"
+                    :title="sprintTooltip(sprintId)"
+                  >
+                    {{ sprintLabel(sprintId) }}
+                  </span>
+                </div>
+              </footer>
+            </article>
+            <div v-if="!grouped[st]?.length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
+          </TransitionGroup>
+          <button v-if="hiddenFlatCount(st) > 0" type="button" class="show-more-btn" @click="showMore(st)">
+            Show {{ hiddenFlatCount(st) }} more…
+          </button>
         </div>
-        <TransitionGroup name="task-list" tag="div" class="col-cards">
-          <article v-for="t in other" :key="t.id" class="card task"
-                   draggable="true"
-                   @dragstart="onDragStart(t)"
-                   @dblclick="openTask(t.id)"
-                   tabindex="0">
-            <header v-if="hasTaskHeader(t)" class="row task-header">
-              <template v-if="hasTaskIdentity(t)">
-                <div class="row task-header__left">
-                  <span v-if="isBoardFieldVisible('id') && (t.id || '').trim()" class="muted id">{{ t.id }}</span>
-                  <strong v-if="isBoardFieldVisible('title') && (t.title || '').trim()" class="title">{{ t.title }}</strong>
+        <div v-if="other.length" class="col column" data-status="__other__">
+          <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
+            <strong>Other</strong>
+            <span class="muted">{{ other.length }}</span>
+          </div>
+          <TransitionGroup name="task-list" tag="div" class="col-cards">
+            <article v-for="task in other" :key="task.id"
+                     class="card task"
+                     :class="[priorityClass(task.priority), { 'task--selected': selectedTaskId === task.id }]"
+                     draggable="true"
+                     @dragstart="onDragStart(task)"
+                     @dblclick="openTask(task.id)"
+                     @click.exact="selectTask(task.id)"
+                     tabindex="0">
+              <header v-if="hasTaskHeader(task)" class="row task-header">
+                <template v-if="hasTaskIdentity(task)">
+                  <div class="row task-header__left">
+                    <span v-if="isBoardFieldVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                    <strong v-if="isBoardFieldVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                  </div>
+                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                </template>
+                <template v-else>
+                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                </template>
+              </header>
+              <footer v-if="hasTaskMeta(task)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(task) }">
+                <div v-if="hasPrimaryMeta(task)" class="row task-meta__tags">
+                  <span v-if="isBoardFieldVisible('status') && (task.status || '').trim()" class="muted">{{ task.status }}</span>
+                  <span v-if="isBoardFieldVisible('task_type') && (task.task_type || '').trim()" class="muted">{{ task.task_type }}</span>
+                  <span v-if="isBoardFieldVisible('effort') && (task.effort || '').trim()" class="muted">{{ task.effort }}</span>
+                  <span v-if="isBoardFieldVisible('reporter') && (task.reporter || '').trim()" class="muted">by {{ formatMember(task.reporter) }}</span>
+                  <span v-if="isBoardFieldVisible('assignee') && (task.assignee || '').trim()" class="member-inline">
+                    <span class="member-badge small" :style="{ background: memberColor(task.assignee) }" :title="task.assignee || ''">{{ memberInitials(task.assignee) }}</span>
+                    {{ formatMember(task.assignee) }}
+                  </span>
+                  <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(task).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(task).overdue }">{{ taskDueInfo(task).label }}</span>
+                  <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(task)" class="muted">{{ taskModifiedInfo(task) }}</span>
+                  <span v-if="isBoardFieldVisible('tags')" v-for="tag in (task.tags || [])" :key="tag" class="tag">{{ tag }}</span>
                 </div>
-                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
-              </template>
-              <template v-else>
-                <span v-if="isBoardFieldVisible('priority') && (t.priority || '').trim()" class="priority">{{ t.priority }}</span>
-              </template>
-            </header>
-            <footer v-if="hasTaskMeta(t)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(t) }">
-              <div v-if="hasPrimaryMeta(t)" class="row task-meta__tags">
-                <span v-if="isBoardFieldVisible('status') && (t.status || '').trim()" class="muted">{{ t.status }}</span>
-                <span v-if="isBoardFieldVisible('task_type') && (t.task_type || '').trim()" class="muted">{{ t.task_type }}</span>
-                <span v-if="isBoardFieldVisible('effort') && (t.effort || '').trim()" class="muted">{{ t.effort }}</span>
-                <span v-if="isBoardFieldVisible('reporter') && (t.reporter || '').trim()" class="muted">by {{ formatMember(t.reporter) }}</span>
-                <span v-if="isBoardFieldVisible('assignee') && (t.assignee || '').trim()" class="muted">{{ formatMember(t.assignee) }}</span>
-                <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(t).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(t).overdue }">{{ taskDueInfo(t).label }}</span>
-                <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(t)" class="muted">{{ taskModifiedInfo(t) }}</span>
-                <span v-if="isBoardFieldVisible('tags')" v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-              </div>
-              <div v-if="isBoardFieldVisible('sprints') && t.sprints?.length" class="row task-meta__sprints">
-                <span
-                  v-for="sprintId in t.sprints"
-                  :key="`${t.id}-other-sprint-${sprintId}`"
-                  class="chip small sprint-chip"
-                  :class="sprintStateClass(sprintId)"
-                  :title="sprintTooltip(sprintId)"
-                >
-                  {{ sprintLabel(sprintId) }}
-                </span>
-              </div>
-            </footer>
-          </article>
-        </TransitionGroup>
-      </div>
+                <div v-if="isBoardFieldVisible('sprints') && task.sprints?.length" class="row task-meta__sprints">
+                  <span
+                    v-for="sprintId in task.sprints"
+                    :key="`${task.id}-other-sprint-${sprintId}`"
+                    class="chip small sprint-chip"
+                    :class="sprintStateClass(sprintId)"
+                    :title="sprintTooltip(sprintId)"
+                  >
+                    {{ sprintLabel(sprintId) }}
+                  </span>
+                </div>
+              </footer>
+            </article>
+          </TransitionGroup>
+        </div>
+      </template>
     </div>
   </section>
 </template>
@@ -263,7 +367,7 @@ import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
-import { formatMember } from '../utils/member'
+import { formatMember, memberColor, memberInitials } from '../utils/member'
 import { findLastStatusChangeAt } from '../utils/taskHistory'
 
 const router = useRouter()
@@ -276,7 +380,7 @@ const loadingTasks = computed(() => store.status.value === 'loading')
 const items = computed(() => store.items.value)
 const { openTaskPanel } = useTaskPanelController()
 
-const project = ref<string>('')
+const project = ref<string>(route.query.project ? String(route.query.project) : '')
 const draggingId = ref<string>('')
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
@@ -291,6 +395,46 @@ const { hasFilters, sanitizeFilterInput, onFilterUpdate, onChipsUpdate, clearFil
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprintLookup, sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
+
+const sprintFilterOptions = computed(() =>
+  (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
+)
+
+// -- Swimlane group-by (persisted per project) ----------------------------
+type GroupByMode = 'none' | 'assignee' | 'priority' | 'type'
+function groupByKey() { return project.value ? `lotar.boardGroupBy::${project.value}` : 'lotar.boardGroupBy' }
+function loadGroupBy(): GroupByMode {
+  try {
+    const v = localStorage.getItem(groupByKey())
+    if (v === 'assignee' || v === 'priority' || v === 'type') return v
+  } catch {}
+  return 'none'
+}
+const groupBy = ref<GroupByMode>(loadGroupBy())
+function saveGroupBy() { try { localStorage.setItem(groupByKey(), groupBy.value) } catch {} }
+
+// -- Initial loading (only shows spinner before first data arrives) --------
+const hasEverLoaded = ref(false)
+const initialLoading = computed(() => (loadingConfig.value || loadingTasks.value) && !hasEverLoaded.value)
+
+// -- Ticket highlight on single click -------------------------------------
+const selectedTaskId = ref('')
+function selectTask(id: string) { selectedTaskId.value = selectedTaskId.value === id ? '' : id }
+
+// -- Collapsible groups ---------------------------------------------------
+const collapsedGroups = ref<Set<string>>(new Set())
+function toggleGroup(label: string) {
+  const next = new Set(collapsedGroups.value)
+  if (next.has(label)) next.delete(label); else next.add(label)
+  collapsedGroups.value = next
+}
+
+// -- Progressive disclosure (virtual scrolling) ---------------------------
+const COLUMN_PAGE_SIZE = 30
+const columnExpansion = ref<Record<string, number>>({})
+function visibleLimit(st: string): number { return columnExpansion.value[st] || COLUMN_PAGE_SIZE }
+function showMore(st: string) { columnExpansion.value = { ...columnExpansion.value, [st]: visibleLimit(st) + COLUMN_PAGE_SIZE } }
+function resetExpansion() { columnExpansion.value = {} }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -350,6 +494,19 @@ function handleBoardPopoverClick(event: MouseEvent) {
   }
 }
 
+function priorityClass(value: string | undefined): string {
+  const v = (value || '').trim().toLowerCase()
+  if (v === 'critical') return 'priority--critical'
+  if (v === 'high') return 'priority--high'
+  if (v === 'low') return 'priority--low'
+  return ''
+}
+
+const doneStatus = computed(() => {
+  const s = statuses.value
+  return s.length ? normalizeStatusKey(s[s.length - 1]) : ''
+})
+
 function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   const raw = (task.due_date || '').trim()
   if (!raw) return { label: '', overdue: false }
@@ -362,7 +519,9 @@ function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   const sameYear = parsed.getFullYear() === today.getFullYear()
   const dateLabel = parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
   if (diffDays < 0) {
-    return { label: `Overdue ${dateLabel}`, overdue: true }
+    // Tasks in the final (done) status are not overdue
+    const isDone = doneStatus.value && normalizeStatusKey(task.status) === doneStatus.value
+    return { label: isDone ? `Due ${dateLabel}` : `Overdue ${dateLabel}`, overdue: !isDone }
   }
   return { label: `Due ${dateLabel}`, overdue: false }
 }
@@ -440,8 +599,18 @@ function handleCustomPreset(expression: string) {
   filterBarRef.value?.appendCustomFilter(expression)
 }
 
+const hasDoneFilters = computed(() => {
+  const d = doneFilters.value
+  return d.statuses.length > 0 || (typeof d.maxAgeDays === 'number' && d.maxAgeDays > 0) || (typeof d.maxVisible === 'number' && d.maxVisible > 0)
+})
+const hasAnyFilters = computed(() => hasFilters.value || groupBy.value !== 'none' || hasDoneFilters.value)
+
 function clearFilters() {
   clearFiltersAction(filterBarRef)
+  groupBy.value = 'none'
+  saveGroupBy()
+  collapsedGroups.value = new Set()
+  resetDoneFilters()
 }
 
 async function refreshBoardTasks(snapshot?: Record<string, string>) {
@@ -452,6 +621,7 @@ async function refreshBoardTasks(snapshot?: Record<string, string>) {
   const { serverFilter, normalized } = buildServerFilter(raw, project.value)
   try {
     await store.hydrateAll(serverFilter, { clear: true })
+    hasEverLoaded.value = true
   } catch (err: any) {
     showToast(err?.message || 'Failed to load board tasks')
   }
@@ -568,6 +738,54 @@ const other = computed(() => {
   })
 })
 
+// -- Aligned swimlane computeds -------------------------------------------
+function groupKeyFor(task: TaskDTO): string {
+  if (groupBy.value === 'assignee') return (task.assignee || '').trim() || '(none)'
+  if (groupBy.value === 'priority') return (task.priority || '').trim() || '(none)'
+  if (groupBy.value === 'type') return (task.task_type || '').trim() || '(none)'
+  return ''
+}
+
+const allGroupLabels = computed<string[]>(() => {
+  if (groupBy.value === 'none') return []
+  const labels = new Set<string>()
+  for (const tasks of Object.values(grouped.value)) {
+    for (const t of tasks) labels.add(groupKeyFor(t))
+  }
+  for (const t of other.value) labels.add(groupKeyFor(t))
+  const arr = Array.from(labels).sort((a, b) => {
+    if (a === '(none)') return 1
+    if (b === '(none)') return -1
+    return a.localeCompare(b)
+  })
+  return arr
+})
+
+function groupedColumnTasks(st: string, group: string): TaskDTO[] {
+  return (grouped.value[st] || []).filter(t => groupKeyFor(t) === group)
+}
+
+function groupTotalCount(group: string): number {
+  let count = 0
+  for (const tasks of Object.values(grouped.value)) {
+    count += tasks.filter(t => groupKeyFor(t) === group).length
+  }
+  return count
+}
+
+// -- Flat (ungrouped) column helpers --------------------------------------
+function visibleFlatTasks(st: string): TaskDTO[] {
+  const all = grouped.value[st] || []
+  const limit = visibleLimit(st)
+  return all.length <= limit ? all : all.slice(0, limit)
+}
+
+function hiddenFlatCount(st: string): number {
+  const all = grouped.value[st] || []
+  const limit = visibleLimit(st)
+  return all.length <= limit ? 0 : all.length - limit
+}
+
 const gridStyle = computed(() => ({
   display: 'grid',
   gridTemplateColumns: `repeat(${columns.value.length + (other.value.length ? 1 : 0)}, minmax(260px, 1fr))`,
@@ -666,6 +884,8 @@ watch(doneFilters, () => {
   saveDoneFilters()
 }, { deep: true })
 
+watch(groupBy, () => { saveGroupBy() })
+
 const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   id: true,
   title: true,
@@ -733,6 +953,7 @@ let filterDebounce: ReturnType<typeof setTimeout> | null = null
 
 watch(filter, (value) => {
   if (filterDebounce) clearTimeout(filterDebounce)
+  resetExpansion()
   const snapshot = { ...value }
   filterDebounce = setTimeout(() => {
     refreshBoardTasks(snapshot).catch((err) => {
@@ -746,7 +967,9 @@ onMounted(async () => {
     window.addEventListener('click', handleBoardPopoverClick)
   }
   await refreshProjects()
-  project.value = route.query.project ? String(route.query.project) : (projects.value[0]?.prefix || '')
+  if (!project.value) {
+    project.value = projects.value[0]?.prefix || ''
+  }
   await refreshSprints(true)
   await refreshConfig(project.value)
   await refreshBoardTasks()
@@ -762,6 +985,9 @@ watch(() => route.query, async (q) => {
   loadWip()
   loadDoneFilters()
   loadBoardFields()
+  groupBy.value = loadGroupBy()
+  collapsedGroups.value = new Set()
+  resetExpansion()
 })
 
 onUnmounted(() => {
@@ -801,6 +1027,11 @@ onUnmounted(() => {
   line-height: 1.35;
 }
 .priority { font-size: 12px; color: var(--muted); flex: 0 0 auto; white-space: nowrap; }
+.priority.priority--critical { color: var(--danger, #d93025); font-weight: 600; }
+.priority.priority--high { color: var(--warning, #e8710a); font-weight: 600; }
+.priority.priority--low { opacity: 0.6; }
+.task.priority--critical { border-left: 3px solid var(--danger, #d93025); }
+.task.priority--high { border-left: 3px solid var(--warning, #e8710a); }
 .column:focus { outline: 2px solid color-mix(in oklab, var(--fg) 30%, transparent); outline-offset: 2px; }
 .board-controls {
   gap: 8px;
@@ -912,6 +1143,28 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+.board-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.board-chips-row__right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.board-chips-row__groupby {
+  font-size: var(--text-sm, 0.875rem);
+  padding: calc(var(--space-2, 0.5rem) - 2px) var(--space-4, 1rem);
+  height: auto;
+  min-height: 0;
+  line-height: var(--line-tight, 1.25);
+}
+
 .board-filter-row {
   flex-wrap: wrap;
   gap: 8px;
@@ -998,5 +1251,120 @@ onUnmounted(() => {
 .chip.sprint--unknown {
   background: color-mix(in oklab, var(--color-muted) 18%, transparent);
   color: var(--color-muted);
+}
+
+/* -- Swimlane headers --------------------------------------------------- */
+.swimlane-row {
+  display: flex;
+  align-items: center;
+}
+
+.swimlane-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  user-select: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+
+.swimlane-header:hover {
+  background: color-mix(in oklab, var(--fg) 4%, transparent);
+}
+
+.swimlane-chevron {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.swimlane-chevron.open {
+  transform: rotate(90deg);
+}
+
+.swimlane-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swimlane-count { font-weight: 400; font-size: var(--text-xs, 0.75rem); }
+
+/* -- Column group cells (grouped mode) ---------------------------------- */
+.column-group-cell {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-col-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  z-index: var(--z-sticky);
+  font-weight: 600;
+  order: -1;
+}
+
+.board-col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
+
+/* -- Ticket selection --------------------------------------------------- */
+.task--selected {
+  outline: 2px solid var(--color-accent, #0969da);
+  outline-offset: -1px;
+  background: color-mix(in oklab, var(--color-accent, #0969da) 6%, var(--bg));
+}
+
+/* -- Member badges (assignee colour dots) ------------------------------- */
+.member-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.member-badge.small {
+  width: 18px;
+  height: 18px;
+  font-size: 9px;
+}
+
+.member-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: inherit;
+  color: var(--muted);
+}
+
+/* -- Show more / progressive disclosure --------------------------------- */
+.show-more-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  border-top: 1px dashed var(--border);
+  background: none;
+  color: var(--color-accent, var(--fg));
+  font-size: var(--text-sm, 0.875rem);
+  cursor: pointer;
+  text-align: center;
+}
+
+.show-more-btn:hover {
+  background: color-mix(in oklab, var(--color-accent) 8%, transparent);
 }
 </style>

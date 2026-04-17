@@ -468,11 +468,11 @@ impl CommandHandler for AddHandler {
 
         let mut storage = if let Some(context) = global_context {
             // Prefer the human-readable project name for smart default prefix generation
-            Storage::new_with_context(write_root, Some(context))
+            Storage::new_with_context(&write_root, Some(context))
         } else {
             // Fall back to environment/project detection heuristics when no context is available
             let context = crate::project::detect_project_name();
-            Storage::new_with_context(write_root, context.as_deref())
+            Storage::new_with_context(&write_root, context.as_deref())
         };
 
         // Use resolved project prefix, not the raw project name
@@ -606,7 +606,7 @@ impl AddHandler {
         // Use the same root selection as write path: prefer local .tasks if resolver adopted a parent
         let read_root = resolver.path.clone();
 
-        if let Some(storage) = Storage::try_open(read_root) {
+        if let Some(storage) = Storage::try_open(&read_root) {
             let project_prefix = cli_project
                 .map(|name| resolve_project_input(name, resolver.path.as_path()))
                 .unwrap_or_else(|| {
@@ -618,7 +618,7 @@ impl AddHandler {
                     }
                 });
 
-            if let Some(task) = storage.get(task_id, project_prefix.clone()) {
+            if let Some(task) = storage.get(task_id, &project_prefix) {
                 match renderer.format {
                     OutputFormat::Json => {
                         let response = serde_json::json!({

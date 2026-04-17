@@ -56,7 +56,7 @@ fn handle_add_link(
         ReferenceService::attach_link_reference(&mut ctx.storage, &loaded.full_id, url)
             .map_err(|e| e.to_string())?;
 
-    emit_reference_result(renderer, "add", "link", &loaded.full_id, url, added, task)
+    emit_reference_result(renderer, "add", "link", &loaded.full_id, url, added, &task)
 }
 
 fn handle_remove_link(
@@ -80,7 +80,7 @@ fn handle_remove_link(
         &loaded.full_id,
         url,
         removed,
-        task,
+        &task,
     )
 }
 
@@ -105,7 +105,7 @@ fn handle_add_code(
     )
     .map_err(|e| e.to_string())?;
 
-    emit_reference_result(renderer, "add", "code", &loaded.full_id, code, added, task)
+    emit_reference_result(renderer, "add", "code", &loaded.full_id, code, added, &task)
 }
 
 fn handle_remove_code(
@@ -129,7 +129,7 @@ fn handle_remove_code(
         &loaded.full_id,
         code,
         removed,
-        task,
+        &task,
     )
 }
 
@@ -154,7 +154,7 @@ fn handle_add_file(
     )
     .map_err(|e| e.to_string())?;
 
-    emit_reference_result(renderer, "add", "file", &loaded.full_id, path, added, task)
+    emit_reference_result(renderer, "add", "file", &loaded.full_id, path, added, &task)
 }
 
 fn handle_remove_file(
@@ -185,7 +185,7 @@ fn handle_remove_file(
         &loaded.full_id,
         path,
         removed,
-        task,
+        &task,
     )
 }
 
@@ -196,7 +196,7 @@ fn emit_reference_result(
     task_id: &str,
     value: &str,
     changed: bool,
-    task: crate::api_types::TaskDTO,
+    task: &crate::api_types::TaskDTO,
 ) -> Result<(), String> {
     match renderer.format {
         OutputFormat::Json => {

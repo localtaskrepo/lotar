@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use serde::Serialize;
 
@@ -12,11 +12,11 @@ use crate::services::sprint_service::SprintService;
 use crate::storage::manager::Storage;
 
 pub(crate) fn handle_cleanup_refs(
-    cleanup_args: SprintCleanupRefsArgs,
-    tasks_root: PathBuf,
+    cleanup_args: &SprintCleanupRefsArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let mut storage = Storage::new(tasks_root.clone());
+    let mut storage = Storage::new(tasks_root);
 
     let mut records = SprintService::list(&storage).map_err(|err| err.to_string())?;
     let outcome = sprint_integrity::cleanup_missing_sprint_refs(

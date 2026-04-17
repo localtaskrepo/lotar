@@ -12,12 +12,12 @@ impl AutomationHandler {
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
         match action {
-            AutomationAction::Simulate(args) => Self::simulate(args, resolver, renderer),
+            AutomationAction::Simulate(args) => Self::simulate(&args, resolver, renderer),
         }
     }
 
     fn simulate(
-        args: AutomationSimulateArgs,
+        args: &AutomationSimulateArgs,
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {

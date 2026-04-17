@@ -206,7 +206,7 @@ impl AgentJobService {
             ))
         })?;
 
-        let storage = Storage::new(tasks_dir.to_path_buf());
+        let storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, &ticket_id, None)?;
         let is_merge_job = is_merge_job_candidate(&task, req.agent.as_deref());
 
@@ -1061,7 +1061,7 @@ fn resolve_job_worktree(job_id: &str) -> Option<WorktreeCleanupTarget> {
 }
 
 fn ticket_is_done(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> bool {
-    let storage = Storage::new(tasks_dir.to_path_buf());
+    let storage = Storage::new(tasks_dir);
     let done_statuses = determine_done_statuses_from_config(config);
     match TaskService::get(&storage, ticket_id, None) {
         Ok(task) => done_statuses.contains(&task.status.as_str().to_ascii_lowercase()),
@@ -1075,6 +1075,7 @@ enum JobOutcome {
     Cancelled,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn maybe_cleanup_worktree(
     job_id: &str,
     ticket_id: &str,
@@ -1116,7 +1117,7 @@ fn maybe_cleanup_worktree(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 fn run_job(
     job_id: String,
     runner_kind: AgentRunnerKind,
@@ -1236,7 +1237,7 @@ fn run_job(
     // Inject LOTAR_* environment variables so the agent runner process has
     // full context about the task it is working on.
     let mut command = command;
-    if let Some(storage) = Storage::try_open(tasks_dir.clone())
+    if let Some(storage) = Storage::try_open(&tasks_dir.clone())
         && let Ok(task) = TaskService::get(&storage, &ticket_id, None)
     {
         let job_ctx = job_context_for(&job_id);
@@ -1725,6 +1726,7 @@ fn push_event(state: &mut AgentJobState, kind: &str, message: Option<String>) {
     );
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn emit_job_event(kind: &str, record: &AgentJobRecord, message: Option<String>) {
     let payload = json!({
         "id": record.id,
@@ -1740,7 +1742,7 @@ fn emit_job_event(kind: &str, record: &AgentJobRecord, message: Option<String>) 
         "worktree_path": record.worktree_path,
         "worktree_branch": record.worktree_branch,
     });
-    crate::api_events::emit(crate::api_events::ApiEvent {
+    crate::api_events::emit(&crate::api_events::ApiEvent {
         kind: kind.to_string(),
         data: payload,
     });

@@ -1622,7 +1622,7 @@ issue.priorities: [Low, Medium, High]
         let _reporter_guard = EnvVarGuard::clear("LOTAR_DEFAULT_REPORTER");
 
         // Create a task via service to get a known ID
-        let mut storage = Storage::new(tasks_dir.clone());
+        let mut storage = Storage::new(&tasks_dir);
         let created = TaskService::create(
             &mut storage,
             TaskCreate {

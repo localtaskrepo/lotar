@@ -45,14 +45,14 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
 
     const sanitizedConfiguredMembers = () => {
         return (options.members.value || [])
-            .map((value) => (value || '').trim())
+            .map((value) => (value || '').trim().replace(/^@/, ''))
             .filter((value) => value.length > 0)
     }
 
     const defaultOwnershipCandidates = () => {
         const defaults = options.defaults.value || {}
         return [defaults.reporter, defaults.assignee]
-            .map((value) => (value || '').trim())
+            .map((value) => (value || '').trim().replace(/^@/, ''))
             .filter((value) => value.length > 0)
     }
 
@@ -205,9 +205,16 @@ export function useTaskPanelOwnership(options: UseTaskPanelOwnershipOptions) {
             const seen = new Set<string>()
             const tags = new Set<string>()
             list.forEach((item) => {
-                if (item.assignee && !item.assignee.startsWith('@')) seen.add(item.assignee)
+                if (item.assignee) {
+                    const normalized = item.assignee.startsWith('@') ? item.assignee.slice(1) : item.assignee
+                    if (normalized) seen.add(normalized)
+                }
                 const reporter = (item as any).reporter
-                if (reporter && !String(reporter).startsWith('@')) seen.add(String(reporter))
+                if (reporter) {
+                    const raw = String(reporter)
+                    const normalized = raw.startsWith('@') ? raw.slice(1) : raw
+                    if (normalized) seen.add(normalized)
+                }
                     ; (item.tags || []).forEach((tag) => {
                         if (!tag) return
                         const trimmed = tag.trim()

@@ -1,16 +1,16 @@
 // Auto-generated from stats_handler.rs.
 use crate::cli::args::stats::StatsEffortUnit;
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
 pub(crate) fn run(
-    by: String,
+    by: &str,
     r#where: Vec<(String, String)>,
     unit: StatsEffortUnit,
     limit: usize,
     global: bool,
-    since: Option<String>,
-    until: Option<String>,
-    transitions: Option<String>,
+    since: Option<&str>,
+    until: Option<&str>,
+    transitions: Option<&str>,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
@@ -25,7 +25,7 @@ pub(crate) fn run(
     };
 
     // Load tasks snapshot
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()
@@ -75,8 +75,7 @@ pub(crate) fn run(
             None
         }
 
-        let (since_dt, until_dt) =
-            crate::utils::time::parse_since_until(since.as_deref(), until.as_deref())?;
+        let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
         let repo_root = match crate::utils::git::find_repo_root(&cwd) {
             Some(p) => p,
@@ -248,7 +247,7 @@ pub(crate) fn run(
             // Enumerate project folders directly under tasks_abs_real
             if let Ok(project_dirs) = fs::read_dir(&tasks_abs_real) {
                 let fallback_storage =
-                    crate::storage::manager::Storage::new(tasks_abs_real.clone());
+                    crate::storage::manager::Storage::new(&tasks_abs_real.clone());
                 let sprint_lookup = crate::services::task_service::TaskService::load_sprint_lookup(
                     &fallback_storage,
                 );
@@ -571,7 +570,7 @@ pub(crate) fn run(
         #[cfg(feature = "schema")]
         {
             match v {
-                serde_json::Value::Null => "".to_string(),
+                serde_json::Value::Null => String::new(),
                 serde_json::Value::Bool(b) => b.to_string(),
                 serde_json::Value::Number(n) => n.to_string(),
                 serde_json::Value::String(s) => s.clone(),
@@ -582,7 +581,7 @@ pub(crate) fn run(
         #[cfg(not(feature = "schema"))]
         {
             match v {
-                serde_yaml::Value::Null => "".to_string(),
+                serde_yaml::Value::Null => String::new(),
                 serde_yaml::Value::Bool(b) => b.to_string(),
                 serde_yaml::Value::Number(n) => n.to_string(),
                 serde_yaml::Value::String(s) => s.clone(),
@@ -675,7 +674,7 @@ pub(crate) fn run(
         )
         .map_err(|e| format!("Failed to load config: {}", e))?;
         let cfg = cfg_mgr.get_resolved_config();
-        let mut keys = resolve_group_key(&id, &t, &by, cfg).unwrap_or_else(|| vec![String::new()]);
+        let mut keys = resolve_group_key(&id, &t, by, cfg).unwrap_or_else(|| vec![String::new()]);
         if by.trim().to_lowercase() == "assignee"
             && let Some(a) = &t.assignee
         {

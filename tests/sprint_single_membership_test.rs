@@ -24,7 +24,7 @@ fn sprint_assignment_requires_force_to_replace_membership() {
     let tasks_dir = temp_dir.path().join(".tasks");
     write_minimal_config(&tasks_dir);
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir);
 
     let sprint_one = Sprint {
         plan: Some(SprintPlan {

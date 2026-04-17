@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::Utc;
 
@@ -22,8 +22,8 @@ use crate::storage::manager::Storage;
 use crate::cli::handlers::sprint::operations::resolve_sprint_records_context;
 
 pub(crate) fn handle_show(
-    show_args: SprintShowArgs,
-    tasks_root: PathBuf,
+    show_args: &SprintShowArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let storage = Storage::try_open(tasks_root)
@@ -93,8 +93,8 @@ pub(crate) fn handle_show(
 }
 
 pub(crate) fn handle_review(
-    review_args: SprintReviewArgs,
-    tasks_root: PathBuf,
+    review_args: &SprintReviewArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let context = resolve_sprint_records_context(tasks_root, "running a review")?;
@@ -124,8 +124,8 @@ pub(crate) fn handle_review(
 }
 
 pub(crate) fn handle_stats(
-    stats_args: SprintStatsArgs,
-    tasks_root: PathBuf,
+    stats_args: &SprintStatsArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let context = resolve_sprint_records_context(tasks_root, "running stats")?;
@@ -155,8 +155,8 @@ pub(crate) fn handle_stats(
 }
 
 pub(crate) fn handle_summary(
-    summary_args: SprintSummaryArgs,
-    tasks_root: PathBuf,
+    summary_args: &SprintSummaryArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let context = resolve_sprint_records_context(tasks_root, "running summary")?;

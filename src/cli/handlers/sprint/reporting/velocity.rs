@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::Utc;
 
@@ -15,8 +15,8 @@ use crate::storage::manager::Storage;
 use super::helpers::{format_percentage, format_velocity_value, metric_label};
 
 pub(crate) fn handle_velocity(
-    velocity_args: SprintVelocityArgs,
-    tasks_root: PathBuf,
+    velocity_args: &SprintVelocityArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     let limit = match velocity_args.limit {
@@ -25,12 +25,12 @@ pub(crate) fn handle_velocity(
         None => DEFAULT_VELOCITY_WINDOW,
     };
 
-    let config_root = tasks_root.clone();
+    let config_root = tasks_root;
     let storage = Storage::try_open(tasks_root)
         .ok_or_else(|| "No sprints found. Create one before running velocity.".to_string())?;
 
     let resolved_config =
-        load_and_merge_configs(Some(config_root.as_path())).map_err(|err| err.to_string())?;
+        load_and_merge_configs(Some(config_root)).map_err(|err| err.to_string())?;
 
     let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
     let had_records = !records.is_empty();
@@ -41,7 +41,7 @@ pub(crate) fn handle_velocity(
         metric: velocity_args.metric,
     };
 
-    let computation = compute_velocity(&storage, records, &resolved_config, options, Utc::now());
+    let computation = compute_velocity(&storage, &records, &resolved_config, &options, Utc::now());
 
     match renderer.format {
         OutputFormat::Json => {

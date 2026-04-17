@@ -122,7 +122,7 @@ mod tests {
         let temp = TempDir::new().expect("tempdir");
         let tasks_root = temp.path().join(".tasks");
         std::fs::create_dir_all(&tasks_root).expect("tasks dir");
-        let mut storage = Storage::new(tasks_root.clone());
+        let mut storage = Storage::new(&tasks_root.clone());
         let config = config_with_custom_field("iteration");
         let resolver = TasksDirectoryResolver {
             path: tasks_root.clone(),

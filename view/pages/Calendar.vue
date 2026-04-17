@@ -7,7 +7,43 @@
           <UiButton icon-only aria-label="Previous month" @click="prevMonth">
             <IconGlyph name="chevron-left" />
           </UiButton>
-          <strong>{{ monthLabel }}</strong>
+          <div class="month-picker" ref="monthPickerRef">
+            <UiButton
+              type="button"
+              class="month-picker__trigger"
+              :aria-expanded="monthPickerOpen ? 'true' : 'false'"
+              aria-haspopup="dialog"
+              @click="toggleMonthPicker"
+            >
+              {{ monthLabel }}
+            </UiButton>
+            <div v-if="monthPickerOpen" class="month-picker__popover" role="dialog" aria-label="Pick month and year">
+              <div class="month-picker__year-row">
+                <UiButton icon-only type="button" aria-label="Previous year" @click="stepPickerYear(-1)">
+                  <IconGlyph name="chevron-left" />
+                </UiButton>
+                <strong class="month-picker__year">{{ pickerYear }}</strong>
+                <UiButton icon-only type="button" aria-label="Next year" @click="stepPickerYear(1)">
+                  <IconGlyph name="chevron-right" />
+                </UiButton>
+              </div>
+              <div class="month-picker__grid">
+                <button
+                  v-for="(label, idx) in monthNames"
+                  :key="label"
+                  type="button"
+                  class="month-picker__month"
+                  :class="{
+                    active: pickerYear === cursor.getFullYear() && idx === cursor.getMonth(),
+                    current: pickerYear === today.getFullYear() && idx === today.getMonth(),
+                  }"
+                  @click="selectPickerMonth(idx)"
+                >
+                  {{ label }}
+                </button>
+              </div>
+            </div>
+          </div>
           <UiButton icon-only aria-label="Next month" @click="nextMonth">
             <IconGlyph name="chevron-right" />
           </UiButton>
@@ -89,14 +125,15 @@
       <div class="grid header">
         <div v-for="d in weekDays" :key="d" class="cell head">{{ d }}</div>
       </div>
-      <div class="grid body">
-        <div
-          v-for="(cell, idx) in cells"
-          :key="cell.dateKey || idx"
-          class="cell day"
-          :class="{ other: !cell.inMonth, today: isTodayCell(cell.date) }"
-          :data-date="cell.dateKey"
-        >
+      <Transition :name="`calendar-slide-${monthSlideDirection}`" mode="out-in">
+        <div class="grid body" :key="monthKey">
+          <div
+            v-for="(cell, idx) in cells"
+            :key="cell.dateKey || idx"
+            class="cell day"
+            :class="{ other: !cell.inMonth, today: isTodayCell(cell.date) }"
+            :data-date="cell.dateKey"
+          >
           <div class="date">{{ cell.date.getDate() }}</div>
           <div v-if="showSprints && cell.sprints.length" class="sprints">
             <div
@@ -140,7 +177,8 @@
             <li v-if="hiddenCountFor(cell) > 0" key="__more__" class="muted more" @click="openDay(cell.date)">{{ moreTicketsLabel(hiddenCountFor(cell)) }}</li>
           </TransitionGroup>
         </div>
-      </div>
+        </div>
+      </Transition>
     </div>
 
     <UiModal :open="dayDialogOpen" aria-label="Day tasks" size="sm" @close="closeDayDialog">
@@ -210,6 +248,8 @@ const { sprintColorForState } = useSprintFormatting(sprintList)
 
 const project = ref<string>('')
 const cursor = ref<Date>(new Date()) // month cursor
+const monthKey = computed(() => `${cursor.value.getFullYear()}-${String(cursor.value.getMonth() + 1).padStart(2, '0')}`)
+const monthSlideDirection = ref<'forward' | 'backward'>('forward')
 const showSprints = ref(false)
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
@@ -324,6 +364,9 @@ function handleCalendarPopoverClick(event: MouseEvent) {
   if (fieldsEditorRef.value?.open && !fieldsEditorRef.value.contains(target)) {
     fieldsEditorRef.value.open = false
   }
+  if (monthPickerOpen.value && monthPickerRef.value && !monthPickerRef.value.contains(target)) {
+    monthPickerOpen.value = false
+  }
 }
 const { hasFilters, onFilterUpdate: baseOnFilterUpdate, onChipsUpdate: baseOnChipsUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
@@ -415,9 +458,43 @@ async function refreshCalendarTasks(snapshot?: Record<string, string>) {
   await store.hydrateAll(serverFilter, { clear: true })
 }
 
-function prevMonth(){ cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()-1, 1); pushRoute() }
-function nextMonth(){ cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()+1, 1); pushRoute() }
-function goToday(){ cursor.value = new Date(); pushRoute() }
+function prevMonth(){
+  monthSlideDirection.value = 'backward'
+  cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()-1, 1)
+  pushRoute()
+}
+function nextMonth(){
+  monthSlideDirection.value = 'forward'
+  cursor.value = new Date(cursor.value.getFullYear(), cursor.value.getMonth()+1, 1)
+  pushRoute()
+}
+function goToday(){
+  const now = new Date()
+  monthSlideDirection.value = now.getTime() >= cursor.value.getTime() ? 'forward' : 'backward'
+  cursor.value = now
+  pushRoute()
+}
+
+const monthPickerOpen = ref(false)
+const monthPickerRef = ref<HTMLElement | null>(null)
+const pickerYear = ref(cursor.value.getFullYear())
+const today = new Date()
+const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function toggleMonthPicker() {
+  monthPickerOpen.value = !monthPickerOpen.value
+  if (monthPickerOpen.value) pickerYear.value = cursor.value.getFullYear()
+}
+function stepPickerYear(delta: number) {
+  pickerYear.value += delta
+}
+function selectPickerMonth(monthIndex: number) {
+  const next = new Date(pickerYear.value, monthIndex, 1)
+  monthSlideDirection.value = next.getTime() >= cursor.value.getTime() ? 'forward' : 'backward'
+  cursor.value = next
+  monthPickerOpen.value = false
+  pushRoute()
+}
 
 function isTodayCell(d: Date){ const now = new Date(); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate() }
 
@@ -488,6 +565,21 @@ watch(filter, (value) => {
   }, 150)
 }, { deep: true })
 
+watch(project, async (nextProject, prevProject) => {
+  if (nextProject === prevProject) return
+  try {
+    await refreshConfig(nextProject || undefined)
+  } catch (err) {
+    console.warn('Failed to refresh calendar config after project change', err)
+  }
+  try {
+    await refreshCalendarTasks()
+  } catch (err) {
+    console.warn('Failed to refresh calendar after project change', err)
+  }
+  loadCalendarHoverFields()
+})
+
 onUnmounted(() => {
   if (filterDebounce) {
     clearTimeout(filterDebounce)
@@ -551,6 +643,9 @@ function onCalendarKey(event: KeyboardEvent) {
   if (event.key === 'Escape' && dayDialogOpen.value) {
     closeDayDialog()
   }
+  if (event.key === 'Escape' && monthPickerOpen.value) {
+    monthPickerOpen.value = false
+  }
 }
 
 watch(showSprints, (enabled, previous) => {
@@ -561,7 +656,7 @@ watch(showSprints, (enabled, previous) => {
 </script>
 
 <style scoped>
-.calendar { display: grid; gap: 8px; }
+.calendar { display: grid; gap: 8px; position: relative; overflow: hidden; }
 .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .cell { border: 1px solid var(--border); border-radius: var(--radius-base); padding: 8px; background: var(--bg); min-height: 100px; }
 .head { text-align: center; font-weight: 600; color: var(--muted); border: none; background: transparent; min-height: 20px; }
@@ -801,5 +896,84 @@ watch(showSprints, (enabled, previous) => {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 6px;
+}
+
+/* Month picker button + popover */
+.month-picker { position: relative; display: inline-flex; }
+.month-picker__trigger {
+  min-width: 170px;
+  justify-content: center;
+  font-weight: 600;
+}
+.month-picker__popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 240px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  z-index: var(--z-popover);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.month-picker__year-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.month-picker__year { font-size: 0.95rem; }
+.month-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.month-picker__month {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  padding: 6px 8px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.month-picker__month:hover { background: color-mix(in oklab, var(--fg) 8%, transparent); }
+.month-picker__month.current { border-color: color-mix(in oklab, var(--fg) 25%, transparent); }
+.month-picker__month.active {
+  background: var(--accent, color-mix(in oklab, var(--fg) 18%, transparent));
+  color: var(--accent-contrast, inherit);
+  border-color: transparent;
+}
+
+/* Month slide transitions */
+.calendar-slide-forward-enter-active,
+.calendar-slide-forward-leave-active,
+.calendar-slide-backward-enter-active,
+.calendar-slide-backward-leave-active {
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+.calendar-slide-forward-enter-from {
+  transform: translateX(24px);
+  opacity: 0;
+}
+.calendar-slide-forward-leave-to {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+.calendar-slide-backward-enter-from {
+  transform: translateX(-24px);
+  opacity: 0;
+}
+.calendar-slide-backward-leave-to {
+  transform: translateX(24px);
+  opacity: 0;
 }
 </style>

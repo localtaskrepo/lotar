@@ -3,7 +3,7 @@ import type { TaskDTO, TaskListFilter } from '../api/types'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
 
 const BUILTIN_QUERY_KEYS = new Set([
-  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs',
+  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints',
 ])
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -41,6 +41,7 @@ export function buildServerFilter(
   if (normalized.type) serverFilter.type = listFromCsv(normalized.type)
   if (normalized.assignee && normalized.assignee !== '__none__') serverFilter.assignee = normalized.assignee
   if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
+  if (normalized.sprints) serverFilter.sprints = listFromCsv(normalized.sprints).map(Number).filter(Number.isFinite)
   Object.assign(serverFilter, extras)
   return { serverFilter, normalized }
 }

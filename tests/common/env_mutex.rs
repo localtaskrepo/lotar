@@ -1,17 +1,16 @@
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::{env, ffi::OsString};
 
 // Legacy global mutex (kept for backward compatibility in case some tests still import it)
 #[allow(dead_code)]
-pub static ENV_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+pub static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 // Registry of per-environment-variable mutexes.
 // We store leaked &'static Mutex<()> pointers so we can return 'static guards safely.
 #[allow(dead_code)]
-static ENV_LOCKS: Lazy<Mutex<HashMap<String, &'static Mutex<()>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static ENV_LOCKS: LazyLock<Mutex<HashMap<String, &'static Mutex<()>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[allow(dead_code)]
 fn get_mutex_for(var: &str) -> &'static Mutex<()> {

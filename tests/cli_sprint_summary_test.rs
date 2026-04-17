@@ -26,7 +26,7 @@ issue.priorities: [Low, Medium, High]
     )
     .expect("write config");
 
-    let mut storage = Storage::new(fixtures.tasks_root.clone());
+    let mut storage = Storage::new(&fixtures.tasks_root.clone());
 
     let sprint = Sprint {
         plan: Some(SprintPlan {
@@ -46,7 +46,7 @@ issue.priorities: [Low, Medium, High]
     let sprint_id = created.record.id;
     let sprint_id_arg = sprint_id.to_string();
 
-    let mut sprint_doc = created.record.sprint.clone();
+    let mut sprint_doc = created.record.sprint;
     sprint_doc.actual = Some(SprintActual {
         started_at: Some("2025-10-01T09:00:00Z".to_string()),
         ..SprintActual::default()

@@ -35,7 +35,7 @@ impl CommandHandler for GitHandler {
 
                 match hook_action {
                     GitHooksAction::Install(install_args) => {
-                        Self::handle_hooks_install(install_args, renderer)
+                        Self::handle_hooks_install(&install_args, renderer)
                     }
                 }
             }
@@ -45,7 +45,7 @@ impl CommandHandler for GitHandler {
 
 impl GitHandler {
     fn handle_hooks_install(
-        args: GitHooksInstallArgs,
+        args: &GitHooksInstallArgs,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
         let cwd = std::env::current_dir()

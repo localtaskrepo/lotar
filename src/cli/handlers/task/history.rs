@@ -5,13 +5,13 @@ use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
 
 pub fn handle_history(
-    id: String,
+    id: &str,
     limit: usize,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let context = resolve_task_file(&id, project, resolver)?;
+    let context = resolve_task_file(id, project, resolver)?;
 
     let commits = crate::services::audit_service::AuditService::list_commits_for_file(
         &context.repo_root,
@@ -65,14 +65,14 @@ pub fn handle_history(
 }
 
 pub fn handle_history_by_field(
-    field: HistoryField,
-    id: String,
+    field: &HistoryField,
+    id: &str,
     limit: usize,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let context = resolve_task_file(&id, project, resolver)?;
+    let context = resolve_task_file(id, project, resolver)?;
 
     let commits = crate::services::audit_service::AuditService::list_commits_for_file(
         &context.repo_root,
@@ -188,14 +188,14 @@ pub fn handle_history_by_field(
 }
 
 pub fn handle_diff(
-    id: String,
+    id: &str,
     commit: Option<String>,
     fields: bool,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let context = resolve_task_file(&id, project, resolver)?;
+    let context = resolve_task_file(id, project, resolver)?;
 
     let commit_sha = if let Some(c) = commit {
         c
@@ -424,17 +424,17 @@ fn format_diff_value(value: &serde_json::Value) -> String {
 }
 
 pub fn handle_at(
-    id: String,
-    commit: String,
+    id: &str,
+    commit: &str,
     project: Option<&str>,
     resolver: &TasksDirectoryResolver,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let context = resolve_task_file(&id, project, resolver)?;
+    let context = resolve_task_file(id, project, resolver)?;
 
     let content = crate::services::audit_service::AuditService::show_file_at(
         &context.repo_root,
-        &commit,
+        commit,
         &context.file_repo_path,
     )?;
     match renderer.format {

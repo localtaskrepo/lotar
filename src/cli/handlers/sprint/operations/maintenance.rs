@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::cli::args::sprint::SprintDeleteArgs;
 use crate::output::{OutputFormat, OutputRenderer};
@@ -15,11 +15,11 @@ use super::super::shared::{
 };
 
 pub(crate) fn handle_delete(
-    delete_args: SprintDeleteArgs,
-    tasks_root: PathBuf,
+    delete_args: &SprintDeleteArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let mut storage = Storage::new(tasks_root.clone());
+    let mut storage = Storage::new(tasks_root);
 
     let sprint_id = delete_args.resolved_sprint_id();
     let existing = SprintService::get(&storage, sprint_id)

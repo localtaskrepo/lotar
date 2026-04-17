@@ -83,17 +83,17 @@ impl CommandHandler for DueDateHandler {
                 Ok(())
             }
             Some(candidate) => handle_set_due_date(
-                candidate, dry_run, explain, full_id, task, &mut ctx, renderer,
+                &candidate, dry_run, explain, &full_id, task, &mut ctx, renderer,
             ),
         }
     }
 }
 
 fn handle_set_due_date(
-    candidate: String,
+    candidate: &str,
     dry_run: bool,
     explain: bool,
-    full_id: String,
+    full_id: &str,
     mut task: crate::storage::task::Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
@@ -105,20 +105,20 @@ fn handle_set_due_date(
     ));
 
     let normalized = validator
-        .parse_due_date(&candidate)
+        .parse_due_date(candidate)
         .map_err(|e| format!("Due date validation failed: {}", e))?;
 
     let previous = task.due_date.clone();
 
     if previous.as_deref() == Some(normalized.as_str()) {
-        render_due_date_noop(renderer, &full_id, previous.as_deref());
+        render_due_date_noop(renderer, full_id, previous.as_deref());
         return Ok(());
     }
 
     if dry_run {
         render_due_date_dry_run(
             renderer,
-            &full_id,
+            full_id,
             previous.as_deref(),
             Some(normalized.as_str()),
             explain,
@@ -144,11 +144,11 @@ fn handle_set_due_date(
         sprints: None,
     };
     let updated =
-        TaskService::update(&mut ctx.storage, &full_id, patch).map_err(|e| e.to_string())?;
+        TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
 
     render_due_date_success(
         renderer,
-        &full_id,
+        full_id,
         previous.as_deref(),
         updated.due_date.as_deref(),
     );

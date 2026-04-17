@@ -86,12 +86,12 @@ impl CommandHandler for EffortHandler {
         }
 
         if clear {
-            return handle_clear_effort(dry_run, explain, full_id, task, &mut ctx, renderer);
+            return handle_clear_effort(dry_run, explain, &full_id, task, &mut ctx, renderer);
         }
 
         if let Some(candidate) = new_effort {
             return handle_set_effort(
-                candidate, dry_run, explain, full_id, task, &mut ctx, renderer,
+                &candidate, dry_run, explain, &full_id, &task, &mut ctx, renderer,
             );
         }
 
@@ -102,7 +102,7 @@ impl CommandHandler for EffortHandler {
 fn handle_clear_effort(
     dry_run: bool,
     explain: bool,
-    full_id: String,
+    full_id: &str,
     mut task: crate::storage::task::Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
@@ -113,7 +113,7 @@ fn handle_clear_effort(
         if dry_run {
             render_effort_preview(
                 renderer,
-                &full_id,
+                full_id,
                 None,
                 None,
                 explain,
@@ -121,14 +121,14 @@ fn handle_clear_effort(
             );
             return Ok(());
         }
-        render_effort_noop(renderer, &full_id, None);
+        render_effort_noop(renderer, full_id, None);
         return Ok(());
     }
 
     if dry_run {
         render_effort_preview(
             renderer,
-            &full_id,
+            full_id,
             previous.as_deref(),
             None,
             explain,
@@ -141,35 +141,35 @@ fn handle_clear_effort(
         effort: Some(String::new()), // empty string = clear
         ..Default::default()
     };
-    crate::services::task_service::TaskService::update(&mut ctx.storage, &full_id, patch)
+    crate::services::task_service::TaskService::update(&mut ctx.storage, full_id, patch)
         .map_err(|e| e.to_string())?;
-    render_effort_clear_success(renderer, &full_id, previous.as_deref());
+    render_effort_clear_success(renderer, full_id, previous.as_deref());
     Ok(())
 }
 
 fn handle_set_effort(
-    candidate: String,
+    candidate: &str,
     dry_run: bool,
     explain: bool,
-    full_id: String,
-    task: crate::storage::task::Task,
+    full_id: &str,
+    task: &crate::storage::task::Task,
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
-    let parsed = crate::utils::effort::parse_effort(&candidate)
+    let parsed = crate::utils::effort::parse_effort(candidate)
         .map_err(|e| format!("Effort validation failed: {}", e))?;
     let normalized = parsed.canonical;
 
     let previous = task.effort.clone();
     if previous.as_deref() == Some(normalized.as_str()) {
-        render_effort_noop(renderer, &full_id, previous.as_deref());
+        render_effort_noop(renderer, full_id, previous.as_deref());
         return Ok(());
     }
 
     if dry_run {
         render_effort_preview(
             renderer,
-            &full_id,
+            full_id,
             previous.as_deref(),
             Some(normalized.as_str()),
             explain,
@@ -194,11 +194,11 @@ fn handle_set_effort(
         sprints: None,
     };
     let updated =
-        TaskService::update(&mut ctx.storage, &full_id, patch).map_err(|e| e.to_string())?;
+        TaskService::update(&mut ctx.storage, full_id, patch).map_err(|e| e.to_string())?;
 
     render_effort_set_success(
         renderer,
-        &full_id,
+        full_id,
         previous.as_deref(),
         updated.effort.as_deref(),
     );

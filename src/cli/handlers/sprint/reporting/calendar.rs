@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::{DateTime, Duration, Utc};
 
@@ -12,8 +12,8 @@ use crate::storage::manager::Storage;
 use super::helpers::format_duration;
 
 pub(crate) fn handle_calendar(
-    calendar_args: SprintCalendarArgs,
-    tasks_root: PathBuf,
+    calendar_args: &SprintCalendarArgs,
+    tasks_root: &Path,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
     if let Some(limit) = calendar_args.limit

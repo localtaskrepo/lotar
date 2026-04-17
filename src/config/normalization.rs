@@ -1146,7 +1146,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             .to_string();
     }
 
-    serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())
+    serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_default()
 }
 
 /// Render ProjectConfig into canonical nested YAML form
@@ -1475,10 +1475,11 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         );
     }
 
-    serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_else(|_| "".to_string())
+    serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_default()
 }
 
 // Helper: tolerant parser for issue.types accepting mixed-case strings mapping to TaskType
+#[allow(clippy::needless_pass_by_value)]
 fn parse_issue_types_tolerant(
     v: serde_yaml::Value,
 ) -> Option<crate::config::types::ConfigurableField<crate::types::TaskType>> {

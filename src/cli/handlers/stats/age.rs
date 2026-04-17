@@ -1,6 +1,7 @@
 // Auto-generated from stats_handler.rs.
 use crate::cli::args::stats::StatsAgeDistribution;
 
+#[allow(clippy::needless_pass_by_value)]
 pub(crate) fn run(
     distribution: StatsAgeDistribution,
     limit: usize,
@@ -19,7 +20,7 @@ pub(crate) fn run(
     };
 
     // Load tasks snapshot
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()

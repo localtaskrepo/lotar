@@ -94,15 +94,15 @@ impl CommandHandler for TaskHandler {
                 EditHandler::execute(edit_args, project, resolver, renderer)
             }
             TaskAction::History { id, limit } => {
-                handle_history(id, limit, project, resolver, renderer)
+                handle_history(&id, limit, project, resolver, renderer)
             }
             TaskAction::HistoryByField { field, id, limit } => {
-                handle_history_by_field(field, id, limit, project, resolver, renderer)
+                handle_history_by_field(&field, &id, limit, project, resolver, renderer)
             }
             TaskAction::Diff { id, commit, fields } => {
-                handle_diff(id, commit, fields, project, resolver, renderer)
+                handle_diff(&id, commit, fields, project, resolver, renderer)
             }
-            TaskAction::At { id, commit } => handle_at(id, commit, project, resolver, renderer),
+            TaskAction::At { id, commit } => handle_at(&id, &commit, project, resolver, renderer),
             TaskAction::Status(status_args) => {
                 let handler_args = StatusHandlerArgs::new(
                     status_args.id,

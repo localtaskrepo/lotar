@@ -69,6 +69,7 @@ impl SyncReportService {
         Ok(Some(filename))
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     pub fn list_reports(
         tasks_dir: &Path,
         config: &ResolvedConfig,

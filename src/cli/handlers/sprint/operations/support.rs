@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use chrono::Utc;
 use serde::Serialize;
@@ -18,16 +18,15 @@ pub(crate) struct SprintRecordsContext {
 }
 
 pub(crate) fn resolve_sprint_records_context(
-    tasks_root: PathBuf,
+    tasks_root: &Path,
     action_label: &str,
 ) -> Result<SprintRecordsContext, String> {
     let missing_message = format!("No sprints found. Create one before {}.", action_label);
 
-    let storage = Storage::try_open(tasks_root.clone()).ok_or_else(|| missing_message.clone())?;
+    let storage = Storage::try_open(tasks_root).ok_or_else(|| missing_message.clone())?;
 
-    let resolved_config =
-        crate::config::resolution::load_and_merge_configs(Some(tasks_root.as_path()))
-            .map_err(|err| err.to_string())?;
+    let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
+        .map_err(|err| err.to_string())?;
 
     let records = SprintService::list(&storage).map_err(|err| err.to_string())?;
     if records.is_empty() {
@@ -49,6 +48,7 @@ pub(super) enum SprintOperationKind {
     Close,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 pub(super) fn render_operation_response(
     kind: SprintOperationKind,
     record: SprintRecord,

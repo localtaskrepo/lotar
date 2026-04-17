@@ -487,7 +487,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             .unwrap_or_default(),
     };
 
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     match TaskService::create(&mut storage, dto) {
         Ok(task) => {
             let response_body = make_task_create_payload(&task, &req.params, enum_hints.as_ref());
@@ -544,6 +544,7 @@ fn applied_defaults_for_task_create(params: &Value, task: &TaskDTO) -> Vec<Value
         })
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn push_default(acc: &mut Vec<Value>, field: &str, value: Value) {
         acc.push(json!({ "field": field, "value": value }));
     }
@@ -613,7 +614,7 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let storage = Storage::new(resolver.path);
+    let storage = Storage::new(&resolver.path);
     match TaskService::get(&storage, &id.unwrap(), project) {
         Ok(task) => ok(
             req.id,
@@ -675,7 +676,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Ok(patch) => patch,
         Err(resp) => return resp,
     };
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     match TaskService::update(&mut storage, &id.unwrap(), patch) {
         Ok(task) => ok(
             req.id,
@@ -714,9 +715,9 @@ pub(crate) fn handle_task_comment_add(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
 
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
 
-    let dto = match TaskService::add_comment(&mut storage, &id, text) {
+    let dto = match TaskService::add_comment(&mut storage, &id, &text) {
         Ok(dto) => dto,
         Err(error) => {
             let msg = error.to_string();
@@ -783,9 +784,9 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
     };
 
     let project_prefix = id.split('-').next().unwrap_or("").to_string();
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
 
-    let mut task = match storage.get(&id, project_prefix.clone()) {
+    let mut task = match storage.get(&id, &project_prefix) {
         Some(task) => task,
         None => {
             return err(
@@ -913,7 +914,7 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(resp) => return resp,
     };
 
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     let mut updated: Vec<TaskDTO> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
 
@@ -979,13 +980,13 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
         }
     };
 
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     let mut updated: Vec<TaskDTO> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
 
     for id in ids {
         let project_prefix = id.split('-').next().unwrap_or("").to_string();
-        let mut task = match storage.get(&id, project_prefix.clone()) {
+        let mut task = match storage.get(&id, &project_prefix) {
             Some(task) => task,
             None => {
                 failed.push(json!({"id": id, "error": "Task not found"}));
@@ -1094,7 +1095,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         }
     };
 
-    let mut storage = Storage::new(resolver.path.clone());
+    let mut storage = Storage::new(&resolver.path.clone());
     let repo_root = if kind == "code" || kind == "file" {
         match find_repo_root(storage.root_path.as_path()) {
             Some(root) => Some(root),
@@ -1298,7 +1299,7 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
         }
     };
 
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(&resolver.path);
     let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
         ("link", true) => ReferenceService::attach_link_reference(&mut storage, &full_id, &value),
         ("link", false) => ReferenceService::detach_link_reference(&mut storage, &full_id, &value),
@@ -1415,7 +1416,7 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let mut storage = Storage::new(resolver.path);
+    let mut storage = Storage::new(&resolver.path);
     match TaskService::delete(&mut storage, id.unwrap(), project) {
         Ok(deleted) => ok(
             req.id,
@@ -1554,7 +1555,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         },
         custom_fields,
     };
-    let storage = Storage::new(resolver.path.clone());
+    let storage = Storage::new(&resolver.path.clone());
     let mut tasks = TaskService::list(&storage, &filter)
         .into_iter()
         .map(|(_, t)| t)

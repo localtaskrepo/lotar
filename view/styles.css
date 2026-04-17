@@ -931,3 +931,18 @@ main {
 	position: absolute;
 	width: 100%;
 }
+
+/* ------------------------------------------------------------------ */
+/* Shared table-row transition (TransitionGroup name="task-rows")     */
+/* Used inside <tbody> where position:absolute on <tr> is invalid.    */
+/* Opacity-only to avoid layout glitches on table rows.               */
+/* ------------------------------------------------------------------ */
+.task-rows-enter-active,
+.task-rows-leave-active {
+	transition: opacity 0.2s ease;
+}
+
+.task-rows-enter-from,
+.task-rows-leave-to {
+	opacity: 0;
+}

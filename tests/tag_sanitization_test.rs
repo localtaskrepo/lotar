@@ -25,7 +25,7 @@ fn service_filters_blank_tags_on_create_and_update() {
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
     write_minimal_config(&tasks_dir);
 
-    let mut storage = Storage::new(tasks_dir.clone());
+    let mut storage = Storage::new(&tasks_dir);
     let req = TaskCreate {
         title: "Tag normalization".to_string(),
         project: Some("TEST".to_string()),

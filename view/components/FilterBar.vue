@@ -85,6 +85,29 @@
         </label>
       </div>
     </div>
+    <div v-if="showSprintSelect" ref="sprintDropdown" class="filter-bar__dropdown">
+      <button
+        type="button"
+        class="input filter-bar__dropdown-trigger"
+        aria-label="Sprint filter"
+        data-testid="filter-sprint"
+        :title="sprintTitle"
+        :aria-expanded="sprintMenuOpen ? 'true' : 'false'"
+        @click="toggleSprintMenu"
+      >
+        <span class="filter-bar__dropdown-trigger-label">{{ sprintTriggerLabel }}</span>
+      </button>
+      <div v-if="sprintMenuOpen" class="filter-bar__menu-popover" role="menu" @click.stop>
+        <div v-if="sprintHasSelections" class="filter-bar__menu-actions">
+          <button type="button" class="filter-bar__menu-action" @click="clearSprint">Clear</button>
+          <button type="button" class="filter-bar__menu-action" @click="invertSprint">Invert</button>
+        </div>
+        <label v-for="opt in sprintOptions" :key="opt.id" class="filter-bar__menu-item">
+          <input type="checkbox" :checked="sprintSelectionSet.has(String(opt.id))" @change="toggleSprintValue(String(opt.id))" />
+          <span>{{ opt.label }}</span>
+        </label>
+      </div>
+    </div>
     <UiSelect v-if="showOrderSelect" v-model="order">
       <option value="desc">Newest</option>
       <option value="asc">Oldest</option>
@@ -140,6 +163,7 @@ const props = withDefaults(
     statuses?: string[]
     priorities?: string[]
     types?: string[]
+    sprintOptions?: Array<{ id: number; label: string }>
     value?: Record<string, string>
     storageKey?: string
     showStatus?: boolean
@@ -157,6 +181,7 @@ const project = ref('')
 const status = ref('')
 const priority = ref('')
 const type = ref('')
+const sprintFilter = ref('')
 const order = ref<'asc'|'desc'>('desc')
 const tags = ref('')
 const assignee = ref('')
@@ -164,7 +189,7 @@ const extraFilters = ref('')
 const customFilterErrors = ref<string[]>([])
 const customFilterInput = ref<{ focus: () => void } | null>(null)
 let lastSyncedExtras = ''
-const CUSTOM_UI_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'order', 'due', 'recent', 'needs'])
+const CUSTOM_UI_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'order', 'due', 'recent', 'needs', 'sprints'])
 const RESERVED_FIELD_ALIASES: Record<string, string> = {
   q: 'q',
   query: 'q',
@@ -265,6 +290,25 @@ const typeSelections = computed(() => splitCsv(type.value))
 const typeSelectionSet = computed(() => new Set(typeSelections.value))
 const typeTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Type', typeSelections.value))
 
+const showSprintSelect = computed(() => (props.sprintOptions ?? []).length > 0)
+const sprintTitle = computed(() => {
+  const values = splitCsv(sprintFilter.value)
+  if (!values.length) return ''
+  const opts = props.sprintOptions ?? []
+  const labels = values.map((id) => opts.find((o) => String(o.id) === id)?.label ?? `#${id}`)
+  return `Selected: ${labels.join(', ')}`
+})
+const sprintHasSelections = computed(() => splitCsv(sprintFilter.value).length > 0)
+const sprintSelections = computed(() => splitCsv(sprintFilter.value))
+const sprintSelectionSet = computed(() => new Set(sprintSelections.value))
+const sprintTriggerLabel = computed(() => {
+  const selected = sprintSelections.value
+  if (!selected.length) return 'Sprint'
+  const opts = props.sprintOptions ?? []
+  const labels = selected.map((id) => opts.find((o) => String(o.id) === id)?.label ?? `#${id}`)
+  return formatMultiSelectTriggerLabel('Sprint', labels)
+})
+
 function formatMultiSelectTriggerLabel(label: string, selected: string[]): string {
   if (!selected.length) return label
   if (selected.length <= 2) return `${label}: ${selected.join(', ')}`
@@ -274,15 +318,18 @@ function formatMultiSelectTriggerLabel(label: string, selected: string[]): strin
 const statusMenuOpen = ref(false)
 const priorityMenuOpen = ref(false)
 const typeMenuOpen = ref(false)
+const sprintMenuOpen = ref(false)
 
 const statusDropdown = ref<HTMLElement | null>(null)
 const priorityDropdown = ref<HTMLElement | null>(null)
 const typeDropdown = ref<HTMLElement | null>(null)
+const sprintDropdown = ref<HTMLElement | null>(null)
 
 function closeAllMenus() {
   statusMenuOpen.value = false
   priorityMenuOpen.value = false
   typeMenuOpen.value = false
+  sprintMenuOpen.value = false
 }
 
 function toggleStatusMenu() {
@@ -303,6 +350,12 @@ function toggleTypeMenu() {
   typeMenuOpen.value = next
 }
 
+function toggleSprintMenu() {
+  const next = !sprintMenuOpen.value
+  closeAllMenus()
+  sprintMenuOpen.value = next
+}
+
 function toggleStatusValue(value: string) {
   status.value = toggleInCsv(status.value, value)
 }
@@ -313,6 +366,10 @@ function togglePriorityValue(value: string) {
 
 function toggleTypeValue(value: string) {
   type.value = toggleInCsv(type.value, value)
+}
+
+function toggleSprintValue(id: string) {
+  sprintFilter.value = toggleInCsv(sprintFilter.value, id)
 }
 
 function clearStatus() {
@@ -339,6 +396,15 @@ function invertType() {
   type.value = invertCsv(type.value, props.types ?? [])
 }
 
+function clearSprint() {
+  sprintFilter.value = ''
+}
+
+function invertSprint() {
+  const ids = (props.sprintOptions ?? []).map((o) => String(o.id))
+  sprintFilter.value = invertCsv(sprintFilter.value, ids)
+}
+
 function onDocumentClick(event: MouseEvent) {
   const target = event.target as Node | null
   if (!target) return
@@ -348,6 +414,9 @@ function onDocumentClick(event: MouseEvent) {
   }
   if (priorityMenuOpen.value && priorityDropdown.value && !priorityDropdown.value.contains(target)) {
     priorityMenuOpen.value = false
+  }
+  if (sprintMenuOpen.value && sprintDropdown.value && !sprintDropdown.value.contains(target)) {
+    sprintMenuOpen.value = false
   }
   if (typeMenuOpen.value && typeDropdown.value && !typeDropdown.value.contains(target)) {
     typeMenuOpen.value = false
@@ -387,6 +456,7 @@ onMounted(() => {
         status.value = saved.status || ''
         priority.value = saved.priority || ''
         type.value = saved.type || ''
+        sprintFilter.value = saved.sprints || ''
         assignee.value = saved.assignee || ''
         tags.value = saved.tags || ''
         order.value = (saved.order === 'asc' || saved.order === 'desc') ? saved.order : 'desc'
@@ -429,6 +499,7 @@ watchEffect(() => {
     status.value = props.value.status || ''
     priority.value = props.value.priority || ''
     type.value = props.value.type || ''
+    sprintFilter.value = props.value.sprints || ''
     const incomingAssignee = props.value.assignee || ''
     const isMine = props.value.mine === 'true' || incomingAssignee === '@me'
     assignee.value = isMine ? '@me' : incomingAssignee
@@ -557,6 +628,7 @@ function emitFilter(){
   if (status.value) v.status = status.value
   if (priority.value) v.priority = priority.value
   if (type.value) v.type = type.value
+  if (sprintFilter.value) v.sprints = sprintFilter.value
   if (assignee.value) v.assignee = assignee.value
   if (tags.value) v.tags = tags.value
   if (showOrderSelect.value) {
@@ -577,6 +649,7 @@ function onClear(){
   status.value = ''
   priority.value = ''
   type.value = ''
+  sprintFilter.value = ''
   tags.value = ''
   assignee.value = ''
   if (showOrderSelect.value) {
@@ -594,7 +667,7 @@ function onClear(){
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, order, tags, extraFilters], emitFilter, { deep: false })
+watch([query, project, status, priority, type, sprintFilter, order, tags, extraFilters], emitFilter, { deep: false })
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>

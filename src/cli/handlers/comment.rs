@@ -113,7 +113,7 @@ impl CommandHandler for CommentHandler {
                     dry_run,
                     explain,
                 };
-                handle_add_comment(&mut ctx, renderer, full_id, add_inputs)
+                handle_add_comment(&mut ctx, renderer, &full_id, add_inputs)
             }
             None => {
                 render_comment_list(
@@ -137,10 +137,11 @@ struct CommentAddInputs {
     explain: bool,
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn handle_add_comment(
     ctx: &mut TaskCommandContext,
     renderer: &OutputRenderer,
-    full_id: String,
+    full_id: &str,
     inputs: CommentAddInputs,
 ) -> Result<(), String> {
     renderer.log_debug("comment: preparing new comment entry");
@@ -153,7 +154,7 @@ fn handle_add_comment(
     if inputs.dry_run {
         render_comment_preview(
             renderer,
-            &full_id,
+            full_id,
             inputs.project.as_deref(),
             &entry,
             inputs.task.comments.len() + 1,
@@ -164,15 +165,15 @@ fn handle_add_comment(
 
     let dto = crate::services::task_service::TaskService::add_comment(
         &mut ctx.storage,
-        &full_id,
-        inputs.text,
+        full_id,
+        &inputs.text,
     )
     .map_err(|e| e.to_string())?;
     renderer.log_info("comment: comment persisted");
 
     render_comment_success(
         renderer,
-        &full_id,
+        full_id,
         inputs.project.as_deref(),
         &entry,
         dto.comments.len(),

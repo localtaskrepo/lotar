@@ -88,6 +88,7 @@ impl HelpSystem {
         self.find_help_file(&help_file)
     }
 
+    #[allow(clippy::needless_pass_by_value)]
     fn render_help_file(
         &self,
         command: &str,

@@ -1,9 +1,9 @@
 // Auto-generated from stats_handler.rs.
 pub(crate) fn run_status(
-    id: String,
+    id: &str,
     time_in_status: bool,
-    since: Option<String>,
-    until: Option<String>,
+    since: Option<&str>,
+    until: Option<&str>,
     project: Option<&str>,
     resolver: &crate::workspace::TasksDirectoryResolver,
     renderer: &crate::output::OutputRenderer,
@@ -14,18 +14,16 @@ pub(crate) fn run_status(
     }
 
     // Resolve time window
-    let (since_dt, until_dt) =
-        crate::utils::time::parse_since_until(since.as_deref(), until.as_deref())?;
+    let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
     // Resolve project + full task id
     let mut project_resolver = crate::cli::project::ProjectResolver::new(resolver)?;
-    project_resolver.validate_task_id_format(&id)?;
+    project_resolver.validate_task_id_format(id)?;
     let final_effective_project =
         project.map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()));
     let resolved_project =
-        project_resolver.resolve_project(&id, final_effective_project.as_deref())?;
-    let full_task_id =
-        project_resolver.get_full_task_id(&id, final_effective_project.as_deref())?;
+        project_resolver.resolve_project(id, final_effective_project.as_deref())?;
+    let full_task_id = project_resolver.get_full_task_id(id, final_effective_project.as_deref())?;
 
     // Repo root and task file path
     let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -239,8 +237,8 @@ pub(crate) fn run_status(
 }
 
 pub(crate) fn run_time_in_status(
-    since: Option<String>,
-    until: Option<String>,
+    since: Option<&str>,
+    until: Option<&str>,
     limit: usize,
     global: bool,
     project: Option<&str>,
@@ -248,8 +246,7 @@ pub(crate) fn run_time_in_status(
     renderer: &crate::output::OutputRenderer,
 ) -> Result<(), String> {
     // Resolve time window
-    let (since_dt, until_dt) =
-        crate::utils::time::parse_since_until(since.as_deref(), until.as_deref())?;
+    let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
 
     // Scope
     let scope_project = if global {

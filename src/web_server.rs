@@ -76,7 +76,7 @@ pub fn serve_with_config(
         if STOP_FLAGS
             .lock()
             .ok()
-            .and_then(|m| m.get(&port).cloned())
+            .and_then(|m| m.get(&port).copied())
             .unwrap_or(false)
         {
             break;
@@ -115,8 +115,8 @@ pub fn serve_with_config(
                         }
                     };
                     let parts: Vec<&str> = request_line.split(' ').collect();
-                    let method = parts.first().cloned().unwrap_or("GET").to_string();
-                    let path_full = parts.get(1).cloned().unwrap_or("/");
+                    let method = parts.first().copied().unwrap_or("GET").to_string();
+                    let path_full = parts.get(1).copied().unwrap_or("/");
                     let (path, query) = parse_path_and_query(path_full);
                     let mut headers = HashMap::new();
                     for line in request_head.lines().skip(1) {
@@ -373,7 +373,7 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
                 let proj_dir = tasks_dir.join(proj_name);
                 if proj_dir.exists() {
                     // Emit via bus (picked up by forwarder) and also write one immediate event inline
-                    crate::api_events::emit(crate::api_events::ApiEvent {
+                    crate::api_events::emit(&crate::api_events::ApiEvent {
                         kind: "project_changed".to_string(),
                         data: serde_json::json!({ "name": proj_name }),
                     });
@@ -630,14 +630,18 @@ fn start_tasks_watcher() {
                                     components.next()
                                     && let Some(project) = project_os.to_str()
                                 {
-                                    proj = Some(project.to_string());
-                                    // Detect task file changes: <PROJECT>/<NUM>.yml
-                                    if let Some(file) = p.file_name().and_then(|s| s.to_str())
-                                        && file.ends_with(".yml")
-                                    {
-                                        let stem = file.trim_end_matches(".yml");
-                                        if stem.chars().all(|c| c.is_ascii_digit()) {
-                                            task_id = Some(format!("{}-{}", project, stem));
+                                    // Skip reserved internal directories (e.g. @sprints)
+                                    // to avoid treating sprint file changes as task events.
+                                    if !project.starts_with('@') {
+                                        proj = Some(project.to_string());
+                                        // Detect task file changes: <PROJECT>/<NUM>.yml
+                                        if let Some(file) = p.file_name().and_then(|s| s.to_str())
+                                            && file.ends_with(".yml")
+                                        {
+                                            let stem = file.trim_end_matches(".yml");
+                                            if stem.chars().all(|c| c.is_ascii_digit()) {
+                                                task_id = Some(format!("{}-{}", project, stem));
+                                            }
                                         }
                                     }
                                 }
@@ -646,7 +650,7 @@ fn start_tasks_watcher() {
                                 crate::utils::query_cache::invalidate_all();
                                 match event.kind {
                                     EventKind::Remove(_) => {
-                                        crate::api_events::emit(crate::api_events::ApiEvent {
+                                        crate::api_events::emit(&crate::api_events::ApiEvent {
                                             kind: "task_deleted".to_string(),
                                             data: serde_json::json!({ "id": task_id }),
                                         })
@@ -659,14 +663,14 @@ fn start_tasks_watcher() {
                                             )
                                         {
                                             let storage = crate::storage::manager::Storage::new(
-                                                resolver.path,
+                                                &resolver.path,
                                             );
                                             match crate::services::task_service::TaskService::get(
                                                 &storage, &task_id, None,
                                             ) {
                                                 Ok(_) => {
                                                     crate::api_events::emit(
-                                                        crate::api_events::ApiEvent {
+                                                        &crate::api_events::ApiEvent {
                                                             kind: "task_updated".to_string(),
                                                             data: serde_json::json!({ "id": task_id }),
                                                         },
@@ -679,7 +683,7 @@ fn start_tasks_watcher() {
                                                         &e.to_string(),
                                                     );
                                                     crate::api_events::emit(
-                                                        crate::api_events::ApiEvent {
+                                                        &crate::api_events::ApiEvent {
                                                             kind: "task_updated".to_string(),
                                                             data: serde_json::json!({ "id": task_id }),
                                                         },
@@ -687,7 +691,7 @@ fn start_tasks_watcher() {
                                                 }
                                             }
                                         } else {
-                                            crate::api_events::emit(crate::api_events::ApiEvent {
+                                            crate::api_events::emit(&crate::api_events::ApiEvent {
                                                 kind: "task_updated".to_string(),
                                                 data: serde_json::json!({ "id": task_id }),
                                             });
@@ -699,7 +703,7 @@ fn start_tasks_watcher() {
                             if let Some(project) = proj
                                 && emitted.insert(project.clone())
                             {
-                                crate::api_events::emit(crate::api_events::ApiEvent {
+                                crate::api_events::emit(&crate::api_events::ApiEvent {
                                     kind: "project_changed".to_string(),
                                     data: serde_json::json!({ "name": project }),
                                 });

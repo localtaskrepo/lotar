@@ -15,7 +15,7 @@ pub(crate) fn run(
             .map(|p| crate::utils::resolve_project_input(p, resolver.path.as_path()))
             .or_else(|| Some(crate::project::get_effective_project_name(resolver)))
     };
-    let storage = crate::storage::manager::Storage::new(resolver.path.clone());
+    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
     let filter = crate::api_types::TaskListFilter {
         project: scope_project.clone(),
         ..Default::default()
