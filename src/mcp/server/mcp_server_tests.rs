@@ -542,6 +542,128 @@ fn project_list_is_paginated() {
 }
 
 #[test]
+fn task_list_pagination_includes_message_and_pages() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    seed_single_project_config(&tasks_dir);
+    set_tasks_dir_env(&tasks_dir);
+
+    // Seed 3 tasks so we can assert middle/last-page behavior with a page size of 2.
+    for i in 0..3 {
+        let create_req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(900 + i)),
+            method: "tools/call".into(),
+            params: json!({
+                "name": "task_create",
+                "arguments": { "title": format!("Pagination task {i}"), "project": "MCP" }
+            }),
+        };
+        let create_resp = dispatch(create_req);
+        assert!(
+            create_resp.error.is_none(),
+            "task_create failed: {:?}",
+            create_resp.error
+        );
+    }
+
+    // First page
+    let first = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(910)),
+        method: "tools/call".into(),
+        params: json!({ "name": "task_list", "arguments": { "project": "MCP", "limit": 2 } }),
+    });
+    assert!(first.error.is_none(), "task_list failed: {:?}", first.error);
+    let payload = parse_tool_payload(&first);
+    assert_eq!(payload.get("total").and_then(|v| v.as_u64()), Some(3));
+    assert_eq!(payload.get("count").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(payload.get("limit").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(payload.get("cursor").and_then(|v| v.as_u64()), Some(0));
+    assert_eq!(payload.get("page").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(payload.get("totalPages").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(payload.get("hasMore").and_then(|v| v.as_bool()), Some(true));
+    assert_eq!(payload.get("nextCursor").and_then(|v| v.as_u64()), Some(2));
+    let message = payload
+        .get("message")
+        .and_then(|v| v.as_str())
+        .expect("message must be present");
+    assert!(
+        message.contains("page 1 of 2") && message.contains("cursor=2"),
+        "message should call out next cursor: {message}"
+    );
+
+    // Last page (using the returned cursor)
+    let last = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(911)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_list",
+            "arguments": { "project": "MCP", "limit": 2, "cursor": 2 }
+        }),
+    });
+    assert!(last.error.is_none(), "task_list (last page) failed");
+    let payload = parse_tool_payload(&last);
+    assert_eq!(payload.get("count").and_then(|v| v.as_u64()), Some(1));
+    assert_eq!(payload.get("page").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(payload.get("totalPages").and_then(|v| v.as_u64()), Some(2));
+    assert_eq!(
+        payload.get("hasMore").and_then(|v| v.as_bool()),
+        Some(false)
+    );
+    assert!(payload.get("nextCursor").is_some_and(|v| v.is_null()));
+    let message = payload
+        .get("message")
+        .and_then(|v| v.as_str())
+        .expect("message must be present on last page");
+    assert!(
+        message.contains("last page"),
+        "last page message should mention it: {message}"
+    );
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn task_list_tool_description_documents_pagination() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    seed_single_project_config(&tasks_dir);
+    set_tasks_dir_env(&tasks_dir);
+
+    let resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(1)),
+        method: "tools/list".into(),
+        params: json!({}),
+    });
+    assert!(resp.error.is_none(), "tools/list failed: {:?}", resp.error);
+    let result = resp.result.expect("tools/list result");
+    let tools = result
+        .get("tools")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .expect("tools array");
+    let task_list = tool_by_name(&tools, "task_list");
+    let description = tool_description(task_list);
+    assert!(
+        description.contains("PAGINATION"),
+        "task_list description should explain pagination, got: {description}"
+    );
+    assert!(
+        description.contains("hasMore") && description.contains("nextCursor"),
+        "task_list description should reference hasMore + nextCursor, got: {description}"
+    );
+
+    clear_tasks_dir_env();
+}
+
+#[test]
 fn tools_list_reports_enum_hints_with_single_project() {
     let _lock = lock_var("LOTAR_TASKS_DIR");
     let tmp = tempfile::tempdir().unwrap();

@@ -79,6 +79,12 @@ lotar list --tasks-dir /repos/infra/.tasks --project INFRA
 
 ## Pagination
 
+The default page size is **20** tasks. When there are more results, the text output ends with a hint showing the remaining count and how to fetch the next page:
+
+```
+  … 144 more task(s) not shown. Use --page 2 (or --offset 20) to see the next page, or --page-size <N> to change page size.
+```
+
 Use either of these patterns:
 
 ```bash
@@ -91,8 +97,9 @@ lotar list --page-size 50 --page 2
 
 Notes:
 
-- `--limit` is still supported as an alias for `--page-size`.
+- `--limit` and `--per-page` are aliases for `--page-size`.
 - `--page` conflicts with `--offset` (pick one).
+- In `--format json` the response includes `total`, `limit`, `offset`, `page`, `total_pages`, `has_more`, `has_previous`, `next_offset`, and `next_page` so callers can paginate without parsing text.
 
 ## Troubleshooting
 

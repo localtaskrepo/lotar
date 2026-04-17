@@ -409,7 +409,7 @@ fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "List tasks using optional filters. status/priority/type accept a single string, comma-separated string, or array and are validated via project config. assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids.".to_string();
+    let description = "List tasks using optional filters. status/priority/type accept a single string, comma-separated string, or array and are validated via project config. assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids.\n\nPAGINATION: Results are paginated. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("project".into(), json!({"type": ["string", "null"]}));

@@ -30,4 +30,3 @@ Bugs:
 - Creating a new project doesn't update the UI until the page is reloaded
 - On the tasks list a prev/next button should also be shown at the end of the list, not just the beginning
 - Tasks List list item action "edit tags" doesn't work when hiding the tags column
-- "lotar list" only shows the top 20 tasks, when there are way more. We either need to allow pagination or show all by default.

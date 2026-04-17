@@ -244,6 +244,12 @@ impl SearchHandler {
     ) {
         if tasks.is_empty() {
             renderer.log_info("list: no results");
+            let current_page = if limit == 0 { 1 } else { offset / limit + 1 };
+            let total_pages = if limit == 0 {
+                1
+            } else {
+                total_matching.div_ceil(limit).max(1)
+            };
             match renderer.format {
                 crate::output::OutputFormat::Json => {
                     renderer.emit_raw_stdout(
@@ -260,7 +266,13 @@ impl SearchHandler {
                             "tasks": [],
                             "total": total_matching,
                             "limit": limit,
-                            "offset": offset
+                            "offset": offset,
+                            "page": current_page,
+                            "total_pages": total_pages,
+                            "has_more": false,
+                            "has_previous": offset > 0,
+                            "next_offset": serde_json::Value::Null,
+                            "next_page": serde_json::Value::Null,
                         })
                         .to_string(),
                     );
@@ -273,6 +285,10 @@ impl SearchHandler {
                             "No tasks on this page (offset {}, limit {}, total {}).",
                             offset, limit, total_matching
                         ));
+                        renderer.emit_raw_stdout(
+                            "  Try --page 1 or --offset 0 to return to the first page, or increase --page-size."
+                                .to_string(),
+                        );
                     }
                 }
             }
@@ -310,6 +326,20 @@ impl SearchHandler {
         let shown = display_tasks.len();
         let start = if shown == 0 { 0 } else { offset + 1 };
         let end = offset + shown;
+        let has_more = end < total_matching;
+        let has_previous = offset > 0;
+        let current_page = if limit == 0 { 1 } else { offset / limit + 1 };
+        let total_pages = if limit == 0 {
+            1
+        } else {
+            total_matching.div_ceil(limit).max(1)
+        };
+        let next_offset = if has_more { Some(end) } else { None };
+        let next_page = if has_more {
+            Some(current_page + 1)
+        } else {
+            None
+        };
 
         match renderer.format {
             crate::output::OutputFormat::Json => {
@@ -320,7 +350,13 @@ impl SearchHandler {
                         "tasks": display_tasks,
                         "total": total_matching,
                         "limit": limit,
-                        "offset": offset
+                        "offset": offset,
+                        "page": current_page,
+                        "total_pages": total_pages,
+                        "has_more": has_more,
+                        "has_previous": has_previous,
+                        "next_offset": next_offset,
+                        "next_page": next_page,
                     })
                     .to_string(),
                 );
@@ -328,8 +364,8 @@ impl SearchHandler {
             _ => {
                 renderer.emit_success(format_args!("Found {} task(s):", display_tasks.len()));
                 renderer.emit_raw_stdout(format_args!(
-                    "  (showing {}–{} of {}, offset {}, page-size {})",
-                    start, end, total_matching, offset, limit
+                    "  (showing {}–{} of {}, page {} of {}, offset {}, page-size {})",
+                    start, end, total_matching, current_page, total_pages, offset, limit
                 ));
                 for task in display_tasks {
                     let assignee = task.assignee.as_deref().unwrap_or("unassigned");
@@ -354,6 +390,21 @@ impl SearchHandler {
                     {
                         renderer.emit_raw_stdout(format_args!("    {}", description));
                     }
+                }
+
+                if has_more {
+                    let remaining = total_matching - end;
+                    renderer.emit_raw_stdout(format_args!(
+                        "  … {} more task(s) not shown. Use --page {} (or --offset {}) to see the next page, or --page-size <N> to change page size.",
+                        remaining,
+                        current_page + 1,
+                        end
+                    ));
+                } else if has_previous {
+                    renderer.emit_raw_stdout(
+                        "  (end of results — use --page 1 or --offset 0 to return to the first page)"
+                            .to_string(),
+                    );
                 }
             }
         }

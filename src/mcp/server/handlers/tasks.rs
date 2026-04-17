@@ -1607,14 +1607,42 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let end = (start + limit).min(total);
     let page = tasks[start..end].to_vec();
     let next_cursor = if end < total { Some(end) } else { None };
+    let page_number = if limit == 0 { 1 } else { start / limit + 1 };
+    let total_pages = if limit == 0 {
+        1
+    } else {
+        total.div_ceil(limit).max(1)
+    };
+    let shown_start = if page.is_empty() { 0 } else { start + 1 };
+    let shown_end = end;
+    let has_more = next_cursor.is_some();
+    let message = if total == 0 {
+        "No tasks match the filters.".to_string()
+    } else if has_more {
+        let remaining = total - end;
+        format!(
+            "Showing tasks {}–{} of {} (page {} of {}). {} more task(s) available — call task_list again with cursor={} to fetch the next page.",
+            shown_start, shown_end, total, page_number, total_pages, remaining, end
+        )
+    } else if start > 0 {
+        format!(
+            "Showing tasks {}–{} of {} (page {} of {}, last page).",
+            shown_start, shown_end, total, page_number, total_pages
+        )
+    } else {
+        format!("Showing all {} matching task(s).", total)
+    };
 
     let mut payload = serde_json::Map::new();
     payload.insert("status".into(), Value::String("ok".into()));
+    payload.insert("message".into(), Value::String(message));
     payload.insert("count".into(), Value::from(page.len() as u64));
     payload.insert("total".into(), Value::from(total as u64));
     payload.insert("cursor".into(), Value::from(start as u64));
     payload.insert("limit".into(), Value::from(limit as u64));
-    payload.insert("hasMore".into(), Value::Bool(next_cursor.is_some()));
+    payload.insert("page".into(), Value::from(page_number as u64));
+    payload.insert("totalPages".into(), Value::from(total_pages as u64));
+    payload.insert("hasMore".into(), Value::Bool(has_more));
     payload.insert(
         "nextCursor".into(),
         next_cursor

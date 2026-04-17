@@ -954,7 +954,21 @@ fn command_runner_failure_fires_job_failed() {
         "command runner job did not fail in time"
     );
 
-    let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
+    // Wait for the automation job_failed hook to reset assignee + add tag.
+    let start = Instant::now();
+    let refreshed = loop {
+        let task = TaskService::get(&storage, &created.id, None).expect("get task");
+        if task.assignee.as_deref() == Some("bob") && task.tags.iter().any(|t| t == "cmd-error") {
+            break task;
+        }
+        if start.elapsed() > Duration::from_millis(3000) {
+            panic!(
+                "automation job_failed hook did not update task in time: assignee={:?} tags={:?}",
+                task.assignee, task.tags
+            );
+        }
+        sleep(Duration::from_millis(50));
+    };
     assert_eq!(refreshed.assignee.as_deref(), Some("bob"));
     assert!(refreshed.tags.iter().any(|t| t == "cmd-error"));
 }
