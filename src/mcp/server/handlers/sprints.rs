@@ -372,7 +372,7 @@ pub(crate) fn handle_sprint_list(req: JsonRpcRequest) -> JsonRpcResponse {
         .iter()
         .map(|record| sprint_record_to_list_item(record, now))
         .collect();
-    sprints.sort_by(|a, b| a.id.cmp(&b.id));
+    sprints.sort_by_key(|a| a.id);
 
     let total = sprints.len();
     let start = cursor.min(total);

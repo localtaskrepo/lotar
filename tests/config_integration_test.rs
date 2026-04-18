@@ -344,9 +344,8 @@ mod project_config {
             .assert()
             .success()
             .stdout(predicate::str::contains(
-                "Initializing configuration with template 'default'",
+                "Project 'MyVeryLongProjectName' initialized at:",
             ))
-            .stdout(predicate::str::contains("✅ Configuration initialized at:"))
             .stdout(path_contains(".tasks/MYVE/config.yml"));
 
         // Verify the project folder was created with the correct prefix
@@ -363,9 +362,6 @@ mod project_config {
         assert!(config_content.contains("project:"));
         assert!(config_content.contains("name: MyVeryLongProjectName"));
         assert!(!config_content.contains("project.id"));
-        // Template-based configs contain all template fields, not just project name
-        let lines: Vec<&str> = config_content.lines().collect();
-        assert!(lines.len() > 1); // Should contain multiple lines from template
     }
 
     #[test]
@@ -381,7 +377,7 @@ mod project_config {
             .arg("--project=TEST")
             .assert()
             .success()
-            .stdout(predicate::str::contains("✅ Configuration initialized at:"))
+            .stdout(predicate::str::contains("Project 'TEST' initialized at:"))
             .stdout(path_contains(".tasks/TEST/config.yml"));
 
         // Verify the project folder was created with the same name
@@ -514,7 +510,7 @@ mod templates {
         let test_fixtures = TestFixtures::new();
         let temp_dir = test_fixtures.temp_dir.path();
 
-        // Test default template
+        // Test default workflow (minimal project config, inherits globals)
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
             .arg("config")
@@ -523,18 +519,13 @@ mod templates {
             .arg("--project=SimpleProject")
             .assert()
             .success()
-            .stdout(predicate::str::contains("template 'default'"));
+            .stdout(predicate::str::contains("SimpleProject"));
 
         let config_path = temp_dir.join(".tasks").join("SIMP").join("config.yml");
         let config_content = fs::read_to_string(&config_path).unwrap();
         assert!(config_content.contains("project:"));
         assert!(config_content.contains("name: SimpleProject"));
         assert!(!config_content.contains("project.id"));
-        assert!(config_content.contains("issue:"));
-        assert!(config_content.contains("states:"));
-        assert!(config_content.contains("Todo"));
-        assert!(config_content.contains("InProgress"));
-        assert!(config_content.contains("Done"));
 
         // Test agile template
         let mut cmd = crate::common::lotar_cmd().unwrap();
@@ -545,7 +536,7 @@ mod templates {
             .arg("--project=AgileProject")
             .assert()
             .success()
-            .stdout(predicate::str::contains("template 'agile'"));
+            .stdout(predicate::str::contains("AgileProject"));
 
         let agile_config_path = temp_dir.join(".tasks").join("AGIL").join("config.yml");
         let agile_config_content = fs::read_to_string(&agile_config_path).unwrap();
@@ -569,9 +560,7 @@ mod templates {
             .arg("templates")
             .assert()
             .success()
-            .stdout(predicate::str::contains(
-                "Available Configuration Templates:",
-            ))
+            .stdout(predicate::str::contains("Available Workflow Presets:"))
             .stdout(predicate::str::contains("default"))
             .stdout(predicate::str::contains("agile"))
             .stdout(predicate::str::contains("kanban"))
@@ -677,7 +666,7 @@ mod config_operations {
             ))
             .stdout(predicate::str::contains("canonical YAML:"))
             .stdout(predicate::str::contains("---"))
-            .stdout(predicate::str::contains("issue:"));
+            .stdout(predicate::str::contains("project:"));
     }
 }
 
@@ -946,7 +935,7 @@ mod error_handling {
             .arg("--project=ErrorTest")
             .assert()
             .failure()
-            .stderr(predicate::str::contains("Unknown template: invalid"));
+            .stderr(predicate::str::contains("Unknown workflow/template"));
     }
 
     #[test]

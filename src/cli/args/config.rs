@@ -7,7 +7,7 @@ pub enum ConfigAction {
     /// Set a configuration value
     Set(ConfigSetArgs),
     /// Initialize project configuration
-    Init(ConfigInitArgs),
+    Init(Box<ConfigInitArgs>),
     /// List available templates
     Templates,
     /// Validate configuration files
@@ -54,9 +54,13 @@ pub struct ConfigSetArgs {
 
 #[derive(Args)]
 pub struct ConfigInitArgs {
-    /// Template to use
-    #[arg(long, default_value = "default")]
-    pub template: String,
+    /// Workflow preset: default | agile | kanban
+    #[arg(long)]
+    pub workflow: Option<String>,
+
+    /// Alias for --workflow (also accepts legacy scaffold names like agent-pipeline)
+    #[arg(long)]
+    pub template: Option<String>,
 
     /// Project prefix (e.g., 'PROJ' for PROJ-1, PROJ-2, etc.)
     #[arg(long)]
@@ -81,6 +85,46 @@ pub struct ConfigInitArgs {
     /// Force initialization even if config exists
     #[arg(long)]
     pub force: bool,
+
+    /// Skip interactive prompts and accept all defaults (non-interactive)
+    #[arg(long, short = 'y', alias = "non-interactive")]
+    pub yes: bool,
+
+    /// Add scaffolds: comma-separated list (automation, agents, agents:pipeline, agents:reviewed, sync:jira, sync:github)
+    #[arg(long, value_delimiter = ',')]
+    pub with: Vec<String>,
+
+    /// Default assignee for new tasks (e.g., @me or alice)
+    #[arg(long)]
+    pub default_assignee: Option<String>,
+
+    /// Default reporter for new tasks
+    #[arg(long)]
+    pub default_reporter: Option<String>,
+
+    /// Default priority for new tasks (Low|Medium|High|Critical)
+    #[arg(long)]
+    pub default_priority: Option<String>,
+
+    /// Default status for new tasks (e.g., Todo)
+    #[arg(long)]
+    pub default_status: Option<String>,
+
+    /// Comma-separated task states (overrides workflow defaults)
+    #[arg(long, value_delimiter = ',')]
+    pub states: Vec<String>,
+
+    /// Comma-separated task types
+    #[arg(long, value_delimiter = ',')]
+    pub types: Vec<String>,
+
+    /// Comma-separated task priorities
+    #[arg(long, value_delimiter = ',')]
+    pub priorities: Vec<String>,
+
+    /// Comma-separated tag allowlist (use "*" for wildcard)
+    #[arg(long, value_delimiter = ',')]
+    pub tags: Vec<String>,
 }
 
 #[derive(Args)]

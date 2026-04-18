@@ -90,7 +90,7 @@ pub(crate) fn run(
     // Filter by age
     items.retain(|i| (now - i.last_date) >= thr);
     // Sort by age descending (older first)
-    items.sort_by(|a, b| a.last_date.cmp(&b.last_date));
+    items.sort_by_key(|a| a.last_date);
     let limited: Vec<_> = items.into_iter().take(limit).collect();
 
     match renderer.format {

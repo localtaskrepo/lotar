@@ -91,43 +91,35 @@ fn validate_condition_value(
         return;
     };
     match field.to_lowercase().as_str() {
-        "status" => {
-            if TaskStatus::parse_with_config(target, config).is_err() {
-                result.add_error(ValidationError::warning(
-                    Some("automation".to_string()),
-                    format!(
-                        "Automation condition references unknown status '{}'.",
-                        target
-                    ),
-                ));
-            }
+        "status" if TaskStatus::parse_with_config(target, config).is_err() => {
+            result.add_error(ValidationError::warning(
+                Some("automation".to_string()),
+                format!(
+                    "Automation condition references unknown status '{}'.",
+                    target
+                ),
+            ));
         }
-        "priority" => {
-            if Priority::parse_with_config(target, config).is_err() {
-                result.add_error(ValidationError::warning(
-                    Some("automation".to_string()),
-                    format!(
-                        "Automation condition references unknown priority '{}'.",
-                        target
-                    ),
-                ));
-            }
+        "priority" if Priority::parse_with_config(target, config).is_err() => {
+            result.add_error(ValidationError::warning(
+                Some("automation".to_string()),
+                format!(
+                    "Automation condition references unknown priority '{}'.",
+                    target
+                ),
+            ));
         }
-        "type" | "task_type" => {
-            if TaskType::parse_with_config(target, config).is_err() {
-                result.add_error(ValidationError::warning(
-                    Some("automation".to_string()),
-                    format!("Automation condition references unknown type '{}'.", target),
-                ));
-            }
+        "type" | "task_type" if TaskType::parse_with_config(target, config).is_err() => {
+            result.add_error(ValidationError::warning(
+                Some("automation".to_string()),
+                format!("Automation condition references unknown type '{}'.", target),
+            ));
         }
-        "assignee" => {
-            if target.eq_ignore_ascii_case("@agent") && config.agent_profiles.is_empty() {
-                result.add_error(ValidationError::warning(
-                    Some("automation".to_string()),
-                    "Automation uses @agent but no agent profiles are configured.".to_string(),
-                ));
-            }
+        "assignee" if target.eq_ignore_ascii_case("@agent") && config.agent_profiles.is_empty() => {
+            result.add_error(ValidationError::warning(
+                Some("automation".to_string()),
+                "Automation uses @agent but no agent profiles are configured.".to_string(),
+            ));
         }
         _ => {}
     }

@@ -275,15 +275,11 @@ impl HelpSystem {
                         out.push('\n');
                     }
                 }
-                Event::Start(Tag::BlockQuote(_)) => {
-                    if !out.ends_with('\n') {
-                        out.push('\n');
-                    }
+                Event::Start(Tag::BlockQuote(_)) if !out.ends_with('\n') => {
+                    out.push('\n');
                 }
-                Event::End(TagEnd::BlockQuote(_)) => {
-                    if !out.ends_with('\n') {
-                        out.push('\n');
-                    }
+                Event::End(TagEnd::BlockQuote(_)) if !out.ends_with('\n') => {
+                    out.push('\n');
                 }
                 Event::Text(text) => {
                     if in_code_block {
@@ -325,10 +321,10 @@ impl HelpSystem {
                 Event::Html(html) => {
                     out.push_str(&html);
                 }
-                Event::Start(Tag::Paragraph) | Event::End(TagEnd::Paragraph) => {
-                    if !out.ends_with('\n') {
-                        out.push('\n');
-                    }
+                Event::Start(Tag::Paragraph) | Event::End(TagEnd::Paragraph)
+                    if !out.ends_with('\n') =>
+                {
+                    out.push('\n');
                 }
                 _ => {}
             }

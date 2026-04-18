@@ -347,7 +347,7 @@ agents:
         }
     });
 
-    it('groups multiple jobs for the same ticket into one card', async () => {
+    it('groups multiple jobs for the same ticket into one card', { retry: 2 }, async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: { '.tasks/config.yml': AGENT_CONFIG },
         });

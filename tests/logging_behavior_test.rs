@@ -90,9 +90,7 @@ fn config_templates_emits_stdout_and_logs() {
         .arg("--log-level=info")
         .assert()
         .success()
-        .stdout(predicate::str::contains(
-            "Available Configuration Templates:",
-        ))
+        .stdout(predicate::str::contains("Available Workflow Presets:"))
         .stdout(predicate::str::contains("default"))
         .stderr(predicate::str::contains("BEGIN CONFIG"))
         .stderr(predicate::str::contains("END CONFIG status=ok"));

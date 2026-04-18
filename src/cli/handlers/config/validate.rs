@@ -84,7 +84,8 @@ impl ConfigHandler {
                             Ok(project_config) => {
                                 let result = validator.validate_project_config(&project_config);
                                 let prefix = &project_name;
-                                let conflict_result = validator.check_prefix_conflicts(prefix);
+                                let conflict_result =
+                                    validator.check_prefix_conflicts_for_existing(prefix);
 
                                 let mut combined_result = result;
                                 combined_result.merge(conflict_result);

@@ -1607,7 +1607,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
     let end = (start + limit).min(total);
     let page = tasks[start..end].to_vec();
     let next_cursor = if end < total { Some(end) } else { None };
-    let page_number = if limit == 0 { 1 } else { start / limit + 1 };
+    let page_number = start.checked_div(limit).map(|q| q + 1).unwrap_or(1);
     let total_pages = if limit == 0 {
         1
     } else {

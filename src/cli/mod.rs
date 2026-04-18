@@ -165,7 +165,7 @@ pub enum Commands {
     },
 
     /// Initialize project configuration (shortcut for `lotar config init`)
-    Init(ConfigInitArgs),
+    Init(Box<ConfigInitArgs>),
 
     /// Scan source files for TODO comments (existing)
     Scan(ScanArgs),

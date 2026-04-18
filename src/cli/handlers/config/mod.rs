@@ -42,25 +42,7 @@ impl CommandHandler for ConfigHandler {
             }) => Self::handle_config_set(
                 resolver, renderer, &field, &value, dry_run, force, global, project,
             ),
-            ConfigAction::Init(crate::cli::ConfigInitArgs {
-                template,
-                prefix,
-                project,
-                copy_from,
-                global,
-                dry_run,
-                force,
-            }) => Self::handle_config_init(
-                resolver,
-                renderer,
-                &template,
-                prefix.as_deref(),
-                project.as_deref(),
-                copy_from.as_deref(),
-                global,
-                dry_run,
-                force,
-            ),
+            ConfigAction::Init(args) => Self::handle_config_init(resolver, renderer, args.as_ref()),
             ConfigAction::Validate(ConfigValidateArgs {
                 project,
                 global,
@@ -70,24 +52,27 @@ impl CommandHandler for ConfigHandler {
                 Self::handle_config_validate(resolver, renderer, project, global, fix, errors_only)
             }
             ConfigAction::Templates => {
-                renderer.emit_success("Available Configuration Templates:");
-                renderer.emit_raw_stdout("  • default - Basic task management setup");
-                renderer.emit_raw_stdout("  • agile - Agile/Scrum workflow configuration");
-                renderer.emit_raw_stdout("  • kanban - Kanban board style setup");
+                renderer.emit_success("Available Workflow Presets:");
+                renderer.emit_raw_stdout("  • default   - Minimal setup; inherits global defaults");
+                renderer.emit_raw_stdout(
+                    "  • agile     - Epic/Feature/Bug/Spike/Chore with Verify state",
+                );
+                renderer.emit_raw_stdout(
+                    "  • kanban    - Flow-based states (Todo/InProgress/Verify/Done)",
+                );
+                renderer.emit_raw_stdout("");
+                renderer.emit_success("Legacy template aliases (produce preset + scaffolds):");
+                renderer.emit_raw_stdout("  • agent-pipeline - default workflow + --with=agents:pipeline,automation:pipeline");
+                renderer.emit_raw_stdout("  • agent-reviewed - default workflow + --with=agents:reviewed,automation:reviewed");
                 renderer
-                    .emit_raw_stdout("  • jira - Jira-aligned workflow with Jira remote mapping");
+                    .emit_raw_stdout("  • jira           - default workflow + --with=sync:jira");
+                renderer
+                    .emit_raw_stdout("  • github         - default workflow + --with=sync:github");
                 renderer.emit_raw_stdout(
-                    "  • github - GitHub issues workflow with GitHub remote mapping",
-                );
-                renderer.emit_raw_stdout("  • jira-github - Dual Jira + GitHub remote mapping");
-                renderer.emit_raw_stdout(
-                    "  • agent-pipeline - Fully automated agent workflow (implement → test → merge)",
-                );
-                renderer.emit_raw_stdout(
-                    "  • agent-reviewed - Agent workflow with human review before merge",
+                    "  • jira-github    - default workflow + --with=sync:jira,sync:github",
                 );
                 renderer.emit_info(
-                    "Use 'lotar config init --template=<n>' to initialize with a template.",
+                    "Use 'lotar init --workflow=<name>' (or --template=<legacy-name>) to initialize.",
                 );
                 Ok(())
             }

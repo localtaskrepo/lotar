@@ -33,11 +33,25 @@ impl PrefixConflictDetector {
     }
 
     pub fn check_conflicts(&self, new_prefix: &str) -> ValidationResult {
+        self.check_conflicts_excluding(new_prefix, None)
+    }
+
+    /// Like [`check_conflicts`] but ignores an existing prefix when building the
+    /// conflict set. Used when validating an already-persisted project where the
+    /// prefix is expected to match its own directory.
+    pub fn check_conflicts_excluding(
+        &self,
+        new_prefix: &str,
+        self_prefix: Option<&str>,
+    ) -> ValidationResult {
         let mut result = ValidationResult::new();
         let new_prefix_upper = new_prefix.to_uppercase();
+        let self_upper = self_prefix.map(|s| s.to_uppercase());
 
         // Exact match check
-        if self.existing_prefixes.contains(&new_prefix_upper) {
+        if self.existing_prefixes.contains(&new_prefix_upper)
+            && self_upper.as_deref() != Some(new_prefix_upper.as_str())
+        {
             result.add_error(
                 ValidationError::error(
                     Some("default_project".to_string()),
@@ -50,6 +64,9 @@ impl PrefixConflictDetector {
 
         // Substring conflict check
         for existing in &self.existing_prefixes {
+            if self_upper.as_deref() == Some(existing.as_str()) {
+                continue;
+            }
             if existing.contains(&new_prefix_upper) || new_prefix_upper.contains(existing) {
                 result.add_error(
                     ValidationError::warning(
@@ -68,6 +85,9 @@ impl PrefixConflictDetector {
 
         // Similar prefix warning (edit distance)
         for existing in &self.existing_prefixes {
+            if self_upper.as_deref() == Some(existing.as_str()) {
+                continue;
+            }
             if self.are_similar(&new_prefix_upper, existing) {
                 result.add_error(
                     ValidationError::warning(

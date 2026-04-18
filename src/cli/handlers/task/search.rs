@@ -244,7 +244,7 @@ impl SearchHandler {
     ) {
         if tasks.is_empty() {
             renderer.log_info("list: no results");
-            let current_page = if limit == 0 { 1 } else { offset / limit + 1 };
+            let current_page = offset.checked_div(limit).map(|q| q + 1).unwrap_or(1);
             let total_pages = if limit == 0 {
                 1
             } else {
@@ -328,7 +328,7 @@ impl SearchHandler {
         let end = offset + shown;
         let has_more = end < total_matching;
         let has_previous = offset > 0;
-        let current_page = if limit == 0 { 1 } else { offset / limit + 1 };
+        let current_page = offset.checked_div(limit).map(|q| q + 1).unwrap_or(1);
         let total_pages = if limit == 0 {
             1
         } else {

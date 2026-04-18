@@ -15,7 +15,6 @@
 - Add an agent skill template that helps agents how to use lotar
 - Add dependency concistency check command
 - Should a depends_on autimatically create blocks reference on the other ticket?
-- Rework the project init function to create configs dynamically instead of using template files. Implement an interactive dialog on CLI (with -yes flag support to auto create with flags specifying choices) and the WebUI.
 - Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system)
 - Add aliases for command commands so that LLMs don't get tripped up (e.g. it's often trying "lotar show <id>", and "lotar update <id>")
 - Config UI should be rebuilt using a submenu for each section, rather than one giant view with all configs tiled.
@@ -23,7 +22,6 @@
 - Allow to define one or more done states in the config (right now defaults to last state in the list)
 
 Bugs:
-- lotar init --project'"..." doesn't work properly. Configs are generated in the project, not global, and the globalm default project isn't set to the first new project.
 - Changelog includes the entire comment body as a copy when a comment is added, duplicating a spamming the file.
 - When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
 - The WebUI doesn't allow custom fields to be shown in the column options.

@@ -170,7 +170,7 @@ pub(crate) fn run(
                 return false;
             }
             // Process in chronological order and seed baseline from before window
-            commits.sort_by(|a, b| a.date.cmp(&b.date));
+            commits.sort_by_key(|a| a.date);
             let mut prev_status: Option<String> = None;
             for c in commits {
                 if c.date > until_dt {
@@ -282,7 +282,7 @@ pub(crate) fn run(
                             if commits.is_empty() {
                                 continue;
                             }
-                            commits.sort_by(|a, b| a.date.cmp(&b.date));
+                            commits.sort_by_key(|a| a.date);
                             let mut prev_status: Option<String> = None;
                             let mut is_match = false;
                             for c in commits {

@@ -824,7 +824,7 @@ impl AuditService {
                 commits,
             });
         }
-        items.sort_by(|a, b| b.last_date.cmp(&a.last_date));
+        items.sort_by_key(|item| std::cmp::Reverse(item.last_date));
         Ok(items)
     }
 
@@ -1007,7 +1007,7 @@ impl AuditService {
         }
 
         let mut items: Vec<ChangedTaskSummary> = summaries.into_values().collect();
-        items.sort_by(|a, b| b.last_date.cmp(&a.last_date));
+        items.sort_by_key(|item| std::cmp::Reverse(item.last_date));
         Ok(items)
     }
 

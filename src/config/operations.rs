@@ -1213,15 +1213,14 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 ));
             }
         }
-        "default_assignee" | "default_reporter" | "project_name" => {
+        "default_assignee" | "default_reporter" | "project_name"
             // Basic validation - not empty and reasonable length
-            if value.len() > 100 {
+            if value.len() > 100 => {
                 return Err(ConfigError::ParseError(format!(
                     "{} cannot be longer than 100 characters",
                     field
                 )));
             }
-        }
         "default_tags" | "tags" | "custom_fields" => {
             // Basic validation: allow comma-separated values, each up to 50 chars
             for part in value.split(',') {
@@ -1294,13 +1293,12 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "agent_context_enabled" => {
             parse_bool_flag(value, field)?;
         }
-        "agent_context_extension" => {
-            if value.trim().is_empty() {
+        "agent_context_extension"
+            if value.trim().is_empty() => {
                 return Err(ConfigError::ParseError(
                     "agent_context_extension cannot be empty".to_string(),
                 ));
             }
-        }
         "agent_logs_dir" => {
             // Accept any string; empty clears the setting.
         }
@@ -1331,11 +1329,10 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "remotes" => {
             let _ = parse_sync_remotes(value)?;
         }
-        "strict_members" => {
-            if !value.trim().is_empty() {
+        "strict_members"
+            if !value.trim().is_empty() => {
                 parse_bool_flag(value, field)?;
             }
-        }
         "auto_set_reporter"
         | "auto_populate_members"
         | "auto_assign_on_status"
@@ -1348,11 +1345,10 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         | "auto_identity_git"
         | "scan_enable_ticket_words"
         | "scan_enable_mentions"
-        | "scan_strip_attributes" => {
-            if !value.trim().is_empty() {
+        | "scan_strip_attributes"
+            if !value.trim().is_empty() => {
                 parse_bool_flag(value, field)?;
             }
-        }
         "scan_signal_words" | "scan_ticket_patterns" => {
             for part in value.split(',') {
                 let token = part.trim();
@@ -1364,21 +1360,18 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
                 }
             }
         }
-        "branch_type_aliases" => {
-            if !value.trim().is_empty() {
+        "branch_type_aliases"
+            if !value.trim().is_empty() => {
                 parse_alias_map::<TaskType>(value, "branch type alias")?;
             }
-        }
-        "branch_status_aliases" => {
-            if !value.trim().is_empty() {
+        "branch_status_aliases"
+            if !value.trim().is_empty() => {
                 parse_alias_map::<TaskStatus>(value, "branch status alias")?;
             }
-        }
-        "branch_priority_aliases" => {
-            if !value.trim().is_empty() {
+        "branch_priority_aliases"
+            if !value.trim().is_empty() => {
                 parse_alias_map::<Priority>(value, "branch priority alias")?;
             }
-        }
         "issue_states" => {
             parse_token_list::<TaskStatus>(value, "task status")?;
         }
@@ -1402,11 +1395,10 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "sprints_defaults_length" | "sprints_defaults_overdue_after" => {
             // No additional validation beyond trimming; empty clears the override
         }
-        "sprints_notifications_enabled" => {
-            if !value.trim().is_empty() {
+        "sprints_notifications_enabled"
+            if !value.trim().is_empty() => {
                 parse_bool_flag(value, field)?;
             }
-        }
         _ => {} // Other fields don't need specific validation
     }
     Ok(())

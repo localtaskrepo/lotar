@@ -291,8 +291,12 @@ mod output_formatting {
 
         // Strip the project name so only the prefix remains
         let project_config = temp.path().join(".tasks").join("EXM").join("config.yml");
-        std::fs::write(project_config, "default_priority: High\n")
+        std::fs::write(project_config, "default:\n  priority: High\n")
             .expect("failed to overwrite project config");
+        // Remove any global config the new init may have created so the validator
+        // only checks the (minimal) project-scoped config.
+        let global_config = temp.path().join(".tasks").join("config.yml");
+        let _ = std::fs::remove_file(&global_config);
 
         // Add a task with explicit project prefix
         crate::common::lotar_cmd()

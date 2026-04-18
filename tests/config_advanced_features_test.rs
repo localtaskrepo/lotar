@@ -129,15 +129,33 @@ fn test_config_force_flag() {
         .assert();
 
     if let Ok(_) = result.try_success() {
-        // Check if config was actually overwritten
-        let config_path = temp_dir.join(".tasks").join("config.yml");
-        if config_path.exists() {
-            let config_content = fs::read_to_string(&config_path).unwrap_or_default();
-            assert!(
-                config_content.contains("agile") || config_content.contains("sprint"),
-                "Force flag should overwrite with agile template"
-            );
+        // New behavior: template state/content lives in the project config, not global.
+        // Just assert that the project config exists and the global config was created.
+        let tasks_dir = temp_dir.join(".tasks");
+        assert!(
+            tasks_dir.join("config.yml").exists(),
+            "Force flag should leave/create the global config"
+        );
+        let mut found_project_config_with_agile_shape = false;
+        if let Ok(rd) = fs::read_dir(&tasks_dir) {
+            for entry in rd.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    let cfg = p.join("config.yml");
+                    if cfg.exists() {
+                        let content = fs::read_to_string(&cfg).unwrap_or_default();
+                        if content.contains("Verify") || content.contains("InProgress") {
+                            found_project_config_with_agile_shape = true;
+                            break;
+                        }
+                    }
+                }
+            }
         }
+        assert!(
+            found_project_config_with_agile_shape,
+            "Force flag should overwrite project config with agile workflow"
+        );
     }
 
     // Test force flag with invalid values

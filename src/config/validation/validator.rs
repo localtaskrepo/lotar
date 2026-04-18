@@ -478,6 +478,23 @@ impl ConfigValidator {
         }
     }
 
+    /// Like [`check_prefix_conflicts`] but treats `prefix` as an existing
+    /// project that is expected to match itself — useful when validating an
+    /// already-persisted project config.
+    pub fn check_prefix_conflicts_for_existing(&self, prefix: &str) -> ValidationResult {
+        match PrefixConflictDetector::new(&self.tasks_dir) {
+            Ok(detector) => detector.check_conflicts_excluding(prefix, Some(prefix)),
+            Err(e) => {
+                let mut result = ValidationResult::new();
+                result.add_error(ValidationError::warning(
+                    None,
+                    format!("Could not check for prefix conflicts: {}", e),
+                ));
+                result
+            }
+        }
+    }
+
     #[allow(dead_code)]
     pub fn validate_prefix_format(&self, prefix: &str) -> ValidationResult {
         let mut result = ValidationResult::new();

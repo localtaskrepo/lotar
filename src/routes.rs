@@ -737,26 +737,22 @@ pub fn initialize(api_server: &mut ApiServer) {
                     };
 
                     match due {
-                        "today" => {
-                            if due_date != today {
+                        "today"
+                            if due_date != today => {
                                 return false;
                             }
-                        }
-                        "soon" => {
-                            if due_date < tomorrow || due_date > soon_cutoff {
+                        "soon"
+                            if (due_date < tomorrow || due_date > soon_cutoff) => {
                                 return false;
                             }
-                        }
-                        "later" => {
-                            if due_date <= soon_cutoff {
+                        "later"
+                            if due_date <= soon_cutoff => {
                                 return false;
                             }
-                        }
-                        "overdue" => {
-                            if due_date >= today {
+                        "overdue"
+                            if due_date >= today => {
                                 return false;
                             }
-                        }
                         _ => {}
                     }
                 }
@@ -875,7 +871,7 @@ pub fn initialize(api_server: &mut ApiServer) {
             .map(|record| sprint_record_to_list_item(record, now))
             .collect();
 
-        sprints.sort_by(|a, b| a.id.cmp(&b.id));
+        sprints.sort_by_key(|a| a.id);
         let total = sprints.len();
         let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
         let page_sprints = sprints[start..end].to_vec();

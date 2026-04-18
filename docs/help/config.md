@@ -25,23 +25,35 @@ Notes:
 - The handler always prints the resolved tasks directory path so you can confirm discovery.
 
 ### init
-Initialize project configuration from template with advanced options.
+Initialize project configuration interactively or non-interactively.
 
 > Tip: `lotar init` is equivalent to `lotar config init`.
 
 ```bash
-lotar config init [--project=PROJECT] [--template=TEMPLATE] [--prefix=PREFIX] 
-                  [--copy-from=SOURCE_PROJECT] [--global] [--dry-run] [--force]
+lotar init [--project=NAME] [--prefix=PREFIX] [--workflow=WORKFLOW]
+           [--template=LEGACY] [--yes|-y] [--with=SCAFFOLDS]
+           [--default-assignee|--default-reporter|--default-priority|--default-status=VALUE]
+           [--states=...] [--types=...] [--priorities=...] [--tags=...]
+           [--copy-from=SOURCE] [--global] [--dry-run] [--force]
 ```
 
-Options:
-- `--template` — Defaults to `default`. Valid templates are `default`, `agile`, and `kanban` (see `lotar config templates`).
-- `--project` — Human-readable project name stored at `project.name`. When omitted, templates keep their placeholder and the folder prefix becomes the identifier.
-- `--prefix` — Explicit project prefix (e.g., `WEB`). The handler validates collisions before writing. Without it, a unique prefix is auto-generated from the project name.
-- `--copy-from` — Merge settings from an existing project before canonicalizing the template. Pass the project prefix/directory name (the handler reads `.tasks/<PREFIX>/config.yml`).
-- `--global` — Initialize `.tasks/config.yml` instead of a project directory.
-- `--dry-run` — Preview the prefix, target path, and any conflicts without writing files.
-- `--force` — Overwrite existing config files (required if the target already exists).
+Behavior:
+- By default `lotar init` runs an interactive wizard when stdin/stdout are TTYs. Agents / CI get non-interactive behavior automatically. Pass `-y` / `--yes` to force non-interactive mode even in a TTY.
+- A bare `lotar init --yes` produces two minimal files:
+  - `.tasks/config.yml` with `default.project: <PREFIX>` (created if missing).
+  - `.tasks/<PREFIX>/config.yml` with just `project.name`.
+  Built-in global defaults are inherited — the saved files stay small.
+- `--workflow` picks a preset vocabulary (`default`, `agile`, `kanban`). Presets are composed dynamically in code; no static template file is written verbatim.
+- `--template` accepts the same values for back-compat, plus legacy scaffold aliases: `agent-pipeline`, `agent-reviewed`, `jira`, `github`, `jira-github`. Each resolves to `default` workflow plus the relevant scaffolds.
+- `--with` is a comma-separated list of opt-in scaffolds:
+  - `automation` / `automation:pipeline` / `automation:reviewed` — writes `<project>/automation.yml`.
+  - `agents` / `agents:pipeline` / `agents:reviewed` — writes `<project>/agents.yml`.
+  - `sync:jira` / `sync:github` — appends a commented `remotes:` block to the project config.
+- Overrides: `--default-assignee`, `--default-reporter`, `--default-priority`, `--default-status`, `--states`, `--types`, `--priorities`, `--tags` (comma-separated for lists).
+- `--copy-from` merges non-identity fields from an existing project (pass its prefix).
+- `--global` writes `.tasks/config.yml` only. Combine with overrides to set workspace-wide defaults.
+- `--dry-run` prints the resolved plan (paths and scaffolds) without touching disk.
+- `--force` overwrites existing config / scaffold files.
 
 ### set
 Set configuration values with validation and conflict detection.
@@ -58,13 +70,13 @@ Details:
 - Fields that only make sense globally (`server.port`, `default_project`) are automatically treated as global even if `--global` is not passed.
 
 ### templates
-List available configuration templates.
+List available workflow presets and legacy template aliases.
 
 ```bash
 lotar config templates
 ```
 
-Prints the three built-in templates (`default`, `agile`, `kanban`) with short summaries so you can choose a name for `lotar config init --template=<name>`.
+Prints the built-in workflow presets (`default`, `agile`, `kanban`) and the legacy aliases (`agent-pipeline`, `agent-reviewed`, `jira`, `github`, `jira-github`) along with the scaffolds each one implies.
 
 ### validate
 Validate configuration files for errors and warnings.

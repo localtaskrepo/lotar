@@ -138,7 +138,7 @@ pub(crate) fn run_status(
         }
         return Ok(());
     }
-    snaps.sort_by(|a, b| a.0.cmp(&b.0));
+    snaps.sort_by_key(|a| a.0);
 
     let mut current_status: Option<crate::types::TaskStatus> = None;
     for (dt, _sha, st) in snaps.iter() {
@@ -403,7 +403,7 @@ pub(crate) fn run_time_in_status(
             continue;
         }
         // Sort oldest->newest by date
-        snaps.sort_by(|a, b| a.0.cmp(&b.0));
+        snaps.sort_by_key(|a| a.0);
 
         // Determine starting status at 'since_dt': use latest snapshot before since_dt
         let mut current_status: Option<crate::types::TaskStatus> = None;
