@@ -76,7 +76,7 @@ debug-assertions = true
 overflow-checks = true
 
 [dev-dependencies]
-assert_cmd = "2.2.0"
+assert_cmd = "2.2.1"
 predicates = "3.1.4"
 tempfile = "3.27.0"
 ctor = "0.10.0"
