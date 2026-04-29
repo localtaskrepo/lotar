@@ -39,7 +39,7 @@ pulldown-cmark = { version = "0.13.3", default-features = false }
 blake3 = { version = "1.8.4", default-features = false, features = ["std"] }
 base64 = { version = "0.22.1", default-features = false, features = ["std"] }
 ureq = { version = "3.3.0", features = ["json"] }
-libc = "0.2.185"
+libc = "0.2.186"
 sysinfo = "0.38.4"
 fs2 = "0.4.3"
 
