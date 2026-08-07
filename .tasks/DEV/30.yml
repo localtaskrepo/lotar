@@ -1,0 +1,46 @@
+title: 'Overhaul agent instructions: Kilo workflow, skills, committed .tasks backlog'
+status: InProgress
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-08-07T22:48:10.853176+00:00
+modified: 2026-08-07T23:14:55.704290+00:00
+comments:
+- date: 2026-08-07T22:48:23.019100+00:00
+  text: 'In progress: rewrote AGENTS.md, added development-workflow + review-handoff + testing-strategy + lotar-dev-tracking skills, wired Kilo skill discovery, slimmed copilot/path-scoped instructions, un-ignored and seeded .tasks.'
+- date: 2026-08-07T22:53:56.544907+00:00
+  text: 'Implementation complete; pending developer review. See handoff summary: AGENTS.md + 4 new/merged skills + kilo.jsonc wiring + .tasks backlog (30 tasks) + task generator.'
+- date: 2026-08-07T23:02:37.180082+00:00
+  text: 'Follow-up: single-source dedup — copilot-instructions.md reduced to thin overlay + skills index; AGENTS.md + skill-discovery corrected (Copilot does not auto-load .github/skills); kilo.jsonc comment fixed. Verified GitHub docs: Copilot reads AGENTS.md everywhere; auto-loads copilot-instructions.md + .github/instructions/*.instructions.md only.'
+- date: 2026-08-07T23:14:55.704290+00:00
+  text: 'Review pass: (1) fmt now self-checks in npm run lint (lint:fmt=cargo fmt --all --check) + npm run fmt to fix — closes local/CI parity gap; (2) flagged test:rust lacks --all-features vs CI (cost tradeoff, left for dev); (3) added lint:backend:fast to testing-strategy; (4) refined dev-workflow rebase step for Agent Manager Apply/PR; (5) fixed inaccurate ''committed fixtures'' refs; (6) gitignored /.kilo/ to prevent committing worktree/agent-manager state. Verified: fmt clean, package.json valid, .kilo ignored, root kilo.jsonc still trackable.'
+history:
+- at: 2026-08-07T22:48:23.013415+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-08-07T22:48:23.019100+00:00
+  actor: mallox
+  changes:
+  - field: comment
+    new: 'In progress: rewrote AGENTS.md, added development-workflow + review-handoff + testing-strategy + lotar-dev-tracking skills, wired Kilo skill discovery, slimmed copilot/path-scoped instructions, un-ignored and seeded .tasks.'
+- at: 2026-08-07T22:53:56.544907+00:00
+  actor: mallox
+  changes:
+  - field: comment
+    new: 'Implementation complete; pending developer review. See handoff summary: AGENTS.md + 4 new/merged skills + kilo.jsonc wiring + .tasks backlog (30 tasks) + task generator.'
+- at: 2026-08-07T23:02:37.180082+00:00
+  actor: mallox
+  changes:
+  - field: comment
+    new: 'Follow-up: single-source dedup — copilot-instructions.md reduced to thin overlay + skills index; AGENTS.md + skill-discovery corrected (Copilot does not auto-load .github/skills); kilo.jsonc comment fixed. Verified GitHub docs: Copilot reads AGENTS.md everywhere; auto-loads copilot-instructions.md + .github/instructions/*.instructions.md only.'
+- at: 2026-08-07T23:14:55.704290+00:00
+  actor: mallox
+  changes:
+  - field: comment
+    new: 'Review pass: (1) fmt now self-checks in npm run lint (lint:fmt=cargo fmt --all --check) + npm run fmt to fix — closes local/CI parity gap; (2) flagged test:rust lacks --all-features vs CI (cost tradeoff, left for dev); (3) added lint:backend:fast to testing-strategy; (4) refined dev-workflow rebase step for Agent Manager Apply/PR; (5) fixed inaccurate ''committed fixtures'' refs; (6) gitignored /.kilo/ to prevent committing worktree/agent-manager state. Verified: fmt clean, package.json valid, .kilo ignored, root kilo.jsonc still trackable.'

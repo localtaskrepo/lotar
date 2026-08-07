@@ -1,0 +1,6 @@
+title: 'BUG: lotar init --project generates config in wrong dir'
+status: Todo
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-08-07T22:48:10.847427+00:00

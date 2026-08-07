@@ -36,6 +36,16 @@ Notes:
 - When chasing server behavior, enable logs:
   - `RUST_LOG=debug cargo run -- serve --port 8080`
 
+## Visual verification (browser + vision)
+
+When validating UI changes, verify in a browser rather than by inspection (see `review-handoff`):
+
+- **Fast poke:** `lotar serve --port 8080 --open` against either the real `.tasks/` backlog or a generated demo set (`npm run seed:test-tasks -- --serve`).
+- **Vision MCP** for quick visual / regression checks: `ui_diff_check` (reference vs actual), `analyze_image` (inspect a captured page), `extract_text_from_screenshot` (pull labels/terminal text), `diagnose_error_screenshot` (on-screen errors).
+- **Durable proof:** add/extend a Playwright smoke test (`smoke-suite-debugging`).
+
+> Don't capture/paste secrets or PII into screenshots.
+
 ## Safety
 
 - Treat `.env*` and local config as sensitive; don’t paste secrets/PII into logs/issues.

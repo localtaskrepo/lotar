@@ -2,7 +2,14 @@
 node_modules/
 /.parcel-cache/
 /public/*
-/.tasks/
 /dist/
 /.history/
 .playwright-mcp/
+/.kilo/
+
+# .tasks/ is the real, version-controlled backlog for this project — do NOT ignore it.
+# Only ignore runtime/local subdirectories so they never get committed:
+/.tasks/@attachments/
+/.tasks/@reports/
+/.tasks/.context/
+/.tasks-demo/

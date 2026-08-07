@@ -6,11 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run build:web && npm run build:rust",
-    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint": "npm run lint:frontend && npm run lint:backend && npm run lint:fmt",
+    "fmt": "cargo fmt --all",
+    "lint:fmt": "cargo fmt --all --check",
     "lint:frontend": "vue-tsc --project view/tsconfig.json --noEmit",
     "lint:backend": "cargo clippy --all-targets --all-features -- -D warnings",
     "lint:backend:fast": "cargo clippy --lib --bins -- -D warnings",
-    "lint:agent": "bash -lc 'set -euo pipefail; export NO_COLOR=1 FORCE_COLOR=0 CARGO_TERM_COLOR=never; npm run lint:frontend; cargo clippy --all-targets --all-features --color never -- -D warnings'",
+    "lint:agent": "bash -lc 'set -euo pipefail; export NO_COLOR=1 FORCE_COLOR=0 CARGO_TERM_COLOR=never; npm run lint:frontend; cargo clippy --all-targets --all-features --color never -- -D warnings; cargo fmt --all --check'",
     "build:web": "vite build",
     "build:rust": "cargo build --release",
     "build:smoke": "npm run build:web && cargo build --profile smoke",
@@ -28,6 +30,7 @@
     "smoke": "npm run test:smoke",
     "smoke:ui": "npm run build:web && bash -lc 'set -euo pipefail; LOTAR_WEB_UI_EMBEDDED=0 LOTAR_WEB_UI_PATH=\"$PWD/target/web\" npm run test:smoke:quick'",
     "playwright:install": "npx playwright install --with-deps chromium",
+    "seed:test-tasks": "node scripts/generate-test-tasks.mjs",
     "clean": "cargo clean && rm -rf node_modules"
   },
   "keywords": [

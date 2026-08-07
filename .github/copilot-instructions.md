@@ -1,63 +1,32 @@
 # Copilot instructions (LoTaR)
 
-Keep this file short and evergreen.
+This file is a **thin Copilot overlay** — it intentionally contains no policy or
+command lists of its own. Everything canonical lives in the shared files below and is
+loaded the same way by Kilo, so there is nothing to keep in sync here.
 
-## Repo quick facts
+## Canonical sources (read these, don't duplicate them)
 
-- Rust CLI + HTTP server, with file-backed YAML storage.
-- Vue 3 + TypeScript SPA under `view/`, bundled by Vite into `target/web` and served by the Rust binary.
-- Node.js: `24.x` (see `package.json` engines).
-- Path-scoped rules: `.github/instructions/`.
-- Runbooks (“skills”): `.github/skills/`.
-- Docs: `docs/help/*`, `docs/developers/*`, and the REST schema in `docs/openapi.json`.
+- **`AGENTS.md`** (repo root) — the canonical policy: workflow, git rules, quality gates,
+  contract sync, storage discipline, safety. Copilot reads it automatically (repo-wide +
+  agent). Defer to it on everything.
+- **`.github/instructions/*.instructions.md`** — per-area structure & conventions.
+  Copilot applies these automatically per file via `applyTo`:
+  - `backend.instructions.md` → `**/*.rs`
+  - `frontend.instructions.md` → `view/**`
+  - `smoke.instructions.md` → `smoke/**`
 
-## Build, test, lint (commands that CI runs)
+## Workflow runbooks (skills)
 
-- Install: `npm ci`
-- Format (Rust, CI check): `cargo fmt --all --check` (local: `cargo fmt --all`)
-- Lint (frontend + backend): `npm run lint`
-- Unit/integration tests: `npm test`
-- Smoke suite (builds artifacts first): `npm run smoke`
+These on-demand runbooks live in `.github/skills/<name>/SKILL.md`. Open the relevant one
+when the task matches (Kilo loads them via its `skill` tool; in Copilot, reference the path):
 
-## Targeted runs (prefer targeted first, then widen)
+- `development-workflow` — task lifecycle, worktree/rebase rules, "staged = reviewed".
+- `review-handoff` — definition of done, handoff summary, browser/vision UI verification.
+- `testing-strategy` — run/target tests (nextest, vitest, smoke) + low-noise variants.
+- `smoke-suite-debugging` — smoke failures (binary, ports, Playwright, server lifecycle).
+- `local-dev-serve-troubleshooting` — Vite dev server, `lotar serve`, ports, SSE.
+- `api-contract-change-end-to-end` — keep `src/api_types.rs` / `view/api/types.ts` / `docs/openapi.json` in sync.
+- `lotar-dev-tracking` — track work in the committed `.tasks/` backlog (dogfooding).
+- `skill-discovery` — maps "what you're editing" → which runbook to load.
 
-- Rust-only tests: `npm run test:rust` (uses `cargo nextest`)
-- UI unit tests: `npm run test:ui`
-- UI-only convenience: `npm run test:ui:only`
-- Smoke without rebuilding: `npm run test:smoke:quick` (requires fresh artifacts)
-- UI-only smoke (no Rust rebuild): `npm run smoke:ui` (requires an existing `target/release/lotar`; builds web assets and serves them from `target/web`)
-
-## Agent-friendly commands (reduced output noise)
-
-- Lint (no ANSI): `npm run lint:agent`
-- Unit/integration tests (dot reporter, no ANSI): `npm run test:agent`
-- Rust-only tests: `npm run test:rust:agent`
-- UI unit tests: `npm run test:ui:agent`
-- Smoke (builds first): `npm run test:smoke:agent` (or quick: `npm run test:smoke:quick:agent`)
-
-## Engineering expectations
-
-- Add/adjust tests for behavior changes.
-- Don’t log or paste secrets/PII (tokens, auth headers, cookies). Treat `.env*` and credential files as sensitive.
-- If unrelated changes exist in the working tree, ignore them unless the user explicitly asks you to coordinate.
-- Don’t “chase” unrelated failures; start with targeted checks for your scoped changes.
-- Git is user-controlled: don’t commit/stage/revert; use `.history/` for recovery.
-- Keep working until the feature is complete and ready for review, or you need user input.
-- Before starting non-trivial work, open the relevant runbooks under `.github/skills/` (start with `.github/skills/skill-discovery/SKILL.md`).
-
-## Contract sync (Rust ↔ UI ↔ OpenAPI)
-
-- Rust API DTOs: `src/api_types.rs`
-- UI DTOs: `view/api/types.ts`
-- REST schema: `docs/openapi.json`
-
-If you change an endpoint’s request/response shape, keep all three aligned and update any relevant docs in `docs/help/*`.
-
-## Build & assets notes
-
-- Static files are served from `target/web` (built via `npm run build:web` or `npm run build`). Release builds embed these assets.
-- Prefer `npm run smoke` as the “did everything still work” validation: it rebuilds and runs the browser-driven smoke suite.
-
-## Common CLI gotcha
-
-- `lotar serve` uses `--port <n>` for the server port. The short `-p` flag is reserved for the global `--project` option (see `docs/help/serve.md`).
+For a quick command reference, see the `testing-strategy` skill rather than duplicating it here.

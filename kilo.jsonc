@@ -1,0 +1,11 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  // Make the existing .github/skills/<name>/SKILL.md files discoverable by Kilo's
+  // skill tool (loaded on demand). Copilot does not auto-load .github/skills/; it
+  // references these runbooks from .github/copilot-instructions.md instead, so the
+  // files remain the single source of truth for both tools. A local, gitignored
+  // .kilo/kilo.jsonc may hold personal overrides; Kilo merges both.
+  "skills": {
+    "paths": ["./.github/skills"]
+  }
+}

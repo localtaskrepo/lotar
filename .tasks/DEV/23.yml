@@ -1,0 +1,6 @@
+title: 'BUG: Default task type field missing on creation'
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-08-07T22:48:10.815112+00:00

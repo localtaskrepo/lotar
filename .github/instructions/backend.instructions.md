@@ -8,30 +8,25 @@ excludeAgent: ["code-review"]
 ## Tech + structure
 
 - Rust (edition 2024), single `lotar` binary: CLI + HTTP server.
-- CLI commands: `src/cli/`
-- API/server surface: `src/api_server.rs`, `src/web_server.rs`, `src/routes.rs`
-- DTOs/contracts: `src/api_types.rs`
-- Storage/domain: `src/storage/`, `src/project.rs`, `src/workspace.rs`
+- CLI commands: `src/cli/` (args under `src/cli/args/`, handlers under `src/cli/handlers/`).
+- API/server surface: `src/api_server.rs`, `src/web_server.rs`, `src/routes.rs`.
+- DTOs/contracts: `src/api_types.rs`.
+- Storage/domain: `src/storage/`, `src/project.rs`, `src/workspace.rs`.
+- Services: `src/services/` (task, sprint, sync, agent, automation, …).
+- MCP server (stdio): `src/mcp/`.
 
-## Tests + lint (use repo scripts)
+## Tests + lint
 
-- Format: `cargo fmt --all`
-- Lint: `npm run lint` (includes `cargo clippy --all-targets --all-features -- -D warnings`)
-- Tests (preferred): `npm test`
-- Rust-only: `npm run test:rust` (runs `cargo nextest run --cargo-profile ci`)
-
-## Test runner policy
-
-- Do NOT use `cargo test` (project policy: `cargo nextest`).
+- Use the repo scripts (see the `testing-strategy` skill): `npm run lint`, `npm run test:rust`, `npm test`.
+- **Do NOT use `cargo test`** — use `cargo nextest` via the scripts.
 
 ## Contract sync
 
-- If you change REST inputs/outputs, update:
-  - Rust DTOs: `src/api_types.rs`
-  - UI DTOs: `view/api/types.ts`
-  - OpenAPI: `docs/openapi.json`
+Changing a REST input/output shape means updating **all three** together:
+`src/api_types.rs`, `view/api/types.ts`, `docs/openapi.json`. See the
+`api-contract-change-end-to-end` skill.
 
 ## Change discipline
 
-- Keep task YAML storage backwards compatible when practical (user-owned files).
+- Keep task YAML storage backwards compatible (user-owned files under `.tasks/`).
 - Prefer existing error/validation patterns (`thiserror`, `src/errors.rs`) over new ad-hoc types.
