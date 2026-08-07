@@ -27,6 +27,7 @@ export interface TaskTableEmit {
     (event: 'open', id: string): void
     (event: 'delete', id: string): void
     (event: 'update-tags', payload: { id: string; tags: string[] }): void
+    (event: 'edit-tags', id: string): void
     (event: 'set-status', payload: { id: string; status: string }): void
     (event: 'assign', id: string): void
     (event: 'unassign', id: string): void
@@ -211,12 +212,15 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     function onDocClick(event: MouseEvent) {
         const root = rootRef.value
-        const target = event.target as Node
+        const target = event.target as Node | null
         if (!root || !target) return
-        if (!root.contains(target)) {
-            showColumnMenu.value = false
-            rowMenu.value = {}
-        }
+        if (root.contains(target)) return
+        // The column-menu toggle lives in the page header, outside this
+        // component's root, so its own click must not count as an outside
+        // click that immediately re-closes the menu it just toggled.
+        if (target instanceof Element && target.closest('[data-column-menu-toggle]')) return
+        showColumnMenu.value = false
+        rowMenu.value = {}
     }
 
     function onDocKey(event: KeyboardEvent) {
@@ -414,38 +418,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         emit('update:bulk', (event.target as HTMLInputElement).checked)
     }
 
-    const tagsEditing = ref<Record<string, boolean>>({})
-    const tagsDrafts = ref<Record<string, string>>({})
-
-    watch(
-        () => props.tasks,
-        (list) => {
-            (list || []).forEach((task) => {
-                if (!tagsEditing.value[task.id]) {
-                    tagsDrafts.value[task.id] = (task.tags || []).join(', ')
-                }
-            })
-        },
-        { immediate: true, deep: true },
-    )
-
-    function isEditingTags(id: string) {
-        return !!tagsEditing.value[id]
-    }
-
-    function toggleTagsEdit(id: string) {
-        tagsEditing.value[id] = !tagsEditing.value[id]
-    }
-
-    function saveTags(task: TaskDTO) {
-        const list = (tagsDrafts.value[task.id] || '')
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean)
-        emit('update-tags', { id: task.id, tags: list })
-        tagsEditing.value[task.id] = false
-    }
-
     function projectOf(id: string) {
         return (id || '').split('-')[0]
     }
@@ -553,11 +525,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         toggleOne,
         toggleAll,
         onToggleBulk,
-        tagsEditing,
-        tagsDrafts,
-        isEditingTags,
-        toggleTagsEdit,
-        saveTags,
         projectOf,
         numericOf,
         fmtDate,

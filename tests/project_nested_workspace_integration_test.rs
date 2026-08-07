@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};

@@ -1,3 +1,4 @@
+#![cfg_attr(no_git_tests, allow(dead_code))]
 use super::*;
 // Minimal per-variable lock for this test to avoid env races
 use std::collections::HashMap;
@@ -121,6 +122,7 @@ fn parse_tool_payload(resp: &JsonRpcResponse) -> serde_json::Value {
     serde_json::from_str(first_tool_text(resp)).expect("tool payload should be valid json")
 }
 
+#[cfg(not(no_git_tests))]
 #[test]
 fn tools_call_reference_add_and_remove() {
     let _lock = lock_var("LOTAR_TASKS_DIR");

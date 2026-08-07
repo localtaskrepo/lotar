@@ -3,6 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn main() {
+    // Declare the custom `no_git_tests` cfg so `check-cfg` doesn't flag it.
+    println!("cargo::rustc-check-cfg=cfg(no_git_tests)");
+
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
     let manifest_dir_path = PathBuf::from(manifest_dir);
     let web_dir = manifest_dir_path.join("target").join("web");
@@ -21,6 +24,20 @@ fn main() {
                 .strip_prefix(&manifest_dir_path)
                 .unwrap_or(entry.as_path());
             println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
+
+    // Some sandboxed runtimes (e.g. certain agent harnesses) forbid creating
+    // anything named `.git`, which makes every integration test that runs
+    // `git init` fail with "Operation not permitted". Probe for that here and,
+    // when detected, set `no_git_tests` so the git-dependent tests compile out
+    // instead of surfacing as false negatives. Normal CI leaves the cfg unset.
+    if let Ok(out_dir) = env::var("OUT_DIR") {
+        let probe = PathBuf::from(&out_dir).join(".git");
+        if fs::create_dir(&probe).is_err() {
+            println!("cargo:rustc-cfg=no_git_tests");
+        } else {
+            let _ = fs::remove_dir(&probe);
         }
     }
 }

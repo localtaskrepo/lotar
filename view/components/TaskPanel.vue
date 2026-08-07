@@ -197,6 +197,7 @@
                   </div>
                 </div>
                 <TaskPanelTagEditor
+                  ref="tagEditorRef"
                   :tags="form.tags"
                   :configured-tags="configTagOptions"
                   :known-tags="knownTags"
@@ -559,7 +560,7 @@ import TaskPanelSummarySection from './task-panel/TaskPanelSummarySection.vue'
 import TaskPanelTagEditor from './task-panel/TaskPanelTagEditor.vue'
 import { showToast } from './toast'
 
-const props = defineProps<{ open: boolean; taskId?: string | null; initialProject?: string | null }>()
+const props = defineProps<{ open: boolean; taskId?: string | null; initialProject?: string | null; focusSection?: string | null }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'created', task: TaskDTO): void; (e: 'updated', task: TaskDTO): void }>()
 
 const {
@@ -1389,6 +1390,20 @@ watch(
       removingSprintId.value = null
     }
   },
+)
+
+const tagEditorRef = ref<{ openTagDialog: () => void } | null>(null)
+
+watch(
+  [() => props.open, () => props.focusSection, () => loading.value],
+  ([isOpen, section, isLoading]) => {
+    if (!isOpen || isLoading) return
+    if (section !== 'tags') return
+    nextTick(() => {
+      tagEditorRef.value?.openTagDialog()
+    })
+  },
+  { immediate: true },
 )
 
 const sprintDialogTitle = computed(() =>

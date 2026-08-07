@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 mod common;
 
 use serde_json::Value;

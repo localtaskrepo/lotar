@@ -1,11 +1,12 @@
 import fs from 'fs-extra';
 import { describe, expect, it } from 'vitest';
+import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
-describe.concurrent('UI SSE reactivity', () => {
+describe.concurrent.skipIf(!gitAvailable())('UI SSE reactivity', () => {
     it('board view moves a card when task status changes on disk', async () => {
         const workspace = await SmokeWorkspace.create();
         try {

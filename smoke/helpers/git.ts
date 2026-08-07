@@ -1,4 +1,7 @@
 import { execa } from 'execa';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 export interface GitCommandOptions {
     readonly env?: NodeJS.ProcessEnv;
@@ -11,6 +14,34 @@ export interface GitInitOptions extends GitCommandOptions {
     readonly name?: string;
     readonly email?: string;
     readonly initialCommitMessage?: string;
+}
+
+// Some sandboxed runtimes (e.g. certain agent harnesses) forbid creating
+// anything named `.git`, which `git init` requires. Probe that once so callers
+// can skip git-dependent tests instead of surfacing them as false negatives.
+let gitAvailableCache: boolean | undefined;
+
+export function gitAvailable(): boolean {
+    if (gitAvailableCache !== undefined) {
+        return gitAvailableCache;
+    }
+    let dir: string | undefined;
+    try {
+        dir = mkdtempSync(join(tmpdir(), 'lotar-git-probe-'));
+        mkdirSync(join(dir, '.git'));
+        gitAvailableCache = true;
+    } catch {
+        gitAvailableCache = false;
+    } finally {
+        if (dir) {
+            try {
+                rmSync(dir, { recursive: true, force: true });
+            } catch {
+                // Ignore cleanup failures.
+            }
+        }
+    }
+    return gitAvailableCache;
 }
 
 export async function runGitCommand(

@@ -184,7 +184,6 @@
               <template v-else-if="col === 'tags'">
                 <div class="row" style="gap:6px; flex-wrap: wrap; align-items:center;">
                   <span v-for="tag in (t.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-                  <input v-if="isEditingTags(t.id)" class="input" v-model="tagsDrafts[t.id]" placeholder="tag1, tag2" style="max-width: 240px;" @click.stop @keyup.enter.prevent="saveTags(t)" />
                 </div>
               </template>
               <template v-else-if="col === 'sprints'">
@@ -218,13 +217,9 @@
                 <IconGlyph name="dots-horizontal" />
               </UiButton>
               <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
-                <button class="menu-item" v-if="!isEditingTags(t.id)" @click="toggleTagsEdit(t.id); closeRowMenu(t.id)">
+                <button class="menu-item" @click="$emit('edit-tags', t.id); closeRowMenu(t.id)">
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
                   <span class="menu-item__label">Edit tags</span>
-                </button>
-                <button class="menu-item" v-else @click="saveTags(t); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="check" /></span>
-                  <span class="menu-item__label">Save tags</span>
                 </button>
                 <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">
                   <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
@@ -301,11 +296,6 @@ const {
   toggleOne,
   toggleAll,
   onToggleBulk,
-  tagsEditing,
-  tagsDrafts,
-  isEditingTags,
-  toggleTagsEdit,
-  saveTags,
   projectOf,
   numericOf,
   fmtDate,

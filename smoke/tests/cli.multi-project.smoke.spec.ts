@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { gitAvailable } from '../helpers/git.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 function frontendManifest(): string {
@@ -14,7 +15,7 @@ function apiManifest(): string {
     ].join('\n');
 }
 
-describe.concurrent('CLI multi-project smoke scenarios', () => {
+describe.concurrent.skipIf(!gitAvailable())('CLI multi-project smoke scenarios', () => {
     it('auto-detects project prefixes across monorepo directories', async () => {
         const workspace = await SmokeWorkspace.create();
 

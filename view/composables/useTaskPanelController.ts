@@ -14,12 +14,16 @@ interface TaskPanelCallbacks {
 interface OpenTaskPanelOptions extends TaskPanelCallbacks {
     taskId: string
     initialProject?: string | null
+    focusSection?: TaskPanelFocusSection | null
 }
+
+export type TaskPanelFocusSection = 'tags'
 
 interface TaskPanelState {
     open: boolean
     taskId: string | null
     initialProject: string | null
+    focusSection: TaskPanelFocusSection | null
     callbacks: TaskPanelCallbacks | null
 }
 
@@ -27,12 +31,14 @@ const state = reactive<TaskPanelState>({
     open: false,
     taskId: null,
     initialProject: null,
+    focusSection: null,
     callbacks: null,
 })
 
 function openTaskPanel(options: OpenTaskPanelOptions) {
     state.taskId = options.taskId
     state.initialProject = options.initialProject ?? null
+    state.focusSection = options.focusSection ?? null
     state.callbacks = {
         onClose: options.onClose ?? null,
         onCreated: options.onCreated ?? null,
@@ -49,6 +55,7 @@ function closeTaskPanel() {
     const { onClose } = state.callbacks ?? {}
     state.taskId = null
     state.initialProject = null
+    state.focusSection = null
     state.callbacks = null
     if (onClose) {
         try {

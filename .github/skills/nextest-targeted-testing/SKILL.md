@@ -30,3 +30,7 @@ NPM passes args through after `--`:
 ## Policy
 
 - Do NOT use `cargo test` in this repo.
+
+## Sandboxed environments
+
+- If `npm run test:rust` reports fewer tests than CI (~756 vs ~795), that's expected: `build.rs` sets `no_git_tests` when `.git` creation is blocked, compiling out git-dependent tests so they don't show as false negatives. CI runs the full set. See `smoke-suite-debugging` for details.

@@ -1,3 +1,4 @@
+#![cfg_attr(no_git_tests, allow(dead_code))]
 use std::env;
 use std::fs;
 
@@ -539,6 +540,7 @@ mod parent_directory_resolution {
         );
     }
 
+    #[cfg(not(no_git_tests))]
     #[test]
     fn test_project_detection_stops_at_git_boundary() {
         let fixtures = TestFixtures::new();

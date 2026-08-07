@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { gitAvailable } from '../helpers/git.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 async function copyRepositoryHooks(targetDir: string): Promise<void> {
@@ -10,7 +11,7 @@ async function copyRepositoryHooks(targetDir: string): Promise<void> {
     await fs.copy(source, targetDir, { overwrite: true });
 }
 
-describe.concurrent('Git hooks smoke scenarios', () => {
+describe.concurrent.skipIf(!gitAvailable())('Git hooks smoke scenarios', () => {
     it('installs bundled git hooks once and reports idempotency on repeat invocations', async () => {
         const workspace = await SmokeWorkspace.create({ name: 'git-hooks-smoke-' });
 

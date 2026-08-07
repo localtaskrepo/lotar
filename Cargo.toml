@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.7.6"
+version = "0.7.7"
 edition = "2024"
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
 description = "A git-native task management CLI that stores issues as YAML files in your repository"
@@ -52,28 +52,33 @@ strip = "symbols"
 opt-level = "z"
 debug = false
 
-# Profile intended for running tests in CI and locally.
+# Profile for running Rust tests (CI and local).
 #
-# The default release profile is tuned for smallest binary size (fat LTO, opt-level=z,
-# single codegen unit), which can significantly slow down linking many test binaries and
-# can trigger intermittent macOS toolchain crashes.
+# The default release profile is tuned for smallest binary size (fat LTO,
+# opt-level=z, single codegen unit), which significantly slows compiling/linking
+# the many test binaries. Tests are I/O-bound (subprocess/file ops), so a lower
+# opt-level barely affects runtime but speeds compile time; high codegen-units
+# parallelize codegen, and incremental compilation speeds the change->test loop.
 [profile.ci]
 inherits = "release"
+opt-level = 1
+codegen-units = 256
+incremental = true
 lto = false
-codegen-units = 16
-opt-level = 2
 panic = "unwind"
 strip = "none"
 
-# Test profile optimization for faster test compilation and execution
-[profile.test]
-opt-level = 0        
-debug = 1            
-incremental = true   
-codegen-units = 256
-lto = false          
-debug-assertions = true
-overflow-checks = true
+# Fast-to-build profile for smoke/E2E tests. Smoke tests exercise functionality,
+# not performance, so they don't need the size-optimizing fat-LTO/opt-z of
+# `release`; this rebuilds the test binary in a fraction of the time.
+# Output: target/smoke/lotar.
+[profile.smoke]
+inherits = "release"
+opt-level = 2
+codegen-units = 16
+lto = false
+panic = "unwind"
+strip = "none"
 
 [dev-dependencies]
 assert_cmd = "2.2.0"

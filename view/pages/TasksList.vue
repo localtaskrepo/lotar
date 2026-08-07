@@ -141,7 +141,7 @@
           />
         </div>
         <div class="tasks-filter-row__actions">
-          <UiButton type="button" title="Configure columns" @click="taskTableRef?.toggleColumnMenu()">
+          <UiButton type="button" title="Configure columns" data-column-menu-toggle @click="taskTableRef?.toggleColumnMenu()">
             <IconGlyph name="columns" aria-hidden="true" />
             <span>Columns</span>
           </UiButton>
@@ -200,6 +200,7 @@
         @delete="openSingleDelete"
         @update-title="onUpdateTitle"
         @update-tags="onUpdateTags"
+        @edit-tags="onEditTags"
         @set-status="onQuickStatus"
         @assign="openSingleAssign"
         @unassign="unassignOne"
@@ -1310,6 +1311,14 @@ const openCreate = () => {
 const openTask = (id: string) => {
   openTaskPanel({
     taskId: id,
+    onUpdated: handleTaskUpdated,
+  })
+}
+
+const onEditTags = (id: string) => {
+  openTaskPanel({
+    taskId: id,
+    focusSection: 'tags',
     onUpdated: handleTaskUpdated,
   })
 }

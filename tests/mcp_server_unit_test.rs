@@ -1,3 +1,4 @@
+#![cfg_attr(no_git_tests, allow(dead_code))]
 mod common;
 use crate::common::env_mutex::EnvVarGuard;
 use std::collections::HashMap;
@@ -1144,6 +1145,7 @@ fn mcp_task_create_honors_default_assignee() {
     assert_eq!(stored.assignee.as_deref(), Some("default-user@example.com"));
 }
 
+#[cfg(not(no_git_tests))]
 #[test]
 fn mcp_task_create_infers_branch_defaults() {
     let tmp = tempfile::tempdir().unwrap();

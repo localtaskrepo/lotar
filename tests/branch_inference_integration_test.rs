@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 use tempfile::TempDir;
 
 mod common;

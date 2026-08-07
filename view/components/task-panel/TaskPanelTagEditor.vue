@@ -367,5 +367,7 @@ function selectTag(tag: string) {
     tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
   }
 }
+
+defineExpose({ openTagDialog })
 </script>
   emit('update:tags', next)

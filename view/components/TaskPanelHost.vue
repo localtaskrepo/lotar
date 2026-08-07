@@ -3,6 +3,7 @@
     :open="panelState.open"
     :task-id="panelState.taskId ?? undefined"
     :initial-project="panelState.initialProject ?? undefined"
+    :focus-section="panelState.focusSection ?? undefined"
     @close="handleClose"
     @created="handleCreated"
     @updated="handleUpdated"

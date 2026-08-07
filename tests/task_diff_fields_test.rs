@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 use predicates::prelude::*;
 use serde_json::Value;
 use std::process::Command as ProcCommand;

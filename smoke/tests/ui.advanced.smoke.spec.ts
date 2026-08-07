@@ -1,5 +1,6 @@
 import fs from 'fs-extra';
 import { describe, expect, it } from 'vitest';
+import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
 import { withBrowser, withPage } from '../helpers/ui.js';
@@ -21,7 +22,7 @@ function waitForInsightsData(page: ResponseWaitTarget): Promise<unknown> {
     return page.waitForResponse(createOkResponsePredicate(insightsRequiredEndpoint), { timeout: 15_000 });
 }
 
-describe.concurrent('UI advanced smoke scenarios', () => {
+describe.concurrent.skipIf(!gitAvailable())('UI advanced smoke scenarios', () => {
     it('keeps multiple browser sessions in sync when tasks are added', async () => {
         const workspace = await SmokeWorkspace.create();
 

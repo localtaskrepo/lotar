@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 use assert_cmd::prelude::*;
 use std::fs;
 use std::path::Path;

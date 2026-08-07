@@ -1,3 +1,4 @@
+#![cfg_attr(no_git_tests, allow(dead_code))]
 #![cfg(unix)]
 
 mod common;
@@ -578,6 +579,7 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
 }
 
+#[cfg(not(no_git_tests))]
 #[cfg(unix)]
 #[test]
 fn shipped_agent_pipeline_template_runs_end_to_end() {
@@ -650,6 +652,7 @@ exit 0
     assert_eq!(phases, vec!["PIP-1|implement", "PIP-1|test", "PIP-1|merge"]);
 }
 
+#[cfg(not(no_git_tests))]
 #[cfg(unix)]
 #[test]
 fn shipped_agent_reviewed_template_handles_failure_review_and_merge() {
@@ -1337,6 +1340,7 @@ fn command_runner_receives_lotar_env_vars() {
 }
 
 /// Backward compatibility: old YAML keys (job_start, complete, error, cancel) still work.
+#[cfg(not(no_git_tests))]
 #[cfg(unix)]
 #[test]
 fn backward_compat_old_yaml_keys_still_work() {
@@ -2674,6 +2678,7 @@ exit 0\n",
     );
 }
 
+#[cfg(not(no_git_tests))]
 #[cfg(unix)]
 #[test]
 fn merge_jobs_are_serialized_even_with_parallel_slots() {

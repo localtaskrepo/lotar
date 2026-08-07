@@ -1,6 +1,7 @@
 import fs from 'fs-extra';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
@@ -375,7 +376,7 @@ agents:
         }
     });
 
-    it('advances the reviewed template workflow live without reloads', async () => {
+    it.skipIf(!gitAvailable())('advances the reviewed template workflow live without reloads', async () => {
         const workspace = await SmokeWorkspace.create();
 
         try {

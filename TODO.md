@@ -26,5 +26,4 @@ Bugs:
 - When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
 - The WebUI doesn't allow custom fields to be shown in the column options.
 - Creating a new project doesn't update the UI until the page is reloaded
-- On the tasks list a prev/next button should also be shown at the end of the list, not just the beginning
 - Tasks List list item action "edit tags" doesn't work when hiding the tags column

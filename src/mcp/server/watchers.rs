@@ -52,54 +52,80 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
     std::thread::spawn(move || {
         let mut previous_hints = gather_enum_hints();
         let (tx, rx) = mpsc::channel();
-        let mut watcher = match recommended_watcher({
-            let tx = tx.clone();
-            move |result| {
-                let _ = tx.send(result);
-            }
-        }) {
-            Ok(watcher) => watcher,
-            Err(_) => return,
-        };
 
-        if watcher.configure(NotifyConfig::default()).is_err() {
-            return;
-        }
-
-        if watcher.watch(&tasks_dir, RecursiveMode::Recursive).is_err() {
-            return;
-        }
-
+        // Best-effort kernel watcher for instant updates. Some runtimes (e.g.
+        // sandboxed agent shells) forbid the underlying file-watch syscalls, so
+        // this may be `None`; the periodic poll below still detects config/
+        // tooling changes so `tools/listChanged` fires reliably everywhere.
+        let _watcher = (|| {
+            let mut watcher = recommended_watcher({
+                let tx = tx.clone();
+                move |result| {
+                    let _ = tx.send(result);
+                }
+            })
+            .ok()?;
+            let _ = watcher.configure(NotifyConfig::default());
+            let _ = watcher.watch(&tasks_dir, RecursiveMode::Recursive);
+            Some(watcher)
+        })();
         drop(tx);
 
         let mut last_emit: Option<Instant> = None;
-        while let Ok(result) = rx.recv() {
-            let Ok(event) = result else {
-                continue;
-            };
-            match event.kind {
-                EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_) => {
-                    if !event_affects_tooling(&event.paths, &tasks_dir) {
+        let poll_interval = Duration::from_secs(2);
+        loop {
+            match rx.recv_timeout(poll_interval) {
+                Ok(result) => {
+                    let Ok(event) = result else {
                         continue;
-                    }
-                    let now = Instant::now();
-                    if last_emit
-                        .map(|instant| now.duration_since(instant) < Duration::from_millis(500))
-                        .unwrap_or(false)
+                    };
+                    if matches!(
+                        event.kind,
+                        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+                    ) && event_affects_tooling(&event.paths, &tasks_dir)
                     {
-                        continue;
+                        emit_tools_change_if_changed(&sender, &mut previous_hints, &mut last_emit);
                     }
-                    last_emit = Some(now);
-                    let next_hints = gather_enum_hints();
-                    let hint_categories =
-                        diff_hint_categories(previous_hints.as_ref(), next_hints.as_ref());
-                    previous_hints = next_hints;
-                    let _ = sender.send(ServerEvent::ToolsChanged { hint_categories });
                 }
-                _ => {}
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    // Polling fallback: catches changes the kernel watcher
+                    // missed or never delivered.
+                    emit_tools_change_if_changed(&sender, &mut previous_hints, &mut last_emit);
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    // Kernel watcher unavailable; keep polling on a timer.
+                    std::thread::sleep(poll_interval);
+                    emit_tools_change_if_changed(&sender, &mut previous_hints, &mut last_emit);
+                }
             }
         }
     });
+}
+
+/// Re-gather enum hints and emit a `tools/listChanged` notification when they
+/// differ from the last snapshot, debounced to coalesce event bursts.
+fn emit_tools_change_if_changed(
+    sender: &mpsc::Sender<ServerEvent>,
+    previous_hints: &mut Option<EnumHints>,
+    last_emit: &mut Option<Instant>,
+) {
+    let now = Instant::now();
+    if last_emit
+        .map(|instant| now.duration_since(instant) < Duration::from_millis(500))
+        .unwrap_or(false)
+    {
+        return;
+    }
+
+    let next_hints = gather_enum_hints();
+    let hint_categories = diff_hint_categories(previous_hints.as_ref(), next_hints.as_ref());
+    if hint_categories.is_empty() {
+        return;
+    }
+
+    *previous_hints = next_hints;
+    *last_emit = Some(now);
+    let _ = sender.send(ServerEvent::ToolsChanged { hint_categories });
 }
 
 pub(crate) fn event_affects_tooling(paths: &[PathBuf], tasks_dir: &Path) -> bool {

@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import { Buffer } from 'node:buffer';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { gitAvailable } from '../helpers/git.js';
 import { parse, stringify } from 'yaml';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -32,7 +33,7 @@ interface TimeInStatusResponse {
     }>;
 }
 
-describe.concurrent('CLI advanced smoke scenarios', () => {
+describe.concurrent.skipIf(!gitAvailable())('CLI advanced smoke scenarios', () => {
     it('supports operations in a detached HEAD worktree', async () => {
         const workspace = await SmokeWorkspace.create();
 

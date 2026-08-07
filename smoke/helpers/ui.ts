@@ -9,6 +9,23 @@ export interface PageVisitOptions extends BrowserSessionOptions {
 }
 
 /**
+ * Extra Chromium launch flags driven by the `LOTAR_SMOKE_CHROMIUM_ARGS` env var
+ * (comma-separated). Empty by default so CI behavior is unchanged; set it in
+ * restricted sandboxes that block the multi-process bootstrap (e.g.
+ * `--no-sandbox,--no-zygote,--single-process` on macOS Mach-denied hosts).
+ */
+function extraLaunchArgs(): string[] {
+    const raw = process.env.LOTAR_SMOKE_CHROMIUM_ARGS;
+    if (!raw) {
+        return [];
+    }
+    return raw
+        .split(',')
+        .map((arg) => arg.trim())
+        .filter((arg) => arg.length > 0);
+}
+
+/**
  * Perform a reliable HTML5 drag-and-drop between two elements.
  *
  * Playwright's built-in `page.dragAndDrop()` uses mouse events that don't
@@ -54,7 +71,10 @@ export async function withBrowser<T>(
     options: BrowserSessionOptions,
     callback: (context: BrowserContext, browser: Browser) => Promise<T>,
 ): Promise<T> {
-    const browser = await chromium.launch({ headless: options.headless ?? true });
+    const browser = await chromium.launch({
+        headless: options.headless ?? true,
+        args: extraLaunchArgs(),
+    });
     const context = await browser.newContext();
 
     try {

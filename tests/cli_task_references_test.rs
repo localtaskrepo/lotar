@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 use predicates::prelude::*;
 use tempfile::TempDir;
 

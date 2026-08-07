@@ -1,3 +1,4 @@
+#![cfg(not(no_git_tests))]
 use chrono::{Duration, SecondsFormat, Utc};
 use serde_json::Value;
 use std::process::Command as ProcCommand;
