@@ -15,7 +15,7 @@ Every task runs the same lifecycle. For anything non-trivial, load the
 4. **Developer reviews** your changes incrementally. Files you see **staged** (`git add`) have already been reviewed and approved — that is intentional bookkeeping for parallel work, not an error. Leave staged files staged; don't unstage or re-edit them unless asked.
 5. **Greenlight → integrate** to the main line by **rebasing** your branch onto `main` (keeps history linear). Do not merge-commit.
 6. **Conflicts?** Resolve them in your worktree, re-run gates, and surface only the conflict-resolution changes for one more developer review.
-7. **Commit** (by the developer or the agent, per their instruction). The worktree and task are then done.
+7. **Commit** (by the developer or the agent, per their instruction), then mark the associated lotar task **Done** with a closing comment (see the `lotar-dev-tracking` skill — whoever integrates the work closes it). The worktree and task are then done.
 
 ## Git rules
 

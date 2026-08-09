@@ -5,13 +5,13 @@ description: Use this at the start of any non-trivial task to follow the standar
 
 ## Lifecycle (every task)
 
-1. **Worktree** — you start in an isolated git worktree (usually under `.kilo/worktrees/<name>/`). Treat it as your whole world: develop here, test here, fix here. Don't edit files in other worktrees or the main checkout unless the developer asks.
+1. **Worktree** — you start in an isolated git worktree (usually under `.kilo/worktrees/<name>/`). Treat it as your whole world: develop here, test here, fix here. Don't edit files in other worktrees or the main checkout unless the developer asks. If a lotar task tracks this work, set it to **InProgress** now (`lotar status DEV-N in_progress`).
 
 2. **Discuss** — understand the task with the developer before coding.
    - *Simple task* → keep the discussion in-context and start.
-   - *Complex/multi-file task* → write a short plan (what changes, which files, risks, test plan) and get alignment first. Track it as a LoTaR task if the work spans sessions (see the `lotar-dev-tracking` skill).
+   - *Complex/multi-file task* → write a short plan (what changes, which files, risks, test plan) and get alignment first. Create a lotar task for it and treat that task as the plan + log (see the `lotar-dev-tracking` skill).
 
-3. **Develop** — implement, running quality gates as you go (see AGENTS.md "Quality gates"). Keep changes scoped; resist refactoring unrelated code.
+3. **Develop** — implement, running quality gates as you go (see AGENTS.md "Quality gates"). Keep changes scoped; resist refactoring unrelated code. Post a short progress comment on the associated lotar task when you hit a meaningful milestone (what changed + where + next step).
 
 4. **Developer review (incremental)** — the developer reviews as you go. A **staged** file (`git add`) means "reviewed and approved." That staging is intentional bookkeeping so the developer can verify in parallel with your work. Do **not** be confused by staged files, do not unstage them, and do not re-edit an already-staged file unless asked. You can keep working on the *unstaged* parts.
 
@@ -27,7 +27,7 @@ description: Use this at the start of any non-trivial task to follow the standar
    - Re-run the quality gates (`npm run lint`, `npm test`, `npm run smoke`).
    - Surface **only** the conflict-resolution diff for one more developer review before finishing.
 
-7. **Commit** — commit per the developer's instruction (they may do it themselves). The worktree and task are then done; clean up the worktree if the developer wants.
+7. **Commit & close the task** — commit per the developer's instruction (they may do it themselves). Then mark the associated lotar task **Done** with a closing comment (what shipped + where: commits, files, how verified). This applies to whoever finishes the work — including an agent that only integrates/commits someone else's branch. Finally, clean up the worktree if the developer wants.
 
 ## Git rules (in detail)
 
