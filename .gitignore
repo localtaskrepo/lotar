@@ -7,9 +7,9 @@ node_modules/
 .playwright-mcp/
 /.kilo/
 
-# .tasks/ is the real, version-controlled backlog for this project — do NOT ignore it.
-# Only ignore runtime/local subdirectories so they never get committed:
-/.tasks/@attachments/
-/.tasks/@reports/
-/.tasks/.context/
-/.tasks-demo/
+# .tasks/ is the version-controlled backlog. Only the DEV project is tracked; every other
+# project + runtime dir (LOTA, TEST, @sprints, @attachments, scenario data from
+# `npm run seed:test-tasks`, …) is local-only so coincidental/test data stays out of git.
+.tasks/*/
+!.tasks/DEV/
+.tasks-demo/
