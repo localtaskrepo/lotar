@@ -13,6 +13,7 @@ pub mod filter;
 pub mod locator;
 pub mod manager;
 pub mod operations;
+pub mod safety;
 pub mod search;
 pub mod sprint;
 pub mod task;

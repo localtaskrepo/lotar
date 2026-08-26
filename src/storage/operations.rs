@@ -1,5 +1,8 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
+use crate::storage::safety::{
+    atomic_write_file, validate_project_prefix, warn_corrupt_once, with_storage_lock,
+};
 use crate::storage::task::Task;
 #[cfg(test)]
 use crate::utils::project::generate_project_prefix;
@@ -17,85 +20,101 @@ impl StorageOperations {
         project_prefix: &str,
         original_project_name: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        // Resolve target project path
-        let project_path = root_path.join(project_prefix);
+        if let Err(e) = validate_project_prefix(project_prefix) {
+            return Err(e.into());
+        }
 
-        // Ensure project directory exists
+        let project_path = root_path.join(project_prefix);
         fs::create_dir_all(&project_path)?;
 
-        // Create project config.yml if it doesn't exist and we have a project name
-        let config_file_path = crate::utils::paths::project_config_path(root_path, project_prefix);
-        if let Some(original_name) = original_project_name {
-            let normalized_name = original_name.trim();
-            if config_file_path.exists() {
-                match crate::config::persistence::load_project_config_from_dir(
-                    project_prefix,
-                    root_path,
-                ) {
-                    Ok(mut existing) => {
-                        let current_name = existing.project_name.trim();
-                        if current_name.is_empty()
-                            || current_name.eq_ignore_ascii_case(project_prefix)
-                        {
-                            existing.project_name = normalized_name.to_string();
-                            if let Err(e) = ConfigManager::save_project_config(
-                                root_path,
-                                project_prefix,
-                                &existing,
-                            ) {
-                                OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
-                                    format_args!(
-                                        "Failed to update project config with detected name: {}",
-                                        e
-                                    ),
-                                );
+        with_storage_lock(&project_path, "task", || {
+            // Create project config.yml if it doesn't exist and we have a project name
+            let config_file_path =
+                crate::utils::paths::project_config_path(root_path, project_prefix);
+            if let Some(original_name) = original_project_name {
+                let normalized_name = original_name.trim();
+                if config_file_path.exists() {
+                    match crate::config::persistence::load_project_config_from_dir(
+                        project_prefix,
+                        root_path,
+                    ) {
+                        Ok(mut existing) => {
+                            let current_name = existing.project_name.trim();
+                            if current_name.is_empty()
+                                || current_name.eq_ignore_ascii_case(project_prefix)
+                            {
+                                existing.project_name = normalized_name.to_string();
+                                if let Err(e) = ConfigManager::save_project_config(
+                                    root_path,
+                                    project_prefix,
+                                    &existing,
+                                ) {
+                                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                                        .log_warn(format_args!(
+                                            "Failed to update project config with detected name: {}",
+                                            e
+                                        ));
+                                }
                             }
                         }
+                        Err(e) => {
+                            OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
+                                format_args!("Failed to load existing project config: {}", e),
+                            );
+                        }
                     }
-                    Err(e) => {
-                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn).log_warn(
-                            format_args!("Failed to load existing project config: {}", e),
-                        );
+                } else {
+                    let project_config = ProjectConfig::new(normalized_name.to_string());
+                    if let Err(e) = ConfigManager::save_project_config(
+                        root_path,
+                        project_prefix,
+                        &project_config,
+                    ) {
+                        OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
+                            .log_warn(format_args!("Failed to create project config: {}", e));
                     }
-                }
-            } else {
-                let project_config = ProjectConfig::new(normalized_name.to_string());
-                if let Err(e) =
-                    ConfigManager::save_project_config(root_path, project_prefix, &project_config)
-                {
-                    OutputRenderer::new(OutputFormat::Text, LogLevel::Warn)
-                        .log_warn(format_args!("Failed to create project config: {}", e));
                 }
             }
-        }
 
-        // Get the next numeric ID by finding the highest existing ID
-        let next_numeric_id = Self::get_current_id(&project_path) + 1;
+            // Get the next numeric ID by finding the highest existing ID
+            let next_numeric_id = Self::get_current_id(&project_path) + 1;
 
-        // Create the formatted ID for external use
-        let formatted_id = format!("{}-{}", project_prefix, next_numeric_id);
+            // Create the formatted ID for external use
+            let formatted_id = format!("{}-{}", project_prefix, next_numeric_id);
 
-        // Get file path using the numeric ID
-        let file_path = Self::get_file_path(project_prefix, next_numeric_id, root_path);
-        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
-            eprintln!("[lotar][debug] writing task file {}", file_path.display());
-        }
-        let file_string = serde_yaml::to_string(task)?;
-        if let Some(parent) = file_path.parent() {
-            fs::create_dir_all(parent)?;
-        } else {
-            return Err("Invalid target file path".into());
-        }
-        fs::write(&file_path, file_string)?;
+            // Get file path using the numeric ID
+            let file_path = Self::get_file_path(project_prefix, next_numeric_id, root_path);
+            if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
+                eprintln!("[lotar][debug] writing task file {}", file_path.display());
+            }
+            let file_string = serde_yaml::to_string(task)?;
+            if let Some(parent) = file_path.parent() {
+                fs::create_dir_all(parent)?;
+            } else {
+                return Err("Invalid target file path".into());
+            }
+            atomic_write_file(&file_path, &file_string)?;
 
-        // No longer need to update index - simplified architecture
+            // No longer need to update index - simplified architecture
 
-        Ok(formatted_id)
+            Ok(formatted_id)
+        })
     }
 
     /// Get a task by ID
     pub fn get(root_path: &Path, id: &str, project: &str) -> Option<Task> {
-        // Extract project folder from the task ID if provided
+        let read_task = |project_path: &Path| -> Option<Task> {
+            let file_path = Self::get_file_path_for_id(project_path, id)?;
+            let file_string = fs::read_to_string(&file_path).ok()?;
+            match serde_yaml::from_str::<Task>(&file_string) {
+                Ok(task) => Some(task),
+                Err(e) => {
+                    warn_corrupt_once(&file_path, &e.to_string());
+                    None
+                }
+            }
+        };
+
         if let Some(folder_from_id) = Self::get_project_for_task(id) {
             // SECURITY: Enforce project isolation - verify the project folder from ID matches the provided project
             let project_name: &str = if project.trim().is_empty() {
@@ -104,6 +123,10 @@ impl StorageOperations {
                 project
             };
 
+            if !Self::is_safe_folder_name(project_name) {
+                return None;
+            }
+
             // If the project folder extracted from ID doesn't match the provided project, deny access
             if folder_from_id != project_name {
                 return None;
@@ -111,10 +134,7 @@ impl StorageOperations {
 
             // Use filesystem-based file path resolution
             let project_path = root_path.join(&folder_from_id);
-            if let Some(file_path) = Self::get_file_path_for_id(&project_path, id)
-                && let Ok(file_string) = fs::read_to_string(&file_path)
-                && let Ok(task) = serde_yaml::from_str::<Task>(&file_string)
-            {
+            if let Some(task) = read_task(&project_path) {
                 return Some(task);
             }
         }
@@ -126,15 +146,12 @@ impl StorageOperations {
             project
         };
 
-        let project_path = root_path.join(project_name);
-        if let Some(file_path) = Self::get_file_path_for_id(&project_path, id)
-            && let Ok(file_string) = fs::read_to_string(&file_path)
-            && let Ok(task) = serde_yaml::from_str::<Task>(&file_string)
-        {
-            return Some(task);
+        if !Self::is_safe_folder_name(project_name) {
+            return None;
         }
 
-        None
+        let project_path = root_path.join(project_name);
+        read_task(&project_path)
     }
 
     /// Edit an existing task
@@ -149,24 +166,26 @@ impl StorageOperations {
             None => return Err("Invalid task ID format".into()),
         };
 
-        // Get old task for potential future use (kept for compatibility)
-        let _old_task = Self::get(root_path, id, &project_folder);
-
         let project_path = root_path.join(&project_folder);
 
-        // Use filesystem-based file path resolution
-        let file_path = match Self::get_file_path_for_id(&project_path, id) {
-            Some(path) => path,
-            None => return Err("Task file not found".into()),
-        };
+        with_storage_lock(&project_path, "task", || {
+            // Get old task for potential future use (kept for compatibility)
+            let _old_task = Self::get(root_path, id, &project_folder);
 
-        // Save the task
-        let file_string = serde_yaml::to_string(new_task)?;
-        fs::write(&file_path, file_string)?;
+            // Use filesystem-based file path resolution
+            let file_path = match Self::get_file_path_for_id(&project_path, id) {
+                Some(path) => path,
+                None => return Err("Task file not found".into()),
+            };
 
-        // No longer need to update index - simplified architecture
+            // Save the task
+            let file_string = serde_yaml::to_string(new_task)?;
+            atomic_write_file(&file_path, &file_string)?;
 
-        Ok(())
+            // No longer need to update index - simplified architecture
+
+            Ok(())
+        })
     }
 
     /// Delete a task
@@ -175,27 +194,33 @@ impl StorageOperations {
         id: &str,
         project: &str,
     ) -> Result<bool, Box<dyn std::error::Error>> {
+        if let Err(e) = validate_project_prefix(project) {
+            return Err(e.into());
+        }
+
         let project_path = root_path.join(project);
 
-        // Use filesystem-based file path resolution
-        let file_path = match Self::get_file_path_for_id(&project_path, id) {
-            Some(path) => path,
-            None => return Ok(false), // Task file not found
-        };
+        with_storage_lock(&project_path, "task", || {
+            // Use filesystem-based file path resolution
+            let file_path = match Self::get_file_path_for_id(&project_path, id) {
+                Some(path) => path,
+                None => return Ok(false), // Task file not found
+            };
 
-        match fs::remove_file(file_path) {
-            Ok(_) => {
-                // No longer need to update index - simplified architecture
-                Ok(true)
-            }
-            Err(err) => {
-                if err.kind() == std::io::ErrorKind::NotFound {
-                    Ok(false)
-                } else {
-                    Err(err.into())
+            match fs::remove_file(file_path) {
+                Ok(_) => {
+                    // No longer need to update index - simplified architecture
+                    Ok(true)
+                }
+                Err(err) => {
+                    if err.kind() == std::io::ErrorKind::NotFound {
+                        Ok(false)
+                    } else {
+                        Err(err.into())
+                    }
                 }
             }
-        }
+        })
     }
 
     /// Get file path for a task
@@ -237,7 +262,16 @@ impl StorageOperations {
     /// Get the actual project folder name for a given task ID
     pub fn get_project_for_task(task_id: &str) -> Option<String> {
         // Extract the prefix from the task ID (e.g., "STAT-001" -> "STAT")
-        task_id.split('-').next().map(|s| s.to_string())
+        task_id
+            .split('-')
+            .next()
+            .filter(|prefix| crate::storage::safety::is_valid_project_prefix(prefix))
+            .map(|s| s.to_string())
+    }
+
+    fn is_safe_folder_name(name: &str) -> bool {
+        crate::storage::safety::is_valid_project_prefix(name)
+            || name.eq_ignore_ascii_case("default")
     }
 
     /// Get or create a project prefix, ensuring it's unique and consistent

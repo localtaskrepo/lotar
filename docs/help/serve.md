@@ -115,9 +115,9 @@ Once started, the server provides:
 
 ## Development Notes
 
-- CORS is permissive by default for local development
+- Cross-process write safety: task and sprint writes take an exclusive advisory lock (`.task.lock` / `.sprints.lock` dot-files inside the affected directory) and are written atomically via temp-file + rename. Locks are descriptor-based, so they release automatically if a process crashes; leftover zero-byte lock files are inert and safe to gitignore, and any orphaned temp file from an interrupted write is swept on the next lock acquisition for that directory.
+- The API is same-origin only: no `Access-Control-Allow-Origin` header is emitted, and mutating requests (`POST`/`PUT`/`PATCH`/`DELETE`) carrying an `Origin` that does not match the server's `Host` are rejected with `403 Forbidden`. Non-browser clients (CLI, scripts, MCP) send no `Origin` and are unaffected.
 - Preflight: `OPTIONS /api/*` returns `204 No Content` with headers:
-	- `Access-Control-Allow-Origin: *`
 	- `Access-Control-Allow-Methods: GET,POST,OPTIONS`
 	- `Access-Control-Allow-Headers: Content-Type`
 - Static files are served with the following priority:
@@ -144,5 +144,5 @@ The custom UI path takes precedence over embedded assets. If a requested file is
 
 - Server runs until interrupted (Ctrl+C)
 - Web interface works with all modern browsers
-- API handlers expect JSON bodies and respond with JSON envelopes that mirror the CLI output (`{status,message,data}`); CORS headers are always added for local development.
+- API handlers expect JSON bodies and respond with JSON envelopes that mirror the CLI output (`{status,message,data}`).
 - Use `--host=0.0.0.0` to allow external connections

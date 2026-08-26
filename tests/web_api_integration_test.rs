@@ -51,6 +51,9 @@ fn start_server_on(port: u16) {
         unsafe {
             std::env::set_var("LOTAR_TEST_FAST_IO", "1");
         }
+        unsafe {
+            std::env::set_var("LOTAR_ALLOW_TEST_STOP", "1");
+        }
         let mut api = ApiServer::new();
         routes::initialize(&mut api);
         lotar::web_server::serve(&api, port);
@@ -90,11 +93,24 @@ fn stop_server_on(port: u16) {
 }
 
 fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>) {
+    http_post_json_with_origin(port, path_and_query, body, None)
+}
+
+fn http_post_json_with_origin(
+    port: u16,
+    path_and_query: &str,
+    body: &str,
+    origin: Option<&str>,
+) -> (u16, Vec<u8>) {
     let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
     stream.set_read_timeout(Some(net_timeout())).unwrap();
+    let origin_header = origin
+        .map(|o| format!("Origin: {o}\r\n"))
+        .unwrap_or_default();
     let req = format!(
-        "POST {} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+        "POST {} HTTP/1.1\r\nHost: 127.0.0.1\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
         path_and_query,
+        origin_header,
         body.len(),
         body
     );
@@ -737,7 +753,8 @@ fn api_options_preflight_returns_204_and_cors_headers() {
         headers
             .get("Access-Control-Allow-Origin")
             .map(|s| s.as_str()),
-        Some("*")
+        None,
+        "wildcard CORS must not be advertised"
     );
     let methods = headers
         .get("Access-Control-Allow-Methods")
@@ -749,6 +766,51 @@ fn api_options_preflight_returns_204_and_cors_headers() {
         .cloned()
         .unwrap_or_default();
     assert!(allow_headers.to_ascii_lowercase().contains("content-type"));
+    stop_server_on(port);
+}
+
+#[test]
+fn mutating_requests_with_foreign_origin_are_rejected() {
+    let port = find_free_port();
+    start_server_on(port);
+    let (status, _body) = http_post_json_with_origin(
+        port,
+        "/api/tasks/add?project=DEMO",
+        r#"{"title":"drive-by"}"#,
+        Some("https://evil.example"),
+    );
+    assert_eq!(status, 403, "cross-origin mutation must be rejected");
+    stop_server_on(port);
+}
+
+#[test]
+fn shutdown_endpoint_is_not_exposed() {
+    let port = find_free_port();
+    start_server_on(port);
+    {
+        let _guard = EnvVarGuard::clear("LOTAR_ALLOW_TEST_STOP");
+        for path in ["/shutdown", "/__test/stop"] {
+            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            stream.set_read_timeout(Some(net_timeout())).unwrap();
+            let req = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+            stream.write_all(req.as_bytes()).unwrap();
+            stream.flush().unwrap();
+            let mut buf = Vec::new();
+            let mut tmp = [0u8; 512];
+            loop {
+                let n = stream.read(&mut tmp).unwrap_or(0);
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&tmp[..n]);
+            }
+            let text = String::from_utf8_lossy(&buf);
+            assert!(
+                !text.contains("stopping"),
+                "{path} must not stop the server without LOTAR_ALLOW_TEST_STOP=1"
+            );
+        }
+    }
     stop_server_on(port);
 }
 

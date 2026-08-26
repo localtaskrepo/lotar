@@ -37,7 +37,14 @@ impl SprintService {
             if !entry.path().is_file() {
                 continue;
             }
-            let (id, mut sprint) = Self::load_entry(&entry.path())?;
+            let loaded = match Self::load_entry(&entry.path()) {
+                Ok(loaded) => loaded,
+                Err(e) => {
+                    crate::storage::safety::warn_corrupt_once(&entry.path(), &e.to_string());
+                    continue;
+                }
+            };
+            let (id, mut sprint) = loaded;
             let _ = sprint.canonicalize();
             records.push(SprintRecord { id, sprint });
         }
@@ -74,8 +81,15 @@ impl SprintService {
         sprint.modified = Some(now);
         let dir = Sprint::dir(&storage.root_path);
         fs::create_dir_all(&dir)?;
-        let next_id = Self::next_identifier(&dir)?;
-        Self::write_sprint(&dir, next_id, &sprint)?;
+        let next_id = crate::storage::safety::with_storage_lock(
+            &dir,
+            crate::storage::safety::sprint_lock_name(),
+            || -> LoTaRResult<u32> {
+                let id = Self::next_identifier(&dir)?;
+                Self::write_sprint(&dir, id, &sprint)?;
+                Ok(id)
+            },
+        )?;
         Ok(SprintOperationOutcome {
             record: SprintRecord {
                 id: next_id,
@@ -102,7 +116,11 @@ impl SprintService {
         if sprint.created.is_none() {
             sprint.created = Some(now);
         }
-        Self::write_sprint(&dir, id, &sprint)?;
+        crate::storage::safety::with_storage_lock(
+            &dir,
+            crate::storage::safety::sprint_lock_name(),
+            || Self::write_sprint(&dir, id, &sprint),
+        )?;
         Ok(SprintOperationOutcome {
             record: SprintRecord { id, sprint },
             warnings,
@@ -112,12 +130,18 @@ impl SprintService {
 
     pub fn delete(storage: &mut Storage, id: u32) -> LoTaRResult<bool> {
         let dir = Sprint::dir(&storage.root_path);
-        let path = dir.join(format!("{}.yml", id));
-        if !path.exists() {
-            return Ok(false);
-        }
-        fs::remove_file(path)?;
-        Ok(true)
+        crate::storage::safety::with_storage_lock(
+            &dir,
+            crate::storage::safety::sprint_lock_name(),
+            || -> LoTaRResult<bool> {
+                let path = dir.join(format!("{}.yml", id));
+                if !path.exists() {
+                    return Ok(false);
+                }
+                fs::remove_file(path)?;
+                Ok(true)
+            },
+        )
     }
 
     pub fn load_tasks_for_record(storage: &Storage, record: &SprintRecord) -> Vec<(String, Task)> {
@@ -170,7 +194,7 @@ impl SprintService {
         fs::create_dir_all(dir)?;
         let serialized = sprint.to_yaml()?;
         let path = dir.join(format!("{}.yml", id));
-        fs::write(path, serialized)?;
+        crate::storage::safety::atomic_write_file(&path, &serialized)?;
         Ok(())
     }
 }

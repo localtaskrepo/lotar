@@ -24,18 +24,15 @@ fn status_update_reports_storage_failure() {
 
     let task_id = extract_task_id_from_bytes(&add_output).expect("task id present in output");
     let project_prefix = task_id.split('-').next().expect("project prefix available");
-    let numeric_id = task_id.split('-').nth(1).expect("numeric id available");
 
-    let task_file = fixtures
-        .tasks_root
-        .join(project_prefix)
-        .join(format!("{numeric_id}.yml"));
-
-    let metadata = std::fs::metadata(&task_file).expect("task file metadata");
+    // Task writes are atomic (temp file + rename), so blocking the write requires
+    // making the containing project directory unwritable.
+    let project_dir = fixtures.tasks_root.join(project_prefix);
+    let metadata = std::fs::metadata(&project_dir).expect("project dir metadata");
     let mut perms = metadata.permissions();
     let original_perms = perms.clone();
     perms.set_readonly(true);
-    std::fs::set_permissions(&task_file, perms).expect("set read-only");
+    std::fs::set_permissions(&project_dir, perms).expect("set read-only");
 
     crate::common::lotar_cmd()
         .unwrap()
@@ -51,7 +48,7 @@ fn status_update_reports_storage_failure() {
         ))
         .stderr(predicate::str::contains(&task_id));
 
-    std::fs::set_permissions(&task_file, original_perms).expect("restore permissions");
+    std::fs::set_permissions(&project_dir, original_perms).expect("restore permissions");
 }
 
 #[test]

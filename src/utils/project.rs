@@ -213,9 +213,12 @@ pub fn validate_explicit_prefix(
 /// Smart resolver that accepts either a project name or prefix and returns the appropriate prefix
 /// for storage operations. This allows users to use either format in --project parameters.
 pub fn resolve_project_input(input: &str, tasks_dir: &std::path::Path) -> String {
-    // First, check if input is already a valid prefix by looking for an exact directory match
+    // First, check if input is already a valid prefix by looking for an exact directory match.
+    // Inputs containing path separators or traversal sequences are never treated as direct
+    // prefixes; they can only match via project-name resolution or prefix generation below.
+    let input_is_safe_prefix = crate::storage::safety::is_valid_project_prefix(input);
     let input_as_prefix_dir = tasks_dir.join(input);
-    if input_as_prefix_dir.exists() && input_as_prefix_dir.is_dir() {
+    if input_is_safe_prefix && input_as_prefix_dir.exists() && input_as_prefix_dir.is_dir() {
         // Input is a valid prefix (directory exists)
         return input.to_string();
     }

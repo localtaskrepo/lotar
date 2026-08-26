@@ -215,7 +215,7 @@ pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(),
     // Serialize in canonical nested format
     let config_yaml = crate::config::normalization::to_canonical_global_yaml(config);
 
-    fs::write(&config_path, config_yaml)
+    crate::storage::safety::atomic_write_file(&config_path, &config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;
 
     // Invalidate cache for this tasks_dir
@@ -231,6 +231,9 @@ pub fn save_project_config(
     project_prefix: &str,
     config: &ProjectConfig,
 ) -> Result<(), ConfigError> {
+    if let Err(e) = crate::storage::safety::validate_project_prefix(project_prefix) {
+        return Err(ConfigError::IoError(e));
+    }
     let project_dir = crate::utils::paths::project_dir(tasks_dir, project_prefix);
     let config_path = crate::utils::paths::project_config_path(tasks_dir, project_prefix);
 
@@ -241,7 +244,7 @@ pub fn save_project_config(
     // Serialize in canonical nested format
     let config_yaml = crate::config::normalization::to_canonical_project_yaml(config);
 
-    fs::write(&config_path, config_yaml)
+    crate::storage::safety::atomic_write_file(&config_path, &config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write project config: {}", e)))?;
 
     // Invalidate cache for this tasks_dir

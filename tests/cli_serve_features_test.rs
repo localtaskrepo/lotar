@@ -398,6 +398,7 @@ fn test_serve_honors_explicit_tasks_dir_for_api_requests() {
         .current_dir(temp_dir)
         .env_remove("LOTAR_TASKS_DIR")
         .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+        .env("LOTAR_ALLOW_TEST_STOP", "1")
         .arg("--tasks-dir")
         .arg(&custom_tasks_dir)
         .arg("serve")

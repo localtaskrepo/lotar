@@ -128,7 +128,7 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
 - **REST API** for all task operations
     - Multi-value filters for list: `status`, `priority`, `type`, `tags`
     - Proper 404 for unknown resources
-    - CORS preflight support for `/api/*`
+    - Same-origin only: mutating requests with a cross-origin `Origin` header are rejected with `403` (no wildcard CORS)
 - **Configurable ports** (default 8080, use `--port` to override; `-p` is reserved for the global `--project` flag)
 - **Personalized chrome** — Preferences page lets each user choose system/light/dark themes and an optional custom accent color; browser chrome tint follows the active theme.
 - **SSE**: realtime events with `retry` hint and periodic heartbeats
@@ -150,7 +150,7 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
     - `--host` controls the bind address (default: 127.0.0.1). Use `0.0.0.0` to listen on all interfaces.
     - `--open` opens the default browser to the server URL, but does not change bind address.
     - Use `--port <n>` to set the server port. The short `-p` flag is reserved for the global `--project` flag (and `lotar serve` ignores `--project` on purpose).
-- Shutdown endpoint: `GET /shutdown` cleanly stops the server. For tests, `/__test/stop` remains available as an alias.
+- No shutdown endpoint: stop the server with Ctrl+C (SIGINT). For automated tests, `GET /__test/stop` stops the server only when it was started with `LOTAR_ALLOW_TEST_STOP=1`.
 
 ## Command Reference
 

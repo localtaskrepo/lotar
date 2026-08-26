@@ -48,6 +48,10 @@ const baseConfig: UserConfig = {
                 configure: (proxy) => {
                     proxy.on('proxyReq', (proxyReq) => {
                         proxyReq.removeHeader('accept-encoding')
+                        // The backend rejects mutating requests whose Origin does not
+                        // match its own Host; the dev server proxies same-origin for
+                        // the browser, so the rewritten request must carry no Origin.
+                        proxyReq.removeHeader('origin')
                     })
                 },
             },

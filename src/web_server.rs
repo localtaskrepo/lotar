@@ -148,7 +148,9 @@ pub fn serve_with_config(
                 if path == "/api/events" || path == "/api/tasks/stream" {
                     handle_sse_connection(stream, &query);
                     continue;
-                } else if path == "/__test/stop" || path == "/shutdown" {
+                } else if path == "/__test/stop"
+                    && std::env::var("LOTAR_ALLOW_TEST_STOP").as_deref() == Ok("1")
+                {
                     if let Ok(mut map) = STOP_FLAGS.lock() {
                         map.insert(port, true);
                     }
@@ -160,7 +162,7 @@ pub fn serve_with_config(
                     if path == "/api/openapi.json" {
                         let spec = include_str!("../docs/openapi.json");
                         let response = format!(
-                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}",
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                             spec.len(),
                             spec
                         );
@@ -169,8 +171,21 @@ pub fn serve_with_config(
                         continue;
                     }
                     if method.eq_ignore_ascii_case("OPTIONS") {
-                        let preflight = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: 0\r\n\r\n";
+                        let preflight = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Methods: GET,POST,OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nContent-Length: 0\r\n\r\n";
                         let _ = stream.write_all(preflight.as_bytes());
+                        let _ = stream.flush();
+                        continue;
+                    }
+                    if is_mutating_method(&method)
+                        && let Err(rejection) = validate_request_origin(&headers)
+                    {
+                        let body = rejection;
+                        let response = format!(
+                            "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                            body.len(),
+                            body
+                        );
+                        let _ = stream.write_all(response.as_bytes());
                         let _ = stream.flush();
                         continue;
                     }
@@ -183,8 +198,6 @@ pub fn serve_with_config(
                         body,
                     };
                     let mut resp = api_server.handle_request(&req);
-                    resp.headers
-                        .push(("Access-Control-Allow-Origin".into(), "*".into()));
                     resp.headers.push((
                         "Access-Control-Allow-Methods".into(),
                         "GET,POST,OPTIONS".into(),
@@ -207,10 +220,12 @@ pub fn serve_with_config(
                     let status_line = match resp.status {
                         200 => "200 OK",
                         201 => "201 Created",
-                        404 => "404 Not Found",
+                        204 => "204 No Content",
                         400 => "400 Bad Request",
+                        403 => "403 Forbidden",
+                        404 => "404 Not Found",
                         500 => "500 Internal Server Error",
-                        _ => "200 OK",
+                        _ => "500 Internal Server Error",
                     };
                     let response = format!(
                         "HTTP/1.1 {}\r\n{}Content-Length: {}\r\n\r\n",
@@ -483,6 +498,53 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
             }
         }
     });
+}
+
+fn is_mutating_method(method: &str) -> bool {
+    !method.eq_ignore_ascii_case("GET")
+        && !method.eq_ignore_ascii_case("HEAD")
+        && !method.eq_ignore_ascii_case("OPTIONS")
+}
+
+fn header_value<'a>(headers: &'a HashMap<String, String>, name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case(name))
+        .map(|(_, v)| v.as_str())
+}
+
+fn origin_authority(origin: &str) -> Option<String> {
+    let rest = origin.split_once("://").map(|(_, r)| r).unwrap_or(origin);
+    let authority = rest.split(['/', '?', '#']).next()?;
+    if authority.is_empty() {
+        None
+    } else {
+        Some(authority.to_string())
+    }
+}
+
+fn validate_request_origin(headers: &HashMap<String, String>) -> Result<(), String> {
+    let Some(origin) = header_value(headers, "Origin")
+        .map(str::trim)
+        .filter(|o| !o.is_empty())
+    else {
+        return Ok(());
+    };
+    let Some(host) = header_value(headers, "Host")
+        .map(str::trim)
+        .filter(|h| !h.is_empty())
+    else {
+        return Err(
+            "{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Missing Host header\"}}".to_string(),
+        );
+    };
+    match origin_authority(origin) {
+        Some(authority) if authority.eq_ignore_ascii_case(host) => Ok(()),
+        _ => Err(
+            "{\"error\":{\"code\":\"FORBIDDEN\",\"message\":\"Cross-origin request rejected (Origin does not match Host)\"}}"
+                .to_string(),
+        ),
+    }
 }
 
 fn parse_path_and_query(path_full: &str) -> (String, HashMap<String, String>) {

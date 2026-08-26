@@ -10,6 +10,20 @@ use std::path::Path;
 pub struct StorageSearch;
 
 impl StorageSearch {
+    fn load_task_file(path: &Path) -> Option<Task> {
+        let content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(_) => return None,
+        };
+        match serde_yaml::from_str::<Task>(&content) {
+            Ok(task) => Some(task),
+            Err(e) => {
+                crate::storage::safety::warn_corrupt_once(path, &e.to_string());
+                None
+            }
+        }
+    }
+
     /// Search for tasks based on filter criteria
     pub fn search(root_path: &Path, filter: &TaskFilter) -> Vec<(String, Task)> {
         let mut results: Vec<(String, Task)> = Vec::new();
@@ -48,8 +62,7 @@ impl StorageSearch {
                         .filter_map(|path| {
                             let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
                             let task_id = format!("{}-{}", project_folder, numeric_id);
-                            let content = fs::read_to_string(path).ok()?;
-                            let task: Task = serde_yaml::from_str(&content).ok()?;
+                            let task = Self::load_task_file(path)?;
                             if Self::task_matches_filter(&task_id, &task, filter) {
                                 Some((task_id, task))
                             } else {
@@ -64,8 +77,7 @@ impl StorageSearch {
                         .filter_map(|path| {
                             let numeric_id = crate::utils::filesystem::file_numeric_stem(path)?;
                             let task_id = format!("{}-{}", project_folder, numeric_id);
-                            let content = fs::read_to_string(path).ok()?;
-                            let task: Task = serde_yaml::from_str(&content).ok()?;
+                            let task = Self::load_task_file(path)?;
                             if Self::task_matches_filter(&task_id, &task, filter) {
                                 Some((task_id, task))
                             } else {
@@ -126,8 +138,7 @@ impl StorageSearch {
                     .filter_map(|(project_folder, task_path)| {
                         let numeric_id = crate::utils::filesystem::file_numeric_stem(task_path)?;
                         let task_id = format!("{}-{}", project_folder, numeric_id);
-                        let content = fs::read_to_string(task_path).ok()?;
-                        let task: Task = serde_yaml::from_str(&content).ok()?;
+                        let task = Self::load_task_file(task_path)?;
                         if Self::task_matches_filter(&task_id, &task, filter) {
                             Some((task_id, task))
                         } else {
@@ -147,37 +158,11 @@ impl StorageSearch {
                                 None => return None,
                             };
                         let task_id = format!("{}-{}", project_folder, numeric_id);
-                        let content = match fs::read_to_string(task_path) {
-                            Ok(c) => c,
-                            Err(_) => return None,
-                        };
-                        match serde_yaml::from_str::<Task>(&content) {
-                            Ok(task) => {
-                                if Self::task_matches_filter(&task_id, &task, filter) {
-                                    Some((task_id, task))
-                                } else {
-                                    None
-                                }
-                            }
-                            Err(e) => {
-                                use std::fs::OpenOptions;
-                                use std::io::Write;
-                                if std::env::var("LOTAR_DEBUG").is_ok() {
-                                    if let Ok(mut f) = OpenOptions::new()
-                                        .create(true)
-                                        .append(true)
-                                        .open("/tmp/lotar_search_debug.log")
-                                    {
-                                        let _ = writeln!(
-                                            f,
-                                            "[PARSE_ERR] file={} err={}",
-                                            task_path.display(),
-                                            e
-                                        );
-                                    }
-                                }
-                                None
-                            }
+                        let task = Self::load_task_file(task_path)?;
+                        if Self::task_matches_filter(&task_id, &task, filter) {
+                            Some((task_id, task))
+                        } else {
+                            None
                         }
                     })
                     .collect();
