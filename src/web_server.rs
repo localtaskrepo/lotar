@@ -16,6 +16,20 @@ static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web");
 static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
+const MAX_REQUEST_BODY_BYTES: usize = 16 * 1024 * 1024;
+const SOCKET_TIMEOUT: Duration = Duration::from_secs(30);
+
+fn reject_oversized_body(stream: &mut TcpStream) {
+    let body = "{\"error\":{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"Request body exceeds the 16 MiB limit\"}}";
+    let response = format!(
+        "HTTP/1.1 413 Content Too Large\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
+}
+
 /// Configuration for the web server's static file serving behavior.
 #[derive(Debug, Clone, Default)]
 pub struct WebServerConfig {
@@ -84,6 +98,8 @@ pub fn serve_with_config(
 
         match stream {
             Ok(mut stream) => {
+                let _ = stream.set_read_timeout(Some(SOCKET_TIMEOUT));
+                let _ = stream.set_write_timeout(Some(SOCKET_TIMEOUT));
                 // Read a single HTTP request (headers + body)
                 let (method, path, query, headers, body) = {
                     let mut head_buf: Vec<u8> = Vec::new();
@@ -128,18 +144,31 @@ pub fn serve_with_config(
                         }
                     }
                     let mut body: Vec<u8> = body_bytes.to_vec();
-                    if let Some(cl) = headers
+                    let declared_length: Option<usize> = headers
                         .get("Content-Length")
-                        .and_then(|v| v.parse::<usize>().ok())
+                        .and_then(|v| v.parse::<usize>().ok());
+                    if declared_length.is_some_and(|cl| cl > MAX_REQUEST_BODY_BYTES)
+                        || body.len() > MAX_REQUEST_BODY_BYTES
                     {
+                        reject_oversized_body(&mut stream);
+                        continue;
+                    }
+                    if let Some(cl) = declared_length {
                         while body.len() < cl {
                             let n: usize = stream.read(&mut buf).unwrap_or_default();
                             if n == 0 {
                                 break;
                             }
                             body.extend_from_slice(&buf[..n]);
+                            if body.len() > MAX_REQUEST_BODY_BYTES {
+                                break;
+                            }
                         }
-                        body.truncate(cl);
+                        body.truncate(cl.min(MAX_REQUEST_BODY_BYTES));
+                    }
+                    if body.len() > MAX_REQUEST_BODY_BYTES {
+                        reject_oversized_body(&mut stream);
+                        continue;
                     }
                     (method, path, query, headers, body)
                 };
@@ -224,6 +253,7 @@ pub fn serve_with_config(
                         400 => "400 Bad Request",
                         403 => "403 Forbidden",
                         404 => "404 Not Found",
+                        413 => "413 Content Too Large",
                         500 => "500 Internal Server Error",
                         _ => "500 Internal Server Error",
                     };
@@ -272,6 +302,10 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
 /// 2. Try embedded assets (bundled at compile time)
 /// 3. Fallback to `target/web` on the filesystem (for development)
 fn try_serve_static(rel_path: &str, stream: &mut TcpStream, external_path: Option<&Path>) -> bool {
+    if has_dot_segments(rel_path) {
+        return false;
+    }
+
     // 1. Try external/custom UI path first (if configured)
     if let Some(ext_dir) = external_path {
         let fs_path = ext_dir.join(rel_path);
@@ -316,6 +350,12 @@ fn should_fallback_to_index(path: &str) -> bool {
     trimmed.is_empty() || !trimmed.contains('.')
 }
 
+fn has_dot_segments(rel_path: &str) -> bool {
+    rel_path
+        .split(['/', '\\'])
+        .any(|segment| segment == "." || segment == "..")
+}
+
 fn content_type_for(path: &str) -> &'static str {
     match Path::new(path)
         .extension()
@@ -355,7 +395,7 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
 
     let rx = crate::api_events::subscribe();
     let fast = std::env::var("LOTAR_TEST_FAST_IO").ok().as_deref() == Some("1");
-    let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\n\r\n";
+    let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
 
     // Send headers and initial retry hint
     let mut initial = String::with_capacity(headers.len() + 14);
@@ -384,17 +424,22 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
                     .iter()
                     .any(|k| k.eq_ignore_ascii_case("project_changed")),
             };
-            if wants_project_changed && let Some(tasks_dir) = resolve_server_tasks_dir() {
+            if wants_project_changed
+                && let Some(tasks_dir) = resolve_server_tasks_dir()
+                && crate::storage::safety::is_valid_project_prefix(proj_name)
+            {
                 let proj_dir = tasks_dir.join(proj_name);
                 if proj_dir.exists() {
-                    // Emit via bus (picked up by forwarder) and also write one immediate event inline
+                    // Emit via bus (picked up by forwarder) and also write one immediate event inline.
+                    // The payload is JSON-serialized so hostile query values cannot break out of the frame.
                     crate::api_events::emit(&crate::api_events::ApiEvent {
                         kind: "project_changed".to_string(),
                         data: serde_json::json!({ "name": proj_name }),
                     });
                     let inline = format!(
-                        "event: project_changed\ndata: {{\"name\":\"{}\"}}\n\n",
-                        proj_name
+                        "event: project_changed\ndata: {}\n\n",
+                        serde_json::to_string(&serde_json::json!({ "name": proj_name }))
+                            .unwrap_or_else(|_| "{}".to_string())
                     );
                     let _ = stream.write_all(inline.as_bytes());
                     let _ = stream.flush();

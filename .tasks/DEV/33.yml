@@ -1,0 +1,50 @@
+title: Close remaining server security holes
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-08-26T10:50:33.136526+00:00
+modified: 2026-08-26T11:08:45.716657+00:00
+comments:
+- date: 2026-08-26T10:50:54.031156+00:00
+  text: 'Scope: (1) static-file dot-segment traversal, (2) commit_diff git arg injection, (3) request body cap + socket read timeouts, (4) MCP Content-Length OOM cap, (5) SSE frame injection via query params, (6) remove /tmp debug-log symlink vectors in search.rs. Verify each live + tests.'
+- date: 2026-08-26T11:08:45.687434+00:00
+  text: 'Shipped: (1) try_serve_static rejects dot-segment paths -> 404, closing arbitrary file read. (2) AuditService.ensure_safe_git_rev applied in show_file_diff/show_file_at rejects option-style/whitespace commit refs, closing git arg injection via /api/tasks/commit_diff. (3) HTTP body cap 16MiB with 413 + 30s socket read/write timeouts. (4) MCP frames capped at 10MiB with drain-without-alloc then parse error. (5) SSE: removed wildcard CORS header; synthetic project_changed payload now JSON-serialized and prefix-validated (frame injection impossible). (6) Removed /tmp/lotar_search_debug.log symlink vectors from search.rs. Tests: static traversal 404, SSE header absence, rev validator unit cases, route-level rejection; live-verified traversal 404, 413, MCP cap message, normal add 201. Gates: lint 0 errors, nextest 769/774 (5 = known env-flaky agent suite), vitest 187/187.'
+history:
+- at: 2026-08-26T10:50:54.020950+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-08-26T10:50:54.031156+00:00
+  actor: mallox
+  changes:
+  - field: comment
+    new: 'Scope: (1) static-file dot-segment traversal, (2) commit_diff git arg injection, (3) request body cap + socket read timeouts, (4) MCP Content-Length OOM cap, (5) SSE frame injection via query params, (6) remove /tmp debug-log symlink vectors in search.rs. Verify each live + tests.'
+- at: 2026-08-26T10:50:54.054704+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-08-26T10:50:54.078239+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-08-26T11:08:45.687434+00:00
+  actor: mallox
+  changes:
+  - field: comment
+    new: 'Shipped: (1) try_serve_static rejects dot-segment paths -> 404, closing arbitrary file read. (2) AuditService.ensure_safe_git_rev applied in show_file_diff/show_file_at rejects option-style/whitespace commit refs, closing git arg injection via /api/tasks/commit_diff. (3) HTTP body cap 16MiB with 413 + 30s socket read/write timeouts. (4) MCP frames capped at 10MiB with drain-without-alloc then parse error. (5) SSE: removed wildcard CORS header; synthetic project_changed payload now JSON-serialized and prefix-validated (frame injection impossible). (6) Removed /tmp/lotar_search_debug.log symlink vectors from search.rs. Tests: static traversal 404, SSE header absence, rev validator unit cases, route-level rejection; live-verified traversal 404, 413, MCP cap message, normal add 201. Gates: lint 0 errors, nextest 769/774 (5 = known env-flaky agent suite), vitest 187/187.'
+- at: 2026-08-26T11:08:45.716657+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

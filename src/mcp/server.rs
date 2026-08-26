@@ -61,6 +61,21 @@ struct JsonRpcError {
 
 const MCP_DEFAULT_TASK_LIST_LIMIT: usize = 50;
 const MCP_MAX_TASK_LIST_LIMIT: usize = 200;
+const MAX_MCP_FRAME_BYTES: usize = 10 * 1024 * 1024;
+
+/// Discard an oversized framed body byte-by-byte so the stream stays in sync
+/// without ever allocating the announced size.
+fn drain_framed_body<R: Read>(reader: &mut R, mut remaining: usize) {
+    let mut sink = [0u8; 8192];
+    while remaining > 0 {
+        let want = remaining.min(sink.len());
+        match reader.read(&mut sink[..want]) {
+            Ok(0) => break,
+            Ok(n) => remaining -= n,
+            Err(_) => break,
+        }
+    }
+}
 const MCP_DEFAULT_PROJECT_LIST_LIMIT: usize = 50;
 const MCP_MAX_PROJECT_LIST_LIMIT: usize = 200;
 const MCP_DEFAULT_SPRINT_LIST_LIMIT: usize = 50;
@@ -294,6 +309,11 @@ pub fn run_stdio_server() {
                 }
             }
             if let Some(len) = content_length {
+                if len > MAX_MCP_FRAME_BYTES {
+                    drain_framed_body(&mut reader, len);
+                    respond_parse_error(&stdout, "Content-Length exceeds maximum frame size");
+                    continue;
+                }
                 let mut buf = vec![0u8; len];
                 if let Err(e) = reader.read_exact(&mut buf) {
                     let detail = format!("body read failed: {}", e);

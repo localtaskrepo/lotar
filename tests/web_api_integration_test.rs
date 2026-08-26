@@ -834,6 +834,103 @@ fn sse_initial_retry_hint_is_sent() {
 }
 
 #[test]
+fn static_files_reject_dot_segment_traversal() {
+    let port = find_free_port();
+    start_server_on(port);
+    for path in [
+        "/../../Cargo.toml",
+        "/assets/../../../../Cargo.toml",
+        "/a/../../web/index.html",
+    ] {
+        let (status, _headers, body) = http_get_bytes(port, path);
+        let text = String::from_utf8_lossy(&body);
+        assert_eq!(status, 404, "dot-segment path {path} must not resolve");
+        assert!(!text.contains("[package]"), "{path} leaked repo file");
+    }
+    stop_server_on(port);
+}
+
+#[test]
+fn sse_headers_do_not_allow_cross_origin() {
+    let port = find_free_port();
+    start_server_on(port);
+    let (_stream, leftover) = open_sse(port, "");
+    let text = String::from_utf8_lossy(&leftover);
+    assert!(
+        !text
+            .to_ascii_lowercase()
+            .contains("access-control-allow-origin"),
+        "SSE response advertises wildcard CORS: {text}"
+    );
+    stop_server_on(port);
+}
+
+#[test]
+fn commit_diff_rejects_option_style_commit() {
+    use lotar::services::audit_service::AuditService;
+    use std::path::Path;
+
+    let evil_file = std::env::temp_dir().join(format!("lotar-git-pwn-{}", std::process::id()));
+    let _ = std::fs::remove_file(&evil_file);
+    let commit_arg = format!("--output={}", evil_file.display());
+
+    let result =
+        AuditService::show_file_diff(Path::new("."), &commit_arg, Path::new(".tasks/DEV/1.yml"));
+    match result {
+        Ok(diff) => panic!("option-style commit must not succeed: {diff}"),
+        Err(message) => assert!(
+            message.contains("Invalid commit reference"),
+            "expected explicit rejection, got: {message}"
+        ),
+    }
+    assert!(
+        !evil_file.exists(),
+        "git wrote attacker-controlled output file"
+    );
+
+    let port = find_free_port();
+    start_server_on(port);
+    let path = format!(
+        "/api/tasks/commit_diff?id=DEV-1&commit={}",
+        url_encode(&commit_arg)
+    );
+    let (status, _headers, body) = http_get_bytes(port, &path);
+    stop_server_on(port);
+
+    let text = String::from_utf8_lossy(&body);
+    assert_ne!(status, 200, "route must not serve option-style commits");
+    assert!(
+        !evil_file.exists(),
+        "no output file may be created via the API"
+    );
+    assert!(!text.contains("[package]"));
+}
+
+fn url_encode(value: &str) -> String {
+    let mut out = String::new();
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+#[test]
+fn audit_service_rejects_unsafe_git_revs() {
+    use lotar::services::audit_service::AuditService;
+    assert!(AuditService::ensure_safe_git_rev("abc123").is_ok());
+    assert!(AuditService::ensure_safe_git_rev("HEAD~1").is_ok());
+    assert!(AuditService::ensure_safe_git_rev("--output=/tmp/x").is_err());
+    assert!(AuditService::ensure_safe_git_rev("-c core.pager=cat").is_err());
+    assert!(AuditService::ensure_safe_git_rev("").is_err());
+    assert!(AuditService::ensure_safe_git_rev("main\nNUL").is_err());
+}
+
+#[test]
 fn openapi_spec_served() {
     let port = find_free_port();
     start_server_on(port);

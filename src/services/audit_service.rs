@@ -170,6 +170,18 @@ impl AuditService {
         OsString::from(Self::git_path_str(path))
     }
 
+    /// Reject commit references that git would parse as command-line options
+    /// (leading `-`, e.g. `--output=<path>`) or that carry control characters.
+    pub fn ensure_safe_git_rev(rev: &str) -> Result<(), String> {
+        if rev.is_empty()
+            || rev.starts_with('-')
+            || rev.chars().any(|c| c.is_whitespace() || c.is_control())
+        {
+            return Err(format!("Invalid commit reference '{}'", rev));
+        }
+        Ok(())
+    }
+
     /// List commits touching a specific file (relative to repo root)
     pub fn list_commits_for_file(
         repo_root: &Path,
@@ -830,6 +842,7 @@ impl AuditService {
 
     /// Show file contents at a specific commit (binary-safe as String lossily)
     pub fn show_file_at(repo_root: &Path, commit: &str, file_rel: &Path) -> Result<String, String> {
+        Self::ensure_safe_git_rev(commit)?;
         let spec = format!("{}:{}", commit, Self::git_path_str(file_rel));
         let output = Command::new("git")
             .arg("-C")
@@ -854,6 +867,7 @@ impl AuditService {
         commit: &str,
         file_rel: &Path,
     ) -> Result<String, String> {
+        Self::ensure_safe_git_rev(commit)?;
         let output = Command::new("git")
             .arg("-C")
             .arg(repo_root)
