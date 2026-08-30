@@ -141,10 +141,22 @@
           />
         </div>
         <div class="tasks-filter-row__actions">
-          <UiButton type="button" title="Configure columns" data-column-menu-toggle @click="taskTableRef?.toggleColumnMenu()">
-            <IconGlyph name="columns" aria-hidden="true" />
-            <span>Columns</span>
-          </UiButton>
+          <ColumnsMenu
+            :open="columnsMenuOpen"
+            :options="fieldOptions"
+            :is-visible="isColumnVisible"
+            :set-visible="setColumnVisible"
+            label="Table columns"
+            @update:open="columnsMenuOpen = $event"
+            @reset="resetColumns"
+          >
+            <template #trigger="{ open, toggle }">
+              <UiButton type="button" title="Configure columns" :aria-expanded="open" @click="toggle">
+                <IconGlyph name="columns" aria-hidden="true" />
+                <span>Columns</span>
+              </UiButton>
+            </template>
+          </ColumnsMenu>
           <UiButton type="button" aria-label="Add task" title="Add task" @click="openCreate">
             <IconGlyph name="plus" aria-hidden="true" />
             <span>Task</span>
@@ -175,7 +187,6 @@
       />
       <TaskTable
         v-else
-        ref="taskTableRef"
         :tasks="shownTasks"
         :loading="loading"
         :statuses="statuses"
@@ -369,6 +380,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentP
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
+import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -380,6 +392,7 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import { useActivity } from '../composables/useActivity'
+import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
 import { useCustomFilterPresets } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
@@ -473,7 +486,28 @@ watch(
 
 const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
-const taskTableRef = ref<InstanceType<typeof TaskTable> | null>(null)
+
+const columnsStore = useColumns()
+provideColumnStore(columnsStore)
+const columnsMenuOpen = ref(false)
+const fieldOptions = columnsStore.fieldOptions
+const isColumnVisible = (key: string) => columnsStore.isVisible(key)
+const setColumnVisible = (key: string, event: Event) => columnsStore.toggleColumn(key, event)
+function resetColumns() {
+    columnsStore.resetColumns()
+}
+
+watch(
+    availableCustomFields,
+    (keys) => {
+        columnsStore.setCustomFieldKeys(keys)
+    },
+    { immediate: true },
+)
+
+// The store's project key is owned by TaskTable (which resolves the concrete
+// project from the filter or the shown tasks), so the page must not override it.
+
 const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
@@ -1361,7 +1395,9 @@ const handleTaskUpdated = (task: TaskDTO) => {
   align-items: center;
   gap: 4px;
   margin-left: auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .tasks-quick-row__controls {
@@ -1449,7 +1485,9 @@ const handleTaskUpdated = (task: TaskDTO) => {
 }
 
 .tasks-filter-row__main {
-  flex: 1;
+  /* Claim at least a full row on narrow screens so the filter controls wrap as
+     a block instead of being crushed beside the action buttons. */
+  flex: 1 1 320px;
   min-width: 0;
 }
 
@@ -1458,6 +1496,7 @@ const handleTaskUpdated = (task: TaskDTO) => {
   align-items: center;
   gap: 8px;
   margin-left: auto;
+  flex-wrap: wrap;
 }
 
 .pagination-bar {

@@ -13,3 +13,15 @@ profile.default.fail-fast = true
 profile.default.slow-timeout = "90s"
 
 # Mark slow tests here in the future if desired (no ignored tests per policy).
+
+# The agent automation suite spawns real worker processes (mock agents) that
+# poll the filesystem on wall-clock schedules. Under full num-cpus parallelism
+# those windows blow and the tests flake (passing standalone, failing under
+# load). Throttle this binary to limited concurrency so the gate stays green
+# without weakening the tests.
+[test-groups.agent-processes]
+max-threads = 2
+
+[[profile.default.overrides]]
+filter = 'binary(agent_automation_integration_test)'
+test-group = 'agent-processes'

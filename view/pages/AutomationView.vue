@@ -5,7 +5,7 @@
         <h1 style="margin: 0;">Automations</h1>
         <p class="muted" style="margin: 0;">Configure rules that trigger actions automatically.</p>
       </div>
-      <div class="row" style="gap: 8px;">
+      <div class="row" style="gap: 8px; flex-wrap: wrap;">
         <UiSelect v-model="project" aria-label="Project scope" style="min-width: 200px;">
           <option value="">Global rules</option>
           <option v-for="p in projects" :key="p.prefix" :value="p.prefix">

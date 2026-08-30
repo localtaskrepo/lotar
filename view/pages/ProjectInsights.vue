@@ -1172,14 +1172,14 @@ onMounted(async () => {
   .insights-header {
     flex-direction: column;
   }
+  /* In column direction the 280px flex-basis would become the title block's
+     height, creating a large gap; reset it to its content size. */
+  .insights-header > .col {
+    flex-basis: auto;
+  }
   .insights-controls {
     width: 100%;
     margin-left: 0;
-    justify-content: flex-start;
-  }
-}
-@media (max-width: 960px) {
-  .insights-controls {
     justify-content: flex-start;
   }
 }

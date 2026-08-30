@@ -554,6 +554,25 @@ main {
 	.scan-layout {
 		grid-template-columns: 1fr;
 	}
+
+	.topbar-inner {
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+
+	.nav {
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		max-width: 100%;
+		/* keep the scrollbar unobtrusive while allowing horizontal paging */
+		scrollbar-width: thin;
+		-webkit-overflow-scrolling: touch;
+		padding-bottom: 2px;
+	}
+
+	.nav__link {
+		white-space: nowrap;
+	}
 }
 
 .scan-sidebar {

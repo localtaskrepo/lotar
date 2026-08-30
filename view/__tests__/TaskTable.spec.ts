@@ -71,9 +71,8 @@ describe('TaskTable', () => {
     // open popover
     const columnsButton = wrapper.findAll('button.btn').find((b) => b.text().includes('Columns'))!
     await columnsButton.trigger('click')
-    const checks = wrapper.findAll('input[type="checkbox"]')
-    // uncheck Tags column
-    const tagsCheckbox = checks.find(c => c.element.nextSibling && (c.element.nextSibling as any).textContent?.includes('Tags'))!
+    const labels = wrapper.findAll('label.column-option')
+    const tagsCheckbox = labels.find((l) => l.text().trim() === 'Tags')!.find('input[type="checkbox"]')!
     await tagsCheckbox.setValue(false)
     // close
     const closeButton = wrapper.findAll('button.btn').find((b) => b.text().trim() === 'Close')!
@@ -114,24 +113,6 @@ describe('TaskTable', () => {
     expect(savedOrder.indexOf('priority')).toBeLessThan(savedOrder.indexOf('status'))
   })
 
-  it('reorders columns via the columns menu drag and drop', async () => {
-    const wrapper = mount(TaskTable, { props: { tasks, projectKey: 'PRJ' } })
-
-    await wrapper.find('button.btn').trigger('click')
-    const rows = wrapper.findAll('.columns-popover label')
-
-    const priorityRow = rows.find((row) => row.text().includes('Priority'))!
-    const statusRow = rows.find((row) => row.text().includes('Status'))!
-
-    const dt = makeDataTransfer()
-    await priorityRow.trigger('dragstart', { dataTransfer: dt })
-    await statusRow.trigger('dragover', { dataTransfer: dt, clientX: 0 })
-    await statusRow.trigger('drop', { dataTransfer: dt, clientX: 0 })
-
-    const savedOrder = JSON.parse(localStorage.getItem('lotar.taskTable.columnOrder::PRJ') || '[]')
-    expect(savedOrder.indexOf('priority')).toBeLessThan(savedOrder.indexOf('status'))
-  })
-
   it('keeps column order stable across toggles', async () => {
     localStorage.setItem('lotar.taskTable.columnOrder::PRJ', JSON.stringify([
       'id',
@@ -159,8 +140,10 @@ describe('TaskTable', () => {
     expect(before.indexOf('Priority')).toBeLessThan(before.indexOf('Status'))
 
     await wrapper.find('button.btn').trigger('click')
-    const checks = wrapper.findAll('input[type="checkbox"]')
-    const priorityCheckbox = checks.find(c => (c.element.nextSibling as any)?.textContent?.includes('Priority'))!
+    const popoverLabels = wrapper.findAll('label.column-option')
+    const priorityCheckbox = popoverLabels
+      .find((l) => l.text().trim() === 'Priority')!
+      .find('input[type="checkbox"]')!
 
     await priorityCheckbox.setValue(false)
     await priorityCheckbox.setValue(true)

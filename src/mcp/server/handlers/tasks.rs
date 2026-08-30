@@ -1006,9 +1006,9 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
             at: now.clone(),
             actor: identity::resolve_current_user(Some(resolver.path.as_path())),
             changes: vec![TaskChange {
-                field: "comment".into(),
+                field: "comment_added".into(),
                 old: None,
-                new: Some(text.clone()),
+                new: None,
             }],
         });
         task.modified = now;

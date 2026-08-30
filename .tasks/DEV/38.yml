@@ -1,0 +1,24 @@
+title: Address code review findings across column/hover refactor
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-08-28T16:37:13.152044+00:00
+modified: 2026-08-28T16:37:13.188070+00:00
+comments:
+- date: 2026-08-28T16:37:13.188070+00:00
+  text: 'Fixed all 10 review findings: (1) watch props.projectKey in useTaskTableState so column prefs re-key on project switch. (2,3) MCP bulk handler + automation comment action now emit body-less comment_added markers. (4) empty column selection is preserved (no default fallback for stored-but-empty state). (5) legacy boolean-map migration maps bare custom field names to custom: prefix. (6) outside-click + Escape handling centralized in ColumnsMenu (window listeners while open, Node-guarded); per-page copies removed from TasksList/Board/Calendar - Calendar gains Escape close. (7) TaskHoverCardBody extracted - single card body for teleport+inline branches. (8) BoardCardMeta extracted - one footer for all three card paths, preserving done-status-aware Overdue logic via dueInfo prop. (9) customFieldEntriesFromTask helper deduplicates custom-field extraction. (10) store API trimmed to consumed members. Tests: +empty-selection, +bare-custom migration, centralized close behaviors; 202/202 vitest, 771/775 nextest (known env-flaky only), lint clean. Live-verified Board cards, Calendar hover (sprint value), Escape close.'
+history:
+- at: 2026-08-28T16:37:13.179986+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-08-28T16:37:13.188070+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

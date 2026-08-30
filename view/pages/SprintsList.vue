@@ -3492,11 +3492,9 @@ onUnmounted(() => {
   white-space: pre-line;
   overflow-wrap: anywhere;
   word-break: break-word;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(6px);
-  transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  /* display:none keeps the tooltip out of layout when idle; an opacity-only
+     hide would still inflate the page's scrollable width on narrow viewports. */
+  display: none;
   z-index: var(--z-tooltip);
 }
 
@@ -3515,20 +3513,19 @@ onUnmounted(() => {
   background: var(--surface);
   border-left: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
   border-top: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
-  transform: rotate(45deg) translateY(6px);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--duration-fast) var(--ease-standard), visibility var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+  transform: rotate(45deg);
+  display: none;
   z-index: calc(var(--z-tooltip) - 1);
 }
 
 .meta-item--hover:hover::after,
-.meta-item--hover:focus-visible::after,
+.meta-item--hover:focus-visible::after {
+  display: block;
+}
+
 .meta-item--hover:hover::before,
 .meta-item--hover:focus-visible::before {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
+  display: block;
 }
 
 .meta-item--truncate .meta-value,

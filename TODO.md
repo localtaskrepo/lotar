@@ -22,8 +22,8 @@
 - Allow to define one or more done states in the config (right now defaults to last state in the list)
 
 Bugs:
-- Changelog includes the entire comment body as a copy when a comment is added, duplicating a spamming the file.
+- Changelog includes the entire comment body as a copy when a comment is added, duplicating a spamming the file. (fixed: history now records a `comment_added` marker without the body — DEV-34)
 - When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
-- The WebUI doesn't allow custom fields to be shown in the column options.
+- The WebUI doesn't allow custom fields to be shown in the column options. (fixed: shared ColumnsMenu + useColumns now expose custom fields on TasksList columns, Board card fields, and Calendar hover fields — DEV-34/DEV-35)
 - Creating a new project doesn't update the UI until the page is reloaded
 - Tasks List list item action "edit tags" doesn't work when hiding the tags column

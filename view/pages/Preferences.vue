@@ -53,7 +53,7 @@
           <h3>Tables</h3>
           <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
             <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
-            <span class="muted">Clears saved TaskTable column visibility and sort for all projects.</span>
+            <span class="muted">Clears saved table columns, sorting, and board/calendar field visibility for all projects.</span>
           </div>
         </UiCard>
 
@@ -240,17 +240,20 @@ function resetAccent() {
 }
 
 function resetTables(){
+  const prefixes = [
+    'lotar.taskTable.columns',
+    'lotar.taskTable.sort',
+    'lotar.taskTable.columnOrder',
+    'lotar.sprints.columns',
+    'lotar.sprints.sort',
+    'lotar.sprints.columnOrder',
+    'lotar.boardFields',
+    'lotar.calendarHoverFields',
+  ]
   try {
     const keys = Object.keys(localStorage)
     for (const k of keys) {
-      if (
-        k.startsWith('lotar.taskTable.columns') ||
-        k.startsWith('lotar.taskTable.sort') ||
-        k.startsWith('lotar.taskTable.columnOrder') ||
-        k.startsWith('lotar.sprints.columns') ||
-        k.startsWith('lotar.sprints.sort') ||
-        k.startsWith('lotar.sprints.columnOrder')
-      ) {
+      if (prefixes.some((p) => k.startsWith(p))) {
         localStorage.removeItem(k)
       }
     }

@@ -1,0 +1,24 @@
+title: Unify column/field menus across pages with shared ColumnsMenu component
+status: Done
+priority: Medium
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-08-27T16:43:14.984416+00:00
+modified: 2026-08-27T16:43:15.016259+00:00
+comments:
+- date: 2026-08-27T16:43:15.016259+00:00
+  text: 'Shipped: new shared view/components/ColumnsMenu.vue (trigger slot + popover with checkboxes/Reset/Close, data-columns-menu attr for click-outside) used by TasksList page header, TaskTable in-table toolbar, Board Fields menu (replaced <details>), and Calendar hover-fields menu (replaced <details>). useColumns refactored from module singleton to a factory (storagePrefix, defaultVisible, per-project keys, sync load, sync projectKey watch, array+legacy-map read). Deleted useFieldVisibility; Board/Calendar migrated. Board cards now render custom field values (visibleCustomFieldEntries) in all three card paths and include them in hasPrimaryMeta. Tests updated: Board/Calendar/TaskTable specs use label.column-option lookups + new storage keys; dropped popover-DnD test (header DnD covers reordering). Verified live: Board card shows ''sprint:Sprint-42 iteration:iter-7'' when custom fields enabled. Gates: lint clean, vitest 191/191, nextest 772/775 (3 = known env-flaky agent suite), smoke non-browser specs green.'
+history:
+- at: 2026-08-27T16:43:15.009232+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-08-27T16:43:15.016259+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

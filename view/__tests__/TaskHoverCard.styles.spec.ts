@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import TaskHoverCardSource from '../components/TaskHoverCard.vue?raw'
+import TaskHoverCardBodySource from '../components/TaskHoverCardBody.vue?raw'
 
 function extractStyle(source: string): string {
     const start = source.indexOf('<style')
@@ -13,7 +13,7 @@ function extractStyle(source: string): string {
 
 describe('TaskHoverCard styles', () => {
     it('keeps the task id on a single line', () => {
-        const style = extractStyle(TaskHoverCardSource)
+        const style = extractStyle(TaskHoverCardBodySource)
         expect(style).toMatch(/\.task-hover-card__id\s*\{[^}]*white-space\s*:\s*nowrap\s*;?/s)
     })
 })

@@ -109,25 +109,22 @@
           @update:value="boardOnFilterUpdate"
         />
 
-        <details ref="fieldsEditorRef" class="board-fields" @toggle="handleFieldsToggle">
-          <summary class="btn">Fields</summary>
-          <div class="card col board-fields__card">
-            <div class="col" style="gap:4px;">
-              <span class="muted">Card fields</span>
-              <div class="col board-fields__items">
-                <label v-for="opt in boardFieldOptions" :key="`field-${opt.key}`" class="row" style="gap:6px; align-items:center;">
-                  <input type="checkbox" :checked="isBoardFieldVisible(opt.key)" @change="setBoardFieldVisible(opt.key, $event)" />
-                  <span>{{ opt.label }}</span>
-                </label>
-              </div>
-            </div>
-            <small class="muted">Saved locally per project.</small>
-            <div class="row" style="justify-content:flex-end; gap:8px;">
-              <UiButton variant="ghost" type="button" @click="resetBoardFields">Reset</UiButton>
-              <UiButton type="button" @click="closeBoardFields">Close</UiButton>
-            </div>
-          </div>
-        </details>
+        <ColumnsMenu
+          :open="fieldsMenuOpen"
+          :options="boardFieldsOptions"
+          :is-visible="boardFields.isVisible"
+          :set-visible="boardFields.toggleColumn"
+          label="Card fields"
+          @update:open="fieldsMenuOpen = $event"
+          @reset="boardFields.resetColumns"
+        >
+          <template #trigger="{ open, toggle }">
+            <UiButton type="button" title="Choose which fields appear on cards" :aria-expanded="open" @click="toggle">
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span>Fields</span>
+            </UiButton>
+          </template>
+        </ColumnsMenu>
       </div>
     </div>
 
@@ -170,33 +167,16 @@
                   <header v-if="hasTaskHeader(task)" class="row task-header">
                     <template v-if="hasTaskIdentity(task)">
                       <div class="row task-header__left">
-                        <span v-if="isBoardFieldVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                        <strong v-if="isBoardFieldVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                        <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                        <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
                       </div>
-                      <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                      <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                     </template>
                     <template v-else>
-                      <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                      <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                     </template>
                   </header>
-                  <footer v-if="hasTaskMeta(task)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(task) }">
-                    <div v-if="hasPrimaryMeta(task)" class="row task-meta__tags">
-                      <span v-if="isBoardFieldVisible('status') && (task.status || '').trim()" class="muted">{{ task.status }}</span>
-                      <span v-if="isBoardFieldVisible('task_type') && (task.task_type || '').trim()" class="muted">{{ task.task_type }}</span>
-                      <span v-if="isBoardFieldVisible('effort') && (task.effort || '').trim()" class="muted">{{ task.effort }}</span>
-                      <span v-if="isBoardFieldVisible('reporter') && (task.reporter || '').trim()" class="muted">by {{ formatMember(task.reporter) }}</span>
-                      <span v-if="isBoardFieldVisible('assignee') && (task.assignee || '').trim()" class="member-inline">
-                        <span class="member-badge small" :style="{ background: memberColor(task.assignee) }" :title="task.assignee || ''">{{ memberInitials(task.assignee) }}</span>
-                        {{ formatMember(task.assignee) }}
-                      </span>
-                      <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(task).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(task).overdue }">{{ taskDueInfo(task).label }}</span>
-                      <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(task)" class="muted">{{ taskModifiedInfo(task) }}</span>
-                      <span v-if="isBoardFieldVisible('tags')" v-for="tag in (task.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-                    </div>
-                    <div v-if="isBoardFieldVisible('sprints') && task.sprints?.length" class="row task-meta__sprints">
-                      <span v-for="sprintId in task.sprints" :key="`${task.id}-sprint-${sprintId}`" class="chip small sprint-chip" :class="sprintStateClass(sprintId)" :title="sprintTooltip(sprintId)">{{ sprintLabel(sprintId) }}</span>
-                    </div>
-                  </footer>
+                                    <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
                 </article>
                 <div v-if="!groupedColumnTasks(st, group).length" key="__group-empty__" class="muted" style="padding: 4px 0; font-size: var(--text-xs, 0.75rem);">—</div>
               </TransitionGroup>
@@ -243,41 +223,16 @@
               <header v-if="hasTaskHeader(task)" class="row task-header">
                 <template v-if="hasTaskIdentity(task)">
                   <div class="row task-header__left">
-                    <span v-if="isBoardFieldVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                    <strong v-if="isBoardFieldVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                    <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                    <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
                   </div>
-                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                 </template>
                 <template v-else>
-                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                 </template>
               </header>
-              <footer v-if="hasTaskMeta(task)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(task) }">
-                <div v-if="hasPrimaryMeta(task)" class="row task-meta__tags">
-                  <span v-if="isBoardFieldVisible('status') && (task.status || '').trim()" class="muted">{{ task.status }}</span>
-                  <span v-if="isBoardFieldVisible('task_type') && (task.task_type || '').trim()" class="muted">{{ task.task_type }}</span>
-                  <span v-if="isBoardFieldVisible('effort') && (task.effort || '').trim()" class="muted">{{ task.effort }}</span>
-                  <span v-if="isBoardFieldVisible('reporter') && (task.reporter || '').trim()" class="muted">by {{ formatMember(task.reporter) }}</span>
-                  <span v-if="isBoardFieldVisible('assignee') && (task.assignee || '').trim()" class="member-inline">
-                    <span class="member-badge small" :style="{ background: memberColor(task.assignee) }" :title="task.assignee || ''">{{ memberInitials(task.assignee) }}</span>
-                    {{ formatMember(task.assignee) }}
-                  </span>
-                  <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(task).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(task).overdue }">{{ taskDueInfo(task).label }}</span>
-                  <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(task)" class="muted">{{ taskModifiedInfo(task) }}</span>
-                  <span v-if="isBoardFieldVisible('tags')" v-for="tag in (task.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-                </div>
-                <div v-if="isBoardFieldVisible('sprints') && task.sprints?.length" class="row task-meta__sprints">
-                  <span
-                    v-for="sprintId in task.sprints"
-                    :key="`${task.id}-sprint-${sprintId}`"
-                    class="chip small sprint-chip"
-                    :class="sprintStateClass(sprintId)"
-                    :title="sprintTooltip(sprintId)"
-                  >
-                    {{ sprintLabel(sprintId) }}
-                  </span>
-                </div>
-              </footer>
+                            <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
             </article>
             <div v-if="!grouped[st]?.length" key="__empty__" class="muted" style="padding: 8px;">No tasks</div>
           </TransitionGroup>
@@ -302,41 +257,16 @@
               <header v-if="hasTaskHeader(task)" class="row task-header">
                 <template v-if="hasTaskIdentity(task)">
                   <div class="row task-header__left">
-                    <span v-if="isBoardFieldVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
-                    <strong v-if="isBoardFieldVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
+                    <span v-if="boardFields.isVisible('id') && (task.id || '').trim()" class="muted id">{{ task.id }}</span>
+                    <strong v-if="boardFields.isVisible('title') && (task.title || '').trim()" class="title">{{ task.title }}</strong>
                   </div>
-                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                 </template>
                 <template v-else>
-                  <span v-if="isBoardFieldVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
+                  <span v-if="boardFields.isVisible('priority') && (task.priority || '').trim()" class="priority" :class="priorityClass(task.priority)">{{ task.priority }}</span>
                 </template>
               </header>
-              <footer v-if="hasTaskMeta(task)" class="task-meta" :class="{ 'task-meta--no-header': !hasTaskHeader(task) }">
-                <div v-if="hasPrimaryMeta(task)" class="row task-meta__tags">
-                  <span v-if="isBoardFieldVisible('status') && (task.status || '').trim()" class="muted">{{ task.status }}</span>
-                  <span v-if="isBoardFieldVisible('task_type') && (task.task_type || '').trim()" class="muted">{{ task.task_type }}</span>
-                  <span v-if="isBoardFieldVisible('effort') && (task.effort || '').trim()" class="muted">{{ task.effort }}</span>
-                  <span v-if="isBoardFieldVisible('reporter') && (task.reporter || '').trim()" class="muted">by {{ formatMember(task.reporter) }}</span>
-                  <span v-if="isBoardFieldVisible('assignee') && (task.assignee || '').trim()" class="member-inline">
-                    <span class="member-badge small" :style="{ background: memberColor(task.assignee) }" :title="task.assignee || ''">{{ memberInitials(task.assignee) }}</span>
-                    {{ formatMember(task.assignee) }}
-                  </span>
-                  <span v-if="isBoardFieldVisible('due_date') && taskDueInfo(task).label" class="task-meta__due" :class="{ 'is-overdue': taskDueInfo(task).overdue }">{{ taskDueInfo(task).label }}</span>
-                  <span v-if="isBoardFieldVisible('modified') && taskModifiedInfo(task)" class="muted">{{ taskModifiedInfo(task) }}</span>
-                  <span v-if="isBoardFieldVisible('tags')" v-for="tag in (task.tags || [])" :key="tag" class="tag">{{ tag }}</span>
-                </div>
-                <div v-if="isBoardFieldVisible('sprints') && task.sprints?.length" class="row task-meta__sprints">
-                  <span
-                    v-for="sprintId in task.sprints"
-                    :key="`${task.id}-other-sprint-${sprintId}`"
-                    class="chip small sprint-chip"
-                    :class="sprintStateClass(sprintId)"
-                    :title="sprintTooltip(sprintId)"
-                  >
-                    {{ sprintLabel(sprintId) }}
-                  </span>
-                </div>
-              </footer>
+                            <BoardCardMeta :task="task" :has-header="hasTaskHeader(task)" :due-info="taskDueInfo(task)" :modified-info="taskModifiedInfo(task)" :sprint="boardSprintHelpers" />
             </article>
           </TransitionGroup>
         </div>
@@ -351,6 +281,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
+import BoardCardMeta from '../components/BoardCardMeta.vue'
+import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import SmartListChips from '../components/SmartListChips.vue'
@@ -358,8 +290,8 @@ import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
+import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
-import { useFieldVisibility } from '../composables/useFieldVisibility'
 import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
@@ -386,7 +318,7 @@ const filter = ref<Record<string, string>>({})
 const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
 const wipEditorRef = ref<HTMLDetailsElement | null>(null)
 const filtersEditorRef = ref<HTMLDetailsElement | null>(null)
-const fieldsEditorRef = ref<HTMLDetailsElement | null>(null)
+const fieldsMenuOpen = ref(false)
 const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
@@ -451,9 +383,6 @@ function handleWipToggle() {
     if (filtersEditorRef.value?.open) {
       filtersEditorRef.value.open = false
     }
-    if (fieldsEditorRef.value?.open) {
-      fieldsEditorRef.value.open = false
-    }
   }
 }
 
@@ -461,20 +390,6 @@ function handleFiltersToggle() {
   if (filtersEditorRef.value?.open) {
     if (wipEditorRef.value?.open) {
       wipEditorRef.value.open = false
-    }
-    if (fieldsEditorRef.value?.open) {
-      fieldsEditorRef.value.open = false
-    }
-  }
-}
-
-function handleFieldsToggle() {
-  if (fieldsEditorRef.value?.open) {
-    if (wipEditorRef.value?.open) {
-      wipEditorRef.value.open = false
-    }
-    if (filtersEditorRef.value?.open) {
-      filtersEditorRef.value.open = false
     }
   }
 }
@@ -488,9 +403,6 @@ function handleBoardPopoverClick(event: MouseEvent) {
   }
   if (filtersEditorRef.value?.open && !filtersEditorRef.value.contains(target)) {
     filtersEditorRef.value.open = false
-  }
-  if (fieldsEditorRef.value?.open && !fieldsEditorRef.value.contains(target)) {
-    fieldsEditorRef.value.open = false
   }
 }
 
@@ -543,35 +455,18 @@ function taskModifiedInfo(task: TaskDTO): string {
   return `Updated ${dateLabel}`
 }
 
-function hasPrimaryMeta(task: TaskDTO): boolean {
-  return Boolean(
-    (isBoardFieldVisible('status') && (task.status || '').trim())
-    || (isBoardFieldVisible('task_type') && (task.task_type || '').trim())
-    || (isBoardFieldVisible('effort') && (task.effort || '').trim())
-    || (isBoardFieldVisible('reporter') && (task.reporter || '').trim())
-    || (isBoardFieldVisible('assignee') && (task.assignee || '').trim())
-    || (isBoardFieldVisible('due_date') && taskDueInfo(task).label)
-    || (isBoardFieldVisible('modified') && (task.modified || '').trim())
-    || (isBoardFieldVisible('tags') && (task.tags || []).length)
-  )
-}
-
-function hasTaskMeta(task: TaskDTO): boolean {
-  return Boolean(hasPrimaryMeta(task) || (isBoardFieldVisible('sprints') && (task.sprints || []).length))
-}
-
 function hasTaskHeader(task: TaskDTO): boolean {
   return Boolean(
-    (isBoardFieldVisible('id') && (task.id || '').trim())
-    || (isBoardFieldVisible('title') && (task.title || '').trim())
-    || (isBoardFieldVisible('priority') && (task.priority || '').trim())
+    (boardFields.isVisible('id') && (task.id || '').trim())
+    || (boardFields.isVisible('title') && (task.title || '').trim())
+    || (boardFields.isVisible('priority') && (task.priority || '').trim())
   )
 }
 
 function hasTaskIdentity(task: TaskDTO): boolean {
   return Boolean(
-    (isBoardFieldVisible('id') && (task.id || '').trim())
-    || (isBoardFieldVisible('title') && (task.title || '').trim())
+    (boardFields.isVisible('id') && (task.id || '').trim())
+    || (boardFields.isVisible('title') && (task.title || '').trim())
   )
 }
 
@@ -901,18 +796,29 @@ const DEFAULT_BOARD_FIELDS: Record<string, boolean> = {
   modified: false,
 }
 
-const { fields: boardFields, fieldOptions: boardFieldOptions, load: loadBoardFields, reset: resetBoardFields, isVisible: isBoardFieldVisible, setVisible: setBoardFieldVisible } = useFieldVisibility(
-  'lotar.boardFields',
-  project,
-  DEFAULT_BOARD_FIELDS,
+const boardFields = useColumns({
+  storagePrefix: 'lotar.boardFields',
+  defaultVisible: Object.entries(DEFAULT_BOARD_FIELDS)
+    .filter(([, on]) => on)
+    .map(([key]) => key),
+})
+provideColumnStore(boardFields)
+
+const boardFieldsOptions = computed(() => boardFields.fieldOptions.value)
+
+const boardSprintHelpers = {
+  label: sprintLabel,
+  stateClass: sprintStateClass,
+  tooltip: sprintTooltip,
+}
+
+watch(
   availableCustomFields,
+  (keys) => boardFields.setCustomFieldKeys(keys),
+  { immediate: true },
 )
 
-function closeBoardFields() {
-  if (fieldsEditorRef.value) {
-    fieldsEditorRef.value.open = false
-  }
-}
+watch(project, (next) => boardFields.setProjectKey(next), { immediate: true })
 
 function onDragStart(t: any) {
   draggingId.value = t.id
@@ -975,7 +881,6 @@ onMounted(async () => {
   await refreshBoardTasks()
   loadWip()
   loadDoneFilters()
-  loadBoardFields()
 })
 
 watch(() => route.query, async (q) => {
@@ -984,7 +889,6 @@ watch(() => route.query, async (q) => {
   await refreshBoardTasks()
   loadWip()
   loadDoneFilters()
-  loadBoardFields()
   groupBy.value = loadGroupBy()
   collapsedGroups.value = new Set()
   resetExpansion()
@@ -1002,7 +906,14 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.board { align-items: flex-start; }
+.board {
+  align-items: flex-start;
+  /* Kanban columns keep a 260px minimum width; on narrow viewports the board
+     itself becomes the horizontal scroll container instead of the page. */
+  overflow-x: auto;
+  max-width: 100%;
+  padding-bottom: 4px;
+}
 .column { border: 1px solid var(--border); border-radius: var(--radius-base); background: var(--bg); min-height: 200px; display: flex; flex-direction: column; }
 .column.over-limit { border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border)); }
 .col-header { position: sticky; top: 0; background: var(--bg); padding: 8px; border-bottom: 1px solid var(--border); border-top-left-radius: var(--radius-base); border-top-right-radius: var(--radius-base); z-index: var(--z-sticky); }
@@ -1102,41 +1013,6 @@ onUnmounted(() => {
   padding: 6px;
 }
 
-.board-fields {
-  position: relative;
-}
-
-.board-fields > summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.board-fields > summary::-webkit-details-marker {
-  display: none;
-}
-
-.board-fields__card {
-  gap: 8px;
-  min-width: 240px;
-  display: none;
-}
-
-.board-fields[open] > .board-fields__card {
-  display: flex;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: var(--z-popover);
-  box-shadow: var(--shadow-popover);
-}
-
-.board-fields__items {
-  gap: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 6px;
-}
-
 .filter-card {
   display: flex;
   flex-direction: column;
@@ -1175,10 +1051,6 @@ onUnmounted(() => {
   flex: 1 1 auto;
 }
 
-.board-filter-row > .board-fields {
-  margin-left: auto;
-}
-
 .task-header {
   justify-content: space-between;
   gap: 6px;
@@ -1209,10 +1081,19 @@ onUnmounted(() => {
 }
 
 .task-meta__tags,
-.task-meta__sprints {
+.task-meta__sprints,
+.task-meta__custom-field {
   gap: 6px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.task-meta__custom-field__label {
+  font-weight: 500;
+}
+
+.task-meta__custom-field__value {
+  color: var(--fg);
 }
 
 .task-meta__due {

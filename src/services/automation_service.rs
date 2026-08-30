@@ -1366,9 +1366,9 @@ fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -
         at: now.clone(),
         actor: Some("automation".to_string()),
         changes: vec![crate::types::TaskChange {
-            field: "comment".into(),
+            field: "comment_added".into(),
             old: None,
-            new: Some(text.to_string()),
+            new: None,
         }],
     });
     task.modified = now;

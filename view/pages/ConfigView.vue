@@ -868,6 +868,7 @@ watch(
   align-items: flex-start;
   gap: 16px;
   padding: 20px;
+  flex-wrap: wrap;
 }
 
 .page-headings h1 {
@@ -879,6 +880,7 @@ watch(
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .new-project-button {

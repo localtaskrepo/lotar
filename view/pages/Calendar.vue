@@ -97,25 +97,22 @@
           @update:value="onFilterUpdate"
         />
 
-        <details ref="fieldsEditorRef" class="calendar-fields" @toggle="handleFieldsToggle">
-          <summary class="btn">Fields</summary>
-          <div class="card col calendar-fields__card">
-            <div class="col" style="gap:4px;">
-              <span class="muted">Hover card fields</span>
-              <div class="col calendar-fields__items">
-                <label v-for="opt in calendarHoverFieldOptions" :key="`calendar-field-${opt.key}`" class="row" style="gap:6px; align-items:center;">
-                  <input type="checkbox" :checked="isCalendarHoverFieldVisible(opt.key)" @change="setCalendarHoverFieldVisible(opt.key, $event)" />
-                  <span>{{ opt.label }}</span>
-                </label>
-              </div>
-            </div>
-            <small class="muted">Saved locally per project.</small>
-            <div class="row" style="justify-content:flex-end; gap:8px;">
-              <UiButton variant="ghost" type="button" @click="resetCalendarHoverFields">Reset</UiButton>
-              <UiButton type="button" @click="closeCalendarFields">Close</UiButton>
-            </div>
-          </div>
-        </details>
+        <ColumnsMenu
+          :open="fieldsMenuOpen"
+          :options="calendarHoverFieldOptions"
+          :is-visible="isCalendarHoverFieldVisible"
+          :set-visible="setCalendarHoverFieldVisible"
+          label="Hover card fields"
+          @update:open="fieldsMenuOpen = $event"
+          @reset="resetCalendarHoverFields"
+        >
+          <template #trigger="{ open, toggle }">
+            <UiButton type="button" title="Choose which fields appear on hover" :aria-expanded="open" @click="toggle">
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span>Fields</span>
+            </UiButton>
+          </template>
+        </ColumnsMenu>
       </div>
     </div>
 
@@ -167,7 +164,7 @@
               @keydown.enter.prevent="openTask(t.id)"
               @keydown.space.prevent="openTask(t.id)"
             >
-              <TaskHoverCard :task="t" :fields="calendarHoverFields" teleport-to-body :placement="(idx % 7) > 3 ? 'right' : 'left'">
+              <TaskHoverCard :task="t" :fields="calendarHoverFieldMap" teleport-to-body :placement="(idx % 7) > 3 ? 'right' : 'left'">
                 <div class="task-inline">
                   <span class="id">{{ t.id }}</span>
                   <span class="title">{{ shortTitle(t.title) }}</span>
@@ -200,7 +197,7 @@
                 @keydown.enter.prevent="openTaskFromDialog(t.id)"
                 @keydown.space.prevent="openTaskFromDialog(t.id)"
               >
-                <TaskHoverCard :task="t" :fields="calendarHoverFields" teleport-to-body placement="left" block>
+                <TaskHoverCard :task="t" :fields="calendarHoverFieldMap" teleport-to-body placement="left" block>
                   <div class="calendar-day-dialog__inline">
                     <span class="id">{{ t.id }}</span>
                     <span class="title">{{ t.title }}</span>
@@ -217,6 +214,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { TaskDTO } from '../api/types'
+import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -226,7 +224,7 @@ import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import { useConfig } from '../composables/useConfig'
-import { useFieldVisibility } from '../composables/useFieldVisibility'
+import { useColumns } from '../composables/useColumns'
 import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
@@ -257,8 +255,6 @@ const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
 }))
-
-const fieldsEditorRef = ref<HTMLDetailsElement | null>(null)
 
 const dayDialogOpen = ref(false)
 const dayDialogDate = ref<Date | null>(null)
@@ -294,18 +290,35 @@ const DEFAULT_CALENDAR_HOVER_FIELDS: Record<string, boolean> = {
   modified: true,
 }
 
-const { fields: calendarHoverFields, fieldOptions: calendarHoverFieldOptions, load: loadCalendarHoverFields, reset: resetCalendarHoverFields, isVisible: isCalendarHoverFieldVisible, setVisible: setCalendarHoverFieldVisible } = useFieldVisibility(
-  'lotar.calendarHoverFields',
-  project,
-  DEFAULT_CALENDAR_HOVER_FIELDS,
+const calendarHoverFields = useColumns({
+  storagePrefix: 'lotar.calendarHoverFields',
+  defaultVisible: Object.entries(DEFAULT_CALENDAR_HOVER_FIELDS)
+    .filter(([, on]) => on)
+    .map(([key]) => key),
+})
+
+const calendarHoverFieldOptions = computed(() => calendarHoverFields.fieldOptions.value)
+const isCalendarHoverFieldVisible = (key: string) => calendarHoverFields.isVisible(key)
+const setCalendarHoverFieldVisible = (key: string, event: Event) =>
+  calendarHoverFields.toggleColumn(key, event)
+const resetCalendarHoverFields = () => calendarHoverFields.resetColumns()
+const calendarHoverFieldMap = computed<Record<string, boolean>>(() => {
+  const map: Record<string, boolean> = {}
+  for (const opt of calendarHoverFieldOptions.value) {
+    map[opt.key] = isCalendarHoverFieldVisible(opt.key)
+  }
+  return map
+})
+
+watch(
   availableCustomFields,
+  (keys) => calendarHoverFields.setCustomFieldKeys(keys),
+  { immediate: true },
 )
 
-function closeCalendarFields() {
-  if (fieldsEditorRef.value) {
-    fieldsEditorRef.value.open = false
-  }
-}
+watch(project, (next) => calendarHoverFields.setProjectKey(next), { immediate: true })
+
+const fieldsMenuOpen = ref(false)
 
 const taskListRefs = new Map<string, HTMLElement>()
 const taskListRowCapacities = ref<Record<string, number>>({})
@@ -350,20 +363,9 @@ function moreTicketsLabel(count: number) {
   return count === 1 ? '1 more ticket' : `${count} more tickets`
 }
 
-function setCalendarHoverFieldVisible_internal(key: string, ev: Event) {
-  setCalendarHoverFieldVisible(key, ev)
-}
-
-function handleFieldsToggle() {
-  // no-op for now; exists to match Boards behavior and keep a stable hook if we add more popovers later.
-}
-
 function handleCalendarPopoverClick(event: MouseEvent) {
   const target = event.target as Node | null
   if (!target) return
-  if (fieldsEditorRef.value?.open && !fieldsEditorRef.value.contains(target)) {
-    fieldsEditorRef.value.open = false
-  }
   if (monthPickerOpen.value && monthPickerRef.value && !monthPickerRef.value.contains(target)) {
     monthPickerOpen.value = false
   }
@@ -577,7 +579,6 @@ watch(project, async (nextProject, prevProject) => {
   } catch (err) {
     console.warn('Failed to refresh calendar after project change', err)
   }
-  loadCalendarHoverFields()
 })
 
 onUnmounted(() => {
@@ -609,7 +610,6 @@ onMounted(async () => {
   showSprints.value = q.sprints === '1'
   await refreshConfig(project.value)
   await refreshCalendarTasks()
-  loadCalendarHoverFields()
   await nextTick()
   recalcTaskListRowCapacities()
 })
@@ -621,7 +621,6 @@ watch(() => route.query, async (q) => {
     project.value = nextProject
     await refreshConfig(project.value)
     await refreshCalendarTasks()
-    loadCalendarHoverFields()
   }
   if (r.month && /^\d{4}-\d{2}$/.test(String(r.month))) {
     const [y, m] = String(r.month).split('-').map((s: string) => parseInt(s, 10))
@@ -856,46 +855,14 @@ watch(showSprints, (enabled, previous) => {
 .calendar-filter-row {
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .calendar-filter-row__bar {
-  flex: 1;
+  /* Claim a full row on narrow screens instead of being crushed beside the
+     actions (month picker / Fields). */
+  flex: 1 1 320px;
   min-width: 0;
-}
-
-.calendar-fields {
-  position: relative;
-}
-
-.calendar-fields > summary {
-  list-style: none;
-  cursor: pointer;
-}
-
-.calendar-fields > summary::-webkit-details-marker {
-  display: none;
-}
-
-.calendar-fields__card {
-  gap: 8px;
-  min-width: 240px;
-  display: none;
-}
-
-.calendar-fields[open] > .calendar-fields__card {
-  display: flex;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: var(--z-popover);
-  box-shadow: var(--shadow-popover);
-}
-
-.calendar-fields__items {
-  gap: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 6px;
 }
 
 /* Month picker button + popover */

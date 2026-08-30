@@ -278,7 +278,10 @@ describe('Calendar task hover cards', () => {
     })
 
     it('loads persisted hover card field visibility per project', async () => {
-        localStorage.setItem('lotar.calendarHoverFields::ACME', JSON.stringify({ tags: false }))
+        localStorage.setItem(
+            'lotar.calendarHoverFields.columns::ACME',
+            JSON.stringify(['id', 'title', 'status', 'priority', 'reporter', 'assignee', 'sprints', 'due_date', 'modified']),
+        )
 
         const wrapper = mount(Calendar)
         await flushPromises()

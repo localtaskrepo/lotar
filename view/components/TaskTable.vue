@@ -48,50 +48,28 @@
         </template>
       </div>
       <div class="row controls" style="gap:8px; align-items:center; flex-wrap: wrap;">
-        <div class="columns-button-wrapper">
-          <UiButton class="columns-button" type="button" title="Configure columns" @click="toggleColumnMenu">
-            <IconGlyph name="columns" aria-hidden="true" />
-            <span>Columns</span>
-          </UiButton>
-        </div>
+        <ColumnsMenu
+          :open="showColumnMenu"
+          :options="fieldOptions"
+          :is-visible="isVisible"
+          :set-visible="toggleColumn"
+          label="Table columns"
+          @update:open="showColumnMenu = $event"
+          @reset="resetColumns"
+        >
+          <template #trigger="{ open, toggle }">
+            <UiButton class="columns-button" type="button" title="Configure columns" :aria-expanded="open" @click="toggle">
+              <IconGlyph name="columns" aria-hidden="true" />
+              <span>Columns</span>
+            </UiButton>
+          </template>
+        </ColumnsMenu>
         <UiButton class="add-button" type="button" aria-label="Add task" title="Add task" @click="$emit('add')">
           <IconGlyph name="plus" aria-hidden="true" />
           <span>Task</span>
         </UiButton>
       </div>
     </div>
-    <div v-if="showColumnMenu" class="columns-popover card" @click.self="showColumnMenu=false">
-      <div class="col" style="gap:6px;">
-        <label
-          v-for="col in columnOrder"
-          :key="col"
-          :class="[
-            'row',
-            'column-option',
-            {
-              'is-draggable': true,
-              'is-drag-over': dragOverCol === col,
-              'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
-              'is-dragging': draggingCol === col,
-            },
-          ]"
-          :draggable="true"
-          style="gap:6px; align-items:center;"
-          @dragstart="onColDragStart(col, $event)"
-          @dragend="onColDragEnd"
-          @dragover.prevent="onColDragOver(col, $event)"
-          @drop.prevent="onColDrop(col, $event)"
-        >
-          <input type="checkbox" :checked="columnsSet.has(col)" @change="toggleColumn(col, $event)" />
-          <span>{{ headerLabel(col) }}</span>
-        </label>
-        <div class="row" style="gap:6px; margin-top: 6px;">
-          <UiButton type="button" @click="resetColumns">Reset</UiButton>
-          <UiButton type="button" @click="showColumnMenu=false">Close</UiButton>
-        </div>
-      </div>
-    </div>
-
     <UiCard>
       <div class="table-scroll">
         <table class="table">
@@ -208,6 +186,9 @@
                 <span :title="fmtDateTime(t.modified)">{{ relativeTime(t.modified) }}</span>
                 <span v-if="touchesMap[t.id]?.actor" class="muted"> • {{ touchesMap[t.id]?.actor }}</span>
               </template>
+              <template v-else-if="customFieldKey(col)">
+                <span>{{ t.custom_fields?.[customFieldKey(col)!] || '—' }}</span>
+              </template>
               <template v-else>
                 <span>{{ (t as any)[col] }}</span>
               </template>
@@ -258,6 +239,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue';
 import { useTaskTableState, type TaskTableEmit, type TaskTableProps } from '../composables/useTaskTableState';
 import { formatMember } from '../utils/member';
+import ColumnsMenu from './ColumnsMenu.vue';
 import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
 import UiCard from './UiCard.vue';
@@ -269,14 +251,13 @@ const props = withDefaults(defineProps<TaskTableProps & { showToolbar?: boolean 
 const emit = defineEmits<TaskTableEmit>()
 
 const {
-  allColumns,
   columnOrder,
-  columns,
-  columnsSet,
+  fieldOptions,
   visibleColumns,
   headerLabel,
+  customFieldKey,
+  isVisible,
   showColumnMenu,
-  toggleColumnMenu,
   toggleColumn,
   resetColumns,
   rootRef,
@@ -307,7 +288,7 @@ const {
 
 const rowsKey = computed(() => sorted.value.map(t => t.id).join('|'))
 
-type ColumnKey = (typeof allColumns)[number]
+type ColumnKey = import('../composables/useColumns').ColKey
 
 const draggingCol = ref<ColumnKey | null>(null)
 const dragOverCol = ref<ColumnKey | null>(null)
@@ -506,8 +487,6 @@ onUnmounted(() => {
     window.removeEventListener('keydown', handleEscape)
   }
 })
-
-defineExpose({ toggleColumnMenu })
 </script>
 
 <style scoped>
@@ -580,24 +559,6 @@ th.active {
 }
 
 .header-button.is-dragging {
-  opacity: 0.65;
-}
-
-.column-option.is-draggable {
-  cursor: grab;
-}
-
-.column-option.is-drag-over {
-  outline: 1px dashed var(--color-border, var(--border));
-  outline-offset: 2px;
-  border-radius: var(--radius-sm, 0.25rem);
-}
-
-.column-option.is-drag-over.is-drag-over--after {
-  outline-style: solid;
-}
-
-.column-option.is-dragging {
   opacity: 0.65;
 }
 
@@ -712,25 +673,11 @@ tbody tr.is-recent {
   color: var(--color-muted);
 }
 
-.columns-button-wrapper {
-  position: relative;
-}
-
 .columns-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2, 0.5rem);
   height: 2.25rem;
-}
-
-.columns-popover {
-  position: absolute;
-  margin-top: var(--space-2, 0.5rem);
-  padding: var(--space-3, 0.75rem);
-  border: 1px solid var(--color-border, var(--border));
-  border-radius: var(--radius-lg, 0.75rem);
-  background: var(--color-bg, var(--bg));
-  box-shadow: var(--shadow-popover);
 }
 
 .table-toolbar {
@@ -739,13 +686,6 @@ tbody tr.is-recent {
 
 .table-toolbar .controls {
   margin-left: auto;
-}
-
-/* Popover anchored to top-right of table-wrap */
-.table-wrap > .columns-popover {
-  top: 0;
-  right: 0;
-  z-index: var(--z-popover);
 }
 
 .overdue {

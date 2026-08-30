@@ -2,6 +2,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import type { TaskDTO } from '../api/types'
 import { formatTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
 import type { TaskTouch } from './useActivity'
+import { injectColumnStore, useColumns, type ColKey } from './useColumns'
 
 export interface TaskTableProps {
     tasks: TaskDTO[]
@@ -45,167 +46,29 @@ export interface TaskTableEmit {
     (event: 'bulk-delete'): void
 }
 
-type ColKey =
-    | 'id'
-    | 'title'
-    | 'status'
-    | 'priority'
-    | 'task_type'
-    | 'reporter'
-    | 'assignee'
-    | 'effort'
-    | 'tags'
-    | 'sprints'
-    | 'due_date'
-    | 'modified'
-
-const allColumns: ColKey[] = [
-    'id',
-    'title',
-    'status',
-    'priority',
-    'task_type',
-    'reporter',
-    'assignee',
-    'effort',
-    'tags',
-    'sprints',
-    'due_date',
-    'modified',
-]
-
-const defaultColumns: ColKey[] = [
-    'id',
-    'title',
-    'status',
-    'priority',
-    'reporter',
-    'assignee',
-    'tags',
-    'sprints',
-    'due_date',
-    'modified',
-]
-
-const COLS_KEY = 'lotar.taskTable.columns'
-const COL_ORDER_KEY = 'lotar.taskTable.columnOrder'
 const SORT_KEY = 'lotar.taskTable.sort'
 
 export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTableEmit) {
-    function colsKey() {
-        return props.projectKey ? `${COLS_KEY}::${props.projectKey}` : COLS_KEY
+    // Reuse the page-provided column store when mounted inside a page (TasksList)
+    // so the page-level Columns menu and the table share one source of truth;
+    // standalone usage falls back to a private store.
+    const columnStore = injectColumnStore() ?? useColumns()
+    if (props.projectKey) {
+        columnStore.setProjectKey(props.projectKey)
     }
-
-    function colOrderKey() {
-        return props.projectKey ? `${COL_ORDER_KEY}::${props.projectKey}` : COL_ORDER_KEY
-    }
-
-    function normalizeColumns(value: unknown): ColKey[] | null {
-        if (!Array.isArray(value)) return null
-
-        const allowed = new Set(allColumns)
-        const seen = new Set<ColKey>()
-        const out: ColKey[] = []
-
-        for (const item of value) {
-            if (typeof item !== 'string') continue
-            if (!allowed.has(item as ColKey)) continue
-            const col = item as ColKey
-            if (seen.has(col)) continue
-            seen.add(col)
-            out.push(col)
-        }
-
-        return out
-    }
-
-    function normalizeColumnOrder(value: unknown): ColKey[] {
-        if (!Array.isArray(value)) return [...allColumns]
-        const allowed = new Set(allColumns)
-        const seen = new Set<ColKey>()
-        const out: ColKey[] = []
-        for (const item of value) {
-            if (typeof item !== 'string') continue
-            if (!allowed.has(item as ColKey)) continue
-            const col = item as ColKey
-            if (seen.has(col)) continue
-            seen.add(col)
-            out.push(col)
-        }
-        // Ensure all columns exist in the order list (stable across toggles)
-        for (const col of allColumns) {
-            if (!seen.has(col)) out.push(col)
-        }
-        return out.length ? out : [...allColumns]
-    }
-
-    const initialColumnsRaw = (() => {
-        try {
-            const raw = localStorage.getItem(colsKey()) ?? localStorage.getItem(COLS_KEY)
-            return JSON.parse(raw || 'null') as unknown
-        } catch {
-            return null
-        }
-    })()
-
-    const initialColumns = normalizeColumns(initialColumnsRaw)
-
-    const initialOrderRaw = (() => {
-        try {
-            const raw = localStorage.getItem(colOrderKey()) ?? localStorage.getItem(COL_ORDER_KEY)
-            return JSON.parse(raw || 'null') as unknown
-        } catch {
-            return null
-        }
-    })()
-
-    const columnOrder = ref<ColKey[]>(normalizeColumnOrder(initialOrderRaw))
-
-    const columns = ref<ColKey[]>(Array.isArray(initialColumns) ? initialColumns : defaultColumns)
-    const columnsSet = computed(() => new Set(columns.value))
-    const visibleColumns = computed(() => columnOrder.value.filter((c) => columnsSet.value.has(c)))
-
     watch(
-        columns,
-        (value) => {
-            try {
-                localStorage.setItem(colsKey(), JSON.stringify(value))
-            } catch { }
+        () => props.projectKey,
+        (key) => {
+            if (key) columnStore.setProjectKey(key)
         },
-        { deep: true },
     )
 
-    watch(
-        columnOrder,
-        (value) => {
-            try {
-                localStorage.setItem(colOrderKey(), JSON.stringify(value))
-            } catch { }
-        },
-        { deep: true },
-    )
+    const columnOrder = columnStore.columnOrder
+    const visibleColumns = columnStore.visibleColumns
+    const showColumnMenu = columnStore.showColumnMenu
 
     function headerLabel(key: ColKey) {
-        const labels: Record<ColKey, string> = {
-            id: 'ID',
-            title: 'Title',
-            status: 'Status',
-            priority: 'Priority',
-            task_type: 'Type',
-            reporter: 'Reporter',
-            assignee: 'Assignee',
-            effort: 'Effort',
-            tags: 'Tags',
-            sprints: 'Sprints',
-            due_date: 'Due',
-            modified: 'Updated',
-        }
-        return labels[key]
-    }
-
-    const showColumnMenu = ref(false)
-    function toggleColumnMenu() {
-        showColumnMenu.value = !showColumnMenu.value
+        return columnStore.headerLabel(key)
     }
 
     const rootRef = ref<HTMLElement | null>(null)
@@ -215,10 +78,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         const target = event.target as Node | null
         if (!root || !target) return
         if (root.contains(target)) return
-        // The column-menu toggle lives in the page header, outside this
-        // component's root, so its own click must not count as an outside
-        // click that immediately re-closes the menu it just toggled.
-        if (target instanceof Element && target.closest('[data-column-menu-toggle]')) return
         showColumnMenu.value = false
         rowMenu.value = {}
     }
@@ -243,23 +102,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
             window.removeEventListener('keydown', onDocKey)
         }
     })
-
-    function toggleColumn(col: ColKey, event: Event) {
-        const checked = (event.target as HTMLInputElement).checked
-        const next = new Set(columns.value)
-        if (checked) next.add(col)
-        else next.delete(col)
-        const arr = Array.from(next)
-        columns.value = arr
-        try {
-            localStorage.setItem(colsKey(), JSON.stringify(arr))
-        } catch { }
-    }
-
-    function resetColumns() {
-        columns.value = [...defaultColumns]
-        columnOrder.value = [...allColumns]
-    }
 
     function sortKey() {
         return props.projectKey ? `${SORT_KEY}::${props.projectKey}` : SORT_KEY
@@ -498,16 +340,15 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     return {
-        allColumns,
         columnOrder,
-        columns,
-        columnsSet,
+        fieldOptions: columnStore.fieldOptions,
         visibleColumns,
         headerLabel,
+        isVisible: columnStore.isVisible,
         showColumnMenu,
-        toggleColumnMenu,
-        toggleColumn,
-        resetColumns,
+        toggleColumn: columnStore.toggleColumn,
+        resetColumns: columnStore.resetColumns,
+        customFieldKey: columnStore.customFieldKey,
         rootRef,
         sort,
         onSort,

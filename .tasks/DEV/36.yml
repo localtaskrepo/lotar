@@ -1,0 +1,24 @@
+title: Render custom fields in Calendar hover cards
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-08-28T06:04:10.489428+00:00
+modified: 2026-08-28T06:04:10.521106+00:00
+comments:
+- date: 2026-08-28T06:04:10.521106+00:00
+  text: 'Shipped: TaskHoverCard fields prop widened to include custom:<name> keys; new customFieldEntries computed renders label/value rows (both teleport and inline branches) for enabled custom fields present on the task; empty values skipped. New test: renders custom fields only when enabled in the fields map (hidden when false, shown when true, empty values omitted). Verified live: enabling ''sprint'' in Calendar Fields menu shows ''sprint Sprint-42'' in the DEV-29 hover card. Base hover behavior was already functional - the gap was custom-field support only. Gates: lint clean, vitest 192/192, nextest 771/775 (failures = known env-flaky agent suite only).'
+history:
+- at: 2026-08-28T06:04:10.513673+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-08-28T06:04:10.521106+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -242,13 +242,15 @@ impl TaskService {
             date: now.clone(),
             text: text.to_string(),
         });
+        // Record that a comment was added without copying the body into the
+        // changelog (the comment itself is the audit trail).
         task.history.push(TaskChangeLogEntry {
             at: now.clone(),
             actor,
             changes: vec![TaskChange {
-                field: "comment".into(),
+                field: "comment_added".into(),
                 old: None,
-                new: Some(text.to_string()),
+                new: None,
             }],
         });
         task.modified = now;

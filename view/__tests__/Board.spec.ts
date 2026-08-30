@@ -215,11 +215,21 @@ describe('Board field visibility', () => {
         expect(firstCard.text()).toContain('Due')
         expect(firstCard.text()).toContain('one')
 
-        // Open is not required for DOM presence in tests; just flip the checkboxes.
-        const checks = wrapper.findAll('input[type="checkbox"]')
+        // Open the popover so the field checkboxes are in the DOM.
+        const fieldsButton = wrapper
+            .findAll('button')
+            .find((b) => b.text().trim() === 'Fields')
+        if (fieldsButton) await fieldsButton.trigger('click')
+        await flushPromises()
 
-        const byLabel = (label: string) =>
-            checks.find((c) => (c.element.nextSibling as any)?.textContent?.trim() === label)!
+        // Open is not required for DOM presence in tests; just flip the checkboxes.
+        const labels = wrapper.findAll('label.column-option')
+        const labelTexts = labels.map((l) => l.text())
+        const byLabel = (label: string) => {
+            const labelEl = labels.find((l) => l.text().trim() === label)
+            if (!labelEl) throw new Error(`Label not found: ${label}; available: ${labelTexts.join('|')}`)
+            return labelEl.find('input[type="checkbox"]')
+        }
 
         await byLabel('ID').setValue(false)
         await byLabel('Title').setValue(false)
@@ -240,16 +250,10 @@ describe('Board field visibility', () => {
         expect(firstCard.text()).not.toContain('Due')
         expect(firstCard.text()).not.toContain('one')
 
-        const saved = JSON.parse(localStorage.getItem('lotar.boardFields::ACME') || '{}')
-        expect(saved).toMatchObject({
-            id: false,
-            title: false,
-            priority: false,
-            assignee: false,
-            due_date: false,
-            tags: false,
-            sprints: false,
-        })
+        const saved = JSON.parse(localStorage.getItem('lotar.boardFields.columns::ACME') || '[]')
+        for (const hidden of ['id', 'title', 'priority', 'assignee', 'due_date', 'tags', 'sprints']) {
+            expect(saved).not.toContain(hidden)
+        }
 
         // Different project should not inherit ACME settings.
         routeState.query = { project: 'BETA' }
@@ -259,6 +263,43 @@ describe('Board field visibility', () => {
         const betaCard = wrapper2.findAll('article.card.task')[0]
         expect(betaCard.text()).toContain('BETA-2')
         expect(betaCard.text()).toContain('Beta')
+    })
+
+    it('renders custom field values on cards when enabled', async () => {
+        configStore.customFields.value = ['sprint']
+        const tasks = [
+            baseTask({ id: 'ACME-1', title: 'Alpha', custom_fields: { sprint: 'Sprint-42' } }),
+            baseTask({ id: 'ACME-2', title: 'Beta', custom_fields: {} }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const cards = wrapper.findAll('article.card.task')
+        expect(cards[0].text()).not.toContain('Sprint-42')
+
+        const fieldsButton = wrapper
+            .findAll('button')
+            .find((b) => b.text().trim() === 'Fields')
+        if (fieldsButton) await fieldsButton.trigger('click')
+        await flushPromises()
+
+        const labels = wrapper.findAll('label.column-option')
+        const sprintCheck = labels
+            .find((l) => l.text().trim() === 'sprint')
+            ?.find('input[type="checkbox"]')
+        expect(sprintCheck).toBeTruthy()
+        await sprintCheck!.setValue(true)
+        await flushPromises()
+
+        expect(cards[0].text()).toContain('sprint:')
+        expect(cards[0].text()).toContain('Sprint-42')
+        expect(cards[1].text()).not.toContain('sprint:')
+
+        const saved = JSON.parse(localStorage.getItem('lotar.boardFields.columns::ACME') || '[]')
+        expect(saved).toContain('custom:sprint')
     })
 })
 

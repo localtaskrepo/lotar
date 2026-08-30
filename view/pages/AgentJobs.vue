@@ -48,7 +48,7 @@
     </UiCard>
 
     <!-- Filter tabs -->
-    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+    <div class="row" style="gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap;">
       <button
         v-for="tab in tabs"
         :key="tab.value"

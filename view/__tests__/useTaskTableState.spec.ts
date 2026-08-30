@@ -38,15 +38,16 @@ describe('useTaskTableState', () => {
         return { wrapper, calls }
     }
 
-    it('initializes columns with defaults and persists toggles', async () => {
+    it('exposes default column visibility and persists toggles', async () => {
         const { wrapper } = mountHarness()
-        expect(wrapper.vm.columns).toContain('title')
+        expect(wrapper.vm.isVisible('title')).toBe(true)
         wrapper.vm.toggleColumn('tags', { target: { checked: false } } as unknown as Event)
         await nextTick()
         const raw = localStorage.getItem('lotar.taskTable.columns::ACME')
         expect(raw).toBeTruthy()
         const parsed = JSON.parse(raw || '[]')
         expect(parsed).not.toContain('tags')
+        expect(wrapper.vm.isVisible('tags')).toBe(false)
     })
 
     it('allows hiding id and title', async () => {
@@ -54,8 +55,8 @@ describe('useTaskTableState', () => {
         wrapper.vm.toggleColumn('id', { target: { checked: false } } as unknown as Event)
         wrapper.vm.toggleColumn('title', { target: { checked: false } } as unknown as Event)
         await nextTick()
-        expect(wrapper.vm.columns).not.toContain('id')
-        expect(wrapper.vm.columns).not.toContain('title')
+        expect(wrapper.vm.isVisible('id')).toBe(false)
+        expect(wrapper.vm.isVisible('title')).toBe(false)
         const raw = localStorage.getItem('lotar.taskTable.columns::ACME')
         expect(raw).toBeTruthy()
         const parsed = JSON.parse(raw || '[]')
