@@ -262,6 +262,22 @@ describe('Calendar task hover cards', () => {
         expect(document.querySelector('.ui-modal__overlay')).toBeNull()
     })
 
+    it('opens the create panel with the due date prefilled when the cell add button is clicked', async () => {
+        const wrapper = mount(Calendar)
+        await flushPromises()
+
+        const cell = wrapper.find('[data-date="2024-02-05"]')
+        const addBtn = cell.find('.cell-add__btn')
+        expect(addBtn.exists()).toBe(true)
+
+        await addBtn.trigger('click')
+
+        expect(openTaskPanelMock).toHaveBeenCalledWith(expect.objectContaining({
+            taskId: 'new',
+            initialDueDate: '2024-02-05',
+        }))
+    })
+
     it('wraps due tasks in hover cards and keeps click-to-open behavior', async () => {
         const wrapper = mount(Calendar)
         await flushPromises()

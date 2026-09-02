@@ -23,6 +23,11 @@ function findByPlaceholder(wrapper: any, ph: string) {
   return wrapper.findAll('input').find((i: any) => i.attributes('placeholder')?.includes(ph))
 }
 
+function openPanel(wrapper: any) {
+  const toggle = wrapper.find('[data-testid="filter-toggle"]')
+  return toggle.trigger('click')
+}
+
 describe('FilterBar', () => {
   beforeEach(() => {
     // Default to multi-project so the project control renders as a select in most tests.
@@ -45,6 +50,7 @@ describe('FilterBar', () => {
 
   it('shows helper text in tooltip when custom filters are invalid', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     expect(custom).toBeTruthy()
     await custom!.setValue('field:iteration')
@@ -60,6 +66,7 @@ describe('FilterBar', () => {
 
   it('appendCustomFilter exposes shortcut for presets', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     const vm: any = wrapper.vm
     vm.appendCustomFilter('field:iteration=')
     await nextTick()
@@ -69,6 +76,7 @@ describe('FilterBar', () => {
 
   it('maps field:priority to the native priority filter', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     await custom!.setValue('field:priority=Medium')
     await nextTick()
@@ -79,6 +87,7 @@ describe('FilterBar', () => {
 
   it('maps field:task_type to the native type filter', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     await custom!.setValue('field:task_type=Bug')
     await nextTick()
@@ -89,6 +98,7 @@ describe('FilterBar', () => {
 
   it('maps field:state to the native status filter', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     await custom!.setValue('field:STATE=Backlog')
     await nextTick()
@@ -99,6 +109,7 @@ describe('FilterBar', () => {
 
   it('emits custom filters when provided via input', async () => {
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     expect(custom).toBeTruthy()
     await custom!.setValue('field:iteration=beta, owner=ops')
@@ -113,7 +124,7 @@ describe('FilterBar', () => {
     const wrapper = mount(FilterBar, {
       props: { value: { q: 'abc', 'field:iteration': 'beta', scope: 'edge' } },
     })
-    await nextTick()
+    await openPanel(wrapper)
     const custom = findByPlaceholder(wrapper, 'Custom filters')
     expect(custom?.element.value).toContain('field:iteration=beta')
     expect(custom?.element.value).toContain('scope=edge')
@@ -127,6 +138,7 @@ describe('FilterBar', () => {
   it('renders project as static text when only one project exists', async () => {
     projectState.projectsRef!.value = [{ name: 'api-service', prefix: 'AS' }]
     const wrapper = mount(FilterBar, { props: { value: {} } })
+    await openPanel(wrapper)
     await nextTick()
 
     expect(wrapper.find('select[data-testid="filter-project"]').exists()).toBe(false)
@@ -148,6 +160,7 @@ describe('FilterBar', () => {
       },
     })
 
+    await openPanel(wrapper)
     await nextTick()
     await wrapper.find('[data-testid="filter-status"]').trigger('click')
     await nextTick()
@@ -175,5 +188,56 @@ describe('FilterBar', () => {
     expect(last).toBeTruthy()
     expect(Object.prototype.hasOwnProperty.call(last, 'project')).toBe(true)
     expect(last?.project).toBe('')
+  })
+
+  it('Enter picks the highlighted suggestion for a bare partial match', async () => {
+    const wrapper = mount(FilterBar, { props: { value: {}, statuses: ['Todo', 'Done'] } })
+    const search = findByPlaceholder(wrapper, 'Search')
+    await search!.setValue('todo')
+    await search!.trigger('keydown', { key: 'ArrowDown' })
+    await search!.trigger('keydown', { key: 'Enter' })
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last?.status).toBe('Todo')
+    expect(last?.q).toBeUndefined()
+  })
+
+  it('inserts a picked key prefix without a trailing space and offers its values immediately', async () => {
+    const wrapper = mount(FilterBar, { props: { value: {}, statuses: ['Todo', 'Done'] } })
+    const search = findByPlaceholder(wrapper, 'Search')
+    await search!.setValue('sta')
+    await search!.trigger('keydown', { key: 'Enter' })
+
+    const input = search!.element as HTMLInputElement
+    expect(input.value).toBe('status:')
+
+    await nextTick()
+    const labels = wrapper.findAll('.filter-bar__suggestion').map((b) => b.text())
+    expect(labels.some((t) => t.includes('Todo'))).toBe(true)
+    expect(labels.some((t) => t.includes('Done'))).toBe(true)
+  })
+
+  it('Enter falls back to free text when no suggestion matches', async () => {
+    const wrapper = mount(FilterBar, { props: { value: {}, statuses: ['Todo'] } })
+    const search = findByPlaceholder(wrapper, 'Search')
+    await search!.setValue('roadmap zzz')
+    await search!.trigger('keydown', { key: 'Enter' })
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last?.q).toBe('roadmap zzz')
+  })
+
+  it('drops a persisted project unknown to this server', async () => {
+    projectState.projectsRef!.value = []
+    const wrapper = mount(FilterBar, { props: { value: { project: 'ZZ' } } })
+    await nextTick()
+    projectState.projectsRef!.value = [
+      { name: 'api-service', prefix: 'AS' },
+      { name: 'frontend-app', prefix: 'FA' },
+    ]
+    await nextTick()
+    const events = wrapper.emitted('update:value') || []
+    const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+    expect(last?.project ?? '').toBe('')
   })
 })

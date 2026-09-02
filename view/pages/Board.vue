@@ -13,6 +13,48 @@
             <small class="muted">Leave empty or 0 for no limit. Limits are saved locally per project.</small>
           </div>
         </details>
+        <details ref="filtersEditorRef" class="done-filter" @toggle="handleFiltersToggle">
+          <summary class="btn">Done column</summary>
+          <div class="card col done-filter__card">
+            <div class="col" style="gap:4px;">
+              <span class="muted">Statuses</span>
+              <div class="col done-filter__statuses">
+                <label v-for="label in columns" :key="`done-${label}`" class="row" style="gap:6px; align-items:center;">
+                  <input type="checkbox" :checked="doneStatusSelected(label)" @change="toggleDoneStatus(label)" />
+                  <span>{{ label }}</span>
+                </label>
+                <p v-if="!columns.length" class="muted">No statuses available yet.</p>
+              </div>
+            </div>
+            <label class="col" style="gap:4px;">
+              <span class="muted">Hide cards older than (days)</span>
+              <input
+                class="input"
+                type="number"
+                min="0"
+                step="1"
+                :value="doneFilters.maxAgeDays ?? ''"
+                placeholder="e.g. 14"
+                @input="onDoneMaxAgeInput"
+              />
+            </label>
+            <label class="col" style="gap:4px;">
+              <span class="muted">Limit visible cards</span>
+              <input
+                class="input"
+                type="number"
+                min="0"
+                step="1"
+                :value="doneFilters.maxVisible ?? ''"
+                placeholder="e.g. 20"
+                @input="onDoneMaxVisibleInput"
+              />
+            </label>
+            <div class="row" style="justify-content:flex-end; gap:8px;">
+              <UiButton variant="ghost" type="button" @click="resetDoneFilters">Reset</UiButton>
+            </div>
+          </div>
+        </details>
         <UiButton
           icon-only
           type="button"
@@ -34,98 +76,44 @@
     </div>
 
     <div class="filter-card">
-      <div class="row board-chips-row">
-        <SmartListChips
-          :statuses="statuses"
-          :priorities="priorities"
-          :value="filter"
-          :custom-presets="customFilterPresets"
-          @update:value="boardOnChipsUpdate"
-          @preset="handleCustomPreset"
-        />
-        <div class="row board-chips-row__right">
+      <FilterBar
+        ref="filterBarRef"
+        :statuses="statuses"
+        :priorities="priorities"
+        :types="types"
+        :sprint-options="sprintFilterOptions"
+        :custom-presets="customFilterPresets"
+        :value="filterPayload"
+        :show-status="false"
+        emit-project-key
+        storage-key="lotar.boards.filter"
+        @update:value="onFilterUpdate"
+      >
+        <template #actions>
+          <ColumnsMenu
+            :open="fieldsMenuOpen"
+            :options="boardFieldsOptions"
+            :is-visible="boardFields.isVisible"
+            :set-visible="boardFields.toggleColumn"
+            label="Card fields"
+            @update:open="fieldsMenuOpen = $event"
+            @reset="boardFields.resetColumns"
+          >
+            <template #trigger="{ open, toggle }">
+              <UiButton type="button" title="Choose which fields appear on cards" :aria-expanded="open" @click="toggle">
+                <IconGlyph name="columns" aria-hidden="true" />
+                <span>Fields</span>
+              </UiButton>
+            </template>
+          </ColumnsMenu>
           <select v-model="groupBy" class="input board-chips-row__groupby" aria-label="Group cards by" data-testid="board-groupby">
             <option value="none">No grouping</option>
             <option value="assignee">Group by assignee</option>
             <option value="priority">Group by priority</option>
             <option value="type">Group by type</option>
           </select>
-          <details ref="filtersEditorRef" class="done-filter" @toggle="handleFiltersToggle">
-            <summary class="btn">Filters</summary>
-            <div class="card col done-filter__card">
-              <div class="col" style="gap:4px;">
-                <span class="muted">Statuses</span>
-                <div class="col done-filter__statuses">
-                  <label v-for="label in columns" :key="`done-${label}`" class="row" style="gap:6px; align-items:center;">
-                    <input type="checkbox" :checked="doneStatusSelected(label)" @change="toggleDoneStatus(label)" />
-                    <span>{{ label }}</span>
-                  </label>
-                  <p v-if="!columns.length" class="muted">No statuses available yet.</p>
-                </div>
-              </div>
-              <label class="col" style="gap:4px;">
-                <span class="muted">Hide cards older than (days)</span>
-                <input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  :value="doneFilters.maxAgeDays ?? ''"
-                  placeholder="e.g. 14"
-                  @input="onDoneMaxAgeInput"
-                />
-              </label>
-              <label class="col" style="gap:4px;">
-                <span class="muted">Limit visible cards</span>
-                <input
-                  class="input"
-                  type="number"
-                  min="0"
-                  step="1"
-                  :value="doneFilters.maxVisible ?? ''"
-                  placeholder="e.g. 20"
-                  @input="onDoneMaxVisibleInput"
-                />
-              </label>
-              <div class="row" style="justify-content:flex-end; gap:8px;">
-                <UiButton variant="ghost" type="button" @click="resetDoneFilters">Reset</UiButton>
-              </div>
-            </div>
-          </details>
-        </div>
-      </div>
-      <div class="row board-filter-row">
-        <FilterBar
-          ref="filterBarRef"
-          class="board-filter-row__bar"
-          :statuses="statuses"
-          :priorities="priorities"
-          :types="types"
-          :sprint-options="sprintFilterOptions"
-          :value="filterPayload"
-          :show-status="false"
-          emit-project-key
-          storage-key="lotar.boards.filter"
-          @update:value="boardOnFilterUpdate"
-        />
-
-        <ColumnsMenu
-          :open="fieldsMenuOpen"
-          :options="boardFieldsOptions"
-          :is-visible="boardFields.isVisible"
-          :set-visible="boardFields.toggleColumn"
-          label="Card fields"
-          @update:open="fieldsMenuOpen = $event"
-          @reset="boardFields.resetColumns"
-        >
-          <template #trigger="{ open, toggle }">
-            <UiButton type="button" title="Choose which fields appear on cards" :aria-expanded="open" @click="toggle">
-              <IconGlyph name="columns" aria-hidden="true" />
-              <span>Fields</span>
-            </UiButton>
-          </template>
-        </ColumnsMenu>
-      </div>
+        </template>
+      </FilterBar>
     </div>
 
     <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
@@ -188,9 +176,22 @@
              :data-status="st"
              style="justify-content: space-between; align-items:center; gap:8px;">
           <strong>{{ st }}</strong>
-          <span class="muted" :class="{ warn: overLimit(st) }">
-            <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
-            <template v-else>{{ countOf(st) }}</template>
+          <span class="row" style="gap:6px; align-items:center;">
+            <UiButton
+              icon-only
+              variant="ghost"
+              class="board-col-add"
+              type="button"
+              :aria-label="`Add task in ${st}`"
+              :title="`Add task in ${st}`"
+              @click="openCreateInStatus(st)"
+            >
+              <IconGlyph name="plus" />
+            </UiButton>
+            <span class="muted" :class="{ warn: overLimit(st) }">
+              <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
+              <template v-else>{{ countOf(st) }}</template>
+            </span>
           </span>
         </div>
       </template>
@@ -205,9 +206,22 @@
         >
           <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
             <strong>{{ st }}</strong>
-            <span class="muted" :class="{ warn: overLimit(st) }">
-              <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
-              <template v-else>{{ countOf(st) }}</template>
+            <span class="row" style="gap:6px; align-items:center;">
+              <UiButton
+                icon-only
+                variant="ghost"
+                class="board-col-add"
+                type="button"
+                :aria-label="`Add task in ${st}`"
+                :title="`Add task in ${st}`"
+                @click="openCreateInStatus(st)"
+              >
+                <IconGlyph name="plus" />
+              </UiButton>
+              <span class="muted" :class="{ warn: overLimit(st) }">
+                <template v-if="limitOf(st) > 0">{{ countOf(st) }} / {{ limitOf(st) }}</template>
+                <template v-else>{{ countOf(st) }}</template>
+              </span>
             </span>
           </div>
           <TransitionGroup name="task-list" tag="div" class="col-cards">
@@ -243,7 +257,20 @@
         <div v-if="other.length" class="col column" data-status="__other__">
           <div class="col-header row" style="justify-content: space-between; align-items:center; gap:8px;">
             <strong>Other</strong>
-            <span class="muted">{{ other.length }}</span>
+            <span class="row" style="gap:6px; align-items:center;">
+              <UiButton
+                icon-only
+                variant="ghost"
+                class="board-col-add"
+                type="button"
+                aria-label="Add task"
+                title="Add task"
+                @click="openCreateInBoard()"
+              >
+                <IconGlyph name="plus" />
+              </UiButton>
+              <span class="muted">{{ other.length }}</span>
+            </span>
           </div>
           <TransitionGroup name="task-list" tag="div" class="col-cards">
             <article v-for="task in other" :key="task.id"
@@ -285,7 +312,6 @@ import BoardCardMeta from '../components/BoardCardMeta.vue'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
-import SmartListChips from '../components/SmartListChips.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
@@ -315,7 +341,7 @@ const { openTaskPanel } = useTaskPanelController()
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
 const draggingId = ref<string>('')
 const filter = ref<Record<string, string>>({})
-const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
+const filterBarRef = ref<{ clear?: () => void } | null>(null)
 const wipEditorRef = ref<HTMLDetailsElement | null>(null)
 const filtersEditorRef = ref<HTMLDetailsElement | null>(null)
 const fieldsMenuOpen = ref(false)
@@ -323,7 +349,9 @@ const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
 }))
-const { hasFilters, sanitizeFilterInput, onFilterUpdate, onChipsUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
+const { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
+  onProjectChange: syncProjectRoute,
+})
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprintLookup, sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
@@ -475,23 +503,6 @@ function syncProjectRoute(nextProject: string) {
   const current = typeof route.query.project === 'string' ? route.query.project : ''
   if (current === desired) return
   router.push({ path: '/boards', query: desired ? { project: desired } : {} })
-}
-
-// Extend the generic filter sync to also sync the route
-function boardOnFilterUpdate(v: Record<string, string>) {
-  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
-  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
-  onFilterUpdate(v)
-}
-
-function boardOnChipsUpdate(v: Record<string, string>) {
-  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
-  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
-  onChipsUpdate(v)
-}
-
-function handleCustomPreset(expression: string) {
-  filterBarRef.value?.appendCustomFilter(expression)
 }
 
 const hasDoneFilters = computed(() => {
@@ -848,6 +859,23 @@ function openTask(id: string) {
   openTaskPanel({ taskId: id })
 }
 
+function openCreateInStatus(status: string) {
+  openTaskPanel({
+    taskId: 'new',
+    initialProject: project.value || null,
+    initialStatus: status,
+    onCreated: () => { refreshAll() },
+  })
+}
+
+function openCreateInBoard() {
+  openTaskPanel({
+    taskId: 'new',
+    initialProject: project.value || null,
+    onCreated: () => { refreshAll() },
+  })
+}
+
 async function refreshAll() {
   await refreshProjects()
   await refreshConfig(project.value)
@@ -916,6 +944,20 @@ onUnmounted(() => {
 }
 .column { border: 1px solid var(--border); border-radius: var(--radius-base); background: var(--bg); min-height: 200px; display: flex; flex-direction: column; }
 .column.over-limit { border-color: color-mix(in oklab, var(--color-danger) 40%, var(--border)); }
+.board-col-add {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.col-header:hover .board-col-add,
+.board-col-add:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .board-col-add { opacity: 1; }
+}
+
 .col-header { position: sticky; top: 0; background: var(--bg); padding: 8px; border-bottom: 1px solid var(--border); border-top-left-radius: var(--radius-base); border-top-right-radius: var(--radius-base); z-index: var(--z-sticky); }
 .col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
 .col-cards { padding: 8px; display: flex; flex-direction: column; gap: 8px; position: relative; }
@@ -1039,16 +1081,6 @@ onUnmounted(() => {
   height: auto;
   min-height: 0;
   line-height: var(--line-tight, 1.25);
-}
-
-.board-filter-row {
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.board-filter-row__bar {
-  flex: 1 1 auto;
 }
 
 .task-header {

@@ -175,97 +175,54 @@
     />
 
     <div class="filter-card">
-      <div class="sprints-quick-row">
-        <div class="sprints-quick-row__chips">
-          <SmartListChips
-            :statuses="statusOptions"
-            :priorities="priorityOptions"
-            :value="filter"
-            :custom-presets="customFilterPresets"
-            @update:value="onChipsUpdate"
-            @preset="handleCustomPreset"
-          />
-        </div>
-        <div class="sprints-quick-row__controls">
-          <label class="filter-field">
-            <span class="muted">Sprint window</span>
-            <UiSelect v-model="timeRange">
-              <option v-for="option in timeRangeChoices" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </UiSelect>
-          </label>
-          <label v-if="showAllowClosedControl" class="filter-checkbox">
-            <input type="checkbox" v-model="allowClosed" />
-            Allow editing closed sprints
-          </label>
-          <label class="filter-checkbox">
-            <input type="checkbox" v-model="highlightMultiSprint" />
-            Highlight tasks in multiple sprints
-          </label>
-        </div>
-      </div>
-      <div class="sprints-filter-row">
-        <div class="sprints-filter-row__main">
-          <FilterBar
-            ref="filterBarRef"
-            :statuses="statuses"
-            :priorities="priorities"
-            :types="types"
-            :value="filterPayload"
-            emit-project-key
-            storage-key="lotar.sprints.filter"
-            @update:value="onFilterUpdate"
-          />
-        </div>
-        <div class="filter-meta__actions">
-          <div class="columns-button-wrapper">
-            <UiButton
-              ref="columnMenuButtonRef"
-              type="button"
-              class="columns-button"
-              title="Configure columns"
-              @click="toggleColumnMenu"
-            >
-              <IconGlyph name="columns" aria-hidden="true" />
-              <span>Columns</span>
-            </UiButton>
-            <div v-if="columnMenuOpen" ref="columnMenuRef" class="columns-popover card" @click.self="closeColumnMenu">
-              <div class="col" style="gap: 8px;">
-                <label
-                  v-for="col in columnOrder"
-                  :key="col"
-                  :class="[
-                    'row',
-                    'column-option',
-                    {
-                      'is-draggable': true,
-                      'is-drag-over': dragOverCol === col,
-                      'is-drag-over--after': dragOverCol === col && dragOverPos === 'after',
-                      'is-dragging': draggingCol === col,
-                    },
-                  ]"
-                  :draggable="true"
-                  style="gap: 6px; align-items: center;"
-                  @dragstart="onColDragStart(col, $event)"
-                  @dragend="onColDragEnd"
-                  @dragover.prevent="onColDragOver(col, $event)"
-                  @drop.prevent="onColDrop(col, $event)"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="columnsSet.has(col)"
-                    @change="toggleColumn(col, $event)"
-                  />
-                  <span>{{ headerLabel(col) }}</span>
-                </label>
-                <div class="row" style="gap: 8px; flex-wrap: wrap;">
-                  <UiButton type="button" @click="resetColumns">Reset</UiButton>
-                  <UiButton type="button" @click="closeColumnMenu">Close</UiButton>
-                </div>
-              </div>
-            </div>
+      <FilterBar
+        ref="filterBarRef"
+        :statuses="statuses"
+        :priorities="priorities"
+        :types="types"
+        :custom-presets="customFilterPresets"
+        :value="filterPayload"
+        emit-project-key
+        storage-key="lotar.sprints.filter"
+        @update:value="onFilterUpdate"
+      >
+        <template #panel>
+          <div class="row sprints-view-settings">
+            <label class="filter-field">
+              <span class="muted">Sprint window</span>
+              <UiSelect v-model="timeRange">
+                <option v-for="option in timeRangeChoices" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </option>
+              </UiSelect>
+            </label>
+            <label v-if="showAllowClosedControl" class="filter-checkbox">
+              <input type="checkbox" v-model="allowClosed" />
+              Allow editing closed sprints
+            </label>
+            <label class="filter-checkbox">
+              <input type="checkbox" v-model="highlightMultiSprint" />
+              Highlight tasks in multiple sprints
+            </label>
           </div>
+        </template>
+        <template #actions>
+          <ColumnsMenu
+            :open="columnMenuOpen"
+            :options="columnOptions"
+            :is-visible="isColumnVisible"
+            :set-visible="toggleColumn"
+            label="Table columns"
+            @update:open="columnMenuOpen = $event"
+            @reset="resetColumns"
+          >
+            <template #trigger="{ open, toggle }">
+              <UiButton type="button" title="Configure columns" :aria-expanded="open" @click="toggle">
+                <IconGlyph name="columns" aria-hidden="true" />
+                <span>Columns</span>
+              </UiButton>
+            </template>
+          </ColumnsMenu>
           <UiButton
             class="create-sprint-button"
             type="button"
@@ -276,8 +233,8 @@
             <IconGlyph name="plus" aria-hidden="true" />
             <span>Sprint</span>
           </UiButton>
-        </div>
-      </div>
+        </template>
+      </FilterBar>
     </div>
 
     <p v-if="hiddenClosedCount" class="muted hint">
@@ -832,10 +789,10 @@ import type {
   SprintVelocityResponse,
   TaskDTO,
 } from '../api/types'
+import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
-import SmartListChips from '../components/SmartListChips.vue'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
@@ -1142,15 +1099,18 @@ const form = reactive({
   skip_defaults: false,
 })
 const filter = ref<Record<string, string>>({})
-const project = ref<string>('')
-const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
-const statusOptions = computed(() => [...(statuses.value || [])])
-const priorityOptions = computed(() => [...(priorities.value || [])])
+// Initialize from the route at setup so the FilterBar's first emit echoes the
+// real project instead of a transient empty value that would strip ?project=
+// from the URL before onMounted runs.
+const project = ref<string>(route.query.project ? String(route.query.project) : '')
+const filterBarRef = ref<{ clear?: () => void } | null>(null)
 const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
 }))
-const { onFilterUpdate: filterSyncUpdate, onChipsUpdate: chipsSyncUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
+const { onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
+  onProjectChange: syncProjectRoute,
+})
 const customFilterPresets = computed(() => {
   const names = (availableCustomFields.value || []).filter((name) => name !== '*')
   return names.slice(0, 6).map((name) => ({
@@ -1164,22 +1124,6 @@ function syncProjectRoute(nextProject: string) {
   const current = typeof route.query.project === 'string' ? route.query.project : ''
   if (current === desired) return
   router.push({ path: '/sprints', query: desired ? { project: desired } : {} })
-}
-
-function onFilterUpdate(value: Record<string, string>) {
-  const hasProjectKey = value && Object.prototype.hasOwnProperty.call(value, 'project')
-  if (hasProjectKey) syncProjectRoute((value.project || '').trim())
-  filterSyncUpdate(value)
-}
-
-function onChipsUpdate(value: Record<string, string>) {
-  const hasProjectKey = value && Object.prototype.hasOwnProperty.call(value, 'project')
-  if (hasProjectKey) syncProjectRoute((value.project || '').trim())
-  chipsSyncUpdate(value)
-}
-
-function handleCustomPreset(expression: string) {
-  filterBarRef.value?.appendCustomFilter(expression)
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -1443,11 +1387,11 @@ function headerLabel(col: ColumnKey) {
   return labels[col]
 }
 
-function toggleColumn(col: ColumnKey, event: Event) {
+function toggleColumn(col: string, event: Event) {
   const checked = (event.target as HTMLInputElement).checked
   const next = new Set(columns.value)
-  if (checked) next.add(col)
-  else next.delete(col)
+  if (checked) next.add(col as ColumnKey)
+  else next.delete(col as ColumnKey)
   columns.value = Array.from(next)
 }
 
@@ -1457,39 +1401,12 @@ function resetColumns() {
 }
 
 const columnMenuOpen = ref(false)
-const columnMenuRef = ref<HTMLElement | null>(null)
-const columnMenuButtonRef = ref<HTMLElement | { $el: HTMLElement } | null>(null)
 
-function columnMenuButtonEl(): HTMLElement | null {
-  const refValue = columnMenuButtonRef.value
-  if (!refValue) return null
-  if (refValue instanceof HTMLElement) return refValue
-  return refValue.$el
-}
+const columnOptions = computed(() =>
+  columnOrder.value.map((col) => ({ key: col, label: headerLabel(col) })),
+)
 
-function toggleColumnMenu() {
-  columnMenuOpen.value = !columnMenuOpen.value
-}
-
-function closeColumnMenu() {
-  columnMenuOpen.value = false
-}
-
-function handleColumnMenuClick(event: MouseEvent) {
-  if (!columnMenuOpen.value) return
-  const target = event.target as Node | null
-  if (!target) return
-  if (columnMenuRef.value?.contains(target)) return
-  const buttonEl = columnMenuButtonEl()
-  if (buttonEl?.contains(target)) return
-  closeColumnMenu()
-}
-
-function handleColumnMenuKey(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    closeColumnMenu()
-  }
-}
+const isColumnVisible = (key: string) => columnsSet.value.has(key as ColumnKey)
 
 const sortState = loadStoredSort()
 const sort = reactive<{ key: ColumnKey | null; dir: 'asc' | 'desc' }>(
@@ -3170,18 +3087,11 @@ function focusBacklogIfRequested() {
 }
 
 onMounted(() => {
-  if (typeof window !== 'undefined') {
-    window.addEventListener('click', handleColumnMenuClick)
-    window.addEventListener('keydown', handleColumnMenuKey)
-  }
-
   stopPreferencesListener = onPreferencesChanged((key) => {
     if (key !== 'lotar.preferences.tasks.pageSize') return
     backlogPageSize.value = readTasksPageSizePreference()
     backlogOffset.value = 0
   })
-
-  project.value = route.query.project ? String(route.query.project) : ''
 
   bindCopyModifierListeners()
   void (async () => {
@@ -3201,8 +3111,6 @@ watch(() => route.query, async (q) => {
 onUnmounted(() => {
   removeModalListeners()
   if (typeof window !== 'undefined') {
-    window.removeEventListener('click', handleColumnMenuClick)
-    window.removeEventListener('keydown', handleColumnMenuKey)
     if (filterTimer.value !== null) {
       window.clearTimeout(filterTimer.value)
     }
@@ -3238,46 +3146,6 @@ onUnmounted(() => {
   gap: 8px;
   padding: 0;
   position: relative;
-}
-
-.sprints-filter-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  min-height: 36px;
-}
-
-.sprints-quick-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  min-height: 36px;
-}
-
-.sprints-quick-row__chips {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.sprints-quick-row__controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.sprints-filter-row__main {
-  flex: 1;
-  min-width: 0;
-}
-
-.filter-field-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .filter-field {

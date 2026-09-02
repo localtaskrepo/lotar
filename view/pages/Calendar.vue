@@ -73,47 +73,39 @@
     </div>
 
     <div class="filter-card">
-      <SmartListChips
+      <FilterBar
+        ref="filterBarRef"
         :statuses="statuses"
         :priorities="priorities"
-        :value="filter"
+        :types="types"
         :custom-presets="customFilterPresets"
         :enable-due-soon="false"
         :enable-recent="false"
-        @update:value="onChipsUpdate"
-        @preset="handleCustomPreset"
-      />
-      <div class="row calendar-filter-row">
-        <FilterBar
-          ref="filterBarRef"
-          class="calendar-filter-row__bar"
-          :statuses="statuses"
-          :priorities="priorities"
-          :types="types"
-          :value="filterPayload"
-          storage-key="lotar.calendar.filter"
-          emit-project-key
-          :show-order="false"
-          @update:value="onFilterUpdate"
-        />
-
-        <ColumnsMenu
-          :open="fieldsMenuOpen"
-          :options="calendarHoverFieldOptions"
-          :is-visible="isCalendarHoverFieldVisible"
-          :set-visible="setCalendarHoverFieldVisible"
-          label="Hover card fields"
-          @update:open="fieldsMenuOpen = $event"
-          @reset="resetCalendarHoverFields"
-        >
-          <template #trigger="{ open, toggle }">
-            <UiButton type="button" title="Choose which fields appear on hover" :aria-expanded="open" @click="toggle">
-              <IconGlyph name="columns" aria-hidden="true" />
-              <span>Fields</span>
-            </UiButton>
-          </template>
-        </ColumnsMenu>
-      </div>
+        :value="filterPayload"
+        storage-key="lotar.calendar.filter"
+        emit-project-key
+        :show-order="false"
+        @update:value="onFilterUpdate"
+      >
+        <template #actions>
+          <ColumnsMenu
+            :open="fieldsMenuOpen"
+            :options="calendarHoverFieldOptions"
+            :is-visible="isCalendarHoverFieldVisible"
+            :set-visible="setCalendarHoverFieldVisible"
+            label="Hover card fields"
+            @update:open="fieldsMenuOpen = $event"
+            @reset="resetCalendarHoverFields"
+          >
+            <template #trigger="{ open, toggle }">
+              <UiButton type="button" title="Choose which fields appear on hover" :aria-expanded="open" @click="toggle">
+                <IconGlyph name="columns" aria-hidden="true" />
+                <span>Fields</span>
+              </UiButton>
+            </template>
+          </ColumnsMenu>
+        </template>
+      </FilterBar>
     </div>
 
     <div v-if="loadingTasks" style="margin: 12px 0;"><UiLoader>Loading calendar…</UiLoader></div>
@@ -172,6 +164,15 @@
               </TaskHoverCard>
             </li>
             <li v-if="hiddenCountFor(cell) > 0" key="__more__" class="muted more" @click="openDay(cell.date)">{{ moreTicketsLabel(hiddenCountFor(cell)) }}</li>
+            <li key="__add__" class="cell-add" :data-date="cell.dateKey">
+              <button
+                type="button"
+                class="cell-add__btn"
+                :aria-label="`Add task due ${cell.dateKey}`"
+                :title="`Add task due ${cell.dateKey}`"
+                @click="openCreateOnDate(cell.dateKey)"
+              >+ Add task</button>
+            </li>
           </TransitionGroup>
         </div>
         </div>
@@ -218,7 +219,6 @@ import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
-import SmartListChips from '../components/SmartListChips.vue'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
 import UiButton from '../components/UiButton.vue'
 import UiLoader from '../components/UiLoader.vue'
@@ -244,13 +244,16 @@ const { openTaskPanel } = useTaskPanelController()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig } = useConfig()
 const { sprintColorForState } = useSprintFormatting(sprintList)
 
-const project = ref<string>('')
+// Initialize from the route at setup so the FilterBar's first emit echoes the
+// real project instead of a transient empty value that would strip ?project=
+// from the URL before onMounted runs.
+const project = ref<string>(route.query.project ? String(route.query.project) : '')
 const cursor = ref<Date>(new Date()) // month cursor
 const monthKey = computed(() => `${cursor.value.getFullYear()}-${String(cursor.value.getMonth() + 1).padStart(2, '0')}`)
 const monthSlideDirection = ref<'forward' | 'backward'>('forward')
 const showSprints = ref(false)
 const filter = ref<Record<string, string>>({})
-const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
+const filterBarRef = ref<{ clear?: () => void } | null>(null)
 const filterPayload = computed(() => ({
   ...filter.value,
   project: project.value || '',
@@ -370,7 +373,9 @@ function handleCalendarPopoverClick(event: MouseEvent) {
     monthPickerOpen.value = false
   }
 }
-const { hasFilters, onFilterUpdate: baseOnFilterUpdate, onChipsUpdate: baseOnChipsUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter)
+const { hasFilters, onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
+  onProjectChange: syncProjectRoute,
+})
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
@@ -381,22 +386,6 @@ function syncProjectRoute(nextProject: string) {
   const current = typeof route.query.project === 'string' ? route.query.project : ''
   if (current === desired) return
   pushRoute()
-}
-
-function onFilterUpdate(v: Record<string, string>) {
-  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
-  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
-  baseOnFilterUpdate(v)
-}
-
-function onChipsUpdate(v: Record<string, string>) {
-  const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
-  if (hasProjectKey) syncProjectRoute((v.project || '').trim())
-  baseOnChipsUpdate(v)
-}
-
-function handleCustomPreset(expression: string) {
-  filterBarRef.value?.appendCustomFilter(expression)
 }
 
 function clearFilters() {
@@ -511,6 +500,19 @@ function pushRoute(){
 function openTask(id: string){
   openTaskPanel({ taskId: id })
 }
+
+function openCreateOnDate(dateKey: string) {
+  openTaskPanel({
+    taskId: 'new',
+    initialProject: project.value || null,
+    initialDueDate: dateKey,
+    onCreated: () => {
+      refreshCalendarTasks().catch((err) => {
+        console.warn('Failed to refresh calendar after task creation', err)
+      })
+    },
+  })
+}
 function openDay(d: Date){
   const key = toDateKey(d)
   const cell = cells.value.find((c) => c.dateKey === key)
@@ -601,7 +603,6 @@ onMounted(async () => {
   }
   await Promise.all([refreshProjects(), refreshSprints(true)])
   const q = route.query as Record<string, any>
-  project.value = q.project ? String(q.project) : ''
   // Parse month from query (YYYY-MM)
   if (q.month && /^\d{4}-\d{2}$/.test(String(q.month))) {
     const [y, m] = String(q.month).split('-').map((s: string) => parseInt(s, 10))
@@ -852,17 +853,37 @@ watch(showSprints, (enabled, previous) => {
   white-space: nowrap;
 }
 
-.calendar-filter-row {
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+/* Hover-revealed per-day add button */
+.cell-add {
+  list-style: none;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.calendar-filter-row__bar {
-  /* Claim a full row on narrow screens instead of being crushed beside the
-     actions (month picker / Fields). */
-  flex: 1 1 320px;
-  min-width: 0;
+.cell:hover .cell-add,
+.cell-add:focus-within {
+  opacity: 1;
+}
+
+.cell-add__btn {
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-muted);
+  font-size: var(--text-xs, 0.75rem);
+  padding: 2px 6px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.cell-add__btn:hover {
+  color: var(--color-accent);
+  border-color: color-mix(in oklab, var(--color-accent) 50%, var(--color-border));
+}
+
+@media (hover: none) {
+  .cell-add { opacity: 1; }
 }
 
 /* Month picker button + popover */

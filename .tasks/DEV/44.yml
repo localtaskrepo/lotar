@@ -1,0 +1,16 @@
+title: 'PR quality pass: cleanup, refactor, coverage, and project-validation regression fix'
+status: Done
+priority: High
+type: Task
+reporter: mallox
+assignee: mallox
+created: 2026-09-02T10:01:00.000000+00:00
+modified: 2026-09-02T09:32:26.743339+00:00
+comments:
+- date: 2026-09-02T09:32:26.743339+00:00
+  text: 'Quality pass over the unified-toolbar PR. CLEANUP: removed dead CSS (sprints/tasks quick+filter row selectors, filter-field-inline), dead SmartListChips imports (Board/Calendar), dead searchRoot ref + focusSearch expose in FilterBar, simplified page filterBarRef types. REFACTOR: useProjectFilterSync gained onProjectChange option and absorbed the per-page syncProjectRoute wrappers (deleted boardOnFilterUpdate/onFilterUpdate wrappers in Board/Calendar/SprintsList, dropped dead onChipsUpdate); FilterBar RESERVED_FIELD_ALIASES and CUSTOM_UI_KEYS now derive from GRAMMAR_KEYS (single alias source of truth). REGRESSION FIX (caught by smoke): strict project validation dropped ?project=ALPHA because the server canonicalizes names to generated prefixes (ALPHA->ALPH) - validation now matches prefix/name case-insensitively with either-direction prefix overlap; SprintsList/Calendar also initialize project from route at setup (Board already did) so FilterBar''s first emit can no longer strip ?project from the URL. TESTS: +9 (TaskPanel initialStatus valid/invalid + initialDueDate, useFilterBuilder sync suite, Board header add button, Calendar cell add button); smoke tests updated to open the filters panel before the project select and leftover console.log debug lines removed. Docs: preferences.md (Navigation section, localStorage key fix, Done column rename) and serve.md (search grammar syntax). Gates: lint clean, nextest 775/775, vitest 235/235, smoke 94/94 (23 git tests skipped in sandbox).'
+history:
+- at: 2026-09-02T09:32:26.743339+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

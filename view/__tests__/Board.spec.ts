@@ -107,11 +107,11 @@ vi.mock('../components/SmartListChips.vue', () => ({
 
 vi.mock('../components/FilterBar.vue', () => ({
     default: {
-        props: ['statuses', 'priorities', 'types', 'value', 'showStatus', 'emitProjectKey', 'storageKey'],
+        props: ['statuses', 'priorities', 'types', 'value', 'showStatus', 'emitProjectKey', 'storageKey', 'customPresets', 'enableDueSoon', 'enableRecent'],
         emits: ['update:value'],
-        setup(_props: any, { expose }: { expose: (api: any) => void }) {
+        setup(_props: any, { expose, slots }: { expose: (api: any) => void; slots: any }) {
             expose({ appendCustomFilter: () => { }, clear: () => { } })
-            return () => h('div', { class: 'filter-bar' })
+            return () => h('div', { class: 'filter-bar' }, slots.actions?.())
         },
     },
 }))
@@ -194,6 +194,25 @@ describe('Board field visibility', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+    })
+
+    it('opens the create panel with the column status prefilled when the header add button is clicked', async () => {
+        const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const addBtn = wrapper.find('[data-status="Todo"] .board-col-add')
+        expect(addBtn.exists()).toBe(true)
+
+        await addBtn.trigger('click')
+
+        expect(openTaskPanelMock).toHaveBeenCalledWith(expect.objectContaining({
+            taskId: 'new',
+            initialStatus: 'Todo',
+        }))
     })
 
     it('hides card fields per-project and persists to localStorage', async () => {

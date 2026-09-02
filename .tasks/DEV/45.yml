@@ -1,0 +1,16 @@
+title: 'Search autocomplete: key-prefix picks insert without trailing space and show values immediately'
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-09-02T18:29:00.000000+00:00
+modified: 2026-09-02T18:28:17.415217+00:00
+comments:
+- date: 2026-09-02T18:28:17.415217+00:00
+  text: 'Picking a key suggestion (e.g. status:) from the search autocomplete inserted a trailing space, which left the current fragment empty and re-showed the key list instead of the key''s values, forcing a manual backspace. Two fixes in FilterBar: replaceFragment no longer appends a space when the replacement ends with '':'' so the fragment stays ''status:'', and pickSuggestion keeps the suggestion list open after a key-prefix pick so value suggestions render immediately. Verified E2E: type ''sta'' -> Enter -> input ''status:'' with value list shown -> arrow+Enter applies the value (chip + URL sync). Gates: lint clean, vitest 236/236 (+1 regression test).'
+history:
+- at: 2026-09-02T18:28:17.415217+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -45,6 +45,8 @@ describe.concurrent('UI project labels', () => {
             try {
                 await withPage(server.url, async (page) => {
                     await page.waitForSelector('text=LoTaR', { timeout: 20_000 });
+                    // The project select lives inside the collapsible filters panel.
+                    await page.click('[data-testid="filter-toggle"]');
                     await page.waitForSelector('select.ui-select', { timeout: 20_000 });
 
                     await page.waitForFunction(

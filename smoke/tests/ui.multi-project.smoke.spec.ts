@@ -33,7 +33,9 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
                     await page.waitForSelector(`text=${apiTitle}`, { timeout: 20_000 });
 
                     const projectSelect = page.locator('[data-testid="filter-project"]');
-                    console.log('project select html', await page.evaluate(() => document.querySelector('[data-testid="filter-project"]')?.outerHTML));
+                    // The project control lives inside the collapsible filters panel.
+                    await page.click('[data-testid="filter-toggle"]');
+                    await projectSelect.waitFor({ state: 'visible', timeout: 10_000 });
                     await projectSelect.selectOption(apiTask.project);
 
                     await page.waitForFunction(
@@ -81,7 +83,9 @@ describe.concurrent('UI multi-project smoke scenarios', () => {
                     await page.waitForSelector(`text=${overrideTitle}`, { timeout: 20_000 });
 
                     const projectSelect = page.locator('[data-testid="filter-project"]');
-                    console.log('project select html', await page.evaluate(() => document.querySelector('[data-testid="filter-project"]')?.outerHTML));
+                    // The project control lives inside the collapsible filters panel.
+                    await page.click('[data-testid="filter-toggle"]');
+                    await projectSelect.waitFor({ state: 'visible', timeout: 10_000 });
                     await projectSelect.selectOption('QA');
 
                     await page.waitForFunction(

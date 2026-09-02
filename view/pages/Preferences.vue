@@ -50,6 +50,23 @@
         </UiCard>
 
         <UiCard>
+          <h3>Navigation</h3>
+          <div class="col" style="gap:8px;">
+            <p class="muted" style="margin:0;">Hide tabs you don't use to reduce clutter. The pages stay reachable by URL.</p>
+            <div class="preferences__tabs row" style="gap:8px; flex-wrap:wrap;">
+              <label v-for="tab in NAV_TABS" :key="tab.path" class="row" style="gap:6px; align-items:center;">
+                <input
+                  type="checkbox"
+                  :checked="isTabVisible(tab.path)"
+                  @change="setTabHidden(tab.path, !($event.target as HTMLInputElement).checked)"
+                />
+                <span>{{ tab.label }}</span>
+              </label>
+            </div>
+          </div>
+        </UiCard>
+
+        <UiCard>
           <h3>Tables</h3>
           <div class="row" style="gap:8px; align-items:center; flex-wrap: wrap;">
             <UiButton @click="resetTables">Reset saved columns and sorting</UiButton>
@@ -107,6 +124,7 @@ import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiInput from '../components/UiInput.vue'
 import UiSelect from '../components/UiSelect.vue'
+import { NAV_TABS, useNavTabs } from '../composables/useNavTabs'
 import { getContrastingColor } from '../utils/color'
 import {
     DEFAULT_STARTUP_DESTINATION,
@@ -136,6 +154,7 @@ import {
     type ThemePreference,
 } from '../utils/theme'
 
+const { isTabVisible, setTabHidden } = useNavTabs()
 const theme = ref<ThemePreference>('system')
 const accent = ref<string>(DEFAULT_ACCENT)
 const accentEnabled = ref(false)

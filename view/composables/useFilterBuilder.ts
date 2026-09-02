@@ -95,6 +95,7 @@ export function applySmartFilters(
 export function useProjectFilterSync(
   projectRef: Ref<string>,
   filterRef: Ref<Record<string, string>>,
+  options?: { onProjectChange?: (project: string) => void },
 ) {
   const hasFilters = computed(() =>
     Object.entries(filterRef.value).some(([key, value]) => key !== 'order' && !!value),
@@ -128,10 +129,8 @@ export function useProjectFilterSync(
   }
 
   function onFilterUpdate(v: Record<string, string>) {
-    filterRef.value = sanitizeFilterInput(v)
-  }
-
-  function onChipsUpdate(v: Record<string, string>) {
+    const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
+    if (hasProjectKey) options?.onProjectChange?.((v.project || '').trim())
     filterRef.value = sanitizeFilterInput(v)
   }
 
@@ -140,7 +139,7 @@ export function useProjectFilterSync(
     filterBarRef.value?.clear?.()
   }
 
-  return { hasFilters, sanitizeFilterInput, onFilterUpdate, onChipsUpdate, clearFilters }
+  return { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters }
 }
 
 export function useCustomFilterPresets(customFieldNames: Ref<string[]>) {

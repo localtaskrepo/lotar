@@ -587,6 +587,78 @@ describe('TaskPanel integration safeguards', () => {
 
         wrapper.unmount()
     })
+
+    it('prefills a valid initialStatus in create mode', async () => {
+        const wrapper = mount(TaskPanel, {
+            props: {
+                open: true,
+                taskId: 'new',
+                initialStatus: 'Closed',
+            },
+            global: {
+                stubs: {
+                    Teleport: true,
+                },
+            },
+            attachTo: document.body,
+        })
+
+        await flushPromises()
+        await nextTick()
+        await flushPromises()
+
+        expect((wrapper.vm as any).form.status).toBe('Closed')
+
+        wrapper.unmount()
+    })
+
+    it('ignores an initialStatus the project does not define', async () => {
+        const wrapper = mount(TaskPanel, {
+            props: {
+                open: true,
+                taskId: 'new',
+                initialStatus: 'Bogus',
+            },
+            global: {
+                stubs: {
+                    Teleport: true,
+                },
+            },
+            attachTo: document.body,
+        })
+
+        await flushPromises()
+        await nextTick()
+        await flushPromises()
+
+        expect((wrapper.vm as any).form.status).toBe('Open')
+
+        wrapper.unmount()
+    })
+
+    it('prefills initialDueDate in create mode', async () => {
+        const wrapper = mount(TaskPanel, {
+            props: {
+                open: true,
+                taskId: 'new',
+                initialDueDate: '2026-09-09',
+            },
+            global: {
+                stubs: {
+                    Teleport: true,
+                },
+            },
+            attachTo: document.body,
+        })
+
+        await flushPromises()
+        await nextTick()
+        await flushPromises()
+
+        expect((wrapper.vm as any).form.due_date).toBe('2026-09-09')
+
+        wrapper.unmount()
+    })
 })
 
 describe('TaskPanel attachments-area link preferences', () => {

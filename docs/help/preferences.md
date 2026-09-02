@@ -29,15 +29,19 @@ Use **Reset saved columns and sorting** to clear TaskTable preferences stored pe
 
 ## Filter Reset
 
-Select **Clear last used filter** to remove the saved filter state for the Tasks list (`sessionStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set.
+Select **Clear last used filter** to remove the saved filter state for the Tasks list (`localStorage` key `lotar.tasks.filter`). The next visit will start with the default filter set. Saved filters are validated against the server's project list on load, so a stale project from another LoTaR instance served on the same port is dropped automatically.
 
 ## Tasks List
 
 Use **Default page size** to control how many tasks the Tasks list shows per page by default. This setting is stored in `localStorage` and only applies to the current browser.
 
+## Navigation
+
+Hide tabs you do not use to reduce clutter in the main navigation. Uncheck a tab on the Preferences page and it disappears from the nav immediately; the page itself stays reachable by URL. Preferences is always visible so you can restore tabs. The setting persists in `localStorage` (key `lotar.preferences.hiddenTabs`).
+
 ## Board Filters
 
-Boards now include a **Filters** popover next to the WIP controls. Use it to keep the final columns readable without touching server data:
+Boards include a **Done column** popover next to the WIP controls (both live in the page header). Use it to keep the final columns readable without touching server data:
 
 - **Statuses** — pick which board columns count as “done.” Only the selected statuses are affected; everything else stays untouched.
 - **Hide cards older than (days)** — optionally drop cards whose most recent status-change timestamp is older than the provided window. The helper (`findLastStatusChangeAt`) scans each task’s history, so cards without history stay visible.

@@ -1,0 +1,16 @@
+title: 'Search bar polish: suggestion keyboard fixes, ultrawide layout, cross-instance project bleed, button consistency'
+status: Done
+priority: High
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-09-02T05:31:00.000000+00:00
+modified: 2026-09-02T05:31:59.936435+00:00
+comments:
+- date: 2026-09-02T05:31:59.936435+00:00
+  text: 'Four fixes: (1) Suggestion keyboard nav - Enter now picks the highlighted suggestion (previously only Tab picked; Enter always committed raw text), and bare partial words (e.g. ''todo'') now offer value completions across option-backed keys (status/priority/type/sprint/project) instead of producing an empty list. (2) Ultrawide layout - search capped at 440px, actions slot wrapped in .filter-bar__actions right-aligned via margin-left:auto; search+Filters stay left. (3) Cross-instance project bleed - localStorage is per browser origin, so another LoTaR instance on the same port left a stale saved project; FilterBar now validates the persisted project against the server project list when it loads and drops unknown values (self-heals the saved filter). (4) Filters toggle uses the bordered default variant when closed (primary when open) so every toolbar button is bordered. Gates: lint clean, vitest 226/226 (+6 new tests). Verified live: suggestion flow (type->arrow->Enter->chip+URL sync), 2560px layout measurements, stale project=ZZZ dropped after reload.'
+history:
+- at: 2026-09-02T05:31:59.936435+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

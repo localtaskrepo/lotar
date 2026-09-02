@@ -14,6 +14,8 @@ interface TaskPanelCallbacks {
 interface OpenTaskPanelOptions extends TaskPanelCallbacks {
     taskId: string
     initialProject?: string | null
+    initialStatus?: string | null
+    initialDueDate?: string | null
     focusSection?: TaskPanelFocusSection | null
 }
 
@@ -23,6 +25,8 @@ interface TaskPanelState {
     open: boolean
     taskId: string | null
     initialProject: string | null
+    initialStatus: string | null
+    initialDueDate: string | null
     focusSection: TaskPanelFocusSection | null
     callbacks: TaskPanelCallbacks | null
 }
@@ -31,6 +35,8 @@ const state = reactive<TaskPanelState>({
     open: false,
     taskId: null,
     initialProject: null,
+    initialStatus: null,
+    initialDueDate: null,
     focusSection: null,
     callbacks: null,
 })
@@ -38,6 +44,8 @@ const state = reactive<TaskPanelState>({
 function openTaskPanel(options: OpenTaskPanelOptions) {
     state.taskId = options.taskId
     state.initialProject = options.initialProject ?? null
+    state.initialStatus = options.initialStatus ?? null
+    state.initialDueDate = options.initialDueDate ?? null
     state.focusSection = options.focusSection ?? null
     state.callbacks = {
         onClose: options.onClose ?? null,
@@ -55,6 +63,8 @@ function closeTaskPanel() {
     const { onClose } = state.callbacks ?? {}
     state.taskId = null
     state.initialProject = null
+    state.initialStatus = null
+    state.initialDueDate = null
     state.focusSection = null
     state.callbacks = null
     if (onClose) {

@@ -3,6 +3,8 @@
     :open="panelState.open"
     :task-id="panelState.taskId ?? undefined"
     :initial-project="panelState.initialProject ?? undefined"
+    :initial-status="panelState.initialStatus ?? undefined"
+    :initial-due-date="panelState.initialDueDate ?? undefined"
     :focus-section="panelState.focusSection ?? undefined"
     @close="handleClose"
     @created="handleCreated"

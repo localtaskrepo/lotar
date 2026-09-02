@@ -4,7 +4,7 @@
       <div class="brand">LoTaR</div>
       <nav class="nav">
         <a
-          v-for="item in navItems"
+          v-for="item in visibleNavItems"
           :key="item.path"
           class="nav__link"
           :class="{ active: isActive(item) }"
@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ActivityDrawer from './components/ActivityDrawer.vue'
 import TaskPanelHost from './components/TaskPanelHost.vue'
@@ -39,6 +39,7 @@ import ToastHost from './components/ToastHost.vue'
 import UiButton from './components/UiButton.vue'
 import { showToast } from './components/toast'
 import { useTaskPanelController } from './composables/useTaskPanelController'
+import { useNavTabs } from './composables/useNavTabs'
 import { useTaskStore } from './composables/useTaskStore'
 
 const store = useTaskStore()
@@ -78,6 +79,9 @@ const navItems: NavItem[] = [
   { label: 'Config', path: '/config' },
   { label: 'Preferences', path: '/preferences' },
 ]
+
+const { isTabVisible } = useNavTabs()
+const visibleNavItems = computed(() => navItems.filter((item) => isTabVisible(item.path)))
 
 function isActive(item: NavItem) {
   const currentPath = route.path

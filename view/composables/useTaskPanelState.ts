@@ -22,6 +22,8 @@ export interface TaskPanelProps {
     open: boolean
     taskId?: string | null
     initialProject?: string | null
+    initialStatus?: string | null
+    initialDueDate?: string | null
 }
 
 export interface TaskPanelEmit {
@@ -421,6 +423,12 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
                 ''
             await refreshConfig(scopeProject)
             applyDefaults(scopeProject)
+            if (props.initialStatus && (statuses.value || []).includes(props.initialStatus)) {
+                form.status = props.initialStatus
+            }
+            if (props.initialDueDate) {
+                form.due_date = props.initialDueDate
+            }
             loading.value = false
             ready.value = true
         } else if (props.taskId) {

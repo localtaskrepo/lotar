@@ -560,7 +560,7 @@ import TaskPanelSummarySection from './task-panel/TaskPanelSummarySection.vue'
 import TaskPanelTagEditor from './task-panel/TaskPanelTagEditor.vue'
 import { showToast } from './toast'
 
-const props = defineProps<{ open: boolean; taskId?: string | null; initialProject?: string | null; focusSection?: string | null }>()
+const props = defineProps<{ open: boolean; taskId?: string | null; initialProject?: string | null; initialStatus?: string | null; initialDueDate?: string | null; focusSection?: string | null }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'created', task: TaskDTO): void; (e: 'updated', task: TaskDTO): void }>()
 
 const {

@@ -62,7 +62,7 @@ lotar serve --web-ui-embedded
 - **Task Dashboard** - Overview panes powered by the `/api/tasks/list` endpoint.
 - **Task Management** - Creation, editing, effort/status changes, and comments all call the same REST endpoints used by the CLI.
 - **Project Views** - Per-project filters share logic with CLI list filters; preferences are stored client-side (see `docs/help/preferences.md`).
-- **Search & Filtering** - Advanced filtering mirrors `lotar list` options (`assignee`, `tags`, `status`, unified filters, etc.).
+- **Search & Filtering** - Advanced filtering mirrors `lotar list` options (`assignee`, `tags`, `status`, unified filters, etc.). The toolbar search box also accepts `key:value` tokens (`status:todo priority:high sprint:2 tag:ci "multi word"`); plain words stay free-text, unknown tokens pass through as custom field filters, and suggestions appear as you type (arrow keys + Enter or Tab to apply).
 - **Insights** - Metrics components consume `/api/stats/*` and `/api/sprints/*` endpoints.
 - **Personalization** - Preferences view interacts solely with browser storage; no server-side config is modified.
 

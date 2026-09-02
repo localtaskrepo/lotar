@@ -29,18 +29,18 @@
       </div>
     </div>
     <div class="filter-card">
-      <div class="tasks-quick-row">
-        <div class="tasks-quick-row__chips">
-          <SmartListChips
-            :statuses="statusOptions"
-            :priorities="priorityOptions"
-            :value="filter"
-            :custom-presets="customFilterPresets"
-            @update:value="onChipsUpdate"
-            @preset="handleCustomPreset"
-          />
-        </div>
-        <div class="tasks-quick-row__controls">
+      <FilterBar
+        ref="filterBarRef"
+        :statuses="statuses"
+        :priorities="priorities"
+        :types="types"
+        :sprint-options="sprintFilterOptions"
+        :custom-presets="customFilterPresets"
+        :value="filter"
+        storage-key="lotar.tasks.filter"
+        @update:value="onFilterUpdate"
+      >
+        <template #actions>
           <label class="tasks-quick-row__checkbox">
             <input type="checkbox" :checked="bulk" @change="onToggleBulkFromToolbar($event)" />
             Bulk select
@@ -87,60 +87,6 @@
               </button>
             </div>
           </div>
-        </div>
-        <nav class="tasks-quick-row__paging" aria-label="Top pagination">
-          <UiButton
-            variant="ghost"
-            type="button"
-            aria-label="Previous page"
-            title="Previous page"
-            :disabled="loading || !hasPrevPage"
-            @click="prevPage"
-          >
-            <IconGlyph name="chevron-left" />
-            <span>Prev</span>
-          </UiButton>
-          <template v-for="(p, i) in visiblePageNumbers" :key="'top-' + i">
-            <span v-if="p === '...'" class="pagination-ellipsis muted">&hellip;</span>
-            <UiButton
-              v-else
-              :variant="p === currentPage ? 'primary' : 'ghost'"
-              type="button"
-              :aria-label="`Page ${p}`"
-              :aria-current="p === currentPage ? 'page' : undefined"
-              :disabled="loading"
-              @click="goToPage(p)"
-            >
-              {{ p }}
-            </UiButton>
-          </template>
-          <UiButton
-            variant="ghost"
-            type="button"
-            aria-label="Next page"
-            title="Next page"
-            :disabled="loading || !hasNextPage"
-            @click="nextPage"
-          >
-            <span>Next</span>
-            <IconGlyph name="chevron-right" />
-          </UiButton>
-        </nav>
-      </div>
-      <div class="tasks-filter-row">
-        <div class="tasks-filter-row__main">
-          <FilterBar
-            ref="filterBarRef"
-            :statuses="statuses"
-            :priorities="priorities"
-            :types="types"
-            :sprint-options="sprintFilterOptions"
-            :value="filter"
-            storage-key="lotar.tasks.filter"
-            @update:value="onFilterUpdate"
-          />
-        </div>
-        <div class="tasks-filter-row__actions">
           <ColumnsMenu
             :open="columnsMenuOpen"
             :options="fieldOptions"
@@ -161,8 +107,8 @@
             <IconGlyph name="plus" aria-hidden="true" />
             <span>Task</span>
           </UiButton>
-        </div>
-      </div>
+        </template>
+      </FilterBar>
     </div>
 
     <div class="col" style="gap: 16px;">
@@ -384,7 +330,6 @@ import ColumnsMenu from '../components/ColumnsMenu.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
-import SmartListChips from '../components/SmartListChips.vue'
 import TaskTable from '../components/TaskTable.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
@@ -485,7 +430,7 @@ watch(
 )
 
 const filter = ref<Record<string, string>>({})
-const filterBarRef = ref<{ appendCustomFilter: (expr: string) => void; clear?: () => void } | null>(null)
+const filterBarRef = ref<{ clear?: () => void } | null>(null)
 
 const columnsStore = useColumns()
 provideColumnStore(columnsStore)
@@ -573,17 +518,12 @@ async function goToPage(page: number) {
 }
 
 function onFilterUpdate(v: Record<string,string>){ filter.value = v }
-function onChipsUpdate(v: Record<string,string>){ filter.value = { ...v } }
 function resetFilters(){
   filter.value = {}
   selectedIds.value = []
   filterBarRef.value?.clear?.()
 }
 function clearFilters(){ resetFilters() }
-
-function handleCustomPreset(expression: string) {
-  filterBarRef.value?.appendCustomFilter(expression)
-}
 
 type NavMode = 'push' | 'replace' | 'none'
 
@@ -1377,37 +1317,6 @@ const handleTaskUpdated = (task: TaskDTO) => {
   padding: 0;
 }
 
-.tasks-quick-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.tasks-quick-row__chips {
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.tasks-quick-row__paging {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 1;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.tasks-quick-row__controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  min-height: 2.25rem;
-}
-
 .tasks-quick-row__checkbox {
   display: inline-flex;
   align-items: center;
@@ -1475,28 +1384,6 @@ const handleTaskUpdated = (task: TaskDTO) => {
 
 .menu-item.danger {
   color: var(--color-danger, #c62828);
-}
-
-.tasks-filter-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.tasks-filter-row__main {
-  /* Claim at least a full row on narrow screens so the filter controls wrap as
-     a block instead of being crushed beside the action buttons. */
-  flex: 1 1 320px;
-  min-width: 0;
-}
-
-.tasks-filter-row__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  flex-wrap: wrap;
 }
 
 .pagination-bar {
