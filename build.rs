@@ -32,13 +32,27 @@ fn main() {
     // `git init` fail with "Operation not permitted". Probe for that here and,
     // when detected, set `no_git_tests` so the git-dependent tests compile out
     // instead of surfacing as false negatives. Normal CI leaves the cfg unset.
+    //
+    // Probe the system temp dir (where tempfile-based tests actually create
+    // their repos) in addition to OUT_DIR: some sandboxes allow `.git` inside
+    // the workspace but deny it elsewhere, which OUT_DIR alone would miss.
+    let mut git_denied = false;
     if let Ok(out_dir) = env::var("OUT_DIR") {
         let probe = PathBuf::from(&out_dir).join(".git");
         if fs::create_dir(&probe).is_err() {
-            println!("cargo:rustc-cfg=no_git_tests");
+            git_denied = true;
         } else {
             let _ = fs::remove_dir(&probe);
         }
+    }
+    let temp_probe = env::temp_dir().join(format!(".git-probe-{}", std::process::id()));
+    if fs::create_dir(&temp_probe).is_err() {
+        git_denied = true;
+    } else {
+        let _ = fs::remove_dir(&temp_probe);
+    }
+    if git_denied {
+        println!("cargo:rustc-cfg=no_git_tests");
     }
 }
 

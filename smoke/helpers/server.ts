@@ -1,6 +1,6 @@
+import { once } from 'node:events';
 import { execa, type ResultPromise } from 'execa';
 import getPort from 'get-port';
-import { once } from 'node:events';
 import { ensureBinaryExists } from './binary.js';
 import type { SmokeWorkspace } from './workspace.js';
 
@@ -76,7 +76,10 @@ export async function startLotarServer(
     });
 
     const ready = waitForServerReady(child);
-    const exit = once(child, 'exit') as Promise<[number | null, NodeJS.Signals | null]>;
+    // execa >= 10 returns a Promise, not an EventEmitter; event/state access
+    // goes through the underlying Node child process.
+    const node = child.nodeChildProcess;
+    const exit = once(node, 'exit') as Promise<[number | null, NodeJS.Signals | null]>;
 
     type ReadyResult = 'ready';
     type ExitResult = { code: number | null; signal: NodeJS.Signals | null };
@@ -98,15 +101,15 @@ export async function startLotarServer(
         port,
         raw: child,
         async stop() {
-            if (child.exitCode !== null || child.killed) {
+            if (node.exitCode !== null || node.killed) {
                 return;
             }
 
-            const exited = once(child, 'exit');
+            const exited = once(node, 'exit');
             const graceful = child.kill('SIGINT');
 
             const forceTimer = setTimeout(() => {
-                if (child.exitCode === null) {
+                if (node.exitCode === null) {
                     child.kill('SIGKILL');
                 }
             }, 2_000);
@@ -129,7 +132,7 @@ export async function startLotarServer(
             child.stdout?.destroy();
             child.stderr?.destroy();
 
-            if (!graceful && child.exitCode === null && !child.killed) {
+            if (!graceful && node.exitCode === null && !node.killed) {
                 child.kill('SIGKILL');
             }
         },

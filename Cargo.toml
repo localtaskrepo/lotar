@@ -37,10 +37,10 @@ ignore = { version = "0.4.25" }
 notify = "8.2.0"
 pulldown-cmark = { version = "0.13.3", default-features = false }
 blake3 = { version = "1.8.4", default-features = false, features = ["std"] }
-base64 = { version = "0.22.1", default-features = false, features = ["std"] }
+base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 ureq = { version = "3.3.0", features = ["json"] }
 libc = "0.2.185"
-sysinfo = "0.38.4"
+sysinfo = "0.39.6"
 fs2 = "0.4.3"
 
 # Production release profile optimized for minimal binary size
