@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, type Ref } from 'vue'
 import { api } from '../api/client'
 import type { SprintIntegrityDiagnostics, SprintListItem } from '../api/types'
 
@@ -68,4 +68,11 @@ export function useSprints() {
         missingSprints,
         hasMissing,
     }
+}
+
+/** Dropdown options for the sprint grammar/filter UI (id + label), shared by pages. */
+export function useSprintFilterOptions(sprints: Ref<SprintListItem[]>) {
+    return computed(() =>
+        (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
+    )
 }

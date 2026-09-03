@@ -166,7 +166,7 @@ fn normalize_project_canonical_includes_custom_fields() {
         .success();
 
     let contents = std::fs::read_to_string(proj.join("config.yml")).unwrap();
-    let doc: serde_yaml::Value = serde_yaml::from_str(&contents).expect("valid yaml");
+    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents).expect("valid yaml");
     let custom_fields = doc
         .get("custom")
         .and_then(|v| v.get("fields"))

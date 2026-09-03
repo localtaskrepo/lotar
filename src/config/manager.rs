@@ -87,9 +87,10 @@ impl ConfigManager {
             let content = fs::read_to_string(&config_path).map_err(|e| {
                 ConfigError::IoError(format!("Failed to read global config: {}", e))
             })?;
-            let mut global_config: GlobalConfig = serde_yaml::from_str(&content).map_err(|e| {
-                ConfigError::ParseError(format!("Failed to parse global config: {}", e))
-            })?;
+            let mut global_config: GlobalConfig =
+                serde_yaml_ng::from_str(&content).map_err(|e| {
+                    ConfigError::ParseError(format!("Failed to parse global config: {}", e))
+                })?;
 
             // Update the default_project
             global_config.default_project = detected_prefix.clone();

@@ -1148,6 +1148,10 @@ fn mcp_task_create_honors_default_assignee() {
 #[cfg(not(no_git_tests))]
 #[test]
 fn mcp_task_create_infers_branch_defaults() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let repo_root = tmp.path();
     let tasks_dir = repo_root.join(".tasks");

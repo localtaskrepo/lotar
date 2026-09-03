@@ -543,6 +543,10 @@ mod parent_directory_resolution {
     #[cfg(not(no_git_tests))]
     #[test]
     fn test_project_detection_stops_at_git_boundary() {
+        if !crate::common::git_available() {
+            eprintln!("skipping: git unavailable in this sandbox");
+            return;
+        }
         let fixtures = TestFixtures::new();
 
         // Create nested project structure

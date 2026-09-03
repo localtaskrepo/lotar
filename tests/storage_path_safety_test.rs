@@ -91,7 +91,7 @@ fn corrupt_yaml_is_skipped_by_search_not_propagated() {
     let tmp = temp_tasks_root("lotar-corrupt-search");
     let project = tmp.path().join("COR");
     fs::create_dir_all(&project).unwrap();
-    let good = serde_yaml::to_string(&sample_task("fine")).unwrap();
+    let good = serde_yaml_ng::to_string(&sample_task("fine")).unwrap();
     fs::write(project.join("1.yml"), good).unwrap();
     fs::write(project.join("2.yml"), "{{{ not yaml: [").unwrap();
 

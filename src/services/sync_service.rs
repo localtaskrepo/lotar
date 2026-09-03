@@ -3673,7 +3673,7 @@ fn custom_field_value_is_null(value: &CustomFieldValue) -> bool {
     }
     #[cfg(not(feature = "schema"))]
     {
-        matches!(value, serde_yaml::Value::Null)
+        matches!(value, serde_yaml_ng::Value::Null)
     }
 }
 
@@ -3758,11 +3758,11 @@ fn custom_field_value_to_field_value(value: &CustomFieldValue) -> Option<FieldVa
     #[cfg(not(feature = "schema"))]
     {
         match value {
-            serde_yaml::Value::Null => None,
-            serde_yaml::Value::String(s) => Some(FieldValue::String(s.clone())),
-            serde_yaml::Value::Number(n) => Some(FieldValue::String(n.to_string())),
-            serde_yaml::Value::Bool(b) => Some(FieldValue::String(b.to_string())),
-            serde_yaml::Value::Sequence(items) => {
+            serde_yaml_ng::Value::Null => None,
+            serde_yaml_ng::Value::String(s) => Some(FieldValue::String(s.clone())),
+            serde_yaml_ng::Value::Number(n) => Some(FieldValue::String(n.to_string())),
+            serde_yaml_ng::Value::Bool(b) => Some(FieldValue::String(b.to_string())),
+            serde_yaml_ng::Value::Sequence(items) => {
                 let list = items
                     .iter()
                     .filter_map(|item| item.as_str().map(|s| s.to_string()))
@@ -3788,7 +3788,12 @@ fn custom_value_list(values: Vec<String>) -> CustomFieldValue {
     }
     #[cfg(not(feature = "schema"))]
     {
-        serde_yaml::Value::Sequence(values.into_iter().map(serde_yaml::Value::String).collect())
+        serde_yaml_ng::Value::Sequence(
+            values
+                .into_iter()
+                .map(serde_yaml_ng::Value::String)
+                .collect(),
+        )
     }
 }
 
@@ -3799,7 +3804,7 @@ fn custom_value_null() -> CustomFieldValue {
     }
     #[cfg(not(feature = "schema"))]
     {
-        serde_yaml::Value::Null
+        serde_yaml_ng::Value::Null
     }
 }
 

@@ -91,7 +91,7 @@ mod custom_patterns {
 }
 
 mod inline_effort {
-    use serde_yaml::Value as Y;
+    use serde_yaml_ng::Value as Y;
     use std::fs;
 
     use super::{TestFixtures, cargo_bin_in};
@@ -118,7 +118,7 @@ mod inline_effort {
             task_file.display()
         );
         let yaml = fs::read_to_string(&task_file).unwrap();
-        let parsed: Y = serde_yaml::from_str(&yaml).expect("valid yaml");
+        let parsed: Y = serde_yaml_ng::from_str(&yaml).expect("valid yaml");
         parsed
             .get("effort")
             .and_then(|v| v.as_str())

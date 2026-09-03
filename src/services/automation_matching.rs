@@ -671,8 +671,8 @@ fn matches_date_conditions(
 #[cfg(not(feature = "schema"))]
 fn custom_value_to_value(value: &crate::types::CustomFieldValue) -> AutomationValue {
     match value {
-        serde_yaml::Value::String(v) => AutomationValue::String(v.clone()),
-        serde_yaml::Value::Sequence(list) => {
+        serde_yaml_ng::Value::String(v) => AutomationValue::String(v.clone()),
+        serde_yaml_ng::Value::Sequence(list) => {
             AutomationValue::List(list.iter().map(yaml_value_to_string).collect())
         }
         _ => AutomationValue::String(yaml_value_to_string(value)),
@@ -680,13 +680,13 @@ fn custom_value_to_value(value: &crate::types::CustomFieldValue) -> AutomationVa
 }
 
 #[cfg(not(feature = "schema"))]
-fn yaml_value_to_string(value: &serde_yaml::Value) -> String {
+fn yaml_value_to_string(value: &serde_yaml_ng::Value) -> String {
     match value {
-        serde_yaml::Value::String(v) => v.clone(),
-        serde_yaml::Value::Bool(v) => v.to_string(),
-        serde_yaml::Value::Number(v) => v.to_string(),
-        serde_yaml::Value::Null => "null".to_string(),
-        other => serde_yaml::to_string(other)
+        serde_yaml_ng::Value::String(v) => v.clone(),
+        serde_yaml_ng::Value::Bool(v) => v.to_string(),
+        serde_yaml_ng::Value::Number(v) => v.to_string(),
+        serde_yaml_ng::Value::Null => "null".to_string(),
+        other => serde_yaml_ng::to_string(other)
             .unwrap_or_else(|_| format!("{other:?}"))
             .trim()
             .to_string(),

@@ -321,7 +321,7 @@ import { useConfig } from '../composables/useConfig'
 import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
-import { useSprints } from '../composables/useSprints'
+import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
@@ -356,9 +356,7 @@ const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprintLookup, sprintLabel, sprintStateClass, sprintTooltip } = useSprintFormatting(sprints)
 
-const sprintFilterOptions = computed(() =>
-  (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
-)
+const sprintFilterOptions = useSprintFilterOptions(sprints)
 
 // -- Swimlane group-by (persisted per project) ----------------------------
 type GroupByMode = 'none' | 'assignee' | 'priority' | 'type'

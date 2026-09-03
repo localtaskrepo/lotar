@@ -71,7 +71,7 @@ pub fn to_canonical_yaml(file: &AutomationFile) -> LoTaRResult<String> {
             rules,
         },
     };
-    serde_yaml::to_string(&output).map_err(LoTaRError::from)
+    serde_yaml_ng::to_string(&output).map_err(LoTaRError::from)
 }
 
 fn load_automation_from_path(path: &Path) -> LoTaRResult<Option<AutomationFile>> {
@@ -79,7 +79,7 @@ fn load_automation_from_path(path: &Path) -> LoTaRResult<Option<AutomationFile>>
         return Ok(None);
     }
     let content = fs::read_to_string(path)?;
-    let parsed = serde_yaml::from_str::<AutomationFile>(&content).map_err(LoTaRError::from)?;
+    let parsed = serde_yaml_ng::from_str::<AutomationFile>(&content).map_err(LoTaRError::from)?;
     Ok(Some(parsed))
 }
 

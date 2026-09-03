@@ -510,7 +510,7 @@ fn derive_default_statuses(
     config: &crate::config::types::ResolvedConfig,
 ) -> Result<Vec<crate::types::TaskStatus>, String> {
     let inspect = AutomationService::inspect(tasks_dir, project).map_err(|e| e.to_string())?;
-    let file: AutomationFile = serde_yaml::from_str(&inspect.effective_yaml)
+    let file: AutomationFile = serde_yaml_ng::from_str(&inspect.effective_yaml)
         .map_err(|e| format!("Invalid automation YAML: {}", e))?;
     let mut statuses = Vec::new();
     for rule in file.automation.rules() {

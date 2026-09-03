@@ -22,6 +22,19 @@ fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
     mtx.lock().unwrap()
 }
 
+fn git_available_for_test() -> bool {
+    static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *AVAILABLE.get_or_init(|| {
+        let Ok(tmp) = tempfile::tempdir() else {
+            return false;
+        };
+        match std::fs::create_dir(tmp.path().join(".git")) {
+            Ok(()) => true,
+            Err(_) => false,
+        }
+    })
+}
+
 fn seed_single_project_config(tasks_dir: &Path) {
     std::fs::create_dir_all(tasks_dir).unwrap();
     let config_yaml = r#"
@@ -126,6 +139,13 @@ fn parse_tool_payload(resp: &JsonRpcResponse) -> serde_json::Value {
 #[test]
 fn tools_call_reference_add_and_remove() {
     let _lock = lock_var("LOTAR_TASKS_DIR");
+    // Sandboxes that forbid creating `.git` cannot run this test; the
+    // build-time cfg normally compiles it out, but cargo's TMPDIR redirect
+    // can fool that probe, so double-check at runtime.
+    if !git_available_for_test() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();

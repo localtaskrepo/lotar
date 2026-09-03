@@ -7,7 +7,7 @@ mod wizard;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde_yaml::Value as Yaml;
+use serde_yaml_ng::Value as Yaml;
 
 use super::ConfigHandler;
 use crate::config::normalization::{to_canonical_global_yaml, to_canonical_project_yaml};

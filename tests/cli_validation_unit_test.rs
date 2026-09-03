@@ -277,7 +277,7 @@ fn ensure_task_membership_requires_configured_members() {
 fn priority_serialization() {
     let priority = Priority::from("High");
     assert_eq!(priority.to_string(), "High");
-    let yaml = serde_yaml::to_string(&priority).unwrap();
+    let yaml = serde_yaml_ng::to_string(&priority).unwrap();
     assert!(yaml.contains("High"));
     let json = serde_json::to_string(&priority).unwrap();
     assert_eq!(json, "\"High\"");

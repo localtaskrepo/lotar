@@ -1,4 +1,5 @@
 #![cfg_attr(no_git_tests, allow(dead_code))]
+mod common;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
@@ -38,6 +39,10 @@ fn with_cwd(dir: &PathBuf, f: impl FnOnce()) {
 #[cfg(not(no_git_tests))]
 #[test]
 fn detect_project_name_prefers_nearest_package_json() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let tmp = tempfile::TempDir::new().unwrap();
     let root = tmp.path().join("repo");
     fs::create_dir_all(root.join(".git")).unwrap(); // mark as repo root

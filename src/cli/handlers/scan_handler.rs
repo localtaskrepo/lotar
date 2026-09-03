@@ -217,16 +217,8 @@ impl CommandHandler for ScanHandler {
         } else {
             renderer.emit_info(format_args!("Found {} TODO comment(s):", all_results.len()));
             // When applying, we'll need a storage context for creating tasks
-            let effective_project = match project_resolver.resolve_project("", _project) {
-                Ok(project) => {
-                    if project.is_empty() {
-                        None
-                    } else {
-                        Some(project)
-                    }
-                }
-                Err(e) => return Err(e),
-            };
+            let resolved_project = project_resolver.resolve_project("", _project)?;
+            let effective_project = (!resolved_project.is_empty()).then_some(resolved_project);
 
             // Resolve config to decide attribute stripping policy if not overridden
             let cfg_strip = if let Some(p) = effective_project_for_config.as_deref() {

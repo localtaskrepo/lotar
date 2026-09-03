@@ -710,7 +710,7 @@ impl AuditService {
     }
 
     fn parse_task_yaml(content: &str) -> Option<Task> {
-        serde_yaml::from_str::<Task>(content).ok()
+        serde_yaml_ng::from_str::<Task>(content).ok()
     }
 
     fn load_task_version(repo_root: &Path, commit: &str, file_rel: &Path) -> Option<Task> {
@@ -1182,10 +1182,15 @@ impl AuditService {
                     };
                     current = Some((_sha, author, _email, date));
 
+                    // `current` was just assigned; bind once instead of
+                    // unwrap()ing inside every arm below.
+                    let Some((_sha, author, _email, date)) = current.as_ref() else {
+                        continue;
+                    };
+
                     // For non-project groups, bump immediately per commit
                     match group_by {
                         GroupBy::Author => {
-                            let (_, author, _, date) = current.as_ref().unwrap();
                             let key = author.clone();
                             let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem {
                                 key: key.clone(),
@@ -1198,7 +1203,6 @@ impl AuditService {
                             }
                         }
                         GroupBy::Day => {
-                            let (_, _, _, date) = current.as_ref().unwrap();
                             let key = date.format("%Y-%m-%d").to_string();
                             let entry = map.entry(key.clone()).or_insert_with(|| ActivityItem {
                                 key: key.clone(),
@@ -1211,7 +1215,6 @@ impl AuditService {
                             }
                         }
                         GroupBy::Week => {
-                            let (_, _, _, date) = current.as_ref().unwrap();
                             // ISO week key: YYYY-Www
                             let iso_week = date.iso_week();
                             let key = format!("{}-W{:02}", iso_week.year(), iso_week.week());

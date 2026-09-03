@@ -87,7 +87,7 @@ impl StorageOperations {
             if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
                 eprintln!("[lotar][debug] writing task file {}", file_path.display());
             }
-            let file_string = serde_yaml::to_string(task)?;
+            let file_string = serde_yaml_ng::to_string(task)?;
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)?;
             } else {
@@ -106,7 +106,7 @@ impl StorageOperations {
         let read_task = |project_path: &Path| -> Option<Task> {
             let file_path = Self::get_file_path_for_id(project_path, id)?;
             let file_string = fs::read_to_string(&file_path).ok()?;
-            match serde_yaml::from_str::<Task>(&file_string) {
+            match serde_yaml_ng::from_str::<Task>(&file_string) {
                 Ok(task) => Some(task),
                 Err(e) => {
                     warn_corrupt_once(&file_path, &e.to_string());
@@ -179,7 +179,7 @@ impl StorageOperations {
             };
 
             // Save the task
-            let file_string = serde_yaml::to_string(new_task)?;
+            let file_string = serde_yaml_ng::to_string(new_task)?;
             atomic_write_file(&file_path, &file_string)?;
 
             // No longer need to update index - simplified architecture
@@ -297,7 +297,7 @@ impl StorageOperations {
             if config_path.exists()
                 && let Ok(content) = fs::read_to_string(&config_path)
                 && let Ok(config) =
-                    serde_yaml::from_str::<crate::config::types::ProjectConfig>(&content)
+                    serde_yaml_ng::from_str::<crate::config::types::ProjectConfig>(&content)
             {
                 // Check if the project name in config matches (either exact or prefix)
                 if config.project_name == project_name || config.project_name == expected_prefix {

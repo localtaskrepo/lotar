@@ -803,7 +803,7 @@ import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
 import { useCopyModifier } from '../composables/useCopyModifier'
-import { useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
@@ -861,8 +861,6 @@ const allColumns: ColumnKey[] = [
 ]
 
 const defaultColumns: ColumnKey[] = ['id', 'title', 'status', 'priority', 'assignee', 'due_date', 'modified']
-
-const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'order', 'due', 'recent', 'needs'])
 
 function normalizeSprintMembership(raw: unknown): number[] {
   if (!Array.isArray(raw)) return []
@@ -2173,13 +2171,6 @@ const startDelayLookup = computed(() => {
   return map
 })
 
-function parseList(value: string): string[] {
-  return value
-    .split(',')
-    .map((token) => token.trim())
-    .filter(Boolean)
-}
-
 function applySprintSmartFilters(source: TaskDTO[], q: Record<string, string>): TaskDTO[] {
   const wantsUnassigned = q.assignee === '__none__'
   const due = q.due || ''
@@ -2285,34 +2276,9 @@ async function refreshTasks() {
   }
   tasksLoading.value = true
   try {
-    const rawFilter = { ...(filter.value || {}) }
-    const qnorm: Record<string, string> = {}
-    const extraQuery: Record<string, string> = {}
-    for (const [key, value] of Object.entries(rawFilter)) {
-      if (!value || key === 'order') continue
-      if (BUILTIN_QUERY_KEYS.has(key)) {
-        qnorm[key] = value
-      } else {
-        extraQuery[key] = value
-      }
-    }
-
-    const payload: Record<string, unknown> = {}
-    if (qnorm.q) payload.q = qnorm.q
+    const { serverFilter: payload, normalized: qnorm } = buildServerFilter(filter.value || {}, '')
     if (qnorm.project) payload.project = qnorm.project
     else if (project.value) payload.project = project.value
-    const statusList = parseList(qnorm.status || '')
-    if (statusList.length) payload.status = statusList
-    const priorityList = parseList(qnorm.priority || '')
-    if (priorityList.length) payload.priority = priorityList
-    const typeList = parseList(qnorm.type || '')
-    if (typeList.length) payload.type = typeList
-    const tagList = parseList(qnorm.tags || '')
-    if (tagList.length) payload.tags = tagList
-    if (qnorm.assignee && qnorm.assignee !== '__none__') payload.assignee = qnorm.assignee
-    Object.entries(extraQuery).forEach(([key, value]) => {
-      payload[key] = value
-    })
 
     const collected: TaskDTO[] = []
     let currentOffset = 0

@@ -9,6 +9,7 @@ use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
 use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::manager::ConfigManager;
+use crate::errors::LoTaRError;
 use crate::services::reference_service::ReferenceService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
@@ -232,9 +233,8 @@ fn parse_task_update_patch(
         }
     }
 
-    if patch_val.get("custom_fields").is_some() {
+    if let Some(custom_fields_val) = patch_val.get("custom_fields") {
         let mut custom_fields_map = std::collections::HashMap::new();
-        let custom_fields_val = patch_val.get("custom_fields").unwrap();
         if custom_fields_val.is_null() {
             patch.custom_fields = Some(custom_fields_map);
         } else {
@@ -254,7 +254,7 @@ fn parse_task_update_patch(
                 }
                 #[cfg(not(feature = "schema"))]
                 {
-                    serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
+                    serde_yaml_ng::to_value(val).unwrap_or(serde_yaml_ng::Value::Null)
                 }
             }
 
@@ -419,7 +419,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         }
         #[cfg(not(feature = "schema"))]
         {
-            serde_yaml::to_value(val).unwrap_or(serde_yaml::Value::Null)
+            serde_yaml_ng::to_value(val).unwrap_or(serde_yaml_ng::Value::Null)
         }
     }
 
@@ -594,14 +594,9 @@ fn applied_defaults_for_task_create(params: &Value, task: &TaskDTO) -> Vec<Value
 }
 
 pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
-    let id = req
-        .params
-        .get("id")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    if id.is_none() {
+    let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing id", None);
-    }
+    };
     let project = req.params.get("project").and_then(|v| v.as_str());
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
@@ -615,7 +610,7 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
     let storage = Storage::new(&resolver.path);
-    match TaskService::get(&storage, &id.unwrap(), project) {
+    match TaskService::get(&storage, id, project) {
         Ok(task) => ok(
             req.id,
             json!({
@@ -632,14 +627,9 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
-    let id = req
-        .params
-        .get("id")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    if id.is_none() {
+    let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing id", None);
-    }
+    };
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
         Err(e) => {
@@ -677,7 +667,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
         Err(resp) => return resp,
     };
     let mut storage = Storage::new(&resolver.path.clone());
-    match TaskService::update(&mut storage, &id.unwrap(), patch) {
+    match TaskService::update(&mut storage, id, patch) {
         Ok(task) => ok(
             req.id,
             json!({
@@ -1154,27 +1144,42 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
             ("link", false) => {
                 ReferenceService::detach_link_reference(&mut storage, &normalized_id, &value)
             }
-            ("code", true) => ReferenceService::attach_code_reference(
-                &mut storage,
-                repo_root.as_ref().unwrap(),
-                &normalized_id,
-                &value,
-            ),
+            ("code", true) => match repo_root.as_deref() {
+                Some(root) => ReferenceService::attach_code_reference(
+                    &mut storage,
+                    root,
+                    &normalized_id,
+                    &value,
+                ),
+                None => Err(LoTaRError::ValidationError(
+                    "unable to locate git repository".to_string(),
+                )),
+            },
             ("code", false) => {
                 ReferenceService::detach_code_reference(&mut storage, &normalized_id, &value)
             }
-            ("file", true) => ReferenceService::attach_file_reference(
-                &mut storage,
-                repo_root.as_ref().unwrap(),
-                &normalized_id,
-                &value,
-            ),
-            ("file", false) => ReferenceService::detach_file_reference(
-                &mut storage,
-                repo_root.as_ref().unwrap(),
-                &normalized_id,
-                &value,
-            ),
+            ("file", true) => match repo_root.as_deref() {
+                Some(root) => ReferenceService::attach_file_reference(
+                    &mut storage,
+                    root,
+                    &normalized_id,
+                    &value,
+                ),
+                None => Err(LoTaRError::ValidationError(
+                    "unable to locate git repository".to_string(),
+                )),
+            },
+            ("file", false) => match repo_root.as_deref() {
+                Some(root) => ReferenceService::detach_file_reference(
+                    &mut storage,
+                    root,
+                    &normalized_id,
+                    &value,
+                ),
+                None => Err(LoTaRError::ValidationError(
+                    "unable to locate git repository".to_string(),
+                )),
+            },
             ("jira", true) => ReferenceService::attach_platform_reference(
                 &mut storage,
                 &normalized_id,
@@ -1400,10 +1405,9 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
 }
 
 pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
-    let id = req.params.get("id").and_then(|v| v.as_str());
-    if id.is_none() {
+    let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing id", None);
-    }
+    };
     let project = req.params.get("project").and_then(|v| v.as_str());
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
@@ -1417,7 +1421,7 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
     let mut storage = Storage::new(&resolver.path);
-    match TaskService::delete(&mut storage, id.unwrap(), project) {
+    match TaskService::delete(&mut storage, id, project) {
         Ok(deleted) => ok(
             req.id,
             json!({

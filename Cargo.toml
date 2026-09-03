@@ -1,6 +1,6 @@
 [package]
 name = "lotar"
-version = "0.7.7"
+version = "0.8.0"
 edition = "2024"
 authors = ["Ravi Gairola <mallox@pyxzl.net>"]
 description = "A git-native task management CLI that stores issues as YAML files in your repository"
@@ -22,11 +22,11 @@ path = "src/bin/lotar_agent_wrapper.rs"
 
 # Optimize dependencies for smaller binaries
 [dependencies]
-regex = { version = "1.12.3", default-features = false, features = ["std", "unicode", "unicode-perl"] }
+regex = { version = "1.13.1", default-features = false, features = ["std", "unicode", "unicode-perl"] }
 include_dir = "0.7.4"
 chrono = { version = "0.4.44", features = ["serde", "clock"], default-features = false }
 serde = { version = "1.0.228", features = ["derive"], default-features = false }
-serde_yaml = { version = "0.9.34", default-features = false }
+serde_yaml_ng = "0.10.0"
 serde_json = { version = "1.0.149", features = ["std"], default-features = false }
 thiserror = "2.0.18"
 dirs = "6.0.0"

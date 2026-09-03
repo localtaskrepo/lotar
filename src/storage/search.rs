@@ -15,7 +15,7 @@ impl StorageSearch {
             Ok(content) => content,
             Err(_) => return None,
         };
-        match serde_yaml::from_str::<Task>(&content) {
+        match serde_yaml_ng::from_str::<Task>(&content) {
             Ok(task) => Some(task),
             Err(e) => {
                 crate::storage::safety::warn_corrupt_once(path, &e.to_string());

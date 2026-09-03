@@ -2816,7 +2816,7 @@ fn get_task_as_json(temp_dir: &TempDir, task_id: &str) -> serde_json::Value {
     panic!("Could not find task with ID: {task_id}");
 }
 
-fn read_task_yaml(temp_dir: &TempDir, task_id: &str) -> serde_yaml::Value {
+fn read_task_yaml(temp_dir: &TempDir, task_id: &str) -> serde_yaml_ng::Value {
     let (project, sequence) = task_id
         .rsplit_once('-')
         .unwrap_or_else(|| panic!("Unexpected task id format: {task_id}"));
@@ -2827,7 +2827,7 @@ fn read_task_yaml(temp_dir: &TempDir, task_id: &str) -> serde_yaml::Value {
         .join(format!("{sequence}.yml"));
     let contents = fs::read_to_string(&path)
         .unwrap_or_else(|_| panic!("Failed to read task file at {}", path.display()));
-    serde_yaml::from_str(&contents)
+    serde_yaml_ng::from_str(&contents)
         .unwrap_or_else(|_| panic!("Failed to parse YAML for task {task_id}"))
 }
 
@@ -2908,11 +2908,11 @@ mod dual_interface {
         let task2_yaml = read_task_yaml(&temp_dir, &task_id2);
         assert_eq!(
             task1_yaml["reporter"],
-            serde_yaml::Value::String("reporter@example.com".to_string())
+            serde_yaml_ng::Value::String("reporter@example.com".to_string())
         );
         assert_eq!(
             task2_yaml["reporter"],
-            serde_yaml::Value::String("reporter@example.com".to_string())
+            serde_yaml_ng::Value::String("reporter@example.com".to_string())
         );
     }
 

@@ -33,6 +33,10 @@ fn init_fake_repo_with_codeowners(repo_root: &std::path::Path, codeowners: &str)
 
 #[test]
 fn codeowners_assigns_owner_on_first_status_change() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     // EnvVarGuard will restore LOTAR_TASKS_DIR automatically
 
     let temp = TempDir::new().unwrap();
@@ -59,7 +63,7 @@ fn codeowners_assigns_owner_on_first_status_change() {
                 {
                     map.insert(
                         "path".to_string(),
-                        serde_yaml::Value::String("src/main.rs".to_string()),
+                        serde_yaml_ng::Value::String("src/main.rs".to_string()),
                     );
                 }
                 #[cfg(feature = "schema")]
@@ -95,6 +99,10 @@ fn codeowners_assigns_owner_on_first_status_change() {
 
 #[test]
 fn codeowners_disabled_falls_back_to_identity() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     // serialize via EnvVarGuard not needed; per-var mutex inside
 
     let temp = TempDir::new().unwrap();
@@ -123,7 +131,7 @@ fn codeowners_disabled_falls_back_to_identity() {
                 {
                     map.insert(
                         "path".to_string(),
-                        serde_yaml::Value::String("src/lib.rs".to_string()),
+                        serde_yaml_ng::Value::String("src/lib.rs".to_string()),
                     );
                 }
                 #[cfg(feature = "schema")]
@@ -157,6 +165,10 @@ fn codeowners_disabled_falls_back_to_identity() {
 
 #[test]
 fn codeowners_default_multiple_owners_picks_first() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     // use EnvVarGuard for LOTAR_TASKS_DIR
 
     let temp = TempDir::new().unwrap();
@@ -182,7 +194,7 @@ fn codeowners_default_multiple_owners_picks_first() {
                 {
                     map.insert(
                         "path".to_string(),
-                        serde_yaml::Value::String("src/file.rs".to_string()),
+                        serde_yaml_ng::Value::String("src/file.rs".to_string()),
                     );
                 }
                 #[cfg(feature = "schema")]
@@ -216,6 +228,10 @@ fn codeowners_default_multiple_owners_picks_first() {
 
 #[test]
 fn codeowners_no_match_and_no_default_falls_back_to_identity() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     // use EnvVarGuard for LOTAR_TASKS_DIR
 
     let temp = TempDir::new().unwrap();
@@ -245,7 +261,7 @@ fn codeowners_no_match_and_no_default_falls_back_to_identity() {
                 {
                     map.insert(
                         "path".to_string(),
-                        serde_yaml::Value::String("src/lib.rs".to_string()),
+                        serde_yaml_ng::Value::String("src/lib.rs".to_string()),
                     );
                 }
                 #[cfg(feature = "schema")]

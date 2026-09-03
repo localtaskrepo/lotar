@@ -914,11 +914,11 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
-    let raw_tasks = req.params.get("tasks");
-    if raw_tasks.is_none() {
+    let Some(raw_tasks) = req.params.get("tasks") else {
         return err(req.id, -32602, "Missing required field: tasks", None);
-    }
-    let tasks: Vec<String> = match raw_tasks.unwrap() {
+    };
+
+    let tasks: Vec<String> = match raw_tasks {
         Value::String(value) => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
@@ -1126,11 +1126,11 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
-    let raw_tasks = req.params.get("tasks");
-    if raw_tasks.is_none() {
+    let Some(raw_tasks) = req.params.get("tasks") else {
         return err(req.id, -32602, "Missing required field: tasks", None);
-    }
-    let tasks: Vec<String> = match raw_tasks.unwrap() {
+    };
+
+    let tasks: Vec<String> = match raw_tasks {
         Value::String(value) => {
             let trimmed = value.trim();
             if trimmed.is_empty() {
@@ -1440,7 +1440,7 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         req.id,
         json!({
             "content": [
-                { "type": "text", "text": format!("{}", summary) },
+                { "type": "text", "text": summary.to_string() },
                 { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) }
             ]
         }),

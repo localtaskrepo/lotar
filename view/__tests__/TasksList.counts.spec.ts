@@ -128,6 +128,9 @@ vi.mock('../composables/useSprints', () => ({
         refresh: sprintsStore.refresh,
         loading: sprintsStore.loading,
     }),
+    useSprintFilterOptions: (sprints: any) => ({
+        value: (sprints?.value || []).map((s: any) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
+    }),
 }))
 
 vi.mock('../composables/useConfig', () => ({

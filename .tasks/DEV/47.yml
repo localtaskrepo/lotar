@@ -1,0 +1,16 @@
+title: 'Held-back major upgrades: serde_yaml_ng migration, regex 1.13, TS7 evaluation, runtime git-test gating'
+status: Done
+priority: High
+type: Task
+reporter: mallox
+assignee: mallox
+created: 2026-09-03T19:05:00.000000+00:00
+modified: 2026-09-03T19:05:28.456725+00:00
+comments:
+- date: 2026-09-03T19:05:28.456725+00:00
+  text: 'Major upgrades: (1) serde_yaml 0.9 -> serde_yaml_ng 0.10 (deprecated -> maintained fork, drop-in API): 232 refs across 34 src files + tests bulk-migrated, zero behavior change. During verification, chasing apparent failures exposed that a stray .tasks/ in the agent TMPDIR root (/private/tmp/kilo) polluted every temp-workspace test via directory-walk-up discovery - root-caused, cleaned, tests green; not a library issue. (2) regex 1.12.3 -> 1.13.1 via --precise (plain cargo update conservatively held it back; MSRV 1.65 is fine). (3) TypeScript 7 re-evaluated: vue-tsc 3.3.11 still hard-requires the pre-7 package layout (./lib/tsc) and no tsgo variant exists - remains ecosystem-blocked, stayed on 6.0.3. (4) Added runtime git_available() gates (tests/common + src mcp tests) so git-dependent tests skip instead of failing when the build-time no_git_tests probe is fooled by cargo''s TMPDIR redirect for build scripts; suite now runs 815 tests in all environments (815/815 green in sandbox, git tests skip where .git creation is denied). Gates: lint clean, nextest 815/815, vitest 236/236, smoke 94/94.'
+history:
+- at: 2026-09-03T19:05:28.456725+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

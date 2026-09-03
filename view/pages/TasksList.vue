@@ -342,7 +342,7 @@ import { useConfig } from '../composables/useConfig'
 import { useCustomFilterPresets } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
-import { useSprints } from '../composables/useSprints'
+import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
@@ -389,9 +389,7 @@ const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, active: activeSprints } = useSprints()
 const { sprintLookup } = useSprintFormatting(sprints)
-const sprintFilterOptions = computed(() =>
-  (sprints.value || []).map((s) => ({ id: s.id, label: s.display_name || `Sprint ${s.id}` })),
-)
+const sprintFilterOptions = useSprintFilterOptions(sprints)
 const sprintSelection = ref('active')
 const allowClosedSprint = ref(false)
 const sprintOptions = computed(() => {

@@ -186,7 +186,7 @@ impl SprintService {
             .parse()
             .map_err(|_| LoTaRError::SerializationError("Invalid sprint identifier".into()))?;
         let contents = fs::read_to_string(path)?;
-        let sprint: Sprint = serde_yaml::from_str(&contents)?;
+        let sprint: Sprint = serde_yaml_ng::from_str(&contents)?;
         Ok((id, sprint))
     }
 

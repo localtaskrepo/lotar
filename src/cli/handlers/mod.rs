@@ -282,17 +282,7 @@ impl CommandHandler for AddHandler {
 
         // Status: inferred via branch alias if enabled; otherwise smart default
         task.status = crate::utils::task_intel::infer_status_from_branch(&config)
-            .and_then(|status| {
-                if validator
-                    .validate_status(status.as_str())
-                    .map(|_| ())
-                    .is_ok()
-                {
-                    Some(status)
-                } else {
-                    None
-                }
-            })
+            .filter(|status| validator.validate_status(status.as_str()).is_ok())
             .unwrap_or_else(|| Self::get_default_status(&config));
 
         // Set validated properties

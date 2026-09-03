@@ -1,4 +1,5 @@
 #![cfg(not(no_git_tests))]
+mod common;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
@@ -17,6 +18,10 @@ fn with_cwd(dir: &PathBuf, f: impl FnOnce()) {
 
 #[test]
 fn prefers_nearest_manifest_across_types() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let tmp = tempfile::TempDir::new().unwrap();
     let repo = tmp.path().join("repo");
     fs::create_dir_all(repo.join(".git")).unwrap();
@@ -56,6 +61,10 @@ version = "0.1.0"
 
 #[test]
 fn stops_at_repo_root_even_if_parent_has_manifest() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let tmp = tempfile::TempDir::new().unwrap();
     let outer = tmp.path().join("outer");
     fs::create_dir_all(&outer).unwrap();
@@ -81,6 +90,10 @@ fn stops_at_repo_root_even_if_parent_has_manifest() {
 
 #[test]
 fn submodule_like_repo_uses_inner_git_file_root() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let tmp = tempfile::TempDir::new().unwrap();
     let outer = tmp.path().join("outer");
     fs::create_dir_all(outer.join(".git")).unwrap();

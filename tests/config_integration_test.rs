@@ -210,7 +210,7 @@ mod global_config {
             .split_once("canonical YAML:\n")
             .expect("full config should include canonical YAML block");
         let doc: serde_json::Value =
-            serde_yaml::from_str(yaml_block).expect("canonical YAML should deserialize");
+            serde_yaml_ng::from_str(yaml_block).expect("canonical YAML should deserialize");
         assert!(
             !yaml_block.contains("# ("),
             "full canonical YAML should omit provenance comments without --explain\n{yaml_block}"
@@ -273,7 +273,7 @@ mod global_config {
         );
 
         let yaml_body = yaml_block.trim_start_matches("---\n");
-        serde_yaml::from_str::<serde_json::Value>(yaml_body)
+        serde_yaml_ng::from_str::<serde_json::Value>(yaml_body)
             .expect("YAML block should remain parseable");
         assert!(
             yaml_block.contains("codeowners-assign: true # (default)"),

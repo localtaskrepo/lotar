@@ -486,7 +486,7 @@ fn render_resolved_config_yaml(
 }
 
 fn yaml_scalar<T: Serialize>(value: &T) -> String {
-    match serde_yaml::to_string(value) {
+    match serde_yaml_ng::to_string(value) {
         Ok(mut text) => {
             if let Some(stripped) = text.strip_prefix("---\n") {
                 text = stripped.to_string();

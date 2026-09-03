@@ -91,8 +91,8 @@ impl Sprint {
     }
 
     /// Serialize the sprint into canonical YAML.
-    pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string(self)
+    pub fn to_yaml(&self) -> Result<String, serde_yaml_ng::Error> {
+        serde_yaml_ng::to_string(self)
     }
 
     /// Compute the file path for a sprint ID relative to a tasks root.

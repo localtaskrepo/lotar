@@ -1,0 +1,22 @@
+title: 'Refactor and code improvement round: panic-path hardening, shared filter/sprint composables, agent-test retry mitigation'
+status: Done
+priority: High
+type: Task
+reporter: mallox
+assignee: mallox
+created: 2026-09-03T19:50:00.000000+00:00
+modified: 2026-09-03T20:08:17.538880+00:00
+comments:
+- date: 2026-09-03T19:52:16.139398+00:00
+  text: 'Rust hardening: eliminated fragile validate-then-unwrap-later patterns in MCP handlers (task get/update/delete id, projects stats name, sprints raw_tasks) via let-else bindings; code/file reference arms now return LoTaRError instead of unwrap() on repo_root (panic-free); audit_service activity grouping binds current once instead of unwrap() per arm; stats due.rs counters use entry API. Remaining unwraps audited: all documented-invariant expects (clap-validated, post-starts_with strips, static regexes). Frontend dedup: extracted useSprintFilterOptions (was duplicated in TasksList+Board); SprintsList now uses canonical buildServerFilter from useFilterBuilder instead of a 30-line hand-rolled query builder, dropped local BUILTIN_QUERY_KEYS and parseList copies; spec mocks updated. Test infra: agent_automation_integration_test binary serialized (max-threads 1) + retries=2 in nextest config - mock agents poll on wall-clock schedules and flaked under parallel load (different test each run, all pass isolated or on retry); assertions unchanged. Gates: lint clean, nextest 775/775 (2 flaky-retried), vitest 236/236, smoke 94/94.'
+- date: 2026-09-03T20:08:17.538880+00:00
+  text: 'Release-blocker fix: CI Quality Assurance failed because GH Actions runs clippy 1.98 while local was 1.95 - five new-lint errors on the pushed dependency commit: manual_filter (comment.rs, handlers/mod.rs), question_mark (scan_handler.rs, git.rs), useless_format (sprints.rs). All five fixed with behavior-preserving rewrites (filter(), ?-propagation kept errors flowing, to_string()). Installed a 1.98 toolchain locally (target/rustup) and verified the exact CI gate locally: clippy --all-targets --all-features -D warnings CLEAN, cargo fmt --all --check CLEAN, nextest 775/775. The parallel Release workflow failure was only its ''Ensure QA succeeded'' gate and clears once QA is green. Full local gates: vitest 236/236, smoke 94/94. Fixes are in the working tree - commit and push to re-run CI.'
+history:
+- at: 2026-09-03T19:52:16.139398+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-03T20:08:17.538880+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

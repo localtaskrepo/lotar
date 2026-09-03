@@ -57,13 +57,13 @@ pub(crate) fn run(
                 }
             }
             // Try strict first
-            if let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(content) {
+            if let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(content) {
                 return Some(task.status);
             }
             // Tolerant fallback: read just `status` as a string
-            if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content)
+            if let Ok(val) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content)
                 && let Some(s) = val.get("status").and_then(|v| match v {
-                    serde_yaml::Value::String(s) => Some(s.clone()),
+                    serde_yaml_ng::Value::String(s) => Some(s.clone()),
                     _ => None,
                 })
             {
@@ -336,7 +336,7 @@ pub(crate) fn run(
                             ) = (|| {
                                 let content = fs::read_to_string(&abs_file).unwrap_or_default();
                                 if let Ok(task) =
-                                    serde_yaml::from_str::<crate::storage::task::Task>(&content)
+                                    serde_yaml_ng::from_str::<crate::storage::task::Task>(&content)
                                 {
                                     let sprints: Vec<u32> = sprint_lookup
                                         .get(&id)
@@ -404,7 +404,8 @@ pub(crate) fn run(
                                     .unwrap_or_default();
                                 let history: Vec<crate::types::TaskChangeLogEntry> = Vec::new();
                                 let custom_fields: crate::types::CustomFields = Default::default();
-                                if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(&content)
+                                if let Ok(val) =
+                                    serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content)
                                 {
                                     if let Some(s) = val.get("title").and_then(|v| v.as_str()) {
                                         title = s.to_string();
@@ -581,12 +582,12 @@ pub(crate) fn run(
         #[cfg(not(feature = "schema"))]
         {
             match v {
-                serde_yaml::Value::Null => String::new(),
-                serde_yaml::Value::Bool(b) => b.to_string(),
-                serde_yaml::Value::Number(n) => n.to_string(),
-                serde_yaml::Value::String(s) => s.clone(),
-                serde_yaml::Value::Sequence(_) => "[array]".to_string(),
-                serde_yaml::Value::Mapping(_) => "{object}".to_string(),
+                serde_yaml_ng::Value::Null => String::new(),
+                serde_yaml_ng::Value::Bool(b) => b.to_string(),
+                serde_yaml_ng::Value::Number(n) => n.to_string(),
+                serde_yaml_ng::Value::String(s) => s.clone(),
+                serde_yaml_ng::Value::Sequence(_) => "[array]".to_string(),
+                serde_yaml_ng::Value::Mapping(_) => "{object}".to_string(),
                 _ => "other".to_string(),
             }
         }

@@ -56,6 +56,10 @@ fn add_and_commit(
 
 #[test]
 fn task_history_diff_at() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);

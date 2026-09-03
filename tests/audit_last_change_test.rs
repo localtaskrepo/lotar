@@ -32,6 +32,10 @@ fn init_repo(temp: &TempDir) {
 
 #[test]
 fn audit_list_last_change_per_task_smoke() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);

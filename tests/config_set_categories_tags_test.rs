@@ -164,7 +164,7 @@ fn config_set_project_custom_fields_and_tags() {
         .success();
 
     let contents = std::fs::read_to_string(proj_dir.join("config.yml")).unwrap();
-    let doc: serde_yaml::Value = serde_yaml::from_str(&contents).expect("valid yaml");
+    let doc: serde_yaml_ng::Value = serde_yaml_ng::from_str(&contents).expect("valid yaml");
 
     let custom_fields = doc
         .get("custom")

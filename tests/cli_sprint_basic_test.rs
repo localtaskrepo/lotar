@@ -1566,7 +1566,7 @@ fn sprint_normalize_rewrites_yaml_when_requested() {
     let contents = std::fs::read_to_string(sprint_dir.join("1.yml")).expect("read sprint file");
     assert!(!contents.contains("length: 2w"));
 
-    let parsed: Sprint = serde_yaml::from_str(&contents).expect("parse canonical sprint");
+    let parsed: Sprint = serde_yaml_ng::from_str(&contents).expect("parse canonical sprint");
     let plan = parsed.plan.expect("plan retained");
     assert!(plan.length.is_none());
     assert_eq!(plan.ends_at.as_deref(), Some("2030-01-15T17:00:00Z"));

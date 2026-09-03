@@ -37,8 +37,8 @@ impl From<std::io::Error> for LoTaRError {
     }
 }
 
-impl From<serde_yaml::Error> for LoTaRError {
-    fn from(error: serde_yaml::Error) -> Self {
+impl From<serde_yaml_ng::Error> for LoTaRError {
+    fn from(error: serde_yaml_ng::Error) -> Self {
         LoTaRError::SerializationError(error.to_string())
     }
 }

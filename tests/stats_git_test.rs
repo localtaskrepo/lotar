@@ -64,6 +64,10 @@ fn add_and_commit(
 // --- Merged from stats_time_in_status_git_test.rs ---
 #[test]
 fn stats_time_in_status_basic_window() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
@@ -168,6 +172,10 @@ fn stats_time_in_status_basic_window() {
 // --- Merged from stats_time_in_status_single_task_test.rs ---
 #[test]
 fn stats_time_in_status_single_task() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
@@ -267,6 +275,10 @@ fn stats_time_in_status_single_task() {
 // --- Merged from stats_effort_transitions_window_test.rs ---
 #[test]
 fn stats_effort_with_transitions_window_filters_tasks() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
@@ -408,6 +420,10 @@ fn stats_effort_with_transitions_window_filters_tasks() {
 
 #[test]
 fn stats_changed_and_churn_and_authors() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);

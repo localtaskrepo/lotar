@@ -318,3 +318,30 @@ pub mod assertions {
 
 // Note: Test functions for common utilities have been removed to prevent duplication
 // across all test files that import this module. Each test file should test its own functionality.
+
+/// Whether git-dependent tests can run in this environment.
+///
+/// Some sandboxed runtimes forbid creating anything named `.git` anywhere
+/// except the workspace, which makes every test that runs `git init` fail
+/// with "Operation not permitted". The build-time `no_git_tests` cfg compiles
+/// those tests out when detected at build time, but cargo redirects `TMPDIR`
+/// for build scripts, which can fool that probe. This runtime probe checks
+/// what the tests actually do — creating a `.git` directory inside a real
+/// tempfile — and lets each gated test skip instead of failing.
+#[allow(dead_code)]
+pub fn git_available() -> bool {
+    static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *AVAILABLE.get_or_init(|| {
+        let Ok(tmp) = tempfile::tempdir() else {
+            return false;
+        };
+        let probe = tmp.path().join(".git");
+        match fs::create_dir(&probe) {
+            Ok(()) => {
+                let _ = fs::remove_dir(&probe);
+                true
+            }
+            Err(_) => false,
+        }
+    })
+}

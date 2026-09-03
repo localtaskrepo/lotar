@@ -97,7 +97,7 @@ pub(crate) fn handle_normalize(
 
         let original = fs::read_to_string(&path)
             .map_err(|err| format!("Failed to read {}: {}", path.display(), err))?;
-        let mut sprint: Sprint = serde_yaml::from_str(&original)
+        let mut sprint: Sprint = serde_yaml_ng::from_str(&original)
             .map_err(|err| format!("Failed to parse sprint #{}: {}", sprint_id, err))?;
 
         let warnings = sprint.canonicalize();

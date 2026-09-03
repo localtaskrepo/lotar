@@ -42,6 +42,10 @@ fn init_repo(root: &Path) {
 mod smoke {
     #[test]
     fn changelog_outside_git_no_crash() {
+        if !crate::common::git_available() {
+            eprintln!("skipping: git unavailable in this sandbox");
+            return;
+        }
         let temp = crate::common::temp_dir();
         // No git repo here; command should not crash
         crate::common::lotar_cmd()
@@ -58,6 +62,10 @@ mod range {
 
     #[test]
     fn changelog_with_ref_range_runs() {
+        if !crate::common::git_available() {
+            eprintln!("skipping: git unavailable in this sandbox");
+            return;
+        }
         let temp = crate::common::temp_dir();
         let root = temp.path();
 
@@ -104,6 +112,10 @@ mod range_json {
 
     #[test]
     fn changelog_range_mode_json() {
+        if !crate::common::git_available() {
+            eprintln!("skipping: git unavailable in this sandbox");
+            return;
+        }
         let temp = crate::common::temp_dir();
         let root = temp.path();
 
@@ -158,6 +170,10 @@ mod working_tree {
 
     #[test]
     fn changelog_working_tree_modified_json() {
+        if !crate::common::git_available() {
+            eprintln!("skipping: git unavailable in this sandbox");
+            return;
+        }
         let temp = crate::common::temp_dir();
         let root = temp.path();
         init_repo(root);
@@ -211,6 +227,10 @@ mod working_tree {
 
     #[test]
     fn changelog_working_tree_created_and_deleted() {
+        if !crate::common::git_available() {
+            eprintln!("skipping: git unavailable in this sandbox");
+            return;
+        }
         let temp = crate::common::temp_dir();
         let root = temp.path();
         init_repo(root);

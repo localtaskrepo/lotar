@@ -90,12 +90,12 @@ pub(crate) fn run_status(
                 _ => None,
             }
         }
-        if let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(content) {
+        if let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(content) {
             return Some(task.status);
         }
-        if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content)
+        if let Ok(val) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content)
             && let Some(s) = val.get("status").and_then(|v| match v {
-                serde_yaml::Value::String(s) => Some(s.clone()),
+                serde_yaml_ng::Value::String(s) => Some(s.clone()),
                 _ => None,
             })
         {
@@ -366,12 +366,12 @@ pub(crate) fn run_time_in_status(
                     _ => None,
                 }
             }
-            if let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(content) {
+            if let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(content) {
                 return Some(task.status);
             }
-            if let Ok(val) = serde_yaml::from_str::<serde_yaml::Value>(content)
+            if let Ok(val) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content)
                 && let Some(s) = val.get("status").and_then(|v| match v {
-                    serde_yaml::Value::String(s) => Some(s.clone()),
+                    serde_yaml_ng::Value::String(s) => Some(s.clone()),
                     _ => None,
                 })
             {

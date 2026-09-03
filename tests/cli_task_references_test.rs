@@ -21,6 +21,10 @@ issue.priorities: [Low, Medium, High]
 
 #[test]
 fn task_reference_add_and_remove_link_file_and_code() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = TempDir::new().unwrap();
 
     // Make this temp dir look like a git repo so code/file references can resolve.

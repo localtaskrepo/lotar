@@ -238,7 +238,7 @@ pub struct AutomationActionSet {
     #[serde(default, alias = "label", alias = "labels")]
     pub labels: Option<StringOrVec>,
     #[serde(default)]
-    pub custom_fields: Option<HashMap<String, serde_yaml::Value>>,
+    pub custom_fields: Option<HashMap<String, serde_yaml_ng::Value>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

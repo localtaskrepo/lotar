@@ -434,19 +434,19 @@ pub struct ReferenceEntry {
 // Type alias for custom fields - can hold any YAML-serializable value
 // For schema generation, use serde_json::Value which has a JsonSchema implementation
 #[cfg(not(feature = "schema"))]
-pub type CustomFields = HashMap<String, serde_yaml::Value>;
+pub type CustomFields = HashMap<String, serde_yaml_ng::Value>;
 #[cfg(feature = "schema")]
 pub type CustomFields = HashMap<String, serde_json::Value>;
 
 // Value type alias and helpers for constructing custom field values in a feature-aware way
 #[cfg(not(feature = "schema"))]
-pub type CustomFieldValue = serde_yaml::Value;
+pub type CustomFieldValue = serde_yaml_ng::Value;
 #[cfg(feature = "schema")]
 pub type CustomFieldValue = serde_json::Value;
 
 #[cfg(not(feature = "schema"))]
-pub fn custom_value_string<S: Into<String>>(s: S) -> serde_yaml::Value {
-    serde_yaml::Value::String(s.into())
+pub fn custom_value_string<S: Into<String>>(s: S) -> serde_yaml_ng::Value {
+    serde_yaml_ng::Value::String(s.into())
 }
 
 #[cfg(feature = "schema")]
@@ -471,12 +471,12 @@ pub fn custom_value_to_string(v: &CustomFieldValue) -> String {
 #[cfg(not(feature = "schema"))]
 pub fn custom_value_to_string(v: &CustomFieldValue) -> String {
     match v {
-        serde_yaml::Value::Null => String::new(),
-        serde_yaml::Value::Bool(b) => b.to_string(),
-        serde_yaml::Value::Number(n) => n.to_string(),
-        serde_yaml::Value::String(s) => s.clone(),
-        serde_yaml::Value::Sequence(_) => "[array]".to_string(),
-        serde_yaml::Value::Mapping(_) => "{object}".to_string(),
+        serde_yaml_ng::Value::Null => String::new(),
+        serde_yaml_ng::Value::Bool(b) => b.to_string(),
+        serde_yaml_ng::Value::Number(n) => n.to_string(),
+        serde_yaml_ng::Value::String(s) => s.clone(),
+        serde_yaml_ng::Value::Sequence(_) => "[array]".to_string(),
+        serde_yaml_ng::Value::Mapping(_) => "{object}".to_string(),
         _ => "other".to_string(),
     }
 }

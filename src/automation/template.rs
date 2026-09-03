@@ -148,11 +148,11 @@ fn shell_quote_into(out: &mut String, value: &str) {
 #[cfg(not(feature = "schema"))]
 fn custom_field_to_string(value: &crate::types::CustomFieldValue) -> String {
     match value {
-        serde_yaml::Value::String(v) => v.clone(),
-        serde_yaml::Value::Bool(v) => v.to_string(),
-        serde_yaml::Value::Number(v) => v.to_string(),
-        serde_yaml::Value::Null => String::new(),
-        other => serde_yaml::to_string(other)
+        serde_yaml_ng::Value::String(v) => v.clone(),
+        serde_yaml_ng::Value::Bool(v) => v.to_string(),
+        serde_yaml_ng::Value::Number(v) => v.to_string(),
+        serde_yaml_ng::Value::Null => String::new(),
+        other => serde_yaml_ng::to_string(other)
             .unwrap_or_default()
             .trim()
             .to_string(),

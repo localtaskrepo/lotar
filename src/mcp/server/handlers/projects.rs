@@ -92,10 +92,9 @@ pub(crate) fn handle_project_list(req: JsonRpcRequest) -> JsonRpcResponse {
 }
 
 pub(crate) fn handle_project_stats(req: JsonRpcRequest) -> JsonRpcResponse {
-    let name = req.params.get("name").and_then(|v| v.as_str());
-    if name.is_none() {
+    let Some(name) = req.params.get("name").and_then(|v| v.as_str()) else {
         return err(req.id, -32602, "Missing name", None);
-    }
+    };
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
         Err(e) => {
@@ -108,7 +107,7 @@ pub(crate) fn handle_project_stats(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
     let storage = crate::storage::manager::Storage::new(&resolver.path);
-    let stats = ProjectService::stats(&storage, name.unwrap());
+    let stats = ProjectService::stats(&storage, name);
     ok(
         req.id,
         json!({

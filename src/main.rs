@@ -717,12 +717,13 @@ fn main() {
                             |content: &str| -> Option<lotar::storage::task::Task> {
                                 // First try strict parse
                                 if let Ok(t) =
-                                    serde_yaml::from_str::<lotar::storage::task::Task>(content)
+                                    serde_yaml_ng::from_str::<lotar::storage::task::Task>(content)
                                 {
                                     return Some(t);
                                 }
-                                // Fallback: tolerant parse via serde_yaml::Value and FromStr for enums
-                                let v: serde_yaml::Value = serde_yaml::from_str(content).ok()?;
+                                // Fallback: tolerant parse via serde_yaml_ng::Value and FromStr for enums
+                                let v: serde_yaml_ng::Value =
+                                    serde_yaml_ng::from_str(content).ok()?;
                                 let get_str = |k: &str| -> Option<String> {
                                     v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
                                 };

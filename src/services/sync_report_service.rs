@@ -62,7 +62,7 @@ impl SyncReportService {
         let filename = build_report_filename(report);
         let path = root.join(&filename);
 
-        let payload = serde_yaml::to_string(report).map_err(|err| {
+        let payload = serde_yaml_ng::to_string(report).map_err(|err| {
             LoTaRError::SerializationError(format!("Failed to serialize sync report: {}", err))
         })?;
         fs::write(&path, payload)?;
@@ -207,8 +207,8 @@ fn format_report_timestamp(value: &str) -> String {
     sanitize_component(&value.replace([':', '.'], "-"), 32)
 }
 
-fn parse_report_payload(payload: &str) -> Result<SyncReport, serde_yaml::Error> {
-    serde_yaml::from_str(payload)
+fn parse_report_payload(payload: &str) -> Result<SyncReport, serde_yaml_ng::Error> {
+    serde_yaml_ng::from_str(payload)
 }
 
 fn sanitize_component(input: &str, max_len: usize) -> String {

@@ -17,8 +17,8 @@ type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-02T10:00:00Z
 "#;
-    let prev_task: lotar::Task = serde_yaml::from_str(prev).expect("prev task should parse");
-    let cur_task: lotar::Task = serde_yaml::from_str(cur).expect("cur task should parse");
+    let prev_task: lotar::Task = serde_yaml_ng::from_str(prev).expect("prev task should parse");
+    let cur_task: lotar::Task = serde_yaml_ng::from_str(cur).expect("cur task should parse");
 
     assert_ne!(prev_task.title, cur_task.title);
 }
@@ -43,9 +43,9 @@ created: 2025-08-01T10:00:00Z
 modified: 2025-08-02T10:00:00Z
 "#;
     let prev_task: lotar::Task =
-        serde_yaml::from_str(prev).expect("Uppercase enums should parse for previous task");
+        serde_yaml_ng::from_str(prev).expect("Uppercase enums should parse for previous task");
     let cur_task: lotar::Task =
-        serde_yaml::from_str(cur).expect("Uppercase enums should parse for current task");
+        serde_yaml_ng::from_str(cur).expect("Uppercase enums should parse for current task");
 
     assert_eq!(prev_task.status.as_str(), "TODO");
     assert_eq!(cur_task.status.as_str(), "TODO");

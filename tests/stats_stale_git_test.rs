@@ -56,6 +56,10 @@ fn add_and_commit(
 
 #[test]
 fn stats_stale_threshold() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = TempDir::new().unwrap();
     let root = temp.path();
     init_repo(&temp);

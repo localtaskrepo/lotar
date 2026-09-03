@@ -8,7 +8,7 @@ use lotar::api_types::TaskCreate;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::utils::paths;
-use serde_yaml::Value;
+use serde_yaml_ng::Value;
 
 fn write_minimal_config(tasks_dir: &std::path::Path, extra: &str) {
     // Provide minimal, valid lists so CLI validation passes where needed
@@ -222,7 +222,7 @@ fn add_sets_reporter_via_me_alias_default() {
 
     let task_path = tasks_dir.join("TEST").join("1.yml");
     let contents = std::fs::read_to_string(task_path).unwrap();
-    let parsed: Value = serde_yaml::from_str(&contents).unwrap();
+    let parsed: Value = serde_yaml_ng::from_str(&contents).unwrap();
     assert_eq!(parsed["reporter"].as_str(), Some("alias-user"));
 }
 

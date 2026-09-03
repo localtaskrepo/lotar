@@ -6,7 +6,7 @@ use crate::utils::project::{
     RESERVED_PREFIX_MESSAGE, generate_project_prefix, is_reserved_project_prefix,
 };
 use serde::de::DeserializeOwned;
-use serde_yaml;
+use serde_yaml_ng;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -21,7 +21,7 @@ where
         return Ok(Vec::new());
     }
 
-    if let Ok(list) = serde_yaml::from_str::<Vec<T>>(trimmed) {
+    if let Ok(list) = serde_yaml_ng::from_str::<Vec<T>>(trimmed) {
         return Ok(list);
     }
 
@@ -49,7 +49,7 @@ fn parse_sync_remotes(value: &str) -> Result<HashMap<String, SyncRemoteConfig>, 
         return Ok(HashMap::new());
     }
 
-    serde_yaml::from_str::<HashMap<String, SyncRemoteConfig>>(trimmed)
+    serde_yaml_ng::from_str::<HashMap<String, SyncRemoteConfig>>(trimmed)
         .map_err(|err| ConfigError::ParseError(format!("Invalid remotes value: {}", err)))
 }
 
@@ -101,7 +101,7 @@ fn parse_simple_csv(value: &str) -> Vec<String> {
         return Vec::new();
     }
 
-    if let Ok(mut list) = serde_yaml::from_str::<Vec<String>>(trimmed) {
+    if let Ok(mut list) = serde_yaml_ng::from_str::<Vec<String>>(trimmed) {
         for entry in &mut list {
             *entry = entry.trim().to_string();
         }
@@ -151,7 +151,7 @@ where
         Ok(())
     }
 
-    if let Ok(map) = serde_yaml::from_str::<HashMap<String, T>>(trimmed) {
+    if let Ok(map) = serde_yaml_ng::from_str::<HashMap<String, T>>(trimmed) {
         let mut out = HashMap::new();
         for (key, value) in map.into_iter() {
             insert_alias(&mut out, &key, value, label)?;
@@ -159,7 +159,7 @@ where
         return Ok(out);
     }
 
-    if let Ok(map) = serde_yaml::from_str::<HashMap<String, String>>(trimmed) {
+    if let Ok(map) = serde_yaml_ng::from_str::<HashMap<String, String>>(trimmed) {
         let mut out = HashMap::new();
         for (k, raw) in map.into_iter() {
             let parsed = raw.parse::<T>().map_err(|err| {

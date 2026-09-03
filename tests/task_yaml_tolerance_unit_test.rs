@@ -8,7 +8,7 @@ type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
-    let t: Result<lotar::Task, _> = serde_yaml::from_str(yml);
+    let t: Result<lotar::Task, _> = serde_yaml_ng::from_str(yml);
     assert!(t.is_ok(), "Expected proper-cased YAML to parse into Task");
 }
 
@@ -24,7 +24,7 @@ type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
-    let t: Result<lotar::Task, _> = serde_yaml::from_str(yml);
+    let t: Result<lotar::Task, _> = serde_yaml_ng::from_str(yml);
     assert!(
         t.is_ok(),
         "Uppercase status should parse successfully into Task"
@@ -41,7 +41,7 @@ type: Feature
 created: 2025-08-01T10:00:00Z
 modified: 2025-08-01T10:00:00Z
 "#;
-    let t: Result<lotar::Task, _> = serde_yaml::from_str(yml);
+    let t: Result<lotar::Task, _> = serde_yaml_ng::from_str(yml);
     assert!(
         t.is_ok(),
         "Uppercase priority should parse successfully into Task"
@@ -58,7 +58,7 @@ priority: Medium
 type: Feature
 modified: 2025-08-01T10:00:00Z
 "#;
-    let t1: Result<lotar::Task, _> = serde_yaml::from_str(missing_created);
+    let t1: Result<lotar::Task, _> = serde_yaml_ng::from_str(missing_created);
     assert!(t1.is_err(), "Missing 'created' should fail to deserialize");
 
     let missing_modified = r#"
@@ -68,7 +68,7 @@ priority: Medium
 type: Feature
 created: 2025-08-01T10:00:00Z
 "#;
-    let t2: Result<lotar::Task, _> = serde_yaml::from_str(missing_modified);
+    let t2: Result<lotar::Task, _> = serde_yaml_ng::from_str(missing_modified);
     assert!(
         t2.is_ok(),
         "Missing 'modified' should be allowed to deserialize"
@@ -89,7 +89,7 @@ priority: Medium
 task_type: Feature
 created: 2025-08-01T10:00:00Z
 "#;
-    let parsed: Result<lotar::Task, _> = serde_yaml::from_str(legacy);
+    let parsed: Result<lotar::Task, _> = serde_yaml_ng::from_str(legacy);
     assert!(parsed.is_ok(), "Legacy 'task_type' key should still parse");
     let parsed = parsed.unwrap();
     assert_eq!(parsed.task_type.to_string(), "Feature");

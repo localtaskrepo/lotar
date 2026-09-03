@@ -58,6 +58,10 @@ fn add_and_commit(
 
 #[test]
 fn task_diff_fields_reports_structured_changes() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);
@@ -144,6 +148,10 @@ fn task_diff_fields_reports_structured_changes() {
 
 #[test]
 fn task_diff_fields_text_output_is_human_readable() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = crate::common::temp_dir();
     let root = temp.path();
     init_repo(&temp);

@@ -244,7 +244,7 @@ impl AutomationService {
         project: Option<&str>,
         yaml: &str,
     ) -> LoTaRResult<AutomationSetOutcome> {
-        let file: AutomationFile = serde_yaml::from_str(yaml).map_err(LoTaRError::from)?;
+        let file: AutomationFile = serde_yaml_ng::from_str(yaml).map_err(LoTaRError::from)?;
         let config = resolve_config_for_project(tasks_dir, project)?;
         let validation = validate_rules(&file, &config);
 
@@ -1682,7 +1682,7 @@ fn resolve_reporter_value(value: &str, task: &TaskDTO, tasks_dir: &Path) -> Opti
 
 #[cfg(not(feature = "schema"))]
 fn convert_custom_field_value(
-    value: &serde_yaml::Value,
+    value: &serde_yaml_ng::Value,
     _key: &str,
 ) -> LoTaRResult<crate::types::CustomFieldValue> {
     Ok(value.clone())
@@ -1690,7 +1690,7 @@ fn convert_custom_field_value(
 
 #[cfg(feature = "schema")]
 fn convert_custom_field_value(
-    value: &serde_yaml::Value,
+    value: &serde_yaml_ng::Value,
     key: &str,
 ) -> LoTaRResult<crate::types::CustomFieldValue> {
     serde_json::to_value(value).map_err(|err| {

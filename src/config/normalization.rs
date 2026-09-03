@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use serde_yaml::Value;
+use serde_yaml_ng::Value;
 
 use crate::config::types::{
     AgentAutomationConfig, AgentAutomationConfigOverride, AgentInstructionsConfig,
@@ -11,7 +11,7 @@ use crate::types::{Priority, TaskStatus, TaskType};
 fn expand_dotted_keys(value: Value) -> Value {
     match value {
         Value::Mapping(map) => {
-            let mut root = serde_yaml::Mapping::new();
+            let mut root = serde_yaml_ng::Mapping::new();
             for (k, v) in map {
                 if let Value::String(key) = k {
                     if key == "auth_profiles" || key == "remotes" {
@@ -28,14 +28,14 @@ fn expand_dotted_keys(value: Value) -> Value {
                         let nested_value = if nested_key.is_empty() {
                             v
                         } else {
-                            let mut nested_map = serde_yaml::Mapping::new();
+                            let mut nested_map = serde_yaml_ng::Mapping::new();
                             nested_map.insert(Value::String(nested_key), v);
                             Value::Mapping(nested_map)
                         };
                         // Merge into existing child
                         let entry = root
                             .entry(Value::String(first))
-                            .or_insert_with(|| Value::Mapping(serde_yaml::Mapping::new()));
+                            .or_insert_with(|| Value::Mapping(serde_yaml_ng::Mapping::new()));
                         let merged = merge_values(entry.clone(), nested_value);
                         *entry = merged;
                     } else {
@@ -55,7 +55,7 @@ fn expand_dotted_keys(value: Value) -> Value {
 fn expand_dotted_keys_keep_keys(value: Value) -> Value {
     match value {
         Value::Mapping(map) => {
-            let mut root = serde_yaml::Mapping::new();
+            let mut root = serde_yaml_ng::Mapping::new();
             for (k, v) in map {
                 root.insert(k, expand_dotted_keys(v));
             }
@@ -97,7 +97,7 @@ fn get_path<'a>(root: &'a Value, path: &[&str]) -> Option<&'a Value> {
 }
 
 fn cast<T: DeserializeOwned>(v: &Value) -> Option<T> {
-    serde_yaml::from_value::<T>(v.clone()).ok()
+    serde_yaml_ng::from_value::<T>(v.clone()).ok()
 }
 
 // Normalize token strings to a tolerant, comparable form: camelCase/PascalCase -> snake, hyphens/spaces -> underscores, lowercased
@@ -191,12 +191,12 @@ pub fn parse_issue_states_tolerant(
 ) -> Option<crate::config::types::ConfigurableField<TaskStatus>> {
     // Try strict first
     if let Ok(cf) =
-        serde_yaml::from_value::<crate::config::types::ConfigurableField<TaskStatus>>(v.clone())
+        serde_yaml_ng::from_value::<crate::config::types::ConfigurableField<TaskStatus>>(v.clone())
     {
         return Some(cf);
     }
     // Fallback vector of strings
-    if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v) {
+    if let Ok(list) = serde_yaml_ng::from_value::<Vec<String>>(v) {
         let mapped: Vec<TaskStatus> = list
             .into_iter()
             .filter_map(|s| parse_task_status_tolerant(&s))
@@ -213,12 +213,14 @@ fn parse_alias_map_tolerant<T: serde::de::DeserializeOwned>(
     parse: fn(&str) -> Option<T>,
 ) -> Option<std::collections::HashMap<String, T>> {
     // Try strict first
-    if let Ok(mut map) = serde_yaml::from_value::<std::collections::HashMap<String, T>>(v.clone()) {
+    if let Ok(mut map) =
+        serde_yaml_ng::from_value::<std::collections::HashMap<String, T>>(v.clone())
+    {
         let map2 = map.drain().map(|(k, v)| (k.to_lowercase(), v)).collect();
         return Some(map2);
     }
     // Fallback: parse as map of strings
-    if let Ok(mut raw) = serde_yaml::from_value::<std::collections::HashMap<String, String>>(v) {
+    if let Ok(mut raw) = serde_yaml_ng::from_value::<std::collections::HashMap<String, String>>(v) {
         let mut out = std::collections::HashMap::new();
         for (k, sv) in raw.drain() {
             if let Some(tv) = parse(&sv) {
@@ -232,7 +234,7 @@ fn parse_alias_map_tolerant<T: serde::de::DeserializeOwned>(
 
 /// Parse global config supporting both existing flat schema and nested/dotted form
 pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigError> {
-    let raw: Value = serde_yaml::from_str(content)
+    let raw: Value = serde_yaml_ng::from_str(content)
         .map_err(|e| ConfigError::ParseError(format!("Failed to parse config: {}", e)))?;
     let data = expand_dotted_keys(raw);
 
@@ -254,14 +256,14 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         cfg.default_reporter = Some(v);
     }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.default_tags = list;
     }
     if let Some(v) = get_path(&data, &["members"])
         .cloned()
         .or_else(|| get_path(&data, &["default", "members"]).cloned())
-        && let Ok(list) = serde_yaml::from_value::<Vec<String>>(v)
+        && let Ok(list) = serde_yaml_ng::from_value::<Vec<String>>(v)
     {
         let members: Vec<String> = list
             .into_iter()
@@ -295,40 +297,40 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
         cfg.issue_types = cf;
     }
     if let Some(v) = get_path(&data, &["issue", "priorities"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.issue_priorities.values = list;
     }
 
     // taxonomy.* (legacy) — will be overridden by issue.* if present
     if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.tags = StringConfigField { values: list };
     }
     // issue.tags (preferred canonical)
     if let Some(v) = get_path(&data, &["issue", "tags"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.tags = StringConfigField { values: list };
     }
 
     // custom.fields
     if let Some(v) = get_path(&data, &["custom", "fields"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.custom_fields = StringConfigField { values: list };
     }
 
     // scan.signal_words
     if let Some(v) = get_path(&data, &["scan", "signal_words"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.scan_signal_words = list;
     }
     // scan.ticket_patterns
     if let Some(v) = get_path(&data, &["scan", "ticket_patterns"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.scan_ticket_patterns = Some(list);
     }
@@ -392,7 +394,7 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
 
     // agent.instructions
     if let Some(v) = get_path(&data, &["agent", "instructions"]).cloned()
-        && let Ok(instructions) = serde_yaml::from_value::<AgentInstructionsConfig>(v)
+        && let Ok(instructions) = serde_yaml_ng::from_value::<AgentInstructionsConfig>(v)
     {
         cfg.agent_instructions = Some(instructions);
     }
@@ -400,21 +402,21 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     // agents (named profiles)
     if let Some(v) = get_path(&data, &["agents"]).cloned()
         && let Ok(profiles) =
-            serde_yaml::from_value::<std::collections::HashMap<String, AgentProfileConfig>>(v)
+            serde_yaml_ng::from_value::<std::collections::HashMap<String, AgentProfileConfig>>(v)
     {
         cfg.agents = profiles;
     }
 
     // agent.automation
     if let Some(v) = get_path(&data, &["agent", "automation"]).cloned()
-        && let Ok(automation) = serde_yaml::from_value::<AgentAutomationConfig>(v)
+        && let Ok(automation) = serde_yaml_ng::from_value::<AgentAutomationConfig>(v)
     {
         cfg.agent_automation = automation;
     }
 
     // agent.worktree
     if let Some(v) = get_path(&data, &["agent", "worktree"]).cloned()
-        && let Ok(worktree) = serde_yaml::from_value::<AgentWorktreeConfig>(v)
+        && let Ok(worktree) = serde_yaml_ng::from_value::<AgentWorktreeConfig>(v)
     {
         cfg.agent_worktree = worktree;
     }
@@ -510,20 +512,20 @@ pub fn parse_global_from_yaml_str(content: &str) -> Result<GlobalConfig, ConfigE
     }
 
     if let Some(v) = get_path(&data, &["sync"]).cloned()
-        && let Ok(sync) = serde_yaml::from_value::<SyncConfig>(v)
+        && let Ok(sync) = serde_yaml_ng::from_value::<SyncConfig>(v)
     {
         cfg.remotes.extend(sync.remotes);
         cfg.auth_profiles.extend(sync.auth_profiles);
     }
     if let Some(v) = get_path(&data, &["remotes"]).cloned()
         && let Ok(remotes) =
-            serde_yaml::from_value::<std::collections::HashMap<String, SyncRemoteConfig>>(v)
+            serde_yaml_ng::from_value::<std::collections::HashMap<String, SyncRemoteConfig>>(v)
     {
         cfg.remotes.extend(remotes);
     }
     if let Some(v) = get_path(&data, &["auth_profiles"]).cloned()
         && let Ok(profiles) =
-            serde_yaml::from_value::<std::collections::HashMap<String, SyncAuthProfile>>(v)
+            serde_yaml_ng::from_value::<std::collections::HashMap<String, SyncAuthProfile>>(v)
     {
         cfg.auth_profiles.extend(profiles);
     }
@@ -536,7 +538,7 @@ pub fn parse_project_from_yaml_str(
     project_name: &str,
     content: &str,
 ) -> Result<ProjectConfig, ConfigError> {
-    let raw: Value = serde_yaml::from_str(content)
+    let raw: Value = serde_yaml_ng::from_str(content)
         .map_err(|e| ConfigError::ParseError(format!("Failed to parse project config: {}", e)))?;
     let data = expand_dotted_keys(raw);
     let mut cfg = ProjectConfig::new(project_name.to_string());
@@ -562,12 +564,12 @@ pub fn parse_project_from_yaml_str(
         cfg.default_reporter = Some(v);
     }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
-        cfg.default_tags = serde_yaml::from_value(v).ok();
+        cfg.default_tags = serde_yaml_ng::from_value(v).ok();
     }
     if let Some(v) = get_path(&data, &["members"])
         .cloned()
         .or_else(|| get_path(&data, &["default", "members"]).cloned())
-        && let Ok(list) = serde_yaml::from_value::<Vec<String>>(v)
+        && let Ok(list) = serde_yaml_ng::from_value::<Vec<String>>(v)
     {
         let members: Vec<String> = list
             .into_iter()
@@ -583,13 +585,13 @@ pub fn parse_project_from_yaml_str(
         cfg.default_assignee = Some(v);
     }
     if let Some(v) = get_path(&data, &["default", "priority"]).cloned() {
-        cfg.default_priority = serde_yaml::from_value(v).ok();
+        cfg.default_priority = serde_yaml_ng::from_value(v).ok();
     }
     if let Some(v) = get_path(&data, &["default", "status"]).cloned() {
-        cfg.default_status = serde_yaml::from_value(v).ok();
+        cfg.default_status = serde_yaml_ng::from_value(v).ok();
     }
     if let Some(v) = get_path(&data, &["default", "tags"]).cloned() {
-        cfg.default_tags = serde_yaml::from_value(v).ok();
+        cfg.default_tags = serde_yaml_ng::from_value(v).ok();
     }
     // auto.*
     if let Some(v) = get_path(&data, &["auto", "populate_members"]).and_then(cast::<bool>) {
@@ -630,32 +632,32 @@ pub fn parse_project_from_yaml_str(
         cfg.issue_types = parse_issue_types_tolerant(v);
     }
     if let Some(v) = get_path(&data, &["issue", "priorities"]).cloned() {
-        cfg.issue_priorities = serde_yaml::from_value(v).ok();
+        cfg.issue_priorities = serde_yaml_ng::from_value(v).ok();
     }
     // taxonomy.* (legacy)
     if let Some(v) = get_path(&data, &["taxonomy", "tags"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.tags = Some(StringConfigField { values: list });
     }
     // issue.tags (preferred)
     if let Some(v) = get_path(&data, &["issue", "tags"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.tags = Some(StringConfigField { values: list });
     }
     if let Some(v) = get_path(&data, &["custom", "fields"]).cloned()
-        && let Ok(list) = serde_yaml::from_value(v)
+        && let Ok(list) = serde_yaml_ng::from_value(v)
     {
         cfg.custom_fields = Some(StringConfigField { values: list });
     }
     // scan.signal_words
     if let Some(v) = get_path(&data, &["scan", "signal_words"]).cloned() {
-        cfg.scan_signal_words = serde_yaml::from_value(v).ok();
+        cfg.scan_signal_words = serde_yaml_ng::from_value(v).ok();
     }
     // scan.ticket_patterns
     if let Some(v) = get_path(&data, &["scan", "ticket_patterns"]).cloned() {
-        cfg.scan_ticket_patterns = serde_yaml::from_value(v).ok();
+        cfg.scan_ticket_patterns = serde_yaml_ng::from_value(v).ok();
     }
     // scan.enable_ticket_words (project)
     if let Some(v) = get_path(&data, &["scan", "enable_ticket_words"]).and_then(cast::<bool>) {
@@ -724,7 +726,7 @@ pub fn parse_project_from_yaml_str(
 
     // agent.instructions (project override)
     if let Some(v) = get_path(&data, &["agent", "instructions"]).cloned()
-        && let Ok(instructions) = serde_yaml::from_value::<AgentInstructionsConfig>(v)
+        && let Ok(instructions) = serde_yaml_ng::from_value::<AgentInstructionsConfig>(v)
     {
         cfg.agent_instructions = Some(instructions);
     }
@@ -732,21 +734,21 @@ pub fn parse_project_from_yaml_str(
     // agents (project override)
     if let Some(v) = get_path(&data, &["agents"]).cloned()
         && let Ok(profiles) =
-            serde_yaml::from_value::<std::collections::HashMap<String, AgentProfileConfig>>(v)
+            serde_yaml_ng::from_value::<std::collections::HashMap<String, AgentProfileConfig>>(v)
     {
         cfg.agents = Some(profiles);
     }
 
     // agent.automation (project override)
     if let Some(v) = get_path(&data, &["agent", "automation"]).cloned()
-        && let Ok(automation) = serde_yaml::from_value::<AgentAutomationConfigOverride>(v)
+        && let Ok(automation) = serde_yaml_ng::from_value::<AgentAutomationConfigOverride>(v)
     {
         cfg.agent_automation = Some(automation);
     }
 
     // agent.worktree (project override)
     if let Some(v) = get_path(&data, &["agent", "worktree"]).cloned()
-        && let Ok(worktree) = serde_yaml::from_value::<AgentWorktreeConfigOverride>(v)
+        && let Ok(worktree) = serde_yaml_ng::from_value::<AgentWorktreeConfigOverride>(v)
     {
         cfg.agent_worktree = Some(worktree);
     }
@@ -765,20 +767,20 @@ pub fn parse_project_from_yaml_str(
     }
 
     if let Some(v) = get_path(&data, &["sync"]).cloned()
-        && let Ok(sync) = serde_yaml::from_value::<SyncConfig>(v)
+        && let Ok(sync) = serde_yaml_ng::from_value::<SyncConfig>(v)
     {
         cfg.remotes.extend(sync.remotes);
         cfg.auth_profiles.extend(sync.auth_profiles);
     }
     if let Some(v) = get_path(&data, &["remotes"]).cloned()
         && let Ok(remotes) =
-            serde_yaml::from_value::<std::collections::HashMap<String, SyncRemoteConfig>>(v)
+            serde_yaml_ng::from_value::<std::collections::HashMap<String, SyncRemoteConfig>>(v)
     {
         cfg.remotes.extend(remotes);
     }
     if let Some(v) = get_path(&data, &["auth_profiles"]).cloned()
         && let Ok(profiles) =
-            serde_yaml::from_value::<std::collections::HashMap<String, SyncAuthProfile>>(v)
+            serde_yaml_ng::from_value::<std::collections::HashMap<String, SyncAuthProfile>>(v)
     {
         cfg.auth_profiles.extend(profiles);
     }
@@ -788,19 +790,19 @@ pub fn parse_project_from_yaml_str(
 
 /// Render GlobalConfig into canonical nested YAML form
 pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
-    use serde_yaml::Value as Y;
+    use serde_yaml_ng::Value as Y;
     let defaults = GlobalConfig::default();
-    let mut root = serde_yaml::Mapping::new();
+    let mut root = serde_yaml_ng::Mapping::new();
 
     // server
     if cfg.server_port != defaults.server_port {
-        let mut server = serde_yaml::Mapping::new();
+        let mut server = serde_yaml_ng::Mapping::new();
         server.insert(Y::String("port".into()), Y::Number(cfg.server_port.into()));
         root.insert(Y::String("server".into()), Y::Mapping(server));
     }
 
     // default
-    let mut default = serde_yaml::Mapping::new();
+    let mut default = serde_yaml_ng::Mapping::new();
     if cfg.default_project != defaults.default_project && !cfg.default_project.is_empty() {
         default.insert(
             Y::String("project".into()),
@@ -819,19 +821,19 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if !cfg.default_tags.is_empty() {
         default.insert(
             Y::String("tags".into()),
-            serde_yaml::to_value(&cfg.default_tags).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.default_tags).unwrap_or(Y::Null),
         );
     }
     if cfg.default_priority != defaults.default_priority {
         default.insert(
             Y::String("priority".into()),
-            serde_yaml::to_value(&cfg.default_priority).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.default_priority).unwrap_or(Y::Null),
         );
     }
     if let Some(v) = &cfg.default_status {
         default.insert(
             Y::String("status".into()),
-            serde_yaml::to_value(v).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(v).unwrap_or(Y::Null),
         );
     }
     if !default.is_empty() {
@@ -841,34 +843,34 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if !cfg.members.is_empty() {
         root.insert(
             Y::String("members".into()),
-            serde_yaml::to_value(&cfg.members).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.members).unwrap_or(Y::Null),
         );
     }
 
     // issue
-    let mut issue = serde_yaml::Mapping::new();
+    let mut issue = serde_yaml_ng::Mapping::new();
     if cfg.issue_states.values != defaults.issue_states.values {
         issue.insert(
             Y::String("states".into()),
-            serde_yaml::to_value(&cfg.issue_states.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.issue_states.values).unwrap_or(Y::Null),
         );
     }
     if cfg.issue_types.values != defaults.issue_types.values {
         issue.insert(
             Y::String("types".into()),
-            serde_yaml::to_value(&cfg.issue_types.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.issue_types.values).unwrap_or(Y::Null),
         );
     }
     if cfg.issue_priorities.values != defaults.issue_priorities.values {
         issue.insert(
             Y::String("priorities".into()),
-            serde_yaml::to_value(&cfg.issue_priorities.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.issue_priorities.values).unwrap_or(Y::Null),
         );
     }
     if cfg.tags.values != defaults.tags.values {
         issue.insert(
             Y::String("tags".into()),
-            serde_yaml::to_value(&cfg.tags.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.tags.values).unwrap_or(Y::Null),
         );
     }
     if !issue.is_empty() {
@@ -876,11 +878,11 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
 
     // custom
-    let mut custom = serde_yaml::Mapping::new();
+    let mut custom = serde_yaml_ng::Mapping::new();
     if cfg.custom_fields.values != defaults.custom_fields.values {
         custom.insert(
             Y::String("fields".into()),
-            serde_yaml::to_value(&cfg.custom_fields.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.custom_fields.values).unwrap_or(Y::Null),
         );
     }
     if !custom.is_empty() {
@@ -888,17 +890,17 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
 
     // scan
-    let mut scan = serde_yaml::Mapping::new();
+    let mut scan = serde_yaml_ng::Mapping::new();
     if cfg.scan_signal_words != defaults.scan_signal_words {
         scan.insert(
             Y::String("signal_words".into()),
-            serde_yaml::to_value(&cfg.scan_signal_words).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.scan_signal_words).unwrap_or(Y::Null),
         );
     }
     if let Some(patterns) = crate::config::types::maybe_scan_ticket_patterns(cfg) {
         scan.insert(
             Y::String("ticket_patterns".into()),
-            serde_yaml::to_value(patterns).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(patterns).unwrap_or(Y::Null),
         );
     }
     if cfg.scan_enable_ticket_words != defaults.scan_enable_ticket_words {
@@ -928,7 +930,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if (cfg.attachments_dir != defaults.attachments_dir && !cfg.attachments_dir.is_empty())
         || cfg.attachments_max_upload_mb != defaults.attachments_max_upload_mb
     {
-        let mut attachments = serde_yaml::Mapping::new();
+        let mut attachments = serde_yaml_ng::Mapping::new();
         if cfg.attachments_dir != defaults.attachments_dir && !cfg.attachments_dir.is_empty() {
             attachments.insert(
                 Y::String("dir".into()),
@@ -947,7 +949,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
 
     // sync reports
-    let mut sync = serde_yaml::Mapping::new();
+    let mut sync = serde_yaml_ng::Mapping::new();
     if cfg.sync_reports_dir != defaults.sync_reports_dir && !cfg.sync_reports_dir.is_empty() {
         sync.insert(
             Y::String("reports_dir".into()),
@@ -965,7 +967,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
 
     // agent
-    let mut agent = serde_yaml::Mapping::new();
+    let mut agent = serde_yaml_ng::Mapping::new();
     if cfg.agent_context_enabled != defaults.agent_context_enabled {
         agent.insert(
             Y::String("context_enabled".into()),
@@ -975,19 +977,19 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if let Some(instructions) = &cfg.agent_instructions {
         agent.insert(
             Y::String("instructions".into()),
-            serde_yaml::to_value(instructions).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(instructions).unwrap_or(Y::Null),
         );
     }
     if cfg.agent_automation != defaults.agent_automation {
         agent.insert(
             Y::String("automation".into()),
-            serde_yaml::to_value(&cfg.agent_automation).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.agent_automation).unwrap_or(Y::Null),
         );
     }
     if cfg.agent_worktree != defaults.agent_worktree {
         agent.insert(
             Y::String("worktree".into()),
-            serde_yaml::to_value(&cfg.agent_worktree).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.agent_worktree).unwrap_or(Y::Null),
         );
     }
     if !agent.is_empty() {
@@ -996,13 +998,13 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if !cfg.agents.is_empty() {
         root.insert(
             Y::String("agents".into()),
-            serde_yaml::to_value(&cfg.agents).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.agents).unwrap_or(Y::Null),
         );
     }
 
     // sprints
-    let mut sprints = serde_yaml::Mapping::new();
-    let mut sprint_defaults = serde_yaml::Mapping::new();
+    let mut sprints = serde_yaml_ng::Mapping::new();
+    let mut sprint_defaults = serde_yaml_ng::Mapping::new();
     if let Some(points) = cfg.sprints.defaults.capacity_points {
         sprint_defaults.insert(
             Y::String("capacity_points".into()),
@@ -1026,7 +1028,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
 
     if cfg.sprints.notifications.enabled != defaults.sprints.notifications.enabled {
-        let mut notifications = serde_yaml::Mapping::new();
+        let mut notifications = serde_yaml_ng::Mapping::new();
         notifications.insert(
             Y::String("enabled".into()),
             Y::Bool(cfg.sprints.notifications.enabled),
@@ -1039,7 +1041,7 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     }
 
     // auto
-    let mut auto = serde_yaml::Mapping::new();
+    let mut auto = serde_yaml_ng::Mapping::new();
     if cfg.auto_identity != defaults.auto_identity {
         auto.insert(Y::String("identity".into()), Y::Bool(cfg.auto_identity));
     }
@@ -1106,23 +1108,23 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
         || !cfg.branch_status_aliases.is_empty()
         || !cfg.branch_priority_aliases.is_empty()
     {
-        let mut branch = serde_yaml::Mapping::new();
+        let mut branch = serde_yaml_ng::Mapping::new();
         if !cfg.branch_type_aliases.is_empty() {
             branch.insert(
                 Y::String("type_aliases".into()),
-                serde_yaml::to_value(&cfg.branch_type_aliases).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(&cfg.branch_type_aliases).unwrap_or(Y::Null),
             );
         }
         if !cfg.branch_status_aliases.is_empty() {
             branch.insert(
                 Y::String("status_aliases".into()),
-                serde_yaml::to_value(&cfg.branch_status_aliases).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(&cfg.branch_status_aliases).unwrap_or(Y::Null),
             );
         }
         if !cfg.branch_priority_aliases.is_empty() {
             branch.insert(
                 Y::String("priority_aliases".into()),
-                serde_yaml::to_value(&cfg.branch_priority_aliases).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(&cfg.branch_priority_aliases).unwrap_or(Y::Null),
             );
         }
         root.insert(Y::String("branch".into()), Y::Mapping(branch));
@@ -1131,13 +1133,13 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
     if !cfg.remotes.is_empty() {
         root.insert(
             Y::String("remotes".into()),
-            serde_yaml::to_value(&cfg.remotes).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.remotes).unwrap_or(Y::Null),
         );
     }
     if !cfg.auth_profiles.is_empty() {
         root.insert(
             Y::String("auth_profiles".into()),
-            serde_yaml::to_value(&cfg.auth_profiles).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.auth_profiles).unwrap_or(Y::Null),
         );
     }
 
@@ -1146,17 +1148,17 @@ pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
             .to_string();
     }
 
-    serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_default()
+    serde_yaml_ng::to_string(&Y::Mapping(root)).unwrap_or_default()
 }
 
 /// Render ProjectConfig into canonical nested YAML form
 pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
-    use serde_yaml::Value as Y;
-    let mut root = serde_yaml::Mapping::new();
+    use serde_yaml_ng::Value as Y;
+    let mut root = serde_yaml_ng::Mapping::new();
 
     // project
     if !cfg.project_name.trim().is_empty() {
-        let mut project = serde_yaml::Mapping::new();
+        let mut project = serde_yaml_ng::Mapping::new();
         project.insert(
             Y::String("name".into()),
             Y::String(cfg.project_name.clone()),
@@ -1165,7 +1167,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
 
     // default
-    let mut default = serde_yaml::Mapping::new();
+    let mut default = serde_yaml_ng::Mapping::new();
     if let Some(v) = &cfg.default_assignee {
         default.insert(Y::String("assignee".into()), Y::String(v.clone()));
     }
@@ -1180,19 +1182,19 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     {
         default.insert(
             Y::String("tags".into()),
-            serde_yaml::to_value(tags).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(tags).unwrap_or(Y::Null),
         );
     }
     if let Some(v) = &cfg.default_priority {
         default.insert(
             Y::String("priority".into()),
-            serde_yaml::to_value(v).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(v).unwrap_or(Y::Null),
         );
     }
     if let Some(v) = &cfg.default_status {
         default.insert(
             Y::String("status".into()),
-            serde_yaml::to_value(v).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(v).unwrap_or(Y::Null),
         );
     }
     if !default.is_empty() {
@@ -1202,11 +1204,11 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     if let Some(members) = &cfg.members {
         root.insert(
             Y::String("members".into()),
-            serde_yaml::to_value(members).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(members).unwrap_or(Y::Null),
         );
     }
 
-    let mut auto = serde_yaml::Mapping::new();
+    let mut auto = serde_yaml_ng::Mapping::new();
     if let Some(v) = cfg.auto_populate_members {
         auto.insert(Y::String("populate_members".into()), Y::Bool(v));
     }
@@ -1242,7 +1244,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     }
 
     // issue
-    let mut issue = serde_yaml::Mapping::new();
+    let mut issue = serde_yaml_ng::Mapping::new();
     if let Some(v) = &cfg.issue_states {
         let vals: Vec<Y> = v
             .values
@@ -1262,7 +1264,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     if let Some(v) = &cfg.issue_priorities {
         issue.insert(
             Y::String("priorities".into()),
-            serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&v.values).unwrap_or(Y::Null),
         );
     }
     if !issue.is_empty() {
@@ -1277,39 +1279,39 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         {
             issue_map.insert(
                 Y::String("tags".into()),
-                serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(&v.values).unwrap_or(Y::Null),
             );
         } else {
-            let mut im = serde_yaml::Mapping::new();
+            let mut im = serde_yaml_ng::Mapping::new();
             im.insert(
                 Y::String("tags".into()),
-                serde_yaml::to_value(&v.values).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(&v.values).unwrap_or(Y::Null),
             );
             root.insert(Y::String("issue".into()), Y::Mapping(im));
         }
     }
 
     if let Some(fields) = &cfg.custom_fields {
-        let mut custom = serde_yaml::Mapping::new();
+        let mut custom = serde_yaml_ng::Mapping::new();
         custom.insert(
             Y::String("fields".into()),
-            serde_yaml::to_value(&fields.values).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&fields.values).unwrap_or(Y::Null),
         );
         root.insert(Y::String("custom".into()), Y::Mapping(custom));
     }
 
     // scan
-    let mut scan = serde_yaml::Mapping::new();
+    let mut scan = serde_yaml_ng::Mapping::new();
     if let Some(v) = &cfg.scan_signal_words {
         scan.insert(
             Y::String("signal_words".into()),
-            serde_yaml::to_value(v).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(v).unwrap_or(Y::Null),
         );
     }
     if let Some(patterns) = crate::config::types::maybe_project_scan_ticket_patterns(cfg) {
         scan.insert(
             Y::String("ticket_patterns".into()),
-            serde_yaml::to_value(patterns).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(patterns).unwrap_or(Y::Null),
         );
     }
     if let Some(enabled) = cfg.scan_enable_ticket_words {
@@ -1333,7 +1335,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         .unwrap_or(false)
         || cfg.attachments_max_upload_mb.is_some();
     if has_attachments {
-        let mut attachments = serde_yaml::Mapping::new();
+        let mut attachments = serde_yaml_ng::Mapping::new();
         if let Some(dir) = &cfg.attachments_dir
             && !dir.trim().is_empty()
         {
@@ -1355,7 +1357,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         .unwrap_or(false)
         || cfg.sync_write_reports.is_some();
     if has_sync_reports {
-        let mut sync = serde_yaml::Mapping::new();
+        let mut sync = serde_yaml_ng::Mapping::new();
         if let Some(dir) = &cfg.sync_reports_dir
             && !dir.trim().is_empty()
         {
@@ -1371,40 +1373,40 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
 
     // agent
     if let Some(enabled) = cfg.agent_context_enabled {
-        let mut agent = serde_yaml::Mapping::new();
+        let mut agent = serde_yaml_ng::Mapping::new();
         agent.insert(Y::String("context_enabled".into()), Y::Bool(enabled));
         root.insert(Y::String("agent".into()), Y::Mapping(agent));
     }
     if let Some(instructions) = &cfg.agent_instructions {
         let entry = root
             .entry(Y::String("agent".into()))
-            .or_insert_with(|| Y::Mapping(serde_yaml::Mapping::new()));
+            .or_insert_with(|| Y::Mapping(serde_yaml_ng::Mapping::new()));
         if let Y::Mapping(map) = entry {
             map.insert(
                 Y::String("instructions".into()),
-                serde_yaml::to_value(instructions).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(instructions).unwrap_or(Y::Null),
             );
         }
     }
     if let Some(automation) = &cfg.agent_automation {
         let entry = root
             .entry(Y::String("agent".into()))
-            .or_insert_with(|| Y::Mapping(serde_yaml::Mapping::new()));
+            .or_insert_with(|| Y::Mapping(serde_yaml_ng::Mapping::new()));
         if let Y::Mapping(map) = entry {
             map.insert(
                 Y::String("automation".into()),
-                serde_yaml::to_value(automation).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(automation).unwrap_or(Y::Null),
             );
         }
     }
     if let Some(worktree) = &cfg.agent_worktree {
         let entry = root
             .entry(Y::String("agent".into()))
-            .or_insert_with(|| Y::Mapping(serde_yaml::Mapping::new()));
+            .or_insert_with(|| Y::Mapping(serde_yaml_ng::Mapping::new()));
         if let Y::Mapping(map) = entry {
             map.insert(
                 Y::String("worktree".into()),
-                serde_yaml::to_value(worktree).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(worktree).unwrap_or(Y::Null),
             );
         }
     }
@@ -1413,7 +1415,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     {
         root.insert(
             Y::String("agents".into()),
-            serde_yaml::to_value(profiles).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(profiles).unwrap_or(Y::Null),
         );
     }
 
@@ -1434,13 +1436,13 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             .map(|m| !m.is_empty())
             .unwrap_or(false);
     if has_branch {
-        let mut branch = serde_yaml::Mapping::new();
+        let mut branch = serde_yaml_ng::Mapping::new();
         if let Some(m) = &cfg.branch_type_aliases
             && !m.is_empty()
         {
             branch.insert(
                 Y::String("type_aliases".into()),
-                serde_yaml::to_value(m).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(m).unwrap_or(Y::Null),
             );
         }
         if let Some(m) = &cfg.branch_status_aliases
@@ -1448,7 +1450,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         {
             branch.insert(
                 Y::String("status_aliases".into()),
-                serde_yaml::to_value(m).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(m).unwrap_or(Y::Null),
             );
         }
         if let Some(m) = &cfg.branch_priority_aliases
@@ -1456,7 +1458,7 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
         {
             branch.insert(
                 Y::String("priority_aliases".into()),
-                serde_yaml::to_value(m).unwrap_or(Y::Null),
+                serde_yaml_ng::to_value(m).unwrap_or(Y::Null),
             );
         }
         root.insert(Y::String("branch".into()), Y::Mapping(branch));
@@ -1465,32 +1467,32 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
     if !cfg.remotes.is_empty() {
         root.insert(
             Y::String("remotes".into()),
-            serde_yaml::to_value(&cfg.remotes).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.remotes).unwrap_or(Y::Null),
         );
     }
     if !cfg.auth_profiles.is_empty() {
         root.insert(
             Y::String("auth_profiles".into()),
-            serde_yaml::to_value(&cfg.auth_profiles).unwrap_or(Y::Null),
+            serde_yaml_ng::to_value(&cfg.auth_profiles).unwrap_or(Y::Null),
         );
     }
 
-    serde_yaml::to_string(&Y::Mapping(root)).unwrap_or_default()
+    serde_yaml_ng::to_string(&Y::Mapping(root)).unwrap_or_default()
 }
 
 // Helper: tolerant parser for issue.types accepting mixed-case strings mapping to TaskType
 #[allow(clippy::needless_pass_by_value)]
 fn parse_issue_types_tolerant(
-    v: serde_yaml::Value,
+    v: serde_yaml_ng::Value,
 ) -> Option<crate::config::types::ConfigurableField<crate::types::TaskType>> {
     use crate::config::types::ConfigurableField;
     use crate::types::TaskType;
     use std::str::FromStr;
 
-    if let Ok(cf) = serde_yaml::from_value::<ConfigurableField<TaskType>>(v.clone()) {
+    if let Ok(cf) = serde_yaml_ng::from_value::<ConfigurableField<TaskType>>(v.clone()) {
         return Some(cf);
     }
-    if let Ok(list) = serde_yaml::from_value::<Vec<String>>(v.clone()) {
+    if let Ok(list) = serde_yaml_ng::from_value::<Vec<String>>(v.clone()) {
         let mut out: Vec<TaskType> = Vec::new();
         for s in list {
             if let Ok(tt) = TaskType::from_str(&s) {

@@ -286,7 +286,7 @@ pub fn project_display_name_from_config(
 
     let explicit_name = std::fs::read_to_string(&config_path)
         .ok()
-        .and_then(|content| serde_yaml::from_str::<serde_yaml::Value>(&content).ok())
+        .and_then(|content| serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content).ok())
         .and_then(|value| extract_project_name(&value));
 
     if let Some(name) = explicit_name {
@@ -302,8 +302,8 @@ pub fn project_display_name_from_config(
         .filter(|name| !name.is_empty() && !name.eq_ignore_ascii_case(project_prefix))
 }
 
-fn extract_project_name(value: &serde_yaml::Value) -> Option<String> {
-    use serde_yaml::Value;
+fn extract_project_name(value: &serde_yaml_ng::Value) -> Option<String> {
+    use serde_yaml_ng::Value;
 
     if let Value::Mapping(map) = value {
         let project_key = Value::String("project".to_string());

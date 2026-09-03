@@ -93,7 +93,7 @@ pub fn handle_history_by_field(
             &context.repo_root,
             &c.commit,
             &context.file_repo_path,
-        ) && let Ok(task) = serde_yaml::from_str::<crate::storage::task::Task>(&content)
+        ) && let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(&content)
         {
             snapshots.push((
                 c.commit.clone(),
@@ -234,9 +234,10 @@ pub fn handle_diff(
             None
         };
 
-        let cur_task: Option<crate::storage::task::Task> = serde_yaml::from_str(&current).ok();
-        let prev_task: Option<crate::storage::task::Task> =
-            prev.as_deref().and_then(|s| serde_yaml::from_str(s).ok());
+        let cur_task: Option<crate::storage::task::Task> = serde_yaml_ng::from_str(&current).ok();
+        let prev_task: Option<crate::storage::task::Task> = prev
+            .as_deref()
+            .and_then(|s| serde_yaml_ng::from_str(s).ok());
 
         let mut deltas = serde_json::Map::new();
         let mut push_change = |k: &str, old: serde_json::Value, new: serde_json::Value| {

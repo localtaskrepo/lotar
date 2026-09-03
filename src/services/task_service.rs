@@ -464,8 +464,8 @@ impl TaskService {
         if let Some(v) = patch.custom_fields
             && t.custom_fields != v
         {
-            let old_yaml = serde_yaml::to_string(&t.custom_fields).ok();
-            let new_yaml = serde_yaml::to_string(&v).ok();
+            let old_yaml = serde_yaml_ng::to_string(&t.custom_fields).ok();
+            let new_yaml = serde_yaml_ng::to_string(&v).ok();
             record_change("custom_fields", old_yaml, new_yaml.clone());
             t.custom_fields = v;
         }

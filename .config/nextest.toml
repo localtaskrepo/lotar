@@ -17,11 +17,13 @@ profile.default.slow-timeout = "90s"
 # The agent automation suite spawns real worker processes (mock agents) that
 # poll the filesystem on wall-clock schedules. Under full num-cpus parallelism
 # those windows blow and the tests flake (passing standalone, failing under
-# load). Throttle this binary to limited concurrency so the gate stays green
-# without weakening the tests.
+# load). Throttle this binary to limited concurrency and allow a couple of
+# retries so transient load spikes do not fail the gate; assertions are
+# unchanged and deterministic failures still fail all retries.
 [test-groups.agent-processes]
-max-threads = 2
+max-threads = 1
 
 [[profile.default.overrides]]
 filter = 'binary(agent_automation_integration_test)'
 test-group = 'agent-processes'
+retries = 2

@@ -30,6 +30,10 @@ fn copy_dir_all(src: &Path, dst: &Path) {
 
 #[test]
 fn installs_git_hooks_and_sets_config() {
+    if !crate::common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let temp = TempDir::new().expect("failed to create temp dir");
     let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let hooks_src = repo_root.join(".githooks");

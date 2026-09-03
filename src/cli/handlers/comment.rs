@@ -63,13 +63,7 @@ impl CommandHandler for CommentHandler {
             task_id, project_hint
         ));
 
-        let comment_text = text.and_then(|candidate| {
-            if candidate.trim().is_empty() {
-                None
-            } else {
-                Some(candidate)
-            }
-        });
+        let comment_text = text.filter(|candidate| !candidate.trim().is_empty());
 
         let mut ctx = if comment_text.is_some() {
             TaskCommandContext::new(resolver, project_hint, Some(task_id.as_str()))?

@@ -13,12 +13,12 @@ pub(crate) fn custom_value_key(v: &crate::types::CustomFieldValue) -> String {
 #[cfg(not(feature = "schema"))]
 pub(crate) fn custom_value_key(v: &crate::types::CustomFieldValue) -> String {
     match v {
-        serde_yaml::Value::Null => "null".to_string(),
-        serde_yaml::Value::Bool(b) => b.to_string(),
-        serde_yaml::Value::Number(n) => n.to_string(),
-        serde_yaml::Value::String(s) => s.clone(),
-        serde_yaml::Value::Sequence(_) => "[array]".to_string(),
-        serde_yaml::Value::Mapping(_) => "{object}".to_string(),
+        serde_yaml_ng::Value::Null => "null".to_string(),
+        serde_yaml_ng::Value::Bool(b) => b.to_string(),
+        serde_yaml_ng::Value::Number(n) => n.to_string(),
+        serde_yaml_ng::Value::String(s) => s.clone(),
+        serde_yaml_ng::Value::Sequence(_) => "[array]".to_string(),
+        serde_yaml_ng::Value::Mapping(_) => "{object}".to_string(),
         _ => "other".to_string(),
     }
 }

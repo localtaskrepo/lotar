@@ -296,7 +296,7 @@ impl ConfigService {
                     return Some(Vec::new());
                 }
                 if let Ok(map) =
-                    serde_yaml::from_str::<std::collections::HashMap<String, String>>(trimmed)
+                    serde_yaml_ng::from_str::<std::collections::HashMap<String, String>>(trimmed)
                 {
                     let mut vec: Vec<(String, String)> = map
                         .into_iter()
