@@ -617,16 +617,18 @@ function onTagFilterKeydown(event: KeyboardEvent) {
     event.preventDefault()
     tagActiveIndex.value = (tagActiveIndex.value - 1 + suggestions.length) % suggestions.length
   } else if (event.key === 'Enter') {
-    if (tagActiveIndex.value >= 0 && suggestions[tagActiveIndex.value]) {
+    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
+    if (active) {
       event.preventDefault()
-      selectTagSuggestion(suggestions[tagActiveIndex.value])
+      selectTagSuggestion(active)
       return
     }
     event.preventDefault()
     applyTagFilters(parseTagInput(tagFilterInput.value))
   } else if (event.key === 'Tab') {
-    if (tagActiveIndex.value >= 0 && suggestions[tagActiveIndex.value]) {
-      selectTagSuggestion(suggestions[tagActiveIndex.value])
+    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
+    if (active) {
+      selectTagSuggestion(active)
       event.preventDefault()
     }
   } else if (event.key === 'Escape') {

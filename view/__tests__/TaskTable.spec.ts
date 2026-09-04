@@ -58,11 +58,11 @@ describe('TaskTable', () => {
     const titleButton = titleHeader.find('button.header-button')
     await titleButton.trigger('click') // asc
     await wrapper.vm.$nextTick()
-    const firstRow = wrapper.findAll('tr').filter(r => r.find('td').exists())[0]
+    const firstRow = wrapper.findAll('tr').filter(r => r.find('td').exists())[0]!
     expect(firstRow.text()).toContain('Alpha')
     await titleButton.trigger('click') // desc
     await wrapper.vm.$nextTick()
-    const firstRowDesc = wrapper.findAll('tr').filter(r => r.find('td').exists())[0]
+    const firstRowDesc = wrapper.findAll('tr').filter(r => r.find('td').exists())[0]!
     expect(firstRowDesc.text()).toContain('Bravo')
   })
 
@@ -193,7 +193,7 @@ describe('TaskTable', () => {
     ]
     const wrapper = mount(TaskTable, {
       props: {
-        tasks: sprintTasks,
+        tasks: sprintTasks as any,
         sprintLookup: {
           42: { label: '#42 Ultra Long Sprint Name For Preview', state: 'active' },
         },

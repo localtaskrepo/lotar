@@ -32,7 +32,7 @@ describe('TaskEditor suggestions', () => {
     await new Promise(r => setTimeout(r))
     const items = wrapper.findAll('ul.suggest li')
     // pick tag 'y'
-    await items[0].trigger('mousedown')
+    await items[0]!.trigger('mousedown')
     expect((wrapper.vm as any).form.tags).toContain('y')
   })
 
@@ -58,7 +58,7 @@ describe('TaskEditor suggestions', () => {
     })
     await (wrapper.vm as any).emitSave()
     const emitted = wrapper.emitted()
-    const payload = (emitted['save']?.[0] as any)?.[0]
+    const payload = (emitted['save']?.[0] as any)?.[0]!
     expect(payload?.product).toBeUndefined()
     expect(payload?.custom_fields?.product).toBe('frontend')
     expect(payload?.custom_fields?.other).toBe('value')

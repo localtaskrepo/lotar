@@ -399,8 +399,10 @@ const sprintOptions = computed(() => {
     if (!activeList.length) return 'Auto (requires an active sprint)'
     if (activeList.length === 1) {
       const sprint = activeList[0]
-      const name = sprint.label || sprint.display_name || `Sprint ${sprint.id}`
-      return `Auto (active: #${sprint.id} ${name})`
+      if (sprint) {
+        const name = sprint.label || sprint.display_name || `Sprint ${sprint.id}`
+        return `Auto (active: #${sprint.id} ${name})`
+      }
     }
     return 'Auto (multiple active sprints – specify one)'
   })()

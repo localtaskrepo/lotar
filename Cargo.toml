@@ -39,8 +39,9 @@ pulldown-cmark = { version = "0.13.3", default-features = false }
 blake3 = { version = "1.8.4", default-features = false, features = ["std"] }
 base64 = { version = "0.23.1", default-features = false, features = ["std"] }
 ureq = { version = "3.3.0", features = ["json"] }
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
 libc = "0.2.185"
-sysinfo = "0.39.6"
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 fs2 = "0.4.3"
 
 # Production release profile optimized for minimal binary size
@@ -67,6 +68,9 @@ incremental = true
 lto = false
 panic = "unwind"
 strip = "none"
+# Keep debug info in object files instead of linking it into every test
+# binary: with ~100 test binaries this is the dominant link-time cost.
+split-debuginfo = "unpacked"
 
 # Fast-to-build profile for smoke/E2E tests. Smoke tests exercise functionality,
 # not performance, so they don't need the size-optimizing fat-LTO/opt-z of
@@ -79,6 +83,7 @@ codegen-units = 16
 lto = false
 panic = "unwind"
 strip = "none"
+split-debuginfo = "unpacked"
 
 [dev-dependencies]
 assert_cmd = "2.2.0"

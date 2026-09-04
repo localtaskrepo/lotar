@@ -235,8 +235,10 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         const rightKeys = Object.keys(right).sort()
         if (leftKeys.length !== rightKeys.length) return false
         for (let i = 0; i < leftKeys.length; i += 1) {
-            if (leftKeys[i] !== rightKeys[i]) return false
-            if ((left[leftKeys[i]] ?? '') !== (right[rightKeys[i]] ?? '')) {
+            const lk = leftKeys[i]
+            const rk = rightKeys[i]
+            if (lk === undefined || rk === undefined || lk !== rk) return false
+            if ((left[lk] ?? '') !== (right[rk] ?? '')) {
                 return false
             }
         }
@@ -308,7 +310,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             if (!global) return
             if (!options.length) return
             if (!form.defaultStatus || !options.includes(form.defaultStatus)) {
-                form.defaultStatus = options[0]
+                form.defaultStatus = options[0] ?? ''
             }
         },
         { immediate: true },

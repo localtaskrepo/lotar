@@ -64,7 +64,7 @@ describe('suggestForFragment', () => {
     it('suggests keys before a colon is typed', () => {
         const suggestions = suggestForFragment('sta', source)
         expect(suggestions.length).toBeGreaterThan(0)
-        expect(suggestions[0].insert.startsWith('status:')).toBe(true)
+        expect(suggestions[0]!.insert.startsWith('status:')).toBe(true)
     })
 
     it('suggests matching option values after a colon', () => {
@@ -111,8 +111,8 @@ describe('chipsForFilterValue', () => {
     })
 
     it('labels special assignee values', () => {
-        expect(chipsForFilterValue({ assignee: '@me' }, source)[0].label).toBe('Mine')
-        expect(chipsForFilterValue({ assignee: '__none__' }, source)[0].label).toBe('No assignee')
+        expect(chipsForFilterValue({ assignee: '@me' }, source)[0]!.label).toBe('Mine')
+        expect(chipsForFilterValue({ assignee: '__none__' }, source)[0]!.label).toBe('No assignee')
     })
 
     it('skips order, text query and tags; project becomes a chip', () => {

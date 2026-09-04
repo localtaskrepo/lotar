@@ -1,4 +1,9 @@
+# Pin the Rust toolchain so local development, CI, and releases all lint and
+# compile with identical compiler/clippy versions. Clippy lints change between
+# stable releases; an unpinned "stable" in CI drifted from local toolchains and
+# broke a release with new-lint errors. Bump this file deliberately (and run
+# `rustup toolchain install` locally) when upgrading.
 [toolchain]
-channel = "stable"
-components = ["rustfmt", "clippy"]
+channel = "1.98.1"
 profile = "minimal"
+components = ["rustfmt", "clippy"]

@@ -560,6 +560,64 @@ fn http_options(port: u16, path: &str) -> (u16, HashMap<String, String>) {
 }
 
 #[test]
+fn api_list_reflects_external_file_edits_immediately() {
+    let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    let project_dir = tasks_dir.join("LIVE");
+    std::fs::create_dir_all(&project_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+
+    std::fs::write(
+        project_dir.join("1.yml"),
+        "title: before external edit\nstatus: Todo\npriority: low\ntask_type: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n",
+    )
+    .unwrap();
+
+    let mut api = ApiServer::new();
+    routes::initialize(&mut api);
+
+    let list_titles = |api: &ApiServer| -> Vec<String> {
+        let resp = api.handle_request(&mk_req(
+            "GET",
+            "/api/tasks/list",
+            &[],
+            serde_json::Value::Null,
+        ));
+        assert_eq!(resp.status, 200);
+        let body: serde_json::Value = serde_json::from_slice(&resp.body).unwrap();
+        body["data"]["tasks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["title"].as_str().unwrap_or_default().to_string())
+            .collect()
+    };
+
+    // Prime every cache with a couple of identical reads.
+    assert_eq!(
+        list_titles(&api),
+        vec!["before external edit".to_string()],
+        "first read must see the on-disk task"
+    );
+    assert_eq!(list_titles(&api), vec!["before external edit".to_string()]);
+
+    // Edit the file behind the server's back, then read again immediately.
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::fs::write(
+        project_dir.join("1.yml"),
+        "title: after external edit\nstatus: Todo\npriority: low\ntask_type: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:01:00Z\ntags: []\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        list_titles(&api),
+        vec!["after external edit".to_string()],
+        "external edits must be visible on the very next request, with no TTL window"
+    );
+}
+
+#[test]
 fn api_add_list_get_delete_roundtrip() {
     // Speed up IO handling in server during tests and serialize env
     let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");

@@ -187,24 +187,13 @@
         @update:value="onFilterUpdate"
       >
         <template #panel>
-          <div class="row sprints-view-settings">
-            <label class="filter-field">
-              <span class="muted">Sprint window</span>
-              <UiSelect v-model="timeRange">
-                <option v-for="option in timeRangeChoices" :key="option.value" :value="option.value">
-                  {{ option.label }}
-                </option>
-              </UiSelect>
-            </label>
-            <label v-if="showAllowClosedControl" class="filter-checkbox">
-              <input type="checkbox" v-model="allowClosed" />
-              Allow editing closed sprints
-            </label>
-            <label class="filter-checkbox">
-              <input type="checkbox" v-model="highlightMultiSprint" />
-              Highlight tasks in multiple sprints
-            </label>
-          </div>
+          <SprintViewSettings
+            v-model:time-range="timeRange"
+            :choices="timeRangeChoices"
+            :show-allow-closed="showAllowClosedControl"
+            v-model:allow-closed="allowClosed"
+            v-model:highlight-multi-sprint="highlightMultiSprint"
+          />
         </template>
         <template #actions>
           <ColumnsMenu
@@ -790,6 +779,7 @@ import type {
   TaskDTO,
 } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
+import SprintViewSettings from '../components/SprintViewSettings.vue'
 import FilterBar from '../components/FilterBar.vue'
 import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
@@ -828,7 +818,7 @@ type ColumnKey =
 
 type SprintMetric = 'tasks' | 'points' | 'hours'
 type AnalyticsTab = 'burndown' | 'velocity' | 'health' | 'history'
-type TimeRangeKey = 'current' | '30' | '90' | '180' | 'all'
+type TimeRangeKey = import('../components/SprintViewSettings.vue').SprintTimeRangeKey
 
 const columnStorageKey = 'lotar.sprints.columns'
 const columnOrderStorageKey = 'lotar.sprints.columnOrder'
@@ -1595,7 +1585,7 @@ watch(
     const current = selectedAnalyticsSprintId.value
     const exists = current ? list.some((item) => item.id === current) : false
     if (!current || !exists) {
-      selectedAnalyticsSprintId.value = analyticsDefaultSprintId.value ?? list[list.length - 1].id
+      selectedAnalyticsSprintId.value = analyticsDefaultSprintId.value ?? list[list.length - 1]?.id ?? null
     }
   },
   { immediate: true },
@@ -2045,11 +2035,11 @@ function parseDurationToMs(value: string | null | undefined): number | null {
   let match: RegExpExecArray | null
   while ((match = pattern.exec(text)) !== null) {
     matched = true
-    const amount = Number.parseFloat(match[1])
+    const amount = Number.parseFloat(match[1] ?? '')
     if (!Number.isFinite(amount)) {
       continue
     }
-    const unitRaw = match[2]
+    const unitRaw = match[2] ?? ''
     const unitMs = DURATION_UNIT_MS[unitRaw] ?? DURATION_UNIT_MS[unitRaw.replace(/s$/, '')]
     if (!unitMs) {
       continue
@@ -2576,6 +2566,7 @@ async function onBacklogDrop(event: DragEvent) {
   try {
     for (let index = 0; index < memberships.length; index += 1) {
       const sprintId = memberships[index]
+      if (sprintId === undefined) continue
       const result = await removeTasksFromSprint([taskId], sprintId, { silent: index > 0 })
       removedAny = removedAny || result
     }

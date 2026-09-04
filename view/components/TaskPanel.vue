@@ -829,7 +829,7 @@ function extractAttachmentHash(relPath: string): string | null {
   }
 
   const m = base.match(/^(.*)[.-]([0-9a-f]{32})$/i)
-  return m ? m[2] : null
+  return m ? (m[2] ?? null) : null
 }
 
 function attachmentDisplayName(relPath: string): string {
@@ -1371,7 +1371,7 @@ watch(
       return
     }
     if (!options.some((opt) => opt.value === sprintDialogSelection.value)) {
-      sprintDialogSelection.value = options[0].value
+      sprintDialogSelection.value = options[0]?.value ?? ''
     }
   },
   { immediate: true },

@@ -133,7 +133,7 @@ describe('TaskStore', () => {
       await store.hydrateAll({}, { clear: true })
 
       expect(store.count.value).toBe(1)
-      expect(store.items.value[0].id).toBe('NEW-1')
+      expect(store.items.value[0]!.id).toBe('NEW-1')
     })
 
     it('sets error status on failure', async () => {

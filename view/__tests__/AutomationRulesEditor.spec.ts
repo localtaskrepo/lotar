@@ -37,7 +37,7 @@ describe('AutomationRulesEditor', () => {
 
         const emitted = wrapper.emitted('update:modelValue')
         expect(emitted).toBeTruthy()
-        const lastPayload = emitted![emitted!.length - 1][0] as string
+        const lastPayload = emitted![emitted!.length - 1]![0] as string
         expect(lastPayload).toContain('name: Ship after tests')
         expect(lastPayload).toContain('complete:')
         expect(lastPayload).toContain('status: Done')
@@ -77,7 +77,7 @@ describe('AutomationRulesEditor', () => {
 
         const emitted = wrapper.emitted('update:modelValue')
         expect(emitted).toBeTruthy()
-        const lastPayload = emitted![emitted!.length - 1][0] as string
+        const lastPayload = emitted![emitted!.length - 1]![0] as string
         expect(lastPayload).toContain('name: Notify reviewer')
         expect(lastPayload).toContain('comment:')
         expect(lastPayload).toContain('Ready for review')
@@ -138,7 +138,7 @@ describe('AutomationRulesEditor', () => {
         // Verify the rule card is rendered
         const ruleNames = wrapper.findAll('.rule-name')
         expect(ruleNames.length).toBe(1)
-        expect(ruleNames[0].text()).toBe('Close after complete')
+        expect(ruleNames[0]!.text()).toBe('Close after complete')
 
         // Click Edit
         await findButton(wrapper, 'Edit')?.trigger('click')

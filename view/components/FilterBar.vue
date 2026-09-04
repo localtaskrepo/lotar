@@ -758,10 +758,10 @@ function formatHelperMessage(errors: string[]): string {
       ? 'Type another key=value pair or pick a preset chip to insert one.'
       : 'Format: key=value. Separate multiple filters with commas.'
   }
-  if (errors.length === 1) return errors[0]
+  if (errors.length === 1) return errors[0] ?? ''
   const [first, second] = errors
   const suffix = errors.length > 2 ? ` (+${errors.length - 2} more)` : ''
-  return `${first}; ${second || ''}${suffix}`.trim()
+  return `${first ?? ''}; ${second || ''}${suffix}`.trim()
 }
 
 const customFilterHint = computed(() => formatHelperMessage(customFilterErrors.value))
@@ -870,7 +870,8 @@ function onSearchKeydown(event: KeyboardEvent) {
     }
     if (event.key === 'Tab') {
       event.preventDefault()
-      pickSuggestion(suggestions.value[activeSuggestion.value])
+      const highlighted = suggestions.value[activeSuggestion.value]
+      if (highlighted) pickSuggestion(highlighted)
       return
     }
   }

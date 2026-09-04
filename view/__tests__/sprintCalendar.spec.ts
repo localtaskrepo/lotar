@@ -70,9 +70,9 @@ describe('sprint calendar helpers', () => {
         ]
         const schedule = buildSprintSchedule(sprints, rangeStart, rangeEnd)
         expect(Object.keys(schedule)).toHaveLength(3)
-        const firstDay = schedule[toDateKey(new Date('2024-03-10T00:00:00Z'))]?.[0]
+        const firstDay = schedule[toDateKey(new Date('2024-03-10T00:00:00Z'))]?.[0]!
         expect(firstDay?.isStart).toBe(false)
-        const lastDay = schedule[toDateKey(new Date('2024-03-12T00:00:00Z'))]?.[0]
+        const lastDay = schedule[toDateKey(new Date('2024-03-12T00:00:00Z'))]?.[0]!
         expect(lastDay?.isEnd).toBe(false)
     })
 
@@ -93,7 +93,7 @@ describe('sprint calendar helpers', () => {
         const entries = Object.values(schedule).flat().filter((entry) => entry.id === 404)
         expect(entries).toHaveLength(14)
         const lastDay = entries[entries.length - 1]
-        expect(toDateKey(lastDay.endDate)).toBe('2024-05-14')
+        expect(toDateKey(lastDay!.endDate)).toBe('2024-05-14')
     })
 
     it('parses duration expressions used in plan_length', () => {
@@ -116,15 +116,15 @@ describe('sprint calendar helpers', () => {
             actual_end: '2024-10-30',
         })
         const schedule = buildSprintSchedule([sprint], rangeStart, rangeEnd)
-        const plannedStartEntry = schedule['2024-10-25'][0]
+        const plannedStartEntry = schedule['2024-10-25']![0]!
         expect(plannedStartEntry.beforeActualStart).toBe(true)
         expect(plannedStartEntry.isStart).toBe(true)
-        const actualStartEntry = schedule['2024-10-27'][0]
+        const actualStartEntry = schedule['2024-10-27']![0]!
         expect(actualStartEntry.isActualStart).toBe(true)
         expect(actualStartEntry.beforeActualStart).toBe(false)
-        const actualEndEntry = schedule['2024-10-30'][0]
+        const actualEndEntry = schedule['2024-10-30']![0]!
         expect(actualEndEntry.isActualEnd).toBe(true)
-        const afterActualEndEntry = schedule['2024-11-01'][0]
+        const afterActualEndEntry = schedule['2024-11-01']![0]!
         expect(afterActualEndEntry.afterActualEnd).toBe(true)
         expect(afterActualEndEntry.isEnd).toBe(false)
     })

@@ -45,6 +45,8 @@ lotar serve --web-ui-embedded
 - `--open` - Automatically open browser after starting server
 - `--web-ui-path <PATH>` - Path to a directory containing custom web UI assets. When set and the directory exists, files are served from here first, falling back to the bundled UI if not found.
 - `--web-ui-embedded` - Force serving only the embedded/bundled UI assets, ignoring any custom web UI path. Useful for CI testing to ensure the bundled UI works correctly.
+
+Assets are served with compression: clients that send `Accept-Encoding: gzip` receive pre-compressed variants (~70% smaller transfer), and content-hashed asset files carry `Cache-Control: immutable` so repeat visits load from browser cache. The HTML entry points always revalidate (`no-cache`).
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Override tasks directory resolution

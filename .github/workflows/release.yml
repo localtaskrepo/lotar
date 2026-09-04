@@ -119,8 +119,7 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
+        # Toolchain comes from rust-toolchain.toml.
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2

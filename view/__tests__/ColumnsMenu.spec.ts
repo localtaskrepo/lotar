@@ -35,8 +35,8 @@ describe('ColumnsMenu', () => {
         const labels = wrapper.findAll('label.column-option')
         expect(labels.map((l) => l.text().trim())).toEqual(['ID', 'Title', 'sprint'])
         const checks = wrapper.findAll('input[type="checkbox"]')
-        expect((checks[0].element as HTMLInputElement).checked).toBe(true)
-        expect((checks[1].element as HTMLInputElement).checked).toBe(false)
+        expect((checks[0]!.element as HTMLInputElement).checked).toBe(true)
+        expect((checks[1]!.element as HTMLInputElement).checked).toBe(false)
     })
 
     it('forwards checkbox changes through setVisible', async () => {

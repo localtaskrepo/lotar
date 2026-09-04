@@ -54,7 +54,7 @@ export function useSprints() {
     })
 
     const active = computed(() => sprints.value.filter((item) => item.state === 'active' || item.state === 'overdue'))
-    const defaultSprintId = computed<number | undefined>(() => (active.value.length === 1 ? active.value[0].id : undefined))
+    const defaultSprintId = computed<number | undefined>(() => (active.value.length === 1 ? (active.value[0]?.id ?? undefined) : undefined))
     const hasMissing = computed(() => missingSprints.value.length > 0)
 
     return {

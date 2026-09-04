@@ -82,8 +82,8 @@ function formatCategoryLabel(key: string) {
 
 function datasetColor(index: number) {
   if (!paletteCssVars.length) return resolveCssVar('--color-accent')
-  const name = paletteCssVars[index % paletteCssVars.length]
-  return resolveCssVar(name, resolveCssVar('--color-accent'))
+  const name = paletteCssVars[index % paletteCssVars.length] ?? ''
+  return resolveCssVar(name || '--color-accent', resolveCssVar('--color-accent'))
 }
 
 function buildDatasets(baseColor: string, hoverColor: string) {
@@ -171,9 +171,10 @@ function upsertChart(resize = false) {
         },
         onClick: (_event, elements) => {
           if (!elements?.length) return
-          const idx = elements[0].index
+          const idx = elements[0]?.index
+          if (typeof idx !== 'number') return
           const value = totals.value[idx] ?? 0
-          if (typeof idx === 'number' && Number.isFinite(value)) {
+          if (Number.isFinite(value)) {
             emit('select', { index: idx, value })
           }
         },

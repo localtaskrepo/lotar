@@ -29,8 +29,8 @@ jobs:
 
     - name: Setup Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: stable
+      # No explicit toolchain input: the action installs the toolchain pinned
+      # in rust-toolchain.toml so CI and local development stay identical.
 
     - name: Rust cache
       uses: Swatinem/rust-cache@v2
@@ -115,8 +115,7 @@ jobs:
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: stable
+      # Toolchain comes from rust-toolchain.toml.
         components: rustfmt, clippy
         
     - name: Rust Cache
@@ -268,8 +267,7 @@ jobs:
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: stable
+      # Toolchain comes from rust-toolchain.toml.
 
     - name: Install sccache
       uses: taiki-e/install-action@v2

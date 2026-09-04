@@ -306,16 +306,18 @@ function onTagInputKeydown(event: KeyboardEvent, close?: () => void) {
       ? (tagActiveIndex.value - 1 + suggestions.length) % suggestions.length
       : -1
   } else if (event.key === 'Enter') {
-    if (tagActiveIndex.value >= 0 && suggestions[tagActiveIndex.value]) {
+    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
+    if (active) {
       event.preventDefault()
-      selectTag(suggestions[tagActiveIndex.value])
+      selectTag(active)
       return
     }
     event.preventDefault()
     commitTagInput()
   } else if (event.key === 'Tab') {
-    if (tagActiveIndex.value >= 0 && suggestions[tagActiveIndex.value]) {
-      selectTag(suggestions[tagActiveIndex.value])
+    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
+    if (active) {
+      selectTag(active)
       event.preventDefault()
     }
   } else if (event.key === 'Escape') {

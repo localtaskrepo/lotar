@@ -7,7 +7,7 @@ describe('api.exportTasks', () => {
     const spy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue(mockRes as any)
     const res = await api.exportTasks({ project: 'ABC', status: ['TODO', 'DONE'], tags: ['ui', 'backend'] } as any)
     expect(spy).toHaveBeenCalled()
-    const url = (spy.mock.calls[0][0] as string)
+    const url = (spy.mock.calls[0]![0] as string)
     expect(url).toContain('/api/tasks/export')
     expect(url).toContain('project=ABC')
     expect(url).toContain('status=TODO%2CDONE')

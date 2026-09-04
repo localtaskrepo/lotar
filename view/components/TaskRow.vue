@@ -94,7 +94,7 @@ function cycleStatus(){
   const cur = (props.task.status || '').trim()
   const idx = normalized.findIndex((value) => value.toLowerCase() === cur.toLowerCase())
   const next = normalized[(idx + 1) % normalized.length]
-  emit('set-status', { id: props.task.id, status: next })
+  if (next) emit('set-status', { id: props.task.id, status: next })
 }
 </script>
 <style scoped>

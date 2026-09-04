@@ -218,7 +218,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         try {
             const data = await options.apiClient.getTask(id)
             Object.assign(options.task, data)
-            await options.refreshConfig(id.split('-')[0])
+            await options.refreshConfig(id.split('-')[0] ?? '')
             options.applyTask(data)
             await options.loadCommitHistory(id)
             return data

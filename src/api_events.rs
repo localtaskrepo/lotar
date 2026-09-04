@@ -32,7 +32,6 @@ pub fn emit(event: &ApiEvent) {
 }
 
 pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
-    crate::utils::query_cache::invalidate_all();
     let mut payload = match serde_json::to_value(task) {
         Ok(v) => v,
         Err(_) => JsonValue::Null,
@@ -47,7 +46,6 @@ pub fn emit_task_created(task: &crate::api_types::TaskDTO, triggered_by: Option<
 }
 
 pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<&str>) {
-    crate::utils::query_cache::invalidate_all();
     let mut payload = match serde_json::to_value(task) {
         Ok(v) => v,
         Err(_) => JsonValue::Null,
@@ -62,7 +60,6 @@ pub fn emit_task_updated(task: &crate::api_types::TaskDTO, triggered_by: Option<
 }
 
 pub fn emit_task_deleted(id: &str, triggered_by: Option<&str>) {
-    crate::utils::query_cache::invalidate_all();
     let mut payload = serde_json::json!({"id": id});
     if let (JsonValue::Object(map), Some(actor)) = (&mut payload, triggered_by) {
         map.insert("triggered_by".into(), JsonValue::String(actor.to_string()));

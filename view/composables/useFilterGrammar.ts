@@ -109,8 +109,8 @@ export function parseFilterQuery(input: string): ParsedFilterQuery {
         const match = TOKEN_RE.exec(token)
         if (match) {
             const [, rawKey, rawValue] = match
-            const key = findGrammarKey(rawKey)
-            const value = unquote(rawValue).trim()
+            const key = findGrammarKey(rawKey ?? '')
+            const value = unquote(rawValue ?? '').trim()
             if (key && value) {
                 if (key.values === 'flag') {
                     filters[key.key] = 'true'

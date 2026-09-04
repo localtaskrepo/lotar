@@ -876,7 +876,7 @@ watch(customEnabledEventActions, (entries) => {
     return
   }
   if (!activeCustomEvent.value || !entries.some((entry) => entry.event === activeCustomEvent.value)) {
-    activeCustomEvent.value = entries[0].event
+    activeCustomEvent.value = entries[0]?.event ?? null
   }
 }, { deep: true })
 
@@ -900,7 +900,9 @@ function openCreateDialog() {
 }
 
 function openEditDialog(index: number) {
-  const draft = getEditableRuleState(parsedDocument.value.rules[index]).draft
+  const source = parsedDocument.value.rules[index]
+  if (!source) return
+  const draft = getEditableRuleState(source).draft
   dialogDraft.value = prepareDraftForDialog(draft)
   dialogStep.value = 0
   editingIndex.value = index
@@ -935,7 +937,7 @@ function moveRule(index: number, direction: number) {
   if (target < 0 || target >= parsedDocument.value.rules.length) return
   const nextRules = [...parsedDocument.value.rules]
   const [rule] = nextRules.splice(index, 1)
-  nextRules.splice(target, 0, rule)
+  if (rule) nextRules.splice(target, 0, rule)
   emit('update:modelValue', buildAutomationYamlDocument(nextRules, parsedDocument.value.maxIterations))
 }
 
@@ -973,7 +975,7 @@ function selectRecipe(recipe: GuidedRecipe) {
 }
 
 function addCondition() {
-  dialogDraft.value.conditions.push(createEmptyRuleDraft().conditions[0])
+  dialogDraft.value.conditions.push(createEmptyRuleDraft().conditions[0]!)
 }
 
 function removeCondition(id: string) {
@@ -1165,6 +1167,7 @@ function inferRecipe(draft: AutomationRuleDraft): GuidedRecipe {
   if (enabled.length !== 1) return 'custom'
 
   const entry = enabled[0]
+  if (!entry) return 'custom'
   const setFields = entry.setFields.filter((row) => row.value.trim())
   const addFields = entry.addFields.filter((row) => row.value.trim())
   const removeFields = entry.removeFields.filter((row) => row.value.trim())
@@ -1179,8 +1182,8 @@ function inferRecipe(draft: AutomationRuleDraft): GuidedRecipe {
     && !removeFields.length
     && !hasComment
     && !hasRun
-    && setFields[0].scope === 'field'
-    && setFields[0].field === 'status'
+    && setFields[0]?.scope === 'field'
+    && setFields[0]?.field === 'status'
   ) {
     return 'status'
   }
@@ -1190,8 +1193,8 @@ function inferRecipe(draft: AutomationRuleDraft): GuidedRecipe {
     && !removeFields.length
     && !hasComment
     && !hasRun
-    && setFields[0].scope === 'field'
-    && (setFields[0].field === 'assignee' || setFields[0].field === 'reporter')
+    && setFields[0]?.scope === 'field'
+    && (setFields[0]?.field === 'assignee' || setFields[0]?.field === 'reporter')
   ) {
     return 'assignment'
   }
@@ -1211,6 +1214,7 @@ function populateSimpleStateFromDraft(draft: AutomationRuleDraft, recipe: Guided
   resetSimpleState()
   const enabled = draft.eventActions.filter((entry) => entry.enabled)
   const entry = enabled[0]
+  if (!entry) return
   selectedSimpleEvent.value = entry?.event ?? recommendedEventForRecipe(recipe)
   if (!entry) return
 

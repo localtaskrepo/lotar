@@ -47,7 +47,7 @@ function parsePlanLengthDays(value?: string | null): number | null {
     if (parts.length === 2) {
         const numeric = Number(parts[0])
         if (!Number.isFinite(numeric) || numeric <= 0) return null
-        const unit = parts[1]
+        const unit = parts[1] ?? ''
         if (unit.startsWith('day')) return numeric
         if (unit.startsWith('week')) return numeric * 7
     }
@@ -146,7 +146,7 @@ export function buildSprintSchedule(
     }
 
     for (const key of Object.keys(schedule)) {
-        schedule[key].sort((a, b) => {
+        (schedule[key] ??= []).sort((a, b) => {
             const startDiff = a.startDate.getTime() - b.startDate.getTime()
             if (startDiff !== 0) {
                 return startDiff

@@ -467,7 +467,7 @@ describe('TaskPanel integration safeguards', () => {
         const suggestions = tagDialog.findAll('.task-panel__tag-suggestion')
         expect(suggestions.length).toBeGreaterThan(0)
 
-        await suggestions[0].trigger('click')
+        await suggestions[0]!.trigger('click')
         await flushPromises()
 
         const closeButton = tagDialog.find('[data-testid="tag-dialog-done"]')
@@ -476,7 +476,7 @@ describe('TaskPanel integration safeguards', () => {
 
         expect((wrapper.vm as any).form.tags).toContain('alpha')
         expect(apiFixtures.updateTaskMock).toHaveBeenCalledTimes(1)
-        expect(apiFixtures.updateTaskMock.mock.calls[0][1]).toMatchObject({ tags: ['alpha'] })
+        expect(apiFixtures.updateTaskMock.mock.calls[0]![1]).toMatchObject({ tags: ['alpha'] })
 
         wrapper.unmount()
     })
@@ -508,11 +508,11 @@ describe('TaskPanel integration safeguards', () => {
         const suggestionItems = wrapper.findAll('.task-panel__relation-suggest li')
         expect(suggestionItems.length).toBeGreaterThan(0)
 
-        await suggestionItems[0].trigger('mousedown')
+        await suggestionItems[0]!.trigger('mousedown')
         await flushPromises()
 
         expect(apiFixtures.updateTaskMock).toHaveBeenCalledTimes(1)
-        const payload = apiFixtures.updateTaskMock.mock.calls[0][1]
+        const payload = apiFixtures.updateTaskMock.mock.calls[0]![1]!
         expect(payload).toHaveProperty('relationships')
         expect(payload.relationships.depends_on).toContain('DEMO-777')
 
@@ -551,10 +551,10 @@ describe('TaskPanel integration safeguards', () => {
 
         const sprintChips = wrapper.findAll('.task-panel__sprint-chip')
         expect(sprintChips.length).toBe(2)
-        expect(sprintChips[0].text()).toContain('#101')
-        expect(sprintChips[0].classes()).toContain('task-panel__sprint-chip--active')
-        expect(sprintChips[1].text()).toContain('#999')
-        expect(sprintChips[1].classes()).toContain('task-panel__sprint-chip--missing')
+        expect(sprintChips[0]!.text()).toContain('#101')
+        expect(sprintChips[0]!.classes()).toContain('task-panel__sprint-chip--active')
+        expect(sprintChips[1]!.text()).toContain('#999')
+        expect(sprintChips[1]!.classes()).toContain('task-panel__sprint-chip--missing')
 
         const warning = wrapper.find('.task-panel__sprint-warning')
         expect(warning.exists()).toBe(true)

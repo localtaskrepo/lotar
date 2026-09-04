@@ -224,7 +224,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
 
     const projectForSuggestions = () => {
         if (options.form.project) return options.form.project
-        if (options.form.id) return options.form.id.split('-')[0]
+        if (options.form.id) return options.form.id.split('-')[0] ?? ''
         const initial = options.getInitialProject()
         if (initial) return initial
         if (options.defaults.value.project) return options.defaults.value.project
@@ -255,7 +255,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
         applyDefaults,
         applyTask,
         projectForSuggestions,
-        projectFromList,
+        projectFromList: () => projectFromList() ?? '',
         ensureProjectsLoaded,
         onProjectChange,
     }

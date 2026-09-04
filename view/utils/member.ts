@@ -18,9 +18,9 @@ export function memberInitials(value: string | null | undefined): string {
   // Strip leading @ for directives
   const clean = name.startsWith('@') ? name.slice(1) : name
   // For emails, use local part
-  const local = clean.includes('@') ? clean.split('@')[0] : clean
+  const local = clean.includes('@') ? (clean.split('@')[0] ?? clean) : clean
   const parts = local.split(/[\s._-]+/).filter(Boolean)
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  if (parts.length >= 2) return ((parts[0]?.[0] ?? '') + (parts[parts.length - 1]?.[0] ?? '')).toUpperCase()
   return local.slice(0, 2).toUpperCase()
 }
 

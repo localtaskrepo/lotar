@@ -82,8 +82,8 @@
               <span class="muted">{{ group.jobs.length }} {{ group.jobs.length === 1 ? 'job' : 'jobs' }}</span>
             </div>
             <div class="muted" style="font-size: 12px;">
-              <span>Latest {{ formatDate(group.latest.created_at) }}</span>
-              <span v-if="group.latest.finished_at"> · {{ group.latest.status }}</span>
+              <span>Latest {{ formatDate(group.latest!.created_at) }}</span>
+              <span v-if="group.latest!.finished_at"> · {{ group.latest!.status }}</span>
             </div>
           </div>
           <div class="row ticket-group-summary" style="gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -236,7 +236,7 @@ const groupedJobs = computed(() => {
         },
       }
     })
-    .sort((a, b) => b.latest.created_at.localeCompare(a.latest.created_at))
+    .sort((a, b) => (b.latest?.created_at ?? '').localeCompare(a.latest?.created_at ?? ''))
 })
 
 const hasCancelableJobs = computed(() => jobs.value.some(job => job.status === 'running' || job.status === 'queued'))
@@ -297,6 +297,7 @@ function mergeJob(next: AgentJob) {
     return
   }
   const existing = jobs.value[idx]
+  if (!existing) return
   const merged: AgentJob = {
     ...existing,
     ...next,

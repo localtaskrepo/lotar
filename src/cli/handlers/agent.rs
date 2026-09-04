@@ -832,7 +832,7 @@ pub(crate) fn running_job_for_ticket(ticket_id: &str) -> Option<RunningAgentJob>
 }
 
 fn list_running_jobs() -> Vec<RunningAgentJob> {
-    let mut system = System::new_all();
+    let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::All, true);
 
     system

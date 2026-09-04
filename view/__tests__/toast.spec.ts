@@ -15,14 +15,14 @@ describe('showToast', () => {
   it('adds a toast with message only', () => {
     showToast('hello')
     expect(toasts.value).toHaveLength(1)
-    expect(toasts.value[0].message).toBe('hello')
-    expect(toasts.value[0].title).toBeUndefined()
+    expect(toasts.value[0]!.message).toBe('hello')
+    expect(toasts.value[0]!.title).toBeUndefined()
   })
 
   it('adds a toast with title and message', () => {
     showToast('body', 'Title')
-    expect(toasts.value[0].title).toBe('Title')
-    expect(toasts.value[0].message).toBe('body')
+    expect(toasts.value[0]!.title).toBe('Title')
+    expect(toasts.value[0]!.message).toBe('body')
   })
 
   it('auto-removes toast after default 3 s', () => {
@@ -45,7 +45,7 @@ describe('showToast', () => {
   it('assigns unique incrementing ids', () => {
     showToast('a')
     showToast('b')
-    expect(toasts.value[0].id).not.toBe(toasts.value[1].id)
-    expect(toasts.value[1].id).toBeGreaterThan(toasts.value[0].id)
+    expect(toasts.value[0]!.id).not.toBe(toasts.value[1]!.id)
+    expect(toasts.value[1]!.id).toBeGreaterThan(toasts.value[0]!.id)
   })
 })

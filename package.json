@@ -13,7 +13,7 @@
     "lint:backend": "cargo clippy --all-targets --all-features -- -D warnings",
     "lint:backend:fast": "cargo clippy --lib --bins -- -D warnings",
     "lint:agent": "bash -lc 'set -euo pipefail; export NO_COLOR=1 FORCE_COLOR=0 CARGO_TERM_COLOR=never; npm run lint:frontend; cargo clippy --all-targets --all-features --color never -- -D warnings; cargo fmt --all --check'",
-    "build:web": "vite build",
+    "build:web": "vite build && node scripts/compress-web.mjs",
     "build:rust": "cargo build --release",
     "build:smoke": "npm run build:web && cargo build --profile smoke",
     "test": "npm run test:rust && npm run test:ui",

@@ -3,25 +3,80 @@ use crate::storage::locator::StorageLocator;
 use crate::storage::task::Task;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::SystemTime;
+
+/// Cached parse of one task file, validated on every read by the file's
+/// (mtime, len) fingerprint. Entries are never trusted across an external
+/// modification: any edit changes the mtime (APFS has nanosecond granularity)
+/// and virtually always the length too, so the next search re-parses the file.
+/// This makes the cache behave exactly like an uncached scan while skipping
+/// the YAML parse for unchanged files — including in serve mode, where tasks
+/// are routinely edited on disk by other tools.
+struct CachedTask {
+    mtime: SystemTime,
+    len: u64,
+    task: Arc<Task>,
+}
+
+/// Upper bound on cached entries so pathological workspaces cannot grow the
+/// resident set without limit. Way above any real project's task count.
+const TASK_CACHE_MAX_ENTRIES: usize = 100_000;
+
+fn task_cache() -> &'static Mutex<HashMap<PathBuf, CachedTask>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, CachedTask>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// Search and filtering functionality for task storage
 pub struct StorageSearch;
 
 impl StorageSearch {
     fn load_task_file(path: &Path) -> Option<Task> {
+        let metadata = fs::metadata(path).ok()?;
+        let mtime = metadata.modified().ok()?;
+        let len = metadata.len();
+
+        let cache_key = path.to_path_buf();
+        if let Ok(cache) = task_cache().lock()
+            && let Some(hit) = cache.get(&cache_key)
+            && hit.mtime == mtime
+            && hit.len == len
+        {
+            return Some((*hit.task).clone());
+        }
+
         let content = match fs::read_to_string(path) {
             Ok(content) => content,
             Err(_) => return None,
         };
-        match serde_yaml_ng::from_str::<Task>(&content) {
-            Ok(task) => Some(task),
+        let task = match serde_yaml_ng::from_str::<Task>(&content) {
+            Ok(task) => task,
             Err(e) => {
                 crate::storage::safety::warn_corrupt_once(path, &e.to_string());
-                None
+                return None;
             }
+        };
+        if let Ok(mut cache) = task_cache().lock() {
+            // Opportunistic size guard: drop the whole cache if it grew past
+            // the bound rather than tracking LRU state. Rebuilding it is
+            // cheap (one parse per file) and the case is pathological anyway.
+            if cache.len() >= TASK_CACHE_MAX_ENTRIES {
+                cache.clear();
+            }
+            cache.insert(
+                cache_key,
+                CachedTask {
+                    mtime,
+                    len,
+                    task: Arc::new(task.clone()),
+                },
+            );
         }
+        Some(task)
     }
 
     /// Search for tasks based on filter criteria

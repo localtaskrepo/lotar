@@ -26,7 +26,7 @@ function mountGroup(source: 'project' | 'global' | 'built_in' | undefined = 'pro
 
 function extractStyle(source: string): string {
     const match = source.match(/<style[^>]*>([\s\S]*?)<\/style>/)
-    return match ? match[1] : ''
+    return match ? match[1]! : ''
 }
 
 describe('ConfigGroup styles', () => {

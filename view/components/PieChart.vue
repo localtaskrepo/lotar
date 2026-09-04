@@ -122,16 +122,18 @@ function upsertChart() {
         },
         onClick: (_event, elements) => {
           if (!elements?.length) return
-          const idx = elements[0].index
-          emitSlice(idx)
+          const idx = elements[0]?.index
+          if (typeof idx === 'number') emitSlice(idx)
         },
       },
     })
   } else {
     const dataset = chart.value.data.datasets[0]
-    dataset.data = [...values.value]
-    dataset.backgroundColor = [...backgroundColors.value]
-    dataset.borderWidth = borderWidth.value
+    if (dataset) {
+      dataset.data = [...values.value]
+      dataset.backgroundColor = [...backgroundColors.value]
+      dataset.borderWidth = borderWidth.value
+    }
     chart.value.data.labels = [...labels.value]
     chart.value.options.cutout = cutoutValue.value
     chart.value.update()

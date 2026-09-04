@@ -1097,7 +1097,10 @@ function upsertRun(runId: string, updater: (run: SyncRun) => SyncRun) {
     }), ...syncRuns.value].slice(0, 20)
     return
   }
-  const updated = updater(syncRuns.value[idx])
+  const current = syncRuns.value[idx]
+  if (!current) return
+  const updated = updater(current)
+  if (!updated) return
   const next = syncRuns.value.slice()
   next.splice(idx, 1, updated)
   syncRuns.value = next

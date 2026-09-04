@@ -132,9 +132,9 @@
                 <div class="task-table__title-wrapper">
                   <span class="task-table__title-text">{{ t.title }}</span>
                   <div v-if="touchesMap[t.id]" class="session-touch">
-                    <span class="session-touch__badge" :class="touchesMap[t.id].kind">{{ touchBadge(touchesMap[t.id]) }}</span>
-                    <span>{{ relativeTime(touchesMap[t.id].time) }}</span>
-                    <span v-if="touchesMap[t.id].actor">• {{ touchesMap[t.id].actor }}</span>
+                    <span class="session-touch__badge" :class="touchesMap[t.id]!.kind">{{ touchBadge(touchesMap[t.id]!) }}</span>
+                    <span>{{ relativeTime(touchesMap[t.id]!.time) }}</span>
+                    <span v-if="touchesMap[t.id]!.actor">• {{ touchesMap[t.id]!.actor }}</span>
                   </div>
                 </div>
               </template>

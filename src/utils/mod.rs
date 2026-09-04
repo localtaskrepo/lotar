@@ -12,7 +12,6 @@ pub mod member;
 pub mod pagination;
 pub mod paths;
 pub mod project;
-pub mod query_cache;
 pub mod scan;
 pub mod tags;
 pub mod task_intel;

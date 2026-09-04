@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
-static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web");
+static STATIC_FILES: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/target/web-embed");
 static STOP_FLAGS: LazyLock<Mutex<HashMap<u16, bool>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -134,13 +134,14 @@ pub fn serve_with_config(
                     let method = parts.first().copied().unwrap_or("GET").to_string();
                     let path_full = parts.get(1).copied().unwrap_or("/");
                     let (path, query) = parse_path_and_query(path_full);
+                    // Header names are case-insensitive; normalize once here.
                     let mut headers = HashMap::new();
                     for line in request_head.lines().skip(1) {
                         if line.trim().is_empty() {
                             break;
                         }
                         if let Some((k, v)) = line.split_once(":") {
-                            headers.insert(k.trim().to_string(), v.trim().to_string());
+                            headers.insert(k.trim().to_lowercase(), v.trim().to_string());
                         }
                     }
                     let mut body: Vec<u8> = body_bytes.to_vec();
@@ -270,9 +271,23 @@ pub fn serve_with_config(
                     let request_path = if path == "/" { "/index.html" } else { &path };
                     let rel_path = request_path.trim_start_matches('/');
                     let external_path = config.effective_web_ui_path();
-                    let mut served = try_serve_static(rel_path, &mut stream, external_path);
+                    let accepts_gzip = headers
+                        .get("accept-encoding")
+                        .map(|value| {
+                            value
+                                .split(',')
+                                .any(|part| part.trim().eq_ignore_ascii_case("gzip"))
+                        })
+                        .unwrap_or(false);
+                    let mut served =
+                        try_serve_static(rel_path, &mut stream, external_path, accepts_gzip);
                     if !served && should_fallback_to_index(&path) {
-                        served = try_serve_static("index.html", &mut stream, external_path);
+                        served = try_serve_static(
+                            "index.html",
+                            &mut stream,
+                            external_path,
+                            accepts_gzip,
+                        );
                     }
                     if !served {
                         let response = "HTTP/1.1 404 NOT FOUND\r\n\r\n404 - Page not found.";
@@ -301,30 +316,47 @@ pub fn serve(api_server: &api_server::ApiServer, port: u16) {
 /// 1. If `external_path` is Some, try to serve from that directory first
 /// 2. Try embedded assets (bundled at compile time)
 /// 3. Fallback to `target/web` on the filesystem (for development)
-fn try_serve_static(rel_path: &str, stream: &mut TcpStream, external_path: Option<&Path>) -> bool {
+fn try_serve_static(
+    rel_path: &str,
+    stream: &mut TcpStream,
+    external_path: Option<&Path>,
+    accepts_gzip: bool,
+) -> bool {
     if has_dot_segments(rel_path) {
         return false;
     }
 
-    // 1. Try external/custom UI path first (if configured)
+    // 1. Try external/custom UI path first (if configured); external trees do
+    //    not carry pre-compressed siblings, so they are served raw.
     if let Some(ext_dir) = external_path {
         let fs_path = ext_dir.join(rel_path);
         if let Ok(bytes) = fs::read(&fs_path) {
-            return serve_bytes(rel_path, &bytes, stream);
+            return serve_bytes(rel_path, &bytes, stream, false);
         }
     }
-
-    // 2. Try embedded assets
-    if let Some(file) = STATIC_FILES.get_file(rel_path) {
-        return serve_bytes(rel_path, file.contents(), stream);
+    // 2. Embedded assets are stored pre-compressed: gzip clients receive the
+    //    bytes as-is; others get a transparent runtime decompression (rare —
+    //    every mainstream client negotiates gzip).
+    if let Some(file) = STATIC_FILES.get_file(format!("{rel_path}.gz")) {
+        if accepts_gzip {
+            return serve_bytes(rel_path, file.contents(), stream, true);
+        }
+        let mut decompressed = Vec::with_capacity(file.contents().len() * 4);
+        if std::io::Read::read_to_end(
+            &mut flate2::read::GzDecoder::new(file.contents()),
+            &mut decompressed,
+        )
+        .is_ok()
+        {
+            return serve_bytes(rel_path, &decompressed, stream, false);
+        }
     }
-
     // 3. Fallback to target/web filesystem (development convenience)
     // Skip this if we already tried an external path to avoid confusion
     if external_path.is_none() {
         let fs_path = Path::new("target/web").join(rel_path);
         if let Ok(bytes) = fs::read(&fs_path) {
-            return serve_bytes(rel_path, &bytes, stream);
+            return serve_bytes(rel_path, &bytes, stream, false);
         }
     }
 
@@ -332,12 +364,27 @@ fn try_serve_static(rel_path: &str, stream: &mut TcpStream, external_path: Optio
 }
 
 /// Write HTTP 200 response with the given bytes
-fn serve_bytes(rel_path: &str, bytes: &[u8], stream: &mut TcpStream) -> bool {
+fn serve_bytes(rel_path: &str, bytes: &[u8], stream: &mut TcpStream, gzipped: bool) -> bool {
     let content_type = content_type_for(rel_path);
+    // Vite emits content-hashed filenames under assets/, so those can be
+    // cached immutably; the HTML entry points must always revalidate.
+    let cache_control = if rel_path.starts_with("assets/") {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    };
+    // The extra trailing \r\n below terminates the header block; the encoding
+    // lines are formatted with their own line endings.
     let header = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: {}\r\n{}\r\n",
         content_type,
-        bytes.len()
+        bytes.len(),
+        cache_control,
+        if gzipped {
+            "Content-Encoding: gzip\r\nVary: Accept-Encoding\r\n"
+        } else {
+            ""
+        },
     );
     let _ = stream.write_all(header.as_bytes());
     let _ = stream.write_all(bytes);
@@ -754,7 +801,6 @@ fn start_tasks_watcher() {
                                 }
                             }
                             if let Some(task_id) = task_id.clone() {
-                                crate::utils::query_cache::invalidate_all();
                                 match event.kind {
                                     EventKind::Remove(_) => {
                                         crate::api_events::emit(&crate::api_events::ApiEvent {

@@ -178,7 +178,7 @@ describe('SprintsList backlog pagination', () => {
 
         const rows = wrapper.findAll('#backlog tbody tr.task-row')
         expect(rows).toHaveLength(50)
-        expect(rows[0].text()).toContain('1')
+        expect(rows[0]!.text()).toContain('1')
         wrapper.unmount()
     })
 
@@ -194,7 +194,7 @@ describe('SprintsList backlog pagination', () => {
 
         const rows = wrapper.findAll('#backlog tbody tr.task-row')
         expect(rows).toHaveLength(50)
-        expect(rows[0].text()).toContain('51')
+        expect(rows[0]!.text()).toContain('51')
 
         wrapper.unmount()
     })

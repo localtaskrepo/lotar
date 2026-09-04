@@ -768,7 +768,7 @@ function findGithubRemote(remotes: Record<string, SyncRemoteConfig>, repo: strin
     const match = candidates.find((remote) => normalizeRepo(remote.repo || '') === normalized)
     if (match) return match
   }
-  if (candidates.length === 1) return candidates[0]
+  if (candidates.length === 1) return candidates[0] ?? null
   return null
 }
 
@@ -779,7 +779,7 @@ function findJiraRemote(remotes: Record<string, SyncRemoteConfig>, project: stri
     const match = candidates.find((remote) => (remote.project || '').trim().toUpperCase() === normalized)
     if (match) return match
   }
-  if (candidates.length === 1) return candidates[0]
+  if (candidates.length === 1) return candidates[0] ?? null
   return null
 }
 
@@ -819,7 +819,7 @@ function parseJiraReference(value: string): { key: string; project: string | nul
     return { key: trimmed, project: null }
   }
   const [projectPart, ...rest] = trimmed.split('-')
-  const project = projectPart.trim().toUpperCase()
+  const project = (projectPart ?? '').trim().toUpperCase()
   const suffix = rest.join('-').trim()
   if (!project || !suffix) {
     return { key: trimmed, project: project || null }
@@ -961,7 +961,7 @@ function extractAttachmentHash(relPath: string): string | null {
   }
 
   const m = base.match(/^(.*)[.-]([0-9a-f]{32})$/i)
-  return m ? m[2] : null
+  return m ? (m[2] ?? null) : null
 }
 
 function attachmentDisplayName(relPath: string): string {

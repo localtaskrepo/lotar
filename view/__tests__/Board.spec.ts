@@ -229,7 +229,7 @@ describe('Board field visibility', () => {
         const wrapper = mount(Board)
         await flushPromises()
 
-        const firstCard = wrapper.findAll('article.card.task')[0]
+        const firstCard = wrapper.findAll('article.card.task')[0]!
         expect(firstCard.text()).toContain('ACME-1')
         expect(firstCard.text()).toContain('Alpha')
         expect(firstCard.text()).toContain('high')
@@ -282,7 +282,7 @@ describe('Board field visibility', () => {
         const wrapper2 = mount(Board)
         await flushPromises()
 
-        const betaCard = wrapper2.findAll('article.card.task')[0]
+        const betaCard = wrapper2.findAll('article.card.task')[0]!
         expect(betaCard.text()).toContain('BETA-2')
         expect(betaCard.text()).toContain('Beta')
     })
@@ -300,7 +300,7 @@ describe('Board field visibility', () => {
         await flushPromises()
 
         const cards = wrapper.findAll('article.card.task')
-        expect(cards[0].text()).not.toContain('Sprint-42')
+        expect(cards[0]!.text()).not.toContain('Sprint-42')
 
         const fieldsButton = wrapper
             .findAll('button')
@@ -316,9 +316,9 @@ describe('Board field visibility', () => {
         await sprintCheck!.setValue(true)
         await flushPromises()
 
-        expect(cards[0].text()).toContain('sprint:')
-        expect(cards[0].text()).toContain('Sprint-42')
-        expect(cards[1].text()).not.toContain('sprint:')
+        expect(cards[0]!.text()).toContain('sprint:')
+        expect(cards[0]!.text()).toContain('Sprint-42')
+        expect(cards[1]!.text()).not.toContain('sprint:')
 
         const saved = JSON.parse(localStorage.getItem('lotar.boardFields.columns::ACME') || '[]')
         expect(saved).toContain('custom:sprint')
@@ -547,17 +547,17 @@ describe('Board collapsible groups', () => {
         // Click the first swimlane header to collapse it
         const headers = wrapper.findAll('.swimlane-header')
         expect(headers.length).toBeGreaterThanOrEqual(2)
-        await headers[0].trigger('click')
+        await headers[0]!.trigger('click')
         await flushPromises()
 
         // One group's cards should be hidden
         expect(wrapper.findAll('article.card.task').length).toBe(1)
 
         // Header should have collapsed class
-        expect(headers[0].classes()).toContain('collapsed')
+        expect(headers[0]!.classes()).toContain('collapsed')
 
         // Click again to expand
-        await headers[0].trigger('click')
+        await headers[0]!.trigger('click')
         await flushPromises()
 
         expect(wrapper.findAll('article.card.task').length).toBe(2)
@@ -596,17 +596,17 @@ describe('Board ticket highlight', () => {
         expect(wrapper.findAll('.task--selected').length).toBe(0)
 
         // Click first card
-        await cards[0].trigger('click')
+        await cards[0]!.trigger('click')
         await flushPromises()
 
-        expect(cards[0].classes()).toContain('task--selected')
-        expect(cards[1].classes()).not.toContain('task--selected')
+        expect(cards[0]!.classes()).toContain('task--selected')
+        expect(cards[1]!.classes()).not.toContain('task--selected')
 
         // Click same card again to deselect
-        await cards[0].trigger('click')
+        await cards[0]!.trigger('click')
         await flushPromises()
 
-        expect(cards[0].classes()).not.toContain('task--selected')
+        expect(cards[0]!.classes()).not.toContain('task--selected')
     })
 })
 

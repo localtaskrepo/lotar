@@ -128,7 +128,9 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         const activeLabel = (() => {
             if (!activeList.length) return 'Auto (requires an active sprint)'
             if (activeList.length === 1) {
-                return `Auto (active: ${toSprintLabel(activeList[0])})`
+                const single = activeList[0]
+                if (single) return `Auto (active: ${toSprintLabel(single)})`
+                return 'Auto (requires an active sprint)'
             }
             return 'Auto (multiple active sprints – specify one)'
         })()

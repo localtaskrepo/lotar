@@ -101,4 +101,20 @@ impl ApiServer {
         let p = path.trim_end_matches('/').to_lowercase();
         format!("{} {}", method.to_uppercase(), p)
     }
+
+    /// All registered exact-match routes as sorted `(METHOD, path)` pairs.
+    /// Used by the OpenAPI contract test to keep `docs/openapi.json` in sync
+    /// with the actual server surface.
+    pub fn registered_routes(&self) -> Vec<(String, String)> {
+        let mut routes: Vec<(String, String)> = self
+            .handlers
+            .keys()
+            .map(|key| {
+                let (method, path) = key.split_once(' ').unwrap_or((key, ""));
+                (method.to_string(), path.to_string())
+            })
+            .collect();
+        routes.sort();
+        routes
+    }
 }

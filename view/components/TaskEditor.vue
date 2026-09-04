@@ -61,50 +61,50 @@
         <div class="col">
           <span class="muted small">Depends on</span>
           <input v-model="rels.depends_on" @keydown="onKey('depends_on', $event)" @input="onSuggest('depends_on')" placeholder="IDs comma separated" />
-          <ul v-if="suggestions.depends_on.length" class="suggest">
-            <li v-for="s in suggestions.depends_on" :key="s.id" @click="pick('depends_on', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('depends_on').length" class="suggest">
+            <li v-for="s in suggestionList('depends_on')" :key="s.id" @click="pick('depends_on', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
         <div class="col">
           <span class="muted small">Blocks</span>
           <input v-model="rels.blocks" @keydown="onKey('blocks', $event)" @input="onSuggest('blocks')" placeholder="IDs comma separated" />
-          <ul v-if="suggestions.blocks.length" class="suggest">
-            <li v-for="s in suggestions.blocks" :key="s.id" @click="pick('blocks', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('blocks').length" class="suggest">
+            <li v-for="s in suggestionList('blocks')" :key="s.id" @click="pick('blocks', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
         <div class="col">
           <span class="muted small">Related</span>
           <input v-model="rels.related" @keydown="onKey('related', $event)" @input="onSuggest('related')" placeholder="IDs comma separated" />
-          <ul v-if="suggestions.related.length" class="suggest">
-            <li v-for="s in suggestions.related" :key="s.id" @click="pick('related', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('related').length" class="suggest">
+            <li v-for="s in suggestionList('related')" :key="s.id" @click="pick('related', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
         <div class="col">
           <span class="muted small">Children</span>
           <input v-model="rels.children" @keydown="onKey('children', $event)" @input="onSuggest('children')" placeholder="IDs comma separated" />
-          <ul v-if="suggestions.children.length" class="suggest">
-            <li v-for="s in suggestions.children" :key="s.id" @click="pick('children', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('children').length" class="suggest">
+            <li v-for="s in suggestionList('children')" :key="s.id" @click="pick('children', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
         <div class="col">
           <span class="muted small">Fixes</span>
           <input v-model="rels.fixes" @keydown="onKey('fixes', $event)" @input="onSuggest('fixes')" placeholder="IDs comma separated" />
-          <ul v-if="suggestions.fixes.length" class="suggest">
-            <li v-for="s in suggestions.fixes" :key="s.id" @click="pick('fixes', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('fixes').length" class="suggest">
+            <li v-for="s in suggestionList('fixes')" :key="s.id" @click="pick('fixes', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
         <div class="col">
           <span class="muted small">Parent</span>
           <input v-model="rels.parent" @keydown="onKey('parent', $event)" @input="onSuggest('parent')" placeholder="ID" />
-          <ul v-if="suggestions.parent.length" class="suggest">
-            <li v-for="s in suggestions.parent" :key="s.id" @click="pick('parent', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('parent').length" class="suggest">
+            <li v-for="s in suggestionList('parent')" :key="s.id" @click="pick('parent', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
         <div class="col">
           <span class="muted small">Duplicate of</span>
           <input v-model="rels.duplicate_of" @keydown="onKey('duplicate_of', $event)" @input="onSuggest('duplicate_of')" placeholder="ID" />
-          <ul v-if="suggestions.duplicate_of.length" class="suggest">
-            <li v-for="s in suggestions.duplicate_of" :key="s.id" @click="pick('duplicate_of', s.id)">{{ s.id }} — {{ s.title }}</li>
+          <ul v-if="suggestionList('duplicate_of').length" class="suggest">
+            <li v-for="s in suggestionList('duplicate_of')" :key="s.id" @click="pick('duplicate_of', s.id)">{{ s.id }} — {{ s.title }}</li>
           </ul>
         </div>
       </div>
@@ -211,7 +211,7 @@ function exportFields(): Record<string,string> {
   for (const oldKey of Object.keys(localFields)) {
     const newKey = normalizeFieldKey(fieldKeysMap[oldKey] || oldKey)
     if (!newKey) continue
-    out[newKey] = localFields[oldKey]
+    out[newKey] = localFields[oldKey] ?? ''
   }
   return out
 }
@@ -236,7 +236,8 @@ async function preloadFields() {
 preloadFields()
 
 // Relationships with suggestions (comma-separated)
-const rels = reactive<Record<string,string>>({ depends_on: '', blocks: '', related: '', children: '', fixes: '', parent: '', duplicate_of: '' })
+type RelFields = { depends_on: string; blocks: string; related: string; children: string; fixes: string; parent: string; duplicate_of: string }
+const rels = reactive<RelFields>({ depends_on: '', blocks: '', related: '', children: '', fixes: '', parent: '', duplicate_of: '' })
 function loadRels(){
   const r = form.relationships || {}
   rels.depends_on = (r.depends_on || []).join(', ')
@@ -261,8 +262,9 @@ function exportRels(){
 }
 
 const suggestions = ref<Record<string, Array<{ id: string; title: string }>>>({ depends_on: [], blocks: [], related: [], children: [], fixes: [], parent: [], duplicate_of: [] })
+function suggestionList(field: string) { return suggestions.value[field] ?? [] }
 let timer: any = null
-function lastToken(s: string){ const parts = s.split(','); return parts[parts.length-1].trim() }
+function lastToken(s: string){ const parts = s.split(','); return (parts[parts.length-1] ?? '').trim() }
 async function onSuggest(field: string){
   const proj = props.suggestProject || form.project || (form.id ? String(form.id).split('-')[0] : '')
   const q = lastToken((rels as any)[field] || '')
@@ -334,7 +336,7 @@ function onUserKey(which: 'reporter'|'assignee', e: KeyboardEvent){
   if (!open.value) open.value = true
   if (e.key === 'ArrowDown') { e.preventDefault(); idx.value = (idx.value + 1) % Math.max(opts.length, 1) }
   else if (e.key === 'ArrowUp') { e.preventDefault(); idx.value = (idx.value - 1 + Math.max(opts.length, 1)) % Math.max(opts.length, 1) }
-  else if (e.key === 'Enter' && opts.length) { e.preventDefault(); pickUser(which, opts[idx.value] || opts[0]) }
+  else if (e.key === 'Enter' && opts.length) { e.preventDefault(); const u = opts[idx.value] ?? opts[0]; if (u) pickUser(which, u) }
   else if (e.key === 'Escape') { open.value = false }
 }
 function pickUser(which: 'reporter'|'assignee', u: string){ if (which === 'reporter') { form.reporter = u; reporterOpen.value = false } else { form.assignee = u; assigneeOpen.value = false } }
@@ -343,7 +345,7 @@ function pickUser(which: 'reporter'|'assignee', u: string){ if (which === 'repor
 const tagsOpen = ref(false)
 const tagIdx = ref(0)
 const tagOpts = computed(() => suggestFrom(allTags.value.filter(t => !(form.tags || []).includes(t)), tagInput.value))
-function onTagEnter(){ if (tagOpts.value.length) { pickTag(tagOpts.value[tagIdx.value] || tagOpts.value[0]) } else { addTag() } }
+function onTagEnter(){ if (tagOpts.value.length) { const t = tagOpts.value[tagIdx.value] ?? tagOpts.value[0]; if (t) pickTag(t) } else { addTag() } }
 function pickTag(t: string){ if (!form.tags) form.tags = []; if (!form.tags.includes(t)) form.tags.push(t); tagInput.value = ''; tagsOpen.value = false }
 
 </script>

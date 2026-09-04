@@ -22,7 +22,7 @@ describe('TaskRow inline edits', () => {
   it('emits update-tags when toggling save', async () => {
     const wrapper = mount(TaskRow, { props: { task: baseTask } })
     const btns = wrapper.findAll('button')
-    const editTagsBtn = btns.filter(b => b.text().includes('Edit tags'))[0]
+    const editTagsBtn = btns.filter(b => b.text().includes('Edit tags'))[0]!
     await editTagsBtn.trigger('click')
     const input = wrapper.find('input.input')
     await input.setValue('a, b, c')

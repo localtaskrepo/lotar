@@ -6,8 +6,8 @@
     </div>
     <div class="alias-rows">
       <div v-for="(entry, index) in entries" :key="`alias-${index}`" class="alias-row">
-        <UiInput v-model="entries[index].key" :placeholder="keyPlaceholder" @blur="onFieldBlur" />
-        <UiInput v-model="entries[index].value" :placeholder="valuePlaceholder" @blur="onFieldBlur" />
+        <UiInput v-model="entries[index]!.key" :placeholder="keyPlaceholder" @blur="onFieldBlur" />
+        <UiInput v-model="entries[index]!.value" :placeholder="valuePlaceholder" @blur="onFieldBlur" />
         <UiButton icon-only type="button" aria-label="Remove alias" @click="$emit('remove', index)">
           <IconGlyph name="close" />
         </UiButton>

@@ -259,7 +259,7 @@ describe('TaskPanel reference preview regression', () => {
         expect(referenceItems.length).toBeGreaterThan(0)
 
         const hover = async (index: number) => {
-            await referenceItems[index].trigger('mouseenter')
+            await referenceItems[index]!.trigger('mouseenter')
             await flushPromises()
             await nextTick()
         }

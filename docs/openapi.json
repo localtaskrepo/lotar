@@ -555,11 +555,11 @@
               }
             }
           },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2174,6 +2174,368 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/whoami": {
+      "get": {
+        "summary": "Current user identity",
+        "responses": {
+          "200": {
+            "description": "Resolved identity used for @me aliases",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/agents/profiles": {
+      "get": {
+        "summary": "List agent profiles",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Restrict profiles to a project prefix"
+          }
+        ]
+      }
+    },
+    "/api/attachments/get": {
+      "get": {
+        "summary": "Fetch attachment content",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Attachment-relative path"
+          }
+        ]
+      }
+    },
+    "/api/config/inspect": {
+      "get": {
+        "summary": "Inspect effective config",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inspect the project-scoped config instead of global"
+          }
+        ]
+      }
+    },
+    "/api/sprints/backlog": {
+      "get": {
+        "summary": "List backlog tasks (not assigned to any sprint)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project prefix"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page size"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page offset"
+          }
+        ]
+      }
+    },
+    "/api/tasks/commit_diff": {
+      "get": {
+        "summary": "Diff a task against a git commit",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Task id"
+          },
+          {
+            "name": "commit",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Commitish (rev syntax, not option style)"
+          }
+        ]
+      }
+    },
+    "/api/tasks/export": {
+      "get": {
+        "summary": "Export tasks",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Project prefix"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Export format"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by status"
+          }
+        ]
+      }
+    },
+    "/api/automation/simulate": {
+      "post": {
+        "summary": "Simulate automation rules against a change",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ticket_id"
+                ],
+                "properties": {
+                  "ticket_id": {
+                    "type": "string"
+                  },
+                  "change": {
+                    "type": "object",
+                    "description": "Field changes to simulate (field -> value)"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sprints/create": {
+      "post": {
+        "summary": "Create a sprint",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/delete": {
+      "post": {
+        "summary": "Delete a sprint",
+        "description": "Deletes the sprint record; tasks keep their data (sprint membership is removed).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "integer"
+                  },
+                  "confirm": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/sprints/update": {
+      "post": {
+        "summary": "Update sprint fields",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/attachments/upload": {
+      "post": {
+        "summary": "Upload an attachment for a task",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/attachments/remove": {
+      "post": {
+        "summary": "Remove an attachment from a task",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/comment": {
+      "post": {
+        "summary": "Add a comment to a task",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/comment/update": {
+      "post": {
+        "summary": "Edit an existing comment",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
           }
         }
       }

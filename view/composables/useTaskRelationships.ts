@@ -82,7 +82,17 @@ function serializeRelationshipsPayload(payload: RelationshipsPayload): string {
 }
 
 export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
-    const relationships = reactive<Record<string, string>>({
+    type RelationshipFields = {
+        depends_on: string
+        blocks: string
+        related: string
+        children: string
+        fixes: string
+        parent: string
+        duplicate_of: string
+    }
+
+    const relationships = reactive<RelationshipFields>({
         depends_on: '',
         blocks: '',
         related: '',
@@ -127,9 +137,9 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
     }
 
     function relationLastToken(field: string) {
-        const value = relationships[field] || ''
+        const value = relationships[field as keyof RelationshipFields] || ''
         const parts = value.split(',')
-        return parts[parts.length - 1].trim()
+        return (parts[parts.length - 1] ?? '').trim()
     }
 
     function clearRelationSuggestions(field?: string) {
@@ -182,11 +192,10 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
 
     function resetRelationships() {
         relationDefs.forEach(({ key }) => {
-            relationships[key] = ''
+            relationships[key as keyof RelationshipFields] = ''
         })
         clearRelationSuggestions()
     }
-
     function applyRelationshipsFromTask(data: TaskDTO | null | undefined) {
         resetRelationships()
         const relData = (data?.relationships || {}) as Record<string, unknown>
@@ -200,7 +209,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
     }
 
     function updateRelationshipField(field: string, value: string) {
-        relationships[field] = value
+        relationships[field as keyof RelationshipFields] = value
     }
 
     function handleRelationshipBlur(field: string) {
@@ -212,7 +221,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         if (field === 'parent' || field === 'duplicate_of') {
             relationships[field] = id
         } else {
-            const currentValue = relationships[field] || ''
+            const currentValue = relationships[field as keyof RelationshipFields] || ''
             let entries = splitCsv(currentValue)
             const lastToken = relationLastToken(field)
             const hasTrailingSeparator = /,\s*$/.test(currentValue)
@@ -223,7 +232,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
             if (!alreadyPresent) {
                 entries.push(id)
             }
-            relationships[field] = entries.join(', ')
+            relationships[field as keyof RelationshipFields] = entries.join(', ')
         }
         clearRelationSuggestions(field)
         commitRelationships()
@@ -234,13 +243,13 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
         if (!list.length) return
         if (event.key === 'ArrowDown') {
             event.preventDefault()
-            relationActiveIndex[field] = (relationActiveIndex[field] + 1) % list.length
+            relationActiveIndex[field] = ((relationActiveIndex[field] ?? -1) + 1) % list.length
         } else if (event.key === 'ArrowUp') {
             event.preventDefault()
-            relationActiveIndex[field] = (relationActiveIndex[field] - 1 + list.length) % list.length
+            relationActiveIndex[field] = ((relationActiveIndex[field] ?? 0) - 1 + list.length) % list.length
         } else if (event.key === 'Enter') {
             event.preventDefault()
-            const idx = relationActiveIndex[field]
+            const idx = relationActiveIndex[field] ?? -1
             const choice = idx >= 0 ? list[idx] : list[0]
             if (choice) {
                 pickRelation(field, choice.id)

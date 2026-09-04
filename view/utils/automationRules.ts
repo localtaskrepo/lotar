@@ -710,8 +710,10 @@ function isSupportedFieldCondition(value: unknown): boolean {
     const record = value as Record<string, unknown>
     const active = CONDITION_OPERATORS.filter((operator) => operator in record)
     if (active.length !== 1) return false
-    const currentValue = record[active[0]]
-    if (active[0] === 'exists') {
+    const operator = active[0]
+    if (operator === undefined) return false
+    const currentValue = record[operator]
+    if (operator === 'exists') {
         return typeof currentValue === 'boolean'
     }
     return isScalarOrListValue(currentValue)
@@ -952,7 +954,7 @@ function buildWhenFromDraft(draft: AutomationRuleDraft): Record<string, any> {
     }
 
     if (entries.length === 1) {
-        return entries[0]
+        return entries[0] ?? {}
     }
 
     return draft.matchMode === 'any'
@@ -1106,7 +1108,7 @@ function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Record<s
 function parseSetValue(field: string, value: string): string | string[] {
     if (field === 'tags' || field === 'labels') {
         const values = splitList(value)
-        return values.length > 1 ? values : values[0]
+        return values.length > 1 ? values : (values[0] ?? value)
     }
     return value
 }

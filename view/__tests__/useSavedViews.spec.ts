@@ -14,7 +14,7 @@ describe('useSavedViews', () => {
 
         const created = saveNew('My view', { project: 'PRJ', status: 'Open' }, { columns: ['id', 'title'], sort: { key: 'modified', dir: 'desc' } })
         expect(views.value).toHaveLength(1)
-        expect(views.value[0].name).toBe('My view')
+        expect(views.value[0]!.name).toBe('My view')
         expect(getById(created.id)?.filter.project).toBe('PRJ')
 
         updateExisting(created.id, { name: 'Renamed', filter: { project: 'APP' } })
@@ -30,8 +30,8 @@ describe('useSavedViews', () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded))
         refresh()
         expect(views.value).toHaveLength(1)
-        expect(views.value[0].id).toBe('external')
-        expect(views.value[0].filter.priority).toBe('High')
+        expect(views.value[0]!.id).toBe('external')
+        expect(views.value[0]!.filter.priority).toBe('High')
     })
 
     it('clones filter and extras to avoid shared references', () => {

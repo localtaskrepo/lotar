@@ -338,6 +338,13 @@ exit 0\n",
         "expected summary from stub agent"
     );
 
+    // Task post-processing lags job completion: poll for the final task state
+    // instead of asserting immediately after the job wait (raced under load).
+    assert!(
+        wait_for_task_status(&storage, &created.id, "NeedsReview", 10_000),
+        "task did not reach NeedsReview after job completion"
+    );
+
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.status.as_str(), "NeedsReview");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
@@ -647,6 +654,11 @@ exit 0
     let jobs = wait_for_completed_jobs(&created.id, 3, 6000);
     assert_eq!(jobs.len(), 3, "expected implement, test, and merge jobs");
 
+    assert!(
+        wait_for_task_status(&storage, &created.id, "Done", 10_000),
+        "task did not reach Done after pipeline completed"
+    );
+
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get final task");
     assert_eq!(refreshed.status.as_str(), "Done");
     assert_eq!(refreshed.assignee.as_deref(), Some("Agent Tests"));
@@ -904,6 +916,11 @@ fn command_runner_captures_output_and_completes() {
 
     let completed = AgentJobService::get_job(&job.id).expect("job exists");
     assert_eq!(completed.exit_code, Some(0));
+
+    assert!(
+        wait_for_task_status(&storage, &created.id, "Done", 10_000),
+        "task did not reach Done after command job completed"
+    );
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.status.as_str(), "Done");
@@ -1409,6 +1426,11 @@ exit 0\n",
     assert!(
         wait_for_job_status(&job.id, "completed", 3000),
         "job did not complete in time (backward compat)"
+    );
+
+    assert!(
+        wait_for_task_status(&storage, &created.id, "Done", 10_000),
+        "task did not reach Done (backward compat)"
     );
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
@@ -2606,6 +2628,11 @@ exit 1\n",
     assert!(
         wait_for_job_status(&job.id, "failed", 3000),
         "clarification job did not fail in time"
+    );
+
+    assert!(
+        wait_for_task_status(&storage, &created.id, "HelpNeeded", 10_000),
+        "task did not reach HelpNeeded after failure handling"
     );
 
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");

@@ -74,7 +74,7 @@ describe('useTaskTableState', () => {
 
     it('sorts rows when invoking onSort', async () => {
         const { wrapper } = mountHarness()
-        expect(wrapper.vm.sorted[0].id).toBe('ACME-1')
+        expect(wrapper.vm.sorted[0]!.id).toBe('ACME-1')
         wrapper.vm.onSort('title')
         await nextTick()
         expect(wrapper.vm.sort.key).toBe('title')

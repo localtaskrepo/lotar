@@ -590,7 +590,7 @@ const rawGrouped = computed<Record<string, TaskDTO[]>>(() => {
     if (!activeProject || !t.id.startsWith(`${activeProject}-`)) continue
     const key = lookup.get(normalizeStatusKey(t.status))
     if (key) {
-      g[key].push(t)
+      (g[key] ??= []).push(t)
     }
   }
   return g

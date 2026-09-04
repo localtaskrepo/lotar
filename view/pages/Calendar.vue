@@ -606,7 +606,7 @@ onMounted(async () => {
   // Parse month from query (YYYY-MM)
   if (q.month && /^\d{4}-\d{2}$/.test(String(q.month))) {
     const [y, m] = String(q.month).split('-').map((s: string) => parseInt(s, 10))
-    cursor.value = new Date(y, m - 1, 1)
+    cursor.value = new Date(y ?? 2026, (m ?? 1) - 1, 1)
   }
   showSprints.value = q.sprints === '1'
   await refreshConfig(project.value)
@@ -625,7 +625,7 @@ watch(() => route.query, async (q) => {
   }
   if (r.month && /^\d{4}-\d{2}$/.test(String(r.month))) {
     const [y, m] = String(r.month).split('-').map((s: string) => parseInt(s, 10))
-    const next = new Date(y, m - 1, 1)
+    const next = new Date(y ?? 2026, (m ?? 1) - 1, 1)
     if (next.getTime() !== cursor.value.getTime()) cursor.value = next
   }
   const show = r.sprints === '1'
