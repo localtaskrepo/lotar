@@ -140,7 +140,7 @@
         :selected-ids="selectedIds"
         :show-bulk-controls="false"
         :show-toolbar="false"
-        :project-key="filter.project || (shownTasks[0]?.id?.split('-')[0] || '')"
+        :project-key="filter.project || projectOf(shownTasks[0]?.id)"
         :touches="activityTouches"
         :sprint-lookup="sprintLookup"
         :has-sprints="hasSprints"
@@ -339,7 +339,7 @@ import UiModal from '../components/UiModal.vue'
 import { useActivity } from '../composables/useActivity'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
-import { useCustomFilterPresets } from '../composables/useFilterBuilder'
+import { buildServerFilter, useCustomFilterPresets } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
@@ -347,6 +347,8 @@ import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
+import { projectOf, titleCase } from '../utils/text'
+import { storageGet, storageSet } from '../utils/storage'
 
 const router = useRouter()
 const store = useTaskStore()
@@ -412,7 +414,7 @@ const sprintOptions = computed(() => {
   const sorted = [...sprints.value].sort((a, b) => a.id - b.id)
   sorted.forEach((item) => {
     const name = item.label || item.display_name || `Sprint ${item.id}`
-    const state = item.state.charAt(0).toUpperCase() + item.state.slice(1)
+    const state = titleCase(item.state)
     options.push({ value: String(item.id), label: `#${item.id} ${name} (${state})` })
   })
   return options
@@ -453,7 +455,6 @@ watch(
 // The store's project key is owned by TaskTable (which resolves the concrete
 // project from the filter or the shown tasks), so the page must not override it.
 
-const BUILTIN_QUERY_KEYS = new Set(['q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs'])
 const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
 
 const shownTasks = computed(() => {
@@ -545,17 +546,9 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   }
 
   const q = { ...raw }
-  const qnorm: Record<string, string> = {}
-  const extraQuery: Record<string, string> = {}
-  for (const [key, value] of Object.entries(q)) {
-    if (!value || key === 'order') continue
-    if (BUILTIN_QUERY_KEYS.has(key)) {
-      qnorm[key] = value
-    } else {
-      extraQuery[key] = value
-    }
-  }
-  qnorm.order = (q.order === 'asc' || q.order === 'desc') ? q.order : 'desc'
+  const { serverFilter: builtFilter, normalized: qnorm, extras: extraQuery } = buildServerFilter(q, '')
+  if (qnorm.project) builtFilter.project = qnorm.project
+  if (qnorm.assignee === '__none__') builtFilter.assignee = '__none__'
   const nextQuery: Record<string, string> = { ...extraQuery, ...qnorm }
   if (pageOffset.value > 0) {
     nextQuery.offset = String(pageOffset.value)
@@ -579,19 +572,12 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
     }
   }
 
-  const serverFilter: any = {}
-  if (qnorm.q) serverFilter.q = qnorm.q
-  if (qnorm.project) serverFilter.project = qnorm.project
-  if (qnorm.status) serverFilter.status = qnorm.status.split(',').map(s => s.trim()).filter(Boolean)
-  if (qnorm.priority) serverFilter.priority = qnorm.priority.split(',').map(s => s.trim()).filter(Boolean)
-  if (qnorm.type) serverFilter.type = qnorm.type.split(',').map(s => s.trim()).filter(Boolean)
-  if (qnorm.assignee) serverFilter.assignee = qnorm.assignee
-  if (qnorm.tags) serverFilter.tags = qnorm.tags.split(',').map(s => s.trim()).filter(Boolean)
-  if (qnorm.due) serverFilter.due = qnorm.due
-  if (qnorm.recent) serverFilter.recent = qnorm.recent
-  if (qnorm.needs) serverFilter.needs = qnorm.needs
-  serverFilter.order = qnorm.order
-  Object.assign(serverFilter, extraQuery)
+  // Keys applied server-side but not part of the shared builder output
+  if (qnorm.due) builtFilter.due = qnorm.due
+  if (qnorm.recent) builtFilter.recent = qnorm.recent
+  if (qnorm.needs) builtFilter.needs = qnorm.needs
+  builtFilter.order = qnorm.order
+  const serverFilter: any = builtFilter
 
   if (disposed) return
 
@@ -708,13 +694,10 @@ function setSelectedIds(value: string[]) {
 
 const ASSIGNEE_STORAGE_KEY = 'lotar.tasks.assign.last'
 const lastAssignee = ref('@me')
-if (typeof window !== 'undefined') {
-  try {
-    const stored = window.localStorage.getItem(ASSIGNEE_STORAGE_KEY)
-    if (stored) lastAssignee.value = stored
-  } catch {
-    // ignore storage errors
-  }
+{
+  const stored = storageGet(ASSIGNEE_STORAGE_KEY)
+  if (stored) lastAssignee.value = stored
+
 }
 
 const assignDialogOpen = ref(false)
@@ -797,12 +780,9 @@ async function submitAssignDialog() {
       console.error('Assignment errors', failures)
     }
     lastAssignee.value = input
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.setItem(ASSIGNEE_STORAGE_KEY, input)
-      } catch {
-        // ignore
-      }
+    {
+      storageSet(ASSIGNEE_STORAGE_KEY, input)
+
     }
   closeAssignDialog(true)
   } finally {

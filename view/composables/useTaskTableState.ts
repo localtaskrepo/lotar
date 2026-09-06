@@ -1,8 +1,10 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
-import { formatTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
+import { storageGetJson, storageSetJson } from '../utils/storage'
+import { formatRelativeTime, formatTaskDate, isTaskOverdue, parseTaskDateToMillis } from '../utils/date'
 import type { TaskTouch } from './useActivity'
 import { injectColumnStore, useColumns, type ColKey } from './useColumns'
+import { numericOf, projectOf } from '../utils/text'
 
 export interface TaskTableProps {
     tasks: TaskDTO[]
@@ -108,18 +110,9 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     const sort = reactive<{ key: ColKey | null; dir: 'asc' | 'desc' }>(
-        (() => {
-            try {
-                return (
-                    JSON.parse((localStorage.getItem(sortKey()) ?? localStorage.getItem(SORT_KEY)) || 'null') || {
-                        key: null,
-                        dir: 'desc',
-                    }
-                )
-            } catch {
-                return { key: null, dir: 'desc' }
-            }
-        })(),
+        storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(sortKey())
+            ?? storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(SORT_KEY)
+            ?? { key: null, dir: 'desc' },
     )
 
     function setSort(key: ColKey, dir: 'asc' | 'desc') {
@@ -142,9 +135,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     watch(
         sort,
         (value) => {
-            try {
-                localStorage.setItem(sortKey(), JSON.stringify(value))
-            } catch { }
+            storageSetJson(sortKey(), value)
         },
         { deep: true },
     )
@@ -260,13 +251,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         emit('update:bulk', (event.target as HTMLInputElement).checked)
     }
 
-    function projectOf(id: string) {
-        return (id || '').split('-')[0]
-    }
-
-    function numericOf(id: string) {
-        return (id || '').split('-').slice(1).join('-')
-    }
 
     function fmtDate(value: string) {
         const formatted = formatTaskDate(value)
@@ -282,36 +266,6 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         }
     }
 
-    const relativeTimeFormatter =
-        typeof Intl !== 'undefined' && (Intl as any).RelativeTimeFormat
-            ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-            : null
-
-    const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
-        { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
-        { unit: 'month', ms: 1000 * 60 * 60 * 24 * 30 },
-        { unit: 'week', ms: 1000 * 60 * 60 * 24 * 7 },
-        { unit: 'day', ms: 1000 * 60 * 60 * 24 },
-        { unit: 'hour', ms: 1000 * 60 * 60 },
-        { unit: 'minute', ms: 1000 * 60 },
-        { unit: 'second', ms: 1000 },
-    ]
-
-    function relativeTime(value: string) {
-        if (!value) return ''
-        const target = new Date(value)
-        const timestamp = target.getTime()
-        if (!isFinite(timestamp)) return value
-        const diff = timestamp - Date.now()
-        if (!relativeTimeFormatter) return target.toLocaleString()
-        for (const { unit, ms } of relativeUnits) {
-            if (Math.abs(diff) >= ms || unit === 'second') {
-                const amount = Math.round(diff / ms)
-                return relativeTimeFormatter.format(amount, unit)
-            }
-        }
-        return target.toLocaleString()
-    }
 
     function touchBadge(touch: TaskTouch) {
         switch (touch.kind) {
@@ -327,16 +281,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     function isOverdue(task: TaskDTO) {
-        try {
-            const status = (task.status || '').toLowerCase()
-            if (!task.due_date || status === 'done') return false
-            const due = parseTaskDateToMillis(task.due_date)
-            if (due === null) return false
-            const todayStart = startOfLocalDay(new Date()).getTime()
-            return due < todayStart
-        } catch {
-            return false
-        }
+        return isTaskOverdue(task)
     }
 
     return {
@@ -370,7 +315,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         numericOf,
         fmtDate,
         fmtDateTime,
-        relativeTime,
+        relativeTime: formatRelativeTime,
         touchBadge,
         isOverdue,
         setSort,

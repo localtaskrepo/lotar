@@ -579,39 +579,13 @@ fn value_matches_regex(value: &AutomationValue, regex: &Regex) -> bool {
 
 // ── Date conditions ─────────────────────────────────────────────────────────
 
-/// Parse a string into a NaiveDate, supporting YYYY-MM-DD and RFC 3339 datetime.
-fn parse_date_value(s: &str) -> Option<chrono::NaiveDate> {
-    let trimmed = s.trim();
-    if let Ok(d) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
-        return Some(d);
-    }
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
-        return Some(dt.date_naive());
-    }
-    // Try ISO without timezone
-    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(trimmed, "%Y-%m-%dT%H:%M:%S") {
-        return Some(dt.date());
-    }
-    None
-}
-
-/// Resolve a date reference string to a NaiveDate.
-/// Supports "today", "tomorrow", "YYYY-MM-DD", offset "+Nd", "+Nw".
+/// Resolve a date reference string to a local NaiveDate.
+/// Supports keywords ("today", "tomorrow", …), "YYYY-MM-DD", RFC 3339 datetimes,
+/// and offset expressions via the shared human date grammar.
 fn resolve_date_reference(s: &str) -> Option<chrono::NaiveDate> {
-    let trimmed = s.trim().to_lowercase();
-    let today = chrono::Local::now().date_naive();
-    match trimmed.as_str() {
-        "today" | "now" => Some(today),
-        "tomorrow" => Some(today + chrono::Duration::days(1)),
-        "yesterday" => Some(today - chrono::Duration::days(1)),
-        _ => {
-            // Try as YYYY-MM-DD
-            if let Some(d) = parse_date_value(s) {
-                return Some(d);
-            }
-            None
-        }
-    }
+    crate::utils::time::parse_human_datetime_to_utc(s)
+        .ok()
+        .map(|dt| dt.with_timezone(&chrono::Local).date_naive())
 }
 
 /// Parse a duration string like "3d", "2w", "30d" into chrono::Duration.
@@ -628,7 +602,7 @@ fn matches_date_conditions(
         AutomationValue::String(v) => v.as_str(),
         AutomationValue::List(_) => return false,
     };
-    let Some(field_date) = parse_date_value(date_str) else {
+    let Some(field_date) = resolve_date_reference(date_str) else {
         return false; // unparseable date → condition fails
     };
     let today = chrono::Local::now().date_naive();

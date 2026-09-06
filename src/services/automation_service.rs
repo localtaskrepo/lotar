@@ -5,7 +5,6 @@ use crate::automation::types::{
     AutomationAction, AutomationActionSet, AutomationFile, AutomationRule, AutomationRunAction,
     AutomationTagAction, StringOrVec,
 };
-use crate::config::manager::ConfigManager;
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -15,7 +14,6 @@ use crate::services::automation_matching::{ChangeSet, MatchMode, matches_rule};
 use crate::services::automation_validation::validate_rules;
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::sprint_service::SprintService;
-use crate::services::sprint_status;
 use crate::services::task_service::{TaskService, TaskUpdateContext};
 use crate::storage::manager::Storage;
 use crate::types::{Priority, TaskStatus, TaskType};
@@ -790,37 +788,15 @@ fn resolve_config_for_project(
     tasks_dir: &Path,
     project: Option<&str>,
 ) -> LoTaRResult<ResolvedConfig> {
-    let cfg_mgr = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-        .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
-    let config = if let Some(prefix) = project
-        && !prefix.is_empty()
-    {
-        cfg_mgr
-            .get_project_config(prefix)
-            .unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone())
-    } else {
-        cfg_mgr.get_resolved_config().clone()
-    };
-    Ok(config)
+    crate::config::resolution::config_for_project(tasks_dir, project)
+        .map_err(|e| LoTaRError::ValidationError(e.to_string()))
 }
 
 fn compute_active_sprint_ids(storage: &Storage) -> Vec<u32> {
-    let records = match SprintService::list(storage) {
-        Ok(r) => r,
-        Err(_) => return Vec::new(),
-    };
-    let now = chrono::Utc::now();
-    records
-        .iter()
-        .filter(|r| {
-            matches!(
-                sprint_status::derive_status(&r.sprint, now).state,
-                sprint_status::SprintLifecycleState::Active
-                    | sprint_status::SprintLifecycleState::Overdue
-            )
-        })
-        .map(|r| r.id)
-        .collect()
+    match SprintService::list(storage) {
+        Ok(records) => crate::services::sprint_assignment::active_sprint_ids(&records),
+        Err(_) => Vec::new(),
+    }
 }
 
 fn load_effective_automation(

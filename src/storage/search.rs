@@ -35,7 +35,9 @@ fn task_cache() -> &'static Mutex<HashMap<PathBuf, CachedTask>> {
 pub struct StorageSearch;
 
 impl StorageSearch {
-    fn load_task_file(path: &Path) -> Option<Task> {
+    /// Load and parse a task file, using the (mtime, len)-validated parse cache.
+    /// Corrupt files warn once and return None, mirroring uncached behavior.
+    pub fn load_task_file(path: &Path) -> Option<Task> {
         let metadata = fs::metadata(path).ok()?;
         let mtime = metadata.modified().ok()?;
         let len = metadata.len();

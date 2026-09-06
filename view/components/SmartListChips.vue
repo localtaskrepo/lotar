@@ -25,6 +25,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { listFromCsv } from '../composables/useFilterBuilder';
 import UiButton from './UiButton.vue';
 
 interface CustomPreset {
@@ -59,7 +60,7 @@ const showRecentChip = computed(() => props.enableRecent !== false)
 const isDueSoon = computed(() => (props.value?.due || '') === 'soon')
 const isOverdue = computed(() => (props.value?.due || '') === 'overdue')
 const isRecent = computed(() => !!(props.value?.recent || ''))
-function getNeeds(): string[] { return String(props.value?.needs || '').split(',').map(s => s.trim()).filter(Boolean) }
+function getNeeds(): string[] { return listFromCsv(String(props.value?.needs || '')) }
 const isNoEstimate = computed(() => getNeeds().includes('effort'))
 
 function patch(next: Partial<Record<string,string>>) {

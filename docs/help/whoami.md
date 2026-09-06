@@ -16,14 +16,14 @@ lotar whoami [--explain] [--format=json]
 The CLI runs a detector stack and stops at the first hit:
 
 1. `default_reporter` from the merged configuration (CLI overrides -> env such as `LOTAR_DEFAULT_REPORTER` -> home directory config -> project config -> global config -> compiled defaults).
-2. Project manifest author picked from the current workspace or repo root. We read `package.json` (`author` string/object or first `contributors` entry), `Cargo.toml` (`authors` array), and any `.csproj` file's `<Authors>` tag.
-3. Git metadata (`user.name`, then `user.email`) from `.git/config` when `auto.identity_git` is true (default).
-4. Environment fallbacks: `$USER`, then `$USERNAME`.
+2. Git metadata (`user.name`, then `user.email`) from the repo root when `auto.identity_git` is true (default).
+3. Environment fallbacks: `$USER`, then `$USERNAME`.
+4. Project manifest author as a last resort. We read `package.json` (`author` string/object or first `contributors` entry), `Cargo.toml` (`authors` array), and any `.csproj` file's `<Authors>` tag. Manifest authors are a static guess, so they only apply when no git or system identity exists.
 
 Toggles:
 
-- `auto.identity` (default: true) - When false, only step 1 runs. If no configured reporter is present, the command emits `Could not resolve current user` and exits with `no-identity`.
-- `auto.identity_git` (default: true) - When false, git detectors are skipped, but manifest and env fallbacks still run.
+- `auto.identity` (default: true) - When false, the git and manifest detectors are skipped and only `default_reporter` plus the `$USER`/`$USERNAME` fallback run. If neither is present, the command emits `Could not resolve current user` and exits with `no-identity`.
+- `auto.identity_git` (default: true) - When false, git detectors are skipped, but env and manifest fallbacks still run.
 
 The CLI also shows when these toggles are disabled inside `--explain` output.
 
@@ -36,8 +36,8 @@ When no identity can be resolved, the command prints `Could not resolve current 
 
 ## Relationship to other surfaces
 
-- `@me` aliases inside CLI/REST/MCP flows call the non-explain resolver. That helper prioritizes `default_reporter`, then git `user.name`/`user.email`, then `$USER`/`$USERNAME`. Project manifest authors are not considered there yet, so `lotar whoami` may succeed (via manifest) even if `@me` still fails.
-- `GET /api/whoami` currently uses the same fast-path resolver as `@me`. Use the CLI if you need manifest-aware resolution or the `--explain` diagnostics.
+- `@me` aliases, `GET /api/whoami`, and task stamping all use this exact resolver (single shared implementation), so CLI, REST, and MCP can never disagree about the current identity.
+- Filtering by `@me` (for example `GET /api/tasks/list?assignee=@me` or MCP `task_list`) fails closed with an explicit error when no identity can be resolved, rather than returning an unfiltered list.
 
 ## Examples
 

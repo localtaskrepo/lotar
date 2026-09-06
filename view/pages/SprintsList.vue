@@ -767,7 +767,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type {
   SprintBurndownResponse,
@@ -793,35 +793,23 @@ import SprintAnalyticsDialog from '../components/analytics/SprintAnalyticsDialog
 import { showToast } from '../components/toast'
 import { useConfig } from '../composables/useConfig'
 import { useCopyModifier } from '../composables/useCopyModifier'
-import { buildServerFilter, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, listFromCsv, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { useColumns } from '../composables/useColumns'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
+import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, isTaskOverdue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
 import { formatMember } from '../utils/member'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
+import { numericOf, projectOf } from '../utils/text'
+import { storageGet, storageGetFlag, storageGetJson, storageSet, storageSetFlag, storageSetJson } from '../utils/storage'
 
-type ColumnKey =
-  | 'id'
-  | 'title'
-  | 'status'
-  | 'priority'
-  | 'task_type'
-  | 'reporter'
-  | 'assignee'
-  | 'effort'
-  | 'tags'
-  | 'sprints'
-  | 'due_date'
-  | 'created'
-  | 'modified'
+type ColumnKey = import('../composables/useColumns').ColKey
 
 type SprintMetric = 'tasks' | 'points' | 'hours'
 type AnalyticsTab = 'burndown' | 'velocity' | 'health' | 'history'
 type TimeRangeKey = import('../components/SprintViewSettings.vue').SprintTimeRangeKey
 
-const columnStorageKey = 'lotar.sprints.columns'
-const columnOrderStorageKey = 'lotar.sprints.columnOrder'
 const sortStorageKey = 'lotar.sprints.sort'
 const timeRangeStorageKey = 'lotar.sprints.window.v2'
 const highlightPreferenceStorageKey = 'lotar.sprints.highlightMulti'
@@ -888,115 +876,30 @@ function sprintMembershipMatches(previous: TaskDTO | null | undefined, next: Tas
   return true
 }
 
-function loadStoredColumns(): ColumnKey[] | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(columnStorageKey)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as unknown
-    return normalizeColumns(parsed)
-  } catch {
-    return null
-  }
-}
-
-function loadStoredColumnOrder(): ColumnKey[] | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(columnOrderStorageKey)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as unknown
-    return normalizeColumnOrder(parsed)
-  } catch {
-    return null
-  }
-}
-
-function normalizeColumns(value: unknown): ColumnKey[] | null {
-  if (!Array.isArray(value)) return null
-
-  const allowed = new Set(allColumns)
-  const seen = new Set<ColumnKey>()
-  const out: ColumnKey[] = []
-
-  for (const item of value) {
-    if (typeof item !== 'string') continue
-    if (!allowed.has(item as ColumnKey)) continue
-    const col = item as ColumnKey
-    if (seen.has(col)) continue
-    seen.add(col)
-    out.push(col)
-  }
-
-  return out
-}
-
-function normalizeColumnOrder(value: unknown): ColumnKey[] {
-  if (!Array.isArray(value)) return [...allColumns]
-  const allowed = new Set(allColumns)
-  const seen = new Set<ColumnKey>()
-  const out: ColumnKey[] = []
-
-  for (const item of value) {
-    if (typeof item !== 'string') continue
-    if (!allowed.has(item as ColumnKey)) continue
-    const col = item as ColumnKey
-    if (seen.has(col)) continue
-    seen.add(col)
-    out.push(col)
-  }
-
-  for (const col of allColumns) {
-    if (!seen.has(col)) out.push(col)
-  }
-  return out.length ? out : [...allColumns]
-}
-
 function loadStoredSort(): { key: ColumnKey | null; dir: 'asc' | 'desc' } | null {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = window.localStorage.getItem(sortStorageKey)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { key?: ColumnKey; dir?: 'asc' | 'desc' }
-    if (parsed && (!parsed.key || allColumns.includes(parsed.key))) {
-      return {
-        key: parsed.key ?? null,
-        dir: parsed.dir === 'asc' ? 'asc' : 'desc',
-      }
+  const parsed = storageGetJson<{ key?: ColumnKey; dir?: 'asc' | 'desc' }>(sortStorageKey)
+  if (parsed && (!parsed.key || allColumns.includes(parsed.key))) {
+    return {
+      key: parsed.key ?? null,
+      dir: parsed.dir === 'asc' ? 'asc' : 'desc',
     }
-    return null
-  } catch {
-    return null
   }
+  return null
 }
 
 function loadStoredTimeRange(): TimeRangeKey {
-  if (typeof window === 'undefined') return 'current'
-  try {
-    const raw = window.localStorage.getItem(timeRangeStorageKey)
-    if (raw === 'current' || raw === '30' || raw === '90' || raw === '180' || raw === 'all') {
-      return raw
-    }
-  } catch {
-    /* ignore persistence errors */
+  const raw = storageGet(timeRangeStorageKey)
+  if (raw === 'current' || raw === '30' || raw === '90' || raw === '180' || raw === 'all') {
+    return raw
   }
   return 'current'
 }
 
 function loadHighlightPreference(): boolean {
-  if (typeof window === 'undefined') return true
-  try {
-    const raw = window.localStorage.getItem(highlightPreferenceStorageKey)
-    if (raw === 'false') return false
-    if (raw === 'true') return true
-  } catch {
-    /* ignore */
-  }
-  return true
+  return storageGetFlag(highlightPreferenceStorageKey, true)
 }
 
 const route = useRoute()
-const router = useRouter()
 
 const { sprints, loading: sprintsLoading, refresh: refreshSprints, missingSprints, hasMissing: hasMissingSprints } = useSprints()
 const { openTaskPanel } = useTaskPanelController()
@@ -1013,12 +916,7 @@ const sprintAnalytics = useSprintAnalytics()
 const highlightMultiSprint = ref(loadHighlightPreference())
 
 watch(highlightMultiSprint, (value) => {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(highlightPreferenceStorageKey, value ? 'true' : 'false')
-  } catch {
-    /* ignore persistence issues */
-  }
+  storageSetFlag(highlightPreferenceStorageKey, value)
 })
 const {
   copyModifierActive,
@@ -1097,7 +995,7 @@ const filterPayload = computed(() => ({
   project: project.value || '',
 }))
 const { onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
-  onProjectChange: syncProjectRoute,
+  routePath: '/sprints',
 })
 const customFilterPresets = computed(() => {
   const names = (availableCustomFields.value || []).filter((name) => name !== '*')
@@ -1107,14 +1005,6 @@ const customFilterPresets = computed(() => {
   }))
 })
 
-function syncProjectRoute(nextProject: string) {
-  const desired = nextProject || ''
-  const current = typeof route.query.project === 'string' ? route.query.project : ''
-  if (current === desired) return
-  router.push({ path: '/sprints', query: desired ? { project: desired } : {} })
-}
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function startOfDay(date: Date) {
   return startOfLocalDay(date)
@@ -1166,20 +1056,30 @@ function canReopenSprint(sprint: SprintListItem) {
 
 async function startSprint(sprint: SprintListItem) {
   if (!canStartSprint(sprint)) return
+  await runSprintLifecycle(
+    sprint,
+    { sprint: sprint.id, actual_started_at: new Date().toISOString() },
+    (name) => `Marked ${name} as started`,
+    'Failed to start sprint',
+  )
+}
+
+async function runSprintLifecycle(
+  sprint: SprintListItem,
+  payload: SprintUpdateRequest,
+  successMessage: (displayName: string) => string,
+  errorFallback: string,
+) {
   setLifecycleBusy(sprint.id, true)
   try {
-    const payload: SprintUpdateRequest = {
-      sprint: sprint.id,
-      actual_started_at: new Date().toISOString(),
-    }
     const response = await api.sprintUpdate(payload)
-    showToast(`Marked ${response.sprint.display_name} as started`)
+    showToast(successMessage(response.sprint.display_name))
     if (response.warnings?.length) {
       response.warnings.forEach((warning) => showToast(`Warning: ${warning}`))
     }
     await refreshAll(true)
   } catch (error: any) {
-    showToast(error?.message || 'Failed to start sprint')
+    showToast(error?.message || errorFallback)
   } finally {
     setLifecycleBusy(sprint.id, false)
   }
@@ -1187,44 +1087,22 @@ async function startSprint(sprint: SprintListItem) {
 
 async function completeSprint(sprint: SprintListItem) {
   if (!canCompleteSprint(sprint)) return
-  setLifecycleBusy(sprint.id, true)
-  try {
-    const payload: SprintUpdateRequest = {
-      sprint: sprint.id,
-      actual_closed_at: new Date().toISOString(),
-    }
-    const response = await api.sprintUpdate(payload)
-    showToast(`Marked ${response.sprint.display_name} as completed`)
-    if (response.warnings?.length) {
-      response.warnings.forEach((warning) => showToast(`Warning: ${warning}`))
-    }
-    await refreshAll(true)
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to complete sprint')
-  } finally {
-    setLifecycleBusy(sprint.id, false)
-  }
+  await runSprintLifecycle(
+    sprint,
+    { sprint: sprint.id, actual_closed_at: new Date().toISOString() },
+    (name) => `Marked ${name} as completed`,
+    'Failed to complete sprint',
+  )
 }
 
 async function reopenSprint(sprint: SprintListItem) {
   if (!canReopenSprint(sprint)) return
-  setLifecycleBusy(sprint.id, true)
-  try {
-    const payload: SprintUpdateRequest = {
-      sprint: sprint.id,
-      actual_closed_at: null,
-    }
-    const response = await api.sprintUpdate(payload)
-    showToast(`Reopened ${response.sprint.display_name}`)
-    if (response.warnings?.length) {
-      response.warnings.forEach((warning) => showToast(`Warning: ${warning}`))
-    }
-    await refreshAll(true)
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to reopen sprint')
-  } finally {
-    setLifecycleBusy(sprint.id, false)
-  }
+  await runSprintLifecycle(
+    sprint,
+    { sprint: sprint.id, actual_closed_at: null },
+    (name) => `Reopened ${name}`,
+    'Failed to reopen sprint',
+  )
 }
 
 const filterTimer = ref<number | null>(null)
@@ -1236,10 +1114,14 @@ const draggingSourceSprint = ref<number | null>(null)
 const hoverSprintId = ref<number | null>(null)
 const hoverBacklog = ref(false)
 
-const columns = ref<ColumnKey[]>(loadStoredColumns() ?? [...defaultColumns])
-const columnOrder = ref<ColumnKey[]>(loadStoredColumnOrder() ?? [...allColumns])
+const columnStore = useColumns({
+  storagePrefix: 'lotar.sprints',
+  builtinColumns: allColumns as import('../composables/useColumns').BuiltinColKey[],
+  defaultVisible: defaultColumns,
+  includeCustomFields: false,
+})
+const { columns, columnOrder, visibleColumns, toggleColumn, resetColumns } = columnStore
 const columnsSet = computed(() => new Set(columns.value))
-const visibleColumns = computed(() => columnOrder.value.filter((col) => columnsSet.value.has(col)))
 
 const draggingCol = ref<ColumnKey | null>(null)
 const dragOverCol = ref<ColumnKey | null>(null)
@@ -1309,84 +1191,7 @@ function onColDragEnd() {
   lastColDragAt.value = Date.now()
 }
 
-watch(
-  columns,
-  (value) => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(columnStorageKey, JSON.stringify(value))
-    } catch {
-      /* ignore persistence errors */
-    }
-  },
-  { deep: true },
-)
-
-watch(
-  columnOrder,
-  (value) => {
-    if (!value.length) {
-      columnOrder.value = [...allColumns]
-      return
-    }
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(columnOrderStorageKey, JSON.stringify(value))
-    } catch {
-      /* ignore persistence errors */
-    }
-  },
-  { deep: true },
-)
-
-watch(
-  columnOrder,
-  (value) => {
-    if (!value.length) {
-      columnOrder.value = [...allColumns]
-      return
-    }
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(columnOrderStorageKey, JSON.stringify(value))
-    } catch {
-      /* ignore persistence errors */
-    }
-  },
-  { deep: true },
-)
-
-function headerLabel(col: ColumnKey) {
-  const labels: Record<ColumnKey, string> = {
-    id: 'ID',
-    title: 'Title',
-    status: 'Status',
-    priority: 'Priority',
-    task_type: 'Type',
-    reporter: 'Reporter',
-    assignee: 'Assignee',
-    effort: 'Effort',
-    tags: 'Tags',
-    sprints: 'Sprints',
-    due_date: 'Due',
-    created: 'Created',
-    modified: 'Updated',
-  }
-  return labels[col]
-}
-
-function toggleColumn(col: string, event: Event) {
-  const checked = (event.target as HTMLInputElement).checked
-  const next = new Set(columns.value)
-  if (checked) next.add(col as ColumnKey)
-  else next.delete(col as ColumnKey)
-  columns.value = Array.from(next)
-}
-
-function resetColumns() {
-  columns.value = [...defaultColumns]
-  columnOrder.value = [...allColumns]
-}
+const headerLabel = (col: ColumnKey) => columnStore.headerLabel(col)
 
 const columnMenuOpen = ref(false)
 
@@ -1405,23 +1210,13 @@ const sort = reactive<{ key: ColumnKey | null; dir: 'asc' | 'desc' }>(
 )
 
 watch(timeRange, (value) => {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(timeRangeStorageKey, value)
-  } catch {
-    /* ignore persistence errors */
-  }
+  storageSet(timeRangeStorageKey, value)
 })
 
 watch(
   sort,
   (value) => {
-    if (typeof window === 'undefined') return
-    try {
-      window.localStorage.setItem(sortStorageKey, JSON.stringify(value))
-    } catch {
-      /* ignore persistence errors */
-    }
+    storageSetJson(sortStorageKey, value)
   },
   { deep: true },
 )
@@ -2165,7 +1960,7 @@ function applySprintSmartFilters(source: TaskDTO[], q: Record<string, string>): 
   const wantsUnassigned = q.assignee === '__none__'
   const due = q.due || ''
   const recent = q.recent || ''
-  const needsSet = new Set((q.needs || '').split(',').map((s) => s.trim()).filter(Boolean))
+  const needsSet = new Set(listFromCsv(q.needs || ''))
   const now = new Date()
   const today = startOfDay(now)
   const tomorrow = new Date(today.getTime() + MS_PER_DAY)
@@ -2700,43 +2495,8 @@ function badgeClass(state: string) {
   return 'badge--muted'
 }
 
-function projectOf(id: string) {
-  return (id || '').split('-')[0]
-}
 
-function numericOf(id: string) {
-  return (id || '').split('-').slice(1).join('-')
-}
-
-const relativeTimeFormatter =
-  typeof Intl !== 'undefined' && (Intl as any).RelativeTimeFormat
-    ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-    : null
-
-const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
-  { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
-  { unit: 'month', ms: 1000 * 60 * 60 * 24 * 30 },
-  { unit: 'week', ms: 1000 * 60 * 60 * 24 * 7 },
-  { unit: 'day', ms: 1000 * 60 * 60 * 24 },
-  { unit: 'hour', ms: 1000 * 60 * 60 },
-  { unit: 'minute', ms: 1000 * 60 },
-  { unit: 'second', ms: 1000 },
-]
-
-function formatRelative(value?: string | null) {
-  if (!value) return '—'
-  const timestamp = safeTimestamp(value)
-  if (timestamp === null) return value
-  if (!relativeTimeFormatter) return new Date(timestamp).toLocaleString()
-  const diff = timestamp - Date.now()
-  for (const { unit, ms } of relativeUnits) {
-    if (Math.abs(diff) >= ms || unit === 'second') {
-      const amount = Math.round(diff / ms)
-      return relativeTimeFormatter.format(amount, unit)
-    }
-  }
-  return new Date(timestamp).toLocaleString()
-}
+const formatRelative = (value?: string | null) => formatRelativeTime(value, { empty: '—' })
 
 function formatExact(value?: string | null) {
   if (!value) return ''
@@ -2747,19 +2507,6 @@ function formatExact(value?: string | null) {
   }
 }
 
-function isTaskOverdue(task: TaskDTO) {
-  try {
-    const status = (task.status || '').toLowerCase()
-    if (!task.due_date || status === 'done') return false
-    const due = safeTimestamp(task.due_date)
-    if (due === null) return false
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return due < today.getTime()
-  } catch {
-    return false
-  }
-}
 
 function sprintLabel(id: number) {
   const entry = sprintLookup.value[id]

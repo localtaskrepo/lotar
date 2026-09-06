@@ -4,7 +4,7 @@ This page explains how LoTaR resolves values for configuration, identity (for @m
 
 ## Configuration precedence
 
-`src/config/resolution.rs` and `src/config/manager.rs` merge configuration layers in a fixed order (highest wins):
+`src/config/resolution.rs` is the single merge engine for configuration layers (`ConfigManager` delegates to its cached resolver) in a fixed order (highest wins):
 1. Command-line flags for the current invocation (e.g., `lotar config set --project`, `--tasks-dir`, `--format`) plus the global `--config KEY=VALUE` overrides. These are evaluated inside each command handler, scoped to the running process, and never persisted.
 2. Project config (`.tasks/<PROJECT>/config.yml`) when a project has been resolved. These files represent the most local settings and override everything except explicit CLI flags.
 3. Environment overrides defined in `src/config/env_overrides.rs` (see `docs/help/environment.md` for the full table). The first set variable wins per key and applies globally across projects.
@@ -22,12 +22,12 @@ Notes:
 ## Identity resolution and @me
 
 Anywhere a person field is accepted (assignee, reporter, default_reporter), the special value @me is allowed. `src/utils/identity_detectors.rs` runs detectors in this order:
-1) Merged config `default_reporter` (using the precedence above). `LOTAR_DEFAULT_REPORTER` feeds this via the env overrides table.
-2) Project manifest author (package.json `author`/`contributors`, Cargo.toml `authors`, or the first `.csproj` `<Authors>` tag) searched from repo root downward.
-3) Git config (`user.name`, then `user.email`) at the repository root, gated by `auto.identity_git`.
-4) System user from `$USER` / `$USERNAME`.
+1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → home → project → global → defaults)
+2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
+3) System user ($USER or $USERNAME)
+4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
 
-`src/utils/identity.rs` caches these results per workspace so CLI/REST/MCP share the same answer. Set `auto.identity=false` to restrict @me lookups to the configured reporter only; set `auto.identity_git=false` to skip git-based fallbacks while still honoring manifests and env values. `lotar whoami --explain` surfaces the same order along with detector metadata.
+`src/utils/identity.rs` caches these results per workspace so CLI/REST/MCP share the same answer. Set `auto.identity=false` to disable the git/manifest detectors (config and system user remain); set `auto.identity_git=false` to skip git-based fallbacks while still honoring env and manifest values. `lotar whoami --explain` surfaces the same order along with detector metadata.
 
 ## Tasks directory resolution
 

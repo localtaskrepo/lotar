@@ -7,6 +7,7 @@
 <script setup lang="ts">
 import { BarController, BarElement, CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js';
 import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch, watchEffect } from 'vue';
+import { titleCase } from '../utils/text'
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip)
 
@@ -76,7 +77,7 @@ function formatCategoryLabel(key: string) {
   return key
     .split(/[_\s-]+/)
     .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => titleCase(part))
     .join(' ')
 }
 

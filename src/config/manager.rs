@@ -10,16 +10,6 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
-    #[allow(dead_code)]
-    pub fn new() -> Result<Self, ConfigError> {
-        let resolved_config = crate::config::resolution::load_and_merge_configs(None)?;
-        let default_root = crate::utils::paths::tasks_root_from(Path::new("."));
-        Ok(Self {
-            resolved_config,
-            tasks_dir: default_root,
-        })
-    }
-
     /// Create a ConfigManager from an existing ResolvedConfig (for testing)
     #[cfg(test)]
     pub fn from_resolved_config(resolved_config: ResolvedConfig) -> Self {
@@ -35,15 +25,13 @@ impl ConfigManager {
         &self.resolved_config
     }
 
-    #[allow(dead_code)]
-    pub fn new_with_tasks_dir(tasks_dir: &Path) -> Result<ResolvedConfig, ConfigError> {
-        Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, false)
-    }
-
     /// Create a ConfigManager instance that ensures global config exists (for write operations)
     pub fn new_manager_with_tasks_dir_ensure_config(tasks_dir: &Path) -> Result<Self, ConfigError> {
-        let resolved_config =
-            Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, true)?;
+        crate::config::persistence::ensure_global_config_exists(Some(tasks_dir))?;
+        // The ensure step above may have created the file; drop any cached
+        // entry computed before it existed.
+        crate::config::resolution::invalidate_config_cache_for(Some(tasks_dir));
+        let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))?;
         Ok(Self {
             resolved_config,
             tasks_dir: tasks_dir.to_path_buf(),
@@ -52,8 +40,7 @@ impl ConfigManager {
 
     /// Create a ConfigManager instance for read-only operations (does not create config files)
     pub fn new_manager_with_tasks_dir_readonly(tasks_dir: &Path) -> Result<Self, ConfigError> {
-        let resolved_config =
-            Self::new_with_tasks_dir_and_home_override_internal(tasks_dir, None, false)?;
+        let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))?;
         Ok(Self {
             resolved_config,
             tasks_dir: tasks_dir.to_path_buf(),
@@ -162,48 +149,6 @@ impl ConfigManager {
         home_config_path: Option<&Path>,
     ) -> Result<GlobalConfig, ConfigError> {
         crate::config::persistence::load_home_config_with_override(home_config_path)
-    }
-
-    /// Internal constructor with full configuration options
-    fn new_with_tasks_dir_and_home_override_internal(
-        tasks_dir: &Path,
-        home_config_override: Option<&Path>,
-        ensure_config_exists: bool,
-    ) -> Result<ResolvedConfig, ConfigError> {
-        let mut config = GlobalConfig::default();
-
-        // Convert Path to PathBuf for the existing API
-        let tasks_dir_buf = tasks_dir.to_path_buf();
-
-        // Only ensure global config exists if explicitly requested (for write operations)
-        if ensure_config_exists {
-            crate::config::persistence::ensure_global_config_exists(Some(tasks_dir_buf.as_path()))?;
-        }
-
-        // 4. Global config (.tasks/config.yml or custom dir) - lowest priority (after defaults)
-        if let Ok(global_config) =
-            crate::config::persistence::load_global_config(Some(tasks_dir_buf.as_path()))
-        {
-            crate::config::resolution::merge_global_config(&mut config, global_config);
-        }
-
-        // 3. Project config (.tasks/{project}/config.yml) - will be handled per-project
-        // For now, we'll use global as base
-
-        // 2. Home config (~/.lotar) - higher priority
-        if let Ok(home_config) =
-            crate::config::persistence::load_home_config_with_override(home_config_override)
-        {
-            crate::config::resolution::merge_global_config(&mut config, home_config);
-        }
-
-        // 1. Environment variables (highest priority)
-        let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
-        crate::config::resolution::merge_global_config(&mut config, env_snapshot.global);
-
-        let mut resolved = ResolvedConfig::from_global(config);
-        crate::config::resolution::apply_cli_overrides(&mut resolved);
-        Ok(resolved)
     }
 }
 

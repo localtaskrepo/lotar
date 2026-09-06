@@ -26,14 +26,6 @@ pub fn list_visible_subdirs(dir: &Path) -> Vec<(String, PathBuf)> {
     result
 }
 
-/// Read a file to string, returning None on error.
-pub fn read_to_string_opt(path: &Path) -> Option<String> {
-    fs::read_to_string(path).ok()
-}
-
-// Placeholder for filesystem-related utilities.
-// We'll move path and IO helpers here as we continue Task 2.2.
-
 /// List files under a directory that have the given extension (case-insensitive).
 /// Returns a Vec of full paths.
 pub fn list_files_with_ext(dir: &Path, ext: &str) -> Vec<PathBuf> {
@@ -48,6 +40,31 @@ pub fn list_files_with_ext(dir: &Path, ext: &str) -> Vec<PathBuf> {
                 && e.to_ascii_lowercase() == ext_lc
             {
                 result.push(path);
+            }
+        }
+    }
+
+    result
+}
+
+/// Recursively list files with the given extension (case-insensitive) under a
+/// directory and all of its subdirectories.
+pub fn list_files_with_ext_recursive(dir: &Path, ext: &str) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+    let ext_lc = ext.to_ascii_lowercase();
+    let mut stack = vec![dir.to_path_buf()];
+
+    while let Some(current) = stack.pop() {
+        if let Ok(entries) = fs::read_dir(&current) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if let Some(e) = path.extension().and_then(|s| s.to_str())
+                    && e.to_ascii_lowercase() == ext_lc
+                {
+                    result.push(path);
+                }
             }
         }
     }

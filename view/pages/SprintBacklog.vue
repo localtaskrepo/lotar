@@ -132,8 +132,10 @@ import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
+import { listFromCsv } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprints } from '../composables/useSprints'
+import { titleCase } from '../utils/text'
 
 const tasks = ref<SprintBacklogTask[]>([])
 const loading = ref(false)
@@ -173,7 +175,7 @@ const sprintOptions = computed(() => {
   const sorted = [...sprints.value].sort((a, b) => a.id - b.id)
   sorted.forEach((item) => {
     const name = item.label || item.display_name || `Sprint ${item.id}`
-    const state = item.state.charAt(0).toUpperCase() + item.state.slice(1)
+    const state = titleCase(item.state)
     options.push({ value: String(item.id), label: `#${item.id} ${name} (${state})` })
   })
   if (!options.some((opt) => opt.value === sprintSelection.value)) {
@@ -197,12 +199,6 @@ function toggleOne(id: string, event: Event) {
   selectedIds.value = Array.from(set)
 }
 
-function parseList(value: string): string[] {
-  return value
-    .split(',')
-    .map((token) => token.trim())
-    .filter(Boolean)
-}
 
 function parseSprintToken(token: string): number | string | undefined {
   const trimmed = (token || '').trim()
@@ -226,8 +222,8 @@ function projectLabel(project: { prefix: string; name?: string | null }) {
 async function fetchBacklog() {
   loading.value = true
   try {
-    const statuses = parseList(statusFilter.value)
-    const tags = parseList(tagFilter.value)
+    const statuses = listFromCsv(statusFilter.value)
+    const tags = listFromCsv(tagFilter.value)
     const response = await api.sprintBacklog({
       project: projectFilter.value || undefined,
       status: statuses.length ? statuses : undefined,

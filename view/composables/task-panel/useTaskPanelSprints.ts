@@ -1,6 +1,7 @@
 import type { ComputedRef, Ref } from 'vue'
 import { computed, ref } from 'vue'
 import type { SprintListItem, TaskDTO } from '../../api/types'
+import { titleCase } from '../../utils/text'
 
 export interface UseTaskPanelSprintsOptions {
     form: { sprints: number[] }
@@ -141,7 +142,7 @@ export function useTaskPanelSprints(options: UseTaskPanelSprintsOptions): TaskPa
         const sorted = [...(options.sprintList.value ?? [])].sort((a, b) => a.id - b.id)
         sorted.forEach((item) => {
             const name = item.label || item.display_name || `Sprint ${item.id}`
-            const state = item.state.charAt(0).toUpperCase() + item.state.slice(1)
+            const state = titleCase(item.state)
             optionsList.push({ value: String(item.id), label: `#${item.id} ${name} (${state})` })
         })
         return optionsList

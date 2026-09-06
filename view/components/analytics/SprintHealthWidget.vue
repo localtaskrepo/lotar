@@ -129,6 +129,7 @@
 
 <script setup lang="ts">
 import { computed, toRefs } from 'vue';
+import { formatDateTime } from '../../utils/date'
 import type { SprintSummaryReportResponse } from '../../api/types';
 
 import UiLoader from '../UiLoader.vue';
@@ -154,14 +155,7 @@ function statusClass(state: string) {
   return 'badge--muted'
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return '—'
-  try {
-    return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-  } catch {
-    return value
-  }
-}
+const formatDate = (value?: string | null) => formatDateTime(value, { empty: '—', mediumShort: true })
 
 function formatNumber(value: number | null | undefined) {
   if (value === null || value === undefined || Number.isNaN(value)) return '0'

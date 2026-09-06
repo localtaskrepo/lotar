@@ -1,7 +1,6 @@
 use crate::config::types::ResolvedConfig;
 use crate::storage::task::Task;
 use crate::types::{Priority, TaskStatus, TaskType};
-use chrono::Datelike;
 
 /// Configuration-aware validation for CLI inputs
 pub struct CliValidator<'a> {
@@ -138,77 +137,38 @@ impl<'a> CliValidator<'a> {
     /// - RFC3339 datetime: 2025-12-31T15:04:05Z or with offset
     /// - Local naive datetime: "YYYY-MM-DD HH:MM[:SS]" or "YYYY-MM-DDTHH:MM[:SS]" (assumed local tz)
     /// - Keywords: today, tomorrow, next week, next <weekday>
-    /// - Shortcuts: in Nd/Nw, +Nd/+Nw, +Nbd (business days), next business day,
+    /// - Shortcuts: in Nd/Nw, +/-Nd/+/-Nw, +Nbd (business days), next business day,
     ///   this/by <weekday>, <weekday>, next week <weekday>
+    ///
+    /// Date-like inputs normalize to a local YYYY-MM-DD string; datetime-like
+    /// inputs normalize to RFC3339. Parsing itself is delegated to
+    /// [`crate::utils::time::parse_human_datetime_to_utc`].
     pub fn parse_due_date(&self, due_date: &str) -> Result<String, String> {
-        use chrono::{Local, Utc};
-
         let s_raw = due_date.trim();
-        let s = s_raw.to_lowercase();
 
-        // Keywords (date-only -> local midnight implied, but we store YYYY-MM-DD)
-        match s.as_str() {
-            "today" => {
-                let d = Local::now().date_naive();
-                return Ok(d.format("%Y-%m-%d").to_string());
-            }
-            "tomorrow" => {
-                let d = Local::now().date_naive() + chrono::Duration::days(1);
-                return Ok(d.format("%Y-%m-%d").to_string());
-            }
-            "next week" | "nextweek" => {
-                let d = Local::now().date_naive() + chrono::Duration::weeks(1);
-                return Ok(d.format("%Y-%m-%d").to_string());
-            }
-            _ => {}
-        }
+        let invalid = || {
+            format!(
+                "Invalid date format: '{}'. Try one of: YYYY-MM-DD, RFC3339 (2025-12-31T15:04:05Z), 'in 3 days', '+3d', '+2w', '+1bd', 'next business day', 'next monday', 'this friday', 'by fri', 'next week monday'",
+                due_date
+            )
+        };
 
-        // Phrases like next monday, this friday, by friday, fri
-        if let Some(next_day) = parse_weekday_phrases(&s) {
-            return Ok(next_day.format("%Y-%m-%d").to_string());
-        }
+        // Datetime-like forms normalize to RFC3339 (UTC)
+        let datetime_like = chrono::DateTime::parse_from_rfc3339(s_raw).is_ok()
+            || crate::utils::time::parse_naive_local_datetime_to_utc(s_raw).is_some();
 
-        // next week <weekday>
-        if let Some(next_week_named) = parse_next_week_named(&s) {
-            return Ok(next_week_named.format("%Y-%m-%d").to_string());
-        }
-
-        // Offsets: +Nd/+Nw and spaced, in Nd/Nw, business day variants
-        if let Some(offset) = parse_simple_offset(&s) {
-            let d = chrono::Local::now().date_naive() + offset;
-            return Ok(d.format("%Y-%m-%d").to_string());
-        }
-
-        if let Some(offset) = parse_in_offset(&s) {
-            let d = chrono::Local::now().date_naive() + offset;
-            return Ok(d.format("%Y-%m-%d").to_string());
-        }
-
-        if let Some(days) = parse_business_days_offset(&s) {
-            let base = chrono::Local::now().date_naive();
-            let d = add_business_days(base, days);
-            return Ok(d.format("%Y-%m-%d").to_string());
-        }
-
-        // RFC3339 datetime with timezone
-        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s_raw) {
-            return Ok(dt.with_timezone(&Utc).to_rfc3339());
-        }
-
-        // Naive local datetime without timezone
-        if let Some(dt_utc) = parse_local_naive_datetime_to_utc(s_raw) {
-            return Ok(dt_utc.to_rfc3339());
-        }
-
-        // Absolute date YYYY-MM-DD (store as date-only)
-        if let Ok(parsed) = chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d") {
-            return Ok(parsed.format("%Y-%m-%d").to_string());
-        }
-
-        Err(format!(
-            "Invalid date format: '{}'. Try one of: YYYY-MM-DD, RFC3339 (2025-12-31T15:04:05Z), 'in 3 days', '+3d', '+2w', '+1bd', 'next business day', 'next monday', 'this friday', 'by fri', 'next week monday'",
-            due_date
-        ))
+        crate::utils::time::parse_human_datetime_to_utc(s_raw)
+            .map(|dt| {
+                if datetime_like {
+                    dt.to_rfc3339()
+                } else {
+                    dt.with_timezone(&chrono::Local)
+                        .date_naive()
+                        .format("%Y-%m-%d")
+                        .to_string()
+                }
+            })
+            .map_err(|_| invalid())
     }
 
     /// Validate effort estimate format
@@ -367,199 +327,6 @@ impl<'a> CliValidator<'a> {
     fn strict_members_misconfiguration_error() -> String {
         "Strict members are enabled but no members are configured. Add entries under members or disable strict_members.".to_string()
     }
-}
-
-fn parse_weekday_name(name: &str) -> Option<chrono::Weekday> {
-    let n = name.to_lowercase();
-    match n.as_str() {
-        "mon" | "monday" => Some(chrono::Weekday::Mon),
-        "tue" | "tues" | "tuesday" => Some(chrono::Weekday::Tue),
-        "wed" | "weds" | "wednesday" => Some(chrono::Weekday::Wed),
-        "thu" | "thur" | "thurs" | "thursday" => Some(chrono::Weekday::Thu),
-        "fri" | "friday" => Some(chrono::Weekday::Fri),
-        "sat" | "saturday" => Some(chrono::Weekday::Sat),
-        "sun" | "sunday" => Some(chrono::Weekday::Sun),
-        _ => None,
-    }
-}
-
-/// Parse "+Nd" or "+Nw" (and variants like "+1 day", "+2 weeks") into a Duration.
-fn parse_simple_offset(s: &str) -> Option<chrono::Duration> {
-    let t = s.trim_start();
-    if !t.starts_with('+') {
-        return None;
-    }
-    let rest = &t[1..];
-    // Try compact form: +10d, +2w
-    if let Some(unit) = rest.chars().last()
-        && (unit == 'd' || unit == 'w')
-    {
-        let num_part = &rest[..rest.len() - 1];
-        if let Ok(n) = num_part.parse::<i64>() {
-            return Some(if unit == 'd' {
-                chrono::Duration::days(n)
-            } else {
-                chrono::Duration::weeks(n)
-            });
-        }
-    }
-    // Try spaced form: +10 day(s), +2 week(s)
-    let parts: Vec<&str> = rest.split_whitespace().collect();
-    if parts.len() == 2
-        && let Ok(n) = parts[0].parse::<i64>()
-    {
-        let unit = parts[1].to_lowercase();
-        if unit.starts_with("day") {
-            return Some(chrono::Duration::days(n));
-        }
-        if unit.starts_with("week") {
-            return Some(chrono::Duration::weeks(n));
-        }
-    }
-    None
-}
-
-/// Parse "in Nd" or "in Nw" into a Duration.
-fn parse_in_offset(s: &str) -> Option<chrono::Duration> {
-    let t = s.trim();
-    if let Some(rest) = t.strip_prefix("in ") {
-        let parts: Vec<&str> = rest.split_whitespace().collect();
-        if parts.len() == 2
-            && let Ok(n) = parts[0].parse::<i64>()
-        {
-            let unit = parts[1].to_lowercase();
-            if unit.starts_with('d') || unit.starts_with("day") {
-                return Some(chrono::Duration::days(n));
-            }
-            if unit.starts_with('w') || unit.starts_with("week") {
-                return Some(chrono::Duration::weeks(n));
-            }
-        }
-    }
-    None
-}
-
-/// Parse "+Nbd" or spaced form "+N business day(s)" into number of business days
-fn parse_business_days_offset(s: &str) -> Option<i64> {
-    let t = s.trim_start();
-    if let Some(rest) = t.strip_prefix('+') {
-        if let Some(rest2) = rest.strip_suffix("bd")
-            && let Ok(n) = rest2.parse::<i64>()
-        {
-            return Some(n);
-        }
-        // spaced form: +N business day(s)
-        let parts: Vec<&str> = rest.split_whitespace().collect();
-        if parts.len() >= 2
-            && let Ok(n) = parts[0].parse::<i64>()
-        {
-            let unit = parts[1].to_lowercase();
-            if unit.starts_with("business") {
-                return Some(n);
-            }
-        }
-    }
-    if s.eq_ignore_ascii_case("next business day") {
-        return Some(1);
-    }
-    None
-}
-
-/// Add n business days (Mon-Fri) to a date
-fn add_business_days(mut date: chrono::NaiveDate, mut days: i64) -> chrono::NaiveDate {
-    while days > 0 {
-        date += chrono::Duration::days(1);
-        let wd = date.weekday();
-        if wd != chrono::Weekday::Sat && wd != chrono::Weekday::Sun {
-            days -= 1;
-        }
-    }
-    date
-}
-
-/// Parse phrases like "next monday", "this friday", "by fri", or just "fri"
-fn parse_weekday_phrases(s: &str) -> Option<chrono::NaiveDate> {
-    let s = s.trim();
-    if let Some(rest) = s.strip_prefix("next ")
-        && let Some(wd) = parse_weekday_name(rest.trim())
-    {
-        return Some(next_occurrence(wd));
-    }
-    if let Some(rest) = s.strip_prefix("this ")
-        && let Some(wd) = parse_weekday_name(rest.trim())
-    {
-        return Some(next_occurrence(wd));
-    }
-    if let Some(rest) = s.strip_prefix("by ")
-        && let Some(wd) = parse_weekday_name(rest.trim())
-    {
-        return Some(next_occurrence(wd));
-    }
-    if let Some(wd) = parse_weekday_name(s) {
-        return Some(next_occurrence(wd));
-    }
-    None
-}
-
-/// Next occurrence of weekday strictly in the future (today counts as +7)
-fn next_occurrence(target: chrono::Weekday) -> chrono::NaiveDate {
-    let today = chrono::Local::now().date_naive();
-    let today_num = today.weekday().num_days_from_monday() as i64;
-    let target_num = target.num_days_from_monday() as i64;
-    let diff = (target_num - today_num).rem_euclid(7);
-    let days_ahead = if diff == 0 { 7 } else { diff };
-    today + chrono::Duration::days(days_ahead)
-}
-
-/// Parse "next week <weekday>"
-fn parse_next_week_named(s: &str) -> Option<chrono::NaiveDate> {
-    let s = s.trim();
-    if let Some(rest) = s.strip_prefix("next week ")
-        && let Some(wd) = parse_weekday_name(rest.trim())
-    {
-        // Find next week's Monday
-        let today = chrono::Local::now().date_naive();
-        let mon_this_week =
-            today - chrono::Duration::days(today.weekday().num_days_from_monday() as i64);
-        let mon_next_week = mon_this_week + chrono::Duration::weeks(1);
-        let offset_days = wd.num_days_from_monday() as i64;
-        return Some(mon_next_week + chrono::Duration::days(offset_days));
-    }
-    None
-}
-
-/// Parse naive local datetime strings and convert to UTC
-fn parse_local_naive_datetime_to_utc(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    use chrono::{Local, NaiveDateTime, TimeZone, Utc};
-    let fmts = [
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-    ];
-    for fmt in &fmts {
-        if let Ok(ndt) = NaiveDateTime::parse_from_str(s, fmt)
-            && let Some(dt) = Local.from_local_datetime(&ndt).single()
-        {
-            return Some(dt.with_timezone(&Utc));
-        }
-    }
-    None
-}
-
-/// Parse stored due-date string into UTC instant (supports RFC3339 and YYYY-MM-DD)
-pub fn parse_due_string_to_utc(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    use chrono::{Local, TimeZone, Utc};
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-        return Some(dt.with_timezone(&Utc));
-    }
-    if let Ok(d) = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d") {
-        let dt_local = Local
-            .with_ymd_and_hms(d.year(), d.month(), d.day(), 0, 0, 0)
-            .single()?;
-        return Some(dt_local.with_timezone(&Utc));
-    }
-    None
 }
 
 /// Find the closest match for a string in a list (simple edit distance)

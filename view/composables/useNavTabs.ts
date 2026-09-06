@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { storageGetJson, storageSetJson } from '../utils/storage'
 
 const STORAGE_KEY = 'lotar.preferences.hiddenTabs'
 
@@ -25,27 +26,15 @@ export const NAV_TABS: NavTabDefinition[] = [
 const ALWAYS_VISIBLE = new Set(['/preferences'])
 
 function readHidden(): Set<string> {
-    try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null
-        if (!raw) return new Set()
-        const parsed = JSON.parse(raw)
-        if (!Array.isArray(parsed)) return new Set()
-        return new Set(parsed.filter((p): p is string => typeof p === 'string'))
-    } catch {
-        return new Set()
-    }
+    const parsed = storageGetJson<unknown>(STORAGE_KEY)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.filter((p): p is string => typeof p === 'string'))
 }
 
 const hiddenTabs = ref<Set<string>>(readHidden())
 
 watch(hiddenTabs, (value) => {
-    try {
-        if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(value)))
-        }
-    } catch {
-        // ignore persistence errors
-    }
+    storageSetJson(STORAGE_KEY, Array.from(value))
 }, { deep: true })
 
 export function useNavTabs() {

@@ -1,8 +1,6 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
-use crate::storage::safety::{
-    atomic_write_file, validate_project_prefix, warn_corrupt_once, with_storage_lock,
-};
+use crate::storage::safety::{atomic_write_file, validate_project_prefix, with_storage_lock};
 use crate::storage::task::Task;
 #[cfg(test)]
 use crate::utils::project::generate_project_prefix;
@@ -105,14 +103,8 @@ impl StorageOperations {
     pub fn get(root_path: &Path, id: &str, project: &str) -> Option<Task> {
         let read_task = |project_path: &Path| -> Option<Task> {
             let file_path = Self::get_file_path_for_id(project_path, id)?;
-            let file_string = fs::read_to_string(&file_path).ok()?;
-            match serde_yaml_ng::from_str::<Task>(&file_string) {
-                Ok(task) => Some(task),
-                Err(e) => {
-                    warn_corrupt_once(&file_path, &e.to_string());
-                    None
-                }
-            }
+            // Route through the mtime-validated parse cache shared with search
+            crate::storage::search::StorageSearch::load_task_file(&file_path)
         };
 
         if let Some(folder_from_id) = Self::get_project_for_task(id) {

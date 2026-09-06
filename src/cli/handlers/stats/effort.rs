@@ -41,39 +41,7 @@ pub(crate) fn run(
     }
     // If transitions is set, filter tasks to those that transitioned into the given status within the window
     if let Some(trans_status) = transitions {
-        // Best-effort status extractor that tolerates mixed-case enum values elsewhere
-        // in the YAML (e.g., priority in UPPERCASE). Falls back to reading only the
-        // `status` field when full Task deserialization fails.
-        fn parse_status_from_yaml(content: &str) -> Option<crate::types::TaskStatus> {
-            fn parse_status_str_tolerant(s: &str) -> Option<crate::types::TaskStatus> {
-                let norm = s.to_ascii_lowercase().replace(['_', '-'], "");
-                match norm.as_str() {
-                    "todo" => Some(crate::types::TaskStatus::from("Todo")),
-                    "inprogress" => Some(crate::types::TaskStatus::from("InProgress")),
-                    "verify" => Some(crate::types::TaskStatus::from("Verify")),
-                    "blocked" => Some(crate::types::TaskStatus::from("Blocked")),
-                    "done" => Some(crate::types::TaskStatus::from("Done")),
-                    _ => None,
-                }
-            }
-            // Try strict first
-            if let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(content) {
-                return Some(task.status);
-            }
-            // Tolerant fallback: read just `status` as a string
-            if let Ok(val) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content)
-                && let Some(s) = val.get("status").and_then(|v| match v {
-                    serde_yaml_ng::Value::String(s) => Some(s.clone()),
-                    _ => None,
-                })
-            {
-                if let Some(ts) = parse_status_str_tolerant(&s) {
-                    return Some(ts);
-                }
-                return s.parse::<crate::types::TaskStatus>().ok();
-            }
-            None
-        }
+        use crate::storage::task::parse_status_from_yaml;
 
         let (since_dt, until_dt) = crate::utils::time::parse_since_until(since, until)?;
         let cwd = std::env::current_dir().map_err(|e| e.to_string())?;
@@ -261,238 +229,95 @@ pub(crate) fn run(
                         None => continue,
                     };
                     // List .yml files in this project folder
-                    if let Ok(files) = fs::read_dir(&p) {
-                        for file in files.flatten() {
-                            let fpath = file.path();
-                            if fpath.extension().and_then(|e| e.to_str()) != Some("yml") {
-                                continue;
+                    for fpath in fs::read_dir(&p)
+                        .map(|rd| {
+                            rd.flatten()
+                                .map(|e| e.path())
+                                .collect::<Vec<std::path::PathBuf>>()
+                        })
+                        .unwrap_or_default()
+                    {
+                        let num = match crate::utils::filesystem::file_numeric_stem(&fpath) {
+                            Some(n) => n,
+                            None => continue,
+                        };
+                        let id = format!("{}-{}", project_folder, num);
+                        let file_rel = tasks_rel.join(&project_folder).join(format!("{}.yml", num));
+                        let mut commits =
+                            crate::services::audit_service::AuditService::list_commits_for_file(
+                                &repo_root_real,
+                                &file_rel,
+                            )
+                            .unwrap_or_default();
+                        if commits.is_empty() {
+                            continue;
+                        }
+                        commits.sort_by_key(|a| a.date);
+                        let mut prev_status: Option<String> = None;
+                        let mut is_match = false;
+                        for c in commits {
+                            if c.date > until_dt {
+                                break;
                             }
-                            let stem = match fpath.file_stem().and_then(|s| s.to_str()) {
-                                Some(s) => s,
-                                None => continue,
-                            };
-                            let num: u64 = match stem.parse() {
-                                Ok(n) => n,
-                                Err(_) => continue,
-                            };
-                            let id = format!("{}-{}", project_folder, num);
-                            let file_rel =
-                                tasks_rel.join(&project_folder).join(format!("{}.yml", num));
-                            let mut commits = crate::services::audit_service::AuditService::list_commits_for_file(&repo_root_real, &file_rel).unwrap_or_default();
-                            if commits.is_empty() {
-                                continue;
-                            }
-                            commits.sort_by_key(|a| a.date);
-                            let mut prev_status: Option<String> = None;
-                            let mut is_match = false;
-                            for c in commits {
-                                if c.date > until_dt {
+                            if let Ok(content) =
+                                crate::services::audit_service::AuditService::show_file_at(
+                                    &repo_root_real,
+                                    &c.commit,
+                                    &file_rel,
+                                )
+                                && let Some(ts) = parse_status_from_yaml(&content)
+                            {
+                                let curr_status = ts.to_string();
+                                if c.date >= since_dt
+                                    && c.date <= until_dt
+                                    && prev_status.as_deref() != Some(curr_status.as_str())
+                                    && curr_status == trans_status
+                                {
+                                    is_match = true;
                                     break;
                                 }
-                                if let Ok(content) =
-                                    crate::services::audit_service::AuditService::show_file_at(
-                                        &repo_root_real,
-                                        &c.commit,
-                                        &file_rel,
-                                    )
-                                    && let Some(ts) = parse_status_from_yaml(&content)
-                                {
-                                    let curr_status = ts.to_string();
-                                    if c.date >= since_dt
-                                        && c.date <= until_dt
-                                        && prev_status.as_deref() != Some(curr_status.as_str())
-                                        && curr_status == trans_status
-                                    {
-                                        is_match = true;
-                                        break;
-                                    }
-                                    prev_status = Some(curr_status);
-                                }
+                                prev_status = Some(curr_status);
                             }
-                            if !is_match {
-                                continue;
-                            }
-                            // Build a minimal TaskDTO by tolerantly reading current YAML
-                            let abs_file = tasks_abs_real
-                                .join(&project_folder)
-                                .join(format!("{}.yml", num));
-                            let (
-                                title,
-                                assignee,
-                                effort,
-                                priority,
-                                task_type,
-                                status,
-                                created,
-                                modified,
-                                reporter,
-                                tags,
-                                custom_fields,
-                                relationships,
-                                comments,
-                                references,
-                                sprints,
-                                history,
-                            ) = (|| {
-                                let content = fs::read_to_string(&abs_file).unwrap_or_default();
-                                if let Ok(task) =
-                                    serde_yaml_ng::from_str::<crate::storage::task::Task>(&content)
-                                {
-                                    let sprints: Vec<u32> = sprint_lookup
-                                        .get(&id)
-                                        .map(|orders| orders.keys().copied().collect::<Vec<u32>>())
-                                        .unwrap_or_default();
-                                    let dto = crate::api_types::TaskDTO {
-                                        id: id.clone(),
-                                        title: task.title,
-                                        status: task.status,
-                                        priority: task.priority,
-                                        task_type: task.task_type,
-                                        reporter: task.reporter,
-                                        assignee: task.assignee,
-                                        created: task.created,
-                                        modified: task.modified,
-                                        due_date: task.due_date,
-                                        effort: task.effort,
-                                        subtitle: task.subtitle,
-                                        description: task.description,
-                                        tags: task.tags,
-                                        relationships: task.relationships,
-                                        comments: task.comments,
-                                        references: task.references,
-                                        sprints,
-                                        sprint_order: std::collections::BTreeMap::new(),
-                                        history: task.history,
-                                        custom_fields: task.custom_fields,
-                                    };
-                                    return (
-                                        dto.title,
-                                        dto.assignee,
-                                        dto.effort,
-                                        dto.priority,
-                                        dto.task_type,
-                                        dto.status,
-                                        dto.created,
-                                        dto.modified,
-                                        dto.reporter,
-                                        dto.tags,
-                                        dto.custom_fields,
-                                        dto.relationships,
-                                        dto.comments,
-                                        dto.references,
-                                        dto.sprints,
-                                        dto.history,
-                                    );
-                                }
-                                // Tolerant parse via generic YAML
-                                let mut title = String::new();
-                                let mut assignee: Option<String> = None;
-                                let mut effort: Option<String> = None;
-                                let mut priority = crate::types::Priority::default();
-                                let mut task_type = crate::types::TaskType::default();
-                                let mut status = crate::types::TaskStatus::default();
-                                let mut created = String::new();
-                                let mut modified = String::new();
-                                let mut reporter: Option<String> = None;
-                                let mut tags: Vec<String> = Vec::new();
-                                let relationships = crate::types::TaskRelationships::default();
-                                let comments: Vec<crate::types::TaskComment> = Vec::new();
-                                let references: Vec<crate::types::ReferenceEntry> = Vec::new();
-                                let sprints: Vec<u32> = sprint_lookup
-                                    .get(&id)
-                                    .map(|orders| orders.keys().copied().collect::<Vec<u32>>())
-                                    .unwrap_or_default();
-                                let history: Vec<crate::types::TaskChangeLogEntry> = Vec::new();
-                                let custom_fields: crate::types::CustomFields = Default::default();
-                                if let Ok(val) =
-                                    serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content)
-                                {
-                                    if let Some(s) = val.get("title").and_then(|v| v.as_str()) {
-                                        title = s.to_string();
-                                    }
-                                    if let Some(s) = val.get("assignee").and_then(|v| v.as_str()) {
-                                        assignee = Some(s.to_string());
-                                    }
-                                    if let Some(s) = val.get("effort").and_then(|v| v.as_str()) {
-                                        effort = Some(s.to_string());
-                                    }
-                                    if let Some(s) = val.get("priority").and_then(|v| v.as_str()) {
-                                        use std::str::FromStr;
-                                        priority =
-                                            crate::types::Priority::from_str(&s.to_lowercase())
-                                                .unwrap_or_default();
-                                    }
-                                    if let Some(s) = val.get("task_type").and_then(|v| v.as_str()) {
-                                        use std::str::FromStr;
-                                        task_type =
-                                            crate::types::TaskType::from_str(s).unwrap_or_default();
-                                    }
-                                    if let Some(s) = val.get("status").and_then(|v| v.as_str()) {
-                                        use std::str::FromStr;
-                                        status = crate::types::TaskStatus::from_str(s)
-                                            .unwrap_or_default();
-                                    }
-                                    if let Some(s) = val.get("created").and_then(|v| v.as_str()) {
-                                        created = s.to_string();
-                                    }
-                                    if let Some(s) = val.get("modified").and_then(|v| v.as_str()) {
-                                        modified = s.to_string();
-                                    }
-                                    if let Some(s) = val.get("reporter").and_then(|v| v.as_str()) {
-                                        reporter = Some(s.to_string());
-                                    }
-                                    if let Some(arr) = val.get("tags").and_then(|v| v.as_sequence())
-                                    {
-                                        tags = arr
-                                            .iter()
-                                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                                            .collect();
-                                    }
-                                }
-                                (
-                                    title,
-                                    assignee,
-                                    effort,
-                                    priority,
-                                    task_type,
-                                    status,
-                                    created,
-                                    modified,
-                                    reporter,
-                                    tags,
-                                    custom_fields,
-                                    relationships,
-                                    comments,
-                                    references,
-                                    sprints,
-                                    history,
-                                )
-                            })();
-                            let dto = crate::api_types::TaskDTO {
-                                id: id.clone(),
-                                title,
-                                status,
-                                priority,
-                                task_type,
-                                reporter,
-                                assignee,
-                                created,
-                                modified,
-                                due_date: None,
-                                effort,
-                                subtitle: None,
-                                description: None,
-                                tags,
-                                relationships,
-                                comments,
-                                references,
-                                sprints,
-                                sprint_order: std::collections::BTreeMap::new(),
-                                history,
-                                custom_fields,
-                            };
-                            matched.push((id, dto));
                         }
+                        if !is_match {
+                            continue;
+                        }
+                        // Build a TaskDTO by tolerantly reading current YAML
+                        let abs_file = tasks_abs_real
+                            .join(&project_folder)
+                            .join(format!("{}.yml", num));
+                        let task = crate::storage::task::parse_task_yaml_tolerant(
+                            &fs::read_to_string(&abs_file).unwrap_or_default(),
+                        )
+                        .unwrap_or_default();
+                        let sprints: Vec<u32> = sprint_lookup
+                            .get(&id)
+                            .map(|orders| orders.keys().copied().collect::<Vec<u32>>())
+                            .unwrap_or_default();
+                        let dto = crate::api_types::TaskDTO {
+                            id: id.clone(),
+                            title: task.title,
+                            status: task.status,
+                            priority: task.priority,
+                            task_type: task.task_type,
+                            reporter: task.reporter,
+                            assignee: task.assignee,
+                            created: task.created,
+                            modified: task.modified,
+                            due_date: task.due_date,
+                            effort: task.effort,
+                            subtitle: task.subtitle,
+                            description: task.description,
+                            tags: task.tags,
+                            relationships: task.relationships,
+                            comments: task.comments,
+                            references: task.references,
+                            sprints,
+                            sprint_order: std::collections::BTreeMap::new(),
+                            history: task.history,
+                            custom_fields: task.custom_fields,
+                        };
+                        matched.push((id, dto));
                     }
                 }
             }
@@ -517,81 +342,8 @@ pub(crate) fn run(
                              key: &str,
                              cfg: &crate::config::types::ResolvedConfig|
      -> Option<Vec<String>> {
-        let raw = key.trim();
-        let k = raw.to_lowercase();
-        // Prefer built-ins first if the key collides
-        if let Some(canon) = crate::utils::fields::is_reserved_field(raw) {
-            match canon {
-                "assignee" => {
-                    return Some(vec![t.assignee.clone().unwrap_or_default()]);
-                }
-                "reporter" => {
-                    return Some(vec![t.reporter.clone().unwrap_or_default()]);
-                }
-                "type" => return Some(vec![t.task_type.to_string()]),
-                "status" => return Some(vec![t.status.to_string()]),
-                "priority" => return Some(vec![t.priority.to_string()]),
-                "project" => {
-                    return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
-                }
-                "tags" => return Some(t.tags.clone()),
-                _ => {}
-            }
-        }
-        if let Some(rest) = k.strip_prefix("field:") {
-            let name = rest.trim();
-            let v = t.custom_fields.get(name)?;
-            return Some(vec![super_key_from_custom(v)]);
-        }
-        // Treat as plain custom field if declared in config or wildcard
-        if cfg.custom_fields.has_wildcard()
-            || cfg
-                .custom_fields
-                .values
-                .iter()
-                .any(|v| v.eq_ignore_ascii_case(raw))
-        {
-            if let Some(v) = t.custom_fields.get(raw) {
-                return Some(vec![super_key_from_custom(v)]);
-            }
-            // case-insensitive fallback
-            let lname = raw.to_lowercase();
-            if let Some((_, v)) = t
-                .custom_fields
-                .iter()
-                .find(|(k, _)| k.to_lowercase() == lname)
-            {
-                return Some(vec![super_key_from_custom(v)]);
-            }
-        }
-        None
+        crate::utils::custom_fields::resolve_task_filter_values(id, t, key, cfg)
     };
-
-    fn super_key_from_custom(v: &crate::types::CustomFieldValue) -> String {
-        #[cfg(feature = "schema")]
-        {
-            match v {
-                serde_json::Value::Null => String::new(),
-                serde_json::Value::Bool(b) => b.to_string(),
-                serde_json::Value::Number(n) => n.to_string(),
-                serde_json::Value::String(s) => s.clone(),
-                serde_json::Value::Array(_) => "[array]".to_string(),
-                serde_json::Value::Object(_) => "{object}".to_string(),
-            }
-        }
-        #[cfg(not(feature = "schema"))]
-        {
-            match v {
-                serde_yaml_ng::Value::Null => String::new(),
-                serde_yaml_ng::Value::Bool(b) => b.to_string(),
-                serde_yaml_ng::Value::Number(n) => n.to_string(),
-                serde_yaml_ng::Value::String(s) => s.clone(),
-                serde_yaml_ng::Value::Sequence(_) => "[array]".to_string(),
-                serde_yaml_ng::Value::Mapping(_) => "{object}".to_string(),
-                _ => "other".to_string(),
-            }
-        }
-    }
 
     // Parse where filters as (key -> allowed set); simple equality only for now
     use std::collections::{BTreeMap, BTreeSet};
@@ -599,27 +351,24 @@ pub(crate) fn run(
     for (k, v) in r#where.into_iter() {
         // Resolve '@me' to current username for assignee filter
         let filter_value = if k.eq_ignore_ascii_case("assignee") && v == "@me" {
-            // Use crate::utils::get_current_username or similar
-            std::env::var("USER").unwrap_or(v)
+            crate::utils::identity::resolve_me_alias(&v, Some(resolver.path.as_path())).unwrap_or(v)
         } else {
             v
         };
         filters.entry(k).or_default().insert(filter_value);
     }
 
+    // Load config once to resolve custom field keys
+    let cfg = crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+
     // Aggregate: keep both time hours and points totals to support unit modes
     let mut agg: BTreeMap<String, (f64, f64, usize)> = BTreeMap::new(); // (hours, points, count)
     for (id, t) in tasks {
         // Apply filters
         let mut passes = true;
-        // Load config once per iteration to resolve custom field keys
-        let cfg_mgr = crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-            &resolver.path,
-        )
-        .map_err(|e| format!("Failed to load config: {}", e))?;
-        let cfg = cfg_mgr.get_resolved_config();
         for (fk, allowed) in &filters {
-            if let Some(vals) = resolve_group_key(&id, &t, fk, cfg)
+            if let Some(vals) = resolve_group_key(&id, &t, fk, &cfg)
                 .map(|vs| vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>())
             {
                 if std::env::var("LOTAR_DEBUG").is_ok() {
@@ -670,12 +419,7 @@ pub(crate) fn run(
 
         // Use literal assignee value for grouping and filtering
         // Config for resolving custom field grouping key
-        let cfg_mgr = crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-            &resolver.path,
-        )
-        .map_err(|e| format!("Failed to load config: {}", e))?;
-        let cfg = cfg_mgr.get_resolved_config();
-        let mut keys = resolve_group_key(&id, &t, by, cfg).unwrap_or_else(|| vec![String::new()]);
+        let mut keys = resolve_group_key(&id, &t, by, &cfg).unwrap_or_else(|| vec![String::new()]);
         if by.trim().to_lowercase() == "assignee"
             && let Some(a) = &t.assignee
         {

@@ -20,6 +20,16 @@ impl SprintLifecycleState {
             SprintLifecycleState::Complete => "complete",
         }
     }
+
+    /// True while a sprint is running (Active) or past its end without
+    /// completion (Overdue) — the "in flight" predicate used by default-sprint
+    /// resolution, velocity windows, and lifecycle helpers.
+    pub fn is_active_or_overdue(&self) -> bool {
+        matches!(
+            self,
+            SprintLifecycleState::Active | SprintLifecycleState::Overdue
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

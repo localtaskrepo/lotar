@@ -9,6 +9,72 @@ pub type PartitionedWhereFilters = (
 use crate::config::types::ResolvedConfig;
 use crate::types::{CustomFields, custom_value_to_string};
 
+/// Task types that can feed filter-value resolution (reserved or custom keys).
+/// Implemented for `TaskDTO` (REST/MCP surfaces) and `Task` (CLI stats/search).
+pub trait TaskFilterSource {
+    /// Values for a reserved field ("assignee", "reporter", "type", "status",
+    /// "priority", "tags"); `None` when the field is not recognized.
+    fn reserved_field_values(&self, field: &str) -> Option<Vec<String>>;
+    fn custom_fields(&self) -> &CustomFields;
+}
+
+impl TaskFilterSource for crate::api_types::TaskDTO {
+    fn reserved_field_values(&self, field: &str) -> Option<Vec<String>> {
+        match field {
+            "assignee" => Some(vec![self.assignee.clone().unwrap_or_default()]),
+            "reporter" => Some(vec![self.reporter.clone().unwrap_or_default()]),
+            "type" => Some(vec![self.task_type.to_string()]),
+            "status" => Some(vec![self.status.to_string()]),
+            "priority" => Some(vec![self.priority.to_string()]),
+            "tags" => Some(self.tags.clone()),
+            _ => None,
+        }
+    }
+    fn custom_fields(&self) -> &CustomFields {
+        &self.custom_fields
+    }
+}
+
+impl TaskFilterSource for crate::storage::task::Task {
+    fn reserved_field_values(&self, field: &str) -> Option<Vec<String>> {
+        match field {
+            "assignee" => Some(vec![self.assignee.clone().unwrap_or_default()]),
+            "reporter" => Some(vec![self.reporter.clone().unwrap_or_default()]),
+            "type" => Some(vec![self.task_type.to_string()]),
+            "status" => Some(vec![self.status.to_string()]),
+            "priority" => Some(vec![self.priority.to_string()]),
+            "tags" => Some(self.tags.clone()),
+            _ => None,
+        }
+    }
+    fn custom_fields(&self) -> &CustomFields {
+        &self.custom_fields
+    }
+}
+
+/// Resolve the comparison values for a reserved or custom filter key against a
+/// task. Single source of truth for REST unknown-key filters, CLI search,
+/// sprint selection, and stats grouping so `@`- and `field:`-handling cannot
+/// drift between surfaces.
+pub fn resolve_task_filter_values<T: TaskFilterSource>(
+    id: &str,
+    task: &T,
+    key: &str,
+    config: &ResolvedConfig,
+) -> Option<Vec<String>> {
+    let raw = key.trim();
+
+    if let Some(canonical) = crate::utils::fields::is_reserved_field(raw) {
+        if canonical == "project" {
+            return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
+        }
+        return task.reserved_field_values(canonical);
+    }
+
+    resolve_filter_name(raw, config)
+        .and_then(|name| extract_value_strings(task.custom_fields(), &name))
+}
+
 /// Determine whether a `--where` key targets a custom field and return the
 /// canonical field name if so.
 pub fn resolve_filter_name(raw_key: &str, config: &ResolvedConfig) -> Option<String> {

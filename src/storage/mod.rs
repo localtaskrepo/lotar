@@ -7,8 +7,6 @@
 // - manager: High-level storage coordination and project management
 // - filter: Task filtering utilities
 // - sprint: Sprint entity definition and helpers
-
-pub mod backend;
 pub mod filter;
 pub mod locator;
 pub mod manager;

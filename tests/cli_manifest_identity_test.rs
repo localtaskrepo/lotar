@@ -16,8 +16,8 @@ issue.priorities: [Low, Medium, High]
 
 #[test]
 fn whoami_uses_project_manifest_author_when_no_default_reporter() {
-    // Use EnvVarGuard; no separate lock_var to avoid double-locking
-
+    // Manifest authors are a last-resort identity source: they must only be
+    // used when neither git identity nor an OS username is available.
     let temp = TempDir::new().unwrap();
     let tasks_dir = temp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
@@ -40,8 +40,22 @@ fn whoami_uses_project_manifest_author_when_no_default_reporter() {
 
     let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
+    // With an OS username present, whoami must prefer it over the manifest.
     crate::common::lotar_cmd()
         .unwrap()
+        .current_dir(temp.path())
+        .args(["whoami"]) // text mode
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            std::env::var("USER").unwrap_or_default(),
+        ));
+
+    // Without git or OS usernames, the manifest author is the only source left.
+    crate::common::lotar_cmd()
+        .unwrap()
+        .env_remove("USER")
+        .env_remove("USERNAME")
         .current_dir(temp.path())
         .args(["whoami"]) // text mode
         .assert()

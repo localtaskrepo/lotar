@@ -2,6 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { nextTick } from 'vue'
 import type { TaskDTO } from '../../api/types'
 import { fromDateInputValue } from '../../utils/date'
+import { projectOf } from '../../utils/text'
 
 export interface TaskPanelFormState {
     id: string
@@ -218,7 +219,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         try {
             const data = await options.apiClient.getTask(id)
             Object.assign(options.task, data)
-            await options.refreshConfig(id.split('-')[0] ?? '')
+            await options.refreshConfig(projectOf(id) || '')
             options.applyTask(data)
             await options.loadCommitHistory(id)
             return data

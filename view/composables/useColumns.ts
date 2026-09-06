@@ -1,4 +1,5 @@
 import { computed, inject, provide, ref, watch, type InjectionKey, type Ref } from 'vue'
+import { storageGetJson, storageSetJson } from '../utils/storage'
 
 export type BuiltinColKey =
     | 'id'
@@ -12,6 +13,7 @@ export type BuiltinColKey =
     | 'tags'
     | 'sprints'
     | 'due_date'
+    | 'created'
     | 'modified'
 
 export type ColKey = BuiltinColKey | `custom:${string}`
@@ -58,32 +60,17 @@ const BUILTIN_LABELS: Record<BuiltinColKey, string> = {
     tags: 'Tags',
     sprints: 'Sprints',
     due_date: 'Due',
+    created: 'Created',
     modified: 'Updated',
 }
 
 export interface UseColumnsOptions {
     storagePrefix?: string
     defaultVisible?: (ColKey | string)[]
-}
-
-function readJson<T>(key: string): T | null {
-    try {
-        const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null
-        if (!raw) return null
-        return JSON.parse(raw) as T
-    } catch {
-        return null
-    }
-}
-
-function writeJson(key: string, value: unknown) {
-    try {
-        if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(key, JSON.stringify(value))
-        }
-    } catch {
-        // ignore quota / availability errors
-    }
+    /** Builtin (non-custom) columns offered by this store; defaults to all builtins. */
+    builtinColumns?: BuiltinColKey[]
+    /** Whether shared custom fields appear as columns; defaults to true. */
+    includeCustomFields?: boolean
 }
 
 function isCustomKey(key: string): key is `custom:${string}` {
@@ -157,7 +144,11 @@ export interface ColumnStore {
 export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     const storagePrefix = options.storagePrefix ?? 'lotar.taskTable'
     const defaultVisible: (ColKey | string)[] = options.defaultVisible ?? DEFAULT_VISIBLE
-    const customFieldKeys = sharedCustomFieldKeys
+    const builtinColumns: BuiltinColKey[] = options.builtinColumns ?? BUILTIN_COLUMNS
+    const includeCustomFields = options.includeCustomFields ?? true
+    const customFieldKeys = includeCustomFields
+        ? sharedCustomFieldKeys
+        : ref<string[]>([])
 
     const showColumnMenu = ref(false)
     const projectKey = ref('')
@@ -179,11 +170,11 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
         const customs = customFieldKeys.value
             .filter(isCustomFieldName)
             .map((k) => `custom:${k}` as ColKey)
-        return [...BUILTIN_COLUMNS, ...customs]
+        return [...builtinColumns, ...customs]
     }
 
     function isAllowedKey(key: string): boolean {
-        if (!BUILTIN_COLUMNS.includes(key as BuiltinColKey)) {
+        if (!builtinColumns.includes(key as BuiltinColKey)) {
             if (!isCustomKey(key)) return false
             return customFieldKeys.value.includes(key.slice('custom:'.length))
         }
@@ -240,13 +231,13 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
     function loadForProject(pk: string) {
         loading = true
         try {
-            let stored = readJson<unknown>(storageKeyFor(pk))
+            let stored = storageGetJson<unknown>(storageKeyFor(pk))
             if (stored === null) {
                 // Migrate the legacy boolean-map format written by earlier versions.
-                stored = readJson<unknown>(storageKeyForLegacy(pk))
+                stored = storageGetJson<unknown>(storageKeyForLegacy(pk))
             }
             columns.value = normalizeVisible(stored)
-            columnOrder.value = normalizeColumnOrder(readJson<unknown>(storageKeyForOrder(pk)))
+            columnOrder.value = normalizeColumnOrder(storageGetJson<unknown>(storageKeyForOrder(pk)))
         } finally {
             loading = false
         }
@@ -254,8 +245,8 @@ export function useColumns(options: UseColumnsOptions = {}): ColumnStore {
 
     function writeForProject() {
         if (loading) return
-        writeJson(storageKeyFor(projectKey.value), columns.value)
-        writeJson(storageKeyForOrder(projectKey.value), columnOrder.value)
+        storageSetJson(storageKeyFor(projectKey.value), columns.value)
+        storageSetJson(storageKeyForOrder(projectKey.value), columnOrder.value)
     }
 
     watch(projectKey, (pk) => loadForProject(pk), { flush: 'sync' })

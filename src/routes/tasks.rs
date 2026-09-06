@@ -108,211 +108,27 @@ match TaskService::create(&mut storage, req_create) {
         Err(msg) => return bad_request(msg),
     };
     // Load config for validation of status/priority/type
-    let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
+    let cfg = match crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return internal(
+                json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
+            );
+        }
     };
-let cfg = cfg_mgr.get_resolved_config();
 
-    // Helpers to parse comma-separated values and validate
-let parse_list = |key: &str| -> Vec<String> {
-        req.query
-            .get(key)
-            .map(|s| s.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect())
-            .unwrap_or_default()
+    // Build filter + unknown-key map from query
+    let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
+        Ok(v) => v,
+        Err(msg) => return bad_request(msg),
     };
-    let mut statuses = Vec::new();
-    for s in parse_list("status") {
-        match crate::types::TaskStatus::parse_with_config(&s, cfg) {
-            Ok(v) => statuses.push(v),
-            Err(msg) => return bad_request(msg),
-        }
-    }
-    let mut priorities = Vec::new();
-    for s in parse_list("priority") {
-        match crate::types::Priority::parse_with_config(&s, cfg) {
-            Ok(v) => priorities.push(v),
-            Err(msg) => return bad_request(msg),
-        }
-    }
-    let mut types_vec = Vec::new();
-    for s in parse_list("type") {
-        match crate::types::TaskType::parse_with_config(&s, cfg) {
-            Ok(v) => types_vec.push(v),
-            Err(msg) => return bad_request(msg),
-        }
-    }
-
-    // Build filter from query
-    let mut filter = crate::api_types::TaskListFilter {
-        status: statuses,
-        priority: priorities,
-        task_type: types_vec,
-        project: req.query.get("project").cloned(),
-        tags: req
-            .query
-            .get("tags")
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default(),
-        text_query: req.query.get("q").cloned(),
-        sprints: req
-            .query
-            .get("sprints")
-            .map(|s| {
-                s.split(',')
-                    .filter_map(|p| p.trim().parse::<u32>().ok())
-                    .collect()
-            })
-            .unwrap_or_default(),
-        custom_fields: BTreeMap::new(),
-    };
-    // API parity: accept additional query keys (built-ins or declared custom fields)
-    // Build filters map from unknown keys and assignee
-    let mut uf: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let known = [
-        "project",
-        "status",
-        "priority",
-        "type",
-        "tags",
-        "sprints",
-        "q",
-        "assignee",
-        "order",
-        "limit",
-        "offset",
-        "page_size",
-        "per_page",
-        "due",
-        "recent",
-        "needs",
-    ];
-    // Assignee (supports @me; __none__ means unassigned)
-    let mut wants_unassigned = false;
-    if let Some(a) = req.query.get("assignee") {
-        if a == "__none__" {
-            wants_unassigned = true;
-        } else {
-            let resolved = if a == "@me" {
-                crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()))
-                    .unwrap_or_else(|| a.clone())
-            } else {
-                a.clone()
-            };
-            // Normalize: strip @ prefix from regular names for consistent matching.
-            let v = crate::utils::member::normalize_member_value(&resolved, |name| {
-                cfg.agent_profiles.contains_key(name)
-            });
-            uf.entry("assignee".into()).or_default().insert(v);
-        }
-    }
-    // Other keys
-    for (k, v) in req.query.iter() {
-        if known.contains(&k.as_str()) || k == "assignee" {
-            continue;
-        }
-        // CSV allowed
-        for part in v.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-            if let Some(name) =
-                crate::utils::custom_fields::resolve_filter_name(k, cfg)
-            {
-                filter
-                    .custom_fields
-                    .entry(name)
-                    .or_default()
-                    .push(part.to_string());
-            } else {
-                uf.entry(k.clone()).or_default().insert(part.to_string());
-            }
-        }
-    }
 
     let tasks = TaskService::list(&storage, &filter);
 
     // Apply in-memory filters if any
     let mut tasks = tasks; // shadow mutable
-    if !uf.is_empty() {
-        let resolve_vals = |id: &str,
-                            t: &crate::api_types::TaskDTO,
-                            key: &str,
-                            cfg: &crate::config::types::ResolvedConfig|
-         -> Option<Vec<String>> {
-            let raw = key.trim();
-            let k = raw.to_lowercase();
-            if let Some(canon) = crate::utils::fields::is_reserved_field(raw) {
-                match canon {
-                    "assignee" => {
-                        let v = t.assignee.as_deref().unwrap_or("");
-                        return Some(vec![v.trim_start_matches('@').to_string()]);
-                    }
-                    "reporter" => {
-                        let v = t.reporter.as_deref().unwrap_or("");
-                        return Some(vec![v.trim_start_matches('@').to_string()]);
-                    }
-                    "type" => return Some(vec![t.task_type.to_string()]),
-                    "status" => return Some(vec![t.status.to_string()]),
-                    "priority" => return Some(vec![t.priority.to_string()]),
-                    "project" => {
-                        return Some(vec![id.split('-').next().unwrap_or("").to_string()])
-                    }
-                    "tags" => return Some(t.tags.clone()),
-                    _ => {}
-                }
-            }
-            if let Some(rest) = k.strip_prefix("field:") {
-                let name = rest.trim();
-                let v = t.custom_fields.get(name)?;
-                return Some(vec![crate::types::custom_value_to_string(v)]);
-            }
-            if cfg.custom_fields.has_wildcard()
-                || cfg
-                    .custom_fields
-                    .values
-                    .iter()
-                    .any(|v| v.eq_ignore_ascii_case(raw))
-            {
-                if let Some(vv) = t.custom_fields.get(raw) {
-                    return Some(vec![crate::types::custom_value_to_string(vv)]);
-                }
-                let lname = raw.to_lowercase();
-                if let Some((_, vv)) = t
-                    .custom_fields
-                    .iter()
-                    .find(|(k, _)| k.to_lowercase() == lname)
-                {
-                    return Some(vec![crate::types::custom_value_to_string(vv)]);
-                }
-            }
-            None
-        };
-
-        tasks.retain(|(id, t)| {
-            for (fk, allowed) in &uf {
-                let vals = match resolve_vals(id, t, fk, cfg) {
-                    Some(vs) => vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>(),
-                    None => return false,
-                };
-                if vals.is_empty() {
-                    return false;
-                }
-                let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
-                if !crate::utils::fuzzy_match::fuzzy_set_match(&vals, &allowed_vec) {
-                    return false;
-                }
-            }
-            true
-        });
-    }
-
-    if wants_unassigned {
-        tasks.retain(|(_, task)| {
-            task.assignee
-                .as_deref()
-                .unwrap_or("")
-                .trim()
-                .is_empty()
-        });
-    }
+    apply_unknown_key_filters(&mut tasks, &uf, &cfg);
 
     let due = req.query.get("due").map(|s| s.as_str()).unwrap_or("");
     let recent = req.query.get("recent").map(|s| s.as_str()).unwrap_or("");
@@ -433,72 +249,22 @@ let parse_list = |key: &str| -> Vec<String> {
         Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
     };
     let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
+    let cfg = match crate::config::resolution::load_and_merge_configs(Some(resolver.path.as_path()))
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return internal(
+                json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}}),
+            );
+        }
     };
-    let cfg = cfg_mgr.get_resolved_config();
 
-    let parse_list = |key: &str| -> Vec<String> {
-        req.query
-            .get(key)
-            .map(|s| s.split(',').map(|p| p.trim().to_string()).filter(|p| !p.is_empty()).collect())
-            .unwrap_or_default()
+    let (filter, uf) = match parse_task_query(&req.query, &cfg, resolver.path.as_path()) {
+        Ok(v) => v,
+        Err(msg) => return bad_request(msg),
     };
-    let mut statuses = Vec::new();
-    for s in parse_list("status") {
-        match crate::types::TaskStatus::parse_with_config(&s, cfg) {
-            Ok(v) => statuses.push(v),
-            Err(msg) => return bad_request(msg),
-        }
-    }
-    let mut priorities = Vec::new();
-    for s in parse_list("priority") {
-        match crate::types::Priority::parse_with_config(&s, cfg) {
-            Ok(v) => priorities.push(v),
-            Err(msg) => return bad_request(msg),
-        }
-    }
-    let mut types_vec = Vec::new();
-    for s in parse_list("type") {
-        match crate::types::TaskType::parse_with_config(&s, cfg) {
-            Ok(v) => types_vec.push(v),
-            Err(msg) => return bad_request(msg),
-        }
-    }
-
-    let mut filter = crate::api_types::TaskListFilter {
-        status: statuses,
-        priority: priorities,
-        task_type: types_vec,
-        project: req.query.get("project").cloned(),
-        tags: req
-            .query
-            .get("tags")
-            .map(|s| s.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default(),
-        text_query: req.query.get("q").cloned(),
-        sprints: vec![],
-        custom_fields: BTreeMap::new(),
-    };
-    let known = ["project", "status", "priority", "type", "tags", "q"];
-    for (k, v) in req.query.iter() {
-        if known.contains(&k.as_str()) {
-            continue;
-        }
-        for part in v.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
-            if let Some(name) =
-                crate::utils::custom_fields::resolve_filter_name(k, cfg)
-            {
-                filter
-                    .custom_fields
-                    .entry(name)
-                    .or_default()
-                    .push(part.to_string());
-            }
-        }
-    }
-    let tasks = TaskService::list(&storage, &filter);
+    let mut tasks = TaskService::list(&storage, &filter);
+    apply_unknown_key_filters(&mut tasks, &uf, &cfg);
 
     // Build CSV (quoted where needed)
     fn esc(s: &str) -> String {
@@ -1233,53 +999,19 @@ let parse_list = |key: &str| -> Vec<String> {
         if trimmed.is_empty() {
             return bad_request("Missing text".into());
         }
-        let project_prefix = id.split('-').next().unwrap_or("").to_string();
-        let mut task = match storage.get(&id, &project_prefix) {
-            Some(t) => t,
-            None => return not_found(format!("Task '{}' not found", id)),
-        };
-        if index >= task.comments.len() {
-            return bad_request("Invalid comment index".into());
-        }
-        let previous = task.comments[index].text.clone();
-        if previous == trimmed {
-            let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
-                Ok(dto) => dto,
-                Err(err) => {
-                    return internal(
-                        json!({"error": {"code": "INTERNAL", "message": err.to_string()}}),
-                    );
-                }
-            };
-            return ok_json(200, json!({"data": dto}));
-        }
-        let new_text = trimmed.to_string();
-        task.comments[index].text = new_text.clone();
-        let now = chrono::Utc::now().to_rfc3339();
-        task.history.push(crate::types::TaskChangeLogEntry {
-            at: now.clone(),
-            actor: crate::utils::identity::resolve_current_user(Some(resolver.path.as_path())),
-            changes: vec![crate::types::TaskChange {
-                field: format!("comment#{}", index + 1),
-                old: Some(previous),
-                new: Some(new_text.clone()),
-            }],
-        });
-        task.modified = now;
-        if let Err(err) = storage.edit(&id, &task) {
-            return internal(json!({
-                "error": {
-                    "code": "INTERNAL",
-                    "message": err.to_string(),
-                }
-            }));
-        }
-        let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+        let dto = match TaskService::update_comment(&mut storage, &id, index, trimmed) {
             Ok(dto) => dto,
             Err(err) => {
-                return internal(
-                    json!({"error": {"code": "INTERNAL", "message": err.to_string()}}),
-                );
+                let msg = err.to_string();
+                if msg.contains("not found") {
+                    return not_found(format!("Task '{}' not found", id));
+                }
+                if msg.contains("Invalid comment index") {
+                    return bad_request("Invalid comment index".into());
+                }
+                return internal(json!({
+                    "error": { "code": "INTERNAL", "message": msg }
+                }));
             }
         };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));

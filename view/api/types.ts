@@ -224,7 +224,9 @@ export interface TaskListFilter {
   project?: string
   tags?: string[]
   q?: string
-  assignee?: string
+  /** Any-of assignee equality filter; `__none__` requests unassigned tasks. */
+  assignee?: string | string[]
+  assignee_none?: boolean
   sprints?: number[]
   custom_fields?: Record<string, string | string[]>
   [key: string]: any

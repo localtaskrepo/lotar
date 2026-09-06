@@ -448,8 +448,33 @@ pub struct TaskListFilter {
     pub tags: Vec<String>,
     pub text_query: Option<String>,
     pub sprints: Vec<u32>,
+    /// Assignee equality filter (any-of, `member_for_comparison` semantics).
+    /// `@me` is expected to be resolved by the caller. Deserializes from
+    /// either a single string (legacy wire shape) or an array.
+    #[serde(default, deserialize_with = "deserialize_string_or_vec")]
+    pub assignee: Vec<String>,
+    /// Keep only tasks with no assignee (`__none__`).
+    #[serde(default)]
+    pub assignee_none: bool,
     #[serde(default)]
     pub custom_fields: BTreeMap<String, Vec<String>>,
+}
+
+fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum StringOrVec {
+        Str(String),
+        Vec(Vec<String>),
+    }
+    match StringOrVec::deserialize(d)? {
+        StringOrVec::Str(s) if s.is_empty() => Ok(Vec::new()),
+        StringOrVec::Str(s) => Ok(vec![s]),
+        StringOrVec::Vec(v) => Ok(v),
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -74,7 +74,3 @@ export function withAlpha(hex: string, alpha: number): string {
 export function darken(hex: string, amount: number): string {
     return mixHex(hex, '#000000', amount)
 }
-
-export function lighten(hex: string, amount: number): string {
-    return mixHex(hex, '#ffffff', amount)
-}

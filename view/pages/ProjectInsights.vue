@@ -277,6 +277,7 @@ import { useActivity } from '../composables/useActivity'
 import { useProjects } from '../composables/useProjects'
 import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
+import { useSuggestList } from '../composables/useSuggestList'
 import { formatMember } from '../utils/member'
 import { formatProjectLabel } from '../utils/projectLabels'
 
@@ -314,7 +315,6 @@ const tagFilters = computed<string[]>(() => parseTagInput(tagFilterInput.value))
 const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map(tag => normaliseTag(tag)))
 
 const tagInputFocused = ref(false)
-const tagActiveIndex = ref(-1)
 let tagBlurTimer: ReturnType<typeof setTimeout> | null = null
 const TAG_SUGGESTION_LIMIT = 8
 
@@ -355,20 +355,18 @@ const activeTagQuery = computed(() => {
   return (current ?? '').trim()
 })
 
-const tagSuggestionList = computed(() => {
-  const base = availableTagSuggestions.value
-  if (!tagInputFocused.value || !base.length) return [] as string[]
-  const query = activeTagQuery.value.toLowerCase()
-  if (!query) return base.slice(0, TAG_SUGGESTION_LIMIT)
-  return base.filter(tag => tag.toLowerCase().includes(query)).slice(0, TAG_SUGGESTION_LIMIT)
+const {
+  activeIndex: tagActiveIndex,
+  list: tagSuggestionList,
+  entries: tagSuggestionEntries,
+  visible: tagSuggestionsVisible,
+  handleKeydown: handleTagSuggestKeydown,
+} = useSuggestList({
+  candidates: availableTagSuggestions,
+  query: () => activeTagQuery.value,
+  active: () => tagInputFocused.value,
+  limit: TAG_SUGGESTION_LIMIT,
 })
-
-const tagSuggestionsVisible = computed(() => tagInputFocused.value && tagSuggestionList.value.length > 0)
-
-const tagSuggestionEntries = computed(() => tagSuggestionList.value.map(tag => ({
-  value: tag,
-  parts: highlightTagSuggestion(tag, activeTagQuery.value),
-})))
 
 const activityChartHost = ref<HTMLElement | null>(null)
 const activityChartWidth = ref(640)
@@ -397,10 +395,6 @@ watch(activityChartHost, el => {
     updateActivityChartWidth()
   }
 })
-watch(tagSuggestionList, list => {
-  tagActiveIndex.value = list.length ? 0 : -1
-})
-
 const projectDisplayName = computed(() => {
   if (!selectedProject.value) return 'All projects'
   const project = projects.value.find(p => p.prefix === selectedProject.value)
@@ -607,34 +601,18 @@ function onTagFilterInput() {
 }
 
 function onTagFilterKeydown(event: KeyboardEvent) {
-  const suggestions = tagSuggestionList.value
-  if (event.key === 'ArrowDown') {
-    if (!suggestions.length) return
-    event.preventDefault()
-    tagActiveIndex.value = (tagActiveIndex.value + 1 + suggestions.length) % suggestions.length
-  } else if (event.key === 'ArrowUp') {
-    if (!suggestions.length) return
-    event.preventDefault()
-    tagActiveIndex.value = (tagActiveIndex.value - 1 + suggestions.length) % suggestions.length
-  } else if (event.key === 'Enter') {
-    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
-    if (active) {
-      event.preventDefault()
-      selectTagSuggestion(active)
-      return
-    }
-    event.preventDefault()
-    applyTagFilters(parseTagInput(tagFilterInput.value))
-  } else if (event.key === 'Tab') {
-    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
-    if (active) {
-      selectTagSuggestion(active)
-      event.preventDefault()
-    }
-  } else if (event.key === 'Escape') {
-    tagActiveIndex.value = -1
-    tagInputFocused.value = false
-  }
+  handleTagSuggestKeydown(event, {
+    onCommit: (active) => {
+      if (active !== undefined) {
+        selectTagSuggestion(active)
+      } else {
+        applyTagFilters(parseTagInput(tagFilterInput.value))
+      }
+    },
+    onEscape: () => {
+      tagInputFocused.value = false
+    },
+  })
 }
 
 function currentTagTokens() {
@@ -651,33 +629,6 @@ function selectTagSuggestion(tag: string) {
   const base = currentTagTokens()
   applyTagFilters([...base, tag])
   tagActiveIndex.value = tagSuggestionList.value.length ? 0 : -1
-}
-
-function highlightTagSuggestion(tag: string, query: string) {
-  if (!query) {
-    return [{ text: tag, match: false }] as Array<{ text: string; match: boolean }>
-  }
-  const lowerTag = tag.toLowerCase()
-  const lowerQuery = query.toLowerCase()
-  const segments: Array<{ text: string; match: boolean }> = []
-  let searchStart = 0
-  let matchIndex = lowerTag.indexOf(lowerQuery)
-  if (matchIndex === -1) {
-    return [{ text: tag, match: false }]
-  }
-  while (matchIndex !== -1) {
-    if (matchIndex > searchStart) {
-      segments.push({ text: tag.slice(searchStart, matchIndex), match: false })
-    }
-    const matchEnd = matchIndex + lowerQuery.length
-    segments.push({ text: tag.slice(matchIndex, matchEnd), match: true })
-    searchStart = matchEnd
-    matchIndex = lowerTag.indexOf(lowerQuery, searchStart)
-  }
-  if (searchStart < tag.length) {
-    segments.push({ text: tag.slice(searchStart), match: false })
-  }
-  return segments
 }
 
 function openDueFilter(key: string) {

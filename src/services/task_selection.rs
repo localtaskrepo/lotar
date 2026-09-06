@@ -74,26 +74,7 @@ fn resolve_values(
     key: &str,
     config: &ResolvedConfig,
 ) -> Option<Vec<String>> {
-    let raw = key.trim();
-
-    if let Some(canonical) = crate::utils::fields::is_reserved_field(raw) {
-        return match canonical {
-            "assignee" => Some(vec![task.assignee.clone().unwrap_or_default()]),
-            "reporter" => Some(vec![task.reporter.clone().unwrap_or_default()]),
-            "type" => Some(vec![task.task_type.to_string()]),
-            "status" => Some(vec![task.status.to_string()]),
-            "priority" => Some(vec![task.priority.to_string()]),
-            "project" => Some(vec![id.split('-').next().unwrap_or("").to_string()]),
-            "tags" => Some(task.tags.clone()),
-            _ => None,
-        };
-    }
-
-    if let Some(name) = crate::utils::custom_fields::resolve_filter_name(raw, config) {
-        return crate::utils::custom_fields::extract_value_strings(&task.custom_fields, &name);
-    }
-
-    None
+    crate::utils::custom_fields::resolve_task_filter_values(id, task, key, config)
 }
 
 #[cfg(test)]

@@ -2,11 +2,10 @@ use crate::types::{
     CustomFields, Priority, ReferenceEntry, TaskComment, TaskRelationships, TaskStatus, TaskType,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Task {
     // Built-in standard fields (special handling in UI)
     // Note: ID is no longer stored in file - it's derived from folder+filename
@@ -67,29 +66,11 @@ pub struct Task {
 
 impl Task {
     pub fn new(_root_path: PathBuf, title: String, priority: Priority) -> Self {
-        let now = chrono::Utc::now().to_rfc3339();
-
         Self {
             title,
-            status: TaskStatus::default(),
             priority,
-            task_type: TaskType::default(),
-            reporter: None,
-            assignee: None,
-            created: now,
-            modified: String::new(),
-            due_date: None,
-            effort: None,
-            acceptance_criteria: vec![],
-            relationships: TaskRelationships::default(),
-            comments: vec![],
-            references: vec![],
-            sprints: vec![],
-            subtitle: None,
-            description: None,
-            tags: vec![],
-            custom_fields: HashMap::new(),
-            history: vec![],
+            created: chrono::Utc::now().to_rfc3339(),
+            ..Self::default()
         }
     }
 }
@@ -110,4 +91,133 @@ impl fmt::Display for Task {
             self.tags
         )
     }
+}
+
+// ── Tolerant parsing ────────────────────────────────────────────────────────
+//
+// Shared helpers for reading task YAML that may not fully satisfy the strict
+// `Task` deserialization (e.g. mixed-case enum values written by other tools).
+// Strict parse first; on failure, read fields from a generic YAML value and
+// normalize enums case-insensitively.
+
+fn tolerant_status(s: &str) -> Option<TaskStatus> {
+    let norm = s.trim().to_ascii_lowercase().replace(['_', '-'], "");
+    match norm.as_str() {
+        "todo" => Some(TaskStatus::from("Todo")),
+        "inprogress" => Some(TaskStatus::from("InProgress")),
+        "verify" => Some(TaskStatus::from("Verify")),
+        "blocked" => Some(TaskStatus::from("Blocked")),
+        "done" => Some(TaskStatus::from("Done")),
+        _ => s.parse().ok(),
+    }
+}
+
+fn tolerant_priority(s: &str) -> Option<Priority> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "low" => Some(Priority::from("Low")),
+        "medium" => Some(Priority::from("Medium")),
+        "high" => Some(Priority::from("High")),
+        "critical" => Some(Priority::from("Critical")),
+        _ => s.parse().ok(),
+    }
+}
+
+fn tolerant_task_type(s: &str) -> Option<TaskType> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "feature" => Some(TaskType::from("Feature")),
+        "bug" => Some(TaskType::from("Bug")),
+        "epic" => Some(TaskType::from("Epic")),
+        "spike" => Some(TaskType::from("Spike")),
+        "chore" => Some(TaskType::from("Chore")),
+        _ => s.parse().ok(),
+    }
+}
+
+/// Tolerantly extract just the `status` field from task YAML content.
+pub fn parse_status_from_yaml(content: &str) -> Option<TaskStatus> {
+    if let Ok(task) = serde_yaml_ng::from_str::<Task>(content) {
+        return Some(task.status);
+    }
+    let val: serde_yaml_ng::Value = serde_yaml_ng::from_str(content).ok()?;
+    let s = val.get("status")?.as_str()?;
+    tolerant_status(s)
+}
+
+/// Tolerantly parse task YAML into a `Task`.
+///
+/// Strict deserialization first; on failure a generic YAML value is read
+/// field-by-field with case-insensitive enum normalization. Structured
+/// collections (comments, relationships, …) are left empty in the fallback
+/// path — callers use this for read-only aggregation/reporting.
+pub fn parse_task_yaml_tolerant(content: &str) -> Option<Task> {
+    if let Ok(task) = serde_yaml_ng::from_str::<Task>(content) {
+        return Some(task);
+    }
+
+    let v: serde_yaml_ng::Value = serde_yaml_ng::from_str(content).ok()?;
+    let get_str =
+        |k: &str| -> Option<String> { v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string()) };
+    let get_vec_str = |k: &str| -> Vec<String> {
+        v.get(k)
+            .and_then(|x| x.as_sequence())
+            .map(|seq| {
+                seq.iter()
+                    .filter_map(|e| e.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let title = get_str("title").unwrap_or_default();
+    let status = get_str("status")
+        .and_then(|s| tolerant_status(&s))
+        .unwrap_or_default();
+    let priority = get_str("priority")
+        .and_then(|s| tolerant_priority(&s))
+        .unwrap_or_default();
+    let task_type = get_str("task_type")
+        .or_else(|| get_str("type"))
+        .and_then(|s| tolerant_task_type(&s))
+        .unwrap_or_default();
+    let reporter = get_str("reporter");
+    let assignee = get_str("assignee");
+    let created = get_str("created").unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
+    let modified = get_str("modified").unwrap_or_default();
+    let due_date = get_str("due_date");
+    let effort = get_str("effort");
+    let subtitle = get_str("subtitle");
+    let description = get_str("description");
+    let tags = get_vec_str("tags");
+    let acceptance_criteria = get_vec_str("acceptance_criteria");
+
+    let custom_fields = v
+        .get("custom_fields")
+        .and_then(|x| x.as_mapping())
+        .and_then(|m| {
+            serde_yaml_ng::from_value::<CustomFields>(serde_yaml_ng::Value::Mapping(m.clone())).ok()
+        })
+        .unwrap_or_default();
+
+    Some(Task {
+        title,
+        status,
+        priority,
+        task_type,
+        reporter,
+        assignee,
+        created,
+        modified,
+        due_date,
+        effort,
+        acceptance_criteria,
+        relationships: TaskRelationships::default(),
+        comments: vec![],
+        references: vec![],
+        sprints: vec![],
+        subtitle,
+        description,
+        tags,
+        custom_fields,
+        history: vec![],
+    })
 }

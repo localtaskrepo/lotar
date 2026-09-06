@@ -304,7 +304,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import FilterBar from '../components/FilterBar.vue'
@@ -319,6 +319,8 @@ import UiLoader from '../components/UiLoader.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
 import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { MS_PER_DAY } from '../utils/date'
+import { storageGet, storageGetJson, storageSet, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
@@ -328,7 +330,6 @@ import { parseTaskDate, startOfLocalDay } from '../utils/date'
 import { formatMember, memberColor, memberInitials } from '../utils/member'
 import { findLastStatusChangeAt } from '../utils/taskHistory'
 
-const router = useRouter()
 const route = useRoute()
 const { projects, refresh: refreshProjects } = useProjects()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig } = useConfig()
@@ -350,7 +351,7 @@ const filterPayload = computed(() => ({
   project: project.value || '',
 }))
 const { hasFilters, sanitizeFilterInput, onFilterUpdate, clearFilters: clearFiltersAction } = useProjectFilterSync(project, filter, {
-  onProjectChange: syncProjectRoute,
+  routePath: '/boards',
 })
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
@@ -362,14 +363,12 @@ const sprintFilterOptions = useSprintFilterOptions(sprints)
 type GroupByMode = 'none' | 'assignee' | 'priority' | 'type'
 function groupByKey() { return project.value ? `lotar.boardGroupBy::${project.value}` : 'lotar.boardGroupBy' }
 function loadGroupBy(): GroupByMode {
-  try {
-    const v = localStorage.getItem(groupByKey())
-    if (v === 'assignee' || v === 'priority' || v === 'type') return v
-  } catch {}
+  const v = storageGet(groupByKey())
+  if (v === 'assignee' || v === 'priority' || v === 'type') return v
   return 'none'
 }
 const groupBy = ref<GroupByMode>(loadGroupBy())
-function saveGroupBy() { try { localStorage.setItem(groupByKey(), groupBy.value) } catch {} }
+function saveGroupBy() { storageSet(groupByKey(), groupBy.value) }
 
 // -- Initial loading (only shows spinner before first data arrives) --------
 const hasEverLoaded = ref(false)
@@ -394,7 +393,6 @@ function visibleLimit(st: string): number { return columnExpansion.value[st] || 
 function showMore(st: string) { columnExpansion.value = { ...columnExpansion.value, [st]: visibleLimit(st) + COLUMN_PAGE_SIZE } }
 function resetExpansion() { columnExpansion.value = {} }
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function startOfDay(date: Date) {
   return startOfLocalDay(date)
@@ -494,13 +492,6 @@ function hasTaskIdentity(task: TaskDTO): boolean {
     (boardFields.isVisible('id') && (task.id || '').trim())
     || (boardFields.isVisible('title') && (task.title || '').trim())
   )
-}
-
-function syncProjectRoute(nextProject: string) {
-  const desired = nextProject || ''
-  const current = typeof route.query.project === 'string' ? route.query.project : ''
-  if (current === desired) return
-  router.push({ path: '/boards', query: desired ? { project: desired } : {} })
 }
 
 const hasDoneFilters = computed(() => {
@@ -700,13 +691,10 @@ const gridStyle = computed(() => ({
 const wipLimits = ref<Record<string, number>>({})
 function wipKey(){ return project.value ? `lotar.wip::${project.value}` : 'lotar.wip' }
 function loadWip(){
-  try {
-    const raw = localStorage.getItem(wipKey())
-    const obj = raw ? JSON.parse(raw) : {}
-    wipLimits.value = (obj && typeof obj === 'object') ? obj : {}
-  } catch { wipLimits.value = {} }
+  const obj = storageGetJson<Record<string, number>>(wipKey())
+  wipLimits.value = (obj && typeof obj === 'object') ? obj : {}
 }
-function saveWip(){ try { localStorage.setItem(wipKey(), JSON.stringify(wipLimits.value || {})) } catch {} }
+function saveWip(){ storageSetJson(wipKey(), wipLimits.value || {}) }
 function limitOf(st: string): number { const v = (wipLimits.value || {})[st]; return (typeof v === 'number' && v > 0) ? v : 0 }
 function countOf(st: string): number { return (grouped.value[st]?.length || 0) }
 function overLimit(st: string): boolean { const lim = limitOf(st); return lim > 0 && countOf(st) > lim }
@@ -727,30 +715,23 @@ const doneFilters = ref<DoneFilterSettings>({ statuses: [], maxAgeDays: null, ma
 function doneFilterKey(){ return project.value ? `lotar.doneFilters::${project.value}` : 'lotar.doneFilters' }
 
 function loadDoneFilters(){
-  try {
-    const raw = localStorage.getItem(doneFilterKey())
-    if (!raw) {
-      doneFilters.value = { statuses: [], maxAgeDays: null, maxVisible: null }
-      return
-    }
-    const parsed = JSON.parse(raw)
-    const statuses = Array.isArray(parsed?.statuses) ? parsed.statuses.filter((label: unknown) => typeof label === 'string') : []
-    const age = Number(parsed?.maxAgeDays)
-    const limit = Number(parsed?.maxVisible)
-    doneFilters.value = {
-      statuses,
-      maxAgeDays: Number.isFinite(age) && age > 0 ? age : null,
-      maxVisible: Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null,
-    }
-  } catch {
+  const parsed = storageGetJson<{ statuses?: unknown; maxAgeDays?: unknown; maxVisible?: unknown }>(doneFilterKey())
+  if (!parsed) {
     doneFilters.value = { statuses: [], maxAgeDays: null, maxVisible: null }
+    return
+  }
+  const statuses = Array.isArray(parsed?.statuses) ? parsed.statuses.filter((label: unknown) => typeof label === 'string') : []
+  const age = Number(parsed?.maxAgeDays)
+  const limit = Number(parsed?.maxVisible)
+  doneFilters.value = {
+    statuses,
+    maxAgeDays: Number.isFinite(age) && age > 0 ? age : null,
+    maxVisible: Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : null,
   }
 }
 
 function saveDoneFilters(){
-  try {
-    localStorage.setItem(doneFilterKey(), JSON.stringify(doneFilters.value))
-  } catch {}
+  storageSetJson(doneFilterKey(), doneFilters.value)
 }
 
 function doneStatusSelected(label: string){

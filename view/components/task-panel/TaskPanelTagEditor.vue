@@ -117,11 +117,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import IconGlyph from '../IconGlyph.vue'
 import UiButton from '../UiButton.vue'
 import UiCard from '../UiCard.vue'
 import UiInput from '../UiInput.vue'
+import { useSuggestList } from '../../composables/useSuggestList'
 
 const props = defineProps<{
   tags: string[]
@@ -137,7 +138,6 @@ const emit = defineEmits<{
 
 const tagsInput = ref('')
 const tagHint = ref('')
-const tagActiveIndex = ref(-1)
 const composerActive = ref(false)
 const tagDialogOpen = ref(false)
 const tagDialogInputRef = ref<{ focus: () => void } | null>(null)
@@ -158,27 +158,18 @@ const availableTags = computed(() => {
   return tagCandidates.value.filter((tag) => !lowerExisting.has(tag.toLowerCase()))
 })
 
-const tagSuggestionList = computed(() => {
-  const base = availableTags.value
-  if (!base.length) return [] as string[]
-  const query = tagsInput.value.trim().toLowerCase()
-  if (!composerActive.value && !query) {
-    return []
-  }
-  if (!query) {
-    return base.slice(0, TAG_SUGGESTION_LIMIT)
-  }
-  return base.filter((tag) => tag.toLowerCase().includes(query)).slice(0, TAG_SUGGESTION_LIMIT)
+const {
+  activeIndex: tagActiveIndex,
+  list: tagSuggestionList,
+  entries: tagSuggestionEntries,
+  visible: tagSuggestionsVisible,
+  handleKeydown: handleTagSuggestKeydown,
+} = useSuggestList({
+  candidates: availableTags,
+  query: () => tagsInput.value,
+  active: () => composerActive.value,
+  limit: TAG_SUGGESTION_LIMIT,
 })
-
-const tagSuggestionsVisible = computed(() => composerActive.value && tagSuggestionList.value.length > 0)
-
-const tagSuggestionEntries = computed(() =>
-  tagSuggestionList.value.map((tag) => ({
-    value: tag,
-    parts: highlightTagSuggestion(tag),
-  })),
-)
 
 const tagSuggestionPrompt = computed(() => {
   if (!composerActive.value) {
@@ -195,10 +186,6 @@ const tagSuggestionPrompt = computed(() => {
   return 'Start typing to filter tags'
 })
 
-watch(tagSuggestionList, (list) => {
-  tagActiveIndex.value = list.length ? 0 : -1
-})
-
 function uniqueNormalizedTags(values: Iterable<string>) {
   const map = new Map<string, string>()
   for (const value of values) {
@@ -210,34 +197,6 @@ function uniqueNormalizedTags(values: Iterable<string>) {
     }
   }
   return Array.from(map.values())
-}
-
-function highlightTagSuggestion(tag: string): Array<{ text: string; match: boolean }> {
-  const query = tagsInput.value.trim()
-  if (!query) {
-    return [{ text: tag, match: false }]
-  }
-  const lowerTag = tag.toLowerCase()
-  const lowerQuery = query.toLowerCase()
-  const segments: Array<{ text: string; match: boolean }> = []
-  let searchStart = 0
-  let matchIndex = lowerTag.indexOf(lowerQuery)
-  if (matchIndex === -1) {
-    return [{ text: tag, match: false }]
-  }
-  while (matchIndex !== -1) {
-    if (matchIndex > searchStart) {
-      segments.push({ text: tag.slice(searchStart, matchIndex), match: false })
-    }
-    const matchEnd = matchIndex + lowerQuery.length
-    segments.push({ text: tag.slice(matchIndex, matchEnd), match: true })
-    searchStart = matchEnd
-    matchIndex = lowerTag.indexOf(lowerQuery, searchStart)
-  }
-  if (searchStart < tag.length) {
-    segments.push({ text: tag.slice(searchStart), match: false })
-  }
-  return segments
 }
 
 function removeTag(tag: string) {
@@ -292,39 +251,19 @@ function onTagInputChange() {
 }
 
 function onTagInputKeydown(event: KeyboardEvent, close?: () => void) {
-  const suggestions = tagSuggestionList.value
-  if (event.key === 'ArrowDown') {
-    if (!suggestions.length) return
-    event.preventDefault()
-    tagActiveIndex.value = suggestions.length
-      ? (tagActiveIndex.value + 1 + suggestions.length) % suggestions.length
-      : -1
-  } else if (event.key === 'ArrowUp') {
-    if (!suggestions.length) return
-    event.preventDefault()
-    tagActiveIndex.value = suggestions.length
-      ? (tagActiveIndex.value - 1 + suggestions.length) % suggestions.length
-      : -1
-  } else if (event.key === 'Enter') {
-    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
-    if (active) {
-      event.preventDefault()
-      selectTag(active)
-      return
-    }
-    event.preventDefault()
-    commitTagInput()
-  } else if (event.key === 'Tab') {
-    const active = tagActiveIndex.value >= 0 ? suggestions[tagActiveIndex.value] : undefined
-    if (active) {
-      selectTag(active)
-      event.preventDefault()
-    }
-  } else if (event.key === 'Escape') {
-    tagActiveIndex.value = -1
-    tagHint.value = ''
-    close?.()
-  }
+  handleTagSuggestKeydown(event, {
+    onCommit: (active) => {
+      if (active !== undefined) {
+        selectTag(active)
+      } else {
+        commitTagInput()
+      }
+    },
+    onEscape: () => {
+      tagHint.value = ''
+      close?.()
+    },
+  })
 }
 
 function addTag(tag: string): boolean {
@@ -372,4 +311,3 @@ function selectTag(tag: string) {
 
 defineExpose({ openTagDialog })
 </script>
-  emit('update:tags', next)

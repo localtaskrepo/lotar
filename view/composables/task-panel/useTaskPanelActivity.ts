@@ -1,7 +1,9 @@
 import type { Ref } from 'vue'
+import { formatDateTime } from '../../utils/date'
 import { ref } from 'vue'
 import { api } from '../../api/client'
 import type { TaskDTO, TaskHistoryEntry } from '../../api/types'
+import { titleCase } from '../../utils/text'
 
 export interface CommitEntry {
     commit: string
@@ -62,18 +64,13 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
         }
     }
 
+    const formatDate = (value: string) => formatDateTime(value)
+
     const refreshCommits = async (taskId: string | undefined, limit = DEFAULT_HISTORY_LIMIT) => {
         if (!taskId) return
         await loadCommitHistory(taskId, limit)
     }
 
-    const formatDate = (value: string) => {
-        try {
-            return new Date(value).toLocaleString()
-        } catch {
-            return value
-        }
-    }
 
     const formatCommit = (value: string) => {
         if (!value) return ''
@@ -85,7 +82,7 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
         return value
             .split(/[_\s]+/)
             .filter(Boolean)
-            .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+            .map((segment) => titleCase(segment))
             .join(' ')
     }
 

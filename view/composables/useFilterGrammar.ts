@@ -1,3 +1,4 @@
+import { listFromCsv } from './useFilterBuilder'
 /**
  * Search-grammar engine for the unified filter toolbar.
  *
@@ -288,8 +289,8 @@ export function chipsForFilterValue(value: Record<string, string>, source: Filte
             continue
         }
         if (key === 'needs') {
-            for (const part of raw.split(',')) {
-                if (part.trim()) chips.push({ key, label: `Needs ${part.trim()}`, value: part.trim() })
+            for (const part of listFromCsv(raw)) {
+                chips.push({ key, label: `Needs ${part}`, value: part })
             }
             continue
         }
@@ -297,9 +298,7 @@ export function chipsForFilterValue(value: Record<string, string>, source: Filte
             continue
         }
         // CSV-backed multi-selects: one chip per value.
-        for (const part of raw.split(',')) {
-            const v = part.trim()
-            if (!v) continue
+        for (const v of listFromCsv(raw)) {
             const display = key === 'sprints' ? (sprintLabels.get(v) ?? `#${v}`) : v
             chips.push({ key, label, value: v, display })
         }

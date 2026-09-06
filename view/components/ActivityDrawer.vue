@@ -71,11 +71,12 @@
 import { computed, watch } from 'vue'
 import { useActivity } from '../composables/useActivity'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { startOfLocalDay } from '../utils/date'
+import { MS_PER_DAY, formatDateTime, startOfLocalDay } from '../utils/date'
 import IconGlyph from './IconGlyph.vue'
 import ReloadButton from './ReloadButton.vue'
 import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
+import { titleCase } from '../utils/text'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -88,7 +89,6 @@ const loading = computed(() => feedLoading.value)
 const error = computed(() => feedError.value || null)
 
 const WINDOW_DAYS = 30
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function nowIso() {
   return new Date().toISOString()
@@ -111,11 +111,7 @@ async function refresh() {
   await refreshFeed({ since: sinceIso(), until: nowIso(), limit: 200 })
 }
 
-function formatDate(value: string | Date) {
-  const date = typeof value === 'string' ? new Date(value) : value
-  if (Number.isNaN(date.getTime())) return 'Unknown time'
-  return date.toLocaleString()
-}
+const formatDate = (value: string | Date) => formatDateTime(value, { empty: 'Unknown time' })
 
 function formatKind(kind: string) {
   switch (kind) {
@@ -138,7 +134,7 @@ function formatKind(kind: string) {
     case 'planning':
       return 'Planning'
     default:
-      return kind.charAt(0).toUpperCase() + kind.slice(1)
+      return titleCase(kind)
   }
 }
 

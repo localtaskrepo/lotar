@@ -1,3 +1,5 @@
+import { storageGet, storageGetFlag, storageSet, storageSetFlag } from './storage'
+
 export type StartupDestination = 'tasks' | 'sprints' | 'boards' | 'calendar' | 'insights' | 'config' | 'remember'
 export type FixedStartupDestination = Exclude<StartupDestination, 'remember'>
 
@@ -60,93 +62,52 @@ export const STARTUP_DESTINATION_OPTIONS: Array<{ value: StartupDestination; lab
 ]
 
 export function readStartupDestination(): StartupDestination {
-    if (typeof window === 'undefined') return DEFAULT_STARTUP_DESTINATION
-    try {
-        const stored = localStorage.getItem(STARTUP_DESTINATION_KEY) as StartupDestination | null
-        if (stored && VALID_DESTINATIONS.includes(stored)) {
-            return stored
-        }
-    } catch (err) {
-        console.warn('Unable to read startup destination preference', err)
+    const stored = storageGet(STARTUP_DESTINATION_KEY) as StartupDestination | null
+    if (stored && VALID_DESTINATIONS.includes(stored)) {
+        return stored
     }
     return DEFAULT_STARTUP_DESTINATION
 }
 
 export function storeStartupDestination(destination: StartupDestination) {
-    if (typeof window === 'undefined') return
-    try {
-        localStorage.setItem(STARTUP_DESTINATION_KEY, destination)
-    } catch (err) {
-        console.warn('Unable to persist startup destination preference', err)
-    }
+    storageSet(STARTUP_DESTINATION_KEY, destination)
 }
 
 export function readLastVisitedStartupRoute(): string | null {
-    if (typeof window === 'undefined') return null
-    try {
-        const stored = localStorage.getItem(LAST_VISITED_SECTION_KEY)
-        if (stored && isStartupRoutePath(stored)) {
-            return stored
-        }
-    } catch (err) {
-        console.warn('Unable to read last visited section', err)
+    const stored = storageGet(LAST_VISITED_SECTION_KEY)
+    if (stored && isStartupRoutePath(stored)) {
+        return stored
     }
     return null
 }
 
 export function storeLastVisitedStartupRoute(path: string) {
-    if (typeof window === 'undefined' || !isStartupRoutePath(path)) return
-    try {
-        localStorage.setItem(LAST_VISITED_SECTION_KEY, path)
-    } catch (err) {
-        console.warn('Unable to persist last visited section', err)
-    }
+    if (!isStartupRoutePath(path)) return
+    storageSet(LAST_VISITED_SECTION_KEY, path)
 }
 
 function readBooleanPreference(key: string, defaultValue: boolean): boolean {
-    if (typeof window === 'undefined') return defaultValue
-    try {
-        const raw = localStorage.getItem(key)
-        if (raw === null) return defaultValue
-        return raw === 'true'
-    } catch {
-        return defaultValue
-    }
+    return storageGetFlag(key, defaultValue)
 }
 
 function storeBooleanPreference(key: string, value: boolean) {
-    if (typeof window === 'undefined') return
-    try {
-        localStorage.setItem(key, value ? 'true' : 'false')
-        emitPreferencesChanged(key)
-    } catch (err) {
-        console.warn('Unable to persist preference', err)
-    }
+    storageSetFlag(key, value)
+    emitPreferencesChanged(key)
 }
 
 export function readTasksPageSizePreference(): number {
-    if (typeof window === 'undefined') return DEFAULT_TASKS_PAGE_SIZE
-    try {
-        const raw = localStorage.getItem(TASKS_PAGE_SIZE_KEY)
-        if (raw === null) return DEFAULT_TASKS_PAGE_SIZE
-        const parsed = Number.parseInt(raw, 10)
-        if (!Number.isFinite(parsed)) return DEFAULT_TASKS_PAGE_SIZE
-        if (TASKS_PAGE_SIZE_CHOICES.has(parsed)) return parsed
-        return DEFAULT_TASKS_PAGE_SIZE
-    } catch {
-        return DEFAULT_TASKS_PAGE_SIZE
-    }
+    const raw = storageGet(TASKS_PAGE_SIZE_KEY)
+    if (raw === null) return DEFAULT_TASKS_PAGE_SIZE
+    const parsed = Number.parseInt(raw, 10)
+    if (!Number.isFinite(parsed)) return DEFAULT_TASKS_PAGE_SIZE
+    if (TASKS_PAGE_SIZE_CHOICES.has(parsed)) return parsed
+    return DEFAULT_TASKS_PAGE_SIZE
 }
 
 export function storeTasksPageSizePreference(value: number) {
-    if (typeof window === 'undefined') return
     const normalized = TASKS_PAGE_SIZE_CHOICES.has(value) ? value : DEFAULT_TASKS_PAGE_SIZE
-    try {
-        localStorage.setItem(TASKS_PAGE_SIZE_KEY, String(normalized))
-        emitPreferencesChanged(TASKS_PAGE_SIZE_KEY)
-    } catch (err) {
-        console.warn('Unable to persist preference', err)
-    }
+    storageSet(TASKS_PAGE_SIZE_KEY, String(normalized))
+    emitPreferencesChanged(TASKS_PAGE_SIZE_KEY)
 }
 
 export function readTaskPanelShowAttachmentsPreference(): boolean {

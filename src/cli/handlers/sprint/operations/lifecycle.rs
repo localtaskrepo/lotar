@@ -6,7 +6,7 @@ use crate::cli::args::sprint::{SprintCloseArgs, SprintStartArgs};
 use crate::output::{OutputFormat, OutputRenderer};
 use crate::services::sprint_assignment;
 use crate::services::sprint_service::{SprintRecord, SprintService};
-use crate::services::sprint_status::{self, SprintLifecycleState, SprintLifecycleStatus};
+use crate::services::sprint_status::{self, SprintLifecycleStatus};
 use crate::storage::sprint::{Sprint, SprintActual};
 use crate::utils::time;
 
@@ -291,10 +291,7 @@ fn warn_about_parallel_active_sprints(
             continue;
         }
         let lifecycle = sprint_status::derive_status(&record.sprint, reference_time);
-        if matches!(
-            lifecycle.state,
-            SprintLifecycleState::Active | SprintLifecycleState::Overdue
-        ) {
+        if lifecycle.state.is_active_or_overdue() {
             others.push((
                 record.id,
                 sprint_assignment::sprint_display_name(record),

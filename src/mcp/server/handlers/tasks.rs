@@ -773,57 +773,28 @@ pub(crate) fn handle_task_comment_update(req: JsonRpcRequest) -> JsonRpcResponse
         }
     };
 
-    let project_prefix = id.split('-').next().unwrap_or("").to_string();
     let mut storage = Storage::new(&resolver.path.clone());
 
-    let mut task = match storage.get(&id, &project_prefix) {
-        Some(task) => task,
-        None => {
-            return err(
-                req.id,
-                -32004,
-                "Task not found",
-                Some(json!({"message": format!("Task '{}' not found", id)})),
-            );
-        }
-    };
-
-    if index >= task.comments.len() {
-        return err(req.id, -32602, "Invalid comment index", None);
-    }
-
-    let previous = task.comments[index].text.clone();
-    if previous != text {
-        task.comments[index].text = text.clone();
-        let now = now_rfc3339();
-        task.history.push(TaskChangeLogEntry {
-            at: now.clone(),
-            actor: identity::resolve_current_user(Some(resolver.path.as_path())),
-            changes: vec![TaskChange {
-                field: format!("comment#{}", index + 1),
-                old: Some(previous),
-                new: Some(text.clone()),
-            }],
-        });
-        task.modified = now;
-        if let Err(error) = storage.edit(&id, &task) {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": error.to_string()})),
-            );
-        }
-    }
-
-    let dto = match TaskService::get(&storage, &id, Some(&project_prefix)) {
+    let dto = match TaskService::update_comment(&mut storage, &id, index, &text) {
         Ok(dto) => dto,
         Err(error) => {
+            let msg = error.to_string();
+            if msg.contains("not found") {
+                return err(
+                    req.id,
+                    -32004,
+                    "Task not found",
+                    Some(json!({"message": format!("Task '{}' not found", id)})),
+                );
+            }
+            if msg.contains("Invalid comment index") {
+                return err(req.id, -32602, "Invalid comment index", None);
+            }
             return err(
                 req.id,
                 -32603,
                 "Internal error",
-                Some(json!({"message": error.to_string()})),
+                Some(json!({"message": msg})),
             );
         }
     };
@@ -1546,7 +1517,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
-    let filter = TaskListFilter {
+    let mut filter = TaskListFilter {
         status,
         priority,
         task_type,
@@ -1557,35 +1528,44 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
             Ok(v) => v,
             Err(msg) => return err(req.id, -32602, msg, None),
         },
+        assignee: Vec::new(),
+        assignee_none: false,
         custom_fields,
     };
-    let storage = Storage::new(&resolver.path.clone());
-    let mut tasks = TaskService::list(&storage, &filter)
-        .into_iter()
-        .map(|(_, t)| t)
-        .collect::<Vec<_>>();
 
+    // Assignee filter (supports @me; resolved here, matched by TaskService::list)
     if let Some(raw) = req.params.get("assignee").and_then(|v| v.as_str()) {
         let trimmed = raw.trim();
         if !trimmed.is_empty() {
-            let target = if trimmed.eq_ignore_ascii_case("@me") {
-                identity::resolve_current_user(Some(storage.root_path.as_path()))
-            } else {
-                Some(trimmed.to_string())
-            };
-            match target {
-                Some(user) => {
-                    let norm_user = crate::utils::member::member_for_comparison(&user);
-                    tasks.retain(|task| {
-                        task.assignee.as_deref().is_some_and(|a| {
-                            crate::utils::member::member_for_comparison(a) == norm_user
-                        })
-                    });
+            if trimmed.eq_ignore_ascii_case("__none__") {
+                filter.assignee_none = true;
+            } else if trimmed.eq_ignore_ascii_case("@me") {
+                // Fail closed: an unresolvable identity must never widen the
+                // query to all tasks.
+                match identity::resolve_current_user(Some(resolver.path.as_path())) {
+                    Some(user) => filter.assignee.push(user),
+                    None => {
+                        return err(
+                            req.id,
+                            -32002,
+                            "Could not resolve @me: no identity configured",
+                            Some(
+                                json!({"message": "Set default_reporter in config, git user.name, or USER environment"}),
+                            ),
+                        );
+                    }
                 }
-                None => tasks.clear(),
+            } else {
+                filter.assignee.push(trimmed.to_string());
             }
         }
     }
+
+    let storage = Storage::new(&resolver.path.clone());
+    let tasks = TaskService::list(&storage, &filter)
+        .into_iter()
+        .map(|(_, t)| t)
+        .collect::<Vec<_>>();
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_TASK_LIST_LIMIT) {
         Ok(value) if (1..=MCP_MAX_TASK_LIST_LIMIT).contains(&value) => value,
         Ok(_) => {

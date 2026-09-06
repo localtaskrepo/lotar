@@ -412,15 +412,8 @@ impl AgentHandler {
         resolver: &TasksDirectoryResolver,
         renderer: &OutputRenderer,
     ) -> Result<(), String> {
-        let cfg_mgr = ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
+        let config = crate::config::resolution::config_for_project(&resolver.path, project)
             .map_err(|e| e.to_string())?;
-        let config = if let Some(prefix) = project {
-            cfg_mgr
-                .get_project_config(prefix)
-                .unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone())
-        } else {
-            cfg_mgr.get_resolved_config().clone()
-        };
 
         let statuses = if args.statuses.is_empty() {
             let derived = derive_default_statuses(resolver.path.as_path(), project, &config)

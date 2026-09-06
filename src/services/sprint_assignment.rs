@@ -455,18 +455,22 @@ pub fn resolve_sprint_id(records: &[SprintRecord], reference: Option<&str>) -> R
     resolve_default_sprint(records)
 }
 
-pub fn resolve_default_sprint(records: &[SprintRecord]) -> Result<u32, String> {
+/// IDs of sprints currently active or overdue, in record order.
+pub fn active_sprint_ids(records: &[SprintRecord]) -> Vec<u32> {
     let now = Utc::now();
-    let mut active = Vec::new();
-    for record in records {
-        let lifecycle = sprint_status::derive_status(&record.sprint, now);
-        if matches!(
-            lifecycle.state,
-            SprintLifecycleState::Active | SprintLifecycleState::Overdue
-        ) {
-            active.push(record.id);
-        }
-    }
+    records
+        .iter()
+        .filter(|record| {
+            sprint_status::derive_status(&record.sprint, now)
+                .state
+                .is_active_or_overdue()
+        })
+        .map(|record| record.id)
+        .collect()
+}
+
+pub fn resolve_default_sprint(records: &[SprintRecord]) -> Result<u32, String> {
+    let active = active_sprint_ids(records);
 
     match active.len() {
         0 => Err(

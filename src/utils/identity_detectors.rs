@@ -59,7 +59,12 @@ impl IdentityDetector for ConfigDefaultReporterDetector {
 
         let rep = cfg.default_reporter.and_then(|s| {
             let t = s.trim().to_string();
-            if t.is_empty() { None } else { Some(t) }
+            // "@me" is a self-referential placeholder, never a usable identity
+            if t.is_empty() || t.eq_ignore_ascii_case("@me") {
+                None
+            } else {
+                Some(t)
+            }
         })?;
 
         Some(IdentityDetection {
@@ -379,21 +384,26 @@ pub fn detect_identity(ctx: &DetectContext) -> Option<IdentityDetection> {
     if let Some(cfg) = cfg.clone()
         && !cfg.auto_identity
     {
-        // Smart features disabled: honor only configured default_reporter
+        // Smart detection disabled: honor only the configured default_reporter
+        // and the OS username. Git/manifest probing stays off.
         let d = ConfigDefaultReporterDetector;
-        // Explicitly avoid falling back to git/system if smart is off
-        return d.detect(ctx).or(None);
+        if let Some(found) = d.detect(ctx) {
+            return Some(found);
+        }
+        return EnvUserDetector.detect(ctx);
     }
 
-    let mut detectors: Vec<Box<dyn IdentityDetector>> = vec![
-        Box::new(ConfigDefaultReporterDetector),
-        Box::new(ProjectManifestDetector),
-    ];
+    // Precedence: configured default > git identity > OS user > manifest author.
+    // The manifest author is a static guess and must never outrank the actual
+    // git/system identity when stamping tasks as the current user.
+    let mut detectors: Vec<Box<dyn IdentityDetector>> =
+        vec![Box::new(ConfigDefaultReporterDetector)];
     // Optionally include git based on toggle
     if cfg.as_ref().map(|c| c.auto_identity_git).unwrap_or(true) {
         detectors.push(Box::new(GitConfigDetector));
     }
     detectors.push(Box::new(EnvUserDetector));
+    detectors.push(Box::new(ProjectManifestDetector));
 
     for d in detectors {
         if let Some(found) = d.detect(ctx) {

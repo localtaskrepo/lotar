@@ -69,7 +69,7 @@ Notes
 - All payloads use snake_case keys.
 - Enum fields follow the same values as the REST API and CLI.
 - Errors are JSON-RPC errors with code/message and optional data.
-- People fields (reporter, assignee) accept the special value `@me`. It resolves to the current user based on merged config default_reporter → git user → system username; identical logic is used inside the CLI and REST server.
+- People fields (reporter, assignee) accept the special value `@me`. It resolves to the current user based on merged config default_reporter → git user → system username → project manifest author (last resort); identical logic is used inside the CLI and REST server. When `task_list` filters with `assignee: "@me"` and the identity cannot be resolved, the tool returns JSON-RPC error `-32002` instead of an unfiltered list.
 
 ## Response Envelope
 

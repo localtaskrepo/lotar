@@ -1,3 +1,4 @@
+import { storageGet, storageRemove, storageSet } from './storage'
 import { darken, getContrastingColor, normalizeHex, withAlpha } from './color'
 
 export type ThemePreference = 'system' | 'light' | 'dark'
@@ -15,14 +16,9 @@ let prefersDarkQuery: MediaQueryList | null = null
 let systemThemeChangeHandler: (() => void) | null = null
 
 export function readThemePreference(): ThemePreference {
-    if (typeof window === 'undefined') return 'system'
-    try {
-        const stored = localStorage.getItem(THEME_KEY) as ThemePreference | null
-        if (stored === 'light' || stored === 'dark' || stored === 'system') {
-            return stored
-        }
-    } catch (err) {
-        console.warn('Unable to read theme preference', err)
+    const stored = storageGet(THEME_KEY) as ThemePreference | null
+    if (stored === 'light' || stored === 'dark' || stored === 'system') {
+        return stored
     }
     return 'system'
 }
@@ -41,12 +37,7 @@ export function applyThemePreference(theme: ThemePreference) {
 }
 
 export function storeThemePreference(theme: ThemePreference) {
-    if (typeof window === 'undefined') return
-    try {
-        localStorage.setItem(THEME_KEY, theme)
-    } catch (err) {
-        console.warn('Unable to persist theme preference', err)
-    }
+    storageSet(THEME_KEY, theme)
 }
 
 export function normalizeAccent(value: string): string | null {
@@ -54,14 +45,8 @@ export function normalizeAccent(value: string): string | null {
 }
 
 export function readAccentPreference(): string | null {
-    if (typeof window === 'undefined') return null
-    try {
-        const stored = localStorage.getItem(ACCENT_KEY)
-        return normalizeHex(stored ?? undefined)
-    } catch (err) {
-        console.warn('Unable to read accent preference', err)
-        return null
-    }
+    const stored = storageGet(ACCENT_KEY)
+    return normalizeHex(stored ?? undefined)
 }
 
 export function applyAccentPreference(accent: string | null) {
@@ -85,18 +70,13 @@ export function applyAccentPreference(accent: string | null) {
 }
 
 export function storeAccentPreference(accent: string | null) {
-    if (typeof window === 'undefined') return
-    try {
-        if (!accent) {
-            localStorage.removeItem(ACCENT_KEY)
-        } else {
-            const normalized = normalizeHex(accent)
-            if (!normalized) return
-            localStorage.setItem(ACCENT_KEY, normalized)
-        }
-    } catch (err) {
-        console.warn('Unable to persist accent preference', err)
+    if (!accent) {
+        storageRemove(ACCENT_KEY)
+        return
     }
+    const normalized = normalizeHex(accent)
+    if (!normalized) return
+    storageSet(ACCENT_KEY, normalized)
 }
 
 export function initializeThemeFromStorage() {

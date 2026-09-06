@@ -263,6 +263,46 @@ impl TaskService {
         Ok(dto)
     }
 
+    /// Edit an existing comment (0-based index) and record a `comment#N` history entry.
+    /// Returns the unchanged task when the new text equals the old one.
+    pub fn update_comment(
+        storage: &mut Storage,
+        id: &str,
+        index: usize,
+        text: &str,
+    ) -> LoTaRResult<TaskDTO> {
+        let derived = id.split('-').next().unwrap_or("");
+        let mut task = storage
+            .get(id, derived)
+            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+
+        if index >= task.comments.len() {
+            return Err(LoTaRError::ValidationError(format!(
+                "Invalid comment index {index}"
+            )));
+        }
+
+        let previous = task.comments[index].text.clone();
+        if previous != text {
+            task.comments[index].text = text.to_string();
+            let now = chrono::Utc::now().to_rfc3339();
+            task.history.push(TaskChangeLogEntry {
+                at: now.clone(),
+                actor: resolve_current_user(Some(storage.root_path.as_path())),
+                changes: vec![TaskChange {
+                    field: format!("comment#{}", index + 1),
+                    old: Some(previous),
+                    new: Some(text.to_string()),
+                }],
+            });
+            task.modified = now;
+            storage.edit(id, &task)?;
+        }
+
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        Ok(Self::to_dto(id, task, Some(&sprint_lookup)))
+    }
+
     pub fn update(storage: &mut Storage, id: &str, patch: TaskUpdate) -> LoTaRResult<TaskDTO> {
         Self::update_with_context(storage, id, patch, TaskUpdateContext::default())
     }
@@ -620,8 +660,15 @@ impl TaskService {
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let requested_sprints: HashSet<u32> = filter.sprints.iter().copied().collect();
+        // Documented filter semantics: case-, `@`-, and separator-insensitive
+        // member matching (docs/openapi.json).
+        let assignee_targets: Vec<String> = filter
+            .assignee
+            .iter()
+            .map(|a| crate::utils::fuzzy_match::member_key(a))
+            .collect();
 
-        storage
+        let mut results: Vec<(String, TaskDTO)> = storage
             .search(&storage_filter)
             .into_iter()
             .filter(|(id, _)| {
@@ -650,7 +697,21 @@ impl TaskService {
                 Self::ensure_task_defaults(&mut t, config);
                 (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup)))
             })
-            .collect()
+            .collect();
+
+        // Assignee filtering (shared by all frontends; @me resolved by caller)
+        if filter.assignee_none {
+            results.retain(|(_, t)| t.assignee.as_deref().unwrap_or("").trim().is_empty());
+        } else if !assignee_targets.is_empty() {
+            results.retain(|(_, t)| {
+                t.assignee.as_deref().is_some_and(|a| {
+                    let key = crate::utils::fuzzy_match::member_key(a);
+                    assignee_targets.contains(&key)
+                })
+            });
+        }
+
+        results
     }
 
     fn to_dto(
@@ -880,19 +941,12 @@ impl TaskService {
         Self::persist_sprint_records(storage, &records, &touched)
     }
     fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
-        let base = crate::config::resolution::load_and_merge_configs(Some(tasks_root))
+        crate::config::resolution::config_for_project(tasks_root, Some(project_prefix))
             .unwrap_or_else(|_| {
                 let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());
                 crate::config::resolution::apply_cli_overrides(&mut fallback);
                 fallback
-            });
-
-        if project_prefix.trim().is_empty() {
-            return base;
-        }
-
-        crate::config::resolution::get_project_config(&base, project_prefix, tasks_root)
-            .unwrap_or(base)
+            })
     }
 
     fn ensure_task_defaults(task: &mut Task, config: &ResolvedConfig) {

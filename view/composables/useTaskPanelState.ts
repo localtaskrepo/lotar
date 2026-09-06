@@ -17,6 +17,7 @@ import { useReferencePreview } from './useReferencePreview'
 import { useSprints } from './useSprints'
 import { useTaskPanelOwnership } from './useTaskPanelOwnership'
 import { useTaskRelationships } from './useTaskRelationships'
+import { projectOf } from '../utils/text'
 
 export interface TaskPanelProps {
     open: boolean
@@ -289,7 +290,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
 
     let projectForSuggestionsImpl = () => {
         if (form.project) return form.project
-        if (form.id) return form.id.split('-')[0]
+        if (form.id) return projectOf(form.id)
         if (props.initialProject) return props.initialProject
         return defaults.value.project || projects.value[0]?.prefix || ''
     }

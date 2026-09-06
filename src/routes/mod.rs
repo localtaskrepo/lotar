@@ -306,6 +306,164 @@ pub(super) fn ok_json(status: u16, v: serde_json::Value) -> HttpResponse {
     json_response(status, v).unwrap_or_else(json_serialize_error)
 }
 
+/// Query keys with dedicated handling in the task list/export endpoints.
+pub(super) const TASK_LIST_KNOWN_KEYS: &[&str] = &[
+    "project",
+    "status",
+    "priority",
+    "type",
+    "tags",
+    "sprints",
+    "q",
+    "assignee",
+    "order",
+    "limit",
+    "offset",
+    "page_size",
+    "per_page",
+    "due",
+    "recent",
+    "needs",
+];
+
+/// Parse a REST task query into a `TaskListFilter` plus a map of leftover
+/// unknown keys (custom fields not declared in config) for in-memory matching.
+///
+/// Shared by the list and export endpoints so both support the full grammar:
+/// CSV enum lists, `q`, `tags`, `sprints`, custom fields (declared or
+/// `field:`-prefixed), and `assignee` including `@me` and `__none__`.
+pub(super) fn parse_task_query(
+    query: &std::collections::HashMap<String, String>,
+    cfg: &crate::config::types::ResolvedConfig,
+    tasks_root: &std::path::Path,
+) -> Result<
+    (
+        crate::api_types::TaskListFilter,
+        std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    ),
+    String,
+> {
+    use std::collections::BTreeSet;
+
+    let parse_list = |key: &str| -> Vec<String> {
+        query
+            .get(key)
+            .map(|s| {
+                s.split(',')
+                    .map(|p| p.trim().to_string())
+                    .filter(|p| !p.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let mut statuses = Vec::new();
+    for s in parse_list("status") {
+        statuses.push(crate::types::TaskStatus::parse_with_config(&s, cfg)?);
+    }
+    let mut priorities = Vec::new();
+    for s in parse_list("priority") {
+        priorities.push(crate::types::Priority::parse_with_config(&s, cfg)?);
+    }
+    let mut types_vec = Vec::new();
+    for s in parse_list("type") {
+        types_vec.push(crate::types::TaskType::parse_with_config(&s, cfg)?);
+    }
+
+    let mut filter = crate::api_types::TaskListFilter {
+        status: statuses,
+        priority: priorities,
+        task_type: types_vec,
+        project: query.get("project").cloned(),
+        tags: parse_list("tags"),
+        text_query: query.get("q").cloned(),
+        sprints: query
+            .get("sprints")
+            .map(|s| {
+                s.split(',')
+                    .filter_map(|p| p.trim().parse::<u32>().ok())
+                    .collect()
+            })
+            .unwrap_or_default(),
+        custom_fields: BTreeMap::new(),
+        assignee: Vec::new(),
+        assignee_none: false,
+    };
+
+    // Assignee: @me resolves to the current identity, __none__ means unassigned.
+    // An unresolvable @me is an explicit error (fail closed) rather than a
+    // silently broadened or empty result.
+    if let Some(a) = query.get("assignee") {
+        if a == "__none__" {
+            filter.assignee_none = true;
+        } else if !a.trim().is_empty() {
+            let resolved = if a.trim().eq_ignore_ascii_case("@me") {
+                crate::utils::identity::resolve_current_user(Some(tasks_root)).ok_or_else(|| {
+                    "Could not resolve @me: no identity configured (default_reporter, git user.name, or USER env)"
+                        .to_string()
+                })?
+            } else {
+                a.trim().to_string()
+            };
+            // Normalize: strip @ prefix from regular names for consistent matching.
+            let v = crate::utils::member::normalize_member_value(&resolved, |name| {
+                cfg.agent_profiles.contains_key(name)
+            });
+            filter.assignee.push(v);
+        }
+    }
+
+    // Unknown keys become either declared custom-field filters or in-memory keys
+    let mut uf: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for (k, v) in query.iter() {
+        if TASK_LIST_KNOWN_KEYS.contains(&k.as_str()) {
+            continue;
+        }
+        for part in v.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            if let Some(name) = crate::utils::custom_fields::resolve_filter_name(k, cfg) {
+                filter
+                    .custom_fields
+                    .entry(name)
+                    .or_default()
+                    .push(part.to_string());
+            } else {
+                uf.entry(k.clone()).or_default().insert(part.to_string());
+            }
+        }
+    }
+
+    Ok((filter, uf))
+}
+
+/// Apply leftover unknown-key filters (fuzzy set matching) in memory.
+pub(super) fn apply_unknown_key_filters(
+    tasks: &mut Vec<(String, crate::api_types::TaskDTO)>,
+    uf: &std::collections::BTreeMap<String, std::collections::BTreeSet<String>>,
+    cfg: &crate::config::types::ResolvedConfig,
+) {
+    if uf.is_empty() {
+        return;
+    }
+
+    tasks.retain(|(id, t)| {
+        for (fk, allowed) in uf {
+            let vals = match crate::utils::custom_fields::resolve_task_filter_values(id, t, fk, cfg)
+            {
+                Some(vs) => vs.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>(),
+                None => return false,
+            };
+            if vals.is_empty() {
+                return false;
+            }
+            let allowed_vec: Vec<String> = allowed.iter().cloned().collect();
+            if !crate::utils::fuzzy_match::fuzzy_set_match(&vals, &allowed_vec) {
+                return false;
+            }
+        }
+        true
+    });
+}
+
 #[allow(clippy::needless_pass_by_value)]
 pub(super) fn bad_request(msg: String) -> HttpResponse {
     ok_json(

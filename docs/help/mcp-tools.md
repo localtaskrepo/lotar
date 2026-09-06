@@ -67,6 +67,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `task_list`
 - **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings.
+- **Errors:** `assignee: "@me"` that cannot be resolved returns JSON-RPC error `-32002` (fail closed — never returns the unfiltered list).
 - **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page.
 
 ## Sprint Tools

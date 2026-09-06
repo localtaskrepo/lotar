@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { listFromCsv } from './useFilterBuilder'
 import { onBeforeUnmount, reactive, ref } from 'vue'
 import type { TaskDTO } from '../api/types'
 
@@ -129,13 +130,6 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
     let relationSuggestTimer: ReturnType<typeof setTimeout> | null = null
     let relationSuggestSeq = 0
 
-    function splitCsv(value: string) {
-        return value
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-    }
-
     function relationLastToken(field: string) {
         const value = relationships[field as keyof RelationshipFields] || ''
         const parts = value.split(',')
@@ -172,11 +166,11 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
 
     function buildRelationships(): RelationshipsPayload {
         return {
-            depends_on: splitCsv(relationships.depends_on),
-            blocks: splitCsv(relationships.blocks),
-            related: splitCsv(relationships.related),
-            children: splitCsv(relationships.children),
-            fixes: splitCsv(relationships.fixes),
+            depends_on: listFromCsv(relationships.depends_on),
+            blocks: listFromCsv(relationships.blocks),
+            related: listFromCsv(relationships.related),
+            children: listFromCsv(relationships.children),
+            fixes: listFromCsv(relationships.fixes),
             parent: relationships.parent.trim() || undefined,
             duplicate_of: relationships.duplicate_of.trim() || undefined,
         }
@@ -222,7 +216,7 @@ export function useTaskRelationships(options: UseTaskRelationshipsOptions) {
             relationships[field] = id
         } else {
             const currentValue = relationships[field as keyof RelationshipFields] || ''
-            let entries = splitCsv(currentValue)
+            let entries = listFromCsv(currentValue)
             const lastToken = relationLastToken(field)
             const hasTrailingSeparator = /,\s*$/.test(currentValue)
             if (lastToken && !hasTrailingSeparator && entries.length) {

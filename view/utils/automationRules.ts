@@ -1,4 +1,5 @@
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
+import { listFromCsv } from '../composables/useFilterBuilder'
 
 export type AutomationEventKey =
     | 'start'
@@ -1014,7 +1015,7 @@ function buildFieldConditionFromDraft(condition: AutomationConditionDraft): any 
         case 'any':
         case 'all':
         case 'none':
-            return { [condition.operator]: splitList(value) }
+            return { [condition.operator]: listFromCsv(value) }
         case 'exists':
             return { exists: value !== 'false' }
         default:
@@ -1026,7 +1027,7 @@ function parseChangeConditionValue(value: string): any {
     const trimmed = value.trim()
     if (!trimmed) return undefined
     if (trimmed.includes(',')) {
-        return splitList(trimmed)
+        return listFromCsv(trimmed)
     }
     return trimmed
 }
@@ -1077,7 +1078,7 @@ function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Record<s
         const run: Record<string, any> = {
             command: actionDraft.runCommand.trim(),
         }
-        const args = splitList(actionDraft.runArgs)
+        const args = listFromCsv(actionDraft.runArgs)
         if (args.length) {
             run.args = args
         }
@@ -1107,7 +1108,7 @@ function buildActionFromDraft(actionDraft: AutomationEventActionDraft): Record<s
 
 function parseSetValue(field: string, value: string): string | string[] {
     if (field === 'tags' || field === 'labels') {
-        const values = splitList(value)
+        const values = listFromCsv(value)
         return values.length > 1 ? values : (values[0] ?? value)
     }
     return value
@@ -1117,7 +1118,7 @@ function buildListAction(entries: AutomationListFieldDraft[]): Record<string, an
     return entries.reduce<Record<string, any>>((acc, entry) => {
         const value = entry.value.trim()
         if (!value) return acc
-        const values = entry.field === 'sprint' ? value : splitList(value)
+        const values = entry.field === 'sprint' ? value : listFromCsv(value)
         acc[entry.field] = entry.field === 'sprint'
             ? value
             : values.length === 1
@@ -1135,12 +1136,6 @@ function parseYamlScalar(value: string): unknown {
     }
 }
 
-function splitList(value: string): string[] {
-    return value
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-}
 
 function createConditionDraft(): AutomationConditionDraft {
     return {

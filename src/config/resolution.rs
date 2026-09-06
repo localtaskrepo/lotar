@@ -7,9 +7,50 @@ use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
 
 // Simple in-process cache for resolved configuration keyed by tasks root path.
-// This reduces repeated disk IO for common read paths. Invalidate on writes.
-static CONFIG_CACHE: OnceLock<RwLock<HashMap<String, ResolvedConfig>>> = OnceLock::new();
+// Entries are validated against the underlying config files' (mtime, len)
+// fingerprints so external edits invalidate them on the next lookup, and writes
+// through this process invalidate eagerly.
+static CONFIG_CACHE: OnceLock<RwLock<HashMap<String, CachedConfig>>> = OnceLock::new();
 static CLI_OVERRIDE_LAYER: OnceLock<RwLock<Option<CliOverrideLayer>>> = OnceLock::new();
+
+#[derive(Clone)]
+struct CachedConfig {
+    resolved: ResolvedConfig,
+    fingerprint: String,
+}
+
+fn file_fingerprint(path: &Path) -> String {
+    match std::fs::metadata(path) {
+        Ok(meta) => match (meta.modified(), meta.created()) {
+            (Ok(mtime), _) => format!("{:?}:{}", mtime, meta.len()),
+            (Err(_), Ok(ctime)) => format!("c{:?}:{}", ctime, meta.len()),
+            (Err(_), Err(_)) => format!("len:{}", meta.len()),
+        },
+        Err(_) => "missing".to_string(),
+    }
+}
+
+/// Fingerprint of every file the resolution chain reads.
+fn config_fingerprint(tasks_dir: Option<&Path>, project: Option<&str>) -> String {
+    let root: PathBuf = match tasks_dir {
+        Some(p) => p.to_path_buf(),
+        None => crate::utils::paths::tasks_root_from(Path::new(".")),
+    };
+    let mut parts = vec![file_fingerprint(&crate::utils::paths::global_config_path(
+        &root,
+    ))];
+    if let Some(home_dir) = dirs::home_dir() {
+        parts.push(file_fingerprint(&home_dir.join(".lotar")));
+    }
+    if let Some(prefix) = project
+        && !prefix.trim().is_empty()
+    {
+        parts.push(file_fingerprint(&crate::utils::paths::project_config_path(
+            &root, prefix,
+        )));
+    }
+    parts.join("|")
+}
 
 #[derive(Clone)]
 struct CliOverrideLayer {
@@ -17,7 +58,7 @@ struct CliOverrideLayer {
     signature: String,
 }
 
-fn config_cache() -> &'static RwLock<HashMap<String, ResolvedConfig>> {
+fn config_cache() -> &'static RwLock<HashMap<String, CachedConfig>> {
     CONFIG_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
 
@@ -40,6 +81,18 @@ fn cache_key_for(tasks_dir: Option<&Path>) -> String {
     let env_signature = crate::config::env_overrides::env_signature();
     let cli_signature = cli_override_signature();
     format!("{}|ENV={}|CLI={}", root_str, env_signature, cli_signature)
+}
+
+/// Root portion of a cache key, shared by base and per-project entries.
+fn cache_root_for(tasks_dir: Option<&Path>) -> String {
+    let root: PathBuf = match tasks_dir {
+        Some(p) => p.to_path_buf(),
+        None => crate::utils::paths::tasks_root_from(Path::new(".")),
+    };
+    root.canonicalize()
+        .unwrap_or(root)
+        .to_string_lossy()
+        .to_string()
 }
 
 fn cli_override_signature() -> String {
@@ -121,14 +174,32 @@ pub fn apply_cli_overrides(resolved: &mut ResolvedConfig) {
 
 /// Load and merge all configurations with proper priority order
 pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig, ConfigError> {
-    // Fast path: return from cache if available
+    // Fast path: return from cache if the config files are unchanged
     let key = cache_key_for(tasks_dir);
+    let fingerprint = config_fingerprint(tasks_dir, None);
     if let Ok(guard) = config_cache().read()
         && let Some(cached) = guard.get(&key)
+        && cached.fingerprint == fingerprint
     {
-        return Ok(cached.clone());
+        return Ok(cached.resolved.clone());
     }
 
+    let resolved = load_merged_global_chain(tasks_dir);
+
+    if let Ok(mut guard) = config_cache().write() {
+        guard.insert(
+            key,
+            CachedConfig {
+                resolved: resolved.clone(),
+                fingerprint,
+            },
+        );
+    }
+    Ok(resolved)
+}
+
+/// Build the merged chain defaults -> global -> home -> env -> CLI (no cache).
+fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
     // Start with built-in defaults
     let mut config = GlobalConfig::default();
 
@@ -157,10 +228,23 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
 
     let mut resolved = ResolvedConfig::from_global(config);
     apply_cli_overrides(&mut resolved);
-    if let Ok(mut guard) = config_cache().write() {
-        guard.insert(key, resolved.clone());
-    }
-    Ok(resolved)
+    resolved
+}
+
+/// Resolve the effective configuration for an optional project scope.
+///
+/// Precedence: CLI > project > env > home > global > defaults.
+/// Uses the same in-process cache as [`load_and_merge_configs`]; falls back to
+/// the merged base config when the project config cannot be loaded.
+pub fn config_for_project(
+    tasks_dir: &Path,
+    project: Option<&str>,
+) -> Result<ResolvedConfig, ConfigError> {
+    let base = load_and_merge_configs(Some(tasks_dir))?;
+    let Some(prefix) = project.map(str::trim).filter(|p| !p.is_empty()) else {
+        return Ok(base);
+    };
+    Ok(get_project_config(&base, prefix, tasks_dir).unwrap_or(base))
 }
 
 /// Improved merging that only overrides non-default values
@@ -473,6 +557,22 @@ pub fn get_project_config(
     project_name: &str,
     tasks_dir: &std::path::Path,
 ) -> Result<ResolvedConfig, ConfigError> {
+    // Fast path: per-project entries share the base cache map (keyed with a
+    // PROJ suffix) so they are invalidated together with the base entries.
+    // Only real project directories are cached — the project name arrives from
+    // query parameters, and load_project_config_from_dir succeeds for
+    // nonexistent paths, so caching those would grow the map without bound.
+    let cacheable = tasks_dir.join(project_name).is_dir();
+    let cache_key = format!("{}|PROJ={}", cache_key_for(Some(tasks_dir)), project_name);
+    let fingerprint = config_fingerprint(Some(tasks_dir), Some(project_name));
+    if cacheable
+        && let Ok(guard) = config_cache().read()
+        && let Some(cached) = guard.get(&cache_key)
+        && cached.fingerprint == fingerprint
+    {
+        return Ok(cached.resolved.clone());
+    }
+
     // Desired precedence: CLI > project > env > home > global > defaults
     // We don't re-handle CLI here (handled by command handlers). Implement the
     // remainder by building a fresh chain where project config is the most local
@@ -501,6 +601,19 @@ pub fn get_project_config(
     apply_project_config_overrides(&mut resolved, project_config);
     apply_cli_overrides(&mut resolved);
 
+    if let Ok(mut guard) = config_cache().write() {
+        // Hard cap: bounded memory even if many legitimate projects are queried.
+        if guard.len() >= 256 {
+            guard.clear();
+        }
+        guard.insert(
+            cache_key,
+            CachedConfig {
+                resolved: resolved.clone(),
+                fingerprint,
+            },
+        );
+    }
     Ok(resolved)
 }
 
@@ -720,11 +833,12 @@ fn apply_agent_worktree_override(
     }
 }
 
-/// Invalidate the cached resolved configuration for a specific tasks_dir
+/// Invalidate the cached resolved configuration for a specific tasks_dir.
+/// Removes both the base entry and all per-project entries for that root.
 pub fn invalidate_config_cache_for(tasks_dir: Option<&Path>) {
-    let key = cache_key_for(tasks_dir);
+    let prefix = format!("{}|", cache_root_for(tasks_dir));
     if let Ok(mut guard) = config_cache().write() {
-        guard.remove(&key);
+        guard.retain(|key, _| !key.starts_with(&prefix));
     }
 }
 

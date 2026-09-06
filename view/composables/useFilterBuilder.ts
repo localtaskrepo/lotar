@@ -1,12 +1,12 @@
 import { computed, type Ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { TaskDTO, TaskListFilter } from '../api/types'
-import { parseTaskDate, startOfLocalDay } from '../utils/date'
+import { MS_PER_DAY, parseTaskDate, startOfLocalDay } from '../utils/date'
 
 const BUILTIN_QUERY_KEYS = new Set([
   'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints',
 ])
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 export function listFromCsv(value: string): string[] {
   return value.split(',').map((entry) => entry.trim()).filter(Boolean)
@@ -29,21 +29,25 @@ export function normalizeFilter(raw: Record<string, string>) {
 }
 
 export function buildServerFilter(
-  raw: Record<string, string>,
-  project: string,
-): { serverFilter: TaskListFilter; normalized: Record<string, string> } {
-  const { normalized, extras } = normalizeFilter(raw)
-  const serverFilter: TaskListFilter = {}
-  if (project) serverFilter.project = project
-  if (normalized.q) serverFilter.q = normalized.q
-  if (normalized.status) serverFilter.status = listFromCsv(normalized.status)
-  if (normalized.priority) serverFilter.priority = listFromCsv(normalized.priority)
-  if (normalized.type) serverFilter.type = listFromCsv(normalized.type)
-  if (normalized.assignee && normalized.assignee !== '__none__') serverFilter.assignee = normalized.assignee
-  if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
-  if (normalized.sprints) serverFilter.sprints = listFromCsv(normalized.sprints).map(Number).filter(Number.isFinite)
-  Object.assign(serverFilter, extras)
-  return { serverFilter, normalized }
+    raw: Record<string, string>,
+    project: string,
+): {
+    serverFilter: TaskListFilter
+    normalized: Record<string, string>
+    extras: Record<string, string>
+} {
+    const { normalized, extras } = normalizeFilter(raw)
+    const serverFilter: TaskListFilter = {}
+    if (project) serverFilter.project = project
+    if (normalized.q) serverFilter.q = normalized.q
+    if (normalized.status) serverFilter.status = listFromCsv(normalized.status)
+    if (normalized.priority) serverFilter.priority = listFromCsv(normalized.priority)
+    if (normalized.type) serverFilter.type = listFromCsv(normalized.type)
+    if (normalized.assignee && normalized.assignee !== '__none__') serverFilter.assignee = normalized.assignee
+    if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
+    if (normalized.sprints) serverFilter.sprints = listFromCsv(normalized.sprints).map(Number).filter(Number.isFinite)
+    Object.assign(serverFilter, extras)
+    return { serverFilter, normalized, extras }
 }
 
 export function applySmartFilters(
@@ -95,11 +99,25 @@ export function applySmartFilters(
 export function useProjectFilterSync(
   projectRef: Ref<string>,
   filterRef: Ref<Record<string, string>>,
-  options?: { onProjectChange?: (project: string) => void },
+  options?: {
+    onProjectChange?: (project: string) => void
+    /** When set (and no onProjectChange), keep ?project= in the URL in sync on this path. */
+    routePath?: string
+  },
 ) {
   const hasFilters = computed(() =>
     Object.entries(filterRef.value).some(([key, value]) => key !== 'order' && !!value),
   )
+
+  const route = useRoute()
+  const router = useRouter()
+
+  function syncProjectRoute(nextProject: string) {
+    const desired = nextProject || ''
+    const current = typeof route.query.project === 'string' ? route.query.project : ''
+    if (current === desired) return
+    router.push({ path: options?.routePath ?? route.path, query: desired ? { project: desired } : {} })
+  }
 
   function resolveProjectSelection(requested: string | undefined) {
     return (requested || '').trim()
@@ -130,7 +148,14 @@ export function useProjectFilterSync(
 
   function onFilterUpdate(v: Record<string, string>) {
     const hasProjectKey = v && Object.prototype.hasOwnProperty.call(v, 'project')
-    if (hasProjectKey) options?.onProjectChange?.((v.project || '').trim())
+    if (hasProjectKey) {
+      const nextProject = (v.project || '').trim()
+      if (options?.onProjectChange) {
+        options.onProjectChange(nextProject)
+      } else if (options?.routePath) {
+        syncProjectRoute(nextProject)
+      }
+    }
     filterRef.value = sanitizeFilterInput(v)
   }
 

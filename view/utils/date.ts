@@ -1,3 +1,21 @@
+export const MS_PER_DAY = 24 * 60 * 60 * 1000
+
+/**
+ * Whether a task is overdue: has a parseable due date strictly before the
+ * start of the local day and is not done. Date-only values count as local
+ * midnight, so a task due today is never overdue.
+ */
+export function isTaskOverdue(task: {
+    status?: string | null
+    due_date?: string | null
+}): boolean {
+    const status = (task.status || '').toLowerCase()
+    if (!task.due_date || status === 'done') return false
+    const due = parseTaskDateToMillis(task.due_date)
+    if (due === null) return false
+    return due < startOfLocalDay(new Date()).getTime()
+}
+
 const DATE_ONLY_REGEX = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/
 
 export function parseTaskDate(value?: string | null): Date | null {
@@ -40,21 +58,6 @@ export function formatTaskDate(value?: string | null, options?: Intl.DateTimeFor
     const parsed = parseTaskDate(value)
     if (!parsed) return value ?? ''
     return parsed.toLocaleDateString(undefined, options)
-}
-
-export function compareTaskDates(a?: string | null, b?: string | null): number {
-    const at = parseTaskDateToMillis(a)
-    const bt = parseTaskDateToMillis(b)
-    if (at === null && bt === null) return 0
-    if (at === null) return -1
-    if (bt === null) return 1
-    return at - bt
-}
-
-export function isDateWithinRange(value: string | null | undefined, start: Date, end: Date): boolean {
-    const parsed = parseTaskDate(value)
-    if (!parsed) return false
-    return parsed >= start && parsed <= end
 }
 
 export function safeTimestamp(value?: string | null): number | null {
@@ -113,4 +116,60 @@ export function fromDateTimeInputValue(value: unknown): string | null {
         return trimmed
     }
     return new Date(parsed).toISOString()
+}
+
+/**
+ * Format a timestamp as a localized date-time string.
+ * Unparseable string values are returned unchanged; empty values yield
+ * `opts.empty` (default '').
+ */
+export function formatDateTime(
+    value?: string | Date | null,
+    opts?: { empty?: string; mediumShort?: boolean },
+): string {
+    if (value === null || value === undefined || value === '') return opts?.empty ?? ''
+    const date = typeof value === 'string' ? new Date(value) : value
+    if (Number.isNaN(date.getTime())) return typeof value === 'string' ? value : String(value)
+    if (opts?.mediumShort) {
+        return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    }
+    return date.toLocaleString()
+}
+
+const relativeTimeFormatter =
+    typeof Intl !== 'undefined' && (Intl as any).RelativeTimeFormat
+        ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+        : null
+
+const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
+    { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
+    { unit: 'month', ms: 1000 * 60 * 60 * 24 * 30 },
+    { unit: 'week', ms: 1000 * 60 * 60 * 24 * 7 },
+    { unit: 'day', ms: 1000 * 60 * 60 * 24 },
+    { unit: 'hour', ms: 1000 * 60 * 60 },
+    { unit: 'minute', ms: 1000 * 60 },
+    { unit: 'second', ms: 1000 },
+]
+
+/**
+ * Format a timestamp as a localized relative time ("3 days ago", "in 2 hours").
+ * Unparseable values are returned unchanged; empty values yield `opts.empty`
+ * (default '').
+ */
+export function formatRelativeTime(
+    value?: string | null,
+    opts?: { empty?: string },
+): string {
+    if (!value) return opts?.empty ?? ''
+    const timestamp = safeTimestamp(value)
+    if (timestamp === null) return value
+    const diff = timestamp - Date.now()
+    if (!relativeTimeFormatter) return new Date(timestamp).toLocaleString()
+    for (const { unit, ms } of relativeUnits) {
+        if (Math.abs(diff) >= ms || unit === 'second') {
+            const amount = Math.round(diff / ms)
+            return relativeTimeFormatter.format(amount, unit)
+        }
+    }
+    return new Date(timestamp).toLocaleString()
 }

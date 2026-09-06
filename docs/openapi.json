@@ -15,7 +15,7 @@
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
+        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username → project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
         "parameters": [
           {
             "name": "project",
@@ -383,7 +383,7 @@
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
-        "description": "Supports built-in filters via named query params (status, priority, type, assignee, tags, project, q). In addition, any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching.",
+        "description": "Supports built-in filters via named query params (status, priority, type, assignee, tags, project, q). In addition, any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. An assignee of @me that cannot be resolved returns 400 INVALID_ARGUMENT.",
         "parameters": [
           {
             "name": "project",
@@ -438,7 +438,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Assignee filter (supports @me; use __none__ for unassigned tasks)."
+            "description": "Assignee filter (supports @me; use __none__ for unassigned tasks). Unresolvable @me returns 400."
           },
           {
             "name": "q",
@@ -1886,7 +1886,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Filter activity to a single project prefix."
+            "description": "Filter activity to a single project prefix. Must be an existing project; invalid or unknown values return 400."
           },
           {
             "name": "limit",
@@ -1966,7 +1966,8 @@
             "required": false,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Filter activity to a single project prefix. Must be an existing project; invalid or unknown values return 400."
           }
         ],
         "responses": {
@@ -2018,7 +2019,8 @@
             "required": false,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Filter activity to a single project prefix. Must be an existing project; invalid or unknown values return 400."
           }
         ],
         "responses": {
@@ -2079,7 +2081,8 @@
             "required": false,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Filter activity to a single project prefix. Must be an existing project; invalid or unknown values return 400."
           }
         ],
         "responses": {
@@ -2353,6 +2356,7 @@
     "/api/tasks/export": {
       "get": {
         "summary": "Export tasks",
+        "description": "Exports tasks in the requested format. Accepts the same filter query parameters as /api/tasks/list (status, priority, type, tags, q, sprints, assignee incl. @me and __none__, and declared custom fields); pagination parameters are ignored.",
         "responses": {
           "200": {
             "description": "OK"

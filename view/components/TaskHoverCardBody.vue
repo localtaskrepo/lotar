@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { customFieldEntriesFromTask } from '../composables/useColumns'
-import { parseTaskDate, startOfLocalDay } from '../utils/date'
+import { formatRelativeTime, parseTaskDate, startOfLocalDay } from '../utils/date'
 import { formatMember } from '../utils/member'
 
 const props = defineProps<{
@@ -52,36 +52,7 @@ const customFieldEntries = computed(() => {
 
 const tags = computed(() => (props.task.tags || []).slice(0, 12))
 
-const relativeTimeFormatter =
-    typeof Intl !== 'undefined' && (Intl as any).RelativeTimeFormat
-        ? new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-        : null
-
-const relativeUnits: Array<{ unit: Intl.RelativeTimeFormatUnit; ms: number }> = [
-    { unit: 'year', ms: 1000 * 60 * 60 * 24 * 365 },
-    { unit: 'month', ms: 1000 * 60 * 60 * 24 * 30 },
-    { unit: 'week', ms: 1000 * 60 * 60 * 24 * 7 },
-    { unit: 'day', ms: 1000 * 60 * 60 * 24 },
-    { unit: 'hour', ms: 1000 * 60 * 60 },
-    { unit: 'minute', ms: 1000 * 60 },
-    { unit: 'second', ms: 1000 },
-]
-
-function relativeTime(value: string) {
-    if (!value) return ''
-    const target = new Date(value)
-    const timestamp = target.getTime()
-    if (!isFinite(timestamp)) return value
-    const diff = timestamp - Date.now()
-    if (!relativeTimeFormatter) return target.toLocaleString()
-    for (const { unit, ms } of relativeUnits) {
-        if (Math.abs(diff) >= ms || unit === 'second') {
-            const amount = Math.round(diff / ms)
-            return relativeTimeFormatter.format(amount, unit)
-        }
-    }
-    return target.toLocaleString()
-}
+const relativeTime = (value: string) => formatRelativeTime(value)
 
 const modifiedInfo = computed(() => {
     const raw = (props.task.modified || '').trim()

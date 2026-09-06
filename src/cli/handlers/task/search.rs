@@ -491,7 +491,7 @@ impl<'a> TaskPostFilters<'a> {
             let now = chrono::Utc::now();
             tasks.retain(|(_, task)| {
                 if let Some(ref due) = task.due_date
-                    && let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due)
+                    && let Some(dt) = crate::utils::time::parse_human_datetime_to_utc(due).ok()
                 {
                     return dt < now;
                 }
@@ -508,7 +508,7 @@ impl<'a> TaskPostFilters<'a> {
             let cutoff = now + chrono::Duration::days(days);
             tasks.retain(|(_, task)| {
                 if let Some(ref due) = task.due_date
-                    && let Some(dt) = crate::cli::validation::parse_due_string_to_utc(due)
+                    && let Some(dt) = crate::utils::time::parse_human_datetime_to_utc(due).ok()
                 {
                     return dt >= now && dt <= cutoff;
                 }
@@ -533,44 +533,7 @@ impl<'a> TaskPostFilters<'a> {
         }
 
         let resolve_vals = |id: &str, task: &Task, key: &str| -> Option<Vec<String>> {
-            let raw = key.trim();
-
-            if let Some(canonical) = crate::utils::fields::is_reserved_field(raw) {
-                match canonical {
-                    "assignee" => return Some(vec![task.assignee.clone().unwrap_or_default()]),
-                    "reporter" => return Some(vec![task.reporter.clone().unwrap_or_default()]),
-                    "type" => return Some(vec![task.task_type.to_string()]),
-                    "status" => return Some(vec![task.status.to_string()]),
-                    "priority" => return Some(vec![task.priority.to_string()]),
-                    "project" => {
-                        return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
-                    }
-                    "tags" => return Some(task.tags.clone()),
-                    _ => {}
-                }
-            }
-
-            let mut field_name: Option<String> = None;
-            if let Some(name) = crate::utils::custom_fields::resolve_filter_name(raw, self.config) {
-                field_name = Some(name);
-            }
-
-            if let Some(name) = field_name {
-                if let Some(value) = task.custom_fields.get(&name) {
-                    return Some(vec![crate::types::custom_value_to_string(value)]);
-                }
-
-                let lower = name.to_lowercase();
-                if let Some((_, value)) = task
-                    .custom_fields
-                    .iter()
-                    .find(|(k, _)| k.to_lowercase() == lower)
-                {
-                    return Some(vec![crate::types::custom_value_to_string(value)]);
-                }
-            }
-
-            None
+            crate::utils::custom_fields::resolve_task_filter_values(id, task, key, self.config)
         };
 
         tasks.retain(|(id, task)| {

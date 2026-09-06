@@ -1,3 +1,6 @@
+mod common;
+
+use crate::common::env_mutex::EnvVarGuard;
 use std::collections::BTreeMap;
 
 use lotar::config::resolution::{get_project_config, load_and_merge_configs};
@@ -19,25 +22,6 @@ fn ensure_tasks_dir(root: &std::path::Path) -> std::path::PathBuf {
     tasks_dir
 }
 
-struct EnvVarGuard {
-    key: String,
-    previous: Option<String>,
-}
-
-impl EnvVarGuard {
-    fn set(key: &str, value: &str) -> Self {
-        let previous = std::env::var(key).ok();
-        // SAFETY: tests serialize environment mutations.
-        unsafe {
-            std::env::set_var(key, value);
-        }
-        Self {
-            key: key.to_string(),
-            previous,
-        }
-    }
-}
-
 struct CliOverrideGuard;
 
 impl CliOverrideGuard {
@@ -55,22 +39,6 @@ impl CliOverrideGuard {
 impl Drop for CliOverrideGuard {
     fn drop(&mut self) {
         lotar::config::resolution::clear_cli_overrides();
-    }
-}
-
-impl Drop for EnvVarGuard {
-    fn drop(&mut self) {
-        if let Some(prev) = &self.previous {
-            // SAFETY: tests serialize environment mutations.
-            unsafe {
-                std::env::set_var(&self.key, prev);
-            }
-        } else {
-            // SAFETY: tests serialize environment mutations.
-            unsafe {
-                std::env::remove_var(&self.key);
-            }
-        }
     }
 }
 

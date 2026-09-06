@@ -58,14 +58,16 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { TaskDTO } from '../api/types';
+import { listFromCsv } from '../composables/useFilterBuilder';
 import { formatTaskDate } from '../utils/date';
 import { formatMember } from '../utils/member';
 import IconGlyph from './IconGlyph.vue';
 import UiButton from './UiButton.vue';
+import { numericOf, projectOf } from '../utils/text'
 const props = defineProps<{ task: TaskDTO; statuses?: string[]; selectable?: boolean; selected?: boolean }>()
 const emit = defineEmits<{ (e:'open', id: string): void; (e:'delete', id: string): void; (e:'update-title', payload: { id: string; title: string }): void; (e:'update-tags', payload: { id: string; tags: string[] }): void; (e:'set-status', payload: { id: string; status: string }): void; (e:'assign', id: string): void; (e:'unassign', id: string): void; (e:'update:selected', v: boolean): void }>()
-const project = (props.task.id || '').split('-')[0]
-const numeric = (props.task.id || '').split('-').slice(1).join('-')
+const project = projectOf(props.task.id)
+const numeric = numericOf(props.task.id)
 const dueDateLabel = computed(() => props.task.due_date ? formatTaskDate(props.task.due_date) : '')
 // bulk select support
 const selectedLocal = ref(!!props.selected)
@@ -84,7 +86,7 @@ const editingTags = ref(false)
 const tagsDraft = ref('')
 watch(() => props.task.tags, (t) => { if (!editingTags.value) tagsDraft.value = (t || []).join(', ') }, { immediate: true })
 function toggleTagsEdit(){ if (editingTags.value) { saveTags() } else { tagsDraft.value = (props.task.tags || []).join(', '); editingTags.value = true } }
-function saveTags(){ const list = tagsDraft.value.split(',').map(s => s.trim()).filter(Boolean); emit('update-tags', { id: props.task.id, tags: list }); editingTags.value = false }
+function saveTags(){ const list = listFromCsv(tagsDraft.value); emit('update-tags', { id: props.task.id, tags: list }); editingTags.value = false }
 
 // Status quick toggle
 function cycleStatus(){

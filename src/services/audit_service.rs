@@ -154,6 +154,15 @@ fn to_feed_history_entry(entry: TaskChangeLogEntry) -> ActivityFeedHistoryEntry 
     }
 }
 
+/// NUL-separated `git log` commit header fields.
+struct CommitHeader {
+    sha: String,
+    author: String,
+    email: String,
+    date: DateTime<Utc>,
+    message: Option<String>,
+}
+
 impl AuditService {
     fn git_path_str(path: &Path) -> String {
         #[cfg(windows)]
@@ -166,8 +175,107 @@ impl AuditService {
         }
     }
 
+    /// Resolve an optional HTTP-provided `project` filter to a pathspec under
+    /// `tasks_rel`. Rejects traversal and non-directory values so the filter
+    /// cannot widen the git log scope outside the tasks directory.
+    fn resolve_project_pathspec(
+        tasks_rel: &Path,
+        project: Option<&str>,
+    ) -> Result<PathBuf, String> {
+        let Some(project) = project else {
+            return Ok(tasks_rel.to_path_buf());
+        };
+        let trimmed = project.trim();
+        if trimmed.is_empty() {
+            return Ok(tasks_rel.to_path_buf());
+        }
+        if trimmed.contains(['/', '\\', '\u{0}'])
+            || trimmed == "."
+            || trimmed == ".."
+            || trimmed.split('/').any(|part| part == "..")
+        {
+            return Err(format!("Invalid project filter: '{}'", trimmed));
+        }
+        let dir = tasks_rel.join(trimmed);
+        if !dir.is_dir() {
+            return Err(format!("Unknown project: '{}'", trimmed));
+        }
+        Ok(dir)
+    }
+
     fn git_path_arg(path: &Path) -> OsString {
         OsString::from(Self::git_path_str(path))
+    }
+
+    /// Parse one `--pretty=format:%H%x00%an%x00%ae%x00%cI[%x00%s]` header line.
+    fn parse_commit_header(line: &str) -> Option<CommitHeader> {
+        if !line.contains('\u{0000}') {
+            return None;
+        }
+        let parts: Vec<&str> = line.split('\u{0000}').collect();
+        if parts.len() < 4 {
+            return None;
+        }
+        let date = chrono::DateTime::parse_from_rfc3339(parts[3])
+            .ok()?
+            .with_timezone(&Utc);
+        Some(CommitHeader {
+            sha: parts[0].to_string(),
+            author: parts[1].to_string(),
+            email: parts[2].to_string(),
+            date,
+            message: parts.get(4).map(|s| s.to_string()),
+        })
+    }
+
+    /// Run `git log` with NUL-separated headers (and optional `--name-only`)
+    /// over the given pathspecs, returning raw stdout for line-by-line parsing.
+    fn run_git_log(
+        repo_root: &Path,
+        since: Option<DateTime<Utc>>,
+        until: Option<DateTime<Utc>>,
+        with_message: bool,
+        name_only: bool,
+        max_commits: usize,
+        pathspecs: &[PathBuf],
+    ) -> Result<String, String> {
+        let mut cmd = Command::new("git");
+        cmd.arg("-C").arg(repo_root);
+        cmd.arg("log");
+        cmd.arg("--no-merges");
+        if let Some(s) = since {
+            cmd.arg(format!("--since={}", s.to_rfc3339()));
+        }
+        if let Some(u) = until {
+            cmd.arg(format!("--until={}", u.to_rfc3339()));
+        }
+        if max_commits > 0 {
+            cmd.arg(format!("--max-count={}", max_commits));
+        }
+        if name_only {
+            cmd.arg("--name-only");
+        }
+        if with_message {
+            cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s");
+        } else {
+            cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
+        }
+        cmd.arg("--");
+        for path in pathspecs {
+            cmd.arg(Self::git_path_arg(path));
+        }
+
+        let output = cmd
+            .output()
+            .map_err(|e| format!("Failed to run git: {}", e))?;
+        if !output.status.success() {
+            return Err(format!(
+                "git log failed (status {}): {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
     /// Reject commit references that git would parse as command-line options
@@ -187,49 +295,34 @@ impl AuditService {
         repo_root: &Path,
         file_rel: &Path,
     ) -> Result<Vec<FileCommitEvent>, String> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
-        cmd.arg("log");
-        cmd.arg("--no-merges");
-        cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s");
-        cmd.arg("--");
-        cmd.arg(Self::git_path_arg(file_rel));
+        let stdout = Self::run_git_log(
+            repo_root,
+            None,
+            None,
+            true,
+            false,
+            0,
+            &[file_rel.to_path_buf()],
+        )?;
 
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
-        if !output.status.success() {
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut items = Vec::new();
         for line in stdout.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
             }
-            if !trimmed.contains('\u{0000}') {
+            let Some(header) = Self::parse_commit_header(trimmed) else {
                 continue;
-            }
-            let parts: Vec<&str> = trimmed.split('\u{0000}').collect();
-            if parts.len() < 5 {
+            };
+            let Some(message) = header.message else {
                 continue;
-            }
-            let date = match chrono::DateTime::parse_from_rfc3339(parts[3]) {
-                Ok(dt) => dt.with_timezone(&Utc),
-                Err(_) => continue,
             };
             items.push(FileCommitEvent {
-                commit: parts[0].to_string(),
-                author: parts[1].to_string(),
-                email: parts[2].to_string(),
-                date,
-                message: parts[4].to_string(),
+                commit: header.sha,
+                author: header.author,
+                email: header.email,
+                date: header.date,
+                message,
             });
         }
 
@@ -246,8 +339,15 @@ impl AuditService {
     ) -> Result<Vec<ActivityFeedItem>, String> {
         let tasks_root_abs = repo_root.join(tasks_rel);
         let tasks_tracked = Self::tasks_are_tracked(repo_root, tasks_rel);
-        let resolved_project_path = project_filter
-            .and_then(|project| Self::resolve_project_path(&tasks_root_abs, tasks_rel, project));
+        let resolved_project_path = match project_filter {
+            Some(project) => {
+                match Self::resolve_project_path(&tasks_root_abs, tasks_rel, project) {
+                    Some(path) => Some(path),
+                    None => return Err(format!("Unknown project: '{}'", project)),
+                }
+            }
+            None => None,
+        };
 
         let path_filters = if tasks_tracked {
             let mut filters = Vec::new();
@@ -261,7 +361,13 @@ impl AuditService {
             None
         };
 
-        let commits = Self::collect_commits(repo_root, since, until, max_commits, path_filters)?;
+        let commits = Self::collect_commits(
+            repo_root,
+            since,
+            until,
+            max_commits,
+            path_filters.as_deref().unwrap_or_default(),
+        )?;
 
         if tasks_tracked {
             Self::build_tracked_activity_feed(repo_root, tasks_rel, commits, project_filter)
@@ -316,38 +422,18 @@ impl AuditService {
         since: DateTime<Utc>,
         until: DateTime<Utc>,
         max_commits: usize,
-        path_filters: Option<Vec<PathBuf>>,
+        path_filters: &[PathBuf],
     ) -> Result<Vec<ParsedCommit>, String> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
-        cmd.arg("log");
-        cmd.arg("--no-merges");
-        cmd.arg(format!("--since={}", since.to_rfc3339()));
-        cmd.arg(format!("--until={}", until.to_rfc3339()));
-        if max_commits > 0 {
-            cmd.arg(format!("--max-count={}", max_commits));
-        }
-        cmd.arg("--name-only");
-        cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI%x00%s");
-        cmd.arg("--");
-        if let Some(filters) = path_filters {
-            for filter in filters {
-                cmd.arg(Self::git_path_arg(&filter));
-            }
-        }
+        let stdout = Self::run_git_log(
+            repo_root,
+            Some(since),
+            Some(until),
+            true,
+            true,
+            max_commits,
+            path_filters,
+        )?;
 
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
-        if !output.status.success() {
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut commits: Vec<ParsedCommit> = Vec::new();
         let mut current: Option<ParsedCommit> = None;
         for line in stdout.lines() {
@@ -362,20 +448,18 @@ impl AuditService {
                 if let Some(commit) = current.take() {
                     commits.push(commit);
                 }
-                let parts: Vec<&str> = trimmed.split('\u{0000}').collect();
-                if parts.len() < 5 {
+                let Some(header) = Self::parse_commit_header(trimmed) else {
                     continue;
-                }
-                let date = match chrono::DateTime::parse_from_rfc3339(parts[3]) {
-                    Ok(dt) => dt.with_timezone(&Utc),
-                    Err(_) => continue,
+                };
+                let Some(message) = header.message else {
+                    continue;
                 };
                 current = Some(ParsedCommit {
-                    sha: parts[0].to_string(),
-                    author: parts[1].to_string(),
-                    email: parts[2].to_string(),
-                    date,
-                    message: parts[4].to_string(),
+                    sha: header.sha,
+                    author: header.author,
+                    email: header.email,
+                    date: header.date,
+                    message,
                     files: Vec::new(),
                 });
                 continue;
@@ -548,11 +632,7 @@ impl AuditService {
                     None => continue,
                 };
 
-                let raw = match fs::read_to_string(&file_path) {
-                    Ok(content) => content,
-                    Err(_) => continue,
-                };
-                let task = match Self::parse_task_yaml(&raw) {
+                let task = match crate::storage::search::StorageSearch::load_task_file(&file_path) {
                     Some(task) => task,
                     None => continue,
                 };
@@ -726,28 +806,14 @@ impl AuditService {
         tasks_rel: &Path,
         project_filter: Option<&str>,
     ) -> Result<Vec<ChangedTaskSummary>, String> {
-        fn visit_dir_collect<F: FnMut(&Path)>(dir: &Path, f: &mut F) {
-            if let Ok(read) = std::fs::read_dir(dir) {
-                for entry in read.flatten() {
-                    let p = entry.path();
-                    if p.is_dir() {
-                        visit_dir_collect(&p, f);
-                    } else {
-                        f(&p);
-                    }
-                }
-            }
-        }
-
         let tasks_abs = repo_root.join(tasks_rel);
-        let mut files: Vec<PathBuf> = Vec::new();
-        if let Some(project) = project_filter {
-            visit_dir_collect(&tasks_abs.join(project), &mut |p| {
-                files.push(p.to_path_buf())
-            });
-        } else {
-            visit_dir_collect(&tasks_abs, &mut |p| files.push(p.to_path_buf()));
-        }
+        let files: Vec<PathBuf> = match project_filter {
+            Some(project) => crate::utils::filesystem::list_files_with_ext_recursive(
+                &tasks_abs.join(project),
+                "yml",
+            ),
+            None => crate::utils::filesystem::list_files_with_ext_recursive(&tasks_abs, "yml"),
+        };
 
         let mut items: Vec<ChangedTaskSummary> = Vec::new();
         for abs_path in files {
@@ -781,31 +847,27 @@ impl AuditService {
             };
             let id = format!("{}-{}", project, numeric);
 
-            let mut log1 = Command::new("git");
-            log1.arg("-C").arg(repo_root);
-            log1.arg("log");
-            log1.arg("-1");
-            log1.arg("--no-merges");
-            log1.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
-            log1.arg("--");
-            log1.arg(&rel_path);
-            let log_out = log1
-                .output()
-                .map_err(|e| format!("Failed to run git log -1: {}", e))?;
-            if !log_out.status.success() {
-                continue;
-            }
-            let header = String::from_utf8_lossy(&log_out.stdout);
-            let parts: Vec<&str> = header.trim().split('\u{0000}').collect();
-            if parts.len() < 4 {
-                continue;
-            }
-            let last_commit = parts[0].to_string();
-            let last_author = parts[1].to_string();
-            let last_date = match chrono::DateTime::parse_from_rfc3339(parts[3]) {
-                Ok(dt) => dt.with_timezone(&Utc),
+            let log1_out = match Self::run_git_log(
+                repo_root,
+                None,
+                None,
+                false,
+                false,
+                1,
+                std::slice::from_ref(&rel_path),
+            ) {
+                Ok(out) => out,
                 Err(_) => continue,
             };
+            let Some(header) = log1_out
+                .lines()
+                .find_map(|l| Self::parse_commit_header(l.trim()))
+            else {
+                continue;
+            };
+            let last_commit = header.sha;
+            let last_author = header.author;
+            let last_date = header.date;
 
             let commits: usize = {
                 let mut rev = Command::new("git");
@@ -901,35 +963,27 @@ impl AuditService {
         author_filter: Option<&str>,
         project_filter: Option<&str>,
     ) -> Result<Vec<ChangedTaskSummary>, String> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
-        cmd.arg("log");
-        cmd.arg(format!("--since={}", since.to_rfc3339()));
-        cmd.arg(format!("--until={}", until.to_rfc3339()));
-        cmd.arg("--name-only");
-        cmd.arg("--no-merges");
-        // Use NUL-separated header for reliable parsing
-        cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
-        // Limit to tasks directory changes
-        cmd.arg("--");
-        cmd.arg(Self::git_path_arg(tasks_rel));
-
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
-        if !output.status.success() {
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
+        if let Some(project) = project_filter {
+            let tasks_root_abs = repo_root.join(tasks_rel);
+            if Self::resolve_project_path(&tasks_root_abs, tasks_rel, project).is_none() {
+                return Err(format!("Unknown project: '{}'", project));
+            }
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = Self::run_git_log(
+            repo_root,
+            Some(since),
+            Some(until),
+            false,
+            true,
+            0,
+            &[tasks_rel.to_path_buf()],
+        )?;
+
         let mut summaries: HashMap<String, ChangedTaskSummary> = HashMap::new();
         let mut current_commit: Option<(String, String, String, DateTime<Utc>)> = None; // (sha, author, email, date)
 
-        // We'll parse by lines: header lines contain three NULs; following non-empty lines are file paths; blank line separates commits
+        // Header lines contain NUL separators; following non-empty lines are file paths; blank lines separate commits
         for line in stdout.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
@@ -937,29 +991,18 @@ impl AuditService {
                 continue;
             }
 
-            if trimmed.contains('\u{0000}') {
-                let parts: Vec<&str> = trimmed.split('\u{0000}').collect();
-                if parts.len() >= 4 {
-                    let sha = parts[0].to_string();
-                    let author = parts[1].to_string();
-                    let email = parts[2].to_string();
-                    let date = match chrono::DateTime::parse_from_rfc3339(parts[3]) {
-                        Ok(dt) => dt.with_timezone(&Utc),
-                        Err(_) => continue,
-                    };
-
-                    // If author filter provided, skip this commit if it doesn't match
-                    if let Some(filter) = author_filter {
-                        let f = filter.to_lowercase();
-                        if !author.to_lowercase().contains(&f) && !email.to_lowercase().contains(&f)
-                        {
-                            current_commit = None;
-                            continue;
-                        }
+            if let Some(header) = Self::parse_commit_header(trimmed) {
+                // If author filter provided, skip this commit if it doesn't match
+                if let Some(filter) = author_filter {
+                    let f = filter.to_lowercase();
+                    if !header.author.to_lowercase().contains(&f)
+                        && !header.email.to_lowercase().contains(&f)
+                    {
+                        current_commit = None;
+                        continue;
                     }
-
-                    current_commit = Some((sha, author, email, date));
                 }
+                current_commit = Some((header.sha, header.author, header.email, header.date));
                 continue;
             }
 
@@ -977,27 +1020,13 @@ impl AuditService {
                         continue;
                     }
                 }
-                // Must be a YAML file with numeric stem under a project folder
+                // Must be a YAML file with a numeric stem under a project folder
                 if rel_path.extension().and_then(|e| e.to_str()) != Some("yml") {
                     continue;
                 }
-                let file_name = match rel_path.file_stem().and_then(|s| s.to_str()) {
-                    Some(s) => s,
-                    None => continue,
+                let Some((id, project)) = Self::task_id_from_path(tasks_rel, rel_path) else {
+                    continue;
                 };
-                let numeric: u64 = match file_name.parse() {
-                    Ok(n) => n,
-                    Err(_) => continue,
-                };
-                let project = match rel_path
-                    .parent()
-                    .and_then(|p| p.file_name())
-                    .and_then(|s| s.to_str())
-                {
-                    Some(p) => p.to_string(),
-                    None => continue,
-                };
-                let id = format!("{}-{}", project, numeric);
 
                 let entry = summaries
                     .entry(id.clone())
@@ -1033,61 +1062,34 @@ impl AuditService {
         until: DateTime<Utc>,
         project_filter: Option<&str>,
     ) -> Result<Vec<AuthorActivity>, String> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
-        cmd.arg("log");
-        cmd.arg(format!("--since={}", since.to_rfc3339()));
-        cmd.arg(format!("--until={}", until.to_rfc3339()));
-        cmd.arg("--no-merges");
-        cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
-        // Limit to tasks directory (and optionally project) changes via pathspec
-        cmd.arg("--");
-        if let Some(project) = project_filter {
-            cmd.arg(tasks_rel.join(project));
-        } else {
-            cmd.arg(Self::git_path_arg(tasks_rel));
-        }
+        let pathspec = Self::resolve_project_pathspec(tasks_rel, project_filter)?;
+        let stdout = Self::run_git_log(
+            repo_root,
+            Some(since),
+            Some(until),
+            false,
+            false,
+            0,
+            &[pathspec],
+        )?;
 
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
-        if !output.status.success() {
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut map: HashMap<(String, String), AuthorActivity> = HashMap::new();
         for line in stdout.lines() {
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
             }
-            if trimmed.contains('\u{0000}') {
-                let parts: Vec<&str> = trimmed.split('\u{0000}').collect();
-                if parts.len() >= 4 {
-                    let _sha = parts[0];
-                    let author = parts[1].to_string();
-                    let email = parts[2].to_string();
-                    let date = match chrono::DateTime::parse_from_rfc3339(parts[3]) {
-                        Ok(dt) => dt.with_timezone(&Utc),
-                        Err(_) => continue,
-                    };
-
-                    let key = (author.clone(), email.clone());
-                    let entry = map.entry(key).or_insert_with(|| AuthorActivity {
-                        author: author.clone(),
-                        email: email.clone(),
-                        commits: 0,
-                        last_date: date,
-                    });
-                    entry.commits += 1;
-                    if date > entry.last_date {
-                        entry.last_date = date;
-                    }
+            if let Some(header) = Self::parse_commit_header(trimmed) {
+                let key = (header.author.clone(), header.email.clone());
+                let entry = map.entry(key).or_insert_with(|| AuthorActivity {
+                    author: header.author.clone(),
+                    email: header.email.clone(),
+                    commits: 0,
+                    last_date: header.date,
+                });
+                entry.commits += 1;
+                if header.date > entry.last_date {
+                    entry.last_date = header.date;
                 }
             }
         }
@@ -1110,38 +1112,18 @@ impl AuditService {
         group_by: GroupBy,
         project_filter: Option<&str>,
     ) -> Result<Vec<ActivityItem>, String> {
-        let mut cmd = Command::new("git");
-        cmd.arg("-C").arg(repo_root);
-        cmd.arg("log");
-        cmd.arg(format!("--since={}", since.to_rfc3339()));
-        cmd.arg(format!("--until={}", until.to_rfc3339()));
-        cmd.arg("--no-merges");
-        // If grouping by project we need names; otherwise headers suffice
-        if matches!(group_by, GroupBy::Project) {
-            cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
-            cmd.arg("--name-only");
-        } else {
-            cmd.arg("--pretty=format:%H%x00%an%x00%ae%x00%cI");
-        }
-        cmd.arg("--");
-        if let Some(project) = project_filter {
-            cmd.arg(tasks_rel.join(project));
-        } else {
-            cmd.arg(Self::git_path_arg(tasks_rel));
-        }
-
-        let output = cmd
-            .output()
-            .map_err(|e| format!("Failed to run git: {}", e))?;
-        if !output.status.success() {
-            return Err(format!(
-                "git log failed (status {}): {}",
-                output.status,
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        // If grouping by project we need file names; otherwise headers suffice
+        let name_only = matches!(group_by, GroupBy::Project);
+        let pathspec = Self::resolve_project_pathspec(tasks_rel, project_filter)?;
+        let stdout = Self::run_git_log(
+            repo_root,
+            Some(since),
+            Some(until),
+            false,
+            name_only,
+            0,
+            &[pathspec],
+        )?;
         let mut map: std::collections::HashMap<String, ActivityItem> =
             std::collections::HashMap::new();
         let mut current: Option<(String, String, String, DateTime<Utc>)> = None;

@@ -6,13 +6,13 @@ Central reference for identity resolution and people fields.
 
 Used wherever a person is needed (assignee, reporter, default_reporter):
 1) Merged config `default_reporter` (same precedence chain described in [config.md](./config.md): CLI overrides → env vars like `LOTAR_DEFAULT_REPORTER` → home → project → global → defaults)
-2) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) detected under the current repo root
-3) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
-4) System user ($USER or $USERNAME)
+2) Git user (user.name or user.email at repo root) — gated by `auto.identity_git`
+3) System user ($USER or $USERNAME)
+4) Project manifest author (package.json author, Cargo.toml authors, or .csproj `<Authors>`) — last resort only, since manifest authors are a static guess that may not be the current user
 
 Automation toggles (under the `auto.*` namespace in config/env/CLI `config set`):
-- `auto.identity` (default: true) — disables all smart detectors when false. Only `default_reporter` is considered, so git/manifests/system are ignored.
-- `auto.identity_git` (default: true) — when false, git detectors are skipped but manifest + env fallbacks remain.
+- `auto.identity` (default: true) — when false, the git and manifest detectors are disabled; only `default_reporter` and the system user ($USER/$USERNAME) are considered.
+- `auto.identity_git` (default: true) — when false, git detectors are skipped but env and manifest fallbacks remain.
 
 Use `lotar whoami --explain` to see the chosen source, confidence, and toggle states.
 
@@ -37,7 +37,7 @@ lotar whoami --explain --format=json
 
 ### REST / MCP
 
-- `GET /api/whoami` returns `{ "status": "ok", "user": "..." }` using the same resolver (`src/routes.rs`).
+- `GET /api/whoami` returns `{ "status": "ok", "user": "..." }` using the same resolver (`src/routes/whoami.rs`).
 - MCP task operations (`src/mcp/server/handlers/tasks.rs`) and REST task mutations rely on the same helper, so `@me` aliases and default reporter fallbacks behave identically across interfaces.
 
 ## Reporter vs Assignee

@@ -245,6 +245,8 @@
 </template>
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
+import { listFromCsv } from '../composables/useFilterBuilder'
+import { storageGetJson, storageRemove, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
 import {
     chipsForFilterValue,
@@ -343,12 +345,6 @@ const singleProjectLabel = computed(() => {
 
 const DOCUMENT_CLICK_OPTS: AddEventListenerOptions = { capture: true }
 
-function splitCsv(value: string): string[] {
-  return value
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-}
 
 function joinCsv(values: string[]): string {
   return values.join(',')
@@ -357,7 +353,7 @@ function joinCsv(values: string[]): string {
 function toggleInCsv(csv: string, value: string): string {
   const trimmed = value.trim()
   if (!trimmed) return csv
-  const next = new Set(splitCsv(csv))
+  const next = new Set(listFromCsv(csv))
   if (next.has(trimmed)) {
     next.delete(trimmed)
   } else {
@@ -369,14 +365,14 @@ function toggleInCsv(csv: string, value: string): string {
 function mergeIntoCsv(csv: string, value: string): string {
   const trimmed = value.trim()
   if (!trimmed) return csv
-  const next = new Set(splitCsv(csv))
+  const next = new Set(listFromCsv(csv))
   next.add(trimmed)
   return joinCsv(Array.from(next))
 }
 
 function invertCsv(csv: string, universe: readonly string[]): string {
   if (!universe.length) return ''
-  const selected = new Set(splitCsv(csv))
+  const selected = new Set(listFromCsv(csv))
   const next = universe
     .map((v) => v.trim())
     .filter(Boolean)
@@ -385,40 +381,40 @@ function invertCsv(csv: string, universe: readonly string[]): string {
 }
 
 const statusTitle = computed(() => {
-  const values = splitCsv(status.value)
+  const values = listFromCsv(status.value)
   return values.length ? `Selected: ${values.join(', ')}` : ''
 })
-const statusHasSelections = computed(() => splitCsv(status.value).length > 0)
-const statusSelections = computed(() => splitCsv(status.value))
+const statusHasSelections = computed(() => listFromCsv(status.value).length > 0)
+const statusSelections = computed(() => listFromCsv(status.value))
 const statusSelectionSet = computed(() => new Set(statusSelections.value))
 const statusTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Status', statusSelections.value))
 const priorityTitle = computed(() => {
-  const values = splitCsv(priority.value)
+  const values = listFromCsv(priority.value)
   return values.length ? `Selected: ${values.join(', ')}` : ''
 })
-const priorityHasSelections = computed(() => splitCsv(priority.value).length > 0)
-const prioritySelections = computed(() => splitCsv(priority.value))
+const priorityHasSelections = computed(() => listFromCsv(priority.value).length > 0)
+const prioritySelections = computed(() => listFromCsv(priority.value))
 const prioritySelectionSet = computed(() => new Set(prioritySelections.value))
 const priorityTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Priority', prioritySelections.value))
 const typeTitle = computed(() => {
-  const values = splitCsv(type.value)
+  const values = listFromCsv(type.value)
   return values.length ? `Selected: ${values.join(', ')}` : ''
 })
-const typeHasSelections = computed(() => splitCsv(type.value).length > 0)
-const typeSelections = computed(() => splitCsv(type.value))
+const typeHasSelections = computed(() => listFromCsv(type.value).length > 0)
+const typeSelections = computed(() => listFromCsv(type.value))
 const typeSelectionSet = computed(() => new Set(typeSelections.value))
 const typeTriggerLabel = computed(() => formatMultiSelectTriggerLabel('Type', typeSelections.value))
 
 const showSprintSelect = computed(() => (props.sprintOptions ?? []).length > 0)
 const sprintTitle = computed(() => {
-  const values = splitCsv(sprintFilter.value)
+  const values = listFromCsv(sprintFilter.value)
   if (!values.length) return ''
   const opts = props.sprintOptions ?? []
   const labels = values.map((id) => opts.find((o) => String(o.id) === id)?.label ?? `#${id}`)
   return `Selected: ${labels.join(', ')}`
 })
-const sprintHasSelections = computed(() => splitCsv(sprintFilter.value).length > 0)
-const sprintSelections = computed(() => splitCsv(sprintFilter.value))
+const sprintHasSelections = computed(() => listFromCsv(sprintFilter.value).length > 0)
+const sprintSelections = computed(() => listFromCsv(sprintFilter.value))
 const sprintSelectionSet = computed(() => new Set(sprintSelections.value))
 const sprintTriggerLabel = computed(() => {
   const selected = sprintSelections.value
@@ -575,20 +571,21 @@ onMounted(() => {
   try {
     const hasIncoming = hasMeaningfulIncoming(props.value)
     if (!hasIncoming) {
-      const saved = JSON.parse(localStorage.getItem(FILTER_KEY.value) || 'null')
+      const saved = storageGetJson<Record<string, unknown>>(FILTER_KEY.value)
       if (saved && typeof saved === 'object') {
-        query.value = saved.q || ''
+        const asText = (v: unknown) => (typeof v === 'string' ? v : '')
+        query.value = asText(saved.q)
         searchDraft.value = query.value
-        project.value = saved.project || ''
-        status.value = saved.status || ''
-        priority.value = saved.priority || ''
-        type.value = saved.type || ''
-        sprintFilter.value = saved.sprints || ''
-        assignee.value = saved.assignee || ''
-        tags.value = saved.tags || ''
-        dueDate.value = saved.due || ''
-        recent.value = saved.recent || ''
-        needs.value = saved.needs || ''
+        project.value = asText(saved.project)
+        status.value = asText(saved.status)
+        priority.value = asText(saved.priority)
+        type.value = asText(saved.type)
+        sprintFilter.value = asText(saved.sprints)
+        assignee.value = asText(saved.assignee)
+        tags.value = asText(saved.tags)
+        dueDate.value = asText(saved.due)
+        recent.value = asText(saved.recent)
+        needs.value = asText(saved.needs)
         order.value = (saved.order === 'asc' || saved.order === 'desc') ? saved.order : 'desc'
         const extras = Object.entries(saved)
           .filter(([key]) => !CUSTOM_UI_KEYS.has(key))
@@ -689,12 +686,6 @@ watchEffect(() => {
   }
 })
 
-function splitCustomTokens(input: string): string[] {
-  return input
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-}
 
 function normalizeReservedKey(input: string): string {
   return input.toLowerCase().replace(/[-_\s]+/g, '')
@@ -725,7 +716,7 @@ function parseCustomFilters(input: string): { map: Record<string, string>; error
   const map: Record<string, string> = {}
   const errors: string[] = []
 
-  splitCustomTokens(input).forEach((part) => {
+  listFromCsv(input).forEach((part) => {
     const eq = part.indexOf('=')
     if (eq <= 0) {
       errors.push(`"${part}" is missing "="`)
@@ -771,7 +762,7 @@ const shouldRenderCustomHint = computed(() => customHintVisible.value && customF
 function appendCustomFilter(expr: string) {
   const trimmed = expr.trim()
   if (!trimmed) return
-  const tokens = splitCustomTokens(extraFilters.value)
+  const tokens = listFromCsv(extraFilters.value)
   if (!tokens.includes(trimmed)) {
     tokens.push(trimmed)
     extraFilters.value = tokens.join(', ')
@@ -991,7 +982,7 @@ function removeChip(chip: FilterChip) {
 }
 
 function removeCsvValue(csv: string, value: string): string {
-  const next = splitCsv(csv).filter((v) => v !== value)
+  const next = listFromCsv(csv).filter((v) => v !== value)
   return joinCsv(next)
 }
 
@@ -1041,7 +1032,7 @@ function emitFilter(){
   Object.entries(parsed.map).forEach(([key, value]) => {
     if (value) v[key] = value
   })
-  try { localStorage.setItem(FILTER_KEY.value, JSON.stringify(v)) } catch {}
+  storageSetJson(FILTER_KEY.value, v)
   emit('update:value', v)
 }
 function onClear(){
@@ -1064,7 +1055,7 @@ function onClear(){
   extraFilters.value = ''
   lastSyncedExtras = ''
   customFilterErrors.value = []
-  try { localStorage.removeItem(FILTER_KEY.value) } catch {}
+  storageRemove(FILTER_KEY.value)
   const empty: Record<string,string> = {}
   if (showOrderSelect.value) {
     empty.order = 'desc'

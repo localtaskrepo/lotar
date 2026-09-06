@@ -1,5 +1,17 @@
 fn norm(s: &str) -> String {
-    s.to_lowercase().replace(['_', '-'], "")
+    // Strip a leading `@` so member-style queries ("@alice") match values
+    // stored without the prefix (and vice versa).
+    s.strip_prefix('@')
+        .unwrap_or(s)
+        .to_lowercase()
+        .replace(['_', '-'], "")
+}
+
+/// Normalized comparison key for member-style values (assignee/reporter):
+/// case-insensitive, `@`-prefix-insensitive, `_`/`-`-separator-insensitive.
+/// This is the documented matching semantics for task filters.
+pub fn member_key(s: &str) -> String {
+    norm(s)
 }
 
 /// Utility for fuzzy property matching: ignores case, underscores, and dashes.

@@ -1,5 +1,4 @@
 use crate::api_types::{AgentJob, AgentJobCreateRequest};
-use crate::config::manager::ConfigManager;
 use crate::config::resolution::load_and_merge_configs;
 use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -186,17 +185,9 @@ impl AgentJobService {
             ));
         }
 
-        let cfg_mgr = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
-
         let project_prefix = ticket_id.split('-').next().unwrap_or("");
-        let config = if project_prefix.is_empty() {
-            cfg_mgr.get_resolved_config().clone()
-        } else {
-            cfg_mgr
-                .get_project_config(project_prefix)
-                .unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone())
-        };
+        let config = crate::config::resolution::config_for_project(tasks_dir, Some(project_prefix))
+            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
         let profile = resolve_profile(&config, &req)?;
         let runner_kind = profile.runner.parse::<AgentRunnerKind>().map_err(|_| {

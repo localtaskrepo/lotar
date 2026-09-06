@@ -92,15 +92,17 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
         }
     }
 
-    // Relative offsets from now
+    // Relative offsets from now. Whole-day/week offsets use local date
+    // arithmetic (snapped to local midnight) so results stay on the same
+    // calendar date across DST transitions instead of drifting ±1 day.
     if let Some(off) = parse_signed_simple_offset(&lower) {
-        return Ok(Utc::now() + off);
+        return Ok(offset_from_local_today(off.num_days()));
     }
     if let Some(off) = parse_in_offset(&lower) {
-        return Ok(Utc::now() + off);
+        return Ok(offset_from_local_today(off.num_days()));
     }
     if let Some(off) = parse_ago_offset(&lower) {
-        return Ok(Utc::now() - off);
+        return Ok(offset_from_local_today(-off.num_days()));
     }
     if let Some(days) = parse_business_days_offset(&lower) {
         let base = Local::now().date_naive();
@@ -117,6 +119,20 @@ pub fn parse_human_datetime_to_utc(s: &str) -> Result<DateTime<Utc>, String> {
         "Invalid date/time: '{}'. Try YYYY-MM-DD, RFC3339, 'now', 'today', 'in 3 days', '3 days ago', '+2w', '-1d', 'next monday'.",
         s
     ))
+}
+
+/// Whole-day offset from today, computed in local date arithmetic and snapped
+/// to local midnight (DST-safe). Falls back to instant arithmetic if the
+/// resulting local midnight is ambiguous or nonexistent.
+fn offset_from_local_today(days: i64) -> DateTime<Utc> {
+    let date = Local::now().date_naive() + chrono::Duration::days(days);
+    match Local
+        .with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0)
+        .single()
+    {
+        Some(dt) => dt.with_timezone(&Utc),
+        None => Utc::now() + chrono::Duration::days(days),
+    }
 }
 
 /// Parse since/until window. Defaults: since=now-30d, until=now.
@@ -270,6 +286,11 @@ fn parse_next_week_named(s: &str) -> Option<chrono::NaiveDate> {
         return Some(mon_next + Duration::days(offset_days));
     }
     None
+}
+
+/// Public probe: does this string look like a naive local datetime?
+pub fn parse_naive_local_datetime_to_utc(s: &str) -> Option<DateTime<Utc>> {
+    parse_local_naive_datetime_to_utc(s)
 }
 
 fn parse_local_naive_datetime_to_utc(s: &str) -> Option<DateTime<Utc>> {

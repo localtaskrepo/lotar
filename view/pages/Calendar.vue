@@ -379,7 +379,6 @@ const { hasFilters, onFilterUpdate, clearFilters: clearFiltersAction } = useProj
 const customFilterPresets = useCustomFilterPresets(availableCustomFields)
 
 const weekDays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 function syncProjectRoute(nextProject: string) {
   const desired = nextProject || ''

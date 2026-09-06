@@ -1,4 +1,6 @@
 // Auto-generated from stats_handler.rs.
+use crate::storage::task::parse_status_from_yaml;
+
 pub(crate) fn run_status(
     id: &str,
     time_in_status: bool,
@@ -77,35 +79,6 @@ pub(crate) fn run_status(
         String,
         Option<crate::types::TaskStatus>,
     )> = Vec::new();
-    // Helper: tolerant status parse from YAML content
-    fn parse_status_from_yaml(content: &str) -> Option<crate::types::TaskStatus> {
-        fn parse_status_str_tolerant(s: &str) -> Option<crate::types::TaskStatus> {
-            let norm = s.to_ascii_lowercase().replace(['_', '-'], "");
-            match norm.as_str() {
-                "todo" => Some(crate::types::TaskStatus::from("Todo")),
-                "inprogress" => Some(crate::types::TaskStatus::from("InProgress")),
-                "verify" => Some(crate::types::TaskStatus::from("Verify")),
-                "blocked" => Some(crate::types::TaskStatus::from("Blocked")),
-                "done" => Some(crate::types::TaskStatus::from("Done")),
-                _ => None,
-            }
-        }
-        if let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(content) {
-            return Some(task.status);
-        }
-        if let Ok(val) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content)
-            && let Some(s) = val.get("status").and_then(|v| match v {
-                serde_yaml_ng::Value::String(s) => Some(s.clone()),
-                _ => None,
-            })
-        {
-            if let Some(ts) = parse_status_str_tolerant(&s) {
-                return Some(ts);
-            }
-            return s.parse::<crate::types::TaskStatus>().ok();
-        }
-        None
-    }
     for c in &commits {
         if c.date > until_dt {
             continue;
@@ -306,31 +279,17 @@ pub(crate) fn run_time_in_status(
     } else {
         base.clone()
     };
-    if walker_root.exists() {
-        let mut stack = vec![walker_root.clone()];
-        while let Some(dir) = stack.pop() {
-            if let Ok(read) = std::fs::read_dir(&dir) {
-                for entry in read.flatten() {
-                    let p = entry.path();
-                    if p.is_dir() {
-                        stack.push(p);
-                    } else if p.extension().and_then(|e| e.to_str()) == Some("yml")
-                        && let Some(stem) = p.file_stem().and_then(|s| s.to_str())
-                        && let Ok(num) = stem.parse::<u64>()
-                    {
-                        let project = p
-                            .parent()
-                            .and_then(|q| q.file_name())
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("");
-                        let id = format!("{}-{}", project, num);
-                        // Compute path relative to repo root for git show
-                        if let Ok(rel) = p.strip_prefix(&repo_root) {
-                            task_files.push((id, rel.to_path_buf()));
-                        }
-                    }
-                }
-            }
+    for p in crate::utils::filesystem::list_files_with_ext_recursive(&walker_root, "yml") {
+        if let Some(stem) = p.file_stem().and_then(|s| s.to_str())
+            && let Ok(num) = stem.parse::<u64>()
+            && let Some(project) = p
+                .parent()
+                .and_then(|q| q.file_name())
+                .and_then(|s| s.to_str())
+            && let Ok(rel) = p.strip_prefix(&repo_root)
+        {
+            let id = format!("{}-{}", project, num);
+            task_files.push((id, rel.to_path_buf()));
         }
     }
 
@@ -353,35 +312,6 @@ pub(crate) fn run_time_in_status(
             String,
             Option<crate::types::TaskStatus>,
         )> = Vec::new();
-        // Helper: tolerant status parse from YAML content
-        fn parse_status_from_yaml(content: &str) -> Option<crate::types::TaskStatus> {
-            fn parse_status_str_tolerant(s: &str) -> Option<crate::types::TaskStatus> {
-                let norm = s.to_ascii_lowercase().replace(['_', '-'], "");
-                match norm.as_str() {
-                    "todo" => Some(crate::types::TaskStatus::from("Todo")),
-                    "inprogress" => Some(crate::types::TaskStatus::from("InProgress")),
-                    "verify" => Some(crate::types::TaskStatus::from("Verify")),
-                    "blocked" => Some(crate::types::TaskStatus::from("Blocked")),
-                    "done" => Some(crate::types::TaskStatus::from("Done")),
-                    _ => None,
-                }
-            }
-            if let Ok(task) = serde_yaml_ng::from_str::<crate::storage::task::Task>(content) {
-                return Some(task.status);
-            }
-            if let Ok(val) = serde_yaml_ng::from_str::<serde_yaml_ng::Value>(content)
-                && let Some(s) = val.get("status").and_then(|v| match v {
-                    serde_yaml_ng::Value::String(s) => Some(s.clone()),
-                    _ => None,
-                })
-            {
-                if let Some(ts) = parse_status_str_tolerant(&s) {
-                    return Some(ts);
-                }
-                return s.parse::<crate::types::TaskStatus>().ok();
-            }
-            None
-        }
 
         for c in &commits {
             // Only consider up to 'until'

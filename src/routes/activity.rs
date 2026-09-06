@@ -40,6 +40,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &tasks_rel, since, until, project, limit,
         ) {
             Ok(items) => ok_json(200, json!({"data": items})),
+            Err(e)
+                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
+            {
+                bad_request(e)
+            }
             Err(e) => internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         }
     });
@@ -90,6 +95,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &tasks_rel, since, until, gb, project,
         ) {
             Ok(items) => ok_json(200, json!({"data": items})),
+            Err(e)
+                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
+            {
+                bad_request(e)
+            }
             Err(e) => internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         }
     });
@@ -130,6 +140,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &tasks_rel, since, until, project,
         ) {
             Ok(items) => ok_json(200, json!({"data": items})),
+            Err(e)
+                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
+            {
+                bad_request(e)
+            }
             Err(e) => internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         }
     });
@@ -171,6 +186,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
             &repo_root, &tasks_rel, since, until, author, project,
         ) {
             Ok(items) => ok_json(200, json!({"data": items})),
+            Err(e)
+                if e.starts_with("Unknown project") || e.starts_with("Invalid project filter") =>
+            {
+                bad_request(e)
+            }
             Err(e) => internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         }
     });

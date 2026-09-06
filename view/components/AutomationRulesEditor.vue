@@ -638,6 +638,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { listFromCsv } from '../composables/useFilterBuilder'
 import {
     automationConditionFieldOptions,
     automationConditionOperatorOptions,
@@ -1233,7 +1234,7 @@ function populateSimpleStateFromDraft(draft: AutomationRuleDraft, recipe: Guided
   if (recipe === 'tags') {
     const source = entry.addFields.find((row) => row.field === 'tags') ?? entry.removeFields.find((row) => row.field === 'tags')
     simpleTagMode.value = entry.addFields.some((row) => row.field === 'tags' && row.value.trim()) ? 'add' : 'remove'
-    simpleTagValues.value = splitCsv(source?.value ?? '')
+    simpleTagValues.value = listFromCsv(source?.value ?? '')
     return
   }
 
@@ -1409,12 +1410,6 @@ function hasChangeContent(row: { field: string; from: string; to: string }) {
   return Boolean(row.field.trim() || row.from.trim() || row.to.trim())
 }
 
-function splitCsv(value: string) {
-  return value
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-}
 
 function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   return JSON.parse(JSON.stringify(draft)) as AutomationRuleDraft

@@ -7,23 +7,11 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
         let project = req.query.get("project").map(|s| s.as_str());
-        let cfg_mgr =
-            match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(
-                &resolver.path,
-            ) {
-                Ok(m) => m,
-                Err(e) => {
-                    return internal(
-                        json!({"error": {"code": "INTERNAL", "message": e.to_string()}}),
-                    );
-                }
-            };
-        let config = if let Some(prefix) = project {
-            cfg_mgr
-                .get_project_config(prefix)
-                .unwrap_or_else(|_| cfg_mgr.get_resolved_config().clone())
-        } else {
-            cfg_mgr.get_resolved_config().clone()
+        let config = match crate::config::resolution::config_for_project(&resolver.path, project) {
+            Ok(c) => c,
+            Err(e) => {
+                return internal(json!({"error": {"code": "INTERNAL", "message": e.to_string()}}));
+            }
         };
 
         let profiles: Vec<crate::api_types::AgentProfileInfo> = config

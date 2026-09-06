@@ -176,6 +176,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { api } from '../api/client'
+import { formatDateTime } from '../utils/date'
 import type { AgentJob, AgentJobLogEntry, AgentQueueStats } from '../api/types'
 import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
@@ -468,12 +469,7 @@ function openTask(taskId: string) {
   openTaskPanel({ taskId })
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return 'unknown'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
-}
+const formatDate = (value?: string | null) => formatDateTime(value, { empty: 'unknown' })
 
 function shouldDisplayLogEntry(entry: AgentJobLogEntry) {
   return Boolean((entry.message || '').trim()) || Boolean(formatLogMessage(entry))

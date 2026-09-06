@@ -1,6 +1,5 @@
 use clap::Parser;
 use std::env;
-use std::str::FromStr;
 
 use lotar::cli::handlers::assignee::{AssigneeArgs, AssigneeHandler};
 use lotar::cli::handlers::comment::{CommentArgs, CommentHandler};
@@ -715,73 +714,7 @@ fn main() {
                         // Load snapshots with tolerant fallback for mixed-case enums in YAML
                         let load_yaml_as_task =
                             |content: &str| -> Option<lotar::storage::task::Task> {
-                                // First try strict parse
-                                if let Ok(t) =
-                                    serde_yaml_ng::from_str::<lotar::storage::task::Task>(content)
-                                {
-                                    return Some(t);
-                                }
-                                // Fallback: tolerant parse via serde_yaml_ng::Value and FromStr for enums
-                                let v: serde_yaml_ng::Value =
-                                    serde_yaml_ng::from_str(content).ok()?;
-                                let get_str = |k: &str| -> Option<String> {
-                                    v.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
-                                };
-                                let get_vec_str = |k: &str| -> Vec<String> {
-                                    v.get(k)
-                                        .and_then(|x| x.as_sequence())
-                                        .map(|seq| {
-                                            seq.iter()
-                                                .filter_map(|e| e.as_str().map(|s| s.to_string()))
-                                                .collect()
-                                        })
-                                        .unwrap_or_default()
-                                };
-
-                                let title = get_str("title").unwrap_or_default();
-
-                                let status = get_str("status")
-                                    .and_then(|s| lotar::types::TaskStatus::from_str(&s).ok())
-                                    .unwrap_or_default();
-                                let priority = get_str("priority")
-                                    .and_then(|s| lotar::types::Priority::from_str(&s).ok())
-                                    .unwrap_or_default();
-                                let task_type = get_str("task_type")
-                                    .and_then(|s| lotar::types::TaskType::from_str(&s).ok())
-                                    .unwrap_or_default();
-
-                                let reporter = get_str("reporter");
-                                let assignee = get_str("assignee");
-                                let created = get_str("created")
-                                    .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
-                                let modified = get_str("modified")
-                                    .unwrap_or_else(|| "1970-01-01T00:00:00Z".to_string());
-                                let due_date = get_str("due_date");
-                                let effort = get_str("effort");
-                                let tags = get_vec_str("tags");
-
-                                Some(lotar::storage::task::Task {
-                                    title,
-                                    status,
-                                    priority,
-                                    task_type,
-                                    reporter,
-                                    assignee,
-                                    created,
-                                    modified,
-                                    due_date,
-                                    effort,
-                                    acceptance_criteria: vec![],
-                                    relationships: lotar::types::TaskRelationships::default(),
-                                    comments: vec![],
-                                    references: vec![],
-                                    sprints: vec![],
-                                    history: vec![],
-                                    subtitle: None,
-                                    description: None,
-                                    tags,
-                                    custom_fields: std::collections::HashMap::new(),
-                                })
+                                lotar::storage::task::parse_task_yaml_tolerant(content)
                             };
 
                         // Current content (right side)

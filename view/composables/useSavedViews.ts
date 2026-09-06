@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { storageGetJson, storageSetJson } from '../utils/storage'
 
 export interface SavedView {
   id: string
@@ -15,17 +16,12 @@ export interface SavedView {
 const STORAGE_KEY = 'lotar.savedViews'
 
 function load(): SavedView[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const arr = JSON.parse(raw)
-    if (Array.isArray(arr)) return arr
-  } catch {}
-  return []
+  const arr = storageGetJson<unknown>(STORAGE_KEY)
+  return Array.isArray(arr) ? arr : []
 }
 
 function persist(list: SavedView[]) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)) } catch {}
+  storageSetJson(STORAGE_KEY, list)
 }
 
 function genId(name: string) {
