@@ -229,5 +229,87 @@ describe('TasksList counts', () => {
         await flushPromises()
 
         expect(wrapper.find('h1').text()).toContain('(1)')
+        wrapper.unmount()
+    })
+
+    it('preserves pagination selection but clears query changes and rejects old rows during loading', async () => {
+        tasksStore.items.value = [baseTask({ id: 'A-1' }), baseTask({ id: 'B-1' })]
+        const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
+        await flushPromises()
+        await vi.runAllTimersAsync()
+        const vm = wrapper.vm as any
+        vm.setSelectedIds(['A-1'])
+        expect(vm.selectedIds).toEqual(['A-1'])
+        vm.pageOffset = 1
+        await flushPromises()
+        expect(vm.selectedIds).toEqual(['A-1'])
+        vm.openBulkDelete()
+        expect(vm.deleteDialogIds).toEqual(['A-1'])
+        vm.filter = { project: 'B' }
+        expect(vm.selectedIds).toEqual([])
+        expect(vm.deleteDialogOpen).toBe(false)
+        vm.setSelectedIds(['A-1'])
+        vm.openBulkDelete()
+        expect(vm.selectedIds).toEqual([])
+        expect(vm.deleteDialogIds).toEqual([])
+        await vi.runAllTimersAsync()
+        await flushPromises()
+        vm.setSelectedIds(['B-1'])
+        vm.openBulkDelete()
+        expect(vm.deleteDialogIds).toEqual(['B-1'])
+        vm.filter = { project: 'B', status: 'done' }
+        expect(vm.selectedIds).toEqual([])
+        expect(vm.deleteDialogOpen).toBe(false)
+        wrapper.unmount()
+    })
+
+    it('serializes in-flight hydrations and never enables selection for an obsolete query', async () => {
+        const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
+        await flushPromises()
+        await vi.runAllTimersAsync()
+        const vm = wrapper.vm as any
+        let finishA!: () => void
+        let finishB!: () => void
+        tasksStore.hydrateAll.mockImplementationOnce(() => new Promise<void>(resolve => {
+            finishA = () => { tasksStore.items.value = [baseTask({ id: 'A-1' })]; resolve() }
+        }))
+        tasksStore.hydrateAll.mockImplementationOnce(() => new Promise<void>(resolve => {
+            finishB = () => { tasksStore.items.value = [baseTask({ id: 'B-1' })]; resolve() }
+        }))
+        vm.filter = { project: 'A' }
+        await vi.advanceTimersByTimeAsync(150)
+        vm.filter = { project: 'B' }
+        await vi.advanceTimersByTimeAsync(150)
+        expect(finishB).toBeUndefined()
+        finishA()
+        await flushPromises()
+        vm.setSelectedIds(['A-1'])
+        expect(vm.selectedIds).toEqual([])
+        expect(vm.selectionReady).toBe(false)
+        finishB()
+        await flushPromises()
+        vm.setSelectedIds(['B-1'])
+        expect(vm.selectedIds).toEqual(['B-1'])
+        wrapper.unmount()
+    })
+
+    it('deletes only the captured selection even if the project changes during the request', async () => {
+        tasksStore.items.value = [baseTask({ id: 'A-1' }), baseTask({ id: 'A-2' }), baseTask({ id: 'B-1' })]
+        const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
+        await flushPromises()
+        await vi.runAllTimersAsync()
+        const vm = wrapper.vm as any
+        vm.setSelectedIds(['A-1', 'A-2'])
+        vm.openBulkDelete()
+        let finish!: () => void
+        tasksStore.remove.mockClear()
+        tasksStore.remove.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+        const pending = vm.submitDeleteDialog()
+        vm.filter = { project: 'B' }
+        finish()
+        await pending
+        expect(tasksStore.remove.mock.calls).toEqual([['A-1'], ['A-2']])
+        expect(vm.selectedIds).toEqual([])
+        wrapper.unmount()
     })
 })

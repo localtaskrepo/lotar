@@ -4,3 +4,30 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.793695+00:00
+modified: 2026-09-06T13:12:54.111626+00:00
+comments:
+- date: 2026-09-06T11:21:52.707792+00:00
+  text: 'Backlog reconciliation: Remains Todo: ConfigView has section components in a grid, not the requested per-section navigation/submenus. Remaining acceptance is actual section navigation and editing-state behavior. DEV-53 config safety is unrelated completion, and DEV-69 only owns dialog accessibility.'
+- date: 2026-09-06T13:12:54.111626+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 20: Config UI should be rebuilt using a submenu for each section, rather than one giant view with all configs tiled.
+description: |-
+  Migrated checklist requirements:
+  Replace the giant tiled configuration view with actual per-section submenu/navigation behavior. Existing extracted section components are partial infrastructure, not this navigation design. Preserve edit state and define project/section routing before implementation.
+history:
+- at: 2026-09-06T11:21:52.707792+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.101037+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Replace the giant tiled configuration view with actual per-section submenu/navigation behavior. Existing extracted section components are partial infrastructure, not this navigation design. Preserve edit state and define project/section routing before implementation.
+- at: 2026-09-06T13:12:54.111626+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

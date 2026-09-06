@@ -67,6 +67,158 @@ use regex::Regex;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[derive(Default)]
+struct CommentLexer {
+    block: Option<(&'static str, &'static str, usize)>,
+    quote: Option<(String, bool, bool)>, // terminator, escapes, multiline
+    ambiguous: bool,
+}
+
+impl CommentLexer {
+    // Conservative lexical subset, not a language parser. Unsupported literal
+    // forms or unterminated ordinary quotes stop further discovery in the source.
+    fn ranges(&mut self, line: &str, extension: &str) -> Vec<std::ops::Range<usize>> {
+        let mut ranges = Vec::new();
+        let mut index = 0;
+        let single = Scanner::get_comment_token(extension);
+        let (open, close) = Scanner::block_tokens_for(extension);
+        while index < line.len() && !self.ambiguous {
+            if let Some((open, close, mut depth)) = self.block {
+                let start = index;
+                while index < line.len() {
+                    if line[index..].starts_with(close) {
+                        depth -= 1;
+                        if depth == 0 {
+                            break;
+                        }
+                        index += close.len();
+                    } else if line[index..].starts_with(open) {
+                        if !matches!(extension, "rs" | "rust" | "swift" | "scala" | "kotlin") {
+                            self.ambiguous = true;
+                            return ranges;
+                        }
+                        depth += 1;
+                        index += open.len();
+                    } else {
+                        index += line[index..].chars().next().unwrap().len_utf8();
+                    }
+                }
+                ranges.push(start..index);
+                self.block = if depth == 0 {
+                    None
+                } else {
+                    Some((open, close, depth))
+                };
+                if depth == 0 {
+                    index += close.len();
+                }
+                continue;
+            }
+            let tail = &line[index..];
+            if let Some((terminator, escapes, _)) = self.quote.as_ref() {
+                if *escapes
+                    && ["${", "#{", "$(", "\\("]
+                        .iter()
+                        .any(|prefix| tail.starts_with(prefix))
+                {
+                    self.ambiguous = true;
+                    break;
+                } else if *escapes
+                    && tail.starts_with(if matches!(extension, "ps1" | "powershell") {
+                        '`'
+                    } else {
+                        '\\'
+                    })
+                {
+                    index += 1;
+                    if index < line.len() {
+                        index += line[index..].chars().next().unwrap().len_utf8();
+                    }
+                } else if tail.starts_with(terminator) {
+                    index += terminator.len();
+                    self.quote = None;
+                } else {
+                    index += tail.chars().next().unwrap().len_utf8();
+                }
+                continue;
+            }
+            let block = if extension.is_empty() {
+                [("/*", "*/"), ("<!--", "-->")]
+                    .into_iter()
+                    .find(|(open, _)| tail.starts_with(open))
+            } else {
+                open.zip(close).filter(|(open, _)| tail.starts_with(open))
+            };
+            if let Some((open, close)) = block {
+                index += open.len();
+                self.block = Some((open, close, 1));
+                continue;
+            }
+            let token = single.filter(|token| tail.starts_with(token)).or_else(|| {
+                if extension.is_empty() {
+                    ["//", "#", "--", ";", "%"].into_iter().find(|token| {
+                        tail.starts_with(token)
+                            && (*token != ";" || line[..index].trim().is_empty())
+                    })
+                } else {
+                    None
+                }
+            });
+            if let Some(token) = token {
+                ranges.push(index + token.len()..line.len());
+                break;
+            }
+            if matches!(extension, "rs" | "rust") && tail.starts_with('r') {
+                let hashes = tail[1..].bytes().take_while(|b| *b == b'#').count();
+                if tail[1 + hashes..].starts_with('"') {
+                    self.quote = Some((format!("\"{}", "#".repeat(hashes)), false, true));
+                    index += hashes + 2;
+                    continue;
+                }
+            }
+            if ["R\"", "@\"", "@'", "$\"", "f\"", "f'", "F\"", "F'", "<<"]
+                .iter()
+                .any(|prefix| tail.starts_with(prefix))
+                || (matches!(extension, "js" | "ts" | "jsx" | "tsx") && tail.starts_with('/'))
+                || (extension == "lua" && (tail.starts_with("[[") || tail.starts_with("[=")))
+                || (extension == "sql"
+                    && (tail.starts_with('$') || tail.starts_with("E'") || tail.starts_with("e'")))
+                || (matches!(extension, "yaml" | "yml") && tail.starts_with(['|', '>']))
+                || (matches!(extension, "rb" | "perl") && tail.starts_with(['/', '%']))
+                || (extension == "r" && tail.starts_with("r\""))
+            {
+                self.ambiguous = true;
+                break;
+            }
+            let ch = tail.chars().next().unwrap();
+            if matches!(ch, '\'' | '"' | '`') {
+                let triple = ch != '`' && tail.starts_with(&ch.to_string().repeat(3));
+                let terminator = ch.to_string().repeat(if triple { 3 } else { 1 });
+                index += terminator.len();
+                let escapes = !matches!(
+                    extension,
+                    "html" | "htm" | "xml" | "vue" | "svelte" | "md" | "markdown" | "sql"
+                ) && !(ch == '\''
+                    && matches!(
+                        extension,
+                        "sh" | "bash" | "toml" | "yaml" | "yml" | "ps1" | "powershell"
+                    ));
+                self.quote = Some((terminator, escapes, triple || ch == '`'));
+            } else {
+                index += ch.len_utf8();
+            }
+        }
+        if self
+            .quote
+            .as_ref()
+            .is_some_and(|(_, _, multiline)| !multiline)
+        {
+            self.ambiguous = true;
+        }
+        ranges
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Reference {
     #[allow(dead_code)]
@@ -404,52 +556,15 @@ impl Scanner {
         {
             let ext_str = ext_str.to_ascii_lowercase();
 
-            // Determine comment syntaxes
-            let single_line = Self::get_comment_token(&ext_str);
-            let (block_open, block_close) = Self::block_tokens_for(&ext_str);
-
-            // Process each line to find TODOs in comments
-            let mut in_block = false;
-            let mut block_start_line: usize = 0;
-
+            let mut lexer = CommentLexer::default();
             for (line_number, raw_line) in file_contents.lines().enumerate() {
-                let mut line = raw_line;
-
-                // Handle block comment state transitions if supported
-                if let (Some(open), Some(close)) = (&block_open, &block_close) {
-                    if !in_block && let Some(open_idx) = line.find(open) {
-                        in_block = true;
-                        block_start_line = line_number + 1; // 1-based
-                        // Consider the remainder after the opener for same-line checks
-                        line = &line[open_idx + open.len()..];
-                    }
-
-                    if in_block {
-                        // If the closer appears on this line, truncate to the part before closer
-                        if let Some(close_idx) = line.find(close) {
-                            let before = &line[..close_idx];
-                            // Process the content within the block on this line
-                            self.process_comment_line(
-                                file_path,
-                                references,
-                                block_start_line, // report first line for block start
-                                before,
-                            );
-                            in_block = false;
-                            continue; // move to next line
-                        } else {
-                            // Entire line is within block; process as-is
-                            self.process_comment_line(file_path, references, line_number + 1, line);
-                            continue;
-                        }
-                    }
-                }
-
-                // Single-line comments (if defined for this extension)
-                if let Some(start_comment) = single_line
-                    && raw_line.contains(start_comment)
-                {
-                    self.process_comment_line(file_path, references, line_number + 1, raw_line);
+                for range in lexer.ranges(raw_line, &ext_str) {
+                    self.process_comment_line(
+                        file_path,
+                        references,
+                        line_number + 1,
+                        &raw_line[range],
+                    );
                 }
             }
         }
@@ -536,41 +651,96 @@ impl Scanner {
         }
     }
 
+    /// Locate the matched comment, excluding source before and after block comments.
+    pub fn matched_comment_range(&self, line: &str) -> Option<std::ops::Range<usize>> {
+        self.matched_source_comment_range(&self.path, line, 1)
+    }
+
+    pub fn matched_source_comment_range(
+        &self,
+        path: &Path,
+        contents: &str,
+        line_number: usize,
+    ) -> Option<std::ops::Range<usize>> {
+        let extension = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let mut lexer = CommentLexer::default();
+        for (index, line) in contents.lines().enumerate() {
+            let ranges = lexer.ranges(line, &extension);
+            if index + 1 == line_number {
+                return ranges.into_iter().find(|range| {
+                    let comment = line[range.clone()]
+                        .trim_start_matches(|c: char| c.is_whitespace() || c == '*');
+                    self.signal_regex
+                        .find(comment)
+                        .is_some_and(|matched| matched.start() == 0)
+                });
+            }
+        }
+        None
+    }
+
+    pub fn suggest_source_insertion(
+        &self,
+        path: &Path,
+        contents: &str,
+        line_number: usize,
+        key: &str,
+        strip: bool,
+    ) -> Option<String> {
+        let line = contents.lines().nth(line_number.checked_sub(1)?)?;
+        let range = self.matched_source_comment_range(path, contents, line_number)?;
+        if strip {
+            let stripped = crate::utils::scan::strip_bracket_attributes(&line[range.clone()]);
+            let next_range = range.start..range.start + stripped.len();
+            let line = format!("{}{}{}", &line[..range.start], stripped, &line[range.end..]);
+            self.suggest_insertion_in_range(&line, key, next_range)
+        } else {
+            self.suggest_insertion_in_range(line, key, range)
+        }
+    }
+
+    pub fn strip_scan_attributes(&self, line: &str) -> String {
+        let Some(range) = self.matched_comment_range(line) else {
+            return line.to_string();
+        };
+        format!(
+            "{}{}{}",
+            &line[..range.start],
+            crate::utils::scan::strip_bracket_attributes(&line[range.clone()]),
+            &line[range.end..]
+        )
+    }
+
     /// Suggest an idempotent insertion of ` (KEY)` right after the first signal word on the line.
     /// Returns Some(edited_line) when an insertion is proposed, or None if not applicable
     /// (no signal word found or the key already exists on the line).
     pub fn suggest_insertion_for_line(&self, line: &str, key: &str) -> Option<String> {
+        self.suggest_insertion_in_range(line, key, self.matched_comment_range(line)?)
+    }
+
+    fn suggest_insertion_in_range(
+        &self,
+        line: &str,
+        key: &str,
+        range: std::ops::Range<usize>,
+    ) -> Option<String> {
         if key.is_empty() {
             return None;
         }
-        if line.contains(&format!("({})", key)) {
+        if line[range.clone()].contains(&format!("({})", key)) {
             return None; // idempotence: already present
         }
         // Find the first signal word, but only insert if it's the first token in the comment text.
-        if let Some(m) = self.signal_regex.find(line) {
-            // Identify the start of the comment segment
-            let mut comment_pos: Option<(usize, usize)> = None; // (idx, token_len)
-            for (tok, len) in [
-                ("//", 2usize),
-                ("#", 1usize),
-                ("--", 2usize),
-                (";", 1usize),
-                ("%", 1usize),
-            ] {
-                if let Some(idx) = line.find(tok) {
-                    comment_pos = match comment_pos {
-                        Some((cur_idx, cur_len)) if cur_idx <= idx => Some((cur_idx, cur_len)),
-                        _ => Some((idx, len)),
-                    };
-                }
-            }
-            // If we can't identify a comment start, bail to avoid altering non-comment content
-            let (cidx, clen) = comment_pos?;
-            let comment = &line[cidx + clen..];
+        if let Some(m) = self.signal_regex.find_at(line, range.start) {
+            let comment = &line[range.clone()];
             // Compute the absolute index of the first non-decorative char in the comment
             let trimmed = comment.trim_start_matches(|c: char| c.is_whitespace() || c == '*');
             let offset = comment.len() - trimmed.len();
-            let first_token_abs = cidx + clen + offset;
+            let first_token_abs = range.start + offset;
             // Only insert if the match begins exactly at the first token in the comment
             if m.start() != first_token_abs {
                 return None;

@@ -1,0 +1,172 @@
+title: 'Second-pass audit: safety fixes and contract consolidation'
+status: InProgress
+priority: High
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-09-06T09:13:57.902147+00:00
+modified: 2026-09-06T13:19:38.915521+00:00
+relationships:
+  related:
+  - DEV-17
+  - DEV-21
+  - DEV-29
+  - DEV-32
+  - DEV-47
+  - DEV-52
+  children:
+  - DEV-54
+  - DEV-55
+  - DEV-56
+  - DEV-57
+  - DEV-58
+  - DEV-59
+  - DEV-60
+  - DEV-61
+  - DEV-62
+  - DEV-63
+  - DEV-64
+  - DEV-65
+  - DEV-66
+  - DEV-67
+  - DEV-68
+  - DEV-69
+  - DEV-70
+  - DEV-71
+  - DEV-72
+  - DEV-73
+  - DEV-74
+  - DEV-75
+  - DEV-76
+  - DEV-77
+  - DEV-78
+  - DEV-79
+  - DEV-80
+  - DEV-81
+  - DEV-82
+  - DEV-83
+  - DEV-84
+comments:
+- date: 2026-09-06T09:14:44.462345+00:00
+  text: 'Approved second-pass implementation: 90 audit observations organized into 35 packages. Worktree audit-pass-2 preserves the reviewed DEV-52 snapshot in its index; new changes remain unstaged, main untouched. First wave: config inspection redaction/path containment/canonical reads, scanner reference/source integrity, storage exclusion/unknown YAML preservation, agent worker/isolation/cleanup/cancellation safety, JSON delete confirmation, UI loaded-scope/selection protection, sync retry recovery/report uniqueness. Regression tests accompany fixes, followed by npm run lint, npm test, npm run smoke. Later waves: canonical task IDs/mutation DTOs/null patches/transactions, shared query and terminal policies, MCP protocol/schema parity, scoped UI resources, test infrastructure/dead code/docs. No commits or integration without explicit instruction.'
+- date: 2026-09-06T09:25:44.703777+00:00
+  text: 'Safety progress: config redaction/containment/canonical-read fixes implemented with 83 targeted tests passing. Sprint JSON/noninteractive delete now requires --force (2 regressions passed; smoke added). Two vacuous SSE tests now require successful creation and positive-control delivery (7 SSE tests passed). Corrected TaskPanel unscoped :deep selectors; web build is warning-free. Other safety lanes still implementing; full integration gates pending.'
+- date: 2026-09-06T10:07:54.736361+00:00
+  text: 'Review/gate follow-up: fixed flat/canonical config compatibility and strict shape validation (224 targeted tests); removed unsafe temp sweeps; added cooldown Unicode/overflow fail-closed validation (2 unit and 10 API/CLI smoke cases pass). Repaired old reanchor test that asserted the data-loss behavior. Frontend panel scope readiness/latest-load repairs now browser-verified, alongside automation scope guard. Main/index snapshot hashes still match exactly. Reviewing scanner quote/concurrency, sync alias/durable journal, and agent Git-env/cancellation/stderr edge cases before final full gates. Git-backed agent tests currently compile out under existing no_git_tests and must not be counted as verified.'
+- date: 2026-09-06T10:31:24.159838+00:00
+  text: 'Safety-wave checkpoint complete in audit-pass-2, no commits/integration/staging changes. Implemented and reviewed: config show/inspect redaction, prefix/symlink containment, typed canonical/flat normalization with strict recognized types and full supported-field roundtrips; fail-closed task locks, semantic unknown task YAML preservation, non-destructive fsynced atomic replacement preserving permissions; scanner file-scoped reanchors, quote-aware comment boundaries, text/JSON mutation parity, atomic source staging/conflict checks/per-entry compensation; agent worker/finalization lifetime, safe worktree setup/cleanup, Git-env isolation, exactly-once cancellation handoffs and bounded output drain; UI loaded-scope/request generation/create readiness and query-scoped selections; sync intent/result journal recovery with canonical task identity, dry-run immutability and collision-safe reports; explicit force for noninteractive/JSON sprint deletion; safe validated cooldowns. Repaired false-green SSE/API assertions and stale test/architecture runbooks. Final gates: npm run lint clean; npm test 844 Rust passed/6 explicit Git skips and 262 UI passed; npm run smoke rebuilt warning-free, 98 passed/23 Git-gated skips; all-features safety 192 passed on clean rerun. Existing agent-automation timing tests needed configured retries; one earlier schema run reported a transient leaky diagnostic, rerun clean. Six Git-backed agent tests and Windows-specific regression still require a permitted platform run; existing repo Git compile gating also remains. Scanner is conservative, per-entry rollback not whole-scan transaction, non-locking editors retain a final compare/rename race. Sync ambiguous remote outcomes require manual reconciliation; Windows power-loss durability is not claimed. Crash-orphan temps intentionally retained rather than unsafe sweeping. Remaining approved work: canonical TaskId/TaskLocation outside sync; atomic create/status/null-aware shared mutation DTOs and task-sprint transactions; unified query/filter/sort/terminal analytics; stale automation snapshots and reference/attachment event pipeline; MCP registry/lifecycle/schema parity; remaining scoped UI/cache/dialog/dead-code/test/docs packages. DEV-53 remains InProgress for these later waves.'
+- date: 2026-09-06T10:41:53.683459+00:00
+  text: Moved the verified safety-wave changes to the main checkout for developer review, as requested. Main's new DEV-52 commit 4f0ac4b exactly matched the worktree's staged baseline. Transferred only the second-pass delta, including all new tests and this task; verified complete Git tree equality before deleting audit-pass-2 and its temporary branch/build artifacts. Main index remains unchanged and all second-pass changes are unstaged. No commit, stash, or merge was created. Prior safety-wave validation still applies to the unchanged code; DEV-53 remains InProgress for the remaining audit packages.
+- date: 2026-09-06T11:21:53.049029+00:00
+  text: 'Backlog reconciliation: all 53 original DEV tickets reviewed; 31 scoped follow-ups created (DEV-54..DEV-84) with native parent/dependency links, while existing DEV-17/21 retain their scopes. Closed source-confirmed stale Todos DEV-11/22/24/26/27/29. DEV-14/23/25/28 are NeedsReview for scope or verification, not declared complete. Historical Done work stays Done with corrective follow-up notes. Current safety code is staged on main, not committed; this metadata pass leaves that index untouched. Audit key: S=services/routes, C=CLI/core, M=MCP, U=frontend, T=tests/smoke, D=docs; ordinal 1..15 corresponds to the six audit reports. DEV-53 ownership means implemented safety scope, not that all its children are done.'
+- date: 2026-09-06T11:21:53.059463+00:00
+  text: 'Audit coverage S: S1=DEV-53; S2=DEV-53; S3=DEV-53; S4=DEV-53; S5=DEV-53; S6=DEV-54; S7=DEV-59; S8=DEV-53; S9=DEV-55; S10=DEV-53; S11=DEV-60; S12=DEV-57; S13=DEV-21; S14=DEV-58; S15=DEV-53.'
+- date: 2026-09-06T11:21:53.070698+00:00
+  text: 'Audit coverage C: C1=DEV-53; C2=DEV-53; C3=DEV-53; C4=DEV-53; C5=DEV-53; C6=DEV-53; C7=DEV-53; C8=DEV-53; C9=DEV-71; C10=DEV-54; C11=DEV-56; C12=DEV-53/DEV-72; C13=DEV-53; C14=DEV-73; C15=DEV-81.'
+- date: 2026-09-06T11:21:53.082877+00:00
+  text: 'Audit coverage M: M1=DEV-62; M2=DEV-62; M3=DEV-63; M4=DEV-58/DEV-63; M5=DEV-63; M6=DEV-64; M7=DEV-54/DEV-64; M8=DEV-54/DEV-64; M9=DEV-57; M10=DEV-54/DEV-64; M11=DEV-57/DEV-64; M12=DEV-60; M13=DEV-60; M14=DEV-64; M15=DEV-64.'
+- date: 2026-09-06T11:21:53.093469+00:00
+  text: 'Audit coverage U: U1=DEV-53; U2=DEV-53; U3=DEV-54; U4=DEV-53/DEV-54; U5=DEV-57; U6=DEV-65; U7=DEV-68; U8=DEV-57; U9=DEV-21; U10=DEV-66; U11=DEV-67; U12=DEV-56; U13=DEV-70; U14=DEV-69; U15=DEV-81.'
+- date: 2026-09-06T11:21:53.104468+00:00
+  text: 'Audit coverage T: T1=DEV-62; T2=DEV-53; T3=DEV-76; T4=DEV-77; T5=DEV-78; T6=DEV-77; T7=DEV-79; T8=DEV-76; T9=DEV-77; T10=DEV-80; T11=DEV-67; T12=DEV-80; T13=DEV-77; T14=DEV-81; T15=DEV-53/DEV-77.'
+- date: 2026-09-06T11:21:53.115872+00:00
+  text: 'Audit coverage D: D1=DEV-53; D2=DEV-74; D3=DEV-53; D4=DEV-53/DEV-83; D5=DEV-82; D6=DEV-82; D7=DEV-61/DEV-82; D8=DEV-17/DEV-75; D9=DEV-53/DEV-71/DEV-83; D10=DEV-53; D11=DEV-53/DEV-82/DEV-83; D12=DEV-17/DEV-83; D13=DEV-83; D14=DEV-53; D15=DEV-53/DEV-83.'
+- date: 2026-09-06T11:21:53.126594+00:00
+  text: 'Coverage qualifications: U5 has NO remaining 5,000-task cap; only sorting/query behavior remains. M1 idle dispatch already exists; notification naming/lifecycle remain DEV-62. C12 web_ui_path normalization was fixed; port precedence remains DEV-72. D3 task YAML/collection/effort docs, T2 SSE assertions and T15 automation 400 checks were fixed; remaining T15 assertions stay DEV-77. DEV-32 unsafe sweeping is historically superseded and replacement work is DEV-84. Six Git safety checks, Windows/non-Unix coverage and existing broader compile gating are explicit DEV-79 obligations, not verified passes.'
+- date: 2026-09-06T13:17:04.564867+00:00
+  text: 'Checklist migration completed: all 27 TODO.md bullets are preserved verbatim in 26 existing DEV tickets, with full requirements added to descriptions and no duplicate tickets created. Line map: 1-5 -> DEV-1..5; 6 -> DEV-22; 7-22 -> DEV-6..21; 25 -> DEV-22; 26 -> DEV-23; 27 -> DEV-24; 28 -> DEV-25; 29 -> DEV-26. The duplicate comment-history entries share DEV-22. Preserved previously omitted details include template list selection (${{references[*].id}}), top-level/custom grouping plus per-group/grand totals, optional relationship inference respecting specific categories, and explicit default persistence in new ticket YAML. DEV-23 remains NeedsReview for the status/type ambiguity; a visible selector is not proof of the original serialization requirement. Original text was verified against the unchanged tracked checklist before deleting TODO.md. No live documentation links pointed to it; historical comments are retained. DEV is now the sole authoritative development backlog. Existing statuses and staged implementation changes were preserved.'
+- date: 2026-09-06T13:19:38.915521+00:00
+  text: 'Backlog reconciliation and checklist migration verified: 84 DEV tickets total; 31 new scoped audit follow-ups; all 90 audit observations mapped; all 27 legacy checklist bullets preserved in 26 existing owners; 31 parent-child links and 20 reciprocal dependency edges with no cycles or dangling targets. Six stale Todos closed with evidence (DEV-11/22/24/26/27/29); DEV-14/23/25/28 remain NeedsReview for scope or verification. Totals: 50 Todo, 29 Done, 4 NeedsReview, 1 InProgress. TODO.md removed only after source-to-ticket wording verification. Only DEV ticket files and the checklist deletion are new working-tree changes; test/scenario projects and existing staged implementation changes were not altered. Native CLI parsing and structural validation passed; application test suites were not rerun for these metadata-only edits.'
+description: |-
+  Second-pass audit umbrella and delivery log.
+
+  IMPLEMENTED: safety wave is reviewed/staged on main after committed DEV-52 (4f0ac4b), pending commit: config redaction/containment/typed normalization; fail-closed locks, task YAML preservation and safe atomic replacement; removed unsafe temp sweeps; scanner source/reference integrity; agent lifecycle/isolation/cancellation/output safety; selected UI scope/panel/selection guards; sync recovery and reports; noninteractive deletion confirmation; cooldown validation; selected assertions/docs. Prior comments retain the chronological worktree and transfer history.
+
+  REMAINING: DEV-54 through DEV-84 now hold scoped acceptance criteria and dependencies. Existing DEV-21 owns terminal-state configuration/analytics and DEV-17 owns README. This umbrella must not be interpreted as all audit findings fixed. Audit S/C/M/U/T/D ordinal coverage is recorded in comments below.
+
+  VERIFICATION: historical safety-wave gates passed (844 Rust with 6 explicit Git skips, 262 UI, 98 smoke with 23 Git skips, schema safety 192). DEV-79 owns excluded Git/Windows/platform coverage. Retry-assisted green runs do not prove determinism. Scanner remains conservative, with per-entry rollback and a non-locking-editor compare/rename gap. Ambiguous remote outcomes require manual reconciliation; Windows power-loss durability is not claimed. Crash-orphan temps are retained until DEV-84.
+
+  CLOSURE: retain InProgress until the safety delivery is committed and remaining obligations/verification are completed or explicitly transferred to their linked owners. Backlog reconciliation itself did not rerun application gates or modify implementation code.
+history:
+- at: 2026-09-06T09:14:44.455348+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T09:14:44.462345+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T09:25:44.703777+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T10:07:54.736361+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T10:31:24.159838+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T10:41:53.683459+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.037253+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Second-pass audit umbrella and delivery log.
+
+      IMPLEMENTED: safety wave is reviewed/staged on main after committed DEV-52 (4f0ac4b), pending commit: config redaction/containment/typed normalization; fail-closed locks, task YAML preservation and safe atomic replacement; removed unsafe temp sweeps; scanner source/reference integrity; agent lifecycle/isolation/cancellation/output safety; selected UI scope/panel/selection guards; sync recovery and reports; noninteractive deletion confirmation; cooldown validation; selected assertions/docs. Prior comments retain the chronological worktree and transfer history.
+
+      REMAINING: DEV-54 through DEV-84 now hold scoped acceptance criteria and dependencies. Existing DEV-21 owns terminal-state configuration/analytics and DEV-17 owns README. This umbrella must not be interpreted as all audit findings fixed. Audit S/C/M/U/T/D ordinal coverage is recorded in comments below.
+
+      VERIFICATION: historical safety-wave gates passed (844 Rust with 6 explicit Git skips, 262 UI, 98 smoke with 23 Git skips, schema safety 192). DEV-79 owns excluded Git/Windows/platform coverage. Retry-assisted green runs do not prove determinism. Scanner remains conservative, with per-entry rollback and a non-locking-editor compare/rename gap. Ambiguous remote outcomes require manual reconciliation; Windows power-loss durability is not claimed. Crash-orphan temps are retained until DEV-84.
+
+      CLOSURE: retain InProgress until the safety delivery is committed and remaining obligations/verification are completed or explicitly transferred to their linked owners. Backlog reconciliation itself did not rerun application gates or modify implementation code.
+- at: 2026-09-06T11:21:53.049029+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.059463+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.070698+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.082877+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.093469+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.104468+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.115872+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.126594+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:17:04.564867+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:19:38.915521+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

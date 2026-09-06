@@ -1,6 +1,42 @@
 title: 'BUG: Creating a new project does not refresh the UI'
-status: Todo
+status: NeedsReview
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.825888+00:00
+modified: 2026-09-06T13:12:54.221855+00:00
+comments:
+- date: 2026-09-06T11:21:52.549652+00:00
+  text: 'Backlog reconciliation: ConfigView creates a project, refreshes its own project list, selects it and reloads config. Other useProjects consumers have separate instances, so that does not prove whole-UI refresh. NeedsReview to identify the original failing surface and verify config/global selectors plus opening task creation without reload. Do not close on local ConfigView refresh alone. Broader query/entity scope work is DEV-65.'
+- date: 2026-09-06T13:12:54.221855+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 28: Creating a new project doesn't update the UI until the page is reloaded
+description: |-
+  Migrated checklist requirements:
+  Verify project creation propagates to the intended already-mounted UI surfaces without browser reload. ConfigView refreshes locally, but that alone does not prove global selectors/task creation refresh. Keep NeedsReview and preserve the need for an exact failing-surface reproduction.
+history:
+- at: 2026-09-06T11:21:52.549652+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.567586+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: NeedsReview
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:54.210968+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Verify project creation propagates to the intended already-mounted UI surfaces without browser reload. ConfigView refreshes locally, but that alone does not prove global selectors/task creation refresh. Keep NeedsReview and preserve the need for an exact failing-surface reproduction.
+- at: 2026-09-06T13:12:54.221855+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

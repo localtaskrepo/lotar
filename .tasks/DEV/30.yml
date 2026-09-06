@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.853176+00:00
-modified: 2026-08-09T19:39:34.674767+00:00
+modified: 2026-09-06T11:21:52.784353+00:00
 comments:
 - date: 2026-08-07T22:48:23.019100+00:00
   text: 'In progress: rewrote AGENTS.md, added development-workflow + review-handoff + testing-strategy + lotar-dev-tracking skills, wired Kilo skill discovery, slimmed copilot/path-scoped instructions, un-ignored and seeded .tasks.'
@@ -17,6 +17,8 @@ comments:
   text: 'Review pass: (1) fmt now self-checks in npm run lint (lint:fmt=cargo fmt --all --check) + npm run fmt to fix — closes local/CI parity gap; (2) flagged test:rust lacks --all-features vs CI (cost tradeoff, left for dev); (3) added lint:backend:fast to testing-strategy; (4) refined dev-workflow rebase step for Agent Manager Apply/PR; (5) fixed inaccurate ''committed fixtures'' refs; (6) gitignored /.kilo/ to prevent committing worktree/agent-manager state. Verified: fmt clean, package.json valid, .kilo ignored, root kilo.jsonc still trackable.'
 - date: 2026-08-09T19:39:34.674767+00:00
   text: 'Completed the agent-instruction single-source overhaul. Commits on main: 7e14f7e (Docs: single-source agent guidance + committed .tasks/ backlog + dev tooling; AGENTS.md canonical, copilot overlay trimmed, 8 focused skills) and 3314aad (Chore: gitignore non-DEV .tasks/ projects). Integrated via fast-forward, pushed to origin; pre-push gate green (fmt + clippy + build + 795/795 nextest tests).'
+- date: 2026-09-06T11:21:52.784353+00:00
+  text: 'Backlog reconciliation: Historical Done retained for the single-source instruction overhaul. Only DEV is the tracked real backlog; other project folders are test/scenario data. Selected newer runbook fixes are staged under DEV-53. Remaining help/ADR/tracker maintenance is DEV-83 and README is DEV-17.'
 history:
 - at: 2026-08-07T22:48:23.013415+00:00
   actor: mallox
@@ -57,3 +59,7 @@ history:
   changes:
   - field: comment
     new: 'Completed the agent-instruction single-source overhaul. Commits on main: 7e14f7e (Docs: single-source agent guidance + committed .tasks/ backlog + dev tooling; AGENTS.md canonical, copilot overlay trimmed, 8 focused skills) and 3314aad (Chore: gitignore non-DEV .tasks/ projects). Integrated via fast-forward, pushed to origin; pre-push gate green (fmt + clippy + build + 795/795 nextest tests).'
+- at: 2026-09-06T11:21:52.784353+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

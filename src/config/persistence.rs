@@ -107,11 +107,7 @@ pub fn load_project_config_from_dir(
         .map_err(|e| ConfigError::IoError(format!("Failed to read project config: {}", e)))?;
 
     // Prefer normalization-aware parse so dotted/nested canonical YAML is supported everywhere
-    match crate::config::normalization::parse_project_from_yaml_str(project_name, &content) {
-        Ok(cfg) => Ok(cfg),
-        Err(_e) => serde_yaml_ng::from_str::<ProjectConfig>(&content)
-            .map_err(|e| ConfigError::ParseError(format!("Failed to parse project config: {}", e))),
-    }
+    crate::config::normalization::parse_project_from_yaml_str(project_name, &content)
 }
 
 /// Load configuration from a specific file path
@@ -126,11 +122,7 @@ fn load_config_file(path: &Path) -> Result<GlobalConfig, ConfigError> {
         .map_err(|e| ConfigError::IoError(format!("Failed to read config: {}", e)))?;
 
     // Prefer normalization-aware parse so dotted/nested canonical YAML is supported everywhere
-    match crate::config::normalization::parse_global_from_yaml_str(&content) {
-        Ok(cfg) => Ok(cfg),
-        Err(_e) => serde_yaml_ng::from_str::<GlobalConfig>(&content)
-            .map_err(|e| ConfigError::ParseError(format!("Failed to parse config: {}", e))),
-    }
+    crate::config::normalization::parse_global_from_yaml_str(&content)
 }
 
 /// Apply environment variable overrides to configuration

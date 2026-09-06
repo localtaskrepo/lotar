@@ -75,6 +75,127 @@ fn add_accepts_valid_projects_and_allocates_sequential_ids() {
 }
 
 #[test]
+fn concurrent_task_creation_allocates_distinct_ids_without_lost_tasks() {
+    let tmp = tempfile::tempdir().unwrap();
+    let barrier = std::sync::Barrier::new(8);
+    let ids = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..8)
+            .map(|i| {
+                let barrier = &barrier;
+                let root = tmp.path();
+                scope.spawn(move || {
+                    barrier.wait();
+                    let title = format!("Concurrent {i}");
+                    let id =
+                        StorageOperations::add(root, &sample_task(&title), "DEV", None).unwrap();
+                    (id, title)
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    let distinct: std::collections::HashSet<_> = ids.iter().map(|(id, _)| id).collect();
+    assert_eq!(distinct.len(), 8);
+    for (id, title) in ids {
+        assert_eq!(
+            StorageOperations::get(tmp.path(), &id, "DEV")
+                .unwrap()
+                .title,
+            title
+        );
+    }
+}
+
+#[test]
+fn yaml_extensions_survive_storage_and_service_mutations_without_dto_exposure() {
+    use lotar::services::task_service::TaskService;
+    use lotar::storage::manager::Storage;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path().join(".tasks");
+    let project = root.join("DEV");
+    fs::create_dir_all(&project).unwrap();
+    let path = project.join("1.yml");
+    // Missing created exercises tolerant parsing before a real storage edit.
+    let input = "title: Before\nx_scalar: '001'\nx_bool: true\nx_null: null\nx_list: [one, 2, false]\nx_nested: {inner: {values: [null, 3.5]}}\nreferences: [{link: 'https://example.com'}]\n";
+    fs::write(&path, input).unwrap();
+    let mut task = lotar::storage::task::parse_task_yaml_tolerant(input).unwrap();
+    let expected = task.extra_fields.clone();
+    task.title = "Edited".into();
+    StorageOperations::edit(&root, "DEV-1", &task).unwrap();
+    assert_eq!(
+        StorageOperations::get(&root, "DEV-1", "DEV")
+            .unwrap()
+            .extra_fields,
+        expected
+    );
+
+    let mut task = StorageOperations::get(&root, "DEV-1", "DEV").unwrap();
+    task.description = Some("Edit through the read cache".into());
+    StorageOperations::edit(&root, "DEV-1", &task).unwrap();
+
+    let mut storage = Storage::new(&root);
+    let dto = TaskService::add_comment(&mut storage, "DEV-1", "Keep the extensions").unwrap();
+    let json = serde_json::to_value(dto).unwrap();
+    assert!(json.get("extra_fields").is_none());
+    for key in expected.keys() {
+        assert!(json.get(key).is_none());
+    }
+    let saved: Task = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(saved.extra_fields, expected);
+    assert_eq!(saved.comments.len(), 1);
+    assert_eq!(saved.references.len(), 1);
+
+    // A replacement constructed without extension data must preserve disk values.
+    StorageOperations::edit(&root, "DEV-1", &sample_task("Replacement")).unwrap();
+    let saved: Task = serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(saved.extra_fields, expected);
+    assert_eq!(saved.title, "Replacement");
+}
+
+#[test]
+fn malformed_task_edit_fails_without_overwriting_user_data() {
+    let tmp = tempfile::tempdir().unwrap();
+    let project = tmp.path().join("DEV");
+    fs::create_dir_all(&project).unwrap();
+    let path = project.join("1.yml");
+    let input = "title: Legacy\ncomments: invalid\nx_keep: {nested: [1, 2]}\n";
+    fs::write(&path, input).unwrap();
+    let result = StorageOperations::edit(tmp.path(), "DEV-1", &sample_task("Replacement"));
+    assert!(result.is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), input);
+}
+
+#[test]
+fn held_task_lock_prevents_add_edit_and_delete() {
+    use fs2::FileExt;
+
+    let tmp = tempfile::tempdir().unwrap();
+    let id = StorageOperations::add(tmp.path(), &sample_task("Original"), "DEV", None).unwrap();
+    let project = tmp.path().join("DEV");
+    let path = project.join("1.yml");
+    let original = fs::read_to_string(&path).unwrap();
+    let held = fs::File::open(project.join(".task.lock")).unwrap();
+    held.lock_exclusive().unwrap();
+    assert!(StorageOperations::add(tmp.path(), &sample_task("New"), "DEV", None).is_err());
+    assert!(StorageOperations::edit(tmp.path(), &id, &sample_task("Edited")).is_err());
+    assert!(StorageOperations::delete(tmp.path(), &id, "DEV").is_err());
+    assert!(!project.join("2.yml").exists());
+    assert_eq!(fs::read_to_string(&path).unwrap(), original);
+    drop(held);
+    StorageOperations::edit(tmp.path(), &id, &sample_task("Released")).unwrap();
+    assert_eq!(
+        StorageOperations::get(tmp.path(), &id, "DEV")
+            .unwrap()
+            .title,
+        "Released"
+    );
+}
+
+#[test]
 fn task_ids_with_unsafe_prefixes_do_not_resolve() {
     let tmp = temp_tasks_root("lotar-id-prefix");
     assert!(StorageOperations::get(tmp.path(), "/abs/path-1", "/abs/path").is_none());

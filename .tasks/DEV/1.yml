@@ -4,3 +4,24 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.685592+00:00
+modified: 2026-09-06T13:12:53.690451+00:00
+comments:
+- date: 2026-09-06T13:12:53.690451+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 1: VSCode Plugin (Contexts?, Issue updates, in-editor quick hints for TODOs with references/quick create dialogs)
+description: |-
+  Migrated checklist requirements:
+  Build the VSCode integration itself, including context integration, issue updates, in-editor reference hints and quick-create dialogs. Existing CLI/MCP support is a foundation, not an extension. Define the initial extension packaging and acceptance flow before implementation.
+history:
+- at: 2026-09-06T13:12:53.673742+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Build the VSCode integration itself, including context integration, issue updates, in-editor reference hints and quick-create dialogs. Existing CLI/MCP support is a foundation, not an extension. Define the initial extension packaging and acceptance flow before implementation.
+- at: 2026-09-06T13:12:53.690451+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

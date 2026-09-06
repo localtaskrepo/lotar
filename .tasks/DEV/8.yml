@@ -4,3 +4,24 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.734366+00:00
+modified: 2026-09-06T13:12:53.866785+00:00
+comments:
+- date: 2026-09-06T13:12:53.866785+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 9: Option to drag and drop tickets between relationship categories in the web UI.
+description: |-
+  Migrated checklist requirements:
+  Support moving existing ticket relationships between categories using drag-and-drop, with persisted category changes and an accessible non-drag alternative. Current text-input category editing is not completion.
+history:
+- at: 2026-09-06T13:12:53.855004+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Support moving existing ticket relationships between categories using drag-and-drop, with persisted category changes and an accessible non-drag alternative. Current text-input category editing is not completion.
+- at: 2026-09-06T13:12:53.866785+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -1,0 +1,21 @@
+title: Restrict MCP tool dispatch and enforce schemas and error classification
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-64]
+  depends_on: [DEV-58, DEV-62]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.579951+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: M3 M4 M5.
+
+  tools/call can reach control-plane methods through recursive dispatch, advertised schemas are not enforced, and domain failures become protocol errors. Use a single tool registry, validate every direct/standard call argument object, and separate malformed envelopes/unknown tools from isError tool execution failures. Acceptance: initialize/tools/list cannot be invoked as tools; unknown fields such as dryrun cannot trigger a live sync; recoverable domain failures have the correct MCP shape. Preserve shipped aliases or document compatibility decisions.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-58, DEV-62.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

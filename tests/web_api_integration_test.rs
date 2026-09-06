@@ -1211,23 +1211,35 @@ fn sse_events_with_kinds_and_project_filter() {
         "debounce_ms=10&kinds=task_created&project=TEST&ready=1",
     );
 
-    let add_body_test = r#"{\"title\":\"A\",\"priority\":\"High\"}"#;
-    let (_st1, _b1) = http_post_json(port, "/api/tasks/add?project=TEST", add_body_test);
-    let add_body_other = r#"{\"title\":\"B\",\"priority\":\"Low\"}"#;
-    let (_st2, _b2) = http_post_json(port, "/api/tasks/add?project=OTHER", add_body_other);
+    let (status, body) = http_post_json(
+        port,
+        "/api/tasks/add?project=TEST",
+        &json!({"title": "A", "priority": "High"}).to_string(),
+    );
+    assert_eq!(status, 201, "TEST task creation must succeed");
+    let created_task: Value = serde_json::from_slice(&body).expect("created task JSON");
+    let expected_id = created_task["data"]["id"]
+        .as_str()
+        .expect("created task ID");
+    let (status, _) = http_post_json(
+        port,
+        "/api/tasks/add?project=OTHER",
+        &json!({"title": "B", "priority": "Low"}).to_string(),
+    );
+    assert_eq!(status, 201, "OTHER task creation must succeed");
 
     let events = read_sse_events(&mut sse, 3, Duration::from_millis(800), leftover);
     let created: Vec<_> = events
         .into_iter()
         .filter(|(k, _)| k == "task_created")
         .collect();
-    assert!(created.iter().all(|(k, _)| k == "task_created"));
-    assert!(
-        created
-            .iter()
-            .all(|(_, d)| d.contains("\"id\":") && d.contains("TEST-")),
-        "events: {created:?}"
+    assert_eq!(
+        created.len(),
+        1,
+        "only the TEST event should pass: {created:?}"
     );
+    let event: Value = serde_json::from_str(&created[0].1).expect("task_created event JSON");
+    assert_eq!(event["id"], expected_id);
 
     // Restored by guard
     stop_server_on(port);
@@ -1438,9 +1450,35 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
 
     // invalid kind should filter out events; debounce 0 should flush immediately
     let (mut sse, leftover) = open_sse(port, "debounce_ms=0&kinds=invalid_kind");
-    std::thread::sleep(Duration::from_millis(20));
+    let (mut control, control_leftover) = open_sse(port, "debounce_ms=0&kinds=task_created");
     // Create a task -> would generate task_created, but our kind filter excludes it
-    let _ = http_post_json(port, "/api/tasks/add?project=TEST", r#"{\"title\":\"Z\"}"#);
+    let (status, body) = http_post_json(
+        port,
+        "/api/tasks/add?project=TEST",
+        &json!({"title": "Z"}).to_string(),
+    );
+    assert_eq!(
+        status, 201,
+        "task creation must succeed before testing filters"
+    );
+    let created_task: Value = serde_json::from_slice(&body).expect("created task JSON");
+    let expected_id = created_task["data"]["id"]
+        .as_str()
+        .expect("created task ID");
+    let control_events = read_sse_events(
+        &mut control,
+        1,
+        Duration::from_millis(1000),
+        control_leftover,
+    );
+    assert_eq!(
+        control_events.len(),
+        1,
+        "positive control must receive the event"
+    );
+    assert_eq!(control_events[0].0, "task_created");
+    let event: Value = serde_json::from_str(&control_events[0].1).expect("control event JSON");
+    assert_eq!(event["id"], expected_id);
     let events = read_sse_events(&mut sse, 1, Duration::from_millis(200), leftover);
     assert!(events.is_empty(), "invalid kind should filter all events");
 

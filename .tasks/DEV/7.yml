@@ -4,3 +4,30 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.727421+00:00
+modified: 2026-09-06T13:12:53.843574+00:00
+comments:
+- date: 2026-09-06T11:21:52.652842+00:00
+  text: 'Backlog reconciliation: Remains Todo for automatic relationship creation from ticket mentions. Explicit relationship editing exists, but does not implement automatic inference. Clarify eligible description/comment/reference surfaces, target relation category, deduplication and removal behavior; coordinate DEV-6/16 and mutation transactions DEV-55.'
+- date: 2026-09-06T13:12:53.843574+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 8: Option to automatically add ticket reference to relationships if they're not already in a more specific category.
+description: |-
+  Migrated checklist requirements:
+  Make automatic relationship inference optional. Referenced tickets already in a more specific category must not be duplicated or have their explicit category overwritten. Define eligible text/reference surfaces, the general fallback category and removal behavior. Coordinate DEV-6/16 and transactional mutation work.
+history:
+- at: 2026-09-06T11:21:52.652842+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:53.833141+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Make automatic relationship inference optional. Referenced tickets already in a more specific category must not be duplicated or have their explicit category overwritten. Define eligible text/reference surfaces, the general fallback category and removal behavior. Coordinate DEV-6/16 and transactional mutation work.
+- at: 2026-09-06T13:12:53.843574+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

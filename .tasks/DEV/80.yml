@@ -1,0 +1,20 @@
+title: Make agent test fixtures cross-platform and own environment and child cleanup
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-76]
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-09-06T11:10:31.865336+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: T10 T12.
+
+  Shell mock agents are Unix-specific, an async smoke sleep survives completion, and common fixture construction mutates process environment outside the shared guard. Prefer child-scoped env and fixture-owned guards; use cross-platform mock runners with deterministic termination/drain. Acceptance: fixtures do not clobber concurrent guards or leave child processes, and supported Windows smoke runs do not require Bash/date/sleep. Do not weaken cancellation or worker-finalization regressions.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-76.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

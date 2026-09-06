@@ -182,31 +182,46 @@ impl AgentQueueService {
             return Ok(());
         }
 
-        loop {
-            let max_parallel = resolve_max_parallel(tasks_dir)?;
-            let running = AgentJobService::queue_stats().running;
-            let capacity = match max_parallel {
-                Some(max) => max.saturating_sub(running),
-                None => usize::MAX,
-            };
+        let result = (|| {
+            let mut exhausted_error = None;
+            loop {
+                let max_parallel = resolve_max_parallel(tasks_dir)?;
+                let running = AgentJobService::queue_stats().running;
+                let capacity = match max_parallel {
+                    Some(max) => max.saturating_sub(running),
+                    None => usize::MAX,
+                };
 
-            if capacity > 0 {
-                let entries = dequeue_entries(tasks_dir, capacity)?;
-                for entry in entries {
-                    if start_entry(tasks_dir, entry.clone()).is_err() {
-                        requeue_entry(tasks_dir, entry)?;
+                if capacity > 0 {
+                    let entries = dequeue_entries(tasks_dir, capacity)?;
+                    for entry in entries {
+                        if let Err(err) = start_entry(tasks_dir, entry.clone())
+                            && !requeue_entry(tasks_dir, entry)?
+                        {
+                            exhausted_error = Some(err);
+                        }
                     }
                 }
+
+                let stats = AgentJobService::queue_stats();
+                if stats.running == 0 && stats.queued == 0 && pending_count(tasks_dir)? == 0 {
+                    break;
+                }
+
+                thread::sleep(Duration::from_millis(WORKER_POLL_MS));
             }
 
-            if running == 0 && pending_count(tasks_dir)? == 0 {
+            exhausted_error.map_or(Ok(()), Err)
+        })();
+        // Even a queue/config I/O failure must not kill dispatched job threads.
+        loop {
+            let stats = AgentJobService::queue_stats();
+            if stats.running == 0 && stats.queued == 0 {
                 break;
             }
-
             thread::sleep(Duration::from_millis(WORKER_POLL_MS));
         }
-
-        Ok(())
+        result
     }
 }
 
@@ -222,10 +237,10 @@ fn start_entry(tasks_dir: &Path, entry: AgentQueueEntry) -> LoTaRResult<()> {
     Ok(())
 }
 
-fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<()> {
+fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<bool> {
     entry.attempts = entry.attempts.saturating_add(1);
     if entry.attempts > 3 {
-        return Ok(());
+        return Ok(false);
     }
 
     with_locked_queue(tasks_dir, |state| {
@@ -238,7 +253,7 @@ fn requeue_entry(tasks_dir: &Path, mut entry: AgentQueueEntry) -> LoTaRResult<()
         }
     })?;
 
-    Ok(())
+    Ok(true)
 }
 
 fn dequeue_entries(tasks_dir: &Path, limit: usize) -> LoTaRResult<Vec<AgentQueueEntry>> {

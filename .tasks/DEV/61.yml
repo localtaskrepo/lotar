@@ -1,0 +1,21 @@
+title: Distinguish repository-file references from managed attachments
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-82]
+  depends_on: [DEV-56]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.545403+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: D7.
+
+  CLI file references are repository-relative, while UI treats all file entries as attachment URLs. Define a backward-compatible discriminator or distinct representation and migration/read policy. Acceptance: legacy attachments still open, repo-file references resolve correctly, code anchors use supported path#L syntax, and detach/download operations cannot cross storage roots. Sync Rust/TS/OpenAPI and help examples. Scope: reference_service.rs, attachment_service.rs, TaskPanel reference rendering and DTOs.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-56.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

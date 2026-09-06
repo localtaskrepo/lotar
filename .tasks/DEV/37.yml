@@ -5,10 +5,12 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-08-28T06:52:47.944607+00:00
-modified: 2026-08-28T06:52:47.977759+00:00
+modified: 2026-09-06T11:21:52.867790+00:00
 comments:
 - date: 2026-08-28T06:52:47.977759+00:00
   text: 'Cleanup+hardening pass over the column/field work: (1) Fixed reload-erase race - persistence watcher now flush:sync so the loading guard holds; saved custom-field selections survive reload (regression test added; initial vitest pass masked by module-state leak, beforeEach now resets shared customs). (2) Fixed split-brain stores - TasksList page menu and TaskTable previously wrote/read separate useColumns instances with different project keys (regression from factory refactor); now single store shared via provide/inject, table owns the project key. (3) Custom-field registry is module-shared with a version counter so every live store re-reads stored selections when config arrives. (4) Legacy boolean-map storage (old boardFields format) is migrated on read. (5) Removed dead code: arrayFormat option, unused menuId prop, unused destructures/passthroughs, orphaned popover CSS. (6) Preferences reset now also clears boardFields/calendarHoverFields. (7) Coverage: new ColumnsMenu.spec.ts (5 cases), Board custom-field render test, useColumns regression+migration tests; useTaskTableState tests rewritten against isVisible. 200/200 vitest, 773/775 nextest (2 known env-flaky), lint clean. Live-verified: toggle renders immediately, reload persists under correct ::DEV key.'
+- date: 2026-09-06T11:21:52.867790+00:00
+  text: 'Backlog reconciliation: Historical Done retained for the listed shared column-state/persistence/reload fixes. It is not a claim of application-wide entity/query isolation; that remainder is DEV-65.'
 history:
 - at: 2026-08-28T06:52:47.970498+00:00
   actor: mallox
@@ -19,6 +21,10 @@ history:
   - field: assignee
     new: mallox
 - at: 2026-08-28T06:52:47.977759+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.867790+00:00
   actor: mallox
   changes:
   - field: comment_added

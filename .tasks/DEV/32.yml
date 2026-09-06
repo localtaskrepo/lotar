@@ -5,10 +5,12 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-08-26T10:26:15.809749+00:00
-modified: 2026-08-26T10:29:49.971240+00:00
+modified: 2026-09-06T11:21:52.807972+00:00
 comments:
 - date: 2026-08-26T10:29:49.932997+00:00
   text: 'Shipped: with_storage_lock now sweeps orphaned .yml.tmp-* files on exclusive lock acquisition (provably safe: all writers create temps under the same lock, so any temp seen under lock is from a dead process; sweep skipped on busy-fallback path). Converted global+project config.yml writes to atomic_write_file so their temps match the sweep marker too. Test: lock_acquisition_sweeps_orphaned_temp_files_only verifies orphan removal without touching real tasks or unrelated dotfiles. Gates: lint clean, nextest 769/770 (1 known env-flaky agent spec), vitest 187/187.'
+- date: 2026-09-06T11:21:52.807972+00:00
+  text: 'Backlog reconciliation: Superseded by DEV-53 safety work. Lock-time orphan-temp sweeping was removed because other atomic writers need not hold that lock; the old provably-safe rationale was incorrect. Regressions now preserve live writer temps. Crash-orphans are intentionally retained while failed operations clean up only their own temp. Keep historical Done; DEV-84 owns an ownership-safe explicit replacement. Do not restore the removed sweep.'
 history:
 - at: 2026-08-26T10:26:15.840337+00:00
   actor: mallox
@@ -29,3 +31,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-09-06T11:21:52.807972+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

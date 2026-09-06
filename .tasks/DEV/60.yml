@@ -1,0 +1,21 @@
+title: Route bulk comments and reference changes through the shared mutation pipeline
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-54]
+  related: [DEV-11, DEV-27]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.528547+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: S11 M12 M13.
+
+  Single comment automation exists (DEV-11/27), but MCP bulk comments bypass it. Reference/attachment edits duplicate direct storage mutation and omit history/automation/fine-grained events. Unify these paths with a service mutation primitive and per-item bulk failures. Code-reference removal must not require Git when the equivalent single operation does not. Acceptance: single/bulk CLI/REST/MCP operations emit intended history, timestamps and events exactly once, including on.commented; bulk code detach works outside Git; no unrelated references are lost.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-54.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

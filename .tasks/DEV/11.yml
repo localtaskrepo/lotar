@@ -1,6 +1,42 @@
 title: Trigger automation on ticket events (created/updated/commented)
-status: Todo
+status: Done
 priority: High
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.751595+00:00
+modified: 2026-09-06T13:12:53.933079+00:00
+comments:
+- date: 2026-09-06T11:21:52.314126+00:00
+  text: 'Backlog reconciliation: the original created/updated/commented event feature is implemented in committed agent/automation work (9f77e1d). AutomationService dispatches all three and TaskService create/update/add_comment call the hooks; created/updated smoke coverage exists. Closing the original feature, not claiming universal transport parity. DEV-59 tracks stale action composition, DEV-60 bulk-comment/reference pipeline gaps, DEV-77 focused comment/command trigger coverage, and DEV-83 stale tracker documentation.'
+- date: 2026-09-06T13:12:53.933079+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 12: Allow to trigger on ticket events like "created", "updated", "comment added", "description changed", etc.
+description: |-
+  Migrated checklist requirements:
+  Original event capability is implemented. Description changes are captured in automation_matching::ChangeSet and can be selected using updated plus changes.description; a distinct named description_changed event is not implied. Preserve Done for this capability, with remaining mutation-entry-point and bulk-comment consistency in DEV-54/60 and focused regression coverage in DEV-77.
+history:
+- at: 2026-09-06T11:21:52.314126+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.339434+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:53.921842+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Original event capability is implemented. Description changes are captured in automation_matching::ChangeSet and can be selected using updated plus changes.description; a distinct named description_changed event is not implied. Preserve Done for this capability, with remaining mutation-entry-point and bulk-comment consistency in DEV-54/60 and focused regression coverage in DEV-77.
+- at: 2026-09-06T13:12:53.933079+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

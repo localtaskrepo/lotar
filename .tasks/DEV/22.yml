@@ -1,6 +1,47 @@
 title: 'BUG: Changelog duplicates the full comment body'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.809965+00:00
+modified: 2026-09-06T13:12:53.800161+00:00
+comments:
+- date: 2026-09-06T11:21:52.350549+00:00
+  text: 'Backlog reconciliation: fixed by DEV-34 in committed work (5f5e04f), retained by DEV-52/4f0ac4b. TaskService::add_comment records a bodyless comment_added history marker; comment_task_parity_test::task_comment_does_not_duplicate_body_into_history covers the exact behavior. Done applies to new comments; old history entries are not migrated.'
+- date: 2026-09-06T13:12:53.800161+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 6: History stored exact same content as comments when a new one is added
+    Former TODO.md line 25: Changelog includes the entire comment body as a copy when a comment is added, duplicating a spamming the file. (fixed: history now records a `comment_added` marker without the body — DEV-34)
+description: |-
+  Migrated checklist requirements:
+  Already fixed: new comments use bodyless comment_added history markers. Preserve the existing Done status and committed fix evidence; historical task comments are not rewritten.
+
+  This is the duplicate of the earlier comment-history checklist entry. Both map to this already-completed ticket; DEV-34 is the recorded fix, not a reason to create another bug.
+history:
+- at: 2026-09-06T11:21:52.350549+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.368222+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:53.788448+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Already fixed: new comments use bodyless comment_added history markers. Preserve the existing Done status and committed fix evidence; historical task comments are not rewritten.
+
+      This is the duplicate of the earlier comment-history checklist entry. Both map to this already-completed ticket; DEV-34 is the recorded fix, not a reason to create another bug.
+- at: 2026-09-06T13:12:53.800161+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

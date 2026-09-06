@@ -33,13 +33,12 @@ impl ConfigService {
             })?;
             let mut value = serde_json::to_value(project_cfg)
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
-            strip_auth_profiles(&mut value);
-            strip_agent_env(&mut value);
+            redact_config(&mut value);
             Ok(value)
         } else {
             let mut value = serde_json::to_value(mgr.get_resolved_config())
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
-            strip_agent_env(&mut value);
+            redact_config(&mut value);
             Ok(value)
         }
     }
@@ -68,7 +67,7 @@ impl ConfigService {
         let mut project_raw_val = serde_json::json!({});
         let mut project_cfg = None;
 
-        let (effective_val, sources_by_path) = if let Some(prefix) = project_prefix {
+        let (mut effective_val, sources_by_path) = if let Some(prefix) = project_prefix {
             let resolved_project = mgr.get_project_config(prefix).map_err(|e| {
                 LoTaRError::ValidationError(format!(
                     "Failed to load project config for '{}': {}",
@@ -126,13 +125,17 @@ impl ConfigService {
             }
         }
 
-        let global_effective_val =
+        let mut global_effective_val =
             serde_json::to_value(&resolved_global).unwrap_or(serde_json::json!({}));
         let mut global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
-        strip_auth_profiles(&mut global_raw_val);
-        strip_auth_profiles(&mut project_raw_val);
-        strip_agent_env(&mut global_raw_val);
-        strip_agent_env(&mut project_raw_val);
+        for value in [
+            &mut effective_val,
+            &mut global_effective_val,
+            &mut global_raw_val,
+            &mut project_raw_val,
+        ] {
+            redact_config(value);
+        }
 
         let mut auth_profiles = global_raw.auth_profiles.clone();
         if let Some(home) = home_cfg.as_ref() {
@@ -499,10 +502,7 @@ impl ConfigService {
 }
 
 fn strip_auth_profiles(value: &mut serde_json::Value) {
-    let serde_json::Value::Object(map) = value else {
-        return;
-    };
-    let Some(serde_json::Value::Object(profiles)) = map.get_mut("auth_profiles") else {
+    let serde_json::Value::Object(profiles) = value else {
         return;
     };
     for profile in profiles.values_mut() {
@@ -513,11 +513,17 @@ fn strip_auth_profiles(value: &mut serde_json::Value) {
     }
 }
 
-fn strip_agent_env(value: &mut serde_json::Value) {
+fn redact_config(value: &mut serde_json::Value) {
     let serde_json::Value::Object(map) = value else {
         return;
     };
     let keys = ["agents", "agent_profiles"];
+    if let Some(profiles) = map.get_mut("auth_profiles") {
+        strip_auth_profiles(profiles);
+    }
+    if let Some(sync) = map.get_mut("sync") {
+        redact_config(sync);
+    }
     for key in keys {
         let Some(serde_json::Value::Object(profiles)) = map.get_mut(key) else {
             continue;

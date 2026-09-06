@@ -4,3 +4,30 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.762443+00:00
+modified: 2026-09-06T13:12:53.975956+00:00
+comments:
+- date: 2026-09-06T11:21:52.663730+00:00
+  text: 'Backlog reconciliation: Remains Todo: stats commands expose related aggregation, but TaskSearchArgs has no list group-by/sum flags. Define supported grouping fields, sum/effort units and JSON output. DEV-57/75 should not silently treat this feature as implemented by query cleanup.'
+- date: 2026-09-06T13:12:53.975956+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 14: --group-by <field> flag on lotar list that groups output by any top-level or custom field AND/OR --sum <field> flag that adds per-group and grand totals for numeric fields (effort being the obvious one)
+description: |-
+  Migrated checklist requirements:
+  Add list --group-by for top-level and custom fields and --sum for numeric fields, separately and together. Include per-group and grand totals; define effort-unit handling, missing/nonnumeric values and machine-readable output. Existing stats commands and DEV-57 query parity do not implement these list flags.
+history:
+- at: 2026-09-06T11:21:52.663730+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:53.965208+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Add list --group-by for top-level and custom fields and --sum for numeric fields, separately and together. Include per-group and grand totals; define effort-unit handling, missing/nonnumeric values and machine-readable output. Existing stats commands and DEV-57 query parity do not implement these list flags.
+- at: 2026-09-06T13:12:53.975956+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

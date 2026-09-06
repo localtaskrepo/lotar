@@ -17,32 +17,14 @@ interface UseTaskPanelWatchersOptions {
 
 export function useTaskPanelWatchers(options: UseTaskPanelWatchersOptions) {
     watch(
-        () => options.open(),
-        async (isOpen) => {
+        [() => options.open(), () => options.taskId()],
+        async ([isOpen]) => {
             if (!isOpen) {
                 options.onClose()
                 return
             }
-            await options.ensureProjectsLoaded()
             await options.initialize()
         },
-        { immediate: true },
-    )
-
-    watch(
-        () => options.taskId(),
-        async (next, prev) => {
-            if (!options.open()) return
-            if (next === prev) return
-            await options.initialize()
-        },
-    )
-
-    watch(
-        () => options.form.project,
-        (project) => {
-            if (options.suppressWatch.value) return
-            options.preloadPeople(project)
-        },
+        { immediate: true, flush: 'sync' },
     )
 }

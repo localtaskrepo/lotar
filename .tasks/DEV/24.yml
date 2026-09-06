@@ -1,6 +1,42 @@
 title: 'BUG: WebUI cannot show custom fields in column options'
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.819904+00:00
+modified: 2026-09-06T13:12:54.199426+00:00
+comments:
+- date: 2026-09-06T11:21:52.380072+00:00
+  text: 'Backlog reconciliation: the original custom-field column-options bug was fixed by DEV-34 (5f5e04f). useColumns.spec.ts covers custom keys, labels, wildcard exclusion and delayed config restoration. DEV-35/36/37/38 extend rendering and harden the same implementation. Close this stale Todo rather than duplicate those completed fixes.'
+- date: 2026-09-06T13:12:54.199426+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 27: The WebUI doesn't allow custom fields to be shown in the column options. (fixed: shared ColumnsMenu + useColumns now expose custom fields on TasksList columns, Board card fields, and Calendar hover fields — DEV-34/DEV-35)
+description: |-
+  Migrated checklist requirements:
+  Already fixed by DEV-34/35 and later Calendar/shared-store work. Preserve Done and existing regression evidence; do not recreate the same custom-field column-options bug.
+history:
+- at: 2026-09-06T11:21:52.380072+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.397331+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:54.188806+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Already fixed by DEV-34/35 and later Calendar/shared-store work. Preserve Done and existing regression evidence; do not recreate the same custom-field column-options bug.
+- at: 2026-09-06T13:12:54.199426+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

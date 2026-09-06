@@ -4,3 +4,30 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.705315+00:00
+modified: 2026-09-06T13:12:53.755953+00:00
+comments:
+- date: 2026-09-06T11:21:52.619873+00:00
+  text: 'Backlog reconciliation: Remains Todo for nested-folder ticket storage plus archive lifecycle/query behavior. DEV-56 owns canonical identity/multi-root lookup correctness, and DEV-53 storage safety is implemented; neither closes archive support.'
+- date: 2026-09-06T13:12:53.755953+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 4: Allow ticket files to be stored in nested folders and handle them transparently (allows for devs to group tickets together without breaking the scanning logic. This also paves the way for very large repos that e.g. want to put old tickets into archives). Maybe we even support an "archive" function.
+description: |-
+  Migrated checklist requirements:
+  Support transparent nested ticket discovery and mutation so manual grouping does not break scanning or lookup in large repositories. Retain archive support as a proposed extension requiring defined lifecycle/query semantics, not a silently assumed implementation. DEV-56 covers identity/multi-root correctness, not the complete nested/archive feature.
+history:
+- at: 2026-09-06T11:21:52.619873+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:53.744989+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Support transparent nested ticket discovery and mutation so manual grouping does not break scanning or lookup in large repositories. Retain archive support as a proposed extension requiring defined lifecycle/query semantics, not a silently assumed implementation. DEV-56 covers identity/multi-root correctness, not the complete nested/archive feature.
+- at: 2026-09-06T13:12:53.755953+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

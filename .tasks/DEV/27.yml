@@ -1,6 +1,24 @@
 title: 'BUG: on.commented automation event not implemented'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.836654+00:00
+modified: 2026-09-06T11:21:52.452442+00:00
+comments:
+- date: 2026-09-06T11:21:52.435517+00:00
+  text: 'Backlog reconciliation: on.commented exists since committed 9f77e1d. AutomationEvent parsing/dispatch and TaskService::add_comment are wired through single CLI, REST and MCP comment operations. Closing the original not-implemented report. Bulk MCP comments still bypass the hook and are tracked separately by DEV-60; focused event/template regressions by DEV-77; stale tracker claims by DEV-83.'
+history:
+- at: 2026-09-06T11:21:52.435517+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.452442+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

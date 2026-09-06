@@ -77,6 +77,8 @@ When enabled:
 - Multiple job phases for the same ticket reuse the same worktree
 - The worktree persists after the job completes unless cleanup is enabled
 - Merge-profile jobs require worktrees so merges happen on isolated branches
+- When worktrees are enabled, setup failure fails the job; the runner never falls back to the repository checkout.
+- Git setup, checks, cleanup, and runners discard inherited/profile repository-selection overrides (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_COMMON_DIR`, `GIT_INDEX_FILE`, object/discovery overrides, and `GIT_CONFIG*`). Worktree top-level and common-directory identity are verified. SSH/askpass and author/committer identity environment variables are retained.
 - Merge-profile jobs are serialized one-at-a-time even when `max_parallel_jobs` allows more general agent concurrency
 
 ### Managing worktrees
@@ -103,7 +105,15 @@ lotar agent worktree cleanup --all
 lotar agent worktree cleanup --dry-run
 ```
 
-Worktrees with active jobs are never removed, even with `--all`.
+Worktrees with active jobs are never removed, even with `--all`. Cleanup refuses dirty worktrees (including untracked or ignored files), unknown Git state, and branches not merged into the repository checkout's `HEAD`. Branch deletion uses Git's non-forced deletion checks. `--all` broadens ticket selection only; it is not a force-delete option. Refusals are reported and return a nonzero exit status.
+
+Default CLI cleanup and all automatic cleanup require a readable, valid ticket in a configured done state. Missing, malformed, unreadable, or unknown-status tickets are preserved, even with `--all`. Failure/cancellation cleanup settings only enable cleanup when that same done-state and Git safety check succeeds.
+
+The queue worker drains pending entries and waits for dispatched jobs, including finalization, before exiting. It also waits for dispatched jobs if queue/config processing fails. There is no single-poll `--once` mode. Start failures retain the existing bounded retry policy (three retries), with exhausted retries reported as an error after draining; failed runner jobs are terminal rather than automatically rerun.
+
+Cancelling a dispatched job requests termination immediately, but cancellation automation and reassignment wait until process/output teardown and context persistence finish. The job retains its capacity slot through finalization, so a replacement is queued safely and cancellation automation runs once. Cancelling an undispatched queued job finalizes immediately.
+
+Both output readers are joined before final summaries, persisted status, and slot release. After the runner exits, already-available output is drained without waiting for a surviving descendant to close inherited streams. Continuous descendant output is bounded to five seconds of draining and reported as an output failure rather than keeping the worker alive indefinitely.
 
 ## Automation rules
 

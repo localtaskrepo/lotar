@@ -31,7 +31,7 @@ modified-only, strip attributes, and re-anchor), but lets you pick individual fi
 | Need to… | Command | Notes |
 | --- | --- | --- |
 | Turn TODO comments into LoTaR tasks | `lotar scan src` | Writes tasks, inserts IDs beside the comments, and adds code references to the task file. |
-| Refresh anchors after refactors | `lotar scan --reanchor` | Keeps only the latest location per task and fixes drifted line numbers even if no new TODOs exist. |
+| Refresh anchors after refactors | `lotar scan --reanchor` | Repairs stale anchors while preserving repeated live locations and unrelated references. |
 | Limit noise to active work | `lotar scan --modified-only` | Uses `git status` to choose files; automatically falls back to full scan outside a repo. |
 | Feed results into tooling | `lotar --format json scan --include rs` | JSON entries provide `file`, `line`, `title`, `uuid`, and captured attributes. |
 | Work in another workspace | `lotar scan --tasks-dir /path/to/.tasks ...` | Shares precedence with other commands plus `LOTAR_TASKS_DIR`. |
@@ -48,6 +48,7 @@ modified-only, strip attributes, and re-anchor), but lets you pick individual fi
 - `--format text|table|markdown|json` behaves exactly like other commands (table/markdown fall back to text today).
 - `--detailed` switches from compact summaries to a file/line header plus the matched comment; pair with `--context <N>` for surrounding lines.
 - `--dry-run` stops before writing task files or editing source, letting you inspect the findings.
+- JSON changes rendering only: `lotar --format json scan` applies changes just like text output. Add `--dry-run` for a JSON preview.
 - Verbose logging (`--log-level debug` or `--verbose`) shows which files were skipped, ignores applied, and whether anchors were rewritten.
 
 Sample text output:
@@ -69,9 +70,12 @@ tests/integration.rs:56
 
 - Inline `[key=value]` attributes on the comment are parsed when no ticket ID exists. Recognized keys: `assignee`, `priority`, `type`, `effort`, `due`/`due_date`, `tag`/`tags`. Unknown keys become custom fields.
 - Mixed time/point effort values are rejected. Supported units include minutes/hours/days/weeks (`1h 30m`, `90m`) or points (`3pt`).
-- `--strip-attributes[=<bool>]` overrides `scan.strip_attributes` to decide whether `[key=value]` blocks stay in the source after LoTaR injects the new ID.
+- `--strip-attributes[=<bool>]` overrides `scan.strip_attributes` to decide whether parsed `[key=value]` blocks stay in the matched comment after LoTaR injects the new ID. Brackets in surrounding source syntax are not metadata and are preserved.
 - Each task receives a bidirectional reference entry: `code` anchors look like `path/to/file.rs#118`. Existing anchors are refreshed whenever scan spots a known ID, even if no new TODOs are added.
-- `--reanchor` prunes older anchors for the same file so only the newest location remains. Without the flag, LoTaR still repairs drifted anchors during non-dry-run scans.
+- Anchor refresh replaces stale locations only within the intended file, retaining repeated live hits, other-file references, links, and metadata on mixed reference entries. Without `--reanchor`, LoTaR still repairs drifted anchors during non-dry-run scans.
+- Source edits are validated before creating a task and written by atomic replacement, preserving file permissions. Read-only files and symlinks are rejected. If a source write or reverse-reference update fails, scan reports failure and attempts to remove the newly created task; rollback failures are included in the error. Completed earlier entries are not rolled back, and task-creation side effects such as configuration or automation are not transactional.
+- Replacements are fully prepared before a final source-content check and rename. Cooperating scans serialize that check and rename: Unix uses source/replacement inode locks and reopens stale inodes after a concurrent rename; other platforms use persistent per-path locks in the user cache. Source locks are separate from task-storage locks, and scan removes only its own staging file. A non-locking editor can still write in the small interval between the final comparison and rename; this is not an atomic compare-and-swap against arbitrary editors.
+- Bare relative file paths such as `lotar scan main.rs` work like `lotar scan ./main.rs`.
 
 ## Signal words & supported files
 
@@ -82,6 +86,8 @@ Default (case-insensitive) triggers: **TODO**, **FIXME**, **HACK**, **BUG**, **N
 - `WORD: message [assignee=@me] [priority=high] [tags=infra,login]`
 
 LoTaR understands any language that uses common comment tokens (`//`, `#`, `--`, `;`, `%`, `/* */`, `<!-- -->`). Out of the box it covers Rust, JS/TS (including JSX/TSX), HTML/XML/Vue/Svelte, CSS/SCSS/LESS, Python, Java, C/C++, Go, Kotlin, Scala, C#, Swift, Groovy, Dart, Shell, SQL, Terraform/HCL, YAML/TOML/INI, and more.
+
+Discovery and edits share a conservative, quote-aware lexical recognizer, not a full language parser. Comment delimiters inside single/double-quoted strings, escaped quotes, triple-quoted strings, simple backtick literals, and Rust raw strings are not scan comments. Metadata and existing ticket IDs come only from the established comment segment. Unsupported or ambiguous literal forms (including interpolation, JavaScript regex/division syntax, heredocs, and unterminated ordinary quotes) stop further discovery in that source rather than risk changing executable literals. This can intentionally miss later real comments; resolve the ambiguity or use a simpler source file instead of relying on scan to parse every language construct.
 
 Tweak the vocabulary via:
 

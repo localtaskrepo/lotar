@@ -1,6 +1,24 @@
 title: 'BUG: CLI single-field commands bypass automation'
-status: Todo
+status: NeedsReview
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.842304+00:00
+modified: 2026-09-06T11:21:52.598022+00:00
+comments:
+- date: 2026-09-06T11:21:52.580269+00:00
+  text: 'Backlog reconciliation: the blanket automation-bypass claim is stale. Committed status, priority, assignee, due-date and effort handlers use TaskService::update; status and assignee have smoke coverage. NeedsReview for confirming the original command inventory and priority/due/effort set-clear regressions, not renewed implementation of already-routed commands. DEV-77 owns focused coverage and DEV-54 remaining shared mutation validation.'
+history:
+- at: 2026-09-06T11:21:52.580269+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.598022+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: NeedsReview
+  - field: assignee
+    new: mallox

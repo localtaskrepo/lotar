@@ -5,12 +5,18 @@ type: Task
 reporter: mallox
 assignee: mallox
 created: 2026-09-04T07:30:00.000000+00:00
-modified: 2026-09-04T08:29:02.902930+00:00
+modified: 2026-09-06T11:21:52.991157+00:00
 comments:
 - date: 2026-09-04T08:29:02.902930+00:00
   text: 'Coverage-first then five improvements. COVERAGE NET FIRST: +5 SprintsList sprint-window tests (per-sprint sections, multi-sprint badge, windowed/all-time closed-sprint filtering with hidden-count hint, backlog grouping) - these also fixed two latent test-format bugs (localStorage values are raw not JSON; multi-sprint tasks badge in every section). (1) TOOLCHAIN PIN: rust-toolchain.toml pins 1.98.1 + components; all 5 CI/release workflow steps now read the file instead of forcing floating stable - the local-vs-CI clippy drift that broke the last release cannot recur. (2) CONTRACT GATE: ApiServer::registered_routes() accessor + tests/openapi_contract_test.rs enforcing both directions (every documented op exists on server; every /api route documented unless allowlisted). First run surfaced 15 undocumented endpoints (sprints create/delete/update/backlog, tasks comment/export/attachments, whoami, agents, config/inspect, automation/simulate, commit_diff) - all now documented in openapi.json; SSE endpoints + spec doc recognized as served-outside-handler-map. (3) ROUTES SPLIT: src/routes.rs (3691 lines, 62 handlers) mechanically split into src/routes/{mod,whoami,jobs,tasks,sprints,references,attachments,config,automation,agents,scan,sync,projects,activity}.rs preserving registration order; imports/helpers stay in mod.rs, resource modules glob-import; largest module tasks.rs 1426 lines. (4) DETERMINISTIC AGENT WAITS: root-caused the flake pattern (task post-processing lags job completion; tests asserted immediately after job waits) - added wait_for_task_status polling before all 5 raced assertions with generous 10s bounds; agent binary suite 29/29. (5) NO_UNCHECKED_INDEXED_ACCESS: enabled in view/tsconfig.json; fixed ~100 production sites with real guards/typing (typed RelationshipFields/RelFields interfaces replacing Record index types, optional-chained picks, entry-API fallbacks) and ~100 spec sites with fixture-backed non-null assertions. (6) SprintsList split: first increment extracted SprintViewSettings.vue (v-model timeRange/allowClosed/highlightMultiSprint); full sprint-group/backlog decomposition deferred - the sections need ~25 props/events and deserve a dedicated session, now protected by the new window tests. Gates: lint clean (vue-tsc 0 errors, clippy -D warnings clean, fmt clean), nextest 777/777 (1 flaky-retried), vitest 241/241, smoke 94/94.'
+- date: 2026-09-06T11:21:52.991157+00:00
+  text: 'Backlog reconciliation: Historical Done retained for the enumerated toolchain/routes/typechecking and specific wait fixes. OpenAPI contract tests currently compare method/path inventory, not request/response schemas; DEV-82 owns semantic contract coverage. Some configured agent retries remain; DEV-76/77/78 own the remaining reliability work. Deferred SprintsList decomposition was not completed by this ticket.'
 history:
 - at: 2026-09-04T08:29:02.902930+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.991157+00:00
   actor: mallox
   changes:
   - field: comment_added

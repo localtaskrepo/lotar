@@ -1,0 +1,18 @@
+title: Honor resolved server port configuration and environment precedence
+status: Todo
+relationships:
+  parent: DEV-53
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.729489+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: C12.
+
+  ServeArgs supplies 8080 before the handler can use resolved server_port/LOTAR_PORT. Make explicit CLI override optional and apply documented precedence once. Acceptance: file config and env select the bound port, explicit --port wins, and serve-position -p remains the port alias. The web_ui_path normalization omission was fixed in DEV-53; verify rather than reimplement it.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

@@ -1,0 +1,20 @@
+title: Make task and sprint membership mutations transactional
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-54]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.446322+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: S9.
+
+  Create/update can persist tasks or sprint membership before later validation/write failures. Validate the complete operation first and provide atomic staging or rollback across task and sprint files under coordinated exclusion. Acceptance: invalid member/sprint or injected write failure leaves every affected file unchanged; retries do not create duplicates; successful task and sprint views agree. Preserve existing YAML and ordering. Scope: task_service.rs, sprint assignment/storage. This is not solved by DEV-53 lock acquisition safety alone.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-54.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

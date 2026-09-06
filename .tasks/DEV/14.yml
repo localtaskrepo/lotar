@@ -1,6 +1,42 @@
 title: Add a lotar agent skill template
-status: Todo
+status: NeedsReview
 priority: Low
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.767609+00:00
+modified: 2026-09-06T13:12:53.997922+00:00
+comments:
+- date: 2026-09-06T11:21:52.492513+00:00
+  text: 'Backlog reconciliation: a built-in LoTaR agent instruction template shipped with agent integration (9f77e1d), with prompt injection and instruction-file coverage. NeedsReview rather than automatic Done: the title says skill template and has no acceptance criteria, so confirm whether the built-in template satisfies the request or a separately installable SKILL.md artifact was intended. DEV-30 covers repository guidance; staged DEV-53 wording changes are not a new packaged skill.'
+- date: 2026-09-06T13:12:53.997922+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 15: Add an agent skill template that helps agents how to use lotar
+description: |-
+  Migrated checklist requirements:
+  The built-in LoTaR instruction template may satisfy this request. Original wording does not require a particular SKILL.md packaging format. Keep NeedsReview to confirm intended usability/distribution and whether the existing reusable template is sufficient, rather than inventing a new packaging requirement or silently closing it.
+history:
+- at: 2026-09-06T11:21:52.492513+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.510533+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: NeedsReview
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:53.986750+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      The built-in LoTaR instruction template may satisfy this request. Original wording does not require a particular SKILL.md packaging format. Keep NeedsReview to confirm intended usability/distribution and whether the existing reusable template is sufficient, rather than inventing a new packaging requirement or silently closing it.
+- at: 2026-09-06T13:12:53.997922+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

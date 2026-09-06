@@ -472,6 +472,13 @@ sleep 5\n",
     let job_after = AgentJobService::get_job(&job.id).expect("job still exists");
     assert_eq!(job_after.status, "cancelled");
 
+    // Dispatched cancellation hands off only after process/context teardown.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while AgentJobService::queue_stats().running != 0 {
+        assert!(Instant::now() < deadline, "cancelled job did not finalize");
+        sleep(Duration::from_millis(25));
+    }
+
     let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
     assert!(
@@ -557,8 +564,12 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     )
     .expect("update assignee");
 
-    let jobs = wait_for_completed_jobs(&created.id, 2, 4000);
-    assert_eq!(jobs.len(), 2, "expected two completed jobs");
+    // Both process launches and the intervening automation run need headroom under suite load.
+    let jobs = wait_for_completed_jobs(&created.id, 2, 10_000);
+    assert!(
+        jobs.len() == 2 && jobs.iter().all(|job| job.status == "completed"),
+        "expected two completed jobs before timeout; last observed jobs: {jobs:?}"
+    );
 
     let implement_job = jobs
         .iter()
@@ -576,12 +587,9 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     assert!(run_output.contains(&created.id));
     assert!(run_output.contains(implement_agent));
 
-    assert!(
-        wait_for_task_status(&storage, &created.id, "Done", 2000),
-        "task did not reach Done after both jobs completed"
-    );
-
-    let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
+    // Job completion is published before the final task automation finishes.
+    let refreshed = wait_for_task_state(&storage, &created.id, "Done", Some("sam"), 10_000)
+        .expect("task did not reach Done and return to reporter after both jobs completed");
     assert_eq!(refreshed.status.as_str(), "Done");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
 }

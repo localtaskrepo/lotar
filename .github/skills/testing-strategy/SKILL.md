@@ -16,6 +16,7 @@ description: Use this to run tests quickly and target a subset, then widen to CI
 - List exact test names: `cargo nextest list --cargo-profile ci`
 - Pass-through test-binary args (e.g. `--nocapture`): `cargo nextest run --cargo-profile ci <filter> -- --nocapture`
 - Fast clippy-only loop (lib+bins, no `--all-targets`/`--all-features`): `npm run lint:backend:fast`
+- Fresh worktree: run `npm run build:web` before compiling Rust; `include_dir!` requires the generated `target/web-embed` directory.
 
 ## UI unit tests (vitest)
 
@@ -30,7 +31,7 @@ description: Use this to run tests quickly and target a subset, then widen to CI
 - Quick (no rebuild — assumes fresh artifacts): `npm run test:smoke:quick`
 - By name: `npm run test:smoke:quick -- -t "<substring>"`
 - By file: `npm run test:smoke:quick -- smoke/tests/<suite>.smoke.spec.ts`
-- Tight in-process loop: `npx vitest watch --config smoke/vitest.config.ts --runInBand`
+- Serialized watch loop: `npx vitest watch --config smoke/vitest.config.ts --maxWorkers=1 --maxConcurrency=1 --no-file-parallelism`
 - Install browsers if missing: `npm run playwright:install`
 
 If smoke fails on environment/binary/server issues, switch to the `smoke-suite-debugging` skill.

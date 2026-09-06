@@ -1,8 +1,12 @@
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use chrono::Utc;
+use fs2::FileExt;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue, json};
 use std::collections::{HashMap, HashSet};
 use std::env;
+use std::fs::{self, File, OpenOptions};
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -210,6 +214,353 @@ fn make_entry_with_fields(
 
 pub struct SyncService;
 
+#[cfg(test)]
+#[path = "../../tests/common/sync_retry_cases.rs"]
+mod retry_safety_tests;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct PendingScope {
+    provider: String,
+    endpoint_hash: String,
+    destination: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct PendingLink {
+    scope: PendingScope,
+    project: String,
+    task_id: Option<String>,
+    reference: Option<String>,
+}
+
+impl PendingLink {
+    fn canonicalize(&mut self, root: &Path) -> LoTaRResult<()> {
+        if let Some(id) = self.task_id.as_deref() {
+            self.task_id = Some(canonical_sync_task_id(root, &self.project, id)?);
+        }
+        self.project = canonical_sync_project(root, &self.project)?;
+        Ok(())
+    }
+}
+
+// The workspace-wide lock spans snapshot reads, creation and linking, across both
+// directions and remote aliases. A crashed process releases it automatically.
+struct SyncJournal {
+    path: PathBuf,
+    _lock: Option<File>,
+    links: Vec<PendingLink>,
+    dry_run: bool,
+}
+
+impl SyncJournal {
+    fn open(root: &Path, dry_run: bool) -> LoTaRResult<Self> {
+        let lock = if dry_run {
+            None
+        } else {
+            let file = OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .read(true)
+                .write(true)
+                .open(root.join(".sync-pending.lock"))?;
+            file.try_lock_exclusive().map_err(|_| {
+                LoTaRError::ValidationError(
+                    "Another sync is running in this workspace; retry after it finishes".into(),
+                )
+            })?;
+            Some(file)
+        };
+        let path = root.join(".sync-pending.json");
+        let mut links: Vec<PendingLink> = match fs::read_to_string(&path) {
+            Ok(payload) => serde_json::from_str(&payload).map_err(|err| LoTaRError::ValidationError(
+                format!("Invalid sync recovery journal {}: {err}; do not delete it or retry creation before reconciling", path.display())))?,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(err) => return Err(err.into()),
+        };
+        // Validate every stored identity before any scope/target filtering. An
+        // unknown task must not turn into an unrelated entry that can be skipped.
+        for link in &mut links {
+            link.canonicalize(root).map_err(|err| LoTaRError::ValidationError(format!(
+                "Invalid sync recovery identity in {}: {err}; reconcile the journal before retrying creation", path.display()
+            )))?;
+        }
+        Ok(Self {
+            path,
+            _lock: lock,
+            links,
+            dry_run,
+        })
+    }
+
+    fn save(&self) -> LoTaRResult<()> {
+        if self.dry_run {
+            return Err(LoTaRError::ValidationError(
+                "Dry run cannot write sync recovery state".into(),
+            ));
+        }
+        #[cfg(test)]
+        if self
+            .links
+            .iter()
+            .any(|link| link.task_id.is_some() && link.reference.is_some())
+            && FAIL_SYNC_RESULT_SAVE.replace(false)
+        {
+            return Err(std::io::Error::other("injected sync result journal failure").into());
+        }
+        let payload = serde_json::to_string_pretty(&self.links)
+            .map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
+        // The shared writer must sync its temporary file before non-destructive
+        // publication. On Unix, also persist the directory entry here. Portable
+        // std::fs does not provide directory fsync on Windows.
+        crate::storage::safety::atomic_write_file(&self.path, &payload)?;
+        #[cfg(unix)]
+        File::open(self.path.parent().expect("journal has a parent"))?.sync_all()?;
+        Ok(())
+    }
+
+    fn begin(&mut self, mut link: PendingLink) -> LoTaRResult<usize> {
+        link.canonicalize(self.path.parent().expect("journal has a parent"))?;
+        if self.links.iter().any(|pending| {
+            pending.scope == link.scope
+                && pending.project == link.project
+                && ((link.task_id.is_some() && pending.task_id == link.task_id)
+                    || (link.reference.is_some() && pending.reference == link.reference))
+        }) {
+            return Err(self.indeterminate());
+        }
+        self.links.push(link);
+        self.save()?;
+        Ok(self.links.len() - 1)
+    }
+
+    fn save_result(&mut self, index: usize) -> LoTaRResult<()> {
+        self.links[index].canonicalize(self.path.parent().expect("journal has a parent"))?;
+        self.save().map_err(|err| {
+            let link = &self.links[index];
+            LoTaRError::ValidationError(format!(
+                "Failed to journal returned identity task_id={:?}, reference={:?}: {err}. {}",
+                link.task_id,
+                link.reference,
+                self.indeterminate()
+            ))
+        })
+    }
+
+    fn indeterminate(&self) -> LoTaRError {
+        LoTaRError::ValidationError(format!(
+            "Indeterminate sync creation in {}. Creation will not be retried. Inspect the remote issues and local tasks, fill the missing task_id/reference in this journal with the verified identity, then retry the same project/remote. Remove an intent only after verifying creation did not occur.",
+            self.path.display()
+        ))
+    }
+
+    fn reconcile(
+        &mut self,
+        resolver: &TasksDirectoryResolver,
+        scope: &PendingScope,
+        project: Option<&str>,
+        task_id: Option<&str>,
+        remote: &SyncRemoteConfig,
+    ) -> LoTaRResult<()> {
+        let project = project
+            .map(|project| canonical_sync_project(&resolver.path, project))
+            .transpose()?;
+        let project = project.as_deref();
+        let task_id = task_id
+            .map(|id| {
+                let prefix =
+                    crate::storage::operations::StorageOperations::get_project_for_task(id.trim())
+                        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
+                canonical_sync_task_id(&resolver.path, &prefix, id.trim())
+            })
+            .transpose()?;
+        let task_id = task_id.as_deref();
+        let mut storage = Storage::new(&resolver.path);
+        let mut index = 0;
+        while index < self.links.len() {
+            let link = &self.links[index];
+            if project.is_some_and(|p| p != link.project)
+                || task_id.is_some_and(|id| {
+                    link.task_id
+                        .as_deref()
+                        .is_some_and(|known| known != id.trim())
+                })
+            {
+                index += 1;
+                continue;
+            }
+            // Never reinterpret a pending identity after switching servers or repos.
+            if &link.scope != scope {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Pending sync belongs to a different remote identity; reconcile {} with its original project/remote first",
+                    self.path.display()
+                )));
+            }
+            let (Some(id), Some(reference)) = (&link.task_id, &link.reference) else {
+                return Err(self.indeterminate());
+            };
+            crate::storage::safety::validate_project_prefix(&link.project)
+                .map_err(LoTaRError::ValidationError)?;
+            if id.split('-').next() != Some(link.project.as_str())
+                || normalize_reference_for_remote(remote, reference).as_deref() != Some(reference)
+            {
+                return Err(LoTaRError::ValidationError(
+                    "Pending sync identity does not match its project/remote".into(),
+                ));
+            }
+            let existing = TaskService::get(&storage, id, Some(&link.project))?;
+            sync_task_path(resolver, &link.project, id)?;
+            match determine_reference_state(remote, &existing) {
+                ReferenceState::None => {}
+                ReferenceState::Matching(value) if value == *reference => {}
+                _ => {
+                    return Err(LoTaRError::ValidationError(format!(
+                        "Pending sync reference conflicts with task {id}; reconcile {} manually",
+                        self.path.display()
+                    )));
+                }
+            }
+            if self.dry_run {
+                index += 1;
+                continue;
+            }
+            attach_sync_reference(&mut storage, id, &scope.provider, reference)?;
+            self.finish(index, resolver)?;
+        }
+        Ok(())
+    }
+
+    fn finish(&mut self, index: usize, resolver: &TasksDirectoryResolver) -> LoTaRResult<()> {
+        let link = &self.links[index];
+        let id = link
+            .task_id
+            .as_deref()
+            .ok_or_else(|| self.indeterminate())?;
+        // Make the link durable before forgetting its recovery identity.
+        let path = sync_task_path(resolver, &link.project, id)?;
+        OpenOptions::new().write(true).open(&path)?.sync_all()?;
+        #[cfg(unix)]
+        File::open(path.parent().expect("task has parent"))?.sync_all()?;
+        self.links.remove(index);
+        self.save()
+    }
+}
+
+fn pending_scope(remote: &SyncRemoteConfig, client: &SyncClient) -> PendingScope {
+    PendingScope {
+        provider: provider_label(&remote.provider).into(),
+        endpoint_hash: blake3::hash(client.auth.api_base.trim_end_matches('/').as_bytes())
+            .to_hex()
+            .to_string(),
+        destination: match remote.provider {
+            SyncProvider::Github => normalize_github_repo(remote.repo.as_deref().unwrap_or("")),
+            SyncProvider::Jira => remote
+                .project
+                .as_deref()
+                .unwrap_or("")
+                .trim()
+                .to_ascii_uppercase(),
+        },
+    }
+}
+
+fn sync_task_path(
+    resolver: &TasksDirectoryResolver,
+    project: &str,
+    id: &str,
+) -> LoTaRResult<PathBuf> {
+    let folders =
+        crate::storage::locator::StorageLocator::project_folders_for_name(&resolver.path, project);
+    let path = folders
+        .iter()
+        .find_map(|folder| {
+            crate::storage::operations::StorageOperations::get_file_path_for_id(
+                &resolver.path.join(folder),
+                id,
+            )
+        })
+        .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+    if !path
+        .canonicalize()?
+        .starts_with(resolver.path.canonicalize()?)
+    {
+        return Err(LoTaRError::ValidationError(
+            "Sync task must be inside the locked tasks workspace".into(),
+        ));
+    }
+    Ok(path)
+}
+
+fn canonical_sync_project(root: &Path, project: &str) -> LoTaRResult<String> {
+    crate::storage::safety::validate_project_prefix(project)
+        .map_err(LoTaRError::ValidationError)?;
+    let path = root.join(project);
+    if !path.exists() {
+        return Ok(project.to_string());
+    }
+    let path = path.canonicalize()?;
+    if path.parent() != Some(root.canonicalize()?.as_path()) || !path.is_dir() {
+        return Err(LoTaRError::ValidationError(
+            "Sync project must be directly inside the locked tasks workspace".into(),
+        ));
+    }
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_string)
+        .ok_or_else(|| LoTaRError::ValidationError("Invalid sync project directory".into()))
+}
+
+fn canonical_sync_task_id(root: &Path, project: &str, id: &str) -> LoTaRResult<String> {
+    use crate::storage::operations::StorageOperations;
+    // Do not duplicate the ID parser: storage currently accepts padding, a leading
+    // '+', and trailing segments. The actual resolved file is the operation key.
+    if StorageOperations::get_project_for_task(id).as_deref() != Some(project)
+        || StorageOperations::get(root, id, project).is_none()
+    {
+        return Err(LoTaRError::InvalidTaskId(id.to_string()));
+    }
+    let project = canonical_sync_project(root, project)?;
+    let path = StorageOperations::get_file_path_for_id(&root.join(&project), id)
+        .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?
+        .canonicalize()?;
+    if path.parent() != Some(root.join(&project).canonicalize()?.as_path()) || !path.is_file() {
+        return Err(LoTaRError::ValidationError(
+            "Sync task identity crosses its project boundary".into(),
+        ));
+    }
+    let number = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .and_then(|stem| stem.parse::<u64>().ok())
+        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
+    let canonical = format!("{project}-{number}");
+    let canonical_path = StorageOperations::get_file_path_for_id(&root.join(&project), &canonical)
+        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?
+        .canonicalize()?;
+    if canonical_path != path {
+        return Err(LoTaRError::InvalidTaskId(id.to_string()));
+    }
+    Ok(canonical)
+}
+
+#[cfg(test)]
+thread_local! {
+    static FAIL_SYNC_LINK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FAIL_SYNC_RESULT_SAVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+fn attach_sync_reference(
+    storage: &mut Storage,
+    id: &str,
+    provider: &str,
+    reference: &str,
+) -> LoTaRResult<(TaskDTO, bool)> {
+    #[cfg(test)]
+    if FAIL_SYNC_LINK.replace(false) {
+        return Err(std::io::Error::other("injected sync link failure").into());
+    }
+    ReferenceService::attach_platform_reference(storage, id, provider, reference)
+}
+
 impl SyncService {
     #[allow(clippy::too_many_arguments)]
     pub fn push(
@@ -412,6 +763,19 @@ impl SyncService {
                 }
             }
         }
+        let project_prefix = project_prefix
+            .map(|prefix| canonical_sync_project(&resolver.path, &prefix))
+            .transpose()?;
+        let canonical_target = task_id
+            .map(|id| {
+                let id = id.trim();
+                let prefix =
+                    crate::storage::operations::StorageOperations::get_project_for_task(id)
+                        .ok_or_else(|| LoTaRError::InvalidTaskId(id.to_string()))?;
+                canonical_sync_task_id(&resolver.path, &prefix, id)
+            })
+            .transpose()?;
+        let task_id = canonical_target.as_deref();
         let resolved = if let Some(prefix) = project_prefix.as_deref() {
             mgr.get_project_config(prefix).map_err(|e| {
                 LoTaRError::ValidationError(format!(
@@ -524,30 +888,50 @@ impl SyncService {
 
         let mut recorder = SyncReportRecorder::new(context);
 
-        let outcome = match direction {
-            SyncDirection::Push => perform_push(
-                resolver,
-                &remote_config,
-                project_prefix.as_deref(),
-                task_id,
-                dry_run,
-                client.as_ref(),
-                &mut recorder,
-                &mut warnings,
-            ),
-            SyncDirection::Pull => perform_pull(
-                resolver,
-                &remote_config,
-                pull_project
-                    .as_deref()
-                    .expect("pull project must be resolved"),
-                task_id,
-                dry_run,
-                client.as_ref().expect("sync client required"),
-                &mut recorder,
-                &mut warnings,
-            ),
-        };
+        let outcome = (|| {
+            let mut journal = SyncJournal::open(&resolver.path, dry_run)?;
+            if let Some(client) = client.as_ref() {
+                journal.reconcile(
+                    resolver,
+                    &pending_scope(&remote_config, client),
+                    run_project.as_deref(),
+                    task_id,
+                    &remote_config,
+                )?;
+            } else if !journal.links.is_empty() {
+                warnings.push(
+                    "Pending sync recovery exists; dry-run creation estimates do not reconcile it"
+                        .into(),
+                );
+            }
+
+            match direction {
+                SyncDirection::Push => perform_push(
+                    resolver,
+                    &remote_config,
+                    project_prefix.as_deref(),
+                    task_id,
+                    dry_run,
+                    client.as_ref(),
+                    &mut recorder,
+                    &mut warnings,
+                    &mut journal,
+                ),
+                SyncDirection::Pull => perform_pull(
+                    resolver,
+                    &remote_config,
+                    pull_project
+                        .as_deref()
+                        .expect("pull project must be resolved"),
+                    task_id,
+                    dry_run,
+                    client.as_ref().expect("sync client required"),
+                    &mut recorder,
+                    &mut warnings,
+                    &mut journal,
+                ),
+            }
+        })();
 
         if let Err(err) = outcome {
             emit_sync_event(
@@ -572,7 +956,7 @@ impl SyncService {
 
         let report_status = "ok";
         let report = recorder.report(report_status, warnings.clone(), info.clone());
-        let write_enabled = write_report.unwrap_or(resolved.sync_write_reports);
+        let write_enabled = !dry_run && write_report.unwrap_or(resolved.sync_write_reports);
         let stored_path = match SyncReportService::write_report(
             &resolver.path,
             &resolved,
@@ -875,6 +1259,7 @@ fn perform_push(
     client: Option<&SyncClient>,
     recorder: &mut SyncReportRecorder,
     warnings: &mut Vec<String>,
+    journal: &mut SyncJournal,
 ) -> LoTaRResult<()> {
     if remote.provider == SyncProvider::Github
         && remote.repo.as_deref().unwrap_or("").trim().is_empty()
@@ -904,8 +1289,16 @@ fn perform_push(
 
     let mut failures = Vec::new();
     let mut jira_lookup = JiraLookupCache::default();
+    let mut selected = HashSet::new();
 
-    for (_id, task) in tasks {
+    for (_id, mut task) in tasks {
+        let prefix = crate::storage::operations::StorageOperations::get_project_for_task(&task.id)
+            .ok_or_else(|| LoTaRError::InvalidTaskId(task.id.clone()))?;
+        task.id = canonical_sync_task_id(&resolver.path, &prefix, &task.id)?;
+        if !selected.insert(task.id.clone()) {
+            continue;
+        }
+        let task = TaskService::get(&storage, &task.id, None)?;
         match determine_reference_state(remote, &task) {
             ReferenceState::Matching(reference) => {
                 let task_id = Some(task.id.clone());
@@ -1170,6 +1563,25 @@ fn perform_push(
                     )
                 })?;
                 let mut storage = Storage::new(&resolver.path.clone());
+                // Use the same identity prerequisites as the reference writer before
+                // issuing a non-idempotent remote request.
+                let local_project = task.id.split('-').next().unwrap_or("");
+                crate::storage::safety::validate_project_prefix(local_project)
+                    .map_err(LoTaRError::ValidationError)?;
+                TaskService::get(&storage, &task.id, Some(local_project))?;
+                let task_path = sync_task_path(resolver, local_project, &task.id)?;
+                OpenOptions::new().write(true).open(&task_path)?;
+                if task_path
+                    .parent()
+                    .expect("task has parent")
+                    .metadata()?
+                    .permissions()
+                    .readonly()
+                {
+                    return Err(LoTaRError::ValidationError(
+                        "Local task directory is read-only; cannot attach sync reference".into(),
+                    ));
+                }
                 match remote.provider {
                     SyncProvider::Jira => {
                         ensure_jira_issue_types(&mut jira_lookup, Some(client), remote, warnings);
@@ -1186,12 +1598,20 @@ fn perform_push(
                                 "Jira remote must define project".to_string(),
                             )
                         })?;
+                        let pending = journal.begin(PendingLink {
+                            scope: pending_scope(remote, client),
+                            project: local_project.into(),
+                            task_id: Some(task.id.clone()),
+                            reference: None,
+                        })?;
                         let key = match jira_create_issue(client, project, &payload) {
                             Ok(key) => key,
                             Err(err) => {
                                 failures.push(format!(
-                                    "Failed to create Jira issue for {}: {}",
-                                    task.id, err
+                                    "Failed to create Jira issue for {}: {}; {}",
+                                    task.id,
+                                    err,
+                                    journal.indeterminate()
                                 ));
                                 recorder.record(
                                     SyncEntryStatus::Failed,
@@ -1207,12 +1627,11 @@ fn perform_push(
                             }
                         };
                         let reference = normalize_jira_reference(&key).unwrap_or(key);
-                        if let Err(err) = ReferenceService::attach_platform_reference(
-                            &mut storage,
-                            &task.id,
-                            "jira",
-                            &reference,
-                        ) {
+                        journal.links[pending].reference = Some(reference.clone());
+                        journal.save_result(pending)?;
+                        if let Err(err) =
+                            attach_sync_reference(&mut storage, &task.id, "jira", &reference)
+                        {
                             failures.push(format!(
                                 "Failed to attach Jira reference for {}: {}",
                                 task.id, err
@@ -1229,6 +1648,7 @@ fn perform_push(
                             );
                             continue;
                         }
+                        journal.finish(pending, resolver)?;
                         if let Some(status) = payload.desired_status.as_deref()
                             && let Err(err) = jira_transition_issue(client, &reference, status)
                         {
@@ -1256,12 +1676,20 @@ fn perform_push(
                                 "GitHub remote must define repo".to_string(),
                             )
                         })?;
+                        let pending = journal.begin(PendingLink {
+                            scope: pending_scope(remote, client),
+                            project: local_project.into(),
+                            task_id: Some(task.id.clone()),
+                            reference: None,
+                        })?;
                         let number = match github_create_issue(client, repo, &payload) {
                             Ok(number) => number,
                             Err(err) => {
                                 failures.push(format!(
-                                    "Failed to create GitHub issue for {}: {}",
-                                    task.id, err
+                                    "Failed to create GitHub issue for {}: {}; {}",
+                                    task.id,
+                                    err,
+                                    journal.indeterminate()
                                 ));
                                 recorder.record(
                                     SyncEntryStatus::Failed,
@@ -1277,12 +1705,11 @@ fn perform_push(
                             }
                         };
                         let reference = format!("{}#{}", normalize_github_repo(repo), number);
-                        if let Err(err) = ReferenceService::attach_platform_reference(
-                            &mut storage,
-                            &task.id,
-                            "github",
-                            &reference,
-                        ) {
+                        journal.links[pending].reference = Some(reference.clone());
+                        journal.save_result(pending)?;
+                        if let Err(err) =
+                            attach_sync_reference(&mut storage, &task.id, "github", &reference)
+                        {
                             failures.push(format!(
                                 "Failed to attach GitHub reference for {}: {}",
                                 task.id, err
@@ -1299,6 +1726,7 @@ fn perform_push(
                             );
                             continue;
                         }
+                        journal.finish(pending, resolver)?;
                         if payload.state.as_deref() == Some("closed") {
                             let close_payload = GithubIssuePayload {
                                 state: Some("closed".to_string()),
@@ -1344,6 +1772,7 @@ fn perform_pull(
     client: &SyncClient,
     recorder: &mut SyncReportRecorder,
     warnings: &mut Vec<String>,
+    journal: &mut SyncJournal,
 ) -> LoTaRResult<()> {
     if remote.provider == SyncProvider::Github
         && remote.repo.as_deref().unwrap_or("").trim().is_empty()
@@ -1362,7 +1791,9 @@ fn perform_pull(
         }
 
         let storage = Storage::new(&resolver.path.clone());
-        let existing = TaskService::get(&storage, trimmed, Some(project))?;
+        let mut existing = TaskService::get(&storage, trimmed, Some(project))?;
+        existing.id = canonical_sync_task_id(&resolver.path, project, trimmed)?;
+        let trimmed = existing.id.as_str();
         let reference = match determine_reference_state(remote, &existing) {
             ReferenceState::Matching(value) => value,
             ReferenceState::ProviderOnly(_) => {
@@ -1371,9 +1802,19 @@ fn perform_pull(
                 ));
             }
             ReferenceState::None => {
-                return Err(LoTaRError::ValidationError(
-                    "Task is missing a remote reference".to_string(),
-                ));
+                let pending_reference = journal
+                    .links
+                    .iter()
+                    .find(|link| {
+                        dry_run
+                            && link.project == project
+                            && link.task_id.as_deref() == Some(trimmed)
+                            && link.scope == pending_scope(remote, client)
+                    })
+                    .and_then(|link| link.reference.clone());
+                pending_reference.ok_or_else(|| {
+                    LoTaRError::ValidationError("Task is missing a remote reference".to_string())
+                })?
             }
         };
 
@@ -1468,12 +1909,29 @@ fn perform_pull(
         project: Some(project.to_string()),
         ..Default::default()
     };
-    let tasks = TaskService::list(&storage, &filter);
+    let mut tasks = TaskService::list(&storage, &filter);
+    for (id, task) in &mut tasks {
+        task.id = canonical_sync_task_id(&resolver.path, project, &task.id)?;
+        *task = TaskService::get(&storage, &task.id, None)?;
+        id.clone_from(&task.id);
+    }
     let mut tasks_by_id: HashMap<String, TaskDTO> = HashMap::new();
     for (_id, task) in &tasks {
         tasks_by_id.insert(task.id.clone(), task.clone());
     }
-    let reference_index = build_reference_index(remote, &tasks);
+    let mut reference_index = build_reference_index(remote, &tasks);
+    if dry_run {
+        for link in &journal.links {
+            if link.project == project
+                && link.scope == pending_scope(remote, client)
+                && let (Some(id), Some(reference)) = (&link.task_id, &link.reference)
+            {
+                reference_index
+                    .entry(reference.clone())
+                    .or_insert_with(|| id.clone());
+            }
+        }
+    }
 
     let mut failures = Vec::new();
 
@@ -1571,10 +2029,32 @@ fn perform_pull(
                 );
                 continue;
             }
+            crate::storage::safety::validate_project_prefix(project)
+                .map_err(LoTaRError::ValidationError)?;
+            let project_path = resolver.path.join(project);
+            if project_path.exists()
+                && !project_path
+                    .canonicalize()?
+                    .starts_with(resolver.path.canonicalize()?)
+            {
+                return Err(LoTaRError::ValidationError(
+                    "Sync project must be inside the locked tasks workspace".into(),
+                ));
+            }
+            let pending = journal.begin(PendingLink {
+                scope: pending_scope(remote, client),
+                project: project.into(),
+                task_id: None,
+                reference: Some(reference.clone()),
+            })?;
             let created_task = match TaskService::create(&mut storage, create) {
                 Ok(task) => task,
                 Err(err) => {
-                    failures.push(format!("Failed to create local task: {}", err));
+                    failures.push(format!(
+                        "Failed to create local task: {}; {}",
+                        err,
+                        journal.indeterminate()
+                    ));
                     recorder.record(
                         SyncEntryStatus::Failed,
                         make_entry(
@@ -1588,7 +2068,9 @@ fn perform_pull(
                     continue;
                 }
             };
-            if let Err(err) = ReferenceService::attach_platform_reference(
+            journal.links[pending].task_id = Some(created_task.id.clone());
+            journal.save_result(pending)?;
+            if let Err(err) = attach_sync_reference(
                 &mut storage,
                 &created_task.id,
                 provider_label(&remote.provider),
@@ -1610,6 +2092,9 @@ fn perform_pull(
                 );
                 continue;
             }
+            journal.finish(pending, resolver)?;
+            reference_index.insert(reference.clone(), created_task.id.clone());
+            tasks_by_id.insert(created_task.id.clone(), created_task.clone());
             if let Some(status) = status {
                 let update = TaskUpdate {
                     status: Some(status),

@@ -5,10 +5,12 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-08-29T03:34:14.761157+00:00
-modified: 2026-08-29T04:13:20.887365+00:00
+modified: 2026-09-06T11:21:52.889801+00:00
 comments:
 - date: 2026-08-29T04:13:20.858792+00:00
   text: 'Shipped: (1) ColumnsMenu now clamps its popover into the viewport (measured clamp via inline offset, resize/scroll re-clamp, max-width capped at 100vw-16px) - Board Fields menu was 114px off-screen left at 390px, now in view at all widths. (2) Insights 267px gap fixed: at <=960px the header switches to column direction so the 280px flex-basis became the title''s height; reset to auto in the media query (also merged duplicate media blocks). (3) Page-wide fixes: topbar nav scrolls horizontally at <=900px (was 551px page overflow on every page); Tasks pagination row wraps (55px overflow); Sprints goal/notes tooltips switched from opacity-hide to display:none so their laid-out pseudo-elements no longer inflate scrollWidth (119px overflow); Board kanban grid is its own horizontal scroll container (723px page overflow); AgentJobs filter tabs wrap (143px); Automations scope row wraps (107px); ConfigView page-header + page-actions wrap (251px). All 11 routes verified at 390px and Boards also at 768px: 0 page overflow, popovers in view. Gates: lint clean, vitest 202/202.'
+- date: 2026-09-06T11:21:52.889801+00:00
+  text: 'Backlog reconciliation: Historical Done retained for viewport clamping and Insights layout. Recorded browser/viewport measurements are prior evidence, not rerun during this metadata reconciliation. Data/query scope correctness is separately DEV-66.'
 history:
 - at: 2026-08-29T03:34:14.816504+00:00
   actor: mallox
@@ -28,3 +30,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-09-06T11:21:52.889801+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

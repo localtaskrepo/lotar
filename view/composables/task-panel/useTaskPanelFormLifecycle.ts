@@ -78,6 +78,7 @@ export interface TaskPanelFormLifecycleApi {
 }
 
 export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOptions): TaskPanelFormLifecycleApi {
+    let projectGeneration = 0
     const projectFromList = () => options.projects.value[0]?.prefix || ''
 
     const resetErrors = () => {
@@ -87,7 +88,9 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
     }
 
     const resetForm = () => {
+        projectGeneration += 1
         options.suppressWatch.value = true
+        for (const key of Object.keys(options.task)) delete (options.task as any)[key]
         options.form.id = ''
         options.form.title = ''
         options.form.project = options.getInitialProject() || ''
@@ -233,18 +236,32 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
 
     const onProjectChange = () => {
         if (options.mode.value !== 'create') return
+        const project = options.form.project
+        const request = ++projectGeneration
+        options.ready.value = false
+        delete options.errors.config
         options
-            .refreshConfig(options.form.project)
-            .then(() => applyDefaults(options.form.project))
-            .catch(() => { })
+            .refreshConfig(project)
+            .then(() => {
+                if (request !== projectGeneration || project !== options.form.project || options.mode.value !== 'create') return
+                applyDefaults(project)
+                options.ready.value = true
+            })
+            .catch((error: unknown) => {
+                if (request !== projectGeneration || project !== options.form.project || options.mode.value !== 'create') return
+                options.errors.config = error instanceof Error ? error.message : 'Failed to load project configuration'
+            })
     }
 
     watch(
         () => options.form.project,
         (project) => {
+            projectGeneration += 1
+            if (options.mode.value === 'create') options.ready.value = false
             if (options.suppressWatch.value) return
             options.preloadPeople(project)
         },
+        { flush: 'sync' },
     )
 
     return {

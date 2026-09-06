@@ -1,0 +1,18 @@
+title: Reconcile documented bare-ticket mention scanning with discovery
+status: Todo
+relationships:
+  parent: DEV-53
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.764270+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: D2.
+
+  The guide promises known-ID mentions without signal words, but discovery filters those lines before mention tracking. Implement a separate safe known-ticket mention path that never creates tasks, or explicitly revise the unsupported promise after scope agreement. Acceptance: enabled/disabled mention behavior has CLI/service tests, unknown IDs never create tasks, and quoted strings/source text remain unchanged. Preserve DEV-53 scanner safety.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

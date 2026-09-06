@@ -11,7 +11,7 @@ use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode};
 use crate::services::agent_queue_service::AgentQueueService;
 use crate::services::automation_matching::{ChangeSet, MatchMode, matches_rule};
-use crate::services::automation_validation::validate_rules;
+use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::sprint_service::SprintService;
 use crate::services::task_service::{TaskService, TaskUpdateContext};
@@ -23,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 const DEFAULT_AUTO_PROMPT: &str = "Work on this ticket using the provided context and agent instructions. Make concrete changes in the repo (code/config/tests), run or update relevant tests, and summarize what changed and how you verified it. If you are blocked or missing information, say what you need and exit non-zero so automation can request help.";
 const DEFAULT_MAX_ITERATIONS: u32 = 10;
@@ -36,23 +36,6 @@ type CooldownKey = (String, String);
 
 static COOLDOWN_STATE: std::sync::LazyLock<Mutex<HashMap<CooldownKey, Instant>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// Parse a human-friendly duration string ("30s", "5m", "2h", "1d") into `Duration`.
-fn parse_duration(s: &str) -> Option<Duration> {
-    let s = s.trim();
-    if s.is_empty() {
-        return None;
-    }
-    let (digits, suffix) = s.split_at(s.len() - 1);
-    let value: u64 = digits.parse().ok()?;
-    match suffix {
-        "s" => Some(Duration::from_secs(value)),
-        "m" => Some(Duration::from_secs(value * 60)),
-        "h" => Some(Duration::from_secs(value * 3600)),
-        "d" => Some(Duration::from_secs(value * 86400)),
-        _ => None,
-    }
-}
 
 /// Return a stable identity string for a rule (name if present, else index).
 fn rule_identity(rule: &AutomationRule, index: usize) -> String {
@@ -69,9 +52,9 @@ fn cooldown_allows(rule: &AutomationRule, rule_key: &str, ticket_id: &str) -> bo
         Some(s) => s,
         None => return true,
     };
-    let duration = match parse_duration(cooldown_str) {
+    let duration = match parse_cooldown(cooldown_str) {
         Some(d) => d,
-        None => return true, // unparseable → don't block
+        None => return false, // Invalid hand-edited rules must not disable loop protection.
     };
     let key = (rule_key.to_string(), ticket_id.to_string());
     let map = COOLDOWN_STATE.lock().unwrap_or_else(|e| e.into_inner());
@@ -245,6 +228,9 @@ impl AutomationService {
         let file: AutomationFile = serde_yaml_ng::from_str(yaml).map_err(LoTaRError::from)?;
         let config = resolve_config_for_project(tasks_dir, project)?;
         let validation = validate_rules(&file, &config);
+        if validation.has_errors() {
+            return Err(LoTaRError::ValidationError(validation.to_string()));
+        }
 
         match project {
             Some(prefix) => {
@@ -1672,4 +1658,72 @@ fn convert_custom_field_value(
     serde_json::to_value(value).map_err(|err| {
         LoTaRError::SerializationError(format!("Invalid custom field value for {}: {}", key, err))
     })
+}
+
+#[cfg(test)]
+mod cooldown_tests {
+    use super::*;
+    use crate::automation::types::AutomationRuleSet;
+    use std::time::Duration;
+
+    #[test]
+    fn cooldown_parser_checks_units_and_arithmetic() {
+        for (input, seconds) in [
+            ("0s", 0),
+            ("30s", 30),
+            (" 5m ", 300),
+            ("2h", 7200),
+            ("1d", 86400),
+        ] {
+            assert_eq!(parse_cooldown(input), Some(Duration::from_secs(seconds)));
+        }
+        for input in [
+            "",
+            "5",
+            "-1s",
+            "1.5m",
+            "1\u{e9}",
+            "\u{1d11e}",
+            "18446744073709551615d",
+            "18446744073709551616s",
+        ] {
+            assert_eq!(parse_cooldown(input), None, "invalid cooldown: {input}");
+            let rule = AutomationRule {
+                cooldown: Some(input.into()),
+                ..Default::default()
+            };
+            assert!(!cooldown_allows(&rule, "invalid", "TEST-1"));
+        }
+        assert!(cooldown_allows(
+            &AutomationRule::default(),
+            "absent",
+            "TEST-1"
+        ));
+    }
+
+    #[test]
+    fn invalid_cooldown_save_preserves_existing_rules() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("automation.yml");
+        let original = "automation: []\n";
+        std::fs::write(&path, original).unwrap();
+        for input in ["", "1\u{e9}", "18446744073709551615h"] {
+            let file = AutomationFile {
+                automation: AutomationRuleSet::List(vec![AutomationRule {
+                    cooldown: Some(input.into()),
+                    ..Default::default()
+                }]),
+            };
+            let yaml = serde_yaml_ng::to_string(&file).unwrap();
+            let result = AutomationService::set(dir.path(), None, &yaml);
+            assert!(
+                matches!(result, Err(LoTaRError::ValidationError(ref message)) if message.contains("cooldown"))
+            );
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        }
+        let outcome =
+            AutomationService::set(dir.path(), None, "automation:\n- cooldown: 30s\n").unwrap();
+        assert!(outcome.updated);
+        assert!(!outcome.validation.has_errors());
+    }
 }

@@ -5,18 +5,24 @@ type: Task
 reporter: mallox
 assignee: mallox
 created: 2026-09-02T18:40:00.000000+00:00
-modified: 2026-09-03T11:23:36.037053+00:00
+modified: 2026-09-06T11:21:52.957982+00:00
 comments:
 - date: 2026-09-02T19:09:08.883366+00:00
   text: 'npm update (semver-compatible only): playwright 1.59.1->1.62.1, @types/node 25.9.5, @vitejs/plugin-vue 6.0.8, @vue/test-utils 2.5.0, dompurify 3.4.14, fs-extra 11.4.0, jsdom 29.1.1, typescript 6.0.3, vite 8.2.2, vitest 4.1.11, vue 3.5.42, vue-router 5.3.1, vue-tsc 3.3.11, yaml 2.9.0 + transitive security fixes (brace-expansion, js-cookie, nanoid, postcss) -> npm audit 8 vulns to 0. Majors deliberately skipped: execa 10, jsdom 30, typescript 7, @types/node 26. cargo update: 112 lockfile bumps within existing requirements (clap 4.6.6, chrono 0.4.45, http 1.5, ureq 3.4, zeroize 1.9, icu 2.3, etc). Fixed build.rs git-test probe to also probe the system temp dir (tests create .git under tempfile::tempdir, but the old probe only checked OUT_DIR where some sandboxes still allow .git, causing git tests to compile in and fail with EPERM). Gates on updated deps: lint clean, nextest 775/775 (git tests compiled out in sandbox), vitest 236/236, smoke 94/94 with playwright 1.62 chromium.'
 - date: 2026-09-03T11:23:36.037053+00:00
   text: 'Follow-up: major updates. Applied: cargo base64 0.22->0.23 and sysinfo 0.38->0.39 (zero code changes needed); npm execa ^10 (smoke server helper ported off EventEmitter subprocess - execa 10 returns a Promise; event/exit-state access now via child.nodeChildProcess), jsdom ^30, @types/node ^26. NOT applied: typescript 7 (native rewrite drops the ./lib/tsc JS API - vue-tsc 3.3 fails with ERR_PACKAGE_PATH_NOT_EXPORTED; blocked until vue-tsc ships TS7 support), regex 1.13 (MSRV above the 1.95 toolchain - cargo resolver holds it back automatically), serde_yaml 0.9 is deprecated upstream (migration to serde_yaml_ng/serde_yml is invasive; flagged for a dedicated task). Gates: lint clean, nextest 775/775, vitest 236/236 (jsdom 30), smoke 94/94 (execa 10).'
+- date: 2026-09-06T11:21:52.957982+00:00
+  text: 'Backlog reconciliation: Historical Done retained. DEV-47 superseded the held-back YAML/regex assessment. Recorded vulnerability totals/gate results are point-in-time, not a fresh dependency audit. Remaining Git/platform gating is DEV-79.'
 history:
 - at: 2026-09-02T19:09:08.883366+00:00
   actor: mallox
   changes:
   - field: comment_added
 - at: 2026-09-03T11:23:36.037053+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.957982+00:00
   actor: mallox
   changes:
   - field: comment_added

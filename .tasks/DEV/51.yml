@@ -5,12 +5,18 @@ type: Task
 reporter: mallox
 assignee: mallox
 created: 2026-09-05T00:25:00.000000+00:00
-modified: 2026-09-04T18:52:41.282307+00:00
+modified: 2026-09-06T11:21:53.013699+00:00
 comments:
 - date: 2026-09-04T18:52:41.282307+00:00
   text: '(1) ALWAYS-FRESH TASK CACHE: storage search now keeps an (mtime,len)-validated cache of parsed tasks - every search stats every file (metadata syscall, ~1000x cheaper than YAML parse) and reuses the parse only when the fingerprint is identical. No invalidation window by construction: external edits (serve mode incl.) change mtime/len and are re-parsed on the very next request. Guarded at 100k entries (clear-on-overflow). While proving this live we found a REAL pre-existing staleness bug: the route layer had a 30s-TTL query_cache invalidated by the file watcher + mutation endpoints - when kernel file-watching is unavailable (the exact reason the MCP watcher needed a polling fallback) external edits could serve stale lists for up to 30s. That layer is REMOVED; the mtime cache makes it redundant and it was the only TTL-based staleness surface. Proof: live serve + external edit visible on next request; new tests: storage_search_freshness_test (edits/deletes/corruption-repair across calls) + web_api api_list_reflects_external_file_edits_immediately (HTTP-level, primes cache then edits behind the server back). (2) GZ-ONLY EMBEDDED ASSETS: compress-web.mjs now builds target/web-embed with .gz variants only; include_dir embeds that, so the binary carries each asset once (compressed) instead of raw+gz. gzip clients get bytes as-is; non-gzip clients get transparent flate2 (rust_backend, already in tree via ureq) decompression. Smoke binary 17M -> 16M; release 6.3MB. Verified: node http strict-parser on both paths (345B gz / 550B decompressed HTML). (3) TLS DIET: resolved as already-optimal - ureq resolves to rustls+ring (not aws-lc-rs); no backend change possible without cutting https sync. Gates: lint clean, nextest 776/776, vitest 241/241, smoke green.'
+- date: 2026-09-06T11:21:53.013699+00:00
+  text: 'Backlog reconciliation: Historical Done retained for TTL removal and mtime/length validation. Always-fresh wording assumes a changed fingerprint; cited edit regressions change length. DEV-77 owns equal-length changed-mtime coverage and explicit unchanged-fingerprint expectations. The cited ApiServer::handle_request test is route-handler-level, not live network HTTP. This is a coverage qualification, not evidence ordinary same-size edits fail.'
 history:
 - at: 2026-09-04T18:52:41.282307+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.013699+00:00
   actor: mallox
   changes:
   - field: comment_added

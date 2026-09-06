@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { formatDateTime } from '../../utils/date'
-import { ref } from 'vue'
+import { onScopeDispose, ref } from 'vue'
 import { api } from '../../api/client'
 import type { TaskDTO, TaskHistoryEntry } from '../../api/types'
 import { titleCase } from '../../utils/text'
@@ -33,11 +33,15 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
     const changeLog = ref<TaskHistoryEntry[]>([])
     const commitHistory = ref<CommitEntry[]>([])
     const commitsLoading = ref(false)
+    let generation = 0
 
     const resetActivity = () => {
+        generation += 1
+        commitsLoading.value = false
         changeLog.value = []
         commitHistory.value = []
     }
+    onScopeDispose(resetActivity)
 
     const syncFromTaskHistory = (task: TaskDTO) => {
         const history = Array.isArray(task.history) ? task.history : []
@@ -53,14 +57,17 @@ export function useTaskPanelActivity(): TaskPanelActivityApi {
     }
 
     const loadCommitHistory = async (taskId: string, limit = DEFAULT_HISTORY_LIMIT) => {
+        const request = ++generation
         commitsLoading.value = true
         try {
             const items = await api.taskHistory(taskId, limit)
+            if (request !== generation) return
             commitHistory.value = items
         } catch {
+            if (request !== generation) return
             commitHistory.value = []
         } finally {
-            commitsLoading.value = false
+            if (request === generation) commitsLoading.value = false
         }
     }
 

@@ -5,10 +5,12 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-08-29T09:22:47.778480+00:00
-modified: 2026-08-29T09:22:47.812287+00:00
+modified: 2026-09-06T11:21:52.900781+00:00
 comments:
 - date: 2026-08-29T09:22:47.812287+00:00
   text: 'Root cause: right-side action groups (Columns/Task, Fields) are non-wrapping flex items while the FilterBar''s container had flex:1 + min-width:0, so on narrow screens the filter area was crushed to ~98px and every control broke onto its own line (8 single-control lines on Tasks at 390px). Fix: give the filter containers a 320px flex-basis so they claim a full row when space is tight and the action groups wrap below as intact units: .tasks-filter-row__main (Tasks), .calendar-filter-row__bar (Calendar, plus missing flex-wrap on its row); Board already wrapped. Also added flex-wrap to .tasks-filter-row__actions. Result at 390px: Tasks filters pack into 5 lines (Search | Project+Status | Priority+Type+Sprint | Tags | Custom) with Columns+Task together right-aligned below; Calendar bar full-width with Fields as its own unit; Board packs in 4 lines. Desktop (1280px) unchanged: actions stay right-aligned beside filters. Gates: lint clean, vitest 202/202.'
+- date: 2026-09-06T11:21:52.900781+00:00
+  text: 'Backlog reconciliation: Historical Done retained; DEV-41/42 superseded the old filter-row structure and DEV-44 removed obsolete CSS. Absence of the old 320px selectors alone is not a regression.'
 history:
 - at: 2026-08-29T09:22:47.805423+00:00
   actor: mallox
@@ -19,6 +21,10 @@ history:
   - field: assignee
     new: mallox
 - at: 2026-08-29T09:22:47.812287+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.900781+00:00
   actor: mallox
   changes:
   - field: comment_added

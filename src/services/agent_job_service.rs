@@ -1,5 +1,4 @@
 use crate::api_types::{AgentJob, AgentJobCreateRequest};
-use crate::config::resolution::load_and_merge_configs;
 use crate::config::types::{AgentInstructionsConfig, AgentProfileDetail, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_context_service::{
@@ -16,18 +15,19 @@ use crate::services::automation_service::{
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
+use crate::utils::git::{clear_repository_env, git_command, verified_common_dir};
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
 use serde::Serialize;
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const EVENT_LOG_LIMIT: usize = 200;
 const DEFAULT_AGENT_INSTRUCTIONS: &str = include_str!("../../docs/help/agent-instructions.md");
@@ -107,6 +107,7 @@ struct AgentJobState {
     record: AgentJobRecord,
     events: Vec<AgentJobEvent>,
     runtime: Option<AgentJobRuntime>,
+    cancellation_finalized: bool,
 }
 
 /// Data needed to start a queued job when a slot becomes available
@@ -286,6 +287,7 @@ impl AgentJobService {
                     },
                     events: Vec::new(),
                     runtime: None,
+                    cancellation_finalized: false,
                 },
             );
 
@@ -388,13 +390,17 @@ impl AgentJobService {
         let mut registry = JOB_REGISTRY
             .lock()
             .map_err(|_| LoTaRError::ValidationError("Job registry unavailable".to_string()))?;
-        let (job, ticket_id, cancelled, tasks_dir, was_pending) = {
+        let (job, cancelled, was_pending) = {
             let was_pending = registry.pending_queue.iter().any(|p| p.job_id == id);
             let Some(state) = registry.jobs.get_mut(id) else {
                 return Ok(None);
             };
-            let ticket_id = state.record.ticket_id.clone();
-            let tasks_dir = state.record.tasks_dir.clone();
+            if !matches!(
+                state.record.status,
+                AgentJobStatus::Queued | AgentJobStatus::Running
+            ) {
+                return Ok(Some(state.record.to_dto()));
+            }
             if let Some(runtime) = state.runtime.as_ref()
                 && let Ok(mut child) = runtime.child.lock()
             {
@@ -409,36 +415,17 @@ impl AgentJobService {
                 cancelled = true;
             }
             let job = state.record.to_dto_with_cancelled(cancelled);
-            (job, ticket_id, cancelled, tasks_dir, was_pending)
+            (job, cancelled, was_pending)
         };
         if cancelled {
-            registry.active_by_ticket.remove(&ticket_id);
             // Remove from pending queue if it was queued
             registry.pending_queue.retain(|p| p.job_id != id);
-            // Decrement running count if the job was occupying a running slot
-            if !was_pending && registry.running_count > 0 {
-                registry.running_count -= 1;
-            }
+            // A dispatched job owns its slot until its thread (and child) has exited.
         }
         drop(registry);
 
-        if cancelled {
-            let job_context = job_context_for(id);
-            let _ = AutomationService::apply_job_event(
-                tasks_dir.as_path(),
-                &ticket_id,
-                AutomationEvent::JobCancelled,
-                job_context,
-            );
-            if let Ok(config) = load_and_merge_configs(Some(tasks_dir.as_path())) {
-                maybe_cleanup_worktree(
-                    id,
-                    &ticket_id,
-                    tasks_dir.as_path(),
-                    &config,
-                    JobOutcome::Cancelled,
-                );
-            }
+        if cancelled && was_pending {
+            finalize_cancelled_job(id);
             process_pending_queue();
         }
         Ok(Some(job))
@@ -901,6 +888,7 @@ fn prepare_worktree(
     if !config.agent_worktree.enabled {
         return Ok(context);
     }
+    let repo_common = verified_common_dir(&repo_root).map_err(LoTaRError::IoError)?;
 
     let worktree_root = resolve_worktree_root(&repo_root, config.agent_worktree.dir.as_deref())?;
     let ticket_token = sanitize_worktree_token(ticket_id);
@@ -916,6 +904,22 @@ fn prepare_worktree(
 
     // Check if worktree already exists (reuse from previous phase)
     if worktree_path.exists() && worktree_path.join(".git").exists() {
+        let actual = fs::canonicalize(&worktree_path).map_err(LoTaRError::IoError)?;
+        let root = fs::canonicalize(&repo_root).map_err(LoTaRError::IoError)?;
+        let head = git_command(&actual)
+            .args(["symbolic-ref", "--quiet", "HEAD"])
+            .current_dir(&actual)
+            .output()
+            .map_err(LoTaRError::IoError)?;
+        if actual == root
+            || verified_common_dir(&actual).map_err(LoTaRError::IoError)? != repo_common
+            || !head.status.success()
+            || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}")
+        {
+            return Err(LoTaRError::ValidationError(
+                "Existing worktree is not the isolated ticket branch".into(),
+            ));
+        }
         // Worktree already set up for this ticket, reuse it
         context.working_dir = worktree_path.clone();
         context.worktree_path = Some(worktree_path);
@@ -925,6 +929,11 @@ fn prepare_worktree(
 
     let worktree_arg = worktree_path.to_string_lossy().to_string();
     run_git_command(&repo_root, &["worktree", "add", &worktree_arg, &branch])?;
+    if verified_common_dir(&worktree_path).map_err(LoTaRError::IoError)? != repo_common {
+        return Err(LoTaRError::ValidationError(
+            "Worktree belongs to a different repository".into(),
+        ));
+    }
 
     context.working_dir = worktree_path.clone();
     context.worktree_path = Some(worktree_path);
@@ -1002,7 +1011,7 @@ fn build_worktree_branch(prefix: &str, suffix: &str) -> String {
 
 fn branch_exists(repo_root: &std::path::Path, branch: &str) -> bool {
     let reference = format!("refs/heads/{}", branch);
-    Command::new("git")
+    git_command(repo_root)
         .arg("show-ref")
         .arg("--verify")
         .arg("--quiet")
@@ -1014,7 +1023,7 @@ fn branch_exists(repo_root: &std::path::Path, branch: &str) -> bool {
 }
 
 fn run_git_command(repo_root: &std::path::Path, args: &[&str]) -> LoTaRResult<()> {
-    let output = Command::new("git")
+    let output = git_command(repo_root)
         .args(args)
         .current_dir(repo_root)
         .output()
@@ -1051,13 +1060,92 @@ fn resolve_job_worktree(job_id: &str) -> Option<WorktreeCleanupTarget> {
     })
 }
 
-fn ticket_is_done(tasks_dir: &std::path::Path, ticket_id: &str, config: &ResolvedConfig) -> bool {
-    let storage = Storage::new(tasks_dir);
-    let done_statuses = determine_done_statuses_from_config(config);
-    match TaskService::get(&storage, ticket_id, None) {
-        Ok(task) => done_statuses.contains(&task.status.as_str().to_ascii_lowercase()),
-        Err(_) => true,
+pub(crate) fn ticket_done_state(tasks_dir: &std::path::Path, ticket_id: &str) -> Option<bool> {
+    let (prefix, number) = ticket_id.rsplit_once('-')?;
+    if crate::storage::safety::validate_project_prefix(prefix).is_err()
+        || number.parse::<u64>().is_err()
+    {
+        return None;
     }
+    let config = crate::config::resolution::config_for_project(tasks_dir, Some(prefix)).ok()?;
+    // Cleanup must not use the tolerant task parser: damaged files are indeterminate.
+    let path = crate::storage::operations::StorageOperations::get_file_path_for_id(
+        &tasks_dir.join(prefix),
+        ticket_id,
+    )?;
+    let raw = fs::read_to_string(path).ok()?;
+    let task = serde_yaml_ng::from_str::<crate::storage::task::Task>(&raw).ok()?;
+    if !config
+        .issue_states
+        .values
+        .iter()
+        .any(|status| status.eq_ignore_case(task.status.as_str()))
+    {
+        return None;
+    }
+    Some(
+        determine_done_statuses_from_config(&config)
+            .contains(&task.status.as_str().to_ascii_lowercase()),
+    )
+}
+
+pub(crate) fn check_worktree_cleanup(
+    repo_root: &std::path::Path,
+    path: &std::path::Path,
+    branch: Option<&str>,
+) -> LoTaRResult<()> {
+    let root = fs::canonicalize(repo_root).map_err(LoTaRError::IoError)?;
+    let target = fs::canonicalize(path).map_err(LoTaRError::IoError)?;
+    if target == root {
+        return Err(LoTaRError::ValidationError(
+            "Refusing to remove the repository checkout".into(),
+        ));
+    }
+    if verified_common_dir(&root).map_err(LoTaRError::IoError)?
+        != verified_common_dir(&target).map_err(LoTaRError::IoError)?
+    {
+        return Err(LoTaRError::ValidationError(
+            "Worktree belongs to a different repository".into(),
+        ));
+    }
+    let status = git_command(&target)
+        .args([
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            "--ignored",
+        ])
+        .current_dir(&target)
+        .output()
+        .map_err(LoTaRError::IoError)?;
+    if !status.status.success() || !status.stdout.is_empty() {
+        return Err(LoTaRError::ValidationError(
+            "Worktree is dirty or its status is unknown".into(),
+        ));
+    }
+    let branch =
+        branch.ok_or_else(|| LoTaRError::ValidationError("Worktree branch is unknown".into()))?;
+    let head = git_command(&target)
+        .args(["symbolic-ref", "--quiet", "HEAD"])
+        .current_dir(&target)
+        .output()
+        .map_err(LoTaRError::IoError)?;
+    if !head.status.success()
+        || String::from_utf8_lossy(&head.stdout).trim() != format!("refs/heads/{branch}")
+    {
+        return Err(LoTaRError::ValidationError(
+            "Worktree branch changed or is unknown".into(),
+        ));
+    }
+    run_git_command(
+        &root,
+        &[
+            "merge-base",
+            "--is-ancestor",
+            &format!("refs/heads/{branch}"),
+            "HEAD",
+        ],
+    )
 }
 
 enum JobOutcome {
@@ -1075,13 +1163,11 @@ fn maybe_cleanup_worktree(
     outcome: JobOutcome,
 ) {
     let should_cleanup = match outcome {
-        JobOutcome::Success => {
-            config.agent_worktree.cleanup_on_done && ticket_is_done(tasks_dir, ticket_id, config)
-        }
+        JobOutcome::Success => config.agent_worktree.cleanup_on_done,
         JobOutcome::Failure => config.agent_worktree.cleanup_on_failure,
         JobOutcome::Cancelled => config.agent_worktree.cleanup_on_cancel,
     };
-    if !should_cleanup {
+    if !should_cleanup || ticket_done_state(tasks_dir, ticket_id) != Some(true) {
         return;
     }
     let Some(target) = resolve_job_worktree(job_id) else {
@@ -1091,21 +1177,32 @@ fn maybe_cleanup_worktree(
         Some(root) => root,
         None => return,
     };
-    if target.path == repo_root {
+    // Do not race a follow-up phase that now owns this ticket's worktree.
+    let Ok(registry) = JOB_REGISTRY.lock() else {
+        return;
+    };
+    if registry
+        .active_by_ticket
+        .get(ticket_id)
+        .is_some_and(|id| id != job_id)
+    {
+        return;
+    }
+    if check_worktree_cleanup(&repo_root, &target.path, target.branch.as_deref()).is_err() {
         return;
     }
 
     let worktree_arg = target.path.to_string_lossy().to_string();
-    let _ = run_git_command(
-        &repo_root,
-        &["worktree", "remove", "--force", &worktree_arg],
-    );
+    if run_git_command(&repo_root, &["worktree", "remove", &worktree_arg]).is_err() {
+        return;
+    }
 
     if config.agent_worktree.cleanup_delete_branches
         && let Some(branch) = target.branch.as_deref()
     {
-        let _ = run_git_command(&repo_root, &["branch", "-D", branch]);
+        let _ = run_git_command(&repo_root, &["branch", "-d", branch]);
     }
+    drop(registry);
 }
 
 #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
@@ -1119,6 +1216,13 @@ fn run_job(
     user_prompt: String,
     config: ResolvedConfig,
 ) {
+    let _slot = RunningJobSlot {
+        job_id: &job_id,
+        ticket_id: &ticket_id,
+    };
+    if should_stop_job(&job_id) {
+        return;
+    }
     let worktree_context = match prepare_worktree(&job_id, &tasks_dir, &ticket_id, &config) {
         Ok(context) => {
             update_job(&job_id, |state| {
@@ -1138,6 +1242,15 @@ fn run_job(
             context
         }
         Err(err) => {
+            if config.agent_worktree.enabled {
+                update_job_failure(
+                    &job_id,
+                    &ticket_id,
+                    format!("Worktree setup failed: {err}"),
+                    &tasks_dir,
+                );
+                return;
+            }
             let msg = format!("Worktree setup skipped: {}", err);
             update_job(&job_id, |state| {
                 push_event(state, "agent_job_progress", Some(msg.clone()));
@@ -1202,12 +1315,6 @@ fn run_job(
         Ok(cmd) => cmd,
         Err(err) => {
             update_job_failure(&job_id, &ticket_id, err.to_string(), &tasks_dir);
-            let _ = AutomationService::apply_job_event(
-                tasks_dir.as_path(),
-                &ticket_id,
-                AutomationEvent::JobFailed,
-                job_context_for(&job_id),
-            );
             return;
         }
     };
@@ -1216,12 +1323,6 @@ fn run_job(
 
     if let Err(err) = validate_runner_command(&command) {
         update_job_failure(&job_id, &ticket_id, err.to_string(), &tasks_dir);
-        let _ = AutomationService::apply_job_event(
-            tasks_dir.as_path(),
-            &ticket_id,
-            AutomationEvent::JobFailed,
-            job_context_for(&job_id),
-        );
         return;
     }
 
@@ -1250,6 +1351,7 @@ fn run_job(
         .stderr(Stdio::piped());
 
     cmd.current_dir(&worktree_context.working_dir);
+    clear_repository_env(&mut cmd);
 
     #[cfg(unix)]
     {
@@ -1264,20 +1366,26 @@ fn run_job(
         }
     }
 
+    // Serialize cancellation with spawn and runtime publication.
+    let Ok(mut registry) = JOB_REGISTRY.lock() else {
+        return;
+    };
+    if registry
+        .jobs
+        .get(&job_id)
+        .is_none_or(|state| state.record.status == AgentJobStatus::Cancelled)
+    {
+        return;
+    }
     let child = match cmd.spawn() {
         Ok(child) => child,
         Err(err) => {
+            drop(registry);
             update_job_failure(
                 &job_id,
                 &ticket_id,
                 format!("Failed to spawn runner: {}", err),
                 &tasks_dir,
-            );
-            let _ = AutomationService::apply_job_event(
-                tasks_dir.as_path(),
-                &ticket_id,
-                AutomationEvent::JobFailed,
-                job_context_for(&job_id),
             );
             return;
         }
@@ -1289,91 +1397,305 @@ fn run_job(
     let stdin = child.lock().ok().and_then(|mut c| c.stdin.take());
     let stdin = stdin.map(|handle| Arc::new(Mutex::new(handle)));
 
-    update_job(&job_id, |state| {
+    if let Some(state) = registry.jobs.get_mut(&job_id) {
         state.runtime = Some(AgentJobRuntime {
             child: Arc::clone(&child),
             stdin: stdin.clone(),
         });
+    }
+    drop(registry);
+
+    let exited = Arc::new(AtomicBool::new(false));
+    let stderr_reader = stderr.map(|stderr| {
+        let job_id_clone = job_id.clone();
+        let exited = Arc::clone(&exited);
+        thread::spawn(move || {
+            read_job_output(stderr, &exited, |line| {
+                let msg = line.trim().to_string();
+                if !msg.is_empty() {
+                    update_job(&job_id_clone, |state| {
+                        state.record.last_message = Some(msg.clone());
+                        push_event(state, "agent_job_progress", Some(msg.clone()));
+                        emit_job_event("agent_job_progress", &state.record, Some(msg.clone()));
+                    });
+                }
+            })
+        })
+    });
+    let stdout_reader = stdout.map(|stdout| {
+        let job_id_clone = job_id.clone();
+        let exited = Arc::clone(&exited);
+        thread::spawn(move || {
+            let mut messages = Vec::new();
+            let result = read_job_output(stdout, &exited, |line| {
+                handle_runner_line(&job_id_clone, runner_kind, line, &mut messages);
+            });
+            (messages, result)
+        })
     });
 
-    let mut context_messages = vec![build_user_message(&user_prompt)];
-
-    if let Some(stderr) = stderr {
-        let job_id_clone = job_id.clone();
-        thread::spawn(move || {
-            let mut reader = BufReader::new(stderr);
-            let mut line = String::new();
-            loop {
-                line.clear();
-                match reader.read_line(&mut line) {
-                    Ok(0) => break,
-                    Ok(_) => {
-                        let msg = line.trim().to_string();
-                        if !msg.is_empty() {
-                            update_job(&job_id_clone, |state| {
-                                state.record.last_message = Some(msg.clone());
-                                push_event(state, "agent_job_progress", Some(msg.clone()));
-                                emit_job_event(
-                                    "agent_job_progress",
-                                    &state.record,
-                                    Some(msg.clone()),
-                                );
-                            });
-                        }
-                    }
-                    Err(_) => break,
-                }
-            }
-        });
-    }
-
-    if let Some(stdout) = stdout {
-        let job_id_clone = job_id.clone();
-        let child_clone = Arc::clone(&child);
-        let mut reader = BufReader::new(stdout);
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match reader.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(_) => {
-                    handle_runner_line(&job_id_clone, runner_kind, &line, &mut context_messages);
-                }
-                Err(_) => break,
-            }
-            if should_stop_job(&job_id_clone) {
-                if let Ok(mut c) = child_clone.lock() {
-                    terminate_child(&mut c);
-                }
-                break;
-            }
+    let status = loop {
+        if should_stop_job(&job_id)
+            && let Ok(mut c) = child.lock()
+        {
+            terminate_child(&mut c);
+            break c.wait();
         }
-    }
-
-    loop {
         let status = child
             .lock()
-            .ok()
-            .and_then(|mut c| c.try_wait().ok().flatten());
-        if let Some(status) = status {
-            let code = status.code();
-            finalize_job(
-                &job_id,
-                &ticket_id,
-                code,
-                &context_messages,
-                &tasks_dir,
-                &config,
-            );
-            break;
-        }
-        if should_stop_job(&job_id) {
-            if let Ok(mut c) = child.lock() {
-                terminate_child(&mut c);
+            .map_err(|_| std::io::Error::other("Job process unavailable"))
+            .and_then(|mut c| c.try_wait());
+        match status {
+            Ok(Some(status)) => break Ok(status),
+            Ok(None) => {}
+            Err(err) => {
+                if let Ok(mut c) = child.lock() {
+                    terminate_child(&mut c);
+                    let _ = c.wait();
+                }
+                break Err(err);
             }
-            break;
         }
         thread::sleep(Duration::from_millis(200));
+    };
+    exited.store(true, Ordering::Release);
+    // Never join while holding the registry or child lock: readers publish events.
+    let mut output_error = None;
+    if let Some(reader) = stderr_reader {
+        output_error = reader
+            .join()
+            .unwrap_or_else(|_| Err(std::io::Error::other("Stderr reader panicked")))
+            .err();
+    }
+    let mut context_messages = vec![build_user_message(&user_prompt)];
+    if let Some(reader) = stdout_reader {
+        match reader.join() {
+            Ok((messages, result)) => {
+                context_messages.extend(messages);
+                output_error = output_error.or(result.err());
+            }
+            Err(_) => {
+                output_error = Some(std::io::Error::other("Stdout reader panicked"));
+            }
+        }
+    }
+    if should_stop_job(&job_id) || output_error.is_some() || status.is_err() {
+        let _ = AgentContextService::append_messages(
+            &tasks_dir,
+            &config,
+            &ticket_id,
+            context_messages,
+            None,
+        );
+        if !should_stop_job(&job_id) {
+            let error = output_error.or_else(|| status.err()).expect("job failed");
+            update_job_failure(
+                &job_id,
+                &ticket_id,
+                format!("Runner output/process failed: {error}"),
+                &tasks_dir,
+            );
+        }
+        return;
+    }
+    finalize_job(
+        &job_id,
+        &ticket_id,
+        status.ok().and_then(|status| status.code()),
+        &context_messages,
+        &tasks_dir,
+        &config,
+    );
+}
+
+trait JobOutputPipe: Read {
+    fn output_ready(&self) -> std::io::Result<bool>;
+}
+
+#[cfg(unix)]
+impl<T: Read + std::os::fd::AsRawFd> JobOutputPipe for T {
+    fn output_ready(&self) -> std::io::Result<bool> {
+        let mut poll = libc::pollfd {
+            fd: self.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        // One reader owns this pipe; readiness permits a nonblocking-sized read.
+        let result = unsafe { libc::poll(&mut poll, 1, 0) };
+        if result < 0 {
+            Err(std::io::Error::last_os_error())
+        } else {
+            Ok(result > 0)
+        }
+    }
+}
+
+#[cfg(windows)]
+impl<T: Read + std::os::windows::io::AsRawHandle> JobOutputPipe for T {
+    fn output_ready(&self) -> std::io::Result<bool> {
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            #[link_name = "PeekNamedPipe"]
+            fn peek_named_pipe(
+                handle: *mut std::ffi::c_void,
+                buffer: *mut std::ffi::c_void,
+                size: u32,
+                read: *mut u32,
+                available: *mut u32,
+                remaining: *mut u32,
+            ) -> i32;
+        }
+        let mut available = 0;
+        let result = unsafe {
+            peek_named_pipe(
+                self.as_raw_handle(),
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null_mut(),
+                &mut available,
+                std::ptr::null_mut(),
+            )
+        };
+        if result != 0 {
+            return Ok(available > 0);
+        }
+        let error = std::io::Error::last_os_error();
+        if error.raw_os_error() == Some(109) {
+            Ok(true)
+        } else {
+            Err(error)
+        }
+    }
+}
+
+fn read_job_output(
+    mut pipe: impl JobOutputPipe,
+    exited: &AtomicBool,
+    mut on_line: impl FnMut(&str),
+) -> std::io::Result<()> {
+    let mut pending = Vec::new();
+    let mut buffer = [0; 8192];
+    let mut drain_started = None;
+    loop {
+        let process_exited = exited.load(Ordering::Acquire);
+        if process_exited {
+            let started = drain_started.get_or_insert_with(Instant::now);
+            if started.elapsed() > Duration::from_secs(5) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    "Runner output drain exceeded five seconds after exit",
+                ));
+            }
+        }
+        match pipe.output_ready() {
+            Ok(true) => {}
+            Ok(false) => {
+                if process_exited {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(10));
+                continue;
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(err) => return Err(err),
+        }
+        match pipe.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(count) => pending.extend_from_slice(&buffer[..count]),
+            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(err) => return Err(err),
+        }
+        let mut consumed = 0;
+        for (index, byte) in pending.iter().enumerate() {
+            if *byte == b'\n' {
+                on_line(&String::from_utf8_lossy(&pending[consumed..=index]));
+                consumed = index + 1;
+            }
+        }
+        pending.drain(..consumed);
+    }
+    if !pending.is_empty() {
+        on_line(&String::from_utf8_lossy(&pending));
+    }
+    Ok(())
+}
+
+struct RunningJobSlot<'a> {
+    job_id: &'a str,
+    ticket_id: &'a str,
+}
+
+impl Drop for RunningJobSlot<'_> {
+    fn drop(&mut self) {
+        // All process/output teardown and context writes precede ownership transfer.
+        // Keep this slot counted while cancellation automation schedules a successor.
+        finalize_cancelled_job(self.job_id);
+        if let Ok(mut registry) = JOB_REGISTRY.lock() {
+            if registry
+                .active_by_ticket
+                .get(self.ticket_id)
+                .is_some_and(|id| id == self.job_id)
+            {
+                registry.active_by_ticket.remove(self.ticket_id);
+            }
+            if let Some(state) = registry.jobs.get_mut(self.job_id) {
+                state.runtime = None;
+            }
+            registry.running_count = registry.running_count.saturating_sub(1);
+        }
+        process_pending_queue();
+    }
+}
+
+fn finalize_cancelled_job(job_id: &str) {
+    let record = {
+        let Ok(mut registry) = JOB_REGISTRY.lock() else {
+            return;
+        };
+        let Some(state) = registry.jobs.get_mut(job_id) else {
+            return;
+        };
+        if state.record.status != AgentJobStatus::Cancelled || state.cancellation_finalized {
+            return;
+        }
+        state.cancellation_finalized = true;
+        state.record.finished_at = Some(Utc::now().to_rfc3339());
+        state.record.summary = state.record.last_message.clone();
+        state.runtime = None;
+        let record = state.record.clone();
+        if registry
+            .active_by_ticket
+            .get(&record.ticket_id)
+            .is_some_and(|id| id == job_id)
+        {
+            registry.active_by_ticket.remove(&record.ticket_id);
+        }
+        record
+    };
+    let _ = AgentLogService::write_status(
+        &record.workspace_root,
+        record.agent_logs_dir.as_deref(),
+        job_id,
+        "cancelled",
+        record.finished_at.as_deref().unwrap_or_default(),
+        record.exit_code,
+        record.summary.clone(),
+    );
+    let _ = AutomationService::apply_job_event(
+        &record.tasks_dir,
+        &record.ticket_id,
+        AutomationEvent::JobCancelled,
+        job_context_for(job_id),
+    );
+    let prefix = record.ticket_id.split('-').next();
+    if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix) {
+        maybe_cleanup_worktree(
+            job_id,
+            &record.ticket_id,
+            &record.tasks_dir,
+            &config,
+            JobOutcome::Cancelled,
+        );
     }
 }
 
@@ -1449,6 +1771,7 @@ fn finalize_job(
 ) {
     let now = Utc::now().to_rfc3339();
     let success = exit_code.unwrap_or(1) == 0;
+    let mut finalized = false;
     update_job(job_id, |state| {
         if state.record.status == AgentJobStatus::Cancelled {
             return;
@@ -1461,6 +1784,7 @@ fn finalize_job(
             AgentJobStatus::Failed
         };
         state.record.summary = state.record.last_message.clone();
+        finalized = true;
         let event_kind = if success {
             "agent_job_completed"
         } else {
@@ -1469,6 +1793,16 @@ fn finalize_job(
         push_event(state, event_kind, None);
         emit_job_event(event_kind, &state.record, None);
     });
+    if !finalized {
+        let _ = AgentContextService::append_messages(
+            tasks_dir,
+            config,
+            ticket_id,
+            context_messages.to_vec(),
+            None,
+        );
+        return;
+    }
 
     // Write final status to persistent log (if logging is enabled)
     let status_str = if success { "completed" } else { "failed" };
@@ -1507,12 +1841,15 @@ fn finalize_job(
                 worktree_branch: state.record.worktree_branch.clone(),
             });
         }
-        registry.active_by_ticket.remove(ticket_id);
+        if registry
+            .active_by_ticket
+            .get(ticket_id)
+            .is_some_and(|id| id == job_id)
+        {
+            registry.active_by_ticket.remove(ticket_id);
+        }
         if let Some(state) = registry.jobs.get_mut(job_id) {
             state.runtime = None;
-        }
-        if registry.running_count > 0 {
-            registry.running_count -= 1;
         }
     }
     drop(registry);
@@ -1545,14 +1882,19 @@ fn finalize_job(
             JobOutcome::Failure
         },
     );
-
-    // Try to start the next queued job
-    process_pending_queue();
 }
 
 fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir: &std::path::Path) {
     let now = Utc::now().to_rfc3339();
+    let mut failed = false;
     update_job(job_id, |state| {
+        if !matches!(
+            state.record.status,
+            AgentJobStatus::Queued | AgentJobStatus::Running
+        ) {
+            return;
+        }
+        failed = true;
         state.record.status = AgentJobStatus::Failed;
         state.record.finished_at = Some(now.clone());
         state.record.last_message = Some(message.clone());
@@ -1560,6 +1902,9 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
         push_event(state, "agent_job_failed", Some(message.clone()));
         emit_job_event("agent_job_failed", &state.record, Some(message.clone()));
     });
+    if !failed {
+        return;
+    }
 
     // Write final status to persistent log (if logging is enabled)
     let (workspace_root, logs_dir) = if let Ok(registry) = JOB_REGISTRY.lock() {
@@ -1585,17 +1930,21 @@ fn update_job_failure(job_id: &str, ticket_id: &str, message: String, tasks_dir:
     );
 
     let mut registry = JOB_REGISTRY.lock().ok();
-    if let Some(ref mut registry) = registry {
+    if let Some(ref mut registry) = registry
+        && registry
+            .active_by_ticket
+            .get(ticket_id)
+            .is_some_and(|id| id == job_id)
+    {
         registry.active_by_ticket.remove(ticket_id);
-        // Decrement running count
-        if registry.running_count > 0 {
-            registry.running_count -= 1;
-        }
     }
     drop(registry);
-
-    // Try to start the next queued job
-    process_pending_queue();
+    let _ = AutomationService::apply_job_event(
+        tasks_dir,
+        ticket_id,
+        AutomationEvent::JobFailed,
+        job_context_for(job_id),
+    );
 }
 
 fn update_job<F>(job_id: &str, mut updater: F)

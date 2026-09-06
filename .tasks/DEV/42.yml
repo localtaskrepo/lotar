@@ -5,10 +5,12 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-31T06:28:01.993046+00:00
-modified: 2026-09-01T19:38:07.312750+00:00
+modified: 2026-09-06T11:21:52.923836+00:00
 comments:
 - date: 2026-09-01T19:38:07.283722+00:00
   text: 'All 9 feedback items shipped: (1) search/filters overlap fixed - root cause was the search input overflowing its flex container by exactly padding+border (no global box-sizing); scoped box-sizing:border-box + min-width:0. (2) Clear-all chip removed (page-header clear button remains the single clear affordance). (3) Project renders as a chip (multi-project mode) with removal support. (4) Chips moved to their own dedicated row below the bar. (5) Sprints migrated to the unified FilterBar - sprint window/allow-closed/highlight-multi view-settings live in a new FilterBar panel slot, hand-rolled columns popover replaced by shared ColumnsMenu. (6) Board header: WIP limits + Done column next to clear/reload; group-by select sits beside Fields in the filter bar. (7) Board columns get hover-revealed + buttons opening the create panel with status prefilled (new initialStatus plumbing through panel controller/host/state; validates against project statuses). (8) Calendar day cells get hover-revealed ''+ Add task'' opening the panel with due date prefilled (initialDueDate plumbing; verified E2E: 2026-09-09 prefill). (9) Preferences gains a Navigation section with per-tab visibility checkboxes (useNavTabs composable, localStorage persistence, Preferences always visible); nav filters live. Verified live at 390px: 0 overflow on all pages. Gates: lint clean, vitest 220/220.'
+- date: 2026-09-06T11:21:52.923836+00:00
+  text: 'Backlog reconciliation: Historical Done retained for the recorded feedback, navigation and add-button prefills. DEV-53 panel project-readiness protections are later safety work, not unfinished original button delivery.'
 history:
 - at: 2026-08-31T06:28:02.027892+00:00
   actor: mallox
@@ -28,3 +30,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-09-06T11:21:52.923836+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

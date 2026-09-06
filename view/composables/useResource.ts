@@ -37,8 +37,10 @@ export function createResource<T, Args extends any[]>(
     const lastArgs = ref<Args | null>(null as Args | null) as Ref<Args | null>
     const loading = computed(() => status.value === 'loading')
     const ready = computed(() => status.value === 'ready')
+    let generation = 0
 
     async function refresh(...args: Args): Promise<T | undefined> {
+        const request = ++generation
         status.value = 'loading'
         error.value = null
         lastArgs.value = args
@@ -46,10 +48,12 @@ export function createResource<T, Args extends any[]>(
         try {
             const result = await loader(...args)
             const transformed = options.transform ? options.transform(result) : result
+            if (request !== generation) return undefined
             data.value = transformed
             status.value = 'ready'
             return transformed
         } catch (err: unknown) {
+            if (request !== generation) return undefined
             const normalized = normalizeError(err)
             error.value = normalized
             status.value = 'error'
@@ -68,6 +72,7 @@ export function createResource<T, Args extends any[]>(
     }
 
     function reset() {
+        generation += 1
         data.value = options.initialValue as T | undefined
         status.value = 'idle'
         error.value = null
@@ -75,11 +80,13 @@ export function createResource<T, Args extends any[]>(
     }
 
     function set(value: T | undefined) {
+        generation += 1
         data.value = value
         status.value = 'ready'
     }
 
     function mutate(updater: (value: T | undefined) => T | undefined) {
+        generation += 1
         data.value = updater(data.value)
         status.value = 'ready'
     }

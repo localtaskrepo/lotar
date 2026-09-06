@@ -9,7 +9,7 @@ excludeAgent: ["code-review"]
 
 - Rust (edition 2024), single `lotar` binary: CLI + HTTP server.
 - CLI commands: `src/cli/` (args under `src/cli/args/`, handlers under `src/cli/handlers/`).
-- API/server surface: `src/api_server.rs`, `src/web_server.rs`, `src/routes.rs`.
+- API/server surface: `src/api_server.rs`, `src/web_server.rs`, `src/routes/` (custom HTTP transport, not Axum).
 - DTOs/contracts: `src/api_types.rs`.
 - Storage/domain: `src/storage/`, `src/project.rs`, `src/workspace.rs`.
 - Services: `src/services/` (task, sprint, sync, agent, automation, …).

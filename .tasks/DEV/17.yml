@@ -4,3 +4,40 @@ priority: Medium
 type: Chore
 reporter: mallox
 created: 2026-08-07T22:48:10.782729+00:00
+modified: 2026-09-06T13:12:54.063794+00:00
+comments:
+- date: 2026-09-06T11:21:52.740612+00:00
+  text: Backlog review retained Todo and clarified README-only ownership; broader help/ADR/tracker corrections are now DEV-83.
+- date: 2026-09-06T13:12:54.063794+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 18: Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system)
+description: |-
+  README feature reconciliation remains open. Agent execution and automation are implemented, but README still labels AI agent integration as planned and says remotes cannot be managed in the UI. Update current feature coverage, SyncHub remote editing versus manual auth profiles, targeted sync discoverability and executable command examples. Related DEV-75 owns CLI list contract decisions; DEV-82 owns REST/OpenAPI contracts; DEV-83 owns the remaining help/developer guides. Preserve those owners rather than duplicating their acceptance criteria here.
+
+  Migrated checklist requirements:
+  README should explain both existing and newer functionality, especially repository synchronization and agent orchestration. Preserve README ownership here; DEV-83 owns broader help/developer docs and DEV-82 API contracts.
+history:
+- at: 2026-09-06T11:21:52.730056+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: README feature reconciliation remains open. Agent execution and automation are implemented, but README still labels AI agent integration as planned and says remotes cannot be managed in the UI. Update current feature coverage, SyncHub remote editing versus manual auth profiles, targeted sync discoverability and executable command examples. Related DEV-75 owns CLI list contract decisions; DEV-82 owns REST/OpenAPI contracts; DEV-83 owns the remaining help/developer guides. Preserve those owners rather than duplicating their acceptance criteria here.
+- at: 2026-09-06T11:21:52.740612+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.052637+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: README feature reconciliation remains open. Agent execution and automation are implemented, but README still labels AI agent integration as planned and says remotes cannot be managed in the UI. Update current feature coverage, SyncHub remote editing versus manual auth profiles, targeted sync discoverability and executable command examples. Related DEV-75 owns CLI list contract decisions; DEV-82 owns REST/OpenAPI contracts; DEV-83 owns the remaining help/developer guides. Preserve those owners rather than duplicating their acceptance criteria here.
+    new: |-
+      README feature reconciliation remains open. Agent execution and automation are implemented, but README still labels AI agent integration as planned and says remotes cannot be managed in the UI. Update current feature coverage, SyncHub remote editing versus manual auth profiles, targeted sync discoverability and executable command examples. Related DEV-75 owns CLI list contract decisions; DEV-82 owns REST/OpenAPI contracts; DEV-83 owns the remaining help/developer guides. Preserve those owners rather than duplicating their acceptance criteria here.
+
+      Migrated checklist requirements:
+      README should explain both existing and newer functionality, especially repository synchronization and agent orchestration. Preserve README ownership here; DEV-83 owns broader help/developer docs and DEV-82 API contracts.
+- at: 2026-09-06T13:12:54.063794+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

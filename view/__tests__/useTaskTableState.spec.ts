@@ -82,4 +82,18 @@ describe('useTaskTableState', () => {
         await nextTick()
         expect(wrapper.vm.sort.dir).toBe('desc')
     })
+
+    it('preserves other pages on select-all and never echoes a cleared parent selection', async () => {
+        const { wrapper, calls } = mountHarness({ selectedIds: ['ACME-99'] })
+        wrapper.vm.toggleAll({ target: { checked: true } } as unknown as Event)
+        expect(calls[calls.length - 1]).toEqual(['update:selectedIds', ['ACME-99', 'ACME-1', 'ACME-2']])
+        calls.length = 0
+        await wrapper.setProps({ selectedIds: [], loading: true })
+        wrapper.vm.toggleOne('ACME-1', { target: { checked: true } } as unknown as Event)
+        wrapper.vm.toggleAll({ target: { checked: true } } as unknown as Event)
+        await nextTick()
+        expect(wrapper.vm.selected).toEqual([])
+        expect(calls).toEqual([])
+        wrapper.unmount()
+    })
 })

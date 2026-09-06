@@ -1,0 +1,21 @@
+title: Reconcile remaining user and developer guides with implemented behavior
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-82]
+  related: [DEV-17, DEV-30]
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-09-06T11:10:31.914397+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: D4 D9 D11 D12 D13 D15.
+
+  Correct stale config-reference coverage/defaults/duration recipes and jq paths, preference reset and serve-project/port claims, sync UI/targeted-sync guidance, remaining route/storage architecture references and superseded sprint-ownership ADR claims. Update the agent-automation tracker that still calls committed events unimplemented. Keep historical ADR decisions visibly superseded rather than rewriting history. Acceptance: help examples match actual commands and documented behavior; unsupported promises link their implementation tickets; no duplication of authoritative agent guidance. README itself remains DEV-17; REST schema/envelope corrections have a separate owner. DEV-53 already corrected task-model preservation, injected instructions and testing/main architecture guides.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-82.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

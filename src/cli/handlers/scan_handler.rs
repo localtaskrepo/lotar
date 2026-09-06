@@ -7,7 +7,9 @@ use crate::cli::handlers::task::mutation::{LoadedTask, load_task};
 use crate::output::OutputRenderer;
 use crate::project;
 use crate::scanner;
-use crate::utils::scan::{parse_inline_attributes, strip_bracket_attributes};
+use crate::utils::scan::{
+    parse_inline_attributes, refresh_code_reference, validate_source_write, write_source,
+};
 use crate::workspace::TasksDirectoryResolver;
 use std::path::PathBuf;
 // feature-aware custom fields manipulation helpers are implemented below
@@ -189,27 +191,23 @@ impl CommandHandler for ScanHandler {
                 .then(a.line_number.cmp(&b.line_number))
         });
 
-        if matches!(renderer.format, crate::output::OutputFormat::Json) {
-            let items: Vec<serde_json::Value> = all_results
-                .iter()
-                .map(|entry| {
-                    serde_json::json!({
-                        "file": entry.file_path,
-                        "line": entry.line_number,
-                        "title": entry.title,
-                        "uuid": entry.uuid,
-                        "annotation": entry.annotation
-                    })
+        let json = matches!(renderer.format, crate::output::OutputFormat::Json);
+        let json_items: Vec<serde_json::Value> = all_results
+            .iter()
+            .map(|entry| {
+                serde_json::json!({
+                    "file": entry.file_path,
+                    "line": entry.line_number,
+                    "title": entry.title,
+                    "uuid": entry.uuid,
+                    "annotation": entry.annotation
                 })
-                .collect();
-            match serde_json::to_string(&items) {
-                Ok(s) => renderer.emit_raw_stdout(s),
-                Err(e) => renderer.emit_raw_stdout(
-                    serde_json::json!({"status":"error","message":format!("scan serialization failed: {}", e)}).to_string(),
-                ),
+            })
+            .collect();
+        if all_results.is_empty() {
+            if !json {
+                renderer.emit_success("No TODO comments found.");
             }
-        } else if all_results.is_empty() {
-            renderer.emit_success("No TODO comments found.");
             // Even if we didn't find TODO comments, we can still try to relocate anchors for existing tasks
             if !args.dry_run {
                 Self::reanchor_existing_references(_resolver, renderer, None)?;
@@ -231,32 +229,72 @@ impl CommandHandler for ScanHandler {
             };
             let strip_attributes = args.strip_attributes.unwrap_or(cfg_strip);
 
-            // Before applying insertions, attempt to re-anchor any existing references that drifted.
-            if !args.dry_run {
-                // Provide a small window for proximity search
-                Self::reanchor_existing_references(_resolver, renderer, Some(7))?;
-            }
-
             let mut applied = 0usize;
             for entry in all_results {
                 // If detailed flag is set, emit a per-file header line
-                if args.detailed {
+                if args.detailed && !json {
                     renderer.emit_raw_stdout(format_args!("  📄 {}", entry.file_path.display()));
                 }
                 // Default behavior: apply changes (unless --dry-run)
                 // Read file and target line
-                if let Ok(contents) = std::fs::read_to_string(&entry.file_path) {
+                {
+                    let contents = std::fs::read_to_string(&entry.file_path).map_err(|e| {
+                        format!("Failed to read {}: {e}", entry.file_path.display())
+                    })?;
                     let all_lines: Vec<&str> = contents.lines().collect();
-                    if let Some(orig_line) = all_lines.get(entry.line_number - 1).copied() {
-                        let tmp_scanner = scanner::Scanner::new(PathBuf::from("."))
+                    let orig_line =
+                        all_lines
+                            .get(entry.line_number - 1)
+                            .copied()
+                            .ok_or_else(|| {
+                                format!(
+                                    "Source line disappeared: {}:{}",
+                                    entry.file_path.display(),
+                                    entry.line_number
+                                )
+                            })?;
+                    {
+                        let mut tmp_scanner = scanner::Scanner::new(PathBuf::from("."))
                             .with_ticket_detection(
                                 cfg_ticket_patterns.as_deref(),
                                 cfg_enable_ticket_words,
                             );
-                        let existing_key = tmp_scanner.extract_ticket_key_from_line(orig_line);
+                        let mut words = cfg_words.clone();
+                        words.extend(issue_type_words.iter().cloned());
+                        if !words.is_empty() {
+                            tmp_scanner = tmp_scanner.with_signal_words(&words);
+                        }
+                        let range = tmp_scanner
+                            .matched_source_comment_range(
+                                &entry.file_path,
+                                &contents,
+                                entry.line_number,
+                            )
+                            .ok_or("Cannot establish a safe scan comment boundary")?;
+                        let existing_key =
+                            tmp_scanner.extract_ticket_key_from_line(&orig_line[range.clone()]);
                         if existing_key.is_none() {
+                            if tmp_scanner
+                                .suggest_source_insertion(
+                                    &entry.file_path,
+                                    &contents,
+                                    entry.line_number,
+                                    "SCAN-NEW",
+                                    strip_attributes,
+                                )
+                                .is_none()
+                            {
+                                return Err(format!(
+                                    "Cannot safely insert a task key at {}:{}",
+                                    entry.file_path.display(),
+                                    entry.line_number
+                                ));
+                            }
+                            if !args.dry_run {
+                                validate_source_write(&entry.file_path)?;
+                            }
                             // Parse inline attributes from the original line before any stripping
-                            let inline_attrs = parse_inline_attributes(orig_line);
+                            let inline_attrs = parse_inline_attributes(&orig_line[range]);
                             // Create task title from entry.title
                             // Reuse AddHandler with smart defaults
                             let cli_add_args = crate::cli::AddArgs {
@@ -299,74 +337,29 @@ impl CommandHandler for ScanHandler {
                                 let rel =
                                     crate::utils::paths::repo_relative_display(&entry.file_path);
                                 let line_number = entry.line_number;
-                                let reanchor = args.reanchor;
                                 if let Err(err) =
                                     edit_task_with_context(_resolver, &task_id, None, |task| {
                                         let code_ref = format!("{}#{}", rel, line_number);
-                                        let has_exact = task
-                                            .references
-                                            .iter()
-                                            .any(|r| r.code.as_deref() == Some(code_ref.as_str()));
-
-                                        if reanchor {
-                                            let before_len = task.references.len();
-                                            task.references.retain(|r| {
-                                                r.code.as_deref() == Some(code_ref.as_str())
-                                            });
-                                            let mut changed = before_len != task.references.len();
-                                            if !has_exact {
-                                                task.references.push(
-                                                    crate::types::ReferenceEntry {
-                                                        code: Some(code_ref),
-                                                        ..Default::default()
-                                                    },
-                                                );
-                                                changed = true;
-                                            }
-                                            return changed;
-                                        }
-
-                                        if has_exact {
-                                            return false;
-                                        }
-
-                                        let file_key = rel.as_str();
-                                        task.references.retain(|r| {
-                                            if let Some(code) = &r.code
-                                                && let Some((file_part, _)) = code.split_once('#')
-                                                && file_part == file_key
-                                                && code != code_ref.as_str()
-                                            {
-                                                return false;
-                                            }
-                                            true
-                                        });
-                                        task.references.push(crate::types::ReferenceEntry {
-                                            code: Some(code_ref),
-                                            ..Default::default()
-                                        });
-                                        true
+                                        refresh_code_reference(&mut task.references, &code_ref, &[])
                                     })
                                 {
-                                    renderer.log_debug(format_args!(
-                                        "scan: unable to update references for {}: {}",
-                                        task_id, err
-                                    ));
+                                    return Err(rollback_created_task(_resolver, &task_id, err));
                                 }
                             }
 
                             // Insert (KEY) after signal word; optionally strip bracket attributes
-                            let mut new_line =
-                                match tmp_scanner.suggest_insertion_for_line(orig_line, &task_id) {
-                                    Some(l) => l,
-                                    None => orig_line.to_string(),
-                                };
-                            if strip_attributes {
-                                new_line = strip_bracket_attributes(&new_line);
-                            }
+                            let new_line = tmp_scanner
+                                .suggest_source_insertion(
+                                    &entry.file_path,
+                                    &contents,
+                                    entry.line_number,
+                                    &task_id,
+                                    strip_attributes,
+                                )
+                                .ok_or("Cannot safely insert task key")?;
 
                             // Optional: emit context snippet when requested
-                            if args.detailed && args.context > 0 {
+                            if args.detailed && args.context > 0 && !json {
                                 let start = entry.line_number.saturating_sub(args.context);
                                 // clamp to at least 1
                                 let start = if start == 0 { 1 } else { start };
@@ -391,7 +384,7 @@ impl CommandHandler for ScanHandler {
                                 && let Some(updated) =
                                     replace_line(&contents, entry.line_number, &new_line)
                             {
-                                if args.dry_run {
+                                if args.dry_run && !json {
                                     renderer.emit_raw_stdout(format_args!(
                                         "  📄 {}:{}\n    - {}\n    + {}",
                                         entry.file_path.display(),
@@ -399,20 +392,28 @@ impl CommandHandler for ScanHandler {
                                         orig_line,
                                         new_line
                                     ));
-                                } else if let Err(e) = std::fs::write(&entry.file_path, updated) {
-                                    renderer.log_error(format_args!(
-                                        "Failed to write changes to {}: {}",
-                                        entry.file_path.display(),
-                                        e
-                                    ));
-                                } else {
-                                    renderer.emit_raw_stdout(format_args!(
-                                        "  📄 {}:{}\n    - {}\n    + {}",
-                                        entry.file_path.display(),
-                                        entry.line_number,
-                                        orig_line,
-                                        new_line
-                                    ));
+                                } else if !args.dry_run {
+                                    if let Err(e) =
+                                        write_source(&entry.file_path, &contents, &updated)
+                                    {
+                                        return Err(rollback_created_task(
+                                            _resolver,
+                                            &task_id,
+                                            format!(
+                                                "Failed to write {}: {e}",
+                                                entry.file_path.display()
+                                            ),
+                                        ));
+                                    }
+                                    if !json {
+                                        renderer.emit_raw_stdout(format_args!(
+                                            "  📄 {}:{}\n    - {}\n    + {}",
+                                            entry.file_path.display(),
+                                            entry.line_number,
+                                            orig_line,
+                                            new_line
+                                        ));
+                                    }
                                     applied += 1;
                                 }
                             }
@@ -420,75 +421,89 @@ impl CommandHandler for ScanHandler {
                             // Movement/relocation resilience: if an existing key is present, ensure
                             // the corresponding task has a code reference for this file+line.
                             if let Some(task_id) = existing_key {
+                                let prefix = task_id.split('-').next().unwrap_or("");
+                                if crate::storage::manager::Storage::try_open(&_resolver.path)
+                                    .and_then(|storage| storage.get(&task_id, prefix))
+                                    .is_none()
+                                {
+                                    // External ticket mentions do not imply a local task exists.
+                                    continue;
+                                }
                                 let rel =
                                     crate::utils::paths::repo_relative_display(&entry.file_path);
                                 let line_number = entry.line_number;
-                                let reanchor = args.reanchor;
-                                if let Err(err) =
-                                    edit_task_with_context(_resolver, &task_id, None, |task| {
-                                        let code_ref = format!("{}#{}", rel, line_number);
-                                        let has_exact = task
-                                            .references
-                                            .iter()
-                                            .any(|r| r.code.as_deref() == Some(code_ref.as_str()));
-
-                                        if reanchor {
-                                            let before_len = task.references.len();
-                                            task.references.retain(|r| {
-                                                r.code.as_deref() == Some(code_ref.as_str())
-                                            });
-                                            let mut changed = before_len != task.references.len();
-                                            if !has_exact {
-                                                task.references.push(
-                                                    crate::types::ReferenceEntry {
-                                                        code: Some(code_ref),
-                                                        ..Default::default()
-                                                    },
-                                                );
-                                                changed = true;
-                                            }
-                                            return changed;
-                                        }
-
-                                        if has_exact {
-                                            return false;
-                                        }
-
-                                        let file_key = rel.as_str();
-                                        task.references.retain(|r| {
-                                            if let Some(code) = &r.code
-                                                && let Some((file_part, _)) = code.split_once('#')
-                                                && file_part == file_key
-                                                && code != code_ref.as_str()
-                                            {
-                                                return false;
-                                            }
-                                            true
-                                        });
-                                        task.references.push(crate::types::ReferenceEntry {
-                                            code: Some(code_ref),
-                                            ..Default::default()
-                                        });
-                                        true
+                                let live_refs: Vec<String> = all_lines
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(index, line)| {
+                                        tmp_scanner
+                                            .matched_source_comment_range(
+                                                &entry.file_path,
+                                                &contents,
+                                                index + 1,
+                                            )
+                                            .and_then(|range| {
+                                                tmp_scanner
+                                                    .extract_ticket_key_from_line(&line[range])
+                                            })
+                                            .as_deref()
+                                            == Some(task_id.as_str())
                                     })
-                                {
-                                    renderer.log_debug(format_args!(
-                                        "scan: unable to refresh anchor for {}: {}",
-                                        task_id, err
-                                    ));
-                                }
+                                    .map(|(index, _)| format!("{}#{}", rel, index + 1))
+                                    .collect();
+                                edit_task_with_context(_resolver, &task_id, None, |task| {
+                                    let code_ref = format!("{}#{}", rel, line_number);
+                                    refresh_code_reference(
+                                        &mut task.references,
+                                        &code_ref,
+                                        &live_refs,
+                                    )
+                                })?;
                             }
                         }
                     }
                 }
                 // Apply path (and dry-run preview) prints patch above when changes occur; lines with existing keys are left untouched
             }
-            if !args.dry_run && applied > 0 {
+            if !args.dry_run {
+                // Do not mutate existing tasks before new source edits have succeeded.
+                Self::reanchor_existing_references(_resolver, renderer, Some(7))?;
+            }
+            if !args.dry_run && applied > 0 && !json {
                 renderer.emit_success(format_args!("Applied {} update(s).", applied));
             }
         }
 
+        if json {
+            renderer.emit_json(&json_items);
+        }
         Ok(())
+    }
+}
+
+fn rollback_created_task(
+    resolver: &TasksDirectoryResolver,
+    task_id: &str,
+    error: String,
+) -> String {
+    let result = task_id
+        .rsplit_once('-')
+        .ok_or_else(|| "Invalid created task ID".to_string())
+        .and_then(|(project, _)| {
+            crate::storage::manager::Storage::new(&resolver.path.clone())
+                .delete(task_id, project)
+                .map_err(|e| e.to_string())
+                .and_then(|deleted| {
+                    if deleted {
+                        Ok(())
+                    } else {
+                        Err("Created task was not removed".to_string())
+                    }
+                })
+        });
+    match result {
+        Ok(()) => error,
+        Err(rollback) => format!("{error}; rollback of {task_id} failed: {rollback}"),
     }
 }
 

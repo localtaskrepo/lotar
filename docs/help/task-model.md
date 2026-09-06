@@ -7,7 +7,7 @@ Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI
 
 - Tasks are stored under `.tasks/<PROJECT>/TASK.yml`. The project prefix is derived from the project name unless overridden.
 - IDs always follow `PREFIX-<NUMBER>` (e.g. `AUTH-42`). CLI commands accept the numeric portion when the active project is unambiguous (`lotar status 42`), otherwise pass the fully-qualified ID or `--project`.
-- `created` timestamps are immutable and always precede or equal `modified`. Updates bump `modified` to the wall-clock time recorded by the storage layer.
+- Normal task-service mutations retain `created` and update `modified` using the current clock. Direct YAML edits and low-level storage writes are not timestamp-validated.
 
 ## TaskDTO fields
 
@@ -23,16 +23,16 @@ Field | Type | Notes
 `created` | `RFC3339 string` | UTC timestamp recorded at creation.
 `modified` | `RFC3339 string` | UTC timestamp updated on any mutation.
 `due_date` | `string?` | ISO8601 date/time or natural-language token parsed by CLI validators.
-`effort` | `string?` | Stored exactly as provided (e.g., `3h`, `5pts`).
+`effort` | `string?` | CLI/service writes normalize time to hours with two decimal places (e.g., `90m` becomes `1.50h`) and points to `pt` (e.g., `5pts` becomes `5pt`). Direct YAML reads retain the stored string.
 `subtitle` | `string?` | Short secondary label; omitted unless explicitly set.
 `description` | `string?` | Markdown-friendly long description.
-`tags` | `string[]` | Normalized, unique tags. Empty array when unset.
+`tags` | `string[]?` | Normalized, unique tags. Omitted when empty; clients should default missing arrays to `[]`.
 `relationships` | `TaskRelationships` | Structured references to other tasks (see below).
-`comments` | `TaskComment[]` | Each comment carries `{ date, text }`.
-`references` | `ReferenceEntry[]` | Code locations (`code`), external URLs (`link`), attachments (`file`), or platform references (`jira`, `github`).
-`sprints` | `u32[]` | Numeric sprint IDs the task belongs to.
-`sprint_order` | `BTreeMap<u32, u32>` | Optional manual ordering per sprint (task id → order index).
-`history` | `TaskChangeLogEntry[]` | Chronological change log entries (field deltas, actor, timestamp).
+`comments` | `TaskComment[]?` | Each comment carries `{ date, text }`; omitted when empty.
+`references` | `ReferenceEntry[]?` | Code locations (`code`), external URLs (`link`), attachments (`file`), or platform references (`jira`, `github`); omitted when empty.
+`sprints` | `u32[]?` | Numeric sprint IDs the task belongs to; omitted when empty.
+`sprint_order` | `BTreeMap<u32, u32>?` | Optional manual ordering for this task (sprint id → order index).
+`history` | `TaskChangeLogEntry[]?` | Chronological change log entries (field deltas, actor, timestamp); omitted when empty.
 `custom_fields` | `CustomFields` | Map of configured custom-field keys → YAML/JSON values. Skipped when empty.
 
 ### Relationships & related structs
@@ -48,7 +48,13 @@ Field | Type | Notes
 
 ### Sprints & ordering
 
-`sprints` mirrors the sprint memberships stored on the task file. When sprint assignment commands enable manual ordering, `sprint_order` stores a per-sprint sequence so boards and reports can render deterministic lanes. Both properties are managed by the sprint services/helpers.
+Sprint files under `.tasks/@sprints/<ID>.yml` are authoritative for membership and manual ordering: their `tasks` entries identify tasks and carry optional order values. The DTO's `sprints` and `sprint_order` are derived from these records by the sprint services/helpers. The task YAML's legacy `sprints` field remains readable but is not the membership authority.
+
+### YAML extensions
+
+Unknown top-level task YAML keys are retained as typed YAML values across task edits, including scalar, list, and nested mapping values. This is **semantic preservation**, not lossless text editing: comments, key order, quoting, whitespace, and anchor formatting are not preserved. Built-in fields and their aliases (such as `type`/`task_type`) remain authoritative and cannot be overridden by extension values.
+
+These extensions are separate from `custom_fields` and are not added to REST/MCP task DTOs. Tolerant legacy parsing retains valid structured fields and extensions; malformed structured data is rejected rather than silently emptied during an edit.
 
 ## Enumerations & config-driven values
 
@@ -66,9 +72,9 @@ Field | Type | Notes
 
 ## Invariants & best practices
 
-- `created <= modified` (enforced when persisting tasks).
-- `tags`, `comments`, `references`, `history`, and `relationships.*` are always arrays even when empty, simplifying client iteration.
+- Keep `created <= modified` when editing YAML manually; low-level persistence does not enforce it.
+- Empty `tags`, `comments`, `references`, `history`, and relationship collections may be omitted. Relationship `parent` and `duplicate_of` are optional single values, not arrays.
 - Explicit `assignee` values persist across status transitions; automation must clear them deliberately if needed.
-- When exporting/importing YAML directly, keep field names lower_snake_case to match the DTOs. Unknown keys are preserved by serde but ignored by CLI readers.
+- When exporting/importing YAML directly, use the storage field names: notably `type` in YAML corresponds to `task_type` in DTOs. Unknown top-level keys are preserved semantically as described above, not exposed as configured CLI fields.
 
 See also: [OpenAPI spec](../openapi.json) for the full REST contract and [Identity & Users](./identity.md) for `reporter`/`assignee` resolution rules.

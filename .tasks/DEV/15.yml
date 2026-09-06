@@ -4,3 +4,30 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.772608+00:00
+modified: 2026-09-06T13:12:54.019780+00:00
+comments:
+- date: 2026-09-06T11:21:52.675067+00:00
+  text: 'Backlog reconciliation: Remains Todo for a dependency consistency checker. Current relationships command lists stored data; sprint integrity checks are a different model. Define dangling IDs, self-links, cycles and reciprocal consistency. Any repair mode requires explicit semantics and DEV-55 transaction discipline.'
+- date: 2026-09-06T13:12:54.019780+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 16: Add dependency concistency check command
+description: |-
+  Migrated checklist requirements:
+  Provide a dependency consistency-check command, distinct from listing relationships or sprint integrity checks. Define dangling IDs, self-links, cycles and reciprocal consistency diagnostics; any repair mode needs explicit safe semantics.
+history:
+- at: 2026-09-06T11:21:52.675067+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.009074+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Provide a dependency consistency-check command, distinct from listing relationships or sprint integrity checks. Define dangling IDs, self-links, cycles and reciprocal consistency diagnostics; any repair mode needs explicit safe semantics.
+- at: 2026-09-06T13:12:54.019780+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

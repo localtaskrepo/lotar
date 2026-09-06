@@ -1,0 +1,20 @@
+title: Canonicalize task IDs and locations across all storage roots and interfaces
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-57, DEV-61]
+  related: [DEV-4]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.463489+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: C11 U12.
+
+  Valid hyphenated prefixes are split at the first dash, and multi-root numeric lookup can read the wrong root. Introduce shared TaskId/TaskLocation resolution using the final numeric suffix and actual root/project. Replace local splits in storage, CLI, UI, attachment and reference paths. Acceptance: ABC-OPS-12 resolves consistently, supported legacy spellings remain deliberate, invalid IDs fail closed, and filtered/unfiltered/numeric queries discover the same nested-root tasks. Sync recovery already canonicalizes through storage under DEV-53; do not regress that protection. Archive functionality remains DEV-4.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

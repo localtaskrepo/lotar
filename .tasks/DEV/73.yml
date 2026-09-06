@@ -1,0 +1,18 @@
+title: Read branch and remote metadata correctly in linked Git worktrees
+status: Todo
+relationships:
+  parent: DEV-53
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.746239+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: C14.
+
+  read_current_branch/read_remotes still assume .git is a directory although discovery accepts gitdir files. Resolve linked-worktree metadata or reuse sanitized Git commands. Acceptance: branch task inference and remote discovery work in normal and linked worktrees, including relative gitdir/common-dir paths; unknown repository state fails safely. DEV-53 agent isolation helpers already exist and should be reused where appropriate.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

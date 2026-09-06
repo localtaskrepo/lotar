@@ -23,6 +23,7 @@ Options:
 
 Notes:
 - The handler always prints the resolved tasks directory path so you can confirm discovery.
+- Config service show/inspect responses omit agent environment maps and auth profile `token_env` / `email_env` fields in effective, raw, and standalone profile sections. Runner details and nonsecret auth metadata remain available to the UI.
 
 ### init
 Initialize project configuration interactively or non-interactively.
@@ -54,6 +55,8 @@ Behavior:
 - `--global` writes `.tasks/config.yml` only. Combine with overrides to set workspace-wide defaults.
 - `--dry-run` prints the resolved plan (paths and scaffolds) without touching disk.
 - `--force` overwrites existing config / scaffold files.
+- Prefix syntax and destination safety are checked even with `--force` and before creating a missing tasks directory. Absolute paths, traversal, and symlinked config destinations are rejected; force only bypasses collision/overwrite checks.
+- Initialization preserves existing normalized global settings when setting the default project. An unreadable or malformed existing global config aborts initialization rather than being replaced with defaults.
 
 ### set
 Set configuration values with validation and conflict detection.
@@ -190,7 +193,10 @@ Notes:
  - Identity resolution uses the merged configuration from this precedence chain.
 
 ### Canonical YAML shape
-LoTaR accepts both dotted keys and nested sections in YAML. Internally, values are canonicalized to sections such as server, default, project, members, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.
+LoTaR accepts shipped flat fields (such as `default_project`, `default_assignee`, and `server_port`), dotted keys, and nested sections in YAML. Canonical nested/dotted fields take precedence over their flat equivalents regardless of YAML key order. Conflicting dotted and nested definitions of the same path are rejected. Internally, values are canonicalized to sections such as server, default, project, members, issue, custom, scan, auto, sprints, and branch. Use `lotar config normalize` to rewrite files into this canonical form.
+
+- Config roots must be mappings; empty or comment-only files still mean built-in defaults. Invalid recognized field types are errors, including invalid values shadowed by another representation. Init aborts before creating project files or rewriting an existing global config when these checks fail.
+- Canonical rewrites retain supported config fields, including `agent.context_extension`, `agent.logs_dir`, and the global-only `web_ui_path`. They are not lossless YAML edits: comments, formatting, and unknown keys (including unknown nested keys and fields unsupported in the selected scope) are not retained. Review the normalization preview before rewriting configs containing extensions.
 
 - When a config file only uses built-in defaults the canonical writer produces a short comment instead of redundant YAML. Modify a value (for example `lotar config set server.port 9000 --global`) and rerun `lotar config normalize --write` to emit the corresponding section.
 - Automation flags use the `auto.*` namespace (e.g., `auto.identity`, `auto.identity_git`, `auto.set_reporter`, `auto.assign_on_status`, `auto.branch_infer_type`, `auto.branch_infer_status`, `auto.branch_infer_priority`).

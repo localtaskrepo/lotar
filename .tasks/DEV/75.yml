@@ -1,0 +1,21 @@
+title: Align CLI list predicate and output-format behavior with documented examples
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-57]
+  related: [DEV-3, DEV-5, DEV-13, DEV-17]
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.783908+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: D8.
+
+  README/help uses unsupported --search, empty/!= predicates, and promises distinct table/Markdown output while renderers alias text. Make examples executable and either implement intended operators/renderers or document unsupported behavior explicitly; avoid silent no-op filters. Acceptance: representative docs commands assert exact exit/output and filters; clarify search covers ID/title/subtitle/tags. Coordinate DEV-3/5/13/17 without treating their broader feature requests as completed.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-57.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

@@ -1,7 +1,6 @@
 use crate::config::types::*;
 use crate::config::validation::errors::ValidationResult;
 use crate::utils::project::generate_project_prefix;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct ConfigManager {
@@ -71,23 +70,14 @@ impl ConfigManager {
         let config_path = crate::utils::paths::global_config_path(tasks_dir);
         if config_path.exists() {
             // Load current config
-            let content = fs::read_to_string(&config_path).map_err(|e| {
-                ConfigError::IoError(format!("Failed to read global config: {}", e))
-            })?;
-            let mut global_config: GlobalConfig =
-                serde_yaml_ng::from_str(&content).map_err(|e| {
-                    ConfigError::ParseError(format!("Failed to parse global config: {}", e))
-                })?;
+            let mut global_config =
+                crate::config::persistence::load_global_config(Some(tasks_dir))?;
 
             // Update the default_project
             global_config.default_project = detected_prefix.clone();
 
             // Save updated config using canonical writer
-            let updated_yaml =
-                crate::config::normalization::to_canonical_global_yaml(&global_config);
-            fs::write(&config_path, updated_yaml).map_err(|e| {
-                ConfigError::IoError(format!("Failed to write updated global config: {}", e))
-            })?;
+            Self::save_global_config(tasks_dir, &global_config)?;
 
             // Update our resolved config too
             self.resolved_config.default_project = detected_prefix.clone();

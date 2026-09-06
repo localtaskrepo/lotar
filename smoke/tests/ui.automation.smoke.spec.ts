@@ -34,6 +34,45 @@ const SEED_RULES = `automation:
 `;
 
 describe.concurrent('UI Automation page smoke tests', () => {
+    it('cannot save old rules while a new project load is pending or failed', async () => {
+        const workspace = await SmokeWorkspace.create({
+            seedFiles: { '.tasks/config.yml': BASE_CONFIG, '.tasks/automation.yml': SEED_RULES },
+        });
+        try {
+            await workspace.addTask('Scope safety target');
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/automations`, async (page) => {
+                    await page.waitForSelector('.rule-card', { timeout: 15_000 });
+                    await page.getByText('Advanced YAML and rule engine settings', { exact: true }).click();
+                    await page.locator('textarea:not([readonly])').fill(`${SEED_RULES}\n# unsaved global edit\n`);
+                    expect(await page.getByRole('button', { name: 'Save rules', exact: true }).isEnabled()).toBe(true);
+                    let release!: () => void;
+                    const pending = new Promise<void>(resolve => { release = resolve; });
+                    const writes: string[] = [];
+                    page.on('request', request => {
+                        if (request.url().includes('/api/automation/set')) writes.push(request.postData() || '');
+                    });
+                    await page.route('**/api/automation/show?*', async route => {
+                        await pending;
+                        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Scope unavailable' }) });
+                    });
+                    await page.selectOption('select[aria-label="Project scope"]', 'UIAUT');
+                    await page.getByText('Loading configuration', { exact: false }).waitFor();
+                    expect(await page.getByRole('button', { name: 'Save rules', exact: true }).count()).toBe(0);
+                    release();
+                    await page.locator('.error').waitFor();
+                    expect(await page.getByRole('button', { name: 'Save rules', exact: true }).count()).toBe(0);
+                    expect(writes).toEqual([]);
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
     it('renders rules from automation.yml', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: {

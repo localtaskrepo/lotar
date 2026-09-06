@@ -1,0 +1,21 @@
+title: Compose automation actions against current task state without lost updates
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-54]
+  related: [DEV-11]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.512163+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: S7.
+
+  Multiple rules/actions clone the same original task snapshot, so additive tags/custom fields/relationships can overwrite earlier additions. Compose deterministically or refresh current state after each committed action, while retaining previous-event values for condition/template semantics. Acceptance: multiple matching rules preserve all intended additions/removals with deterministic ordering and recursion protection. Scope: automation_service.rs and mutation tests. DEV-11 event support and DEV-53 cooldown/cancellation fixes are already implemented.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-54.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

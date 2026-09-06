@@ -1,0 +1,20 @@
+title: Synchronize MCP parameter schemas pagination and sprint hints with handlers
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-54, DEV-57, DEV-63]
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.596456+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: M6 M7 M8 M10 M11 M14 M15.
+
+  Expose supported sync task_id, task sprint/clear fields and sprint assignment controls; remove or implement phantom create-status/delete-force fields. Resolve project config before validation and hints. Keep empty-page metadata invariant, populate/fingerprint sprint hints or remove the promise, and reconcile schemas with typed shared DTOs. Acceptance: schema/handler contract tests cover every tool and nullable field, targeted sync, project-only values, force semantics and hint refresh. Underlying mutation/query behavior belongs to the linked foundation tickets.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-54, DEV-57, DEV-63.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

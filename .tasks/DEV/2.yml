@@ -4,3 +4,24 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.692252+00:00
+modified: 2026-09-06T13:12:53.712604+00:00
+comments:
+- date: 2026-09-06T13:12:53.712604+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 2: IntelliJ Plugin
+description: |-
+  Migrated checklist requirements:
+  Deliver an IntelliJ integration; the original checklist does not specify its initial feature set. Agree that scope and packaging before implementation rather than treating VSCode or CLI support as completion.
+history:
+- at: 2026-09-06T13:12:53.701848+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Deliver an IntelliJ integration; the original checklist does not specify its initial feature set. Agree that scope and packaging before implementation rather than treating VSCode or CLI support as completion.
+- at: 2026-09-06T13:12:53.712604+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

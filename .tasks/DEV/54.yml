@@ -1,0 +1,20 @@
+title: Unify project-aware task mutation contracts and patch semantics
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-55, DEV-59, DEV-60, DEV-64, DEV-82]
+  related: [DEV-23, DEV-28]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.418447+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: S6 C10 M7 M8 M10 U3 U4.
+
+  REST currently adapts CLI structs and ignores advertised custom_fields; enums are validated before resolving project configuration, CLI edit validation drifts, and acceptance_criteria is missing from API DTOs. Define one project-aware mutation validator and omitted/null/value patch contract across CLI, REST, MCP and UI. Make initial status part of atomic creation rather than add-then-status; serialize/coalesce same-task autosaves and reconcile failures. Acceptance: custom fields and acceptance criteria round-trip; project-only enums work; clear operations actually clear; failed creation cannot leave a task and invite duplicates. Update Rust/TS/OpenAPI together. Scope: api_types.rs, task_service.rs, routes/tasks.rs, CLI/MCP task adapters and TaskPanel persistence. Existing DEV-53 cross-scope guards must remain intact.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

@@ -1,0 +1,18 @@
+title: Make Scan run-confirm preferences tolerate unavailable localStorage
+status: Todo
+relationships:
+  parent: DEV-53
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.696636+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: U13.
+
+  ScanView directly reads/writes localStorage before confirmation or runScan, so storage-denied/quota exceptions prevent scanning. Use existing safe storage utilities and make preference persistence nonfatal. Acceptance: denied get/set still allows confirmation and a single scan submission; skip-next-time works when storage is available. No new storage abstraction is needed.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

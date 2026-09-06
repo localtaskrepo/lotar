@@ -1,6 +1,42 @@
 title: 'BUG: Default task type field missing on creation'
-status: Todo
+status: NeedsReview
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.815112+00:00
+modified: 2026-09-06T13:12:54.177536+00:00
+comments:
+- date: 2026-09-06T11:21:52.521107+00:00
+  text: 'Backlog reconciliation: creation already exposes a type selector and applies configured defaults; backend effective_default_task_type exists. DEV-53 also has reviewed/staged project-load/readiness protection. NeedsReview for scope/reproduction, not a claim that every default-type issue is fixed: verify a non-first configured type, project switching and pending/failed config, and clarify whether the original report concerned the creation selector or config editor. Remaining cross-transport mutation/default validation is DEV-54.'
+- date: 2026-09-06T13:12:54.177536+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 26: When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
+description: |-
+  Migrated checklist requirements:
+  Clarified original symptom: newly created ticket files should persist explicit default values rather than rely on implicit configuration. This is not merely a missing UI selector. The original text calls ToDo a type although it resembles a status label; confirm which field(s) are affected. Acceptance: default-valued creation persists the intended explicit YAML fields and reload/API values agree. Keep NeedsReview until the serialized default case is verified; the presence of a type selector alone is insufficient. Coordinate DEV-54.
+history:
+- at: 2026-09-06T11:21:52.521107+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.538625+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: NeedsReview
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:54.166873+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Clarified original symptom: newly created ticket files should persist explicit default values rather than rely on implicit configuration. This is not merely a missing UI selector. The original text calls ToDo a type although it resembles a status label; confirm which field(s) are affected. Acceptance: default-valued creation persists the intended explicit YAML fields and reload/API values agree. Keep NeedsReview until the serialized default case is verified; the presence of a type selector alone is insufficient. Coordinate DEV-54.
+- at: 2026-09-06T13:12:54.177536+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

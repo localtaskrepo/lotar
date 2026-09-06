@@ -31,6 +31,122 @@ fn read(p: &Path) -> String {
 }
 
 #[test]
+fn init_rejects_unsafe_prefixes_even_with_force_and_absent_root() {
+    for force in [false, true] {
+        for existing in [false, true] {
+            for prefix in ["../OUTSIDE", "/OUTSIDE", "A/B", "A\\B", "..", "@sprints"] {
+                let tmp = TempDir::new().unwrap();
+                if existing {
+                    std::fs::create_dir(tmp.path().join(".tasks")).unwrap();
+                }
+                let outside = tmp.path().join("OUTSIDE");
+                std::fs::create_dir(&outside).unwrap();
+                std::fs::write(outside.join("config.yml"), "untouched").unwrap();
+                let mut args = vec!["init", "--yes", "--project=Example", "--prefix", prefix];
+                if force {
+                    args.push("--force");
+                }
+                assert!(!run(&args, tmp.path()).status.success());
+                assert_eq!(read(&outside.join("config.yml")), "untouched");
+                assert!(!tmp.path().join(".tasks/config.yml").exists());
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn init_rejects_symlink_destinations_without_changing_outside_files() {
+    use std::os::unix::fs::symlink;
+    for force in [false, true] {
+        for target in [
+            ".tasks",
+            ".tasks/EX",
+            ".tasks/EX/config.yml",
+            ".tasks/config.yml",
+        ] {
+            let tmp = TempDir::new().unwrap();
+            let outside = TempDir::new().unwrap();
+            let outside_config = outside.path().join("config.yml");
+            std::fs::write(&outside_config, "untouched").unwrap();
+            let link = tmp.path().join(target);
+            std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+            symlink(
+                if target.ends_with("yml") {
+                    &outside_config
+                } else {
+                    outside.path()
+                },
+                &link,
+            )
+            .unwrap();
+            let mut args = vec!["init", "--yes", "--project=Example", "--prefix=EX"];
+            if force {
+                args.push("--force");
+            }
+            assert!(!run(&args, tmp.path()).status.success());
+            assert_eq!(read(&outside_config), "untouched");
+        }
+    }
+}
+
+#[test]
+fn init_does_not_replace_malformed_global_config() {
+    for global in [false, true] {
+        let tmp = TempDir::new().unwrap();
+        std::fs::create_dir(tmp.path().join(".tasks")).unwrap();
+        let path = tmp.path().join(".tasks/config.yml");
+        std::fs::write(&path, "default: [broken").unwrap();
+        let mut args = vec!["init", "--yes", "--force", "--project=Example"];
+        if global {
+            args.push("--global");
+        }
+        assert!(!run(&args, tmp.path()).status.success());
+        assert_eq!(read(&path), "default: [broken");
+    }
+}
+
+#[test]
+fn init_rejects_structurally_invalid_global_before_any_project_write() {
+    for yaml in [
+        "[]",
+        "default: {project: [DEV]}",
+        "default_project: [DEV]",
+        "default_assignee: []",
+        "server: {port: invalid}",
+        "scan_enable_mentions: []",
+        "agent: {logs_dir: []}",
+        "web_ui_path: {}",
+    ] {
+        for global in [false, true] {
+            for force in [false, true] {
+                let tmp = TempDir::new().unwrap();
+                let root = tmp.path().join(".tasks");
+                std::fs::create_dir(&root).unwrap();
+                let path = root.join("config.yml");
+                std::fs::write(&path, yaml).unwrap();
+                let mut args = vec!["init", "--yes", "--project=Example", "--prefix=EX"];
+                if global {
+                    args.push("--global");
+                }
+                if force {
+                    args.push("--force");
+                }
+                assert!(
+                    !run(&args, tmp.path()).status.success(),
+                    "accepted invalid config: {yaml}"
+                );
+                assert_eq!(read(&path), yaml);
+                assert!(
+                    !root.join("EX").exists(),
+                    "created project before validating global config"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn validate_after_init_succeeds() {
     // Regression: with the "always create global with default_project" behavior,
     // `config validate --project=<PREFIX>` used to fail because the prefix

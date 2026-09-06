@@ -1,6 +1,49 @@
 title: Configurable done states in project config
 status: Todo
-priority: Medium
+priority: High
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.804618+00:00
+modified: 2026-09-06T13:12:54.155713+00:00
+comments:
+- date: 2026-09-06T11:21:52.773737+00:00
+  text: Backlog review retained Todo and raised priority to High because audit S13/U9 show contradictory analytics and overdue semantics. Existing inference is documented as partial, not completion. Shared policy remains owned by this existing ticket rather than a duplicate.
+- date: 2026-09-06T13:12:54.155713+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 22: Allow to define one or more done states in the config (right now defaults to last state in the list)
+description: |-
+  Existing done-state inference (last configured status, conventional names and aliases) is not explicit project-configurable terminal states. Define one project-aware terminal-state policy with backward-compatible defaults and use it across task statistics, sprint metrics/burndown/timing, overdue UI and agent cleanup. Acceptance: configured Closed/Completed/custom terminal states agree across surfaces; due-today is not overdue; completed tasks do not inflate overdue totals; reopened task histories use the current/latest completion interval rather than earliest-ever done. Update configuration contracts/docs and add project-override/reopen/DST regressions. Audit S13/U9 are owned here; DEV-57/66/68 coordinate query and rendering behavior.
+
+  Migrated checklist requirements:
+  Support one or more explicitly configured terminal states while preserving legacy last-state inference as a deliberate fallback. Reuse this ticket for the shared project-aware terminal policy and analytics/overdue/reopen requirements already documented here.
+history:
+- at: 2026-09-06T11:21:52.751604+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: 'Existing done-state inference (last configured status, conventional names and aliases) is not explicit project-configurable terminal states. Define one project-aware terminal-state policy with backward-compatible defaults and use it across task statistics, sprint metrics/burndown/timing, overdue UI and agent cleanup. Acceptance: configured Closed/Completed/custom terminal states agree across surfaces; due-today is not overdue; completed tasks do not inflate overdue totals; reopened task histories use the current/latest completion interval rather than earliest-ever done. Update configuration contracts/docs and add project-override/reopen/DST regressions. Audit S13/U9 are owned here; DEV-57/66/68 coordinate query and rendering behavior.'
+- at: 2026-09-06T11:21:52.762466+00:00
+  actor: mallox
+  changes:
+  - field: priority
+    old: Medium
+    new: High
+- at: 2026-09-06T11:21:52.773737+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.144596+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: 'Existing done-state inference (last configured status, conventional names and aliases) is not explicit project-configurable terminal states. Define one project-aware terminal-state policy with backward-compatible defaults and use it across task statistics, sprint metrics/burndown/timing, overdue UI and agent cleanup. Acceptance: configured Closed/Completed/custom terminal states agree across surfaces; due-today is not overdue; completed tasks do not inflate overdue totals; reopened task histories use the current/latest completion interval rather than earliest-ever done. Update configuration contracts/docs and add project-override/reopen/DST regressions. Audit S13/U9 are owned here; DEV-57/66/68 coordinate query and rendering behavior.'
+    new: |-
+      Existing done-state inference (last configured status, conventional names and aliases) is not explicit project-configurable terminal states. Define one project-aware terminal-state policy with backward-compatible defaults and use it across task statistics, sprint metrics/burndown/timing, overdue UI and agent cleanup. Acceptance: configured Closed/Completed/custom terminal states agree across surfaces; due-today is not overdue; completed tasks do not inflate overdue totals; reopened task histories use the current/latest completion interval rather than earliest-ever done. Update configuration contracts/docs and add project-override/reopen/DST regressions. Audit S13/U9 are owned here; DEV-57/66/68 coordinate query and rendering behavior.
+
+      Migrated checklist requirements:
+      Support one or more explicitly configured terminal states while preserving legacy last-state inference as a deliberate fallback. Reuse this ticket for the shared project-aware terminal policy and analytics/overdue/reopen requirements already documented here.
+- at: 2026-09-06T13:12:54.155713+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

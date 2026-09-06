@@ -388,7 +388,8 @@
                 <div v-if="Object.keys(errors).length" class="task-panel__errors">
                   <p v-for="(message, field) in errors" :key="field">{{ message }}</p>
                 </div>
-                <UiButton v-if="mode === 'create'" variant="primary" type="submit" :disabled="submitting || !(form.project || '').trim()">
+                <UiButton v-if="mode === 'create' && errors.config" type="button" @click="onProjectChange">Retry configuration</UiButton>
+                <UiButton v-if="mode === 'create'" variant="primary" type="submit" :disabled="!canCreate">
                   {{ submitting ? 'Creating…' : 'Create task' }}
                 </UiButton>
               </footer>
@@ -571,6 +572,7 @@ const {
   typeOptions,
   loading,
   submitting,
+  canCreate,
   task,
   form,
   hoveredReferenceCode,
@@ -1741,17 +1743,17 @@ async function removeSprintChip(sprintId: number) {
   cursor: not-allowed;
 }
 
-.task-panel__sprint-field :deep(.chip-field__control) {
+.task-panel__sprint-field .chip-field__control {
   align-items: flex-start;
   gap: var(--space-2, 0.5rem);
 }
 
-.task-panel__sprint-field :deep(.chip-field__chip) {
+.task-panel__sprint-field .chip-field__chip {
   padding: 0;
   background: transparent;
 }
 
-.task-panel__sprint-field :deep(.chip-field__add) {
+.task-panel__sprint-field .chip-field__add {
   margin-left: 0;
 }
 
@@ -2144,7 +2146,7 @@ details.task-panel__group:not([open]) {
   gap: var(--space-2, 0.5rem);
 }
 
-.task-panel__ownership-custom :deep(.input) {
+.task-panel__ownership-custom .input {
   flex: 1;
 }
 
@@ -2349,8 +2351,8 @@ textarea {
   white-space: nowrap;
 }
 
-.task-panel :deep(.input),
-.task-panel :deep(select) {
+.task-panel .input,
+.task-panel select {
   max-width: 100%;
   box-sizing: border-box;
 }
@@ -2391,7 +2393,7 @@ textarea {
   gap: var(--space-1, 0.25rem);
 }
 
-.task-panel__relation-input :deep(.input) {
+.task-panel__relation-input .input {
   width: 100%;
 }
 

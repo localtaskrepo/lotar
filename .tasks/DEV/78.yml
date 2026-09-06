@@ -1,0 +1,19 @@
+title: Separate wall-clock performance budgets from parallel correctness tests
+status: Todo
+relationships:
+  parent: DEV-53
+  related: [DEV-48, DEV-49]
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-09-06T11:10:31.831754+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: T5.
+
+  Absolute subprocess/filesystem timing limits run alongside correctness tests and produce load-dependent failures. Move meaningful benchmarks to an opt-in dedicated job or controlled execution group with justified thresholds; replace sleeps/timing assertions with completion signals where testing behavior. Acceptance: ordinary correctness gates do not fail due solely to host load, while performance regressions remain measurable. Coordinate existing DEV-48/49 retry/determinism history.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

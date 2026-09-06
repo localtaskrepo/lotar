@@ -4,3 +4,30 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.798862+00:00
+modified: 2026-09-06T13:12:54.133770+00:00
+comments:
+- date: 2026-09-06T11:21:52.718614+00:00
+  text: 'Backlog reconciliation: Remains Todo for config-stored tag colors. Existing generic styling is not persisted per-tag configuration. Define global/project inheritance, missing-color fallback, contrast, and compatibility with existing string tag lists before implementation.'
+- date: 2026-09-06T13:12:54.133770+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 21: Allow tags to be assigned a color (Store it in the project config under tags, but keep it backwards compatible)
+description: |-
+  Migrated checklist requirements:
+  Support per-tag colors stored in project configuration under the tags concept while remaining compatible with existing string tag lists and colorless configs. Choose a backward-compatible representation and readable fallback/contrast behavior before implementation.
+history:
+- at: 2026-09-06T11:21:52.718614+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.122812+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Support per-tag colors stored in project configuration under the tags concept while remaining compatible with existing string tag lists and colorless configs. Choose a backward-compatible representation and readable fallback/contrast behavior before implementation.
+- at: 2026-09-06T13:12:54.133770+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

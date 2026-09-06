@@ -1,6 +1,24 @@
 title: 'BUG: lotar init --project generates config in wrong dir'
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.847427+00:00
+modified: 2026-09-06T11:21:52.481577+00:00
+comments:
+- date: 2026-09-06T11:21:52.464121+00:00
+  text: 'Backlog reconciliation: ordinary init --project destination behavior is implemented. cli_init_behavior_test::bare_init_writes_global_and_minimal_project asserts --project=MyApp writes .tasks/MYAP/config.yml; forced App reinitialization stays under .tasks/APP. Closing this title-only historical bug for that supported case. No original nested-root reproduction was supplied; distinct canonical-root issues remain DEV-56. DEV-53 adds reviewed/staged path/symlink safety, not the original basic destination implementation.'
+history:
+- at: 2026-09-06T11:21:52.464121+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.481577+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox

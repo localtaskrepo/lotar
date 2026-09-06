@@ -11,6 +11,7 @@ use crate::services::agent_log_service::AgentLogService;
 use crate::services::agent_queue_service::AgentQueueService;
 use crate::services::automation_service::AutomationService;
 use crate::services::task_service::TaskService;
+use crate::utils::git::{git_command, verified_common_dir};
 use crate::workspace::TasksDirectoryResolver;
 use serde::Serialize;
 use std::fmt::Write as _;
@@ -216,7 +217,7 @@ impl AgentHandler {
             return Ok(());
         }
         if let Some(job) = job {
-            renderer.emit_success(format!("Job {} cancelled", job.id));
+            renderer.emit_success(format!("Job {}: {}", job.id, job.status));
         } else {
             renderer.emit_warning("Job not found");
         }
@@ -530,6 +531,8 @@ struct WorktreeInfo {
     ticket_id: String,
     /// Whether the ticket is in a "done" state
     is_done: bool,
+    #[serde(skip)]
+    task_known: bool,
     /// Whether there's an active job for this ticket
     has_active_job: bool,
 }
@@ -587,7 +590,7 @@ impl AgentHandler {
         let to_remove: Vec<_> = worktrees
             .iter()
             .filter(|wt| {
-                if wt.has_active_job {
+                if wt.has_active_job || !wt.task_known {
                     return false; // Never remove worktrees with active jobs
                 }
                 args.all || wt.is_done
@@ -613,6 +616,30 @@ impl AgentHandler {
         let mut errors = Vec::new();
 
         for wt in &to_remove {
+            let done_state = crate::services::agent_job_service::ticket_done_state(
+                &resolver.path,
+                &wt.ticket_id,
+            );
+            if done_state.is_none()
+                || (!args.all && done_state != Some(true))
+                || AgentJobService::has_active_job(&wt.ticket_id)
+                || running_job_for_ticket(&wt.ticket_id).is_some()
+            {
+                errors.push(format!(
+                    "{}: ticket state changed or a job is active",
+                    wt.ticket_id
+                ));
+                continue;
+            }
+            if let Err(err) = crate::services::agent_job_service::check_worktree_cleanup(
+                &repo_root,
+                std::path::Path::new(&wt.path),
+                Some(&wt.branch),
+            ) {
+                errors.push(format!("{}: {}", wt.ticket_id, err));
+                renderer.emit_warning(format!("Preserving worktree {}: {}", wt.ticket_id, err));
+                continue;
+            }
             if args.dry_run {
                 renderer.emit_info(format!("Would remove: {} ({})", wt.ticket_id, wt.path));
                 removed.push(wt.ticket_id.clone());
@@ -620,8 +647,8 @@ impl AgentHandler {
             }
 
             // Remove worktree
-            let worktree_result = std::process::Command::new("git")
-                .args(["worktree", "remove", "--force", &wt.path])
+            let worktree_result = git_command(&repo_root)
+                .args(["worktree", "remove", &wt.path])
                 .current_dir(&repo_root)
                 .output();
 
@@ -632,8 +659,8 @@ impl AgentHandler {
 
                     // Optionally delete the branch
                     if args.delete_branches {
-                        let branch_result = std::process::Command::new("git")
-                            .args(["branch", "-D", &wt.branch])
+                        let branch_result = git_command(&repo_root)
+                            .args(["branch", "-d", &wt.branch])
                             .current_dir(&repo_root)
                             .output();
 
@@ -643,6 +670,7 @@ impl AgentHandler {
                             }
                             Ok(out) => {
                                 let stderr = String::from_utf8_lossy(&out.stderr);
+                                errors.push(format!("{}: {}", wt.branch, stderr.trim()));
                                 renderer.emit_warning(format!(
                                     "Failed to delete branch {}: {}",
                                     wt.branch,
@@ -650,6 +678,7 @@ impl AgentHandler {
                                 ));
                             }
                             Err(e) => {
+                                errors.push(format!("{}: {}", wt.branch, e));
                                 renderer.emit_warning(format!(
                                     "Failed to delete branch {}: {}",
                                     wt.branch, e
@@ -690,7 +719,11 @@ impl AgentHandler {
             ));
         }
 
-        Ok(())
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err("Some worktrees were preserved because cleanup was unsafe or failed".into())
+        }
     }
 }
 
@@ -705,9 +738,10 @@ fn list_agent_worktrees(
     };
 
     let branch_prefix = &config.agent_worktree.branch_prefix;
+    verified_common_dir(&repo_root).map_err(|e| e.to_string())?;
 
     // Get list of worktrees from git
-    let output = std::process::Command::new("git")
+    let output = git_command(&repo_root)
         .args(["worktree", "list", "--porcelain"])
         .current_dir(&repo_root)
         .output()
@@ -722,19 +756,23 @@ fn list_agent_worktrees(
     let worktrees = parse_git_worktree_list(&stdout, branch_prefix);
 
     // Enrich with task status information
-    let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-
     let mut results = Vec::new();
     for (path, branch) in worktrees {
+        if std::path::Path::new(&path) == repo_root {
+            continue;
+        }
         let ticket_id = extract_ticket_from_branch(&branch, branch_prefix);
-        let is_done = check_ticket_done(&storage, &ticket_id);
-        let has_active_job = AgentJobService::has_active_job(&ticket_id);
+        let done_state =
+            crate::services::agent_job_service::ticket_done_state(&resolver.path, &ticket_id);
+        let has_active_job = AgentJobService::has_active_job(&ticket_id)
+            || running_job_for_ticket(&ticket_id).is_some();
 
         results.push(WorktreeInfo {
             path,
             branch,
             ticket_id,
-            is_done,
+            is_done: done_state == Some(true),
+            task_known: done_state.is_some(),
             has_active_job,
         });
     }
@@ -786,22 +824,6 @@ fn extract_ticket_from_branch(branch: &str, prefix: &str) -> String {
         .unwrap_or(branch)
         .trim_start_matches('/')
         .to_string()
-}
-
-/// Check if a ticket is in a "done" state
-fn check_ticket_done(storage: &crate::storage::manager::Storage, ticket_id: &str) -> bool {
-    // Derive project prefix from ID (e.g., ABCD-1 -> ABCD)
-    let derived = ticket_id.split('-').next().unwrap_or("");
-    match storage.get(ticket_id, derived) {
-        Some(task) => {
-            let status_lower = task.status.as_str().to_lowercase();
-            status_lower == "done" || status_lower == "closed" || status_lower == "completed"
-        }
-        None => {
-            // Task not found - consider it "done" for cleanup purposes
-            true
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize)]

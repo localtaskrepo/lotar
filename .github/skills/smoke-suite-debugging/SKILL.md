@@ -21,12 +21,12 @@ description: Use this when smoke tests fail (binary/web assets, Playwright setup
 ## Common failure modes
 
 - “Binary not found”
-  - Smoke resolves the binary from `target/release/lotar` by default.
-  - Fix: run `npm run build`, or set `LOTAR_BINARY_PATH` (or `LOTAR_BIN`) to a custom path.
+  - Smoke prefers `target/smoke/lotar`, falling back to `target/release/lotar`.
+  - Fix: run `npm run build:smoke`, or set `LOTAR_BINARY_PATH` (or `LOTAR_BIN`) to a freshly built custom binary.
 
 - “Port already in use”
   - The harness normally auto-picks a free port; failures may indicate a stuck server.
-  - Re-run with a single test in-band (`--runInBand`) so it’s easier to spot lifecycle issues.
+  - Re-run with `--maxWorkers=1 --maxConcurrency=1 --no-file-parallelism` so it is easier to isolate lifecycle issues. Vitest does not support `--runInBand`.
 
 - “SSE readiness / flaky waits”
   - Smoke uses `LOTAR_SSE_READY` hooks and server heartbeats; see `docs/help/serve.md` for the testing aids.
@@ -48,5 +48,5 @@ Some agent harnesses run the shell in a sandbox that blocks certain OS operation
 
 ## Debugging approach
 
-- Prefer `npx vitest watch --config smoke/vitest.config.ts --runInBand` for a tight loop.
+- Prefer `npx vitest watch --config smoke/vitest.config.ts --maxWorkers=1 --maxConcurrency=1 --no-file-parallelism` for a serialized watch loop.
 - If needed, temporarily enable inherited stdio in the smoke helpers while debugging (but keep changes scoped and revert before finalizing).

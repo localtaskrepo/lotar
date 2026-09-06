@@ -1,3 +1,5 @@
+import fs from 'fs-extra';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { startLotarServer } from '../helpers/server.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
@@ -163,21 +165,31 @@ describe.concurrent('REST API automation endpoints', () => {
         }
     });
 
-    it('POST /api/automation/set rejects invalid YAML', async () => {
+    it('POST /api/automation/set rejects invalid YAML and cooldowns without rewriting rules', async () => {
         const workspace = await SmokeWorkspace.create({
-            seedFiles: { '.tasks/config.yml': BASE_CONFIG },
+            seedFiles: {
+                '.tasks/config.yml': BASE_CONFIG,
+                '.tasks/automation.yml': SEED_RULES,
+            },
         });
 
         try {
             const server = await startLotarServer(workspace);
             try {
-                const res = await fetch(`${server.url}/api/automation/set`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ yaml: 'not valid yaml: [[[' }),
-                });
-                // Should fail with a 4xx error
-                expect(res.ok).toBe(false);
+                for (const yaml of [
+                    'not valid yaml: [[[',
+                    'automation:\n  rules:\n    - cooldown: "1\u00e9"\n',
+                    'automation:\n  rules:\n    - cooldown: "18446744073709551615d"\n',
+                ]) {
+                    const res = await fetch(`${server.url}/api/automation/set`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ yaml }),
+                    });
+                    expect(res.status).toBe(400);
+                    expect(await fs.readFile(path.join(workspace.tasksDir, 'automation.yml'), 'utf8'))
+                        .toBe(SEED_RULES);
+                }
             } finally {
                 await server.stop();
             }

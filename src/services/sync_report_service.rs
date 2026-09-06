@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use chrono::{DateTime, Utc};
@@ -59,14 +60,30 @@ impl SyncReportService {
         }
 
         let root = Self::resolve_reports_root(tasks_dir, config)?;
-        let filename = build_report_filename(report);
-        let path = root.join(&filename);
-
         let payload = serde_yaml_ng::to_string(report).map_err(|err| {
             LoTaRError::SerializationError(format!("Failed to serialize sync report: {}", err))
         })?;
-        fs::write(&path, payload)?;
-        Ok(Some(filename))
+        let filename = build_report_filename(report);
+        for suffix in 0u64.. {
+            let candidate = if suffix == 0 {
+                filename.clone()
+            } else {
+                format!("{}-{suffix}.yml", filename.trim_end_matches(".yml"))
+            };
+            let mut file = match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(root.join(&candidate))
+            {
+                Ok(file) => file,
+                Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(err) => return Err(err.into()),
+            };
+            file.write_all(payload.as_bytes())?;
+            file.sync_all()?;
+            return Ok(Some(candidate));
+        }
+        unreachable!("report filename suffix exhausted")
     }
 
     #[allow(clippy::needless_pass_by_value)]
@@ -193,11 +210,8 @@ fn build_report_filename(report: &SyncReport) -> String {
     let provider = sanitize_component(&report.provider, 12);
     let prefix = if !remote.is_empty() { remote } else { provider };
 
-    if prefix.is_empty() {
-        return format!("{}.yml", timestamp);
-    }
-
-    format!("{}-{}.yml", prefix, timestamp)
+    let run_id = sanitize_component(&report.id, 80);
+    format!("{}-{}-{}.yml", prefix, timestamp, run_id)
 }
 
 fn format_report_timestamp(value: &str) -> String {

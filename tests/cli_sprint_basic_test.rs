@@ -65,6 +65,61 @@ fn task_sprint_ids(storage: &Storage, task_id: &str) -> Vec<u32> {
 }
 
 #[test]
+fn sprint_delete_requires_force_without_interactive_confirmation() {
+    for format in ["json", "text"] {
+        let fixtures = common::TestFixtures::new();
+        let mut storage = Storage::new(&fixtures.tasks_root);
+        SprintService::create(&mut storage, Sprint::default(), None).expect("create sprint");
+        let sprint_path = fixtures.tasks_root.join("@sprints/1.yml");
+        let original = std::fs::read(&sprint_path).expect("read original sprint");
+
+        let mut cmd = common::cargo_bin_in(&fixtures);
+        cmd.args([
+            "--format",
+            format,
+            "sprint",
+            "delete",
+            "1",
+            "--cleanup-missing",
+        ])
+        .write_stdin("yes\n")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--force"));
+
+        assert_eq!(
+            std::fs::read(&sprint_path).expect("refused deletion must preserve sprint"),
+            original,
+            "output format {format} must not bypass confirmation"
+        );
+    }
+}
+
+#[test]
+fn sprint_delete_force_works_in_text_and_json() {
+    for format in ["json", "text"] {
+        let fixtures = common::TestFixtures::new();
+        let mut storage = Storage::new(&fixtures.tasks_root);
+        SprintService::create(&mut storage, Sprint::default(), None).expect("create sprint");
+
+        let mut cmd = common::cargo_bin_in(&fixtures);
+        let result = cmd
+            .args(["--format", format, "sprint", "delete", "1", "--force"])
+            .assert()
+            .success();
+        assert!(!fixtures.tasks_root.join("@sprints/1.yml").exists());
+        if format == "json" {
+            let payload: Value = serde_json::from_slice(&result.get_output().stdout)
+                .expect("one structured deletion response");
+            assert_eq!(payload["deleted"], true);
+            assert_eq!(payload["sprint_id"], 1);
+        } else {
+            result.stdout(predicate::str::contains("Deleted"));
+        }
+    }
+}
+
+#[test]
 fn sprint_list_reports_empty_state() {
     let fixtures = common::TestFixtures::new();
 

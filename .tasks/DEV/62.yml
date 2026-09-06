@@ -1,0 +1,19 @@
+title: Align MCP lifecycle notifications and smoke transport with the advertised protocol
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-63]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.562818+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: M1 M2 T1.
+
+  Implement initialized readiness and ping; emit notifications/tools/list_changed rather than tools/listChanged. Idle dispatch already exists and is not an outstanding defect. Build a standards-compliant NDJSON smoke client with complete initialize parameters and notifications/initialized. Keep framed transport only as explicit compatibility coverage. Acceptance: standard handshake/ping/list-change tests pass and premature operational calls are rejected consistently. Preserve the intentional polling fallback.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

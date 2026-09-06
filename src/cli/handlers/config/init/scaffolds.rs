@@ -149,7 +149,8 @@ fn write_scaffold(
         fs::create_dir_all(parent)
             .map_err(|e| format!("Failed to create {}: {}", parent.display(), e))?;
     }
-    fs::write(path, content).map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+    crate::storage::safety::atomic_write_file(path, content)
+        .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
     renderer.emit_success(format_args!("Wrote scaffold: {}", path.display()));
     Ok(())
 }
@@ -333,7 +334,7 @@ fn append_sync_comment(
         out.push('\n');
     }
     out.push_str(&block);
-    fs::write(target, out).map_err(|e| {
+    crate::storage::safety::atomic_write_file(target, &out).map_err(|e| {
         format!(
             "Failed to append sync scaffold to {}: {}",
             target.display(),

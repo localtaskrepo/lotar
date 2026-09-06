@@ -4,3 +4,30 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.698804+00:00
+modified: 2026-09-06T13:12:53.733652+00:00
+comments:
+- date: 2026-09-06T11:21:52.608760+00:00
+  text: 'Backlog reconciliation: Remains Todo for CLI list/search filtering by age older than N days. Existing age/stale statistics are not this filter. Specify created versus modified time and boundary semantics. Coordinate DEV-57 query parity and DEV-75 CLI contracts; neither automatically implements this feature.'
+- date: 2026-09-06T13:12:53.733652+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 3: Allow CLI list/search to filter by age older than N days
+description: |-
+  Migrated checklist requirements:
+  Provide an older-than-N-days filter for CLI list/search, not only age/stale statistics. Specify created versus modified age and inclusive/exclusive boundaries; verify composition with other filters. Coordinate DEV-57/75.
+history:
+- at: 2026-09-06T11:21:52.608760+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:53.723185+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Provide an older-than-N-days filter for CLI list/search, not only age/stale statistics. Specify created versus modified age and inclusive/exclusive boundaries; verify composition with other filters. Coordinate DEV-57/75.
+- at: 2026-09-06T13:12:53.733652+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

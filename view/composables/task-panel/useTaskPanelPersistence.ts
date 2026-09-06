@@ -1,5 +1,5 @@
 import type { ComputedRef, Ref } from 'vue'
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
 import type { TaskDTO } from '../../api/types'
 import { fromDateInputValue } from '../../utils/date'
 import { projectOf } from '../../utils/text'
@@ -33,6 +33,9 @@ interface TaskPanelEmitter {
 }
 
 interface UseTaskPanelPersistenceOptions {
+    panelGeneration: Ref<number>
+    getTaskId: () => string | null | undefined
+    canCreate: ComputedRef<boolean>
     mode: ComputedRef<'create' | 'edit'>
     task: TaskDTO
     form: TaskPanelFormState
@@ -64,23 +67,35 @@ export interface TaskPanelPersistenceApi {
 }
 
 export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions): TaskPanelPersistenceApi {
+    let loadGeneration = 0
+    let saveGeneration = 0
+    let createGeneration = 0
+    watch(() => options.form.project, () => { createGeneration += 1 }, { flush: 'sync' })
+    const canEdit = () => options.mode.value === 'edit' && options.ready.value && !options.loading.value &&
+        options.task.id === options.getTaskId() && options.form.id === options.task.id
     const applyPatch = async (patch: Record<string, unknown>) => {
-        if (!options.task.id) return
+        if (!canEdit()) return
+        const id = options.task.id
+        const scope = options.panelGeneration.value
+        const request = ++saveGeneration
+        const current = () => scope === options.panelGeneration.value && request === saveGeneration && id === options.getTaskId()
         try {
-            const updated = await options.apiClient.updateTask(options.task.id, patch)
+            const updated = await options.apiClient.updateTask(id, patch)
+            if (!current()) return
             Object.assign(options.task, updated)
             options.suppressWatch.value = true
             options.applyTask(updated)
             options.emit('updated', updated)
         } catch (error: any) {
+            if (!current()) return
             options.showToast(error?.message || 'Failed to save changes')
         } finally {
-            nextTick(() => (options.suppressWatch.value = false))
+            nextTick(() => { if (current()) options.suppressWatch.value = false })
         }
     }
 
     const updateField = async (field: string) => {
-        if (!options.task.id) return
+        if (!canEdit()) return
         const patch: Record<string, unknown> = {}
         switch (field) {
             case 'title':
@@ -153,25 +168,31 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     }
 
     const updateStatus = async (status: string) => {
-        if (options.mode.value !== 'edit' || !options.task.id) return
+        if (!canEdit()) return
         if (!status) return
+        const id = options.task.id
+        const scope = options.panelGeneration.value
+        const request = ++saveGeneration
+        const current = () => scope === options.panelGeneration.value && request === saveGeneration && id === options.getTaskId()
         try {
-            const updated = await options.apiClient.setStatus(options.task.id, status)
+            const updated = await options.apiClient.setStatus(id, status)
+            if (!current()) return
             Object.assign(options.task, updated)
             options.suppressWatch.value = true
             options.applyTask(updated)
             options.emit('updated', updated)
             options.showToast('Status updated')
         } catch (error: any) {
+            if (!current()) return
             options.showToast(error?.message || 'Failed to change status')
             options.form.status = options.task.status
         } finally {
-            nextTick(() => (options.suppressWatch.value = false))
+            nextTick(() => { if (current()) options.suppressWatch.value = false })
         }
     }
 
     const handleSubmit = async () => {
-        if (options.mode.value !== 'create') return
+        if (!options.canCreate.value || options.submitting.value) return
         if (!(options.form.project || '').trim()) {
             options.validate()
             options.showToast('Project is required')
@@ -182,6 +203,10 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             return
         }
         options.submitting.value = true
+        const scope = options.panelGeneration.value
+        const request = createGeneration
+        const status = options.form.status
+        const current = () => scope === options.panelGeneration.value && request === createGeneration
         try {
             const dueDateValue = fromDateInputValue(options.form.due_date)
             const payload = {
@@ -194,40 +219,54 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 due_date: dueDateValue ?? undefined,
                 effort: options.form.effort || undefined,
                 description: options.form.description || undefined,
-                tags: options.form.tags,
+                tags: [...options.form.tags],
                 sprints: options.form.sprints.length ? [...options.form.sprints] : undefined,
                 relationships: options.buildRelationships(),
                 custom_fields: options.buildCustomFields(),
             }
             const created = await options.apiClient.addTask(payload)
-            if (options.form.status && created.status !== options.form.status) {
-                const synced = await options.apiClient.setStatus(created.id, options.form.status)
+            if (status && created.status !== status) {
+                const synced = await options.apiClient.setStatus(created.id, status)
                 Object.assign(created, synced)
             }
+            if (!current()) return
             options.showToast('Task created')
             options.emit('created', created)
             options.closePanel()
         } catch (error: any) {
+            if (!current()) return
             options.showToast(error?.message || 'Failed to create task')
         } finally {
-            options.submitting.value = false
+            if (scope === options.panelGeneration.value) options.submitting.value = false
         }
     }
 
     const loadTask = async (id: string): Promise<TaskDTO | undefined> => {
+        const scope = options.panelGeneration.value
+        const request = ++loadGeneration
+        saveGeneration += 1
+        const current = () => scope === options.panelGeneration.value && request === loadGeneration && id === options.getTaskId()
+        if (!current()) return undefined
+        options.ready.value = false
+        options.loading.value = true
         options.resetActivity()
         try {
             const data = await options.apiClient.getTask(id)
-            Object.assign(options.task, data)
+            if (!current()) return undefined
             await options.refreshConfig(projectOf(id) || '')
+            if (!current()) return undefined
+            Object.assign(options.task, data)
             options.applyTask(data)
             await options.loadCommitHistory(id)
+            if (!current()) return undefined
+            options.ready.value = true
             return data
         } catch (error: any) {
+            if (!current()) return undefined
             options.showToast(error?.message || 'Failed to load task')
             return undefined
         } finally {
-            options.loading.value = false
+            if (current()) options.loading.value = false
         }
     }
 

@@ -4,3 +4,30 @@ priority: Medium
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.757103+00:00
+modified: 2026-09-06T13:12:53.954505+00:00
+comments:
+- date: 2026-09-06T11:14:14.354808+00:00
+  text: 'Backlog review: script/action template expansion is implemented in automation/template.rs and covered by template_expansion_in_run_action. Agent instruction text is still appended without expansion. This combined feature remains Todo; remaining scope is instruction/file interpolation using a defined context and the existing template engine, not a second script-template implementation.'
+- date: 2026-09-06T13:12:53.954505+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 13: Template variables for agent instructions and script that get filled in at runtime. Should follow env/bash syntax for both inline and file-based instructions. This allows for dynamic instructions that can reference ticket fields, context variables, etc. Should support lists for properties like "references". Bash/env syntax allows to address both simple values and complex structures (e.g., `${{references[*].id}}` to get a list of all reference IDs).
+description: |-
+  Migrated checklist requirements:
+  Scalar action/script expansion already exists, but the original requirement is broader: runtime variables in inline and file-based agent instructions/scripts, ticket and context values, and structured/list selection such as ${{references[*].id}}. Keep Todo. Define the supported env/bash-style grammar and safe escaping/expansion behavior, reuse the existing engine where possible, and add scalar/list plus inline/file regressions. Do not label list or instruction expansion complete based only on scalar script tests.
+history:
+- at: 2026-09-06T11:14:14.354808+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:53.943665+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Scalar action/script expansion already exists, but the original requirement is broader: runtime variables in inline and file-based agent instructions/scripts, ticket and context values, and structured/list selection such as ${{references[*].id}}. Keep Todo. Define the supported env/bash-style grammar and safe escaping/expansion behavior, reuse the existing engine where possible, and add scalar/list plus inline/file regressions. Do not label list or instruction expansion complete based only on scalar script tests.
+- at: 2026-09-06T13:12:53.954505+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

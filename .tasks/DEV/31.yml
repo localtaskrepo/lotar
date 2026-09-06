@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-08-26T03:07:05.900354+00:00
-modified: 2026-08-26T10:16:25.213011+00:00
+modified: 2026-09-06T11:21:52.796212+00:00
 comments:
 - date: 2026-08-26T03:07:16.979684+00:00
   text: 'Plan: (1) web_server: remove /shutdown, gate /__test/stop behind LOTAR_ALLOW_TEST_STOP, drop ACAO *, add Origin-host validation on mutating methods. (2) storage: central project-prefix validation rejecting absolute/../ paths; atomic temp+rename writes; fs2 per-project lock around ID alloc + RMW; warn-once corrupt-file handling. (3) sprint_service: same lock/atomic-write for sprint files; skip corrupt sprint files instead of failing all endpoints. Tests: new unit tests + full gates.'
@@ -13,6 +13,8 @@ comments:
   text: 'Milestone: security+integrity code done (web_server origin/CORS/shutdown, storage validation/atomic writes/locks, sprint graceful degrade). Agent automation suite confirmed pre-existing flaky on this machine (fails 5/29 on pristine HEAD too). Next: full gates.'
 - date: 2026-08-26T10:16:25.181894+00:00
   text: 'Shipped: web_server.rs removes /shutdown, gates /__test/stop behind LOTAR_ALLOW_TEST_STOP=1, drops wildcard CORS, adds Origin-vs-Host validation (403) on mutating methods, strict unknown-status mapping. storage/safety.rs (new): project-prefix validation, per-directory .lock fs2 locking, atomic temp+rename writes, warn-once corrupt-file handling. Wired into operations.rs (add/get/edit/delete), sprint_service.rs (create/update/delete/list degrade), config/operations.rs save_project_config choke point, utils/project.rs resolve_project_input, search.rs. Vite dev proxy strips Origin. Tests: +8 storage_path_safety_test cases, updated web_api/cli_serve/error-path suites. Verified live: traversal add rejected, foreign-origin POST 403, /shutdown gone, no ACAO header, normal flows intact.'
+- date: 2026-09-06T11:21:52.796212+00:00
+  text: 'Backlog reconciliation: Historical Done covers the enumerated original server/storage hardening, not a universal security or multi-file atomicity guarantee. DEV-53 adds reviewed/staged lock and replacement safety; DEV-54/55/56 own remaining mutation/transaction/identity foundations.'
 history:
 - at: 2026-08-26T03:07:16.971838+00:00
   actor: mallox
@@ -43,3 +45,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-09-06T11:21:52.796212+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

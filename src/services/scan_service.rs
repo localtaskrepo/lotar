@@ -4,9 +4,11 @@ use crate::errors::{LoTaRError, LoTaRResult};
 use crate::scanner;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
-use crate::types::{CustomFields, Priority, ReferenceEntry, TaskType, custom_value_string};
+use crate::types::{CustomFields, Priority, TaskType, custom_value_string};
 use crate::utils::paths::repo_relative_display;
-use crate::utils::scan::{parse_inline_attributes, strip_bracket_attributes};
+use crate::utils::scan::{
+    parse_inline_attributes, refresh_code_reference, validate_source_write, write_source,
+};
 use crate::workspace::TasksDirectoryResolver;
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
@@ -24,13 +26,20 @@ const ACTION_SKIP: &str = "skip";
 pub struct ScanService;
 
 impl ScanService {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn run(
         resolver: &TasksDirectoryResolver,
         request: ScanRequest,
     ) -> LoTaRResult<ScanResponse> {
+        Self::run_with_source_writer(resolver, request, write_source)
+    }
+
+    fn run_with_source_writer(
+        resolver: &TasksDirectoryResolver,
+        request: ScanRequest,
+        mut source_writer: impl FnMut(&Path, &str, &str) -> Result<(), String>,
+    ) -> LoTaRResult<ScanResponse> {
         let dry_run = request.dry_run;
-        let mut warnings = Vec::new();
+        let warnings = Vec::new();
         let info = Vec::new();
         let mut summary = ScanSummary::default();
 
@@ -43,7 +52,7 @@ impl ScanService {
         let roots: Vec<PathBuf> = if request.paths.is_empty() {
             vec![default_root]
         } else {
-            request.paths.iter().map(PathBuf::from).collect()
+            request.paths.into_iter().map(PathBuf::from).collect()
         };
 
         for root in &roots {
@@ -131,8 +140,21 @@ impl ScanService {
                 continue;
             }
 
-            let (original_line, line_error) = match read_line(&entry.file_path, entry.line_number) {
-                Ok(line) => (Some(line), None),
+            let (source, line_error) = match std::fs::read_to_string(&entry.file_path)
+                .map_err(|err| err.to_string())
+                .and_then(|contents| {
+                    line_scanner
+                        .matched_source_comment_range(
+                            &entry.file_path,
+                            &contents,
+                            entry.line_number,
+                        )
+                        .ok_or_else(|| {
+                            "Cannot establish a safe scan comment boundary".to_string()
+                        })?;
+                    Ok(contents)
+                }) {
+                Ok(contents) => (Some(contents), None),
                 Err(err) => (None, Some(err)),
             };
 
@@ -156,8 +178,17 @@ impl ScanService {
                 continue;
             }
 
-            let original_line = original_line.unwrap_or_default();
-            let existing_key = line_scanner.extract_ticket_key_from_line(&original_line);
+            let source = source.unwrap_or_default();
+            let original_line = source
+                .lines()
+                .nth(entry.line_number - 1)
+                .unwrap_or_default()
+                .to_string();
+            let range = line_scanner
+                .matched_source_comment_range(&entry.file_path, &source, entry.line_number)
+                .ok_or_else(|| LoTaRError::ValidationError("Missing scan comment".to_string()))?;
+            let existing_key =
+                line_scanner.extract_ticket_key_from_line(&original_line[range.clone()]);
             let action = if existing_key.is_none() {
                 ACTION_CREATE
             } else if scan_config.enable_mentions {
@@ -170,15 +201,13 @@ impl ScanService {
                 let (status, message, updated_line) = match action {
                     ACTION_CREATE => {
                         let placeholder_id = format!("{}-NEW", project_name);
-                        let proposed = line_scanner
-                            .suggest_insertion_for_line(&original_line, &placeholder_id)
-                            .map(|line| {
-                                if strip_attributes {
-                                    strip_bracket_attributes(&line)
-                                } else {
-                                    line
-                                }
-                            });
+                        let proposed = line_scanner.suggest_source_insertion(
+                            &entry.file_path,
+                            &source,
+                            entry.line_number,
+                            &placeholder_id,
+                            strip_attributes,
+                        );
                         (
                             STATUS_CREATED,
                             Some("Dry run: would create task".to_string()),
@@ -215,7 +244,6 @@ impl ScanService {
             let status_result = match action {
                 ACTION_CREATE => {
                     let mut task_id = None;
-                    let mut message = None;
                     let mut updated_line = None;
 
                     let title = coerce_entry_title(
@@ -224,7 +252,7 @@ impl ScanService {
                         &rel_path,
                         entry.line_number,
                     );
-                    let inline_attrs = parse_inline_attributes(&original_line);
+                    let inline_attrs = parse_inline_attributes(&original_line[range]);
 
                     let task_create = TaskCreate {
                         title,
@@ -242,13 +270,37 @@ impl ScanService {
                         sprints: Vec::new(),
                     };
 
-                    let created = match storage
-                        .as_mut()
-                        .ok_or_else(|| {
-                            LoTaRError::ValidationError("Storage unavailable".to_string())
-                        })
-                        .and_then(|storage| TaskService::create(storage, task_create))
-                    {
+                    let prepared = (|| {
+                        let contents =
+                            std::fs::read_to_string(&entry.file_path).map_err(|e| e.to_string())?;
+                        if contents != source {
+                            return Err("Source changed while scanning".to_string());
+                        }
+                        line_scanner
+                            .suggest_source_insertion(
+                                &entry.file_path,
+                                &contents,
+                                entry.line_number,
+                                "SCAN-NEW",
+                                strip_attributes,
+                            )
+                            .ok_or_else(|| {
+                                "Cannot safely insert a task key into source".to_string()
+                            })?;
+                        validate_source_write(&entry.file_path)?;
+                        Ok(contents)
+                    })();
+                    let created = match prepared
+                        .as_ref()
+                        .map_err(|err: &String| LoTaRError::ValidationError(err.clone()))
+                        .and_then(|_| {
+                            storage
+                                .as_mut()
+                                .ok_or_else(|| {
+                                    LoTaRError::ValidationError("Storage unavailable".to_string())
+                                })
+                                .and_then(|storage| TaskService::create(storage, task_create))
+                        }) {
                         Ok(task) => {
                             task_id = Some(task.id.clone());
                             Ok(task.id)
@@ -259,50 +311,56 @@ impl ScanService {
                     match created {
                         Ok(created_id) => {
                             let code_ref = format!("{}#{}", rel_path, entry.line_number);
-                            if let Some(storage) = storage.as_mut()
-                                && let Err(err) = update_task_code_reference(
-                                    storage,
+                            let applied = (|| -> Result<(), String> {
+                                let storage = storage.as_mut().ok_or("Storage unavailable")?;
+                                update_task_code_reference(storage, &created_id, &code_ref, &[])
+                                    .map_err(|e| e.to_string())?;
+
+                                let proposed = line_scanner.suggest_source_insertion(
+                                    &entry.file_path,
+                                    &source,
+                                    entry.line_number,
                                     &created_id,
-                                    &code_ref,
-                                    request.reanchor,
-                                )
-                            {
-                                warnings.push(format!(
-                                    "Failed to update references for {}: {}",
-                                    created_id, err
-                                ));
-                            }
+                                    strip_attributes,
+                                );
 
-                            let proposed = line_scanner
-                                .suggest_insertion_for_line(&original_line, &created_id)
-                                .map(|line| {
-                                    if strip_attributes {
-                                        strip_bracket_attributes(&line)
-                                    } else {
-                                        line
-                                    }
-                                });
-
-                            if let Some(next_line) = proposed
-                                && next_line != original_line
-                            {
-                                match replace_line(&entry.file_path, entry.line_number, &next_line)
-                                {
-                                    Ok(()) => {
-                                        updated_line = Some(next_line);
-                                    }
-                                    Err(err) => {
-                                        warnings.push(format!(
-                                            "Failed to update {}:{}: {}",
-                                            rel_path, entry.line_number, err
-                                        ));
-                                        message =
-                                            Some("Task created but file update failed".to_string());
+                                let next_line = proposed.ok_or("Cannot safely insert task key")?;
+                                replace_line(
+                                    &entry.file_path,
+                                    prepared.as_ref().map_err(|e| e.clone())?,
+                                    entry.line_number,
+                                    &next_line,
+                                    &mut source_writer,
+                                )?;
+                                updated_line = Some(next_line);
+                                Ok(())
+                            })();
+                            match applied {
+                                Ok(()) => (STATUS_CREATED, task_id, updated_line, None),
+                                Err(error) => {
+                                    let project =
+                                        created_id.rsplit_once('-').map(|(p, _)| p).unwrap_or("");
+                                    let rollback = storage
+                                        .as_mut()
+                                        .ok_or_else(|| {
+                                            LoTaRError::ValidationError(
+                                                "Storage unavailable".to_string(),
+                                            )
+                                        })
+                                        .and_then(|storage| storage.delete(&created_id, project));
+                                    match rollback {
+                                        Ok(true) => (STATUS_FAILED, None, None, Some(error)),
+                                        result => (
+                                            STATUS_FAILED,
+                                            task_id,
+                                            None,
+                                            Some(format!(
+                                                "{error}; rollback of {created_id} failed: {result:?}"
+                                            )),
+                                        ),
                                     }
                                 }
                             }
-
-                            (STATUS_CREATED, task_id, updated_line, message)
                         }
                         Err(err) => (STATUS_FAILED, task_id, None, Some(err.to_string())),
                     }
@@ -310,18 +368,32 @@ impl ScanService {
                 ACTION_REFRESH => {
                     if let Some(task_id) = existing_key.as_deref() {
                         let code_ref = format!("{}#{}", rel_path, entry.line_number);
+                        let contents = std::fs::read_to_string(&entry.file_path)?;
+                        let live_refs: Vec<String> = contents
+                            .lines()
+                            .enumerate()
+                            .filter(|(index, line)| {
+                                line_scanner
+                                    .matched_source_comment_range(
+                                        &entry.file_path,
+                                        &contents,
+                                        index + 1,
+                                    )
+                                    .and_then(|range| {
+                                        line_scanner.extract_ticket_key_from_line(&line[range])
+                                    })
+                                    .as_deref()
+                                    == Some(task_id)
+                            })
+                            .map(|(index, _)| format!("{}#{}", rel_path, index + 1))
+                            .collect();
                         let updated = storage
                             .as_mut()
                             .ok_or_else(|| {
                                 LoTaRError::ValidationError("Storage unavailable".to_string())
                             })
                             .and_then(|storage| {
-                                update_task_code_reference(
-                                    storage,
-                                    task_id,
-                                    &code_ref,
-                                    request.reanchor,
-                                )
+                                update_task_code_reference(storage, task_id, &code_ref, &live_refs)
                             });
                         match updated {
                             Ok(_) => (STATUS_UPDATED, Some(task_id.to_string()), None, None),
@@ -450,23 +522,13 @@ fn build_custom_fields(fields: Vec<(String, String)>) -> Option<CustomFields> {
     Some(custom)
 }
 
-fn read_line(path: &Path, line_number: usize) -> Result<String, String> {
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-    let lines: Vec<&str> = contents.lines().collect();
-    if line_number == 0 || line_number > lines.len() {
-        return Err(format!(
-            "Line {} is out of range (max {})",
-            line_number,
-            lines.len()
-        ));
-    }
-    Ok(lines[line_number - 1].to_string())
-}
-
-fn replace_line(path: &Path, line_number: usize, new_line: &str) -> Result<(), String> {
-    let contents = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+fn replace_line(
+    path: &Path,
+    contents: &str,
+    line_number: usize,
+    new_line: &str,
+    source_writer: &mut impl FnMut(&Path, &str, &str) -> Result<(), String>,
+) -> Result<(), String> {
     let mut lines: Vec<&str> = contents.lines().collect();
     if line_number == 0 || line_number > lines.len() {
         return Err(format!(
@@ -483,7 +545,8 @@ fn replace_line(path: &Path, line_number: usize, new_line: &str) -> Result<(), S
             out.push('\n');
         }
     }
-    std::fs::write(path, out).map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+    source_writer(path, contents, &out)
+        .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
     Ok(())
 }
 
@@ -491,7 +554,7 @@ fn update_task_code_reference(
     storage: &mut Storage,
     task_id: &str,
     code_ref: &str,
-    reanchor: bool,
+    live_refs: &[String],
 ) -> LoTaRResult<bool> {
     let derived = task_id.split('-').next().unwrap_or("");
     if derived.trim().is_empty() {
@@ -502,47 +565,7 @@ fn update_task_code_reference(
         .get(task_id, derived)
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
-    let has_exact = task
-        .references
-        .iter()
-        .any(|r| r.code.as_deref() == Some(code_ref));
-
-    let mut changed = false;
-    if reanchor {
-        let before_len = task.references.len();
-        task.references
-            .retain(|r| r.code.as_deref() == Some(code_ref));
-        if before_len != task.references.len() {
-            changed = true;
-        }
-        if !has_exact {
-            task.references.push(ReferenceEntry {
-                code: Some(code_ref.to_string()),
-                ..Default::default()
-            });
-            changed = true;
-        }
-    } else if !has_exact {
-        let file_key = code_ref
-            .split_once('#')
-            .map(|(file, _)| file)
-            .unwrap_or(code_ref);
-        task.references.retain(|r| {
-            if let Some(code) = &r.code
-                && let Some((file_part, _)) = code.split_once('#')
-                && file_part == file_key
-                && code != code_ref
-            {
-                return false;
-            }
-            true
-        });
-        task.references.push(ReferenceEntry {
-            code: Some(code_ref.to_string()),
-            ..Default::default()
-        });
-        changed = true;
-    }
+    let changed = refresh_code_reference(&mut task.references, code_ref, live_refs);
 
     if changed {
         task.modified = Utc::now().to_rfc3339();
@@ -581,6 +604,73 @@ mod scan_service_tests {
     use super::ScanService;
     use crate::api_types::{ScanRequest, ScanTarget};
     use crate::workspace::TasksDirectoryResolver;
+
+    #[test]
+    fn source_changed_after_prepare_rolls_back_only_losing_task() {
+        let temp = tempfile::tempdir().unwrap();
+        let tasks_dir = temp.path().join(".tasks");
+        std::fs::create_dir(&tasks_dir).unwrap();
+        let source = temp.path().join("main.rs");
+        std::fs::write(&source, "// TODO: contested source\n").unwrap();
+        let resolver =
+            TasksDirectoryResolver::resolve(Some(tasks_dir.to_str().unwrap()), None).unwrap();
+        let request = ScanRequest {
+            paths: vec![source.display().to_string()],
+            include: vec![],
+            exclude: vec![],
+            project: Some("SAFE".into()),
+            dry_run: false,
+            strip_attributes: None,
+            reanchor: false,
+            modified_only: false,
+            targets: vec![],
+        };
+        let mut winner_id = String::new();
+        let response =
+            ScanService::run_with_source_writer(&resolver, request, |path, expected, updated| {
+                crate::utils::scan::write_source_with_prepared(path, expected, updated, || {
+                    // Deterministic editor hook: replacement is fully prepared, but
+                    // the compare/rename critical section has not started yet.
+                    let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
+                    let task = crate::storage::task::Task::new(
+                        tasks_dir.clone(),
+                        "winning task".into(),
+                        crate::types::Priority::new("medium"),
+                    );
+                    winner_id = storage
+                        .add(&task, "SAFE", None)
+                        .map_err(|error| error.to_string())?;
+                    std::fs::write(path, format!("// TODO ({winner_id}): competing editor\n"))
+                        .map_err(|error| error.to_string())
+                })
+            })
+            .unwrap();
+        assert_eq!(response.summary.created, 0);
+        assert_eq!(response.summary.failed, 1);
+        assert!(response.entries[0].task_id.is_none());
+        assert!(
+            response.entries[0]
+                .message
+                .as_deref()
+                .unwrap()
+                .contains("Source changed while scanning")
+        );
+        assert_eq!(
+            std::fs::read_to_string(&source).unwrap(),
+            format!("// TODO ({winner_id}): competing editor\n")
+        );
+        let tasks = crate::storage::manager::Storage::new(&tasks_dir).search(&Default::default());
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].0, winner_id);
+        assert_eq!(tasks[0].1.title, "winning task");
+        assert!(!std::fs::read_dir(temp.path()).unwrap().any(|entry| {
+            entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".lotar-scan-")
+        }));
+    }
 
     #[test]
     fn scan_service_dry_run_reports_create_action() {

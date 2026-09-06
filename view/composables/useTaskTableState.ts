@@ -1,4 +1,4 @@
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { storageGetJson, storageSetJson } from '../utils/storage'
 import { formatRelativeTime, formatTaskDate, isTaskOverdue, parseTaskDateToMillis } from '../utils/date'
@@ -186,23 +186,14 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     const touchesMap = computed(() => props.touches ?? ({} as Record<string, TaskTouch>))
 
     const selected = ref<string[]>(props.selectedIds ? [...props.selectedIds] : [])
-    const suppressSelectedEmit = ref(false)
 
     watch(
         () => props.selectedIds,
         (value) => {
-            suppressSelectedEmit.value = true
             selected.value = value ? [...value] : []
-            nextTick(() => {
-                suppressSelectedEmit.value = false
-            })
         },
+        { flush: 'sync' },
     )
-
-    watch(selected, (value) => {
-        if (suppressSelectedEmit.value) return
-        emit('update:selectedIds', value)
-    })
 
     const visibleIds = computed(() => sorted.value.map((task) => task.id))
     const allSelected = computed(() => visibleIds.value.length > 0 && visibleIds.value.every((id) => selected.value.includes(id)))
@@ -229,22 +220,26 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     function toggleOne(id: string, event: Event) {
+        if (props.loading || !visibleIds.value.includes(id)) return
         const checked = (event.target as HTMLInputElement).checked
         const set = new Set(selected.value)
         if (checked) set.add(id)
         else set.delete(id)
         selected.value = Array.from(set)
+        emit('update:selectedIds', [...selected.value])
     }
 
     function toggleAll(event: Event) {
+        if (props.loading) return
         const checked = (event.target as HTMLInputElement).checked
         const visible = visibleIds.value
         if (checked) {
-            selected.value = [...visible]
+            selected.value = Array.from(new Set([...selected.value, ...visible]))
         } else {
             const drop = new Set(visible)
             selected.value = selected.value.filter((id) => !drop.has(id))
         }
+        emit('update:selectedIds', [...selected.value])
     }
 
     function onToggleBulk(event: Event) {

@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 
 use crate::cli::args::sprint::SprintDeleteArgs;
@@ -31,7 +31,14 @@ pub(crate) fn handle_delete(
         .as_ref()
         .and_then(|plan| plan.label.clone());
 
-    if !delete_args.force && !matches!(renderer.format, OutputFormat::Json) {
+    if !delete_args.force {
+        if matches!(renderer.format, OutputFormat::Json) || !io::stdin().is_terminal() {
+            return Err(
+                "Sprint deletion requires --force with JSON output or non-interactive input."
+                    .to_string(),
+            );
+        }
+
         print!(
             "Are you sure you want to delete sprint '{}'? (y/N): ",
             display_name
@@ -39,10 +46,9 @@ pub(crate) fn handle_delete(
         let _ = io::stdout().flush();
 
         let mut input = String::new();
-        if io::stdin().read_line(&mut input).is_err() {
-            renderer.emit_error("Failed to read input. Aborting.");
-            return Ok(());
-        }
+        io::stdin()
+            .read_line(&mut input)
+            .map_err(|err| format!("Failed to read confirmation. Aborting: {err}"))?;
         let input = input.trim().to_lowercase();
         if input != "y" && input != "yes" {
             renderer.emit_warning("Deletion cancelled.");

@@ -1,0 +1,21 @@
+title: Give Insights and activity consumers query-scoped refreshable state
+status: Todo
+relationships:
+  parent: DEV-53
+  depends_on: [DEV-65]
+  related: [DEV-21]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.629552+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: U10.
+
+  ActivityDrawer and ProjectInsights share a global feed; busy guards drop project/window changes and cached project stats ignore Reload. Give each consumer keyed activity state, honor latest query, verify explicit project filtering, invalidate stats on reload, and handle empty tag results correctly. Acceptance: opening drawer cannot alter chart data, rapid project/date changes settle on the selected scope, and Reload updates totals. Terminal/overdue policy is tracked by DEV-21.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-65.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

@@ -1,0 +1,22 @@
+title: Unify task query filtering ordering pagination and export behavior
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-64, DEV-65, DEV-68, DEV-75]
+  depends_on: [DEV-56]
+  related: [DEV-3, DEV-5, DEV-13, DEV-41]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.479215+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: S12 M9 M11 U5 U8.
+
+  Shared parsing exists, but REST list/export and MCP still use different post-filter/order pipelines; MCP enum CSV/invalid values can fail open. UI sorts page slices, custom-field sort is ineffective, and saved sort does not reload per project. Define one strict query executor and field accessor; implement the advertised due/recent vocabulary with date-time and DST-safe boundaries; forward every export filter. Acceptance: equivalent transports/export match the displayed filtered set and global order; invalid explicit filters error; custom sorting and totals/pagination are correct. There is NO outstanding 5,000-task cap. Coordinate age/Boolean/grouping features with DEV-3/5/13 without silently expanding their scope.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-56.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

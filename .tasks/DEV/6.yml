@@ -4,3 +4,30 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.720192+00:00
+modified: 2026-09-06T13:12:53.821924+00:00
+comments:
+- date: 2026-09-06T11:21:52.641675+00:00
+  text: 'Backlog reconciliation: Remains Todo: MarkdownContent currently renders sanitized GFM without task-ID transformation or hover-card binding. Existing general task hover components do not fulfill markdown references. Remaining acceptance: recognize task references while preserving code blocks/ordinary links and sanitization, then attach the shared hover UI.'
+- date: 2026-09-06T13:12:53.821924+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 7: Support references to other tickets in the description when rendering markdown (e.g. "See TASK-1234 for more info" becomes a link with hover card).
+description: |-
+  Migrated checklist requirements:
+  Render plain task references such as "See TASK-1234 for more info" as navigable links with shared hover cards in descriptions. Preserve ordinary links, code blocks and sanitization. Existing generic markdown and hover components do not fulfill this wiring.
+history:
+- at: 2026-09-06T11:21:52.641675+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:53.810997+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Render plain task references such as "See TASK-1234 for more info" as navigable links with shared hover cards in descriptions. Preserve ordinary links, code blocks and sanitization. Existing generic markdown and hover components do not fulfill this wiring.
+- at: 2026-09-06T13:12:53.821924+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

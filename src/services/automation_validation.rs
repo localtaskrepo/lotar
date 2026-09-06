@@ -5,10 +5,33 @@ use crate::automation::types::{
 use crate::config::types::ResolvedConfig;
 use crate::config::validation::errors::{ValidationError, ValidationResult};
 use crate::types::{Priority, TaskStatus, TaskType};
+use std::time::Duration;
+
+pub(crate) fn parse_cooldown(value: &str) -> Option<Duration> {
+    let value = value.trim();
+    let unit = value.chars().last()?;
+    let multiplier = match unit {
+        's' => 1,
+        'm' => 60,
+        'h' => 3600,
+        'd' => 86400,
+        _ => return None,
+    };
+    let count = value.strip_suffix(unit)?.parse::<u64>().ok()?;
+    Some(Duration::from_secs(count.checked_mul(multiplier)?))
+}
 
 pub(crate) fn validate_rules(file: &AutomationFile, config: &ResolvedConfig) -> ValidationResult {
     let mut result = ValidationResult::new();
     for rule in file.automation.rules() {
+        if let Some(cooldown) = rule.cooldown.as_deref()
+            && parse_cooldown(cooldown).is_none()
+        {
+            result.add_error(ValidationError::error(
+                Some("automation.cooldown".to_string()),
+                "Cooldown must be a nonnegative integer followed by s, m, h, or d, within the supported duration range.".to_string(),
+            ));
+        }
         if let Some(group) = rule.when.as_ref() {
             validate_condition_group(group, config, &mut result);
         }

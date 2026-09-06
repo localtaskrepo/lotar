@@ -1,0 +1,52 @@
+title: Replace permissive test assertions and strengthen fixture invariants
+status: Todo
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-09-06T11:10:31.815608+00:00
+modified: 2026-09-06T11:29:34.263929+00:00
+relationships:
+  depends_on:
+  - DEV-76
+  related:
+  - DEV-11
+  - DEV-27
+  - DEV-28
+  - DEV-51
+  parent: DEV-53
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: T4 T6 T9 T13 T15.
+
+  Legacy suites accept either success/failure, cache tests change length instead of isolating mtime, addTask accepts an arbitrary new YAML path, drag-copy uses delays, and hover/filter tests assert no observable behavior. Require exact contracts and filesystem effects, equal-size deterministic mtime edits, exact ID/project/path correspondence, and DOM plus stored-membership assertions. DEV-53 already fixed vacuous SSE filters and automation 400 checks; do not count those as still broken. Include priority/due/effort command automation and commented-event coverage associated with DEV-11/27/28.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-76.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+  Acceptance: each rewritten regression fails when its guarded behavior is removed; assert exact exit/status, nonempty expected data and filesystem effects; same-length edits use deterministic mtime changes; CLI IDs match stored paths; drag-copy verifies both memberships; retain the already-repaired SSE and automation checks.
+tags:
+- audit-pass-2
+history:
+- at: 2026-09-06T11:29:34.263929+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: |-
+      DEV-53 second-pass audit follow-up.
+      Audit findings: T4 T6 T9 T13 T15.
+
+      Legacy suites accept either success/failure, cache tests change length instead of isolating mtime, addTask accepts an arbitrary new YAML path, drag-copy uses delays, and hover/filter tests assert no observable behavior. Require exact contracts and filesystem effects, equal-size deterministic mtime edits, exact ID/project/path correspondence, and DOM plus stored-membership assertions. DEV-53 already fixed vacuous SSE filters and automation 400 checks; do not count those as still broken. Include priority/due/effort command automation and commented-event coverage associated with DEV-11/27/28.
+
+      Related umbrella: DEV-53.
+      Prerequisites/coordination: DEV-76.
+      Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+    new: |-
+      DEV-53 second-pass audit follow-up.
+      Audit findings: T4 T6 T9 T13 T15.
+
+      Legacy suites accept either success/failure, cache tests change length instead of isolating mtime, addTask accepts an arbitrary new YAML path, drag-copy uses delays, and hover/filter tests assert no observable behavior. Require exact contracts and filesystem effects, equal-size deterministic mtime edits, exact ID/project/path correspondence, and DOM plus stored-membership assertions. DEV-53 already fixed vacuous SSE filters and automation 400 checks; do not count those as still broken. Include priority/due/effort command automation and commented-event coverage associated with DEV-11/27/28.
+
+      Related umbrella: DEV-53.
+      Prerequisites/coordination: DEV-76.
+      Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+      Acceptance: each rewritten regression fails when its guarded behavior is removed; assert exact exit/status, nonempty expected data and filesystem effects; same-length edits use deterministic mtime changes; CLI IDs match stored paths; drag-copy verifies both memberships; retain the already-repaired SSE and automation checks.

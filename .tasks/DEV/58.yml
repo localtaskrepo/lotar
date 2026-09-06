@@ -1,0 +1,19 @@
+title: Centralize REST domain-error to HTTP response mapping
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-63]
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.496121+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: S14.
+
+  Sibling task/sprint routes classify the same missing-resource, validation and I/O failures as different 400/404/500 responses. Use an exhaustive shared LoTaRError mapping and preserve documented error envelopes. Acceptance: table-driven create/get/update/delete/status/summary/burndown tests verify bad input, missing task/sprint, and server failures distinctly. Keep DEV-53 safety errors fail closed. Scope: routes/mod.rs and sibling handlers; document the contract.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

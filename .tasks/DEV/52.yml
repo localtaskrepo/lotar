@@ -5,7 +5,7 @@ type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-09-04T19:16:23.544759+00:00
-modified: 2026-09-05T05:17:07.595022+00:00
+modified: 2026-09-06T11:21:53.025323+00:00
 comments:
 - date: 2026-09-04T19:26:11.459882+00:00
   text: 'T1.1+T3 done: single cached config engine (resolution.rs) with (mtime,len) fingerprint validation; ConfigManager delegates to it; new config_for_project() replaces hand-rolled project fallbacks (task_service, automation_service, agent_job_service, routes/agents, cli/agent, effort.rs per-task loops); prefix-based cache invalidation covers per-project entries. Dead code removed: TaskEditor.vue+spec, Inbox.vue, read_to_string_opt, ConfigManager::new/new_with_tasks_dir, storage backend trait.'
@@ -17,6 +17,8 @@ comments:
   text: 'Review follow-up (post /review, all findings fixed): (1) MCP task/list @me now fails CLOSED with explicit -32002 error when identity unresolvable; REST parse_task_query errors likewise. (2) Identity precedence corrected: config > git > env > manifest (manifest is last-resort; auto_identity=false keeps Config+Env) — whoami/@me/stamping agree and no longer flip to package.json authors; cli_manifest_identity_test updated to pin new precedence. (3) Assignee matching normalized via fuzzy member_key (case/@/separator-insensitive) restoring documented openapi semantics on all surfaces; fuzzy norm strips leading @ so @alice≈alice everywhere. (4) Config project cache only caches existing project dirs + 256-entry hard cap (fixes unbounded growth via ?project=). (5) audit_service resolve_project_pathspec validates project filters (rejects traversal/nondirs) before git pathspecs. (6) resolve_task_filter_values shared in utils/custom_fields.rs replaces the 4 resolver copies (routes, CLI search, task selection, effort grouping); super_key_from_custom deleted. (7) DST-safe date offsets (offset_from_local_today snaps to local midnight). (8) useColumns/preferences/theme on utils/storage.ts + storageRemove; FilterBar removeItem migrated. (9) Dead bindings + redundant setLifecycleBusy calls removed. Gates: fmt, clippy -D warnings, vue-tsc, nextest 776/776, vitest 238/238, smoke 94 passed.'
 - date: 2026-09-05T05:17:07.595022+00:00
   text: 'Doc sync pass: docs/help+docs/developers identity/precedence/whoami pages updated to the new detector order (config > git > env > manifest-last-resort; auto.identity=false keeps config+env) and the single-resolver guarantee; due-date.md documents signed/ago offsets and DST-safe local date arithmetic; mcp.md/mcp-tools.md document the -32002 fail-closed @me error; openapi.json updated (tasks/add chain incl. manifest fallback, tasks/list+assignee param document 400 on unresolvable @me, tasks/export gains a description declaring filter parity with list, all four /api/activity project params document 400-on-invalid); api-quick-reference notes the same. Code harmonized to match docs: list_activity_feed + list_changed_tasks now validate project filters (previously silent fallback/empty), and all four activity route handlers map Unknown/Invalid project errors to 400 instead of 500. Stale src/routes.rs reference fixed to src/routes/whoami.rs. Gates: JSON valid, nextest 776/776, fmt, clippy -D warnings, vitest 238/238, smoke 94 passed/23 git-gated skips.'
+- date: 2026-09-06T11:21:53.025323+00:00
+  text: 'Backlog reconciliation: Committed as 4f0ac4b. Done covers the enumerated first duplication audit, not every correctness issue in these subsystems. DEV-53 and its extracted children own the second pass; DEV-81 covers remaining verified dead code. Do not reopen this completed consolidation wholesale.'
 description: 'Fix all findings from the 2026-09-04 duplication audit: T1 config/identity/date-grammar/tolerant-parse/cache-bypass; T2 comment mutation, filter building, git-log parsing, SprintsList column store, date/CSV helpers, tag-suggest, route sync; T3 dead code; T4 minor mechanical.'
 history:
 - at: 2026-09-04T19:16:23.565405+00:00
@@ -50,6 +52,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-09-05T05:17:07.595022+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.025323+00:00
   actor: mallox
   changes:
   - field: comment_added

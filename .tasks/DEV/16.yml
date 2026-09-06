@@ -4,3 +4,30 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.777846+00:00
+modified: 2026-09-06T13:12:54.042174+00:00
+comments:
+- date: 2026-09-06T11:21:52.685650+00:00
+  text: 'Backlog reconciliation: Remains Todo: depends_on and blocks are independently stored/edited. Confirm A.depends_on=B then B.blocks and edge removal in an isolated scenario; decide persisted versus derived inverse behavior. DEV-55/60 are related mutation foundations, not completion of reciprocal edges.'
+- date: 2026-09-06T13:12:54.042174+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 17: Should a depends_on autimatically create blocks reference on the other ticket?
+description: |-
+  Migrated checklist requirements:
+  Preserve this as a design question: should setting A.depends_on=B automatically create or derive B.blocks=A? Decide persistence versus derivation and removal behavior, then cover reciprocal consistency and partial-write failures. Current manual reciprocal backlog links do not implement automatic application behavior.
+history:
+- at: 2026-09-06T11:21:52.685650+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.031038+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Preserve this as a design question: should setting A.depends_on=B automatically create or derive B.blocks=A? Decide persistence versus derivation and removal behavior, then cover reciprocal consistency and partial-write failures. Current manual reciprocal backlog links do not implement automatic application behavior.
+- at: 2026-09-06T13:12:54.042174+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

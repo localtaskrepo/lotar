@@ -5,10 +5,12 @@ type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-30T16:15:05.015205+00:00
-modified: 2026-08-31T06:13:53.230947+00:00
+modified: 2026-09-06T11:21:52.912133+00:00
 comments:
 - date: 2026-08-31T06:13:53.206962+00:00
   text: 'Shipped unified filter toolbar (Option A+B) across Tasks/Board/Calendar: (1) New useFilterGrammar composable - key:value token parsing with aliases, quoted values, unknown-token passthrough, suggestion generation (keys before colon, option values after), and chip derivation. 15 unit tests. (2) FilterBar restructured into a compact bar (grammar search + active filter chips with x-removal + Clear all + Filters count badge + actions slot) with a collapsible panel holding smart chips and all classic controls. Enter parses tokens into structured filters (text stays as q); picking a value suggestion applies immediately. (3) Pages consolidated: Tasks (removed quick-row + top pagination + separate smart chips; bulk controls in actions slot), Board (group-by/WIP/done-column/Fields into actions slot), Calendar (Fields into actions slot). (4) Fixed latent state-loss bug: due/recent/needs filters were dropped on FilterBar re-emit. (5) Extras: ''/'' focuses search, live q mirror while typing, props-sync guarded by snapshot to stop effect-feedback clobbering. Verified live at 390px and 1280px on all three pages: 0 overflow, grammar pick->chip->URL flow, panel chips, badge, clear-all, slash shortcut. Gates: lint clean, vitest 217/217.'
+- date: 2026-09-06T11:21:52.912133+00:00
+  text: 'Backlog reconciliation: Historical Done retained for toolbar/grammar delivery. That does not establish CLI/REST/MCP filter-sort parity or terminal-state policy. New semantic audit findings are DEV-57 and existing DEV-21.'
 history:
 - at: 2026-08-30T16:15:05.047948+00:00
   actor: mallox
@@ -28,3 +30,7 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-09-06T11:21:52.912133+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

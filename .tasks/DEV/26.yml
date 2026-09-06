@@ -1,6 +1,42 @@
 title: 'BUG: Edit-tags row action breaks when tags column is hidden'
-status: Todo
+status: Done
 priority: Low
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.831119+00:00
+modified: 2026-09-06T13:12:54.243523+00:00
+comments:
+- date: 2026-09-06T11:21:52.407979+00:00
+  text: 'Backlog reconciliation: committed fix f5c94be addresses the edit-tags action when the tags column is hidden. smoke/tests/ui.edit-tags.smoke.spec.ts covers that exact scenario and passed in the prior safety-wave browser suite. This original bug is complete.'
+- date: 2026-09-06T13:12:54.243523+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 29: Tasks List list item action "edit tags" doesn't work when hiding the tags column
+description: |-
+  Migrated checklist requirements:
+  Already fixed in f5c94be and covered by the hidden-tags-column browser regression. Preserve Done; the migrated checklist is historical evidence, not a reopening.
+history:
+- at: 2026-09-06T11:21:52.407979+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:52.425113+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-09-06T13:12:54.232858+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Already fixed in f5c94be and covered by the hidden-tags-column browser regression. Preserve Done; the migrated checklist is historical evidence, not a reopening.
+- at: 2026-09-06T13:12:54.243523+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

@@ -1,0 +1,19 @@
+title: Make Git and platform test coverage explicit and validate safety cases
+status: Todo
+relationships:
+  parent: DEV-53
+  related: [DEV-46, DEV-47]
+priority: High
+type: Chore
+reporter: mallox
+created: 2026-09-06T11:10:31.848688+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: T7.
+
+  Build-time no_git_tests can silently remove suites, the smoke Git probe does not run git init, and unrelated cases are gated. Use a real isolated runtime capability probe, gate only dependent tests, and require Git support in designated CI. Execute the six DEV-53 Git safety cases and Windows atomic-replacement/permission and non-Unix scan-lock cases on supported runners; report exclusions honestly. Acceptance: no broad false-green coverage holes and platform results recorded. Prior DEV-46/47 work is not proof runtime gating is complete.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

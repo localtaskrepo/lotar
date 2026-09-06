@@ -1,0 +1,19 @@
+title: Remove verified orphan UI CLI and test infrastructure after consolidation
+status: Todo
+relationships:
+  parent: DEV-53
+  related: [DEV-52]
+priority: Medium
+type: Chore
+reporter: mallox
+created: 2026-09-06T11:10:31.881622+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: C15 U15 T14.
+
+  Reverify callers then remove orphan SprintBacklog/TaskRow/QuickHelp/ConfigSync/AuthProfiles surfaces, unused API/TaskTable contracts, shadow CLI args/index/sort exports, duplicate scan/stats/list suites, unused common helpers and the hard-coded-pass test framework. Acceptance: no public/shipped interface is removed without compatibility review, active route behavior is unchanged, and full gates cover the canonical implementations. DEV-52 removals are already done; this ticket is the second-pass remainder.
+
+  Related umbrella: DEV-53.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

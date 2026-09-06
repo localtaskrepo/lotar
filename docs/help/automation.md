@@ -191,14 +191,14 @@ on:
 
 ## Cooldown
 
-Actions that resolve to the same event can trigger further automation. To prevent infinite loops, rules enforce a configurable cooldown window and a maximum iteration count (`max_iterations`, default 5). If a rule has already fired for the same task within the cooldown period, subsequent matches are skipped.
+Actions that resolve to the same event can trigger further automation. To prevent infinite loops, rules support a cooldown window and a maximum iteration count (`max_iterations`, default 10). Set `cooldown` to a nonnegative integer followed by `s`, `m`, `h`, or `d`, such as `30s` or `5m`; `0s` permits immediate firing. Invalid or overflowing durations are rejected when saving through LoTaR. If malformed cooldowns are introduced by hand-editing YAML, those rules are skipped rather than disabling loop protection. If a rule has already fired for the same task within the cooldown period, subsequent matches are skipped.
 
 ## Simulating rules
 
 Use `lotar automation simulate` to test what actions a rule change would produce without applying them:
 
 ```bash
-lotar automation simulate --task PROJ-1
+lotar automation simulate --ticket PROJ-1
 ```
 
 ## Validation

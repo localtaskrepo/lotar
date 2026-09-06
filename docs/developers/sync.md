@@ -43,7 +43,30 @@ References are stored as typed reference entries on the task (see `ReferenceEntr
 Behavior:
 - Pull: if a remote issue has no matching local reference, create a new local task and attach the platform reference.
 - Push: if a local task has no platform reference, create a remote issue and attach the platform reference.
-- If the reference is removed locally, a subsequent push creates a new remote issue (by definition, the reference is the source-of-truth for link identity).
+- If the reference is removed locally after a completed sync, a subsequent push creates a new remote issue (by definition, the reference is the source-of-truth for link identity). An unfinished creation is reconciled first, not recreated.
+
+### Creation recovery
+
+Sync serializes mutating runs within a tasks workspace using `.tasks/.sync-pending.lock` (an OS file lock released when the process exits). Remote aliases and push/pull share this lock. Tasks outside that workspace are not eligible for creation/link recovery. This does not lock out ordinary task editors or coordinate separate workspace copies.
+
+Before creating a Jira/GitHub issue or importing a local task, sync persists an intent in `.tasks/.sync-pending.json`. After creation returns, it persists the returned reference/task ID before attaching the platform reference. Journal writes and the linked task are synced to disk before the recovery entry is removed. This journal is required even when optional reports are disabled; do not delete it to clear a sync error.
+
+A retry reconciles known IDs before selecting tasks or indexing references, including task-targeted retries. Recovery is scoped by local project, provider, API endpoint hash, and remote project/repository; remote aliases with identical identity can recover the same operation. A conflicting endpoint/repository or existing reference fails closed instead of attaching across scopes. The journal stores no auth headers/tokens or task bodies; the endpoint is hashed rather than stored as a URL.
+
+Task identity is the file resolved by the current storage lookup, not the raw request string. Storage aliases such as `TEST-01`, `TEST-+1`, and `TEST-1-extra` all key the same `TEST-1` operation. Target selection, new intents, and loaded journal entries are canonicalized before comparison; unknown or invalid stored task IDs block recovery rather than being skipped. Canonicalization during a dry run is in-memory only.
+
+There is no atomic transaction between a remote server and local storage. If creation fails or the process stops after creation but before its returned ID is journaled, sync reports **Indeterminate sync creation** and will not create again automatically. This also applies when local task creation commits but fails before returning an ID. Even an apparently rejected create is treated conservatively.
+
+To recover an indeterminate operation:
+
+1. Stop sync runs and back up the pending journal. Keep the original project, remote destination, and auth endpoint configuration.
+2. Inspect the remote issues and local tasks to establish whether creation committed. Do not infer identity from title similarity alone.
+3. If it committed, fill only the missing `task_id` or `reference` in the matching JSON entry with the verified ID. Retry the same project/remote to attach the reference. Resolve any conflicting local reference explicitly first.
+4. Remove an intent only after verifying that creation did not occur. If the outcome remains uncertain, keep it blocked. Never delete a remote issue as blind compensation.
+
+Recovery guarantees depend on keeping the journal with its workspace and on filesystem locking/fsync support. A read-only task or directory is checked before remote creation, but concurrent non-sync edits and later I/O failures can still cause linking to fail; the returned identity remains recoverable. Dry runs do not acquire/create the lock, persist recovery state, attach references, write reports, or mutate the remote. Pull dry runs still read remote data; push dry runs without resolved auth warn that pending recovery is not reconciled.
+
+The shared atomic writer syncs its temporary file before publishing and never deletes the old journal to retry a failed replacement. Sync additionally fsyncs parent directories on Unix after publication and before forgetting a durable task link. Portable `std::fs` does not provide directory fsync on Windows; Windows power-loss durability is not claimed or runtime-verified by the macOS regression tests.
 
 ## Config structure
 
@@ -172,8 +195,7 @@ How to get GitHub values:
 
 - Each sync run returns a summary plus per-task results (created/updated/skipped/failed).
 - `--dry-run` returns the same report without applying changes.
-- Failures are non-fatal to the overall run unless `--strict` is introduced later.
+- Per-task failures are normally non-fatal to the overall run. Invalid/indeterminate recovery state and concurrent sync runs abort safely with an actionable error.
 - Sync runs emit SSE progress events (`sync_started`, `sync_progress`, `sync_completed`, `sync_failed`) so the UI can show live status.
-- Reports are persisted to disk (default `.tasks/@reports`) when `sync.write_reports` is enabled; disable by setting `sync.write_reports: false`.
+- Non-dry-run reports are persisted to disk (default `.tasks/@reports`) when `sync.write_reports` is enabled; disable by setting `sync.write_reports: false`. Filenames include a bounded, sanitized run ID and use exclusive creation with a numeric collision suffix. Identical timestamps, repeated client IDs, sanitization collisions, and existing files never overwrite earlier reports. Original IDs remain unchanged inside reports; slashes and other unsafe filename characters are not used in paths.
 - REST helpers: `GET /api/sync/reports/list` and `GET /api/sync/reports/get?path=<relative>`.
-

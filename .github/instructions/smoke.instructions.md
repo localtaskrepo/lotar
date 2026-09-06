@@ -22,5 +22,5 @@ If you hit environment/binary/server/port issues, switch to the `smoke-suite-deb
 
 ## CI parity notes
 
-- Smoke expects a built binary and web assets (release binary + `target/web`).
-- CI may set `LOTAR_BINARY_PATH` to point at `target/release/lotar`.
+- `npm run smoke` builds profile `smoke` and embeds compressed SPA assets from `target/web-embed`.
+- The harness prefers `target/smoke/lotar`, then `target/release/lotar`; `LOTAR_BINARY_PATH` can override the binary.

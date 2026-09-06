@@ -1,0 +1,22 @@
+title: Repair REST OpenAPI and quick-reference request and response contracts
+status: Todo
+relationships:
+  parent: DEV-53
+  blocks: [DEV-83]
+  depends_on: [DEV-54, DEV-61]
+  related: [DEV-49]
+priority: High
+type: Bug
+reporter: mallox
+created: 2026-09-06T11:10:31.898132+00:00
+description: |-
+  DEV-53 second-pass audit follow-up.
+  Audit findings: D5 D6 D7 D11.
+
+  Quick reference has the wrong task-list envelope; sprint create/update bodies are missing and delete body is wrong; attachment payloads are unspecified; automation simulate advertises change instead of required event. Reference typed components and add semantic contract tests beyond route existence. Acceptance: generated/example requests deserialize and response examples match populated/empty output; Rust/TS/OpenAPI/help stay aligned. General README/help drift remains DEV-17.
+
+  Related umbrella: DEV-53.
+  Prerequisites/coordination: DEV-54, DEV-61.
+  Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
+tags:
+- audit-pass-2

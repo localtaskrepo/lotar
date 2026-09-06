@@ -43,7 +43,7 @@ function pickArray(obj: any, path: string[], fallback: string[] = []): string[] 
   return fallback
 }
 
-export function useConfig() {
+export function useConfig(options: { throwOnError?: boolean } = {}) {
   const currentProject = ref<string>('')
   const defaults = reactive<ConfigDefaults>({
     project: '',
@@ -75,6 +75,7 @@ export function useConfig() {
       const projParam = project && project.trim().length > 0 ? project : undefined
       return api.showConfig(projParam)
     },
+    { throwOnError: options.throwOnError },
   )
 
   const cfg = computed<any>(() => cfgResource.data.value ?? null)
@@ -169,6 +170,8 @@ export function useConfig() {
   async function refresh(project?: string) {
     const trimmed = project ? String(project).trim() : ''
     currentProject.value = trimmed
+    cfgResource.reset()
+    resetState()
     await cfgResource.refresh(trimmed || undefined)
   }
 

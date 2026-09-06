@@ -45,7 +45,7 @@
             <input type="checkbox" :checked="bulk" @change="onToggleBulkFromToolbar($event)" />
             Bulk select
           </label>
-          <span v-if="bulk" class="muted tasks-quick-row__selected">Selected: {{ selectedIds.length }} / {{ shownTasks.length }}</span>
+          <span v-if="bulk" class="muted tasks-quick-row__selected" title="Selection is preserved across pages, and cleared when filters change.">Selected: {{ selectedIds.length }} / {{ totalCount }}</span>
           <div v-if="bulk" class="bulk-menu-wrapper">
             <UiButton
               icon-only
@@ -134,7 +134,7 @@
       <TaskTable
         v-else
         :tasks="shownTasks"
-        :loading="loading"
+        :loading="loading || !selectionReady"
         :statuses="statuses"
         :selectable="bulk"
         :selected-ids="selectedIds"
@@ -533,7 +533,14 @@ type PagingUpdate = {
   resetOffset?: boolean
 }
 
+let filterGeneration = 0
+let hydrateQueue: Promise<void> = Promise.resolve()
+const loadedFilterGeneration = ref(-1)
+const selectionReady = computed(() => loadedFilterGeneration.value === filterGeneration && !loading.value && !error.value)
+
 async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', paging: PagingUpdate = {}) {
+  const request = ++filterGeneration
+  loadedFilterGeneration.value = -1
   if (disposed) return
   const onTasksRoute = router.currentRoute.value.path === '/'
   if (!onTasksRoute) return
@@ -579,12 +586,18 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   builtFilter.order = qnorm.order
   const serverFilter: any = builtFilter
 
-  if (disposed) return
-
+  if (disposed || request !== filterGeneration) return
   await refreshConfig(serverFilter.project)
-  if (disposed) return
-  await store.hydrateAll(serverFilter, { clear: true })
-  if (disposed) return
+  if (disposed || request !== filterGeneration) return
+  // The shared store has no cancellation contract. Serialize our hydrations so
+  // an older query cannot replace a newer result after selection is enabled.
+  hydrateQueue = hydrateQueue.catch(() => {}).then(async () => {
+    if (disposed || request !== filterGeneration) return
+    await store.hydrateAll(serverFilter, { clear: true })
+  })
+  await hydrateQueue
+  if (disposed || request !== filterGeneration) return
+  if (!error.value) loadedFilterGeneration.value = request
 
   const currentTotal = totalCount.value
   if (currentTotal > 0 && pageOffset.value >= currentTotal) {
@@ -646,7 +659,12 @@ type BulkMenuButtonRef = HTMLElement | (ComponentPublicInstance & { $el: HTMLEle
 const bulkMenuButton = ref<BulkMenuButtonRef | null>(null)
 const bulkMenuPopover = ref<HTMLElement | null>(null)
 
-const disableBulkActions = computed(() => !selectedIds.value.length)
+const scopedSelection = computed(() => {
+  if (!selectionReady.value) return []
+  const ids = new Set(store.items.value.filter(task => !filter.value.project || projectOf(task.id) === filter.value.project).map(task => task.id))
+  return selectedIds.value.filter(id => ids.has(id))
+})
+const disableBulkActions = computed(() => !scopedSelection.value.length)
 const disableSprintActions = computed(() => disableBulkActions.value || sprintsLoading.value || !hasSprints.value)
 
 function onToggleBulkFromToolbar(event: Event) {
@@ -689,7 +707,9 @@ function handleBulkAction(action: BulkMenuAction) {
 }
 
 function setSelectedIds(value: string[]) {
-  selectedIds.value = Array.isArray(value) ? [...value] : []
+  if (!selectionReady.value) return
+  const allowed = new Set([...selectedIds.value, ...shownTasks.value.map(task => task.id)])
+  selectedIds.value = Array.isArray(value) ? [...new Set(value)].filter(id => allowed.has(id)) : []
 }
 
 const ASSIGNEE_STORAGE_KEY = 'lotar.tasks.assign.last'
@@ -715,6 +735,7 @@ const assignDialogTitle = computed(() =>
 )
 
 function openAssignDialog(ids: string[], mode: 'single' | 'bulk') {
+  if (assignDialogSubmitting.value) return
   const unique = Array.from(new Set(ids))
   if (!unique.length) {
     showToast('Select at least one task first')
@@ -743,13 +764,14 @@ function useAssignShortcut(value: string) {
 }
 
 async function applyAssignment(ids: string[], assignee: string) {
+  const scope = filterGeneration
   const unique = Array.from(new Set(ids))
   const failures: Array<{ id: string; error: unknown }> = []
   let success = 0
   for (const id of unique) {
     try {
       const updated = await api.updateTask(id, { assignee })
-      store.upsert(updated)
+      if (scope === filterGeneration) store.upsert(updated)
       success += 1
     } catch (error) {
       failures.push({ id, error })
@@ -759,7 +781,7 @@ async function applyAssignment(ids: string[], assignee: string) {
 }
 
 async function submitAssignDialog() {
-  if (assignDialogSubmitting.value) return
+  if (assignDialogSubmitting.value || !assignDialogOpen.value || !assignDialogIds.value.length) return
   const input = (assignInputValue.value || '').trim()
   if (!input) {
     showToast('Enter an assignee or use @me')
@@ -795,17 +817,18 @@ function openSingleAssign(id: string) {
 }
 
 function openBulkAssign() {
-  openAssignDialog(selectedIds.value, 'bulk')
+  openAssignDialog(scopedSelection.value, 'bulk')
 }
 
 async function unassignTasks(ids: string[]) {
+  const scope = filterGeneration
   const unique = Array.from(new Set(ids))
   const failures: Array<{ id: string; error: unknown }> = []
   let success = 0
   for (const id of unique) {
     try {
       const updated = await api.updateTask(id, { assignee: '' as any })
-      store.upsert(updated)
+      if (scope === filterGeneration) store.upsert(updated)
       success += 1
     } catch (error) {
       failures.push({ id, error })
@@ -825,11 +848,11 @@ async function unassignOne(id: string) {
 }
 
 async function bulkUnassign() {
-  if (!selectedIds.value.length) {
+  if (!scopedSelection.value.length) {
     showToast('Select at least one task first')
     return
   }
-  await unassignTasks(selectedIds.value)
+  await unassignTasks(scopedSelection.value)
 }
 
 function parseSprintToken(token: string): number | string | undefined {
@@ -924,6 +947,7 @@ const sprintDialogTitle = computed(() =>
 )
 
 function openSprintDialog(ids: string[], mode: 'add' | 'remove') {
+  if (sprintDialogSubmitting.value) return
   const unique = Array.from(new Set(ids))
   if (!unique.length) {
     showToast('Select at least one task first')
@@ -946,7 +970,7 @@ function closeSprintDialog(force?: boolean | Event) {
 }
 
 async function submitSprintDialog() {
-  if (sprintDialogSubmitting.value) return
+  if (sprintDialogSubmitting.value || !sprintDialogOpen.value || !sprintDialogIds.value.length) return
   if (!sprintOptions.value.length) {
     showToast('No sprints available yet')
     return
@@ -975,11 +999,11 @@ function openSingleSprintRemove(id: string) {
 }
 
 function openBulkSprintAdd() {
-  openSprintDialog(selectedIds.value, 'add')
+  openSprintDialog(scopedSelection.value, 'add')
 }
 
 function openBulkSprintRemove() {
-  openSprintDialog(selectedIds.value, 'remove')
+  openSprintDialog(scopedSelection.value, 'remove')
 }
 
 const deleteDialogOpen = ref(false)
@@ -994,6 +1018,7 @@ const deleteDialogTitle = computed(() =>
 )
 
 function openDeleteDialog(ids: string[], mode: 'single' | 'bulk') {
+  if (deleteDialogSubmitting.value) return
   const unique = Array.from(new Set(ids))
   if (!unique.length) {
     showToast('Select at least one task first')
@@ -1012,6 +1037,7 @@ function closeDeleteDialog(force?: boolean | Event) {
 }
 
 async function deleteTasks(ids: string[]) {
+  const scope = filterGeneration
   const unique = Array.from(new Set(ids))
   const failures: Array<{ id: string; error: unknown }> = []
   let success = 0
@@ -1019,7 +1045,7 @@ async function deleteTasks(ids: string[]) {
     try {
       await store.remove(id)
       success += 1
-      selectedIds.value = selectedIds.value.filter((value) => value !== id)
+      if (scope === filterGeneration) selectedIds.value = selectedIds.value.filter((value) => value !== id)
     } catch (error) {
       failures.push({ id, error })
     }
@@ -1028,7 +1054,7 @@ async function deleteTasks(ids: string[]) {
 }
 
 async function submitDeleteDialog() {
-  if (deleteDialogSubmitting.value) return
+  if (deleteDialogSubmitting.value || !deleteDialogOpen.value || !deleteDialogIds.value.length) return
   deleteDialogSubmitting.value = true
   try {
     const { success, failures } = await deleteTasks(deleteDialogIds.value)
@@ -1050,7 +1076,7 @@ function openSingleDelete(id: string) {
 }
 
 function openBulkDelete() {
-  openDeleteDialog(selectedIds.value, 'bulk')
+  openDeleteDialog(scopedSelection.value, 'bulk')
 }
 
 const { refresh: refreshProjects } = useProjects()
@@ -1152,6 +1178,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disposed = true
+  filterGeneration += 1
+  if (debounceTimer) clearTimeout(debounceTimer)
   if (refreshTimer) {
     clearTimeout(refreshTimer)
     refreshTimer = null
@@ -1203,6 +1231,7 @@ watch(
   () => route.query,
   (query) => {
     if (disposed || suppressRouteSync) return
+    if (debounceTimer) clearTimeout(debounceTimer)
 
     const nextOffset = clampOffset(queryInt((query as any).offset, pageOffset.value))
     const nextFilter = Object.fromEntries(
@@ -1223,6 +1252,7 @@ watch(
       console.warn('Failed to apply route query filter', err)
     })
   },
+  { flush: 'sync' },
 )
 
 let stopPreferencesListener: null | (() => void) = null
@@ -1243,6 +1273,16 @@ onMounted(() => {
 // Debounced fetch on any filter change; also sync URL and config
 let debounceTimer: any = null
 
+watch(() => JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => a.localeCompare(b))), () => {
+  filterGeneration += 1
+  loadedFilterGeneration.value = -1
+  selectedIds.value = []
+  closeBulkMenu()
+  closeAssignDialog(true)
+  closeSprintDialog(true)
+  closeDeleteDialog(true)
+}, { flush: 'sync' })
+
 watch(filter, (q) => {
   if (suppressFilterWatch) return
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -1252,7 +1292,7 @@ watch(filter, (q) => {
       console.warn('Failed to apply filter', err)
     })
   }, 150)
-}, { deep: true })
+}, { deep: true, flush: 'sync' })
 
 const openCreate = () => {
   openTaskPanel({

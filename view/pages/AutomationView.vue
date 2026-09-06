@@ -16,7 +16,7 @@
           Open config
         </UiButton>
         <ReloadButton
-          :disabled="loading"
+          :disabled="loading || savingRules"
           :loading="loading"
           label="Refresh automations"
           title="Refresh automations"
@@ -183,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type {
@@ -212,7 +212,9 @@ const projects = ref<ProjectDTO[]>([])
 const projectsError = ref('')
 const configData = ref<ConfigInspectResult | null>(null)
 const router = useRouter()
-const rulesDirty = computed(() => scopeYaml.value !== baselineYaml.value)
+const loadedScope = ref<string | null>(null)
+let generation = 0
+const rulesDirty = computed(() => loadedScope.value === project.value && !loading.value && !error.value && scopeYaml.value !== baselineYaml.value)
 
 const availableStatuses = computed(() => configData.value?.effective.issue_states ?? [])
 const availablePriorities = computed(() => configData.value?.effective.issue_priorities ?? [])
@@ -247,43 +249,54 @@ function openConfig() {
 }
 
 async function refresh() {
+  const scope = project.value
+  const request = ++generation
+  loadedScope.value = null
+  savingRules.value = false
   loading.value = true
   error.value = ''
   rulesSaveError.value = ''
   try {
     const [automationResponse, configResponse] = await Promise.all([
-      api.inspectAutomation(project.value || undefined),
-      api.inspectConfig(project.value || undefined).catch(() => null),
+      api.inspectAutomation(scope || undefined),
+      api.inspectConfig(scope || undefined).catch(() => null),
     ])
+    if (request !== generation) return
     automationSource.value = automationResponse.source || ''
     scopeYaml.value = automationResponse.scope_yaml || ''
     effectiveYaml.value = automationResponse.effective_yaml || ''
     baselineYaml.value = automationResponse.scope_yaml || ''
     configData.value = configResponse
+    loadedScope.value = scope
   } catch (err) {
+    if (request !== generation) return
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
-    loading.value = false
+    if (request === generation) loading.value = false
   }
 }
 
 async function saveRules() {
-  if (!rulesDirty.value) return
+  if (!rulesDirty.value || savingRules.value) return
+  const scope = project.value
+  const request = generation
   savingRules.value = true
   rulesSaveError.value = ''
   try {
     const response = await api.setAutomation({
       yaml: scopeYaml.value,
-      project: project.value || undefined,
+      project: scope || undefined,
     })
+    if (request !== generation) return
     if (response.errors?.length) {
       throw new Error(response.errors.join('\n'))
     }
     await refresh()
   } catch (err) {
+    if (request !== generation) return
     rulesSaveError.value = err instanceof Error ? err.message : String(err)
   } finally {
-    savingRules.value = false
+    if (request === generation) savingRules.value = false
   }
 }
 
@@ -335,7 +348,8 @@ onMounted(() => {
 
 watch(project, () => {
   void refresh()
-})
+}, { flush: 'sync' })
+onUnmounted(() => { generation += 1 })
 </script>
 
 <style scoped>

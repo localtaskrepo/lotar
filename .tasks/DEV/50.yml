@@ -5,12 +5,18 @@ type: Task
 reporter: mallox
 assignee: mallox
 created: 2026-09-04T14:45:00.000000+00:00
-modified: 2026-09-04T18:22:59.847654+00:00
+modified: 2026-09-06T11:21:53.002728+00:00
 comments:
 - date: 2026-09-04T18:22:59.847654+00:00
   text: 'TEST SPEED: incremental cargo-nextest loop went 77s -> 13s by setting split-debuginfo=unpacked on the ci (and smoke) profiles - macOS was extracting dSYM debug info into every one of ~100 test binaries on each rebuild; keeping debug info in object files removes the dominant link cost with no assertion-quality loss. APP TRANSFER+MEMORY: web assets now ship pre-compressed (scripts/compress-web.mjs wired into build:web, level-9 gzip; bundle 1179KiB -> 332KiB = 72% smaller). web_server serves the .gz variant to Accept-Encoding: gzip clients (1060KB -> 317KB on the wire for the JS bundle), adds Vary: Accept-Encoding, immutable Cache-Control for content-hashed /assets/* and no-cache for HTML entry points - repeat visits now load from browser cache. Request header map now normalized to lowercase (was case-sensitive; Accept-Encoding lookups silently missed before). Fixed a header-framing bug caught by the smoke suite where the restructured response lost the blank line between headers and body (curl tolerated it, Chromium/Node rejected with ERR_INVALID_HTTP_RESPONSE). sysinfo trimmed to just the system feature and System::new_all() -> System::new() + refresh_processes: agent job cleanup no longer enumerates disks/networks/components/users (runtime memory + latency). Release binary ~6.3MB net-neutral (gz assets +330KB offset by sysinfo trim; size is code-dominated, not asset-dominated). Gates: lint clean, nextest 777/777, vitest 241/241 (~3s wall), smoke 94/94 with Chromium exercising the gzip path.'
+- date: 2026-09-06T11:21:53.002728+00:00
+  text: 'Backlog reconciliation: Historical Done retained for sysinfo/build/asset improvements. The 6x/size figures are prior measurements, not new benchmarks. DEV-51 superseded dual-asset embedding; DEV-78 owns current performance-test discipline.'
 history:
 - at: 2026-09-04T18:22:59.847654+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T11:21:53.002728+00:00
   actor: mallox
   changes:
   - field: comment_added

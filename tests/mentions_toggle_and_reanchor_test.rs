@@ -75,7 +75,7 @@ fn scan_does_not_add_reference_when_mentions_disabled() {
 }
 
 #[test]
-fn scan_reanchor_flag_prunes_cross_file_anchors() {
+fn scan_reanchor_flag_preserves_cross_file_anchors() {
     let tf = TestFixtures::new();
     let root = tf.temp_dir.path();
 
@@ -108,7 +108,7 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
     assert!(yaml_norm.contains("code: a.rs#1"));
     assert!(yaml_norm.contains("code: nested/b.rs#1"));
 
-    // Now run with --reanchor: only the newest occurrence should remain
+    // Reanchor replaces stale locations within a file, not references in other files.
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(root)
@@ -116,10 +116,8 @@ fn scan_reanchor_flag_prunes_cross_file_anchors() {
         .assert()
         .success();
     let yaml2 = fs::read_to_string(&task_file).unwrap().replace('\\', "/");
-    // We only assert that at most one anchor remains. It should be for whichever scan processed last
     let count = yaml2.matches("code:").count();
-    assert!(
-        count <= 1,
-        "expected reanchor to prune to a single anchor, got {count}: {yaml2}"
-    );
+    assert_eq!(count, 2, "both live file anchors must remain: {yaml2}");
+    assert!(yaml2.contains("code: a.rs#1"));
+    assert!(yaml2.contains("code: nested/b.rs#1"));
 }

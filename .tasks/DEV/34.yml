@@ -5,12 +5,16 @@ type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-08-26T17:59:27.403005+00:00
-modified: 2026-08-27T02:48:36.351234+00:00
+modified: 2026-09-06T13:16:31.857468+00:00
 comments:
 - date: 2026-08-26T17:59:27.450056+00:00
   text: 'Plan: (1) confirm columns dialog actually opens on TasksList page header click. Likely bug: page-header Columns button calls taskTableRef?.toggleColumnMenu() but TaskTable is unmounted in EmptyState -> no-op. Fix: lift showColumnMenu state to TasksList so the popover works regardless of TaskTable mount. (2) Widen ColKey/columns options to include declared custom fields per project config (TODO #27). (3) Stop duplicating comment body into history changelog (TODO #25) and update TODO.md line.'
 - date: 2026-08-27T02:48:36.326558+00:00
   text: 'Shipped: (1) columns dialog now actually opens in TasksList - lifted showColumnMenu state into the page (composable useColumns drives the popover anchored to the page-header Columns button), so it works in EmptyState/error states where TaskTable is unmounted. (2) Custom fields show up as columns: ColKey union widened to include custom:<name>, populated from useConfig customFieldKeys, filtered to drop the ''*'' wildcard, with cell rendering for t.custom_fields[key]. (3) Fixed TODO #25: add_comment no longer mirrors the comment body into the history changelog; instead records a comment_added marker with no body. (4) Updated TODO.md #25 line. Tests: new useColumns.spec.ts (5 cases), new comment_task_parity_test case verifying history has comment_added and no body. Verified live: popover opens with both built-in and custom-field checkboxes (sprint, iteration); toggling adds a column header and renders the value cell. Gates: lint clean, nextest 773/775 (2 = env-flaky agent suite), vitest 191/192 (1 = pre-existing TaskTable test on pristine HEAD), smoke green for all non-browser specs.'
+- date: 2026-09-06T11:21:52.832765+00:00
+  text: 'Backlog reconciliation: Original column-options/value-rendering and comment-history fixes remain complete. Reconciled stale DEV-22 and DEV-24 to Done with this evidence. Later menu/hover consolidation is DEV-35/37/38/52; remaining bulk-comment/reference events are DEV-60.'
+- date: 2026-09-06T13:16:31.857468+00:00
+  text: 'Checklist retirement: historical TODO.md line 25 now maps to DEV-22 (bodyless comment history), and line 27 to DEV-24 (custom-field columns), with original fix lineage retained. The checklist file has been removed after full ticket migration. Earlier comments and history remain unchanged as provenance, not active references to a current backlog file.'
 history:
 - at: 2026-08-26T17:59:27.442353+00:00
   actor: mallox
@@ -35,3 +39,11 @@ history:
   - field: status
     old: InProgress
     new: Done
+- at: 2026-09-06T11:21:52.832765+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:16:31.857468+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

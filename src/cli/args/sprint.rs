@@ -403,7 +403,7 @@ pub struct SprintDeleteArgs {
         conflicts_with = "sprint_id"
     )]
     pub sprint: Option<u32>,
-    /// Skip the interactive confirmation prompt
+    /// Confirm deletion; required with JSON output or non-interactive input
     #[arg(long)]
     pub force: bool,
     /// Automatically remove dangling sprint references after deleting the sprint

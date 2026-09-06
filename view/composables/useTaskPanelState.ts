@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref } from 'vue'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import { showToast } from '../components/toast'
@@ -70,8 +70,18 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         defaults,
         attachmentsDir,
         members,
-        refresh: refreshConfig,
-    } = useConfig()
+        refresh: refreshConfigResource,
+    } = useConfig({ throwOnError: true })
+
+    const panelGeneration = ref(0)
+    const loadedConfigScope = ref<string | null>(null)
+    let configGeneration = 0
+    async function refreshConfig(project: string) {
+        const request = ++configGeneration
+        loadedConfigScope.value = null
+        await refreshConfigResource(project)
+        if (request === configGeneration) loadedConfigScope.value = project
+    }
 
     const statusOptions = computed(() => statuses.value ?? [])
     const priorityOptions = computed(() => priorities.value ?? [])
@@ -104,6 +114,8 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         tags: [] as string[],
         sprints: [] as number[],
     })
+    const canCreate = computed(() => props.open && mode.value === 'create' && ready.value &&
+        !loading.value && !submitting.value && !!form.project.trim() && loadedConfigScope.value === form.project)
 
     const {
         hoveredReferenceCode,
@@ -363,7 +375,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         applyTask,
         projectForSuggestions: projectForSuggestionsFromLifecycle,
         ensureProjectsLoaded,
-        onProjectChange,
+        onProjectChange: onProjectChangeFromLifecycle,
     } = useTaskPanelFormLifecycle({
         mode,
         ready,
@@ -403,41 +415,67 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         refreshConfig,
     })
 
-    const cleanup = lifecycleCleanup
+    const cleanup = () => {
+        panelGeneration.value += 1
+        configGeneration += 1
+        loadedConfigScope.value = null
+        ready.value = false
+        submitting.value = false
+        lifecycleCleanup()
+    }
+    onScopeDispose(cleanup)
+
+    function onProjectChange() {
+        if (mode.value !== 'create') return
+        panelGeneration.value += 1
+        submitting.value = false
+        onProjectChangeFromLifecycle()
+    }
 
     projectForSuggestionsImpl = projectForSuggestionsFromLifecycle
 
     bindCommentApplyTask(applyTask)
 
     async function initialize() {
+        const request = ++panelGeneration.value
+        const taskId = props.taskId
+        const current = () => props.open && request === panelGeneration.value
         ready.value = false
         submitting.value = false
         loading.value = mode.value === 'edit'
         resetErrors()
         resetForm()
-        if (mode.value === 'create') {
+        try {
             await ensureProjectsLoaded()
-            const scopeProject =
-                props.initialProject ||
-                defaults.value.project ||
-                projects.value[0]?.prefix ||
-                ''
-            await refreshConfig(scopeProject)
-            applyDefaults(scopeProject)
-            if (props.initialStatus && (statuses.value || []).includes(props.initialStatus)) {
-                form.status = props.initialStatus
+            if (!current()) return
+            if (mode.value === 'create') {
+                const scopeProject =
+                    props.initialProject ||
+                    defaults.value.project ||
+                    projects.value[0]?.prefix ||
+                    ''
+                form.project = scopeProject
+                await refreshConfig(scopeProject)
+                if (!current() || form.project !== scopeProject || loadedConfigScope.value !== scopeProject) return
+                applyDefaults(scopeProject)
+                if (props.initialStatus && (statuses.value || []).includes(props.initialStatus)) {
+                    form.status = props.initialStatus
+                }
+                if (props.initialDueDate) {
+                    form.due_date = props.initialDueDate
+                }
+                ready.value = true
+                loading.value = false
+            } else if (taskId) {
+                await loadTask(taskId)
+            } else {
+                ready.value = true
+                loading.value = false
             }
-            if (props.initialDueDate) {
-                form.due_date = props.initialDueDate
-            }
+        } catch (error: unknown) {
+            if (!current()) return
+            errors.config = error instanceof Error ? error.message : 'Failed to initialize task'
             loading.value = false
-            ready.value = true
-        } else if (props.taskId) {
-            await loadTask(props.taskId)
-            ready.value = true
-        } else {
-            loading.value = false
-            ready.value = true
         }
     }
 
@@ -459,6 +497,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     }
 
     function closePanel() {
+        cleanup()
         emit('close')
     }
 
@@ -471,6 +510,9 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         reloadTask: reloadTaskFromPersistence,
         loadTask: loadTaskFromPersistence,
     } = useTaskPanelPersistence({
+        panelGeneration,
+        getTaskId: () => props.taskId,
+        canCreate,
         mode,
         task,
         form,
@@ -547,6 +589,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         loading,
         submitting,
         ready,
+        canCreate,
         suppressWatch,
         task,
         form,

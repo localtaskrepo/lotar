@@ -15,7 +15,7 @@ Avoid "missing context" by making skill discovery a deliberate first step. The c
 ## Procedure
 
 1. **Identify the domain(s)** you'll touch:
-   - Rust backend: CLI (`src/cli/`), server/API (`src/api_server.rs`, `src/web_server.rs`, `src/routes.rs`), storage (`src/storage/`), config, scanner.
+   - Rust backend: CLI (`src/cli/`), server/API (`src/api_server.rs`, `src/web_server.rs`, `src/routes/`), storage (`src/storage/`), config, scanner.
    - Frontend: Vue UI under `view/`.
    - Smoke: end-to-end harness under `smoke/`.
    - Docs/contracts: `docs/openapi.json`, `docs/help/*`.

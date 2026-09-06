@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use serde_yaml_ng::Value as Yaml;
 
 use super::ConfigHandler;
-use crate::config::normalization::{to_canonical_global_yaml, to_canonical_project_yaml};
+use crate::config::manager::ConfigManager;
 use crate::config::types::{GlobalConfig, ProjectConfig};
 use crate::output::OutputRenderer;
 use crate::types::{Priority, TaskStatus, TaskType};
@@ -114,6 +114,10 @@ impl ConfigHandler {
             }
         };
 
+        validate_init_path(&tasks_root, Some(&prefix))?;
+        validate_init_path(&tasks_root, None)?;
+        // Fail before creating a project if the global config cannot be preserved.
+        load_existing_global(&crate::utils::paths::global_config_path(&tasks_root))?;
         let project_config_path = crate::utils::paths::project_config_path(&tasks_root, &prefix);
         let global_config_path = crate::utils::paths::global_config_path(&tasks_root);
 
@@ -184,7 +188,8 @@ fn init_global(
     scaffolds: &ScaffoldPlan,
 ) -> Result<(), String> {
     let global_path = crate::utils::paths::global_config_path(tasks_root);
-    let existing = load_existing_global(&global_path);
+    validate_init_path(tasks_root, None)?;
+    let existing = load_existing_global(&global_path)?;
 
     if args.dry_run {
         renderer.emit_info(format_args!(
@@ -205,9 +210,7 @@ fn init_global(
     }
 
     let cfg = builder::build_global_config(existing, workflow, overrides);
-    fs::create_dir_all(tasks_root).map_err(|e| format!("Failed to create tasks dir: {}", e))?;
-    let yaml = to_canonical_global_yaml(&cfg);
-    fs::write(&global_path, yaml).map_err(|e| format!("Failed to write global config: {}", e))?;
+    ConfigManager::save_global_config(tasks_root, &cfg).map_err(|e| e.to_string())?;
     renderer.emit_success(format_args!(
         "Global configuration initialized at: {}",
         global_path.display()
@@ -226,16 +229,13 @@ fn write_project_config(
     force: bool,
     renderer: &OutputRenderer,
 ) -> Result<(), String> {
+    validate_init_path(tasks_root, Some(prefix))?;
     let path = crate::utils::paths::project_config_path(tasks_root, prefix);
     if path.exists() && !force {
         return Err(format!(
             "Project config already exists at {}. Use --force to overwrite.",
             path.display()
         ));
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create project dir {}: {}", parent.display(), e))?;
     }
     // Validate before writing.
     let validator = crate::config::validation::ConfigValidator::new(tasks_root);
@@ -250,9 +250,7 @@ fn write_project_config(
         return Err("Generated project configuration failed validation".to_string());
     }
 
-    let yaml = to_canonical_project_yaml(cfg);
-    fs::write(&path, yaml)
-        .map_err(|e| format!("Failed to write project config {}: {}", path.display(), e))?;
+    ConfigManager::save_project_config(tasks_root, prefix, cfg).map_err(|e| e.to_string())?;
     renderer.emit_success(format_args!(
         "Project '{}' initialized at: {}",
         project_name,
@@ -268,14 +266,12 @@ fn ensure_global_config_has_default(
 ) -> Result<(), String> {
     let path = crate::utils::paths::global_config_path(tasks_root);
     if path.exists() {
-        let text = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-        match crate::config::normalization::parse_global_from_yaml_str(&text) {
+        match crate::config::persistence::load_global_config(Some(tasks_root)) {
             Ok(mut cfg) => {
                 if cfg.default_project.is_empty() {
                     cfg.default_project = prefix.to_string();
-                    fs::write(&path, to_canonical_global_yaml(&cfg))
-                        .map_err(|e| format!("Failed to update global config: {}", e))?;
+                    ConfigManager::save_global_config(tasks_root, &cfg)
+                        .map_err(|e| e.to_string())?;
                     renderer.emit_info(format_args!(
                         "Set default_project to '{}' in {}",
                         prefix,
@@ -284,23 +280,17 @@ fn ensure_global_config_has_default(
                 }
             }
             Err(e) => {
-                renderer.emit_warning(format_args!(
-                    "Could not parse existing global config at {} ({}); leaving untouched",
-                    path.display(),
-                    e
-                ));
+                return Err(format!("Could not parse existing global config: {}", e));
             }
         }
         return Ok(());
     }
 
-    fs::create_dir_all(tasks_root).map_err(|e| format!("Failed to create tasks dir: {}", e))?;
     let cfg = GlobalConfig {
         default_project: prefix.to_string(),
         ..GlobalConfig::default()
     };
-    fs::write(&path, to_canonical_global_yaml(&cfg))
-        .map_err(|e| format!("Failed to write global config: {}", e))?;
+    ConfigManager::save_global_config(tasks_root, &cfg).map_err(|e| e.to_string())?;
     renderer.emit_success(format_args!(
         "Global configuration created at: {} (default_project={})",
         path.display(),
@@ -309,12 +299,48 @@ fn ensure_global_config_has_default(
     Ok(())
 }
 
-fn load_existing_global(path: &Path) -> Option<GlobalConfig> {
+fn load_existing_global(path: &Path) -> Result<Option<GlobalConfig>, String> {
     if !path.exists() {
-        return None;
+        return Ok(None);
     }
-    let text = fs::read_to_string(path).ok()?;
-    crate::config::normalization::parse_global_from_yaml_str(&text).ok()
+    crate::config::persistence::load_global_config(path.parent())
+        .map(Some)
+        .map_err(|e| e.to_string())
+}
+
+// Reject symlinks at and below the selected root, including dangling links.
+// Check before any directories are created.
+fn validate_init_path(tasks_root: &Path, prefix: Option<&str>) -> Result<(), String> {
+    if let Some(prefix) = prefix {
+        crate::storage::safety::validate_project_prefix(prefix)?;
+    }
+    let path = match prefix {
+        Some(prefix) => crate::utils::paths::project_config_path(tasks_root, prefix),
+        None => crate::utils::paths::global_config_path(tasks_root),
+    };
+    // macOS commonly exposes /tmp and /var through symlinks, so ancestors above
+    // the selected tasks root are resolved normally. The root itself must not link out.
+    for candidate in [
+        Some(tasks_root.to_path_buf()),
+        prefix.map(|p| tasks_root.join(p)),
+        Some(path),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        match fs::symlink_metadata(&candidate) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                return Err(format!(
+                    "Config init refuses symlink path: {}",
+                    candidate.display()
+                ));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("Failed to inspect config path: {}", e)),
+        }
+    }
+    Ok(())
 }
 
 fn render_scaffold_plan(
@@ -472,6 +498,7 @@ fn copy_from_project(
     source_prefix: &str,
     target: &mut ProjectConfig,
 ) -> Result<(), String> {
+    validate_init_path(tasks_root, Some(source_prefix))?;
     let source_path = crate::utils::paths::project_config_path(tasks_root, source_prefix);
     if !source_path.exists() {
         return Err(format!("Source project '{}' does not exist", source_prefix));

@@ -4,3 +4,30 @@ priority: Low
 type: Feature
 reporter: mallox
 created: 2026-08-07T22:48:10.787987+00:00
+modified: 2026-09-06T13:12:54.089384+00:00
+comments:
+- date: 2026-09-06T11:21:52.696878+00:00
+  text: 'Backlog reconciliation: Remains Todo for the requested show/update aliases. Existing ls/c/task aliases do not implement those spellings. Define top-level versus task subcommand forms and add parser/help coverage; corrected DEV-53 injected instructions intentionally use currently supported commands instead.'
+- date: 2026-09-06T13:12:54.089384+00:00
+  text: |-
+    Checklist migration: preserved the original wording below; implementation status is unchanged.
+    Former TODO.md line 19: Add aliases for command commands so that LLMs don't get tripped up (e.g. it's often trying "lotar show <id>", and "lotar update <id>")
+description: |-
+  Migrated checklist requirements:
+  Consider familiar aliases such as lotar show <id> and lotar update <id> so agent-generated commands are less error-prone. Agree top-level/subcommand semantics and preserve existing commands; test parser and help behavior. Existing ls/c aliases are not this request.
+history:
+- at: 2026-09-06T11:21:52.696878+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-06T13:12:54.077146+00:00
+  actor: mallox
+  changes:
+  - field: description
+    new: |-
+      Migrated checklist requirements:
+      Consider familiar aliases such as lotar show <id> and lotar update <id> so agent-generated commands are less error-prone. Agree top-level/subcommand semantics and preserve existing commands; test parser and help behavior. Existing ls/c aliases are not this request.
+- at: 2026-09-06T13:12:54.089384+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

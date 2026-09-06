@@ -68,6 +68,7 @@ pub fn generate_unique_project_prefix(
     tasks_dir: &std::path::Path,
 ) -> Result<String, String> {
     let generated_prefix = generate_project_prefix(project_name);
+    crate::storage::safety::validate_project_prefix(&generated_prefix)?;
 
     // Check if tasks directory exists - if not, no conflicts possible
     if !tasks_dir.exists() {
@@ -102,8 +103,10 @@ pub fn generate_unique_project_prefix(
     }
 
     // 2. Check if our generated prefix matches an existing project name
-    for (existing_project_name, _) in &existing_projects {
-        if generated_prefix.eq_ignore_ascii_case(existing_project_name) {
+    for (existing_project_name, existing_prefix) in &existing_projects {
+        if generated_prefix.eq_ignore_ascii_case(existing_project_name)
+            && !existing_project_name.eq_ignore_ascii_case(existing_prefix)
+        {
             return Err(format!(
                 "Cannot create project '{}' with prefix '{}': This prefix conflicts with existing project name '{}'. Choose a different project name.",
                 project_name, generated_prefix, existing_project_name
@@ -160,6 +163,7 @@ pub fn validate_explicit_prefix(
     if is_reserved_project_prefix(explicit_prefix) {
         return Err(RESERVED_PREFIX_MESSAGE.to_string());
     }
+    crate::storage::safety::validate_project_prefix(explicit_prefix)?;
 
     // Check if tasks directory exists - if not, no conflicts possible
     if !tasks_dir.exists() {
@@ -284,10 +288,7 @@ pub fn project_display_name_from_config(
 ) -> Option<String> {
     let config_path = crate::utils::paths::project_config_path(tasks_dir, project_prefix);
 
-    let explicit_name = std::fs::read_to_string(&config_path)
-        .ok()
-        .and_then(|content| serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&content).ok())
-        .and_then(|value| extract_project_name(&value));
+    let explicit_name = crate::utils::config::read_project_name_from_config(&config_path);
 
     if let Some(name) = explicit_name {
         let trimmed = name.trim();
@@ -300,65 +301,4 @@ pub fn project_display_name_from_config(
         .ok()
         .map(|cfg| cfg.project_name.trim().to_string())
         .filter(|name| !name.is_empty() && !name.eq_ignore_ascii_case(project_prefix))
-}
-
-fn extract_project_name(value: &serde_yaml_ng::Value) -> Option<String> {
-    use serde_yaml_ng::Value;
-
-    if let Value::Mapping(map) = value {
-        let project_key = Value::String("project".to_string());
-        if let Some(Value::Mapping(project)) = map.get(&project_key) {
-            let project_name_key = Value::String("name".to_string());
-            if let Some(Value::String(name)) = project.get(&project_name_key) {
-                let trimmed = name.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
-                }
-            }
-            let project_id_key = Value::String("id".to_string());
-            if let Some(Value::String(id)) = project.get(&project_id_key) {
-                let trimmed = id.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
-                }
-            }
-        }
-
-        let config_key = Value::String("config".to_string());
-        if let Some(Value::Mapping(cfg)) = map.get(&config_key) {
-            let cfg_project_name_key = Value::String("project_name".to_string());
-            if let Some(Value::String(name)) = cfg.get(&cfg_project_name_key) {
-                let trimmed = name.trim();
-                if !trimmed.is_empty() {
-                    return Some(trimmed.to_string());
-                }
-            }
-        }
-
-        let project_name_key = Value::String("project_name".to_string());
-        if let Some(Value::String(name)) = map.get(&project_name_key) {
-            let trimmed = name.trim();
-            if !trimmed.is_empty() {
-                return Some(trimmed.to_string());
-            }
-        }
-
-        for (key, val) in map {
-            if let Value::String(key_str) = key {
-                match key_str.as_str() {
-                    "project.name" | "project.id" | "config.project_name" | "project_name" => {
-                        if let Value::String(name) = val {
-                            let trimmed = name.trim();
-                            if !trimmed.is_empty() {
-                                return Some(trimmed.to_string());
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-
-    None
 }
