@@ -1,0 +1,7 @@
+title: Fix group sorting on Boards view
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-08T20:06:56.146448+00:00
+description: 'Currently the grouping is not sorted. For example grouping by priority sorts High -> Low -> Medium, alphabetically, not logically. '

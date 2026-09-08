@@ -18,9 +18,10 @@ description: Plan and carry non-trivial implementation through tracking, verific
 5. Before final handoff, satisfy the applicable AGENTS.md gates, reconcile tests
    and docs with behavior, and inspect the final diff for scope and safety.
    Report blockers instead of presenting incomplete verification as success.
-6. Leave the task ready for review with a concise
-   [handoff](../review-handoff/SKILL.md). Incremental developer review is welcome
-   during implementation; final review-ready status requires completed checks.
+6. Reconcile the task's final state under [AGENTS.md](../../../AGENTS.md) and leave
+   a concise [handoff](../review-handoff/SKILL.md). Record the outcome, verification,
+   remaining work, and commit/integration state separately so completed work does
+   not retain a stale in-progress status.
 
 ## Integrate only when authorized
 
@@ -29,7 +30,7 @@ the assigned checkout, and rerun affected gates. Surface conflict-resolution
 changes for review before integration. Use a fast-forward to preserve linear
 history. For work already on main, no branch integration step is needed.
 
-Commit only when requested. The person or agent completing integration/commit
-closes the LoTaR task with the shipped outcome and verification. Do not close a
-task merely because an agent finished editing. Worktree cleanup remains the
+Commit only when requested. After authorized integration/commit, append the commit
+reference and any additional verification to the task; ticket completion follows
+the handoff policy, not the timing of a commit. Worktree cleanup remains the
 developer's decision.

@@ -12,6 +12,11 @@ and report without edits, task mutations, or implementation gates.
 - Track non-trivial implementation in LoTaR: reuse the assigned task, record the
   plan and meaningful progress, and leave a resumable handoff. See
   [development-workflow](.github/skills/development-workflow/SKILL.md).
+- Reconcile ticket state during final cleanup and handoff. Mark completed,
+  self-verified work `Done` without requiring `NeedsReview`, a commit, or integration.
+  Use `NeedsReview` only when human review is requested or needed. Keep incomplete
+  or unverified work open with an exact next step; document verification limits
+  and any developer-accepted exceptions rather than reporting unchecked work as passed.
 - Staged changes are reviewed and approved. Leave them staged and unchanged
   unless asked; preserve unrelated work by the developer or other agents.
 - Commit, rebase, push, and integrate only when authorized. Keep linear history:

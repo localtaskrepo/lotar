@@ -56,12 +56,15 @@ when reproducing it, and recheck the limitation when that work ships.
    scope/acceptance criteria, important paths, risks, and checks.
 2. Append comments at meaningful milestones or blockers: outcome, evidence,
    decision, and next step. Reference files/tests rather than pasting transcripts.
-3. Before review or a session transition, record checks and remaining work. Use
-   `NeedsReview` when configured and implementation is review-ready; otherwise
-   retain the current state and explain readiness. Use a configured blocked state
-   only for a real blocker, without inventing enums or reassigning unrelated work.
-4. After authorized integration/commit, mark Done and append a closing comment
-   with what shipped, commit reference, verification, and any linked follow-up.
+3. Before final handoff or a session transition, record checks and remaining work,
+   then apply the completion policy in [AGENTS.md](../../../AGENTS.md). Use the CLI
+   or MCP to update each task completed in the current scope and verify its stored
+   status; do not leave status reconciliation as an instruction for the developer.
+   Do not close unrelated tickets. Use a configured blocked state only for a real
+   blocker, without inventing enums or reassigning unrelated work.
+4. Append a closing comment with the completed outcome, verification, limitations,
+   and linked follow-ups. State whether changes remain uncommitted or unintegrated;
+   append the commit reference later if that operation is authorized.
 
 Small guidance corrections belong in the current task. Independently actionable
 work gets its own ticket; do not reopen historical Done tickets for a new scope.

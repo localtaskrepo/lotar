@@ -146,7 +146,7 @@ pub fn serve_with_config(
                     }
                     let mut body: Vec<u8> = body_bytes.to_vec();
                     let declared_length: Option<usize> = headers
-                        .get("Content-Length")
+                        .get("content-length")
                         .and_then(|v| v.parse::<usize>().ok());
                     if declared_length.is_some_and(|cl| cl > MAX_REQUEST_BODY_BYTES)
                         || body.len() > MAX_REQUEST_BODY_BYTES

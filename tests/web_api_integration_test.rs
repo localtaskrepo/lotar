@@ -618,6 +618,52 @@ fn api_list_reflects_external_file_edits_immediately() {
 }
 
 #[test]
+fn task_creation_waits_for_fragmented_body_with_case_insensitive_content_length() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+    let port = find_free_port();
+    start_server_on(port);
+
+    for header in ["Content-Length", "content-length", "cOnTeNt-LeNgTh"] {
+        let body = json!({
+            "title": "Task with fragmented request body",
+            "project": "TEST",
+            "description": "details ".repeat(512),
+        })
+        .to_string();
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        write!(
+            stream,
+            "POST /api/tasks/add HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n{header}: {}\r\n\r\n",
+            body.len()
+        )
+        .unwrap();
+        // A response before the body arrives means the declared length was ignored.
+        let mut byte = [0u8; 1];
+        let early = stream.read(&mut byte);
+        assert!(
+            matches!(early, Err(ref error) if matches!(error.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut)),
+            "server must wait for the body with {header}, got {early:?}"
+        );
+        stream.set_read_timeout(Some(net_timeout())).unwrap();
+        stream.write_all(body.as_bytes()).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 201"), "{response}");
+        let (_, payload) = response.split_once("\r\n\r\n").unwrap();
+        let created: Value = serde_json::from_str(payload).unwrap();
+        assert_eq!(created["data"]["description"], "details ".repeat(512));
+    }
+
+    stop_server_on(port);
+}
+
+#[test]
 fn api_add_list_get_delete_roundtrip() {
     // Speed up IO handling in server during tests and serialize env
     let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");

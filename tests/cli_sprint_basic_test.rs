@@ -171,6 +171,86 @@ fn sprint_list_and_show_surface_created_sprint() {
 }
 
 #[test]
+fn sprint_list_ignores_lock_and_backup_artifacts() {
+    let fixtures = common::TestFixtures::new();
+    let mut storage = Storage::new(&fixtures.tasks_root);
+
+    let sprint = Sprint {
+        plan: Some(SprintPlan {
+            label: Some("Sprint Live".to_string()),
+            ..SprintPlan::default()
+        }),
+        ..Sprint::default()
+    };
+    SprintService::create(&mut storage, sprint, None).expect("create sprint");
+    drop(storage);
+
+    let sprints_dir = fixtures.tasks_root.join("@sprints");
+    assert!(
+        sprints_dir.join(".sprints.lock").exists(),
+        "sprint mutation must leave the storage lock file behind"
+    );
+    std::fs::write(
+        sprints_dir.join("1.yml.bak"),
+        "plan:\n  label: Sprint Yml Backup\n",
+    )
+    .expect("write yml backup");
+    std::fs::write(
+        sprints_dir.join("2.bak"),
+        "plan:\n  label: Sprint Numeric Backup\n",
+    )
+    .expect("write numeric backup");
+    std::fs::write(sprints_dir.join(".1.yml.tmp-123-7"), "partial write\n")
+        .expect("write stale temp file");
+
+    let mut cmd = common::lotar_cmd().unwrap();
+    cmd.args(["sprint", "list"])
+        .current_dir(fixtures.get_temp_path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Sprint Live"))
+        .stdout(predicate::str::contains("Sprint Yml Backup").not())
+        .stdout(predicate::str::contains("Sprint Numeric Backup").not())
+        .stderr(predicate::str::contains("Skipping unreadable").not());
+}
+
+#[test]
+fn sprint_list_still_warns_for_corrupt_sprint_yaml() {
+    let fixtures = common::TestFixtures::new();
+    let mut storage = Storage::new(&fixtures.tasks_root);
+
+    let sprint = Sprint {
+        plan: Some(SprintPlan {
+            label: Some("Sprint Healthy".to_string()),
+            ..SprintPlan::default()
+        }),
+        ..Sprint::default()
+    };
+    SprintService::create(&mut storage, sprint, None).expect("create sprint");
+    drop(storage);
+
+    let sprints_dir = fixtures.tasks_root.join("@sprints");
+    std::fs::write(
+        sprints_dir.join("2.yaml"),
+        "plan:\n  label: Sprint Yaml Extension\n",
+    )
+    .expect("write yaml-extension sprint");
+    std::fs::write(sprints_dir.join("3.yml"), "plan: [oops\n").expect("write corrupt sprint");
+
+    let mut cmd = common::lotar_cmd().unwrap();
+    cmd.args(["sprint", "list"])
+        .current_dir(fixtures.get_temp_path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Sprint Healthy"))
+        .stdout(predicate::str::contains("Sprint Yaml Extension"))
+        .stderr(predicate::str::contains("Skipping unreadable"))
+        .stderr(predicate::str::contains("3.yml"))
+        .stderr(predicate::str::contains(".sprints.lock").not())
+        .stderr(predicate::str::contains("2.yaml").not());
+}
+
+#[test]
 fn sprint_create_applies_defaults_from_global_config() {
     let fixtures = common::TestFixtures::new();
 

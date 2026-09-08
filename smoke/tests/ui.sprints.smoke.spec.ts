@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
@@ -289,6 +290,76 @@ describe.concurrent('UI sprints smoke scenarios', () => {
             const taskYaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
             const membership = Array.isArray(taskYaml.sprints) ? taskYaml.sprints : [];
             expect(membership).not.toContain(1);
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('creates a task from the UI after completing several empty sprints', async () => {
+        const workspace = await SmokeWorkspace.create();
+        const taskTitle = 'Task created after completing sprints';
+        const longDescription = 'Long description line exercising large request bodies end to end. '.repeat(20);
+        expect(Buffer.byteLength(longDescription, 'utf8')).toBeGreaterThan(1024);
+
+        try {
+            await workspace.addTask('Sprint completion seed task', { args: ['--project', 'WEB'] });
+
+            for (const label of ['Complete Alpha', 'Complete Beta', 'Complete Gamma']) {
+                await workspace.runLotar(['sprint', 'create', '--label', label]);
+            }
+
+            const filesBefore = await workspace.listTaskFiles();
+
+            const server = await startLotarServer(workspace);
+
+            try {
+                await withPage(server.url, async (page) => {
+                    await page.waitForSelector('text=LoTaR', { timeout: 15_000 });
+                    await page.click('a[href="/sprints"]');
+                    await page.waitForSelector('text=Sprints', { timeout: 15_000 });
+
+                    for (const sprintId of ['1', '2', '3']) {
+                        const group = page.locator(`[data-sprint-id="${sprintId}"]`);
+                        await group.waitFor({ timeout: 15_000 });
+                        await group.getByRole('button', { name: 'Start', exact: true }).click();
+                        await group
+                            .getByRole('button', { name: 'Complete', exact: true })
+                            .waitFor({ timeout: 15_000 });
+                        await group.getByRole('button', { name: 'Complete', exact: true }).click();
+                        await group.waitFor({ state: 'detached', timeout: 15_000 });
+                    }
+
+                    await page.click('a[href="/"]');
+                    await page.getByRole('button', { name: 'Add task', exact: true }).click();
+
+                    const panel = page.locator('.task-panel');
+                    await panel.waitFor({ timeout: 10_000 });
+                    await panel.locator('input[placeholder="Title"]').fill(taskTitle);
+                    await panel.getByRole('button', { name: 'Edit description' }).click();
+                    await panel.locator('.task-panel__description textarea').fill(longDescription);
+
+                    const create = panel.getByRole('button', { name: 'Create task', exact: true });
+                    const deadline = Date.now() + 10_000;
+                    while (!(await create.isEnabled()) && Date.now() < deadline) {
+                        await page.waitForTimeout(100);
+                    }
+                    expect(await create.isEnabled()).toBe(true);
+                    await create.click();
+                    await panel.waitFor({ state: 'hidden', timeout: 10_000 });
+
+                    await page.waitForSelector(`text=${taskTitle}`, { timeout: 15_000 });
+                });
+            } finally {
+                await server.stop();
+            }
+
+            const filesAfter = await workspace.listTaskFiles();
+            const newFiles = filesAfter.filter((file) => !filesBefore.includes(file));
+            expect(newFiles).toHaveLength(1);
+
+            const taskYaml = parse(await readFile(newFiles[0]!, 'utf8')) as Record<string, any>;
+            expect(taskYaml.title).toBe(taskTitle);
+            expect(Buffer.byteLength(String(taskYaml.description ?? ''), 'utf8')).toBeGreaterThan(1024);
         } finally {
             await workspace.dispose();
         }

@@ -43,9 +43,12 @@ Do not create another handoff document when the task already holds the state.
 Keep session-specific availability in the handoff, not permanent project policy.
 The receiving agent verifies current checkout/task state before continuing.
 
-Use configured review-ready status only after applicable AGENTS.md checks; an
-interrupted handoff may remain in progress or blocked with missing checks named.
-Completion of editing is not permission to commit or mark the task shipped.
+As part of final cleanup, reconcile and verify ticket status using
+[lotar-dev-tracking](../lotar-dev-tracking/SKILL.md) and the completion policy in
+[AGENTS.md](../../../AGENTS.md). An interrupted handoff must identify unfinished
+work and missing checks. Report ticket completion separately from whether changes
+have been committed, integrated, or deployed; closing a ticket does not authorize
+those operations.
 
 Handoff techniques adapted from AI Hero's `handoff`; see
 [sources and license](../THIRD_PARTY_NOTICES).

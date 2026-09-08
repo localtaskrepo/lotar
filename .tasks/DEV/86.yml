@@ -1,0 +1,55 @@
+title: Fix task POST body parsing and spurious sprint lock warnings
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-09-08T19:35:17.418423+00:00
+modified: 2026-09-08T20:10:20.051560+00:00
+comments:
+- date: 2026-09-08T19:37:51.969608+00:00
+  text: 'Confirmed sprint listing treats .sprints.lock as corrupt but catches and skips it. Found normalized-header regression in web_server.rs: headers stored lowercase but Content-Length queried mixed case. New TCP regression fails before fix because response arrives before request body; fixing lowercase lookup. Exact browser Fetch failed causality remains unconfirmed. No user sprint data changed.'
+- date: 2026-09-08T19:50:44.396071+00:00
+  text: 'Implemented lowercase Content-Length lookup (fragmented/large task POST) and YAML-extension filtering for sprint scans, preserving corrupt YAML diagnostics. TCP regression reproduced before fix and passes; new CLI tests reproduced lock/temp warnings and phantom backup sprint before fix. Final targeted Rust suites: 62/62 pass. Lint passes; frontend 262/262 pass. Full Rust run: 885/892 pass, six sandbox git-init permission failures, one automation failure passed targeted rerun. Full smoke build succeeded; 67 pass, 23 skip, 31 browser failures because Playwright Chromium 1234 missing; installer repeatedly timed out. Browser regression in progress. Keep InProgress until environment-limited checks are resolved; no durable guidance finding.'
+- date: 2026-09-08T19:55:43.833146+00:00
+  text: Final backend review found no blocking findings. Sprint filter kept inline and extension-only so malformed YAML filenames still reach existing diagnostics. Final 62 transport/sprint tests and full lint pass. Refreshed runnable binary at target/smoke/lotar; running serve process was not restarted. Browser coverage remains environment-blocked; no commits or sprint data changes.
+- date: 2026-09-08T19:58:24.834049+00:00
+  text: 'Browser blocker resolved using temporary Chromium at /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/kilo/pw-browsers with local sandbox launch flags. Full build-first smoke rerun: 99 passed, 23 skipped (28 spec files passed, 5 skipped). New browser regression completes three empty sprints in UI then creates and verifies persisted task with description >1024 bytes; full sprint UI spec passed 7/7. Remaining validation blocker is six full Rust tests unable to git init in sandbox; separate automation timing failure passed targeted rerun. Exact original browser network error not captured, but POST truncation was reproduced and fixed. Source changes uncommitted; running user server unchanged. No durable guidance finding.'
+- date: 2026-09-08T20:10:14.860359+00:00
+  text: 'Cleanup correction requested by developer: close completed self-verified work directly, without mandatory NeedsReview or waiting for commit/integration. Outcome: POST parsing and sprint artifact filtering fixed; targeted Rust 62/62, frontend 262/262, lint, and browser smoke 99 passed/23 skipped verify the changes. Previously documented six sandbox-blocked Git tests and automation rerun remain verification caveats, not claims of a clean full Rust run; closing this completed scope per developer request. Updated AGENTS.md as policy owner and aligned development-workflow, lotar-dev-tracking, and review-handoff skills, removing conflicting commit-gated closure instructions. Checked relative link targets, unchanged skill frontmatter, contradictory-rule search, and git diff --check. Scenario check: self-verified work goes Done; incomplete work stays open with next step; human-review work may use NeedsReview; no commit is authorized by ticket closure. DEV-87 is unrelated and remains Todo. Changes are uncommitted.'
+description: Investigate Fetch failed after closing empty sprints. Fix case-normalized Content-Length lookup and exclude non-YAML sprint artifacts; add regression tests and run lint, tests, smoke. Preserve existing sprint data and distinguish confirmed defects from unproven browser symptom causality.
+history:
+- at: 2026-09-08T19:35:31.329197+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-08T19:37:51.969608+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T19:50:44.396071+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T19:55:43.833146+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T19:58:24.834049+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T20:10:14.860359+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T20:10:20.051560+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

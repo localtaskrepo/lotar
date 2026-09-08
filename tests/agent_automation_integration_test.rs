@@ -408,7 +408,9 @@ exit 1\n",
         "job did not fail in time"
     );
 
-    let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
+    // Failure automation updates the task after the job status becomes visible.
+    let refreshed = wait_for_task_state(&storage, &created.id, "InProgress", Some("sam"), 10_000)
+        .expect("failure automation did not return the task to its reporter");
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
     assert!(
         refreshed

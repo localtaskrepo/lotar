@@ -34,7 +34,12 @@ impl SprintService {
         let mut records = Vec::new();
         for entry in fs::read_dir(&dir)? {
             let entry = entry?;
-            if !entry.path().is_file() {
+            if !entry.path().is_file()
+                || !matches!(
+                    entry.path().extension().and_then(|ext| ext.to_str()),
+                    Some("yml" | "yaml")
+                )
+            {
                 continue;
             }
             let loaded = match Self::load_entry(&entry.path()) {
