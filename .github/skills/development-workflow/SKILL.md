@@ -1,54 +1,35 @@
 ---
 name: development-workflow
-description: Use this at the start of any non-trivial task to follow the standard worktree lifecycle — discuss, plan, develop, gate, review, rebase, commit.
+description: Plan and carry non-trivial implementation through tracking, verification, review, and authorized integration.
 ---
 
-## Lifecycle (every task)
+## Implement
 
-1. **Worktree** — you start in an isolated git worktree (usually under `.kilo/worktrees/<name>/`). Treat it as your whole world: develop here, test here, fix here. Don't edit files in other worktrees or the main checkout unless the developer asks. If a lotar task tracks this work, set it to **InProgress** now (`lotar status DEV-N in_progress`).
+1. Inspect the current checkout and working-tree state. Follow the checkout and
+   safety policy in [AGENTS.md](../../../AGENTS.md); no automatic worktree setup.
+2. Read the assigned LoTaR task and relevant code. If no task exists, search before
+   creating one. Use [lotar-dev-tracking](../lotar-dev-tracking/SKILL.md) for the
+   plan, status, acceptance criteria, and progress log.
+3. State the outcome, scope, risks, and verification plan. Ask only about decisions
+   that materially affect correctness or authorization; an already approved plan
+   does not need another approval ceremony. Do not implement a plan-only request.
+4. Implement the smallest complete change. Test the relevant behavior as you go,
+   recording decisions and milestones rather than each tool call.
+5. Before final handoff, satisfy the applicable AGENTS.md gates, reconcile tests
+   and docs with behavior, and inspect the final diff for scope and safety.
+   Report blockers instead of presenting incomplete verification as success.
+6. Leave the task ready for review with a concise
+   [handoff](../review-handoff/SKILL.md). Incremental developer review is welcome
+   during implementation; final review-ready status requires completed checks.
 
-2. **Discuss** — understand the task with the developer before coding.
-   - *Simple task* → keep the discussion in-context and start.
-   - *Complex/multi-file task* → write a short plan (what changes, which files, risks, test plan) and get alignment first. Create a lotar task for it and treat that task as the plan + log (see the `lotar-dev-tracking` skill).
+## Integrate only when authorized
 
-3. **Develop** — implement, running quality gates as you go (see AGENTS.md "Quality gates"). Keep changes scoped; resist refactoring unrelated code. Post a short progress comment on the associated lotar task when you hit a meaningful milestone (what changed + where + next step).
+For branch work, rebase onto the agreed current main line, resolve conflicts in
+the assigned checkout, and rerun affected gates. Surface conflict-resolution
+changes for review before integration. Use a fast-forward to preserve linear
+history. For work already on main, no branch integration step is needed.
 
-4. **Developer review (incremental)** — the developer reviews as you go. A **staged** file (`git add`) means "reviewed and approved." That staging is intentional bookkeeping so the developer can verify in parallel with your work. Do **not** be confused by staged files, do not unstage them, and do not re-edit an already-staged file unless asked. You can keep working on the *unstaged* parts.
-
-5. **Greenlight → integrate** — once the developer approves the whole task, bring your branch back to `main`. Prefer **rebasing** (linear history, no merge commits):
-   ```bash
-   git fetch origin main
-   git rebase origin/main              # replay your commits on top of main
-   ```
-   In an Agent Manager worktree you can equivalently use the extension's **Apply** (selected changes) or **PR** flow — whichever the developer prefers. The rule is: linear history via rebase, not merge commits.
-
-6. **Conflicts** — if the rebase conflicts:
-   - Resolve the conflict in **your worktree** (keep the smallest set of conflict-resolution changes).
-   - Re-run the quality gates (`npm run lint`, `npm test`, `npm run smoke`).
-   - Surface **only** the conflict-resolution diff for one more developer review before finishing.
-
-7. **Commit & close the task** — commit per the developer's instruction (they may do it themselves). Then mark the associated lotar task **Done** with a closing comment (what shipped + where: commits, files, how verified). This applies to whoever finishes the work — including an agent that only integrates/commits someone else's branch. Finally, clean up the worktree if the developer wants.
-
-## Git rules (in detail)
-
-- **No git for recovery.** Recover lost code from `.history/` (VS Code Local History), never via `git revert`/`reflog`/`reset --hard` unless the developer directs it.
-- **Rebase, don't merge.** Linear history is the project convention.
-- **Never `git stash` across worktrees.** Stashes are global and leak between worktrees — a stash made in one worktree can clobber another. If you absolutely must stash, it must be a single `git stash` immediately followed by `git stash pop` **in the same worktree**.
-- **Staged = reviewed.** See step 4. Don't fight the staging area.
-- **Scope.** Only touch files relevant to the current task. Ignore unrelated changes in the working tree unless the developer asks you to coordinate.
-
-## Definition of done
-
-A task is ready to hand off for final review when ALL hold:
-- Feature complete for the agreed scope.
-- `cargo fmt --all`, `npm run lint`, `npm test`, `npm run smoke` all pass (gates in AGENTS.md).
-- Builds warning-free (`npm run lint` enforces `-D warnings`).
-- Tests added/updated for behavior changes.
-- Contract files in sync if any REST shape changed.
-- For UI changes: verified in a browser (Playwright smoke, screenshot, or UI diff), not just eyeballed (see `review-handoff`).
-- Docs updated for user-visible changes.
-
-## When to ask vs. proceed
-
-- Ask: scope is ambiguous, a decision reverses a prior one, or a change is risky/irreversible (data migrations, public API removal, `.tasks/` backlog edits).
-- Proceed: you have a clear, scoped task and the gates are green. Keep going until the feature is review-ready or you genuinely need input.
+Commit only when requested. The person or agent completing integration/commit
+closes the LoTaR task with the shipped outcome and verification. Do not close a
+task merely because an agent finished editing. Worktree cleanup remains the
+developer's decision.

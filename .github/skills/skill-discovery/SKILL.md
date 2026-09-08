@@ -1,41 +1,20 @@
 ---
 name: skill-discovery
-description: Use this at the start of non-trivial work to load the right runbooks (skills + path-scoped instructions) before making changes.
+description: Troubleshoot missing skill discovery or adapt instruction loading to a different agent harness.
 ---
 
-## Goal
+Use the routing map in [AGENTS.md](../../../AGENTS.md) for ordinary work; this
+skill is only for loading problems, not a mandatory startup step.
 
-Avoid "missing context" by making skill discovery a deliberate first step. The canonical policy is **AGENTS.md**; skills only add extra context for specific situations.
+- Copilot supports `.github/skills` and applies `.github/instructions` according
+  to `applyTo`. Its thin overlay adds no separate policy.
+- For another harness, verify its current discovery rules. Point its supported
+  skill directory/configuration at the existing sources using personal settings.
+  Reading `SKILL.md` directly is always a fallback. Read applicable path-scoped
+  instruction files explicitly when not auto-loaded.
+- Keep one authoritative copy of each rule. Do not install both a plugin and
+  editable copies of the same skill, or globally inject the full skill directory.
 
-## Delivery (how this reaches you)
-
-- **Kilo:** skills live in `.github/skills/` and are discoverable via the `skill` tool (wired in repo-root `kilo.jsonc`). Load the 1–3 most relevant on demand. Path-scoped rules (below) are **not** auto-applied in Kilo — read the matching `.github/instructions/*.instructions.md` file when you work in that area.
-- **Copilot:** the `.github/instructions/*.instructions.md` files apply automatically per file via their `applyTo` frontmatter. Copilot does **not** auto-load `.github/skills/`; workflow runbooks are referenced from `.github/copilot-instructions.md` (open the relevant one when the task matches).
-
-## Procedure
-
-1. **Identify the domain(s)** you'll touch:
-   - Rust backend: CLI (`src/cli/`), server/API (`src/api_server.rs`, `src/web_server.rs`, `src/routes/`), storage (`src/storage/`), config, scanner.
-   - Frontend: Vue UI under `view/`.
-   - Smoke: end-to-end harness under `smoke/`.
-   - Docs/contracts: `docs/openapi.json`, `docs/help/*`.
-
-2. **Load path-scoped rules** (Copilot: automatic; Kilo: read manually):
-   - Rust → `.github/instructions/backend.instructions.md`
-   - UI → `.github/instructions/frontend.instructions.md`
-   - Smoke → `.github/instructions/smoke.instructions.md`
-
-3. **Load the 1–3 most relevant skills** (keyword → skill):
-   - "task lifecycle", "worktree", "rebase", "merge", "staged" → `development-workflow`
-   - "handoff", "review", "definition of done", "verify UI", "screenshot", "ui diff" → `review-handoff`
-   - "nextest", "vitest", "test failing", "run one test", "no ANSI" → `testing-strategy`
-   - "smoke", "Playwright", "E2E", "serve lifecycle" → `smoke-suite-debugging`
-   - "endpoint", "REST", "DTO", "OpenAPI", "schema" → `api-contract-change-end-to-end`
-   - "local dev", "Vite", "lotar serve", "ports", "SSE" → `local-dev-serve-troubleshooting`
-   - "track work", ".tasks", "LoTaR task", "plan doc" → `lotar-dev-tracking`
-
-4. **Verify before you assume** — confirm current behavior (tests/repro) before changing semantics; search for existing helpers before introducing new ones.
-
-## When something's missing
-
-If guidance you need isn't here, that's a signal to improve this file or add a narrowly-scoped skill (see AGENTS.md "Self-improvement loop"). Keep skills task-focused; link to docs instead of duplicating them.
+Validate with one matching task and one unrelated task: the required guidance
+should be discoverable for the first and stay unloaded for the second. Record the
+observed harness/version and result in LoTaR, not in the shared startup policy.

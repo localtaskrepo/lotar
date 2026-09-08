@@ -1,58 +1,81 @@
 ---
 name: lotar-dev-tracking
-description: Use this to track development work in LoTaR's own committed `.tasks/` backlog — create tasks, update status, and leave progress notes (dogfooding).
+description: Track non-trivial LoTaR development in DEV tickets; read, create, update progress, resume, and hand off work through CLI or MCP.
 ---
 
-## Why
+## Choose the workspace and task
 
-LoTaR tracks its own development in `.tasks/` (committed, version-controlled — see `.tasks/README.md`). Use it for anything that spans more than a quick fix: it gives you a durable plan + progress log and lets work resume across sessions.
+Use LoTaR as the durable plan and progress log, not a second TODO file or private
+harness memory. Read-only requests and tiny fixes do not require a new ticket.
 
-## Quick start
+- Work from the assigned checkout; explicitly use its `.tasks` directory and DEV
+  project. A shared external backlog is used only when the developer designates it.
+- Read the assigned fully qualified ID first. Otherwise search a small page for
+  the outcome before creating a task; inspect likely matches and pagination.
+- Inspect configured states/types when unknown. Use installed command help or
+  live MCP schemas rather than assuming every binary matches this checkout.
 
 ```bash
-# List the backlog
-lotar list -p DEV
-
-# Create a task
-lotar add "<title>" -p DEV --type=feature --priority=high
-
-# Update status / leave a progress note
-lotar status DEV-1 in_progress
-lotar comment DEV-1 -m "what changed + where + next step"
+lotar --tasks-dir .tasks list -p DEV "guidance" --limit 10
+lotar --tasks-dir .tasks --format json list DEV-14
+lotar --tasks-dir .tasks config show --project DEV
+lotar --tasks-dir .tasks add "<outcome>" -p DEV --type chore --description "<scope and acceptance criteria>"
 ```
 
-## IDs + the `DEV` project
+The list query is positional, not `--search`. Verify the returned ID when using
+list to fetch a ticket. Read comments with `lotar --tasks-dir .tasks comment DEV-N`
+when resuming; use relationships when dependencies matter.
 
-The backlog lives under project `DEV` (see `.tasks/DEV/`), and `.tasks/config.yml` sets `DEV` as the default project, so bare commands resolve to it. Still, **pass `-p DEV`** (or `--project=DEV`) explicitly for clarity and to be safe in fresh clones or before config resolution. Prefer fully-qualified IDs (`DEV-1`); numeric-only IDs (`1`) work only once the project is unambiguous.
+## CLI or MCP, not both for every operation
 
-## Complex tasks
+Prefer the already connected LoTaR MCP tools when they target this checkout;
+otherwise use the CLI. MCP host prefixes vary: use the advertised tools.
 
-For multi-step work, create a task early and treat it as the plan + log:
-- Title = the outcome; add a first comment with the plan (files, approach, risks, test plan).
-- Post short progress comments as you go (what changed, where, next step) — not full prose.
-- Reference the task ID in your handoff summary (see `review-handoff`).
+| Intent | MCP tool | CLI |
+| --- | --- | --- |
+| Find/read | `task_list`, `task_get` | `list -p DEV "query" --limit 10`, `--format json list DEV-N` |
+| Create | `task_create` | `add "title" -p DEV` |
+| Status | `task_update` with `patch.status` | `status DEV-N <configured-state>` |
+| Progress | `task_comment_add` | `comment DEV-N -m "text"` |
+| Allowed values | `config_show`, filtered `schema_discover` | `config show --project DEV` |
 
-## Lifecycle touchpoints (always do these)
+For arguments, consult [MCP tools](../../../docs/help/mcp-tools.md) or the live
+schema only as needed. CLI mutations preserve validation/history; do not patch
+backlog YAML by hand. Serialize mutations within a shared project: even different
+ticket IDs can contend on its storage lock. A coordinator owns shared ticket state;
+workers report results rather than overwriting its plan.
 
-Whenever a worktree has (or gets) an associated lotar task, keep it current as part of the work — not as an afterthought. Use lotar end-to-end:
+If MCP rejects an enum allowed by project config, inspect current state and use a
+validated CLI operation rather than changing configuration to appease the tool.
+Project-aware mutation consistency is tracked in DEV-54; retain evidence there
+when reproducing it, and recheck the limitation when that work ships.
 
-- **Start** → `lotar status DEV-N in_progress`.
-- **Along the way** → a one-line progress comment at each meaningful milestone (what changed, where, next step).
-- **When the work ships** → mark it **Done** and add a closing comment (commits, files, verification). Whoever integrates/commits the branch closes the task — including a commit agent finishing someone else's work.
+## Lifecycle
 
-See `development-workflow` for where these sit in the lifecycle.
+1. Mark the task in progress using the configured state. Record a short plan:
+   scope/acceptance criteria, important paths, risks, and checks.
+2. Append comments at meaningful milestones or blockers: outcome, evidence,
+   decision, and next step. Reference files/tests rather than pasting transcripts.
+3. Before review or a session transition, record checks and remaining work. Use
+   `NeedsReview` when configured and implementation is review-ready; otherwise
+   retain the current state and explain readiness. Use a configured blocked state
+   only for a real blocker, without inventing enums or reassigning unrelated work.
+4. After authorized integration/commit, mark Done and append a closing comment
+   with what shipped, commit reference, verification, and any linked follow-up.
 
-## Good update pattern
+Small guidance corrections belong in the current task. Independently actionable
+work gets its own ticket; do not reopen historical Done tickets for a new scope.
+Preserve the original acceptance criteria and human comments.
 
-Keep comments short and actionable:
-- What changed (1 sentence)
-- Where (paths/symbols)
-- Next step (1 line)
+## Handoff comment
 
-## Test data ≠ backlog
+```text
+Outcome: <what is implemented or decided>
+Evidence: <paths, tests/commands and results, relevant failed approach>
+Remaining: <blocker or next exact action; review/integration state>
+Guidance: <instruction corrected and trigger checked, or no durable finding>
+```
 
-**Never** seed throwaway/test data into `.tasks/`. For manual or ad-hoc testing use the generator: `npm run seed:test-tasks` (see `.tasks/README.md`). The automated test suite uses isolated temp workspaces and never touches `.tasks/`.
-
-## Safety
-
-Don't paste secrets/PII into task titles or comments (tokens, auth headers, cookies).
+The user-facing, project-neutral version is
+[LoTaR Agent Skills](../../../docs/help/agent-skills.md); DEV conventions above
+are specific to developing this repository.

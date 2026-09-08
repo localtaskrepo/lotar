@@ -1,13 +1,25 @@
 ---
 name: testing-strategy
-description: Use this to run tests quickly and target a subset, then widen to CI parity. Covers Rust (nextest), UI (vitest), and smoke (Playwright), plus low-noise agent variants.
+description: Choose meaningful behavior checks and run targeted Rust, UI, or smoke tests before the required final gates; includes low-noise commands.
 ---
 
 ## Strategy
 
-- **Start as narrow as possible** (one failing test / one file), then **widen** to the full suite.
-- After fixing an issue, run the full gates before declaring done: `npm test` (Rust + UI) and `npm run smoke`.
-- Repo policy: **do NOT use `cargo test`** — use `cargo nextest` via the `npm` scripts below.
+- Start with the affected behavior (one failing test or file), then run the
+  applicable final gates in [AGENTS.md](../../../AGENTS.md). Repeat successful
+  checks only for subsequent changes, failures, or unresolved risks.
+- For a bug, reproduce its actual symptom with a focused failing test or command
+  before fixing when feasible. Minimize inputs, test a falsifiable hypothesis,
+  and remove temporary instrumentation. If reproduction is unavailable, state
+  the evidence and limitation instead of blocking all useful analysis.
+- Test observable behavior at an existing public boundary with independent
+  expected values, not private implementation structure or tautological assertions.
+  For test-first work, implement one failing behavior, make it pass, then proceed
+  to the next slice. Ask about a testing boundary only when it changes the agreed
+  design, not as a mandatory gate before every test.
+- Pure documentation needs link/example/consistency checks. Run executable
+  examples in isolated temporary workspaces. Embedded prompts and behavioral
+  configuration need relevant behavior checks even when their files are Markdown.
 
 ## Rust (nextest)
 
@@ -38,7 +50,7 @@ If smoke fails on environment/binary/server issues, switch to the `smoke-suite-d
 
 ## Low-noise output (agent / CI logs)
 
-Same commands with ANSI disabled and compact reporters:
+Prefer these commands with ANSI disabled and compact reporters:
 
 - Lint: `npm run lint:agent`
 - Rust + UI tests: `npm run test:agent`
@@ -46,4 +58,13 @@ Same commands with ANSI disabled and compact reporters:
 - UI-only: `npm run test:ui:agent`
 - Smoke (builds): `npm run test:smoke:agent` · quick: `npm run test:smoke:quick:agent`
 
-These are still the same checks; the completion bar is `npm run lint`, `npm test`, `npm run smoke` (see AGENTS.md).
+These can satisfy the corresponding final gates when run without filters; do not
+rerun the noisy variants solely for their names. One execution difference matters:
+`test:rust:agent` sets `--retries 0`, overriding configured nextest retries. A pass
+is sufficient; if it fails, inspect the failure and use the normal Rust command
+when configured retry behavior is relevant. Report flaky recovery, not a clean
+first pass. Quick smoke is for iteration with fresh artifacts, not a substitute
+for the build-first final smoke gate.
+
+Behavioral testing and reproduction techniques adapted from AI Hero's `tdd` and
+`diagnosing-bugs`; see [sources and license](../THIRD_PARTY_NOTICES).

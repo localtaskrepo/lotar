@@ -1,0 +1,85 @@
+title: Modernize portable agent guidance and efficient development workflows
+status: Done
+priority: High
+type: Chore
+reporter: mallox
+assignee: mallox
+created: 2026-09-08T13:48:18.590597+00:00
+modified: 2026-09-08T19:14:16.135767+00:00
+comments:
+- date: 2026-09-08T13:48:37.746044+00:00
+  text: 'Plan: simplify AGENTS.md and existing runbooks; add cache-aware context and evidence-driven instruction maintenance skills; adapt selected AI Hero techniques with attribution; publish LoTaR skill and installation guidance under DEV-14. Work in main checkout as explicitly authorized; no subagents or Z.ai calls. Validate links/frontmatter/examples and appropriate quality gates, record limits and review handoff.'
+- date: 2026-09-08T13:54:23.651778+00:00
+  text: 'Guidance updated: main-checkout work is allowed unless a worktree is assigned; read-only requests avoid implementation gates; CLI/MCP tracking and handoffs use LoTaR. Added efficient-context and instruction-maintenance runbooks, with stable-prefix caching caveats and evidence/counterexample checks. Adapted AI Hero writing/testing/handoff techniques with pinned revision and MIT notice. Preserved required code gates; documented the existing retries=0 agent-script difference rather than changing test behavior. Next: user-facing skill and isolated command/schema validation.'
+- date: 2026-09-08T14:03:06.276886+00:00
+  text: 'Evidence-driven correction: original worktree rule caused an unnecessary worktree during this task; developer clarified current-checkout operation is allowed. Updated AGENTS.md/development-workflow; empty worktree and branch removed. Scenario walkthrough preserves assigned-worktree isolation, read-only no-mutation, explicit no-subagent limits, and commit/review/quality authorization. Real command checks found MCP project-enum rejection (DEV-54): corrected skill fallback and validated it, demonstrating the evidence -> correction -> check loop. This is not a live-model compliance evaluation.'
+- date: 2026-09-08T14:03:06.284757+00:00
+  text: 'Review-ready on main, all changes unstaged/uncommitted. AGENTS.md 779->569 words, Copilot adapter 243->50, lifecycle skill 702->268; new details are on-demand. Validation: 11 skill frontmatters, 81 local links, JSON examples, git diff --check, isolated CLI/MCP flows and custom-state CLI fallback; Kilo config change is comments only and schema validation passed. Full application lint/test/smoke not run: no application code, runtime settings, or embedded job prompt changed. No subagents, Z.ai inference, or paid model evaluation; caching benefits unmeasured. Remaining: review/commit and future matching-task check of instruction effectiveness.'
+- date: 2026-09-08T14:03:50.778647+00:00
+  text: 'Additional observed tracking constraint: concurrent mutations to different DEV tickets emitted a project .task.lock contention warning. Both ticket updates persisted, but the tracking runbook and generic skill now require serializing writes within a shared project, not only per ticket. Remaining updates were serialized; no backend locking change was attempted.'
+- date: 2026-09-08T17:49:39.901265+00:00
+  text: 'Follow-up scope: remove tracked harness-specific setup/configuration from shared repository guidance and the generic skill guide. Preserve GitHub integration, ignored personal settings, historical task evidence, and actual product runner support. Delete the root tool configuration; retain direct SKILL.md reading as the portable discovery fallback.'
+- date: 2026-09-08T17:54:20.568845+00:00
+  text: 'Follow-up complete: deleted tracked root harness config; removed tool-specific discovery/routing references and setup examples from shared guidance. AGENTS.md and instruction-maintenance now keep non-GitHub harness configuration in personal settings. Ignored local settings, protective ignore rule, historical tickets, and actual product runner support preserved. Validation: 11 skill frontmatters, 81 local links, isolated CLI/MCP examples, no named non-GitHub harness references in .github or the new skill guide, git diff --check. Automatic discovery now depends on personal setup; direct SKILL.md reading remains supported. Ready for review; no commit.'
+description: 'Update shared instructions for current and future agents: developer-controlled worktrees, cache-aware context and delegation, LoTaR-backed progress and handoffs, bounded evidence-driven instruction improvement, and selective AI Hero techniques. Publish a reusable user-facing LoTaR skill under existing DEV-14. Keep provider settings personal and preserve required safety and verification.'
+history:
+- at: 2026-09-08T13:48:37.738708+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-08T13:48:37.746044+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T13:54:23.651778+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T14:03:06.276886+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T14:03:06.284757+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T14:03:06.315536+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: NeedsReview
+- at: 2026-09-08T14:03:50.778647+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T17:49:39.890504+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: InProgress
+- at: 2026-09-08T17:49:39.901265+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T17:54:20.568845+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T17:54:20.598827+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: NeedsReview
+- at: 2026-09-08T19:14:16.135767+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: Done

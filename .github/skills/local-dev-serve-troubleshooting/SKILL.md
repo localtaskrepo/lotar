@@ -38,13 +38,10 @@ Notes:
 
 ## Visual verification (browser + vision)
 
-When validating UI changes, verify in a browser rather than by inspection (see `review-handoff`):
-
-- **Fast poke:** `lotar serve --port 8080 --open` against either the real `.tasks/` backlog or a generated demo set (`npm run seed:test-tasks -- --serve`).
-- **Vision MCP** for quick visual / regression checks: `ui_diff_check` (reference vs actual), `analyze_image` (inspect a captured page), `extract_text_from_screenshot` (pull labels/terminal text), `diagnose_error_screenshot` (on-screen errors).
-- **Durable proof:** add/extend a Playwright smoke test (`smoke-suite-debugging`).
-
-> Don't capture/paste secrets or PII into screenshots.
+Follow [review-handoff](../review-handoff/SKILL.md) for browser/screenshot evidence.
+For manual scenarios use `npm run seed:test-tasks -- --serve`; for durable proof
+add a smoke test. Start long-running servers using the harness's managed process
+facility, or a dedicated terminal if unavailable, and stop only processes you own.
 
 ## Safety
 

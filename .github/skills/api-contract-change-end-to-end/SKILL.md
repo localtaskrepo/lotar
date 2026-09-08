@@ -9,30 +9,29 @@ Make API changes once, but keep all consumers consistent (CLI/server, UI, docs).
 
 ## Checklist
 
-1) Locate the endpoint
-- Routing/handlers: `src/routes.rs`, `src/api_server.rs`, `src/web_server.rs`
+1. Locate the endpoint
+- Routing/handlers: `src/routes/`, `src/api_server.rs`, `src/web_server.rs`
 
-2) Update Rust contract types
+2. Update Rust contract types
 - DTOs: `src/api_types.rs`
 - If you adjust validation/errors, keep behavior consistent with existing API error shapes (`src/errors.rs`).
 
-3) Update UI types + API client
+3. Update UI types + API client
 - DTOs: `view/api/types.ts` (explicit note at top: aligned with `src/api_types.rs`)
 - Calls: `view/api/client.ts`
 
-4) Update OpenAPI + help docs
+4. Update OpenAPI + help docs
 - REST schema: `docs/openapi.json`
 - If it’s user-visible, update relevant guides under `docs/help/*` (often `docs/help/api-quick-reference.md`, plus the feature-specific page).
 
-5) Add/adjust tests
+5. Add/adjust tests
 - Rust behavior: `tests/*.rs` (integration-heavy, many use `assert_cmd`).
 - UI behavior: `npm run test:ui` (Vitest).
 - Cross-cutting behavior: consider adding/updating smoke coverage under `smoke/tests/`.
 
-6) Verify locally (CI parity)
-- `npm run lint`
-- `npm test`
-- `npm run smoke`
+6. Verify with targeted behavior checks, then the final gates in
+   [AGENTS.md](../../../AGENTS.md). Use
+   [testing-strategy](../testing-strategy/SKILL.md) for targeting and low-noise output.
 
 ## Notes
 

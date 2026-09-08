@@ -9,6 +9,7 @@ LoTaR is an actively developed task management tool with a CLI, web server, and 
 - Issues & feature requests: https://github.com/localtaskrepo/lotar/issues
 - Security issues: https://github.com/localtaskrepo/lotar/security/advisories/new
 - Not sure where to start? See the [Help Index](help/index.md) (especially [Errors](help/errors.md) and [Serve](help/serve.md)).
+- Using a coding agent? Install the [LoTaR workflow skill](help/agent-skills.md) to keep tasks and handoffs portable across editors, CLIs, and models.
 
 ## Quick Start
 
@@ -258,11 +259,10 @@ Nextest configuration is in `.config/nextest.toml` and sets:
 - failure-output = immediate, status-level = fail, fail-fast = true
 - a 90s per-test timeout as a guardrail
 
-Need Rust doc tests? Run them explicitly:
-
-```bash
-cargo test --doc --all-features
-```
+For repository verification and targeted Rust/UI/smoke runs, follow
+[AGENTS.md](../AGENTS.md) and the
+[testing strategy](../.github/skills/testing-strategy/SKILL.md). Nextest does not
+run Rust doctests; a passing nextest suite does not establish doctest coverage.
 
 ## More screenshots
 

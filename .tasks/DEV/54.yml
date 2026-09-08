@@ -1,13 +1,24 @@
 title: Unify project-aware task mutation contracts and patch semantics
 status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-55, DEV-59, DEV-60, DEV-64, DEV-82]
-  related: [DEV-23, DEV-28]
 priority: High
 type: Bug
 reporter: mallox
 created: 2026-09-06T11:10:31.418447+00:00
+modified: 2026-09-08T14:02:10.726034+00:00
+relationships:
+  blocks:
+  - DEV-55
+  - DEV-59
+  - DEV-60
+  - DEV-64
+  - DEV-82
+  related:
+  - DEV-23
+  - DEV-28
+  parent: DEV-53
+comments:
+- date: 2026-09-08T14:02:10.726034+00:00
+  text: 'Reproduced while validating DEV-14/DEV-85 docs with installed lotar 0.8.0 in an isolated APP workspace: config set issue_states Queued,Active,Review,Complete --project APP; CLI status APP-1 Active succeeds; MCP task_update {id:APP-1,patch:{status:Review}} returns -32602 with default Todo/InProgress/NeedsReview/Done suggestions. Rejected update leaves ticket unchanged; CLI status APP-1 Review succeeds. User-facing skill documents validated CLI fallback rather than altering project config. No backend changes in this guidance task.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S6 C10 M7 M8 M10 U3 U4.
@@ -18,3 +29,8 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-08T14:02:10.726034+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

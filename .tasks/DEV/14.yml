@@ -1,11 +1,11 @@
 title: Add a lotar agent skill template
-status: NeedsReview
+status: Done
 priority: Low
 type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.767609+00:00
-modified: 2026-09-06T13:12:53.997922+00:00
+modified: 2026-09-08T19:14:09.497628+00:00
 comments:
 - date: 2026-09-06T11:21:52.492513+00:00
   text: 'Backlog reconciliation: a built-in LoTaR agent instruction template shipped with agent integration (9f77e1d), with prompt injection and instruction-file coverage. NeedsReview rather than automatic Done: the title says skill template and has no acceptance criteria, so confirm whether the built-in template satisfies the request or a separately installable SKILL.md artifact was intended. DEV-30 covers repository guidance; staged DEV-53 wording changes are not a new packaged skill.'
@@ -13,9 +13,15 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 15: Add an agent skill template that helps agents how to use lotar
-description: |-
-  Migrated checklist requirements:
-  The built-in LoTaR instruction template may satisfy this request. Original wording does not require a particular SKILL.md packaging format. Keep NeedsReview to confirm intended usability/distribution and whether the existing reusable template is sufficient, rather than inventing a new packaging requirement or silently closing it.
+- date: 2026-09-08T13:48:37.770981+00:00
+  text: 'Scope clarified by developer: provide a reusable agent SKILL.md template and user documentation for tracking work with LoTaR across harnesses. Implement alongside DEV-85; preserve existing built-in job instructions and use configured statuses, explicit workspace selection, MCP discovery with CLI fallback, and concise task-backed handoffs.'
+- date: 2026-09-08T14:00:16.285533+00:00
+  text: 'Implemented docs/help/agent-skills.md and standalone docs/help/skills/lotar-workflow/SKILL.md, linked from help index and docs overview. Template covers scoped CLI/MCP tracking, configured workflow values, workspace verification, serialized shared updates, and task-backed handoffs; it is independent of DEV conventions and the built-in agent-job prompt. Initial isolated CLI/MCP examples and read-only no-mutation check passed. Next: final link/frontmatter and custom-status validation; no live model evaluation while quota is constrained.'
+- date: 2026-09-08T14:03:06.277399+00:00
+  text: 'Review-ready: generic skill and guide are linked from docs overview/help index. Validated all 11 skill frontmatters, 81 local links, JSON snippets, isolated CLI create/read/search/status/comment/relationships and MCP schema/config/list/get/comment/default-state update on lotar 0.8.0. Read-only operations and rejected custom-status update leave ticket unchanged; custom-state CLI fallback passes. MCP project-enum mismatch recorded on DEV-54 and documented. No built-in runtime prompt or application code changed; full lint/test/smoke not run for this documentation scope. No live model/harness discovery evaluation due quota constraint. Remaining: developer review and authorized commit.'
+- date: 2026-09-08T17:54:20.556594+00:00
+  text: 'Follow-up: user-facing guide now uses generic skill discovery and transport-neutral MCP setup values, retaining only GitHub-specific installation guidance. Removed tool-specific configuration snippets; standalone skill behavior unchanged. Metadata/link checks and isolated CLI/MCP examples pass; known DEV-54 custom-status limitation remains documented.'
+description: 'Provide a standalone, reusable SKILL.md template and user documentation for using LoTaR from coding agents across harnesses. Scope clarified on 2026-09-08: the built-in agent-job prompt alone is insufficient for this request. Acceptance: documented discovery/setup, explicit workspace and configured statuses, CLI/MCP operations, task-backed progress and handoff, and isolated example validation. Preserve the existing built-in job prompt and original historical comments; coordinate repository-specific guidance with DEV-85.'
 history:
 - at: 2026-09-06T11:21:52.492513+00:00
   actor: mallox
@@ -40,3 +46,45 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-08T13:48:37.763450+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: InProgress
+- at: 2026-09-08T13:48:37.770981+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T14:00:16.285533+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T14:03:06.270090+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: |-
+      Migrated checklist requirements:
+      The built-in LoTaR instruction template may satisfy this request. Original wording does not require a particular SKILL.md packaging format. Keep NeedsReview to confirm intended usability/distribution and whether the existing reusable template is sufficient, rather than inventing a new packaging requirement or silently closing it.
+    new: 'Provide a standalone, reusable SKILL.md template and user documentation for using LoTaR from coding agents across harnesses. Scope clarified on 2026-09-08: the built-in agent-job prompt alone is insufficient for this request. Acceptance: documented discovery/setup, explicit workspace and configured statuses, CLI/MCP operations, task-backed progress and handoff, and isolated example validation. Preserve the existing built-in job prompt and original historical comments; coordinate repository-specific guidance with DEV-85.'
+- at: 2026-09-08T14:03:06.277399+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T14:03:06.310040+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: NeedsReview
+- at: 2026-09-08T17:54:20.556594+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-08T19:14:09.497628+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: Done
