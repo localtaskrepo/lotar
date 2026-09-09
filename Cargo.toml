@@ -89,7 +89,7 @@ split-debuginfo = "unpacked"
 assert_cmd = "2.2.0"
 predicates = "3.1.4"
 tempfile = "3.27.0"
-ctor = "0.10.0"
+ctor = "1.0.13"
 
 [features]
 default = ["parallel"]
