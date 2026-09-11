@@ -964,7 +964,7 @@ pub(crate) fn handle_sprint_add(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let outcome = match sprint_assignment::assign_tasks(
         &mut storage,
-        &records,
+        &mut records,
         &tasks,
         sprint_ref.as_deref(),
         allow_closed,
@@ -1163,7 +1163,7 @@ pub(crate) fn handle_sprint_remove(req: JsonRpcRequest) -> JsonRpcResponse {
 
     let outcome = match sprint_assignment::remove_tasks(
         &mut storage,
-        &records,
+        &mut records,
         &tasks,
         sprint_ref.as_deref(),
     ) {

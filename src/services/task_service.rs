@@ -6,8 +6,10 @@ use crate::services::automation_service::AutomationService;
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::task_validation::{self as validation};
 use crate::storage::manager::Storage;
+use crate::storage::operations::StorageOperations;
 use crate::storage::sprint::SprintTaskEntry;
 use crate::storage::task::Task;
+use crate::storage::transaction::MultiFileTransaction;
 use crate::types::{Priority, TaskChange, TaskChangeLogEntry, TaskStatus, TaskType};
 use crate::utils::identity::{resolve_current_user, resolve_me_alias};
 use crate::utils::project::generate_project_prefix;
@@ -51,6 +53,10 @@ impl Default for TaskUpdateContext {
     }
 }
 
+#[cfg(test)]
+#[path = "../../tests/common/dev55_transaction_cases.rs"]
+mod dev55_transaction_cases;
+
 impl TaskService {
     pub fn create(storage: &mut Storage, req: TaskCreate) -> LoTaRResult<TaskDTO> {
         let TaskCreate {
@@ -92,7 +98,7 @@ impl TaskService {
             generate_project_prefix(&repo_name)
         });
 
-        let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
 
         let parsed_status = match status.as_deref() {
             Some(raw) => Some(validation::parse_status(raw, &config)?),
@@ -233,25 +239,36 @@ impl TaskService {
             .collect();
 
         Self::ensure_task_defaults(&mut t, &config, true);
-        config =
-            Self::maybe_auto_populate_members(storage.root_path.as_path(), &project, &t, config)?;
-        Self::enforce_membership(&t, &config, &project)?;
 
-        // Validate sprint membership before writing the task file so an
-        // invalid sprint cannot orphan a created task; a sprint listing
-        // failure also blocks the write (fail closed). A failure after the
-        // task write triggers best-effort cleanup below — this is not a
-        // transaction: a crash between the task write and the sprint file
-        // writes can still leave partial state (DEV-55 owns transactions).
-        Self::ensure_sprints_exist(storage, &normalized_sprints)?;
+        // Coordinated transaction (DEV-55): task file, sprint memberships, and
+        // any auto-populated project config are validated in full and then
+        // published together under the sprints + project locks. Any failure
+        // before or during publication leaves every affected file unchanged
+        // (rollback failure retains the journal and fails closed); automation
+        // and events run only after the commit.
+        crate::storage::safety::validate_project_prefix(&project)
+            .map_err(LoTaRError::ValidationError)?;
+        let project_path = storage.root_path.join(&project);
+        let config_path = crate::utils::paths::project_config_path(&storage.root_path, &project);
+        let desired_set: BTreeSet<u32> = normalized_sprints.iter().copied().collect();
 
-        let id = storage.add(&t, &project, None)?;
-        if !normalized_sprints.is_empty()
-            && let Err(err) = Self::replace_sprint_memberships(storage, &id, &normalized_sprints)
-        {
-            let _ = storage.delete(&id, &project);
-            return Err(err);
+        let mut txn =
+            MultiFileTransaction::begin(&storage.root_path, std::slice::from_ref(&project))?;
+        let (id, config, config_populated) = Self::stage_create(
+            &mut txn,
+            storage,
+            &project_path,
+            &config_path,
+            &project,
+            &t,
+            &desired_set,
+            config,
+        )?;
+        txn.commit()?;
+        if config_populated {
+            Self::invalidate_config_caches(storage.root_path.as_path());
         }
+
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let dto = Self::to_dto(&id, t, Some(&sprint_lookup));
 
@@ -260,6 +277,60 @@ impl TaskService {
         // Re-fetch after automation may have mutated the task
         let dto = Self::get(storage, &id, Some(&project)).unwrap_or(dto);
         Ok(dto)
+    }
+
+    /// Stage every write a task creation needs under the coordinated
+    /// transaction: sprint memberships, auto-populated project config, and the
+    /// new task file itself. Returns the allocated task ID. Any error here
+    /// leaves the workspace untouched, except the fail-closed case where the
+    /// transaction's own rollback cannot complete (journal retained).
+    #[allow(clippy::too_many_arguments)]
+    fn stage_create(
+        txn: &mut MultiFileTransaction,
+        storage: &Storage,
+        project_path: &Path,
+        config_path: &Path,
+        project: &str,
+        t: &Task,
+        desired_set: &BTreeSet<u32>,
+        config: ResolvedConfig,
+    ) -> LoTaRResult<(String, ResolvedConfig, bool)> {
+        let (config, config_yaml) =
+            Self::plan_auto_populate_members(&storage.root_path, project, t, config)?;
+        Self::enforce_membership(t, &config, project)?;
+
+        let mut records = SprintService::list(storage)?;
+        let next_numeric_id = StorageOperations::get_current_id(project_path) + 1;
+        let id = format!("{}-{}", project, next_numeric_id);
+        let touched = Self::apply_memberships_to_records(records.as_mut_slice(), &id, desired_set)?;
+        for record in &records {
+            if touched.contains(&record.id) {
+                SprintService::stage_update(
+                    txn,
+                    &storage.root_path,
+                    record.id,
+                    record.sprint.clone(),
+                )?;
+            }
+        }
+        let config_populated = config_yaml.is_some();
+        if let Some(yaml) = config_yaml {
+            txn.stage(config_path, yaml)?;
+        }
+
+        let file_path =
+            StorageOperations::get_file_path(project, next_numeric_id, &storage.root_path);
+        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
+            eprintln!("[lotar][debug] writing task file {}", file_path.display());
+        }
+        let file_string = serde_yaml_ng::to_string(t)?;
+        txn.stage(&file_path, file_string)?;
+        Ok((id, config, config_populated))
+    }
+
+    fn invalidate_config_caches(tasks_root: &Path) {
+        crate::config::resolution::invalidate_config_cache_for(Some(tasks_root));
+        crate::utils::identity::invalidate_identity_cache(Some(tasks_root));
     }
 
     pub fn get(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
@@ -363,11 +434,21 @@ impl TaskService {
     ) -> LoTaRResult<TaskDTO> {
         // Derive project prefix from ID (e.g., ABCD-1 -> ABCD) to locate the task
         let derived = id.split('-').next().unwrap_or("");
+        // Cheap unlocked existence check keeps TaskNotFound lock-free.
+        storage
+            .get(id, derived)
+            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+
+        // Coordinated transaction (DEV-55): sprint memberships, task fields,
+        // and any auto-populated project config validate fully and publish
+        // together under the sprints + project locks. Errors leave every
+        // affected file unchanged; automation runs strictly post-commit.
+        let mut txn = MultiFileTransaction::begin(&storage.root_path, &[derived.to_string()])?;
         let existing = storage
             .get(id, derived)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
-        let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
 
         // Shared project-aware enum validation: raw patch strings are checked
         // against this task's project configuration and canonicalized before
@@ -616,18 +697,23 @@ impl TaskService {
             t.custom_fields = v;
         }
 
+        let mut sprint_change: Option<(Vec<SprintRecord>, BTreeSet<u32>)> = None;
         if let Some(sprint_ids) = patch.sprints.clone() {
-            let normalized = Self::normalize_sprint_ids(&sprint_ids);
-            let desired_set: BTreeSet<u32> = normalized.iter().copied().collect();
-            let current_lookup = Self::load_sprint_lookup(storage);
-            let current_orders = current_lookup.get(id).cloned().unwrap_or_default();
-            let current_set: BTreeSet<u32> = current_orders.keys().copied().collect();
+            let desired_set: BTreeSet<u32> = Self::normalize_sprint_ids(&sprint_ids)
+                .into_iter()
+                .collect();
+            let records = SprintService::list(storage)?;
+            let current_set: BTreeSet<u32> = records
+                .iter()
+                .filter(|record| record.sprint.tasks.iter().any(|entry| entry.id == id))
+                .map(|record| record.id)
+                .collect();
 
             if current_set != desired_set {
-                Self::replace_sprint_memberships(storage, id, &normalized)?;
                 let old_display = Self::format_sprint_change(&current_set);
                 let new_display = Self::format_sprint_change(&desired_set);
                 record_change("sprints", old_display, new_display);
+                sprint_change = Some((records, desired_set));
             }
         }
 
@@ -644,13 +730,40 @@ impl TaskService {
         }
 
         Self::ensure_task_defaults(&mut t, &config, !explicit_tags);
-        config =
-            Self::maybe_auto_populate_members(storage.root_path.as_path(), derived, &t, config)?;
+        let (config, config_yaml) =
+            Self::plan_auto_populate_members(&storage.root_path, derived, &t, config)?;
         Self::enforce_membership(&t, &config, derived)?;
 
         t.sprints.clear();
 
-        storage.edit(id, &t)?;
+        // Stage in deterministic order: sprints, config, task file.
+        if let Some((mut records, desired_set)) = sprint_change {
+            let touched =
+                Self::apply_memberships_to_records(records.as_mut_slice(), id, &desired_set)?;
+            for record in &records {
+                if touched.contains(&record.id) {
+                    SprintService::stage_update(
+                        &mut txn,
+                        &storage.root_path,
+                        record.id,
+                        record.sprint.clone(),
+                    )?;
+                }
+            }
+        }
+        let config_populated = config_yaml.is_some();
+        if let Some(yaml) = config_yaml {
+            let config_path = crate::utils::paths::project_config_path(&storage.root_path, derived);
+            txn.stage(&config_path, yaml)?;
+        }
+        let project_path = storage.root_path.join(derived);
+        let (file_path, file_string) = StorageOperations::prepare_task_edit(&project_path, id, &t)
+            .map_err(crate::storage::manager::map_storage_error)?;
+        txn.stage(&file_path, file_string)?;
+        txn.commit()?;
+        if config_populated {
+            Self::invalidate_config_caches(storage.root_path.as_path());
+        }
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let previous_dto = Self::to_dto(id, existing, Some(&sprint_lookup));
@@ -905,48 +1018,45 @@ impl TaskService {
         normalized.into_iter().collect()
     }
 
-    fn ensure_sprints_exist(storage: &Storage, desired: &[u32]) -> LoTaRResult<()> {
-        if desired.is_empty() {
-            return Ok(());
-        }
-        let records = SprintService::list(storage)?;
-        let existing: BTreeSet<u32> = records.iter().map(|record| record.id).collect();
-        if let Some(missing) = desired.iter().copied().find(|id| !existing.contains(id)) {
-            return Err(LoTaRError::SprintNotFound(missing));
-        }
-        Ok(())
-    }
-
-    fn maybe_auto_populate_members(
+    /// Plan the auto-populated member list without writing the project config.
+    /// Returns the updated config (for validation and automation) plus the
+    /// exact config bytes to stage inside the transaction, so a validation or
+    /// publish failure can never leave a mutated config behind (DEV-55).
+    fn plan_auto_populate_members(
         tasks_root: &Path,
         project: &str,
         task: &Task,
         mut config: ResolvedConfig,
-    ) -> LoTaRResult<ResolvedConfig> {
+    ) -> LoTaRResult<(ResolvedConfig, Option<String>)> {
         if project.trim().is_empty() || !config.auto_populate_members {
-            return Ok(config);
+            return Ok((config, None));
         }
 
         let missing = Self::missing_members_for_task(task, &config);
         if missing.is_empty() {
-            return Ok(config);
+            return Ok((config, None));
         }
 
-        match crate::config::operations::auto_populate_project_members(
+        let plan = crate::config::operations::plan_auto_populated_project_config(
             tasks_root,
             project,
             &config.members,
             &missing,
-        ) {
-            Ok(Some(updated)) => {
-                config.members = updated;
-                Ok(config)
-            }
-            Ok(None) => Ok(config),
-            Err(err) => Err(LoTaRError::ValidationError(format!(
+        )
+        .map_err(|err| {
+            LoTaRError::ValidationError(format!(
                 "Failed to auto-populate members for project '{}': {}",
                 project, err
-            ))),
+            ))
+        })?;
+
+        match plan {
+            Some((project_config, effective)) => {
+                let yaml = crate::config::normalization::to_canonical_project_yaml(&project_config);
+                config.members = effective;
+                Ok((config, Some(yaml)))
+            }
+            None => Ok((config, None)),
         }
     }
 
@@ -986,14 +1096,17 @@ impl TaskService {
         Ok(touched)
     }
 
-    pub(crate) fn persist_sprint_records(
-        storage: &mut Storage,
+    /// Stage the touched sprint records inside a coordinated transaction
+    /// instead of writing them one by one (DEV-55).
+    pub(crate) fn stage_sprint_records(
+        txn: &mut crate::storage::transaction::MultiFileTransaction,
+        tasks_root: &Path,
         records: &[SprintRecord],
         touched: &HashSet<u32>,
     ) -> LoTaRResult<()> {
         for record in records {
             if touched.contains(&record.id) {
-                SprintService::update(storage, record.id, record.sprint.clone())?;
+                SprintService::stage_update(txn, tasks_root, record.id, record.sprint.clone())?;
             }
         }
         Ok(())
@@ -1042,21 +1155,6 @@ impl TaskService {
         missing
     }
 
-    pub(crate) fn replace_sprint_memberships(
-        storage: &mut Storage,
-        task_id: &str,
-        desired: &[u32],
-    ) -> LoTaRResult<()> {
-        let normalized = Self::normalize_sprint_ids(desired);
-        let desired_set: BTreeSet<u32> = normalized.iter().copied().collect();
-        let mut records = SprintService::list(storage)?;
-        let touched =
-            Self::apply_memberships_to_records(records.as_mut_slice(), task_id, &desired_set)?;
-        if touched.is_empty() {
-            return Ok(());
-        }
-        Self::persist_sprint_records(storage, &records, &touched)
-    }
     fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
         crate::config::resolution::config_for_project(tasks_root, Some(project_prefix))
             .unwrap_or_else(|_| {

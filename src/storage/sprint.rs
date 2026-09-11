@@ -1,7 +1,7 @@
 use serde::de::{self, Deserializer, IgnoredAny, MapAccess, Visitor};
 use serde::ser::{SerializeMap, Serializer};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -56,6 +56,34 @@ pub struct Sprint {
     pub tasks: Vec<SprintTaskEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub history: Vec<SprintHistoryEntry>,
+
+    /// User-owned YAML extensions, preserved across typed edits like `Task`.
+    #[serde(flatten, default, serialize_with = "serialize_extra_fields")]
+    #[cfg_attr(feature = "schema", schemars(skip))]
+    pub extra_fields: BTreeMap<String, serde_yaml_ng::Value>,
+}
+
+fn is_builtin_sprint_key(key: &str) -> bool {
+    matches!(
+        key,
+        "created" | "modified" | "plan" | "actual" | "tasks" | "history"
+    )
+}
+
+fn serialize_extra_fields<S: serde::Serializer>(
+    fields: &BTreeMap<String, serde_yaml_ng::Value>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    use serde::ser::SerializeMap;
+    let mut map = serializer.serialize_map(None)?;
+    for (key, value) in fields {
+        // Programmatic extensions must never shadow a typed field, even when
+        // the typed field is omitted because it is empty.
+        if !is_builtin_sprint_key(key) {
+            map.serialize_entry(key, value)?;
+        }
+    }
+    map.end()
 }
 
 impl Sprint {

@@ -15,6 +15,7 @@ pub mod safety;
 pub mod search;
 pub mod sprint;
 pub mod task;
+pub mod transaction;
 
 // Re-export commonly used types and operations for convenience
 pub use filter::TaskFilter;

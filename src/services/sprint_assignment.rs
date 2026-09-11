@@ -66,9 +66,12 @@ impl SprintReassignmentInfo {
     }
 }
 
+/// Assign tasks to a sprint. The caller-provided records are refreshed under
+/// the coordinated sprints lock and written back with the post-transaction
+/// state, so membership changes land as one atomic batch (DEV-55).
 pub fn assign_tasks(
     storage: &mut Storage,
-    records: &[SprintRecord],
+    records: &mut Vec<SprintRecord>,
     tasks: &[String],
     sprint_reference: Option<&str>,
     allow_closed: bool,
@@ -89,9 +92,11 @@ pub fn assign_tasks(
     )
 }
 
+/// Remove tasks from a sprint with the same atomic guarantees as
+/// [`assign_tasks`].
 pub fn remove_tasks(
     storage: &mut Storage,
-    records: &[SprintRecord],
+    records: &mut Vec<SprintRecord>,
     tasks: &[String],
     sprint_reference: Option<&str>,
 ) -> Result<SprintAssignmentOutcome, String> {
@@ -112,7 +117,7 @@ pub fn remove_tasks(
 
 fn apply_assignment(
     storage: &mut Storage,
-    records: &[SprintRecord],
+    records: &mut Vec<SprintRecord>,
     tasks: &[String],
     sprint_reference: Option<&str>,
     allow_closed: bool,
@@ -131,6 +136,17 @@ fn apply_assignment(
         return Err(message);
     }
 
+    // Coordinated transaction (DEV-55): refresh the sprint state under the
+    // sprints lock, compute the full membership batch, then publish every
+    // changed sprint file in one staged commit. A mid-batch failure rolls
+    // all of them back, so force-single moves cannot lose memberships.
+    let mut txn = crate::storage::transaction::MultiFileTransaction::begin(&storage.root_path, &[])
+        .map_err(|err| err.to_string())?;
+    *records = SprintService::list(storage).map_err(|err| err.to_string())?;
+    if records.is_empty() {
+        return Err("No sprints found. Create a sprint before assigning tasks.".to_string());
+    }
+
     let sprint_id = resolve_sprint_id(records, sprint_reference)?;
     let target_record = records
         .iter()
@@ -140,6 +156,14 @@ fn apply_assignment(
     if action == SprintAssignmentAction::Add && !allow_closed {
         ensure_sprint_is_open(target_record)?;
     }
+
+    // Detach the target metadata before `records` is refreshed post-commit.
+    let target_sprint_label = target_record
+        .sprint
+        .plan
+        .as_ref()
+        .and_then(|plan| plan.label.clone());
+    let target_sprint_display_name = sprint_display_name(target_record);
 
     let mut sprint_map: BTreeMap<u32, Sprint> = records
         .iter()
@@ -261,22 +285,25 @@ fn apply_assignment(
         }
     }
 
-    for sprint_id in &changed_sprints {
-        if let Some(sprint) = sprint_map.get(sprint_id) {
-            SprintService::update(storage, *sprint_id, sprint.clone())
+    // Deterministic publish order for reproducible behavior under failure.
+    let mut changed: Vec<u32> = changed_sprints.iter().copied().collect();
+    changed.sort_unstable();
+    for sprint_id in changed {
+        if let Some(sprint) = sprint_map.get(&sprint_id) {
+            SprintService::stage_update(&mut txn, &storage.root_path, sprint_id, sprint.clone())
                 .map_err(|err| err.to_string())?;
         }
     }
+    txn.commit().map_err(|err| err.to_string())?;
+
+    // Write back the durable post-commit state (canonicalized, fresh stamps).
+    *records = SprintService::list(storage).map_err(|err| err.to_string())?;
 
     Ok(SprintAssignmentOutcome {
         action,
         sprint_id,
-        sprint_label: target_record
-            .sprint
-            .plan
-            .as_ref()
-            .and_then(|plan| plan.label.clone()),
-        sprint_display_name: sprint_display_name(target_record),
+        sprint_label: target_sprint_label,
+        sprint_display_name: target_sprint_display_name,
         modified,
         unchanged,
         replaced,

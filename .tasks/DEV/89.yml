@@ -1,0 +1,16 @@
+title: Route CLI task add through the coordinated task mutation transaction
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-09-11T06:03:56.641092+00:00
+modified: 2026-09-11T06:04:13.326112+00:00
+comments:
+- date: 2026-09-11T06:04:13.326112+00:00
+  text: 'Filed during DEV-55 verification: e2e CLI probing showed ''lotar add --field=sprint=1'' lands a custom field (no sprint-file write) and the AddHandler persists via StorageOperations with config auto-populate before the task write. Not a DEV-55 regression: that path never wrote sprint files. Follow-up scope as in description.'
+description: 'DEV-55 follow-up. The ''lotar add'' / ''lotar task add'' handler builds the Task and persists it via StorageOperations directly instead of TaskService::create, so it does not participate in the DEV-55 coordinated transaction. It never writes sprint files (no cross-file partial state), but its auto-populated project config write still precedes the task write and is not rollback-protected if the task write fails. Scope: src/cli/handlers/mod.rs AddHandler; consider converging on TaskService::create or staging its config write in MultiFileTransaction. Also verify whether documenting ''--field=sprint=N'' as the sprint example for ''task add'' is intentional (it stores a custom field, not sprint membership).'
+history:
+- at: 2026-09-11T06:04:13.326112+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

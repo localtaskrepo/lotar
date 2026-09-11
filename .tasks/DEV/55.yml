@@ -1,12 +1,78 @@
 title: Make task and sprint membership mutations transactional
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-54]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.446322+00:00
+modified: 2026-09-11T07:04:18.529457+00:00
+relationships:
+  depends_on:
+  - DEV-54
+  parent: DEV-53
+comments:
+- date: 2026-09-11T05:10:43.086789+00:00
+  text: 'Plan (DEV-55 transactional task/sprint mutations): (1) Research current create/update paths in task_service, sprint_assignment/integrity, storage locks, SyncJournal precedent. (2) Design bounded coordinated transaction: deterministic lock order, full prevalidation (membership+config) before any write, staged writes with exact-byte backups, atomic publish, rollback on error, durable journal for crash recovery if warranted. (3) Preserve unknown YAML fields and member order; keep automation/events post-commit; no lock reentry. (4) Fault-injection + public-boundary regression tests (nextest, no git). (5) Docs sync (serve.md orphan-temp claim), review instruction-maintenance for obsolete DEV54 guidance. Limits: no arbitrary external editors, no full crash-atomicity claims beyond implementation.'
+- date: 2026-09-11T05:21:47.894886+00:00
+  text: 'Design (bounded, decided): (1) New storage::transaction MultiFileTransaction: acquires @sprints lock then per-project .task.locks (sorted) via extracted acquire_storage_lock; performs pending-journal recovery (fail-closed on corrupt/traversal/symlink/conflicting-edit; restores exact original bytes; deletes journal) before staging. (2) Stage writes with exact original bytes captured; deterministic order sprints -> project config -> task files; commit = durable journal (atomic write + dir fsync) -> atomic publishes -> journal removal + fsync; any publish error rolls back all files in reverse (restore bytes / remove creations) and returns error; rollback failure retains journal. (3) TaskService create/update: full prevalidation (enums, membership with in-memory auto-populated members, sprint existence) under coordinated exclusion; config auto-populate becomes staged write (never mutates on validation failure); automation/events strictly post-commit outside locks. (4) sprint_assignment::apply_assignment re-lists records under sprints lock and stages all sprint writes (force_single multi-sprint moves atomic); signature takes &mut Vec<SprintRecord> to write back fresh state. (5) sprint_integrity cleanup stages task+sprint writes in one txn (projects pre-scanned, locks sorted). (6) Sprint gains top-level extra_fields preservation like Task. (7) Fault injection: cfg(test) thread-local fail_publish_at under the transaction primitive only; unit tests prove midpublish rollback + crash recovery; integration tests cover public boundaries (invalid member/sprint, retry no duplicate, malformed YAML, concurrency). Limits to document: no full crash atomicity (rollback-based recovery on next participating mutation), config file writes remain unlocked against non-participating config commands, readers may observe intermediate states, lock dirs/files remain after rollback.'
+- date: 2026-09-11T05:57:31.239954+00:00
+  text: 'Implemented. Architecture: (1) New src/storage/transaction.rs MultiFileTransaction — acquires @sprints lock then sorted per-project .task.locks via extracted safety::acquire_storage_lock; recovers pending .txn-pending.json journals (fail-closed on corrupt/version/traversal/symlink/conflicting-external-edit; restores exact original bytes incl. non-UTF-8 via new safety::atomic_write_bytes; deletes journal); stages writes capturing exact original bytes (no-op writes skipped, duplicate staging rejected); commit = durable journal (fsync + unix dir fsync) -> atomic publishes -> journal removal. Publish failure rolls back all files in reverse (restore bytes / remove creations), removing the journal only when rollback fully succeeds; rollback failure retains the journal and errors with its path. Deterministic stage order: sprint files -> project config -> task file. (2) TaskService::create/update_with_context: full prevalidation (enums, review owner, job lock, membership against in-memory auto-populated config via new config::operations::plan_auto_populated_project_config, sprint existence via apply_memberships_to_records) before any publish; auto-populated project config is staged (never mutated on failure); update re-reads task+sprints under exclusion; automation/events strictly post-commit outside locks. (3) sprint_assignment::apply_assignment refreshes records under the sprints lock and stages all sprint writes (force_single multi-sprint moves atomic); signature now &mut Vec<SprintRecord> writing back durable post-commit state (call sites updated: CLI manage.rs, routes, MCP, automation_service, tests). (4) sprint_integrity::cleanup_missing_sprint_refs stages task+sprint writes in one txn (candidate projects pre-scanned for sorted lock order; task files staged sorted). (5) Sprint gains top-level extra_fields preservation like Task (schemars(skip) under schema feature). Fault injection: cfg(test) thread-local fail_publish_at under the transaction primitive only — no prod env bypass.'
+- date: 2026-09-11T05:57:31.252633+00:00
+  text: 'Verification: unit (src/storage/transaction.rs, 14 tests): commit/removal, no-op skip, midpublish exact-byte rollback incl. created files + binary originals + 0o600 perms, journal-write failure leaves files unchanged, crash-after-journal recovered by next begin, corrupt/traversal/symlink/conflicting-edit journals fail closed, staging outside-root/twice rejected, dropped-uncommitted writes nothing, cross-thread lock serialization. Service fault cases (tests/common/dev55_transaction_cases.rs): create midpublish failure rolls back task+sprint+config; update task-write failure restores published sprint bytes then retry lands; force_single midbatch failure keeps every membership then retry moves exactly once. Integration (tests/dev55_transactional_mutations_test.rs, 8): invalid sprint create leaves task/sprint/config unchanged (incl. REST /api/tasks/add boundary); strict-member update rejection leaves task+sprint bytes; failed create retry reuses id, single file, single membership; corrupted task YAML update leaves sprint bytes; success preserves unknown sprint fields (x_team_extension) and member order; 6-thread concurrent creates+assignments lose no memberships (18 unique files, sprint holds all, DTOs consistent). Broad: npm run test:rust = 896 passed, 6 skipped (1 documented agent-automation flake recovered on retry 3/3 — pre-existing DEV-48 serialization note). cargo clippy --all-targets --all-features -D warnings clean; cargo fmt --all --check clean; lib+schema feature builds clean. Docs: serve.md write-safety bullet corrected (orphan tmp files are NOT swept — matches safety.rs behavior) + transactional guarantees and precise limits documented.'
+- date: 2026-09-11T05:57:31.261355+00:00
+  text: 'Instruction correction (instruction-maintenance): Trigger: lotar-dev-tracking SKILL.md told agents ''Project-aware mutation consistency is tracked in DEV-54; retain evidence there ... recheck the limitation when that work ships'' — DEV-54 is Done (verified: lotar list DEV-54), so the tracking pointer misdirects new evidence to a closed ticket. Correction: removed that one sentence from .github/skills/lotar-dev-tracking/SKILL.md; kept the still-valid MCP-enum guidance. Check: surrounding skill text reads coherently, no links/frontmatter affected, no other DEV-54 references remain in .github or AGENTS.md; counterexample preserved (read-only flows unaffected). Limit: none. Limits of DEV-55 itself (documented in serve.md): crash recovery runs on next participating mutation, not at startup; readers may observe intermediate states; plain config edits outside participating commands remain uncoordinated; rollback restores files not directories (lock files/dirs remain); Windows power-loss durability not claimed; scan-service task creation keeps its own separate rollback.'
+- date: 2026-09-11T06:04:13.368437+00:00
+  text: 'Handoff — Outcome: task creation, task update with sprint changes, sprint assignment/removal (add/move/remove incl. force-single), and missing-sprint cleanup now validate the complete operation first and publish task files, sprint files, and auto-populated project config as one staged MultiFileTransaction under coordinated locks (sprints lock, then sorted per-project task locks), with exact-byte rollback on any failure and a durable .txn-pending.json journal whose recovery fails closed on corruption, unsafe paths, or conflicting external edits. Evidence: see prior comments; tests = 14 transaction unit tests + 3 service fault-injection cases (tests/common/dev55_transaction_cases.rs) + 8 public-boundary integration tests (tests/dev55_transactional_mutations_test.rs); npm run test:rust 896 passed/6 skipped (1 pre-existing agent-automation flake recovered on retry 3/3, see DEV-48 note); clippy --all-targets --all-features -D warnings and cargo fmt --all --check clean; CLI e2e verified (sprint add/remove, task edit, task status). Remaining: follow-up DEV-89 (CLI add path bypasses TaskService; no sprint writes there, config auto-populate not rollback-protected); limits documented in docs/help/serve.md (recovery on next participating mutation, intermediate reader states, uncoordinated plain config edits, directory/lock-file residue, no Windows power-loss claim). Guidance: obsolete DEV-54 tracking sentence removed from .github/skills/lotar-dev-tracking/SKILL.md (evidence in earlier comment). Changes remain uncommitted in this checkout; parent runs full lint/test/smoke gates.'
+- date: 2026-09-11T06:05:41.325897+00:00
+  text: 'Reopened InProgress by verifier: full verification pending. Implementer marked Done prematurely; final gates (lint:agent, test:agent, smoke:agent) not yet independently run this wave. Verification owner will keep this InProgress until coordinator approves closure.'
+- date: 2026-09-11T06:20:45.665912+00:00
+  text: |-
+    Final verification (verifier wave, read-only; no source edits, no git):
+
+    Outcome: All gates green in a contamination-free environment; DEV-55 implementation verified.
+
+    Evidence:
+    - npm run lint:agent: PASS (vue-tsc clean, clippy --all-targets --all-features -D warnings clean, cargo fmt --all --check clean).
+    - npm run test:agent (first attempt, shared session TMPDIR): 6 deterministic sync failures. Root-caused read-only to environmental contamination, NOT a DEV-55 regression: scratch workspaces ws1/ws2/ws3 (TEST projects, created ~11:29-11:33 local by the concurrent reviewer) sit as visible siblings under the shared temp dir and leak into fixtures via StorageLocator::candidate_task_roots' monorepo sibling scan (src/storage/locator.rs). search() merged their TEST-1..3 phantoms (TaskService::list of a 1-task fixture returned 6; empty-workspace list returned 5 external tasks, reproduced with target/ci/lotar) while get/canonical_sync_task_id read only the primary root, yielding InvalidTaskId(TEST-2/TEST-3/TEST-1). Affected: retry_safety_tests x5 + sync_report_safety_test::sync_push_dry_run_does_not_persist_even_when_reports_requested. Follow-up filed as DEV-90; ws1-3 left untouched.
+    - npm run test:agent (clean isolated TMPDIR): test:rust:agent fails only the known agent-automation flaky because it forces --retries 0 (documented agent-variant behavior). Authoritative full run with configured retries, --no-fail-fast: 896 run: 896 passed, 1 flaky (agent_automation_integration_test::async_run_action_does_not_block, recovered retry 2/3), 6 skipped (known Git skips). Matches expected 896/6/1.
+    - npm run test:ui:agent: 275/275 passed, 51 files (expected ~275).
+    - PLAYWRIGHT_BROWSERS_PATH=target/pw-browsers LOTAR_SMOKE_CHROMIUM_ARGS=--no-sandbox,--no-zygote,--single-process npm run test:smoke:agent (clean TMPDIR): 102 passed, 23 skipped (known Git skips), 30 files passed + 5 skipped (expected ~102).
+
+    Remaining: Ticket intentionally kept InProgress pending coordinator closure approval. Note for anyone rerunning gates from this session: ws1-3 contamination persists until those scratch workspaces are removed or tests run under an isolated TMPDIR (see DEV-90).
+
+    Guidance: no instruction correction needed; testing-strategy skill's agent-variant retry caveat (test:rust:agent sets --retries 0) was followed as documented.
+- date: 2026-09-11T06:24:16.518797+00:00
+  text: 'Reopened per coordinator review; final closure deferred to coordinator gates. Review findings being fixed: M1 (journal recovery must run under the union of requested+journal-derived project locks, acquired deterministically under the sprints lock; staging must be provably inside held locks), L1 (cleanup lock coverage must fail closed / safe-retry when fresh state reveals unlocked projects, not just documented), L2 (parent-dir fsync errors propagated through publish/rollback/recovery; fault tests), L4 (cleanup caller records mutated before commit — write back only after success), M2 (define and test exact acknowledgment semantics around journal removal, incl. removal-rename failure vs root-fsync failure; no error-with-no-journal duplicate-retry trap), L3 (nonparticipating lock-taking writers refuse when a pending journal exists, checked after lock acquisition to avoid check-before-lock races; config writes without any lock stay a documented limit), production staging validates symlinked path components like journal recovery does. Harness: unique isolated TMPDIR for test runs, scratch consolidated under one owned subdir (DEV-90 tracks the gate finding).'
+- date: 2026-09-11T06:40:36.242339+00:00
+  text: 'Review fixes implemented and verified (DEV-55 stays InProgress pending coordinator final gates). M1: MultiFileTransaction::begin now derives the lock set as the UNION of requested prefixes and every project referenced by a pending journal — parsed and path-validated under the sprints lock (the only lock through which journals are created) — then acquires all project task locks in sorted order BEFORE recovery, so recovery can never restore a file whose lock is not held; sprint_assignment begin(&[]) therefore blocks on (or times out against) a concurrent comment-writer holding that project''s task lock. stage() additionally refuses writes outside @sprints/locked projects. L1: cleanup recomputes the authoritative project set under the locks via txn.ensure_covers(); on newly observed projects it drops the still-write-free transaction and retries with the union lock set (bounded 3 attempts, then fail closed) — no unlocked writes, no mere documentation. L2: parent-directory fsyncs now run per published rename and propagate (fault-proven), rollback and recovery restore-path fsyncs propagate, and a failed rollback retains the journal. L4: cleanup mutates only a local working snapshot; caller records are written back strictly after commit (fault-proven). M2: acknowledgement semantics defined and tested — journal-removal rename is the linearization point; if the rename fails the caller gets an error with the journal retained (next participating mutation rolls back, retry re-applies, no duplicates — tested end-to-end through TaskService); if the rename succeeds but the root fsync fails the commit is still acknowledged (Ok) so an error is never returned alongside removed-journal disk changes. L3: with_storage_lock now refuses nonparticipating writers (raw task edits/comments, direct sprint create/update/delete, scan creation) while a pending journal exists, checked after lock acquisition so no check-before-lock race exists; lock-less config writes stay a documented limit. Production staging now applies the same symlink-component validation as journal recovery and refuses the journal as a staging target. New tests: 9 primitive (recovery waits for journal project''s task lock incl. 2s timeout proof; begin unions locks; ensure_covers; symlink staging refusal; parent-sync failure rollback; failed journal removal retention + recovery + clean retry; removal-fsync-failure acknowledgement; 40-commit reader concurrency with parse checks) + 2 service fault cases (nonparticipating refusal then participating recovery; cleanup failure leaves caller records and files unchanged). Totals: 23 primitive + 5 service fault + 8 integration tests. Broad: npm run test:rust with isolated TMPDIR = 907 passed, 6 skipped (one nondeterministic nextest leaky flag on the known agent async test, informational, not a failure; no retries needed this run). clippy --all-targets --all-features -D warnings clean; cargo fmt --all --check clean. docs/help/serve.md updated with lock-union, refusal, and acknowledgement semantics. Harness: test TMPDIR isolated under the owned scratch subdir; earlier ws1-3 scratch siblings removed (DEV-90).'
+- date: 2026-09-11T06:54:49.151494+00:00
+  text: 'R1+R2 review fixes (DEV-55 remains InProgress for coordinator gates). R1 (error=>unchanged violated on journal-unlink failure): commit''s final remove_journal failure no longer returns Err with all files NEW — the published writes are rolled back immediately under the still-held locks, then journal cleanup is retried: unlink-retry success => Err with files already restored and journal gone; retry failure => Err with files already restored and the retained journal accurately describing that restored state (recovery = verify-noop + removal retry); rollback failure => journal retained, composite actionable error. Same immediate-unchanged ordering applied to the post-rollback cleanup path with explicit ''files restored'' messaging. Fault hook upgraded to fail_journal_removal_times(n) to prove both paths. New/updated tests: journal_removal_failure_rolls_back_immediately (asserts unchanged AT error return, journal absent — not merely after next retry), persistent_journal_removal_failure_retains_a_valid_journal (two failures => files restored at error + valid journal retained; third failure => begin fails closed with files untouched; then no-op recovery + clean commit), service case nonparticipating_writers_refuse_while_a_journal_is_pending reworked for the new semantics (failed update leaves task file already-restored with journal pending, raw edit refuses, participating update recovers and applies). R2 (misleading durability framing): chose the reviewer''s minimum-scope option — NO power-loss durability claimed on ANY platform. Module doc, remove_journal doc, and serve.md now state the Unix fsyncs are best-effort hardening rather than a proven durable-commit protocol, describe the exact post-acknowledgement resurrection window, and no longer imply Unix power-loss safety; ''rename'' wording corrected to unlink for fs::remove_file. No naive committed-marker was added. Verification (isolated TMPDIR under owned scratch subdir): 100 targeted tests + full npm run test:rust = 908 passed / 6 skipped, zero flakes; cargo fmt --all --check clean; clippy --all-targets --all-features -D warnings clean.'
+- date: 2026-09-11T07:00:30.812812+00:00
+  text: |-
+    Final gates after recovery-lock/fsync/unlink rollback fixes (verifier wave 2; read-only, no source edits, no git):
+
+    Environment: unique owned isolated TMPDIR under the dev55-verify-gates scratch subdir (DEV-90 sibling-leakage avoidance), exported identically for lint/test/smoke.
+
+    Outcome: all gates green; exact commands and counts below.
+
+    Evidence:
+    - npm run lint:agent: PASS (vue-tsc clean, clippy --all-targets --all-features -D warnings clean, cargo fmt --all --check clean).
+    - npm run test:agent (nextest --retries 0 per agent variant), honest failure reporting:
+      - Attempt 1: FAIL - 381/908 run: 380 passed, 1 failed, 6 skipped (known Git skips). Failure: agent_automation_integration_test::async_run_action_does_not_block; mock agent process exited SIGKILL (wall-clock sensitivity under current machine load; the documented reason .config/nextest.toml serializes that binary with retries=2). Fail-fast aborted before UI.
+      - Attempt 2 (identical command): PASS - Rust passed and chain continued to UI: 275/275 passed, 51 files.
+      - Rust-only npm run test:rust:agent (attempt 3, exact counts): FAIL again on the same single test only. So under retries 0 the flake tripped 2/3 attempts; it is load-sensitive, not deterministic.
+      - Explicitly labeled configured-retry full run (cargo nextest run --cargo-profile ci --no-fail-fast, configured retries incl. agent-processes retries=2): 908 run: 908 passed, 6 skipped, 0 flaky recoveries - matches the 908/6/zero-flakes direct baseline.
+    - PLAYWRIGHT_BROWSERS_PATH=target/pw-browsers LOTAR_SMOKE_CHROMIUM_ARGS=--no-sandbox,--no-zygote,--single-process npm run test:smoke:agent:
+      - Attempt 1: 1 failed | 101 passed | 23 skipped (Git). Failure: ui.project-creation-refresh.smoke.spec.ts at browser setup (helpers/ui.ts withBrowser) - transient launch contention; the spec passes standalone in 1.7s.
+      - Attempt 2 (identical command): 102 passed, 23 skipped (Git), 30 files passed + 5 skipped - matches the 102 baseline.
+
+    Rollback contract (verified scope caveat): normal mutation failures roll back immediately; a failed rollback fails closed with the recovery journal preserved, blocking further participating mutations until reconciled. Verification therefore does NOT claim that every Err always leaves every file unchanged - only that non-rollback failures do, and rollback failures surface fail-closed with the journal retained.
+
+    Remaining: kept InProgress pending coordinator closure approval; no fixes applied to the retries-0 wall-clock flake or the transient smoke browser-launch contention (both pre-existing, load-sensitive, out of DEV-55 scope; DEV-90 still tracks fixture hermeticity).
+
+    Guidance: no instruction correction; testing-strategy agent-variant retry caveat followed and disclosed.
+- date: 2026-09-11T07:04:18.499390+00:00
+  text: 'Closing record — Outcome: task creation, task updates with sprint changes, sprint assignment/removal (incl. force-single moves), and missing-sprint cleanup validate the complete operation first and publish task files, sprint files, and auto-populated project config as one staged MultiFileTransaction under coordinated locks (sprints lock first, then sorted per-project task locks; lock set unions every project referenced by a pending journal). Normal write errors (incl. failed directory sync and failed journal unlink) roll every affected file back to exact original bytes before the error returns; the sole exception is fail-closed: if the rollback itself fails, the journal is retained, participating mutations refuse, and files may stay mixed until recovery or manual reconciliation (documented in serve.md and module docs; retries stay duplicate-safe). Acknowledgement = successful journal unlink; an error is never returned with a removed journal. Pending journals make nonparticipating lock-taking writers refuse; recovery fails closed on corruption, unsafe paths (traversal/symlinks), and conflicting external edits. Evidence: 24 transaction-primitive unit tests (injection midpublish, immediate rollback incl. binary originals and permissions, crash-after-journal recovery, corrupt/traversal/symlink/conflict fail-closed, journal-unlink-failure immediate rollback + persistent-failure retention, removal-fsync acknowledgement, recovery-waits-for-journal-project-lock incl. 2s timeout proof, lock-union, ensure_covers, 40-commit reader concurrency), 5 service fault-injection cases (create/update rollback incl. config; force-single midbatch; nonparticipating refusal + participating recovery; cleanup caller-records immutability), 8 public-boundary integration tests (invalid member/sprint leave task/sprint/config bytes unchanged incl. REST /api/tasks/add; failed-create retry reuses id with single file/membership; malformed task YAML leaves sprint bytes; unknown sprint fields + member order preserved; 6-thread concurrency loses nothing). Core injection/lock-coverage/recovery/path-guard properties validated. Coordinator final gates (exact, honest): lint:agent passed. test:agent with retries=0: attempt 1 FAILED on the known async_run_action_does_not_block SIGKILL flake; attempt 2 PASSED (Rust + UI 275). Separate Rust-only repeats exposed the same flake again. Explicit configured-nextest final run: 908 passed, 6 skipped, 0 failed, with retry recoveries (NOT claiming all runs green; the agent-automation async flake is real and recurring under parallel load — see DEV-48 serialization note). Smoke: first run hit a transient browser launch failure, then an identical final run: 102 passed, 23 skipped, 0 failed. Test isolation workaround: unique TMPDIR per run with scratch under one owned subdir (DEV-90 tracks the fixture root-bleed harness issue). Remaining (documented, no new follow-ups): no power-loss durability on ANY platform (Unix fsyncs are best-effort hardening; post-acknowledgement journal resurrection window documented); recovery on next participating mutation, not at startup; readers may observe intermediate per-file states; no client-response-loss create idempotency; lock-less config writers and CLI add auto-population outside the transaction (DEV-89); test-fixture root bleed (DEV-90). Guidance correction: removed the obsolete DEV-54 tracking sentence from .github/skills/lotar-dev-tracking/SKILL.md after verifying DEV-54 shipped (smallest proven fact correction; earlier comment on this ticket records the evidence); no other guidance changes. Changes remain uncommitted in this checkout for the coordinator.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S9.
@@ -18,3 +84,82 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-11T05:10:43.078388+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-11T05:10:43.086789+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T05:21:47.894886+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T05:57:31.239954+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T05:57:31.252633+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T05:57:31.261355+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T06:04:13.359606+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-09-11T06:04:13.368437+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T06:05:36.325311+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-09-11T06:05:41.325897+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T06:20:45.665912+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T06:24:16.518797+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T06:40:36.242339+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T06:54:49.151494+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T07:00:30.812812+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T07:04:18.499390+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T07:04:18.529457+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

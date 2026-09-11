@@ -47,8 +47,6 @@ workers report results rather than overwriting its plan.
 
 If MCP rejects an enum allowed by project config, inspect current state and use a
 validated CLI operation rather than changing configuration to appease the tool.
-Project-aware mutation consistency is tracked in DEV-54; retain evidence there
-when reproducing it, and recheck the limitation when that work ships.
 
 ## Lifecycle
 

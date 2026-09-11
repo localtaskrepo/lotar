@@ -161,28 +161,41 @@ impl StorageOperations {
         let project_path = root_path.join(&project_folder);
 
         with_storage_lock(&project_path, "task", || {
-            // Use filesystem-based file path resolution
-            let file_path = match Self::get_file_path_for_id(&project_path, id) {
-                Some(path) => path,
-                None => return Err("Task file not found".into()),
-            };
-
-            // Read under the lock rather than using a potentially stale caller
-            // snapshot. DTO-based replacements do not carry YAML extensions.
-            let content = fs::read_to_string(&file_path)?;
-            let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
-                .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
-            let mut task = new_task.clone();
-            let mut extras = old_task.extra_fields;
-            extras.extend(task.extra_fields);
-            task.extra_fields = extras;
-            let file_string = serde_yaml_ng::to_string(&task)?;
+            let (file_path, file_string) = Self::prepare_task_edit(&project_path, id, new_task)?;
             atomic_write_file(&file_path, &file_string)?;
 
             // No longer need to update index - simplified architecture
 
             Ok(())
         })
+    }
+
+    /// Compute the exact replacement bytes for a task edit without writing.
+    /// Re-reads the current file (merging user-owned YAML extensions) so the
+    /// result is safe to stage inside a coordinated transaction that already
+    /// holds the project task lock (DEV-55).
+    pub(crate) fn prepare_task_edit(
+        project_path: &Path,
+        id: &str,
+        new_task: &Task,
+    ) -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
+        // Use filesystem-based file path resolution
+        let file_path = match Self::get_file_path_for_id(project_path, id) {
+            Some(path) => path,
+            None => return Err("Task file not found".into()),
+        };
+
+        // Read fresh rather than using a potentially stale caller snapshot.
+        // DTO-based replacements do not carry YAML extensions.
+        let content = fs::read_to_string(&file_path)?;
+        let old_task = crate::storage::task::parse_task_yaml_tolerant(&content)
+            .ok_or("Cannot safely edit malformed task YAML; repair the task file first")?;
+        let mut task = new_task.clone();
+        let mut extras = old_task.extra_fields;
+        extras.extend(task.extra_fields);
+        task.extra_fields = extras;
+        let file_string = serde_yaml_ng::to_string(&task)?;
+        Ok((file_path, file_string))
     }
 
     /// Delete a task

@@ -55,6 +55,48 @@ pub fn sprint_lock_name() -> &'static str {
     SPRINT_LOCK_NAME
 }
 
+/// Acquire an exclusive advisory directory lock, retrying contention for up
+/// to two seconds. The returned file owns the lock; dropping it releases the
+/// lock on success, error, or panic. The lock file itself must not be removed.
+/// Do not sweep atomic-write temp files here: other writers need not hold this
+/// lock, so even an exclusive lock does not prove that their temp files are orphaned.
+pub fn acquire_storage_lock(target_dir: &Path, lock_name: &str) -> std::io::Result<File> {
+    let lock_path = target_dir.join(format!(".{lock_name}.lock"));
+    let file = File::options().write(true).create(true).truncate(false)
+        .open(&lock_path).map_err(|e| std::io::Error::new(e.kind(), format!(
+            "Cannot open storage lock {}: {e}; check the directory and permissions; mutation was not run",
+            lock_path.display()
+        )))?;
+    let start = Instant::now();
+    loop {
+        match file.try_lock_exclusive() {
+            Ok(()) => return Ok(file),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if start.elapsed() >= Duration::from_secs(2) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::WouldBlock,
+                        format!(
+                            "Storage lock {} is still busy after 2 seconds; retry after the other writer finishes; mutation was not run",
+                            lock_path.display()
+                        ),
+                    ));
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => {
+                return Err(std::io::Error::new(
+                    e.kind(),
+                    format!(
+                        "Cannot acquire storage lock {}: {e}; check filesystem locking support and permissions; mutation was not run",
+                        lock_path.display()
+                    ),
+                ));
+            }
+        }
+    }
+}
+
 /// Run a mutation only after acquiring an exclusive advisory directory lock.
 /// Contention is retried for up to two seconds. Dropping the file releases the
 /// lock on success, error, or panic; the lock file itself must not be removed.
@@ -65,33 +107,32 @@ pub fn with_storage_lock<T, E: From<std::io::Error>>(
     lock_name: &str,
     f: impl FnOnce() -> Result<T, E>,
 ) -> Result<T, E> {
-    let lock_path = target_dir.join(format!(".{lock_name}.lock"));
-    let file = File::options().write(true).create(true).truncate(false)
-        .open(&lock_path).map_err(|e| std::io::Error::new(e.kind(), format!(
-            "Cannot open storage lock {}: {e}; check the directory and permissions; mutation was not run",
-            lock_path.display()
-        )))?;
-    let start = Instant::now();
-    loop {
-        match file.try_lock_exclusive() {
-            Ok(()) => break,
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                if start.elapsed() >= Duration::from_secs(2) {
-                    return Err(std::io::Error::new(std::io::ErrorKind::WouldBlock, format!(
-                        "Storage lock {} is still busy after 2 seconds; retry after the other writer finishes; mutation was not run",
-                        lock_path.display()
-                    )).into());
-                }
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(std::io::Error::new(e.kind(), format!(
-                "Cannot acquire storage lock {}: {e}; check filesystem locking support and permissions; mutation was not run",
-                lock_path.display()
-            )).into()),
-        }
-    }
+    let _file = acquire_storage_lock(target_dir, lock_name)?;
+    refuse_under_pending_transaction(target_dir)?;
     f()
+}
+
+/// Fail closed when a pending multi-file transaction journal exists for the
+/// workspace this directory belongs to (DEV-55 review L3). Checked after the
+/// advisory lock is acquired, never before, so a journal cannot appear or be
+/// recovered around the check: journals are only created by writers that hold
+/// this same lock, and recovery runs while holding it. Refusing here keeps
+/// non-participating writers (task comments, direct sprint edits, scan
+/// creation) from mutating files a pending rollback would need to restore.
+/// Lock-less config writes remain outside this guard and are documented as
+/// such.
+fn refuse_under_pending_transaction(target_dir: &Path) -> std::io::Result<()> {
+    let Some(root) = target_dir.parent() else {
+        return Ok(());
+    };
+    let journal = root.join(crate::storage::transaction::JOURNAL_FILE_NAME);
+    if journal.is_file() {
+        return Err(std::io::Error::other(format!(
+            "A pending task/sprint transaction journal exists at {}; a crashed multi-file mutation is waiting to be rolled back. Run any task create/update, sprint assignment, or sprint cleanup operation to trigger recovery, then retry this change",
+            journal.display()
+        )));
+    }
+    Ok(())
 }
 
 /// Sync the new file before atomically publishing it. Callers requiring durable
@@ -102,6 +143,19 @@ pub fn atomic_write_file(path: &Path, contents: &str) -> std::io::Result<()> {
         path,
         |file| {
             file.write_all(contents.as_bytes())?;
+            file.sync_all()
+        },
+        |temp, target| fs::rename(temp, target),
+    )
+}
+
+/// Byte-oriented variant of [`atomic_write_file`] for rollback payloads that
+/// must reproduce exact original bytes (including non-UTF-8 content).
+pub(crate) fn atomic_write_bytes(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    atomic_write_file_with_io(
+        path,
+        |file| {
+            file.write_all(contents)?;
             file.sync_all()
         },
         |temp, target| fs::rename(temp, target),

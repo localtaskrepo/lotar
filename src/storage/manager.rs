@@ -142,7 +142,7 @@ impl Storage {
     }
 }
 
-fn map_storage_error(err: Box<dyn std::error::Error>) -> LoTaRError {
+pub(crate) fn map_storage_error(err: Box<dyn std::error::Error>) -> LoTaRError {
     match err.downcast::<std::io::Error>() {
         Ok(io_err) => LoTaRError::IoError(*io_err),
         Err(err) => match err.downcast::<serde_yaml_ng::Error>() {

@@ -66,7 +66,7 @@ pub(crate) fn handle_add(
 
     let outcome = sprint_assignment::assign_tasks(
         &mut context.storage,
-        &context.records,
+        &mut context.records,
         &tasks,
         explicit.as_deref(),
         add_args.allow_closed,
@@ -178,7 +178,7 @@ pub(crate) fn handle_move(
 
     let outcome = sprint_assignment::assign_tasks(
         &mut context.storage,
-        &context.records,
+        &mut context.records,
         &tasks,
         explicit.as_deref(),
         move_args.allow_closed,
@@ -290,7 +290,7 @@ pub(crate) fn handle_remove(
 
     let outcome = sprint_assignment::remove_tasks(
         &mut context.storage,
-        &context.records,
+        &mut context.records,
         &tasks,
         explicit.as_deref(),
     )?;

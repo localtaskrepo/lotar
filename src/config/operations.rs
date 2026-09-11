@@ -262,6 +262,26 @@ pub fn auto_populate_project_members(
     base_members: &[String],
     new_members: &[String],
 ) -> Result<Option<Vec<String>>, ConfigError> {
+    match plan_auto_populated_project_config(tasks_dir, project_prefix, base_members, new_members)?
+    {
+        Some((project_config, effective)) => {
+            save_project_config(tasks_dir, project_prefix, &project_config)?;
+            Ok(Some(effective))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Compute the project config that auto-population would write, without
+/// writing it. Returns `None` when no member changes are needed; otherwise the
+/// updated config (for the caller to persist or stage transactionally, DEV-55)
+/// and the effective member list.
+pub fn plan_auto_populated_project_config(
+    tasks_dir: &Path,
+    project_prefix: &str,
+    base_members: &[String],
+    new_members: &[String],
+) -> Result<Option<(crate::config::types::ProjectConfig, Vec<String>)>, ConfigError> {
     if new_members.is_empty() {
         return Ok(None);
     }
@@ -300,9 +320,7 @@ pub fn auto_populate_project_members(
 
     effective.sort_by_key(|a| a.to_ascii_lowercase());
     project_config.members = Some(effective.clone());
-    save_project_config(tasks_dir, project_prefix, &project_config)?;
-
-    Ok(Some(effective))
+    Ok(Some((project_config, effective)))
 }
 
 /// Update a specific field in global or project configuration

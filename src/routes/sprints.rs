@@ -176,7 +176,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
         let outcome = match sprint_assignment::assign_tasks(
             &mut storage,
-            &records,
+            &mut records,
             &body.tasks,
             sprint_reference.as_deref(),
             body.allow_closed,
@@ -267,7 +267,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         let sprint_reference = body.sprint.as_ref().map(|selector| selector.as_reference());
         let outcome = match sprint_assignment::remove_tasks(
             &mut storage,
-            &records,
+            &mut records,
             &body.tasks,
             sprint_reference.as_deref(),
         ) {

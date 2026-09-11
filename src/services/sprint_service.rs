@@ -108,29 +108,59 @@ impl SprintService {
     pub fn update(
         storage: &mut Storage,
         id: u32,
-        mut sprint: Sprint,
+        sprint: Sprint,
     ) -> LoTaRResult<SprintOperationOutcome> {
         let dir = Sprint::dir(&storage.root_path);
-        let path = dir.join(format!("{}.yml", id));
-        if !path.exists() {
-            return Err(LoTaRError::SprintNotFound(id));
-        }
-        let warnings = sprint.canonicalize();
-        let now = Utc::now().to_rfc3339();
-        sprint.modified = Some(now.clone());
-        if sprint.created.is_none() {
-            sprint.created = Some(now);
-        }
+        let (sprint, warnings, serialized) = Self::prepare_update(sprint)?;
         crate::storage::safety::with_storage_lock(
             &dir,
             crate::storage::safety::sprint_lock_name(),
-            || Self::write_sprint(&dir, id, &sprint),
+            || {
+                let path = dir.join(format!("{}.yml", id));
+                if !path.exists() {
+                    return Err(LoTaRError::SprintNotFound(id));
+                }
+                crate::storage::safety::atomic_write_file(&path, &serialized)
+                    .map_err(LoTaRError::from)
+            },
         )?;
         Ok(SprintOperationOutcome {
             record: SprintRecord { id, sprint },
             warnings,
             applied_defaults: Vec::new(),
         })
+    }
+
+    /// Canonicalize and serialize a sprint for an update without writing it,
+    /// so coordinated transactions can stage the exact bytes (DEV-55).
+    fn prepare_update(
+        mut sprint: Sprint,
+    ) -> LoTaRResult<(Sprint, Vec<SprintCanonicalizationWarning>, String)> {
+        let warnings = sprint.canonicalize();
+        let now = Utc::now().to_rfc3339();
+        sprint.modified = Some(now.clone());
+        if sprint.created.is_none() {
+            sprint.created = Some(now);
+        }
+        let serialized = sprint.to_yaml()?;
+        Ok((sprint, warnings, serialized))
+    }
+
+    /// Stage a sprint update inside a coordinated transaction. The caller must
+    /// hold the transaction (which owns the sprints lock) for the staging and
+    /// commit; this never takes storage locks itself.
+    pub(crate) fn stage_update(
+        txn: &mut crate::storage::transaction::MultiFileTransaction,
+        root: &std::path::Path,
+        id: u32,
+        sprint: Sprint,
+    ) -> LoTaRResult<()> {
+        let path = Sprint::path_for_id(root, id);
+        if !path.exists() {
+            return Err(LoTaRError::SprintNotFound(id));
+        }
+        let (_, _, serialized) = Self::prepare_update(sprint)?;
+        txn.stage(&path, serialized)
     }
 
     pub fn delete(storage: &mut Storage, id: u32) -> LoTaRResult<bool> {

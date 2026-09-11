@@ -1277,7 +1277,7 @@ fn apply_sprint_action(
 ) -> LoTaRResult<()> {
     use crate::services::sprint_assignment;
 
-    let records = SprintService::list(storage)?;
+    let mut records = SprintService::list(storage)?;
     if records.is_empty() {
         return Ok(());
     }
@@ -1296,7 +1296,7 @@ fn apply_sprint_action(
     if add {
         let _ = sprint_assignment::assign_tasks(
             storage,
-            &records,
+            &mut records,
             &tasks,
             Some(&sprint_id.to_string()),
             true,  // allow_closed
@@ -1305,7 +1305,7 @@ fn apply_sprint_action(
     } else {
         let _ = sprint_assignment::remove_tasks(
             storage,
-            &records,
+            &mut records,
             &tasks,
             Some(&sprint_id.to_string()),
         );
