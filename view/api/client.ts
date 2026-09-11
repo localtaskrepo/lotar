@@ -249,16 +249,23 @@ export const api = {
     return get('/api/activity/feed', params)
   },
   whoami(): Promise<string> { return get('/api/whoami') },
+  /**
+   * CSV export of the CURRENT filtered set in the CURRENT global order.
+   * Forwards every supported list filter verbatim (status, priority, type,
+   * project, tags, q, assignee incl. `__none__`, sprints, custom fields,
+   * unknown extra keys, due/recent/needs smart filters, order, sort_by) so the
+   * export matches what the list view displays.
+   */
   exportTasks(filter: TaskListFilter & { q?: string } = {} as any): Promise<Response> {
-    const params: any = {
-      status: filter.status,
-      priority: filter.priority,
-      type: (filter as any).task_type || (filter as any).type,
-      project: filter.project,
-      tags: filter.tags,
-      q: (filter as any).text_query || (filter as any).q,
-    }
-    return fetch(`/api/tasks/export${qs(params)}`, { headers: { 'Accept': 'text/csv' } })
+    const source = filter as Record<string, any>
+    const params: Record<string, unknown> = { ...source }
+    if (params.type === undefined && source.task_type !== undefined) params.type = source.task_type
+    if (params.q === undefined && source.text_query !== undefined) params.q = source.text_query
+    delete params.task_type
+    delete params.text_query
+    // DTO-only flag; the REST grammar spells it assignee=__none__.
+    delete params.assignee_none
+    return fetch(`/api/tasks/export${qs(params as Record<string, any>)}`, { headers: { 'Accept': 'text/csv' } })
   },
 
   // Sprints

@@ -1,10 +1,11 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { storageGetJson, storageSetJson } from '../utils/storage'
-import { formatRelativeTime, formatTaskDate, isTaskOverdue, parseTaskDateToMillis } from '../utils/date'
+import { formatRelativeTime, formatTaskDate, isTaskOverdue } from '../utils/date'
 import type { TaskTouch } from './useActivity'
 import { injectColumnStore, useColumns, type ColKey } from './useColumns'
 import { numericOf, projectOf } from '../utils/text'
+import { colKeyToSortBy, sortTasks } from '../utils/taskSort'
 
 export interface TaskTableProps {
     tasks: TaskDTO[]
@@ -24,9 +25,17 @@ export interface TaskTableProps {
     hasMissingSprints?: boolean
     missingSprintMessage?: string
     sprintsLoading?: boolean
+    /**
+     * Controlled sort state. When provided, the table renders it as-is (the
+     * caller owns ordering, typically server-side), header clicks emit
+     * `update:sort` instead of mutating local state, and only columns with a
+     * server sort key offer the sort affordance.
+     */
+    sort?: { key: ColKey | string | null; dir: 'asc' | 'desc' } | null
 }
 
 export interface TaskTableEmit {
+    (event: 'update:sort', value: { key: ColKey | null; dir: 'asc' | 'desc' }): void
     (event: 'open', id: string): void
     (event: 'delete', id: string): void
     (event: 'update-tags', payload: { id: string; tags: string[] }): void
@@ -109,36 +118,73 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         return props.projectKey ? `${SORT_KEY}::${props.projectKey}` : SORT_KEY
     }
 
-    const sort = reactive<{ key: ColKey | null; dir: 'asc' | 'desc' }>(
-        storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(sortKey())
+    function readStoredSort(): { key: ColKey | null; dir: 'asc' | 'desc' } {
+        return storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(sortKey())
             ?? storageGetJson<{ key: ColKey | null; dir: 'asc' | 'desc' }>(SORT_KEY)
-            ?? { key: null, dir: 'desc' },
+            ?? { key: null, dir: 'desc' }
+    }
+
+    // Internal sort state (standalone usage). When the page passes the
+    // controlled `sort` prop, that value wins and local state is untouched.
+    const internalSort = reactive<{ key: ColKey | null; dir: 'asc' | 'desc' }>(readStoredSort())
+    let loadingSort = false
+
+    const isControlledSort = computed(() => props.sort !== undefined && props.sort !== null)
+
+    const sort = computed<{ key: ColKey | string | null; dir: 'asc' | 'desc' }>(() =>
+        isControlledSort.value ? (props.sort as { key: ColKey | null; dir: 'asc' | 'desc' }) : internalSort,
+    )
+
+    // Reload the stored sort whenever the project changes so one project's
+    // sort never leaks into (or gets persisted under) another project's key.
+    watch(
+        () => props.projectKey,
+        () => {
+            loadingSort = true
+            try {
+                const stored = readStoredSort()
+                internalSort.key = stored.key
+                internalSort.dir = stored.dir
+            } finally {
+                loadingSort = false
+            }
+        },
+    )
+
+    watch(
+        internalSort,
+        (value) => {
+            if (!loadingSort) storageSetJson(sortKey(), value)
+        },
+        { deep: true },
     )
 
     function setSort(key: ColKey, dir: 'asc' | 'desc') {
-        if (sort.key === key && sort.dir === dir) {
+        if (sort.value.key === key && sort.value.dir === dir) {
             return
         }
-        sort.key = key
-        sort.dir = dir
+        if (isControlledSort.value) {
+            emit('update:sort', { key, dir })
+            return
+        }
+        internalSort.key = key
+        internalSort.dir = dir
+    }
+
+    function isSortableCol(key: ColKey | string): boolean {
+        if (!isControlledSort.value) return true
+        return colKeyToSortBy(key) !== null
     }
 
     function onSort(key: ColKey) {
-        if (sort.key === key) {
-            const nextDir = sort.dir === 'asc' ? 'desc' : 'asc'
+        if (!isSortableCol(key)) return
+        if (sort.value.key === key) {
+            const nextDir = sort.value.dir === 'asc' ? 'desc' : 'asc'
             setSort(key, nextDir)
         } else {
             setSort(key, 'asc')
         }
     }
-
-    watch(
-        sort,
-        (value) => {
-            storageSetJson(sortKey(), value)
-        },
-        { deep: true },
-    )
 
     const rowMenu = ref<Record<string, boolean>>({})
 
@@ -156,31 +202,18 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     const filtered = computed(() => props.tasks || [])
 
+    // Standalone tables sort through the SHARED contract comparator for every
+    // column with a server sort key, so header sorts and exports can never
+    // disagree. (The tasks page renders the authoritative server order
+    // instead of sorting locally.)
     const sorted = computed(() => {
         const base = filtered.value
-        if (!sort.key) return base
-        const arr = [...base]
-        const key = sort.key
-        const dir = sort.dir === 'asc' ? 1 : -1
-        arr.sort((a, b) => {
-            const av = (a as any)[key]
-            const bv = (b as any)[key]
-            if (av == null && bv == null) return 0
-            if (av == null) return -1 * dir
-            if (bv == null) return 1 * dir
-            if (key === 'sprints') {
-                const toKey = (value: unknown) =>
-                    Array.isArray(value) && value.length > 0 ? value.join(',') : ''
-                return toKey(av).localeCompare(toKey(bv)) * dir
-            }
-            if (key === 'due_date' || key === 'modified') {
-                const at = parseTaskDateToMillis(av as any) ?? 0
-                const bt = parseTaskDateToMillis(bv as any) ?? 0
-                return (at - bt) * dir
-            }
-            return String(av).localeCompare(String(bv)) * dir
-        })
-        return arr
+        if (isControlledSort.value) return base
+        const key = sort.value.key
+        if (!key) return base
+        const serverSortBy = colKeyToSortBy(key)
+        if (!serverSortBy) return base
+        return sortTasks(base, serverSortBy, sort.value.dir)
     })
 
     const touchesMap = computed(() => props.touches ?? ({} as Record<string, TaskTouch>))
@@ -292,6 +325,8 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
         rootRef,
         sort,
         onSort,
+        isControlledSort,
+        isSortableCol,
         rowMenu,
         toggleRowMenu,
         closeRowMenu,

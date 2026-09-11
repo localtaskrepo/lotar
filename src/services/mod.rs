@@ -26,4 +26,5 @@ pub mod sync_service;
 pub mod task_service;
 pub mod task_validation;
 
+pub mod task_query;
 pub mod task_selection;

@@ -1,3 +1,5 @@
+mod common;
+
 use lotar::storage::operations::StorageOperations;
 use lotar::storage::safety::{is_valid_project_prefix, validate_project_prefix};
 use lotar::storage::task::Task;

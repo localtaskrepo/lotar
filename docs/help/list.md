@@ -28,10 +28,10 @@ lotar --format json list --due-soon --tag release
 | Project or workspace | `--project/-p`, `--tasks-dir`, `--tag/-i` |
 | Status & priority | `--status/-s`, `--priority/-P`, plus shortcuts `--high` and `--critical` |
 | Type & ownership | `--type/-t`, `--assignee/-a`, `--mine/-m`, `--where assignee=""` for unassigned |
-| Dates | `--overdue`, `--due-soon[=days]` |
+| Dates | `--overdue` (due before today), `--due-soon[=days]` (due today through today+days inclusive) |
 | Custom data | `--where key=value` or `--where field:<name>=value` (repeat as needed) |
 | Effort windows | `--effort-min 2h`, `--effort-max 1d`, accepts time or points |
-| Sorting & size | `--sort-by due-date`, `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
+| Sorting & size | `--sort-by due-date` (keys: priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, `field:<name>`), `--reverse`, `--page-size 100` (alias: `--limit`), plus `--offset` / `--page` |
 | Output | `--format text|json|table|markdown`, `--log-level info`, `--details` |
 
 Tips:
@@ -49,6 +49,8 @@ Tips:
 | `json` | Trigger automation or feed dashboards. |
 
 All formats show canonical IDs (`AUTH-12`), even if you entered `12`.
+
+Default order (no `--sort-by`) is newest-modified first, matching the REST and MCP list endpoints; ties break by canonical ID ascending. `--assignee`/`--mine` match assignees fuzzily (case and `@`-insensitive), like the API. An unknown `--sort-by` key is an error unless it names a configured custom field (bare name, `field:<name>`, or `custom:<name>`).
 
 Use `--details` to include task descriptions in text output.
 
@@ -107,6 +109,6 @@ Notes:
 | --- | --- |
 | “Task not found” or inconsistent IDs | Confirm you’re in the right workspace (`lotar status --explain` also prints context) or pass `--project`. |
 | Filters return nothing | Run without `--where` to make sure the field exists; custom keys must match your config names. |
-| Sorting feels off | Remember that string sorts are case-insensitive but depend on the stored values. Use `--sort-by field:<name>` for custom fields.
+| Sorting feels off | Ties between equal values always break by canonical ID ascending, even with `--reverse` (which flips the primary order only). Use `--sort-by field:<name>` for custom fields; tasks missing the field sort first ascending and last descending. |
 
 Happy with your filter? Drop it into an alias or script for repeat use.

@@ -81,8 +81,8 @@
             <th
               v-for="col in visibleColumns"
               :key="col"
-              :class="['sortable', { active: sort.key === col }]"
-              :aria-sort="sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'"
+              :class="[{ sortable: isSortableCol(col), active: isSortableCol(col) && sort.key === col }]"
+              :aria-sort="isSortableCol(col) ? (sort.key === col ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none') : undefined"
               @dragover.prevent="onColDragOver(col, $event)"
               @drop.prevent="onColDrop(col, $event)"
             >
@@ -104,7 +104,7 @@
                 @dragend="onColDragEnd"
               >
                 <span class="header-button__label">{{ headerLabel(col) }}</span>
-                <span class="header-button__sort" aria-hidden="true">
+                <span v-if="isSortableCol(col)" class="header-button__sort" aria-hidden="true">
                   <template v-if="sort.key === col">
                     {{ sort.dir === 'asc' ? '▲' : '▼' }}
                   </template>
@@ -263,6 +263,7 @@ const {
   rootRef,
   sort,
   onSort,
+  isSortableCol,
   rowMenu,
   toggleRowMenu,
   closeRowMenu,

@@ -1,14 +1,108 @@
 title: Unify task query filtering ordering pagination and export behavior
-status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-64, DEV-65, DEV-68, DEV-75]
-  depends_on: [DEV-56]
-  related: [DEV-3, DEV-5, DEV-13, DEV-41]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.479215+00:00
+modified: 2026-09-11T19:30:34.310356+00:00
+relationships:
+  depends_on:
+  - DEV-56
+  blocks:
+  - DEV-64
+  - DEV-65
+  - DEV-68
+  - DEV-75
+  related:
+  - DEV-3
+  - DEV-5
+  - DEV-13
+  - DEV-41
+  parent: DEV-53
+comments:
+- date: 2026-09-11T15:36:38.783680+00:00
+  text: |-
+    Backend wave start (agent: backend, current checkout, no git ops).
+
+    Plan:
+    1. Map current pipelines: REST list (src/routes), export, MCP tool param parsing (src/mcp), CLI list post-filters/sort (src/cli), task selection helpers; confirm documented due/recent/needs vocabulary instead of assuming.
+    2. New shared query executor: src/services/task_query.rs — strict parse of sort_by (builtins + custom:<name> + field:<name> alias), order asc|desc, due today|soon|later|overdue, recent7d, needs comma list (effort,due strict), sprints/other list filters forwarded. Default: modified desc, canonical-ID lexical asc tiebreak. RFC3339 + date-only handling, clock injection.
+    3. Wire REST list + export through executor: export applies full filter + global order, no pagination. Strict errors for invalid explicit enum/order/sort/page params (400-shaped like existing errors).
+    4. Wire MCP schemas: only new supported params; invalid enum values error instead of silently dropping.
+    5. CLI: route shared sort/filter semantics where compatible, preserve CLI-extra semantics (exact assignee etc.).
+    6. Docs: docs/openapi.json + help docs for new params; MCP schema docs.
+    7. Tests: new tests/dev57_task_query.rs (transport parity pages+CSV+MCP, sort custom/missing/tie, strict invalid matrix, date/DST boundaries); keep existing relevant API/MCP/CLI tests passing.
+    8. Targeted nextest only; no full gates until coordinator.
+- date: 2026-09-11T15:44:04.737248+00:00
+  text: |-
+    Contract locked (coordinator directive, wave 2):
+    - REST /api/tasks/list AND /api/tasks/export accept sort_by (builtins: priority|status|effort|due-date(due)|created|modified|assignee|type|project|id, plus custom:<name> with field:<name> alias), order=asc|desc. Default: modified desc, tie canonical ID lexical ASC (never flipped).
+    - due=today|soon|later|overdue (date buckets in task local date; soon=(today,today+7], later>today+7, overdue<today), recent=7d (modified >= now-7d), needs=effort,due CSV strict (AND, blank = missing).
+    - Strict 400/-32602 on invalid order/sort_by/due/recent/needs/sprints entries/status|priority|type enums; list limit strict 1..=200; export applies full filter+global order, no pagination.
+    - MCP task_list gains sort_by/order/due/recent/needs; strict enum+sprints; deterministic default order. CLI list delegates to shared comparator, keeps CLI-only flags and bare-custom sort keys.
+    - Docs vocabulary inspected: only recent=7d, needs effort|due exist (openapi list params). No other values.
+- date: 2026-09-11T16:11:01.019218+00:00
+  text: |-
+    Backend implementation complete (not marking Done per coordinator; awaiting integration/full gates + frontend wave).
+
+    Outcome: shared strict query executor + field accessor at src/services/task_query.rs, wired into REST /api/tasks/list AND /api/tasks/export, MCP task_list, and the CLI list comparator; docs/contracts updated.
+
+    Contract as implemented (matches locked plan):
+    - sort_by builtins priority|status|effort|due-date(due)|created|modified|assignee|type|project|id + custom:<name> (field:<name> alias, case-insensitive prefix, original name spelling). order asc|desc. Default modified desc; tie canonical ID lexical asc, never flipped.
+    - due today|soon|later|overdue bucketed by local calendar date from parsed stored due (RFC3339/naive/date-only; no human-keyword re-eval); soon=(today,today+7], later>today+7, overdue<today; DST-safe date arithmetic + local-midnight conversion. recent=7d inclusive on parsed modified instants. needs CSV strict (effort,due ANDed).
+    - Strict 400/-32602: invalid order/sort_by/due/recent/needs, bad sprints CSV entries (REST list+export), MCP invalid status/priority/type (with enum hints, previously silently dropped), MCP bad sprints entries, MCP type-confused params. REST list limit now strict 1..=200 (was clamped); export still ignores page params by design.
+    - Export: full filter set + global order, no pagination (was: ignored due/recent/needs/order entirely).
+    - MCP task_list schema: new params sort_by/order/due/recent/needs; deterministic default ordering; pagination over the global order.
+    - CLI: delegates to shared comparator (parse_sort_by first, then CLI-only bare declared/wildcard custom names; unknown keys still silently ignored); --reverse maps to Desc; keeps mine/high/critical/overdue/due-soon/effort-min/max/--where CLI-extra semantics. CLI default remains storage order (only sorts when asked).
+
+    Files: src/services/task_query.rs (new, 10 unit tests), src/services/mod.rs, src/routes/tasks.rs, src/routes/mod.rs (strict sprints + sort_by known key), src/utils/pagination.rs (parse_page_strict), src/mcp/server/handlers/tasks.rs, src/mcp/server/tools.rs, src/cli/handlers/task/search.rs, src/cli/args/task.rs (help text), docs/openapi.json (list+export params), docs/help/api-quick-reference.md, docs/help/mcp-tools.md, docs/help/list.md, tests/dev57_task_query_test.rs (new, 10 integration tests: transport parity pages+CSV+MCP, custom/missing/tie sorts, strict invalid matrix REST+MCP, due bucket boundaries incl. RFC3339-vs-date-only and no-due, recent cutoff band, effort sort parity, project sort).
+
+    Evidence: nextest targeted: dev57 10/10, web_api_integration 25/25, mcp_server_unit 21/21, combined affected sweep 409/409 passed (1 leaky = scratch dtor), list/sort/export-name sweep 90/90+71/71+141/141, lib/bin units 238/238. cargo clippy --all-targets -D warnings clean; cargo fmt --all --check clean. No full npm test / smoke yet (coordinator holds gates). No git operations.
+
+    Known deltas/risks:
+    1. REST list limit>200 or =0 now 400 (was silent clamp) — UI always sends <=200; smoke/frontend agent informed surface.
+    2. Modified sorting now parses instants (mixed-offset timestamps sort chronologically, corrupt values sort last asc) instead of raw string compare.
+    3. CLI --reverse no longer flips the ID tiebreak (contract: tie always ID asc); verified CLI suites pass.
+    4. MCP task_list now returns deterministic modified-desc order by default (was storage order).
+    5. Integration recent-boundary test uses +/-2s band around cutoff (handler clock skew); exact inclusivity unit-tested with injected clock.
+    6. DEV-65 cache redesign intentionally untouched; DEV-56 identity/root rules untouched.
+
+    Remaining: coordinator to run full gates (npm run lint/test/smoke) and frontend agent to forward sort_by/order + smart filters from view/ (server already authoritative).
+- date: 2026-09-11T19:14:52.017810+00:00
+  text: |-
+    Next-wave checkpoint (review findings addressed; still InProgress per coordinator).
+
+    1) Project-scoped enum validation: REST parse_task_query and MCP task_list now resolve config_for_project(tasks_root, project) for status/priority/type validation when an explicit project is requested (base config for cross-project queries). Regression: project-only enum accepted for its project, other-project enum 400/-32602.
+    2) CLI aligned with shared executor: default order now modified desc + canonical-ID asc tie (was storage order); invalid --sort-by is an explicit error (bare configured custom fields still accepted; field:/custom: prefixes accepted); --overdue uses the shared local-date bucket (due before today; a due later today is never overdue); --due-soon[=days] uses the shared inclusive window today..=today+days; --assignee/--mine use the fuzzy member_key predicate (case/@-insensitive) like REST/MCP.
+    3) New sort keys restoring UI headers: title (case-sensitive scalar), reporter (Option semantics identical to assignee: None first ascending), tags (array-lex of strings, empty first ascending), sprints (numeric vec-lex of the ascending sprint-id list derived from @sprints membership, empty first ascending). Canonical-ID asc tie unchanged. Documented in openapi.json, MCP tools schema, api-quick-reference.md, mcp-tools.md, list.md; CLI --sort-by help updated.
+    4) Strict blanks: explicitly blank due/recent/needs now 400 (REST list+export) and -32602 (MCP); omit the param to clear. UI told to omit empty values.
+    5) DST-gap robustness: due smart filters bucket date-only values directly on their calendar date (no local-midnight resolution involved); sorting maps date-only dues to the earliest valid local instant of that date (minute-scan fallback through DST gaps).
+    6) task_selection already reuses TaskService::list + the shared where-filter resolver; no ordering/flags added there.
+
+    Files this wave: src/services/task_query.rs (StoredDue, window/overdue predicates, new SortKeys, strict blanks, earliest_local_instant), src/routes/mod.rs, src/mcp/server/handlers/tasks.rs, src/cli/handlers/task/search.rs, src/cli/args/task.rs, docs (openapi.json, api-quick-reference.md, mcp-tools.md, list.md), tests/dev57_task_query_test.rs (14 tests now).
+
+    Verification: dev57 14/14 (incl. project-scoped enums REST+MCP, new keys parity, strict blanks, CLI default order/strict sort/date buckets/fuzzy assignee); affected sweep 436/436; name sweeps 144/144; 405/405 final; cargo clippy --all-targets -D warnings clean; cargo fmt --check clean. No git ops; view/ and smoke/ untouched.
+- date: 2026-09-11T19:30:30.545379+00:00
+  text: |-
+    Final review signoff + gate evidence (backend agent; coordinator finalization wave).
+
+    Outcome (full contract as shipped):
+    - Shared strict query executor services/task_query.rs used by REST /api/tasks/list AND /api/tasks/export, MCP task_list, and the CLI list comparator: strict filters (invalid enums, sprints entries, smart filters due/recent/needs incl. explicit blanks, order/sort_by, page params) error — nothing fails open.
+    - Project-aware enum validation: explicit project scope resolves config_for_project for status/priority/type (REST+MCP); base config for cross-project queries.
+    - Full sort/export parity: sort_by builtins priority,status,effort,due-date(due),created,modified,assignee,reporter,title,type,project,id,tags(array-lex strings, empty first asc),sprints(numeric vec-lex of ascending @sprints-derived ids, empty first asc) + custom:<name>/field:<name>; order asc|desc; default modified desc with canonical-ID lexical asc tie (never flipped); export applies the complete filter set + global order, no pagination; transport parity regressions for pages+CSV+MCP.
+    - UI consumes server ordering (sort persisted per project; Export CSV via browser) — frontend dropped duplicate comparator; server authoritative.
+    - CLI compatibility wave: default order aligned to modified desc, strict --sort-by errors (bare configured custom names preserved), fuzzy assignee/member predicate, --overdue/--due-soon day-bucket flags (inclusive today..=today+N window), no new flags.
+    - REST list limit strict 1..=200 (no clamping); due buckets are local-date based (date-only dues bucket directly on calendar date, DST-gap safe); recent=7d inclusive on parsed instants; needs=effort,due strict AND.
+    - docs/openapi.json, api-quick-reference.md, mcp-tools.md, list.md, MCP tools schema updated in parity.
+
+    Final gate evidence (coordinator-run, current prod source): npm run lint:agent passed repeatedly. npm run test:agent (DEFAULT concurrency, --retries 0) passed: Rust 981 passed with 6 explicit skips; 17 additional git-dependent test FILES are cfg-compiled-out via the build-time sandbox probe and therefore absent from the total — no claim that all tests executed (distinct from the original default run of 1000 passing with 6 runtime early-returns recorded before the build-cfg shift). UI 349 at the whole gate, then 352 final after 3 ledger unit tests. Full build-first smoke 109 passed / 23 skips. Mandatory WIP capability-skip branches were removed from ui.sort-export into assertions: targeted 6 executed / 6 passed / 0 skipped; full UI 352 and lint clean afterwards. No production changes since the full gates — only JSDoc/docs/tests and one comment-only fix in services/task_query.rs (tags accessor wording; fmt check clean).
+
+    Earlier stabilization notes: the original three tests genuinely ran and passed under the default gate before the build-cfg shift; async suite repeated 3x, transaction pair passes, MCP single-contention case actually executes ~2s through real repo ancestry in an isolated fixture store.
+
+    Remaining/linked (NOT blockers): DEV-65 shared-cache race remains open with dependents (no autoclose); DEV-3/5/13 feature coordination untouched; repo-less artifact fail-closed arm only on DEV-79 runner coverage. Changes remain uncommitted/unstaged per instructions; no git operations performed.
+
+    Guidance: no durable instruction or policy correction found this wave.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S12 M9 M11 U5 U8.
@@ -20,3 +114,38 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-11T15:36:38.774004+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-11T15:36:38.783680+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T15:44:04.737248+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T16:11:01.019218+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T19:14:52.017810+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T19:30:30.545379+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T19:30:34.310356+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

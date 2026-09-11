@@ -37,6 +37,8 @@ Notes
 - `custom_fields` replace-all patches keep keys already present on the task even when removed from project config, canonicalize configured keys to their configured spelling, and reject brand-new undeclared keys. `sprints` entries must be positive integers; invalid entries are rejected (REST and MCP).
 - Validation errors return 400 with INVALID_ARGUMENT.
 - `assignee=@me` that cannot be resolved fails closed with a 400 error rather than returning an unfiltered list.
-- `/api/tasks/export` supports the same filter query parameters as `/api/tasks/list`.
+- `/api/tasks/export` supports the exact `/api/tasks/list` query grammar, including the `due`/`recent`/`needs` smart filters and `sort_by`/`order`: the export applies the complete filter set and the requested global order (default `modified` desc, canonical-ID ascending tiebreak); pagination params are ignored (no page slicing).
+- `/api/tasks/list` and `/api/tasks/export` share one strict query executor: `sort_by` accepts the builtin keys (`priority`, `status`, `effort`, `due-date`, `created`, `modified`, `assignee`, `reporter`, `title`, `type`, `project`, `id`, `tags`, `sprints`) plus `custom:<name>` (alias `field:<name>`); `tags` compares the tag array lexicographically and `sprints` the ascending sprint-id list numerically (empty first ascending); `order` is `asc|desc`; invalid explicit enum values, sprint entries, smart filters, sort/order params, or page params (`limit` must be 1-200) return `400 INVALID_ARGUMENT` instead of being ignored or clamped. Explicitly blank `due`/`recent`/`needs` values are errors — omit the parameter instead.
+- Enum filters (`status`, `priority`, `type`) validate against the explicit `project`'s resolved configuration when a project is requested, so project-only enum values are accepted; queries without `project` validate against the base config.
 
 See also: [Identity & Users](./identity.md), [Task Model](./task-model.md), and [SSE Events](./sse.md).

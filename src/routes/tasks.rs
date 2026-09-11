@@ -42,7 +42,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
     };
     let storage = crate::storage::manager::Storage::new(&resolver.path.clone());
 
-    let page = match crate::utils::pagination::parse_page(&req.query, 50, 200) {
+    let page = match crate::utils::pagination::parse_page_strict(&req.query, 50, 200) {
         Ok(v) => v,
         Err(msg) => return bad_request(msg),
     };
@@ -63,105 +63,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
         Err(msg) => return bad_request(msg),
     };
 
+    // Shared strict executor (DEV-57): invalid explicit order/sort_by/due/
+    // recent/needs values are 400s, never silently ignored.
+    let options = match crate::services::task_query::parse_query_options(&req.query) {
+        Ok(v) => v,
+        Err(msg) => return bad_request(msg),
+    };
+
     let tasks = TaskService::list(&storage, &filter);
 
     // Apply in-memory filters if any
     let mut tasks = tasks; // shadow mutable
     apply_unknown_key_filters(&mut tasks, &uf, &cfg);
 
-    let due = req.query.get("due").map(|s| s.as_str()).unwrap_or("");
-    let recent = req.query.get("recent").map(|s| s.as_str()).unwrap_or("");
-    let needs_raw = req.query.get("needs").map(|s| s.as_str()).unwrap_or("");
-    let needs: BTreeSet<&str> = needs_raw
-        .split(',')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    if !due.is_empty() || !recent.is_empty() || !needs.is_empty() {
-        use chrono::{DateTime, Duration, Local, NaiveDate, Utc};
-
-        let today = Local::now().date_naive();
-        let tomorrow = today + Duration::days(1);
-        let soon_cutoff = today + Duration::days(7);
-        let recent_cutoff = Utc::now() - Duration::days(7);
-
-        tasks.retain(|(_, task)| {
-            if !due.is_empty() {
-                let Some(raw_due) = task.due_date.as_deref() else {
-                    return false;
-                };
-                let Ok(due_date) = NaiveDate::parse_from_str(raw_due.trim(), "%Y-%m-%d") else {
-                    return false;
-                };
-
-                match due {
-                    "today"
-                        if due_date != today => {
-                            return false;
-                        }
-                    "soon"
-                        if (due_date < tomorrow || due_date > soon_cutoff) => {
-                            return false;
-                        }
-                    "later"
-                        if due_date <= soon_cutoff => {
-                            return false;
-                        }
-                    "overdue"
-                        if due_date >= today => {
-                            return false;
-                        }
-                    _ => {}
-                }
-            }
-
-            if recent == "7d" {
-                let Ok(modified) = DateTime::parse_from_rfc3339(task.modified.as_str()) else {
-                    return false;
-                };
-                if modified.with_timezone(&Utc) < recent_cutoff {
-                    return false;
-                }
-            }
-
-            if !needs.is_empty() {
-                if needs.contains("effort") {
-                    let effort = task.effort.as_deref().unwrap_or("").trim();
-                    if !effort.is_empty() {
-                        return false;
-                    }
-                }
-                if needs.contains("due") {
-                    let due_val = task.due_date.as_deref().unwrap_or("").trim();
-                    if !due_val.is_empty() {
-                        return false;
-                    }
-                }
-            }
-
-            true
-        });
-    }
-
-    let order = req.query.get("order").map(|s| s.as_str()).unwrap_or("desc");
-    let desc = order != "asc";
-    tasks.sort_by(|(ida, ta), (idb, tb)| {
-        use std::cmp::Ordering;
-
-        let mut cmp = ta.modified.cmp(&tb.modified);
-        if desc {
-            cmp = cmp.reverse();
-        }
-        if cmp != Ordering::Equal {
-            return cmp;
-        }
-        if desc {
-            idb.cmp(ida)
-        } else {
-            ida.cmp(idb)
-        }
-    });
+    // Smart filters + deterministic global ordering (default modified desc,
+    // canonical-ID lexical asc tiebreak), then pagination.
+    crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
 
     let total = tasks.len();
     let (start, end) = crate::utils::pagination::slice_bounds(total, page.offset, page.limit);
@@ -202,8 +119,15 @@ pub(super) fn register(api_server: &mut ApiServer) {
         Ok(v) => v,
         Err(msg) => return bad_request(msg),
     };
+    // Export shares the full list grammar (DEV-57): every filter including
+    // the smart filters, the requested global order, and no pagination.
+    let options = match crate::services::task_query::parse_query_options(&req.query) {
+        Ok(v) => v,
+        Err(msg) => return bad_request(msg),
+    };
     let mut tasks = TaskService::list(&storage, &filter);
     apply_unknown_key_filters(&mut tasks, &uf, &cfg);
+    crate::services::task_query::apply(&mut tasks, &options, chrono::Utc::now());
 
     // Build CSV (quoted where needed)
     fn esc(s: &str) -> String {

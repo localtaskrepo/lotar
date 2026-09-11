@@ -484,7 +484,7 @@ fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "List tasks using optional filters. status/priority/type accept a single string, comma-separated string, or array and are validated via project config. assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids.\n\nPAGINATION: Results are paginated. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
+    let description = "List tasks using optional filters. status/priority/type accept a single string, comma-separated string, or array and are validated via project config (invalid values error). assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids. due (today|soon|later|overdue), recent (7d), and needs (CSV of effort,due) are smart filters. sort_by orders globally (builtins: priority, status, effort, due-date, created, modified, assignee, type, project, id; or custom:<name> / field:<name>); order is asc|desc. Default: modified desc with canonical-ID ascending tiebreak. Invalid explicit filter/sort values error instead of being dropped.\n\nPAGINATION: Results are paginated over that deterministic global order. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("project".into(), json!({"type": ["string", "null"]}));
@@ -531,6 +531,45 @@ fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         json!({
             "type": ["number", "null"],
             "description": "Alias for cursor (0-based)."
+        }),
+    );
+    properties.insert(
+        "sort_by".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending)."
+        }),
+    );
+    properties.insert(
+        "order".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["asc", "desc", null],
+            "description": "Sort direction. Defaults to desc. Ties always break by canonical task ID ascending."
+        }),
+    );
+    properties.insert(
+        "due".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["today", "soon", "later", "overdue", null],
+            "description": "Smart filter on the due date: today, soon (next 7 days excluding today), later (beyond 7 days), or overdue (before today)."
+        }),
+    );
+    properties.insert(
+        "recent".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["7d", null],
+            "description": "Smart filter: only tasks modified in the last 7 days."
+        }),
+    );
+    properties.insert(
+        "needs".into(),
+        json!({
+            "type": ["string", "array", "null"],
+            "items": {"type": "string", "enum": ["effort", "due"]},
+            "description": "Smart filter: keep only tasks missing these fields. Accepts CSV string or array; strict vocabulary: effort, due. Blank explicit values are errors."
         }),
     );
 
@@ -1091,6 +1130,45 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
             "description": "Alias for cursor (0-based)."
         }),
     );
+    properties.insert(
+        "sort_by".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending)."
+        }),
+    );
+    properties.insert(
+        "order".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["asc", "desc", null],
+            "description": "Sort direction. Defaults to desc. Ties always break by canonical task ID ascending."
+        }),
+    );
+    properties.insert(
+        "due".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["today", "soon", "later", "overdue", null],
+            "description": "Smart filter on the due date: today, soon (next 7 days excluding today), later (beyond 7 days), or overdue (before today)."
+        }),
+    );
+    properties.insert(
+        "recent".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["7d", null],
+            "description": "Smart filter: only tasks modified in the last 7 days."
+        }),
+    );
+    properties.insert(
+        "needs".into(),
+        json!({
+            "type": ["string", "array", "null"],
+            "items": {"type": "string", "enum": ["effort", "due"]},
+            "description": "Smart filter: keep only tasks missing these fields. Accepts CSV string or array; strict vocabulary: effort, due. Blank explicit values are errors."
+        }),
+    );
 
     let mut tool = json!({
         "name": "sprint_backlog",
@@ -1165,6 +1243,45 @@ fn make_project_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         json!({
             "type": ["number", "null"],
             "description": "Alias for cursor (0-based)."
+        }),
+    );
+    properties.insert(
+        "sort_by".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending)."
+        }),
+    );
+    properties.insert(
+        "order".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["asc", "desc", null],
+            "description": "Sort direction. Defaults to desc. Ties always break by canonical task ID ascending."
+        }),
+    );
+    properties.insert(
+        "due".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["today", "soon", "later", "overdue", null],
+            "description": "Smart filter on the due date: today, soon (next 7 days excluding today), later (beyond 7 days), or overdue (before today)."
+        }),
+    );
+    properties.insert(
+        "recent".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["7d", null],
+            "description": "Smart filter: only tasks modified in the last 7 days."
+        }),
+    );
+    properties.insert(
+        "needs".into(),
+        json!({
+            "type": ["string", "array", "null"],
+            "items": {"type": "string", "enum": ["effort", "due"]},
+            "description": "Smart filter: keep only tasks missing these fields. Accepts CSV string or array; strict vocabulary: effort, due. Blank explicit values are errors."
         }),
     );
 

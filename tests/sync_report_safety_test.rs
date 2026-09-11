@@ -1,3 +1,5 @@
+mod common;
+
 use lotar::api_types::{SyncReport, SyncSummary};
 use lotar::config::types::ResolvedConfig;
 use lotar::services::sync_report_service::SyncReportService;

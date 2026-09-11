@@ -2,6 +2,8 @@
 //! must behave exactly like an uncached scan — external edits, deletes, and
 //! new files are all reflected in subsequent searches.
 
+mod common;
+
 use lotar::storage::manager::Storage;
 use lotar::storage::task::Task;
 use lotar::types::Priority;

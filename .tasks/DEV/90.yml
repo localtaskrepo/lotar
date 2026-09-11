@@ -1,12 +1,39 @@
 title: Rust test fixtures are not hermetic to sibling .tasks workspaces under the shared temp dir
-status: Todo
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-11T06:20:31.516893+00:00
+modified: 2026-09-11T19:30:57.273182+00:00
+comments:
+- date: 2026-09-11T15:17:33.479237+00:00
+  text: 'Implemented under DEV-78 scope (session 2026-09-11). Fixture hermeticity against sibling .tasks contamination now holds at the TMPDIR level: a ctor in tests/common/mod.rs (and a mirrored #[cfg(test)] ctor in src/lib.rs for the lib test binary) redirects TMPDIR to .lotar-test-scratch/<pid>-<nanos>/ under a dot-prefixed base that candidate_task_roots sibling scanning can never see. mod common was added to the 14 fixture-creating test files that lacked it (config_validation, config_validate_integration, storage_path_safety, sync_report_safety, config_service_inspect, config_service_branch_alias, storage_search_freshness, sprint_storage, scanner_custom_ticket_patterns, cli_project_resolver_unit, config_normalization_safety, workspace_unit, sprint_single_membership, scan_ignore_and_filters). Under nextest each test runs in its own process, so fixtures of different tests are no longer siblings of each other or of unrelated leftover workspaces (the ws1-3 failure class); multiple fixtures inside one test remain siblings as before. Cleanup: #[dtor] removes the scratch on regular exits, and each process sweeps base entries whose owning pid is dead, because nextest kills finished test processes before destructors; leaked scratches stay invisible to scans either way. Evidence: ctor DIAG output showed per-process scratches (e.g. .../T/kilo/.lotar-test-scratch/<pid>-<nanos>), a direct binary run swept 4 stale dead-owner dirs, and full gates below. Verification: npm run test:rust:agent -- --no-fail-fast -> 1000 tests, 994 passed, 6 failed (all six are the pre-existing sandbox .git-denied agent_safety git tests, unrelated to this change; see DEV-79); npm run test:ui:agent 291/291; npm run lint:agent clean. Smoke not run per session instruction (test-infra-only change; smoke gate deferred to integration). Uncommitted, unstaged; no production behavior changed.'
+- date: 2026-09-11T19:30:57.273182+00:00
+  text: |-
+    Final gate evidence appended (backend agent, coordinator finalization wave; status stays Done — broader-fix audit upheld, no reopen).
+
+    Earlier verification on this ticket recorded the pre-finalization gates (1000/994/6 under the old default cfg, UI 291, lint). Final gates at current prod source, after this wave's stabilization: npm run lint:agent clean (repeated); npm run test:agent DEFAULT concurrency --retries 0: Rust 981 passed + 6 explicit skips, with 17 git-dependent test FILES cfg-compiled-out by the sandbox probe and absent from totals (accounting distinction vs the earlier 1000-pass/6-runtime-early-return run; no claim all tests executed); UI 352 final (349 whole-gate + 3 ledger unit tests); full build-first smoke 109 passed / 23 skips. No production changes after the full gates — only JSDoc/docs/tests and one comment-only Rust doc fix (fmt check clean). Process-TMPDIR fixture isolation infra from this ticket continues to hold under nextest per-process scratches; no leakage regressions observed in any gate. No git operations.
 description: |-
   StorageLocator::candidate_task_roots (src/storage/locator.rs) scans visible sibling directories of a workspace for .tasks folders (monorepo layout). Test fixtures use tempfile::tempdir() directly under the shared per-session temp dir, so any leftover visible sibling workspace containing .tasks leaks its tasks into every fixture that shares a project prefix.
 
   Evidence (2026-09-11 final DEV-55 verification): scratch workspaces ws1/ws2/ws3 (TEST projects with @sprints, created ~11:29-11:33 local) under the shared temp dir caused 6 deterministic failures with InvalidTaskId and task-count assertions: services::sync_service::retry_safety_tests::{sync_dry_run_never_writes_journal_tasks_or_remote, sync_dry_recovery_preserves_journal_and_rejects_cross_scope_linking, sync_creation_link_failure_recovers_once_both_providers_and_directions, sync_returned_identity_journal_failure_never_recreates, sync_replacement_io_failure_preserves_all_pending_intents} and sync_report_safety_test::sync_push_dry_run_does_not_persist_even_when_reports_requested. search() merges sibling TEST-1..3 phantoms while get/canonical_sync_task_id only read the primary root. Rerunning with an isolated clean TMPDIR passed the full suite unchanged, so this is environmental, not a DEV-55 regression.
 
   Scope: consider nesting fixture tempdirs one level deeper (dedicated parent per suite/run), or a test-only guard asserting candidate_task_roots returns only the fixture root. Not fixed during DEV-55 verification (read-only mandate); ws1-3 are the concurrent reviewer's scratch data and were left untouched.
+history:
+- at: 2026-09-11T15:17:33.469489+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: Done
+  - field: assignee
+    new: mallox
+- at: 2026-09-11T15:17:33.479237+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T19:30:57.273182+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

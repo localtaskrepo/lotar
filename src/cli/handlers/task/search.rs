@@ -3,6 +3,7 @@ use crate::cli::handlers::CommandHandler;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::validation::CliValidator;
 use crate::config::types::ResolvedConfig;
+use crate::services::task_query::{SortOrder, SortSpec};
 use crate::storage::{TaskFilter, task::Task};
 use crate::workspace::TasksDirectoryResolver;
 
@@ -35,7 +36,7 @@ impl CommandHandler for SearchHandler {
             .apply(&mut tasks)?;
 
         let total_matching = tasks.len();
-        Self::apply_sort(tasks.as_mut_slice(), &args, &ctx.config);
+        Self::apply_sort(tasks.as_mut_slice(), &args, &ctx.config)?;
 
         let (offset, limit) = Self::resolve_pagination(&args)?;
         Self::apply_offset_and_limit(&mut tasks, offset, limit);
@@ -102,108 +103,57 @@ impl SearchHandler {
         })
     }
 
-    fn apply_sort(tasks: &mut [(String, Task)], args: &TaskSearchArgs, config: &ResolvedConfig) {
-        if let Some(sort_key) = args.sort_by.as_deref() {
-            let key_raw = sort_key.trim();
-            let key = key_raw.to_lowercase();
-            tasks.sort_by(|(id_a, task_a), (id_b, task_b)| {
-                use std::cmp::Ordering::*;
-
-                let ordering = match key.as_str() {
-                    "priority" => task_a.priority.as_str().cmp(task_b.priority.as_str()),
-                    "status" => task_a.status.as_str().cmp(task_b.status.as_str()),
-                    "effort" => {
-                        let effort_a = task_a
-                            .effort
-                            .as_deref()
-                            .and_then(|s| crate::utils::effort::parse_effort(s).ok());
-                        let effort_b = task_b
-                            .effort
-                            .as_deref()
-                            .and_then(|s| crate::utils::effort::parse_effort(s).ok());
-
-                        match (effort_a, effort_b) {
-                            (Some(x), Some(y)) => match (x.kind, y.kind) {
-                                (
-                                    crate::utils::effort::EffortKind::TimeHours(ax),
-                                    crate::utils::effort::EffortKind::TimeHours(by),
-                                ) => ax.partial_cmp(&by).unwrap_or(Equal),
-                                (
-                                    crate::utils::effort::EffortKind::Points(ax),
-                                    crate::utils::effort::EffortKind::Points(by),
-                                ) => ax.partial_cmp(&by).unwrap_or(Equal),
-                                _ => x.canonical.cmp(&y.canonical),
-                            },
-                            (Some(_), None) => Less,
-                            (None, Some(_)) => Greater,
-                            (None, None) => Equal,
-                        }
-                    }
-                    "due-date" | "due" => match (&task_a.due_date, &task_b.due_date) {
-                        (Some(x), Some(y)) => x.cmp(y),
-                        (Some(_), None) => Less,
-                        (None, Some(_)) => Greater,
-                        (None, None) => Equal,
-                    },
-                    "created" => task_a.created.cmp(&task_b.created),
-                    "modified" => task_a.modified.cmp(&task_b.modified),
-                    "assignee" => task_a.assignee.cmp(&task_b.assignee),
-                    "type" => task_a
-                        .task_type
-                        .to_string()
-                        .cmp(&task_b.task_type.to_string()),
-                    "project" => project_prefix_of(id_a).cmp(&project_prefix_of(id_b)),
-                    "id" => id_a.cmp(id_b),
-                    other => {
-                        let mut name_opt: Option<&str> = None;
-                        if let Some(rest) = other.strip_prefix("field:") {
-                            name_opt = Some(rest.trim());
-                        } else if config.custom_fields.has_wildcard()
-                            || config
-                                .custom_fields
-                                .values
-                                .iter()
-                                .any(|v| v.eq_ignore_ascii_case(key_raw))
-                        {
-                            name_opt = Some(key_raw);
-                        }
-
-                        if let Some(name) = name_opt {
-                            let pick = |task: &Task| -> String {
-                                if let Some(value) = task.custom_fields.get(name) {
-                                    return crate::types::custom_value_to_string(value);
-                                }
-                                let lower = name.to_lowercase();
-                                if let Some((_, value)) = task
-                                    .custom_fields
-                                    .iter()
-                                    .find(|(k, _)| k.to_lowercase() == lower)
-                                {
-                                    return crate::types::custom_value_to_string(value);
-                                }
-                                String::new()
-                            };
-
-                            pick(task_a).cmp(&pick(task_b))
-                        } else {
-                            Equal
-                        }
-                    }
-                };
-
-                let ordering = if ordering == Equal {
-                    id_a.cmp(id_b)
-                } else {
-                    ordering
-                };
-
-                if args.reverse {
-                    ordering.reverse()
-                } else {
-                    ordering
-                }
-            });
+    /// Resolve the CLI sort key into the shared executor spec. CLI keeps one
+    /// extra grammar form over strict REST/MCP (DEV-57): bare declared or
+    /// wildcard custom-field names are accepted. Any other unknown key is an
+    /// explicit error, matching the shared strict-query contract.
+    fn resolve_sort_spec(sort_key: &str, config: &ResolvedConfig) -> Result<SortSpec, String> {
+        if let Ok(spec) = crate::services::task_query::parse_sort_by(sort_key) {
+            return Ok(spec);
         }
+        let key_raw = sort_key.trim();
+        if !key_raw.is_empty()
+            && (config.custom_fields.has_wildcard()
+                || config
+                    .custom_fields
+                    .values
+                    .iter()
+                    .any(|v| v.eq_ignore_ascii_case(key_raw)))
+        {
+            return Ok(SortSpec::Custom(key_raw.to_string()));
+        }
+        Err(format!(
+            "Invalid --sort-by '{key_raw}': not a builtin key or configured custom field"
+        ))
+    }
+
+    /// Shared-executor sorting (DEV-57): without `--sort-by` the CLI now uses
+    /// the shared default order (modified desc, canonical-ID asc tie) like
+    /// REST and MCP; an invalid explicit key is an error instead of a silent
+    /// no-op; `--reverse` maps to descending order (the tiebreak never
+    /// flips).
+    fn apply_sort(
+        tasks: &mut [(String, Task)],
+        args: &TaskSearchArgs,
+        config: &ResolvedConfig,
+    ) -> Result<(), String> {
+        let (spec, order) = match args.sort_by.as_deref() {
+            Some(sort_key) => {
+                let spec = Self::resolve_sort_spec(sort_key, config)?;
+                let order = if args.reverse {
+                    SortOrder::Desc
+                } else {
+                    SortOrder::Asc
+                };
+                (spec, order)
+            }
+            None => (
+                SortSpec::Builtin(crate::services::task_query::SortKey::Modified),
+                SortOrder::Desc,
+            ),
+        };
+        crate::services::task_query::sort_tasks(tasks, &spec, order);
+        Ok(())
     }
 
     fn resolve_pagination(args: &TaskSearchArgs) -> Result<(usize, usize), String> {
@@ -448,6 +398,10 @@ impl<'a> TaskPostFilters<'a> {
         Ok(())
     }
 
+    /// Assignee filtering uses the shared fuzzy member predicate
+    /// (`member_key` equality, same as REST/TaskService) instead of exact
+    /// string equality, so `--assignee alice` matches stored `Alice` and
+    /// `@alice` (DEV-57 alignment).
     fn apply_assignee_filter(&self, tasks: &mut Vec<(String, Task)>) {
         if let Some(assignee) = self.args.assignee.as_ref() {
             let target = if assignee == "@me" {
@@ -456,10 +410,16 @@ impl<'a> TaskPostFilters<'a> {
                 Some(assignee.clone())
             };
 
-            if let Some(user) = target {
-                tasks.retain(|(_, task)| task.assignee.as_ref() == Some(&user));
-            } else {
-                tasks.clear();
+            match target {
+                Some(user) => {
+                    let key = crate::utils::fuzzy_match::member_key(&user);
+                    tasks.retain(|(_, task)| {
+                        task.assignee
+                            .as_deref()
+                            .is_some_and(|a| crate::utils::fuzzy_match::member_key(a) == key)
+                    });
+                }
+                None => tasks.clear(),
             }
         }
     }
@@ -469,7 +429,12 @@ impl<'a> TaskPostFilters<'a> {
             if let Some(me) =
                 crate::utils::identity::resolve_current_user(Some(self.resolver.path.as_path()))
             {
-                tasks.retain(|(_, task)| task.assignee.as_ref() == Some(&me));
+                let key = crate::utils::fuzzy_match::member_key(&me);
+                tasks.retain(|(_, task)| {
+                    task.assignee
+                        .as_deref()
+                        .is_some_and(|a| crate::utils::fuzzy_match::member_key(a) == key)
+                });
             } else {
                 tasks.clear();
             }
@@ -486,16 +451,23 @@ impl<'a> TaskPostFilters<'a> {
         }
     }
 
+    /// Due flags share the executor's local-date bucket predicates
+    /// (DEV-57): `--overdue` matches due dates strictly before today and
+    /// `--due-soon[=days]` matches today through today+days inclusive, so a
+    /// task due later today is "today" work, never overdue, and stored
+    /// date-only values never depend on local-midnight resolution.
     fn apply_due_filters(&self, tasks: &mut Vec<(String, Task)>) {
+        if !self.args.overdue && self.args.due_soon.is_none() {
+            return;
+        }
+        let today = crate::services::task_query::today_local(chrono::Utc::now());
         if self.args.overdue {
-            let now = chrono::Utc::now();
             tasks.retain(|(_, task)| {
-                if let Some(ref due) = task.due_date
-                    && let Some(dt) = crate::utils::time::parse_human_datetime_to_utc(due).ok()
-                {
-                    return dt < now;
-                }
-                false
+                crate::services::task_query::due_raw_matches_bucket(
+                    task.due_date.as_deref(),
+                    crate::services::task_query::DueFilter::Overdue,
+                    today,
+                )
             });
         }
 
@@ -504,15 +476,12 @@ impl<'a> TaskPostFilters<'a> {
                 Some(n) => n as i64,
                 None => 7,
             };
-            let now = chrono::Utc::now();
-            let cutoff = now + chrono::Duration::days(days);
             tasks.retain(|(_, task)| {
-                if let Some(ref due) = task.due_date
-                    && let Some(dt) = crate::utils::time::parse_human_datetime_to_utc(due).ok()
-                {
-                    return dt >= now && dt <= cutoff;
-                }
-                false
+                crate::services::task_query::due_raw_within_window(
+                    task.due_date.as_deref(),
+                    today,
+                    days,
+                )
             });
         }
     }
@@ -602,11 +571,4 @@ impl<'a> TaskPostFilters<'a> {
 
         Ok(())
     }
-}
-
-fn project_prefix_of(id: &str) -> String {
-    crate::storage::TaskId::parse(id)
-        .ok()
-        .map(|parsed| parsed.project)
-        .unwrap_or_else(|| id.to_string())
 }

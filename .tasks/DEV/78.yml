@@ -1,12 +1,35 @@
 title: Separate wall-clock performance budgets from parallel correctness tests
-status: Todo
-relationships:
-  parent: DEV-53
-  related: [DEV-48, DEV-49]
+status: InProgress
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.831754+00:00
+modified: 2026-09-11T19:30:41.909404+00:00
+relationships:
+  related:
+  - DEV-48
+  - DEV-49
+  parent: DEV-53
+comments:
+- date: 2026-09-11T14:48:18.732631+00:00
+  text: 'Plan (session 2026-09-11): fix three researched failing-test issues + two coverage/hermeticity items, all test-infra side, no production behavior changes. (1) tests/agent_automation_integration_test.rs async_run_action_does_not_block: replace sleep-0.1 timing assumption with a child release gate (script waits bounded ~10s for a release file, then writes marker) + Drop guard that releases on any exit path, so a blocking regression fails promptly and no child leaks. (2) .config/nextest.toml: put binary(agent_safety_test) into the agent-processes group (max-threads=1) like agent_automation_integration_test; retries stay configured but nothing relies on them because test:agent overrides --retries 0. (3) src/storage/transaction.rs concurrent_transactions_serialize_on_the_coordinated_locks: bounded retry on IoError kind WouldBlock (the legitimate 2s busy timeout under fsync load) only, preserving the read-back-own-write serialization assertion and the recovery_waits_for_the_journal_projects_task_lock timeout test; no production timeout change. (4) tests/dev56_task_identity_test.rs mcp_single_file_reference_blocks_on_held_store_lock: try .git FILE marker (find_repo_root supports files), then fall back to a fixture under CARGO_TARGET_TMPDIR so find_repo_root discovers the real checkout root by ancestry (sandbox denies creating ANY .git path - verified dir+file both EPERM); genuine contention coverage without git commands or production repo-discovery changes; DEV-79 records any remaining gap. (5) tests/common/mod.rs ctor: isolate TMPDIR under a dot-prefixed owned scratch per test process (DEV-90) so fixtures are not siblings of leftover workspaces in the shared temp dir. Verification: focused nextest runs per test, then npm run test:agent (default concurrency, retries 0) and npm run lint:agent.'
+- date: 2026-09-11T15:11:31.042453+00:00
+  text: 'Progress: all five changes implemented. (1) async_run_action_does_not_block rewritten with a bounded (~10s) child release gate + Drop release guard; focused run x6 passed (0.6-0.9s each). (2) .config/nextest.toml now assigns binary(agent_safety_test) to the agent-processes group (max-threads=1, retries configured but not relied on; test:agent overrides --retries 0). (3) transaction.rs concurrent test retries only IoError-kind-WouldBlock begins (6 extra attempts); serialization read-back assertion and the 2s lock-timeout test unchanged; focused runs passed incl. recovery_waits_for_the_journal_projects_task_lock. (4) dev56 MCP store-lock test: probes .git dir then FILE marker; both are denied by this sandbox (verified EPERM for dir AND file), so it now places the fixture under CARGO_TARGET_TMPDIR and finds the REAL repo root by ancestry - focused run passed with stderr ''lock section via real repo root discovered by ancestry'', i.e. the genuine held-lock contention section executed for the first time in this sandbox; repo-less builds keep the fail-closed-only arm (DEV-79). (5) TMPDIR isolation (DEV-90): ctor in tests/common redirects TMPDIR to .lotar-test-scratch/<pid>-<nanos> (dot-base invisible to sibling scans), mirrored cfg(test) ctor in src/lib.rs for the lib test binary, plus mod common added to the 14 fixture-creating test files that lacked it; dead-owner sweeping removes scratches of processes nextest killed before dtor; verified sweep + cleanup lifecycle. Note: agent_safety_test has 6 git-repo tests that fail in this sandbox because creating ANY .git path under the session temp dir is denied (pre-existing environment limitation, matches the sandbox_blocks_git correction; the 19:56 junit pass came from an unsandboxed run); runtime gating for them is DEV-79 scope, not changed here.'
+- date: 2026-09-11T15:17:56.795076+00:00
+  text: 'Handoff (session 2026-09-11). Outcome: three researched failing-test issues fixed at the test-infrastructure level plus two coverage/hermeticity items; no production behavior changed. Files: .config/nextest.toml (binary(agent_safety_test) joined to the agent-processes group; retries configured but not relied on since test:agent forces --retries 0); tests/agent_automation_integration_test.rs (async_run_action_does_not_block: bounded ~10s child release gate + Drop release guard, no sleep-0.1 timing assumption; regression would fail promptly at the first assert instead of leaking a child); src/storage/transaction.rs (concurrent test retries ONLY IoError kind WouldBlock - the legitimate 2s busy timeout under fsync load - up to 6 extra attempts; serialization read-back assertion and recovery_waits_for_the_journal_projects_task_lock timeout test untouched; no production timeout change); tests/dev56_task_identity_test.rs (marker probe dir->FILE->CARGO_TARGET_TMPDIR ancestry; genuine contention coverage achieved in-sandbox, see DEV-79 comment); tests/common/mod.rs + src/lib.rs + 14 mod-common additions (TMPDIR isolation, DEV-90 Done). Evidence: pre-fix junit target/nextest/default/target/nextest/junit.xml (async test exit 101 ''marker file'' at 2.19s; agent_safety groupless under num-cpus); post-fix junit same path: tests=1000 failures=6 with async_run_action_does_not_block 0.894s PASS, worker_persists_trailing_stderr 1.627s PASS, concurrent_transactions_serialize 3.573s PASS, mcp_single_file_reference 2.495s PASS. Verification: focused runs x6 async + transaction pair + full dev56 (15/15), agent_automation (33/33); npm run test:rust:agent -- --no-fail-fast -> 994/1000, 6 failures all pre-existing sandbox .git-denied agent_safety git tests (environment, DEV-79; first full run also flagged 1 leaky pass, not reproducible standalone); npm run test:ui:agent 291/291; npm run lint:agent clean (vue-tsc, clippy -D warnings, fmt --check). The --no-fail-fast passthrough was required to collect results past those environment failures; concurrency stayed default and retries 0. Remaining for THIS ticket''s full acceptance: move meaningful wall-clock benchmarks to an opt-in dedicated job/group with justified thresholds (performance_test.rs and any remaining timing assertions), consider runtime gating evidence from DEV-79, then full npm test + smoke gates at integration. Status stays InProgress: exact next action = audit performance_test.rs and remaining sleep/timing assertions against the acceptance criteria. Changes uncommitted and unstaged; preexisting edits untouched.'
+- date: 2026-09-11T19:30:41.909404+00:00
+  text: |-
+    Status reconciliation (backend agent, coordinator finalization wave): remains InProgress — full perf-budget scope not complete.
+
+    Recorded for the closed portion (targeted failing-test failures fixed, test-infra only):
+    - child release gate now asserts the actual gate reason (no blind pass);
+    - child process group handling corrected so the gate waits on the real descendants;
+    - WouldBlock retry made bounded — test-only retry loop, production 2s timeout semantics unchanged.
+
+    Final gate evidence at current source: lint:agent clean (repeated); test:agent DEFAULT concurrency --retries 0: Rust 981 passed + 6 explicit skips (17 git-dependent test FILES cfg-compiled-out by the sandbox probe, absent from totals — accounting distinction vs the earlier default run of 1000 passing with 6 runtime early-returns; no claim all tests executed); UI 352 final (349 at whole gate + 3 ledger unit tests); build-first smoke 109 passed / 23 skips.
+
+    Remaining for this ticket: the broader wall-clock performance budget work (opt-in dedicated benchmark job / controlled execution group with justified thresholds, replacing remaining sleeps/timing assertions with completion signals) is NOT done. No git operations.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T5.
@@ -17,3 +40,28 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-11T14:48:18.721631+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-11T14:48:18.732631+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T15:11:31.042453+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T15:17:56.795076+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T19:30:41.909404+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

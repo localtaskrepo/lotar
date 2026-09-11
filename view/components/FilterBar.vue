@@ -299,6 +299,9 @@ const priority = ref('')
 const type = ref('')
 const sprintFilter = ref('')
 const order = ref<'asc'|'desc'>('desc')
+// Server sort key (`sort_by` wire value). The table headers own the value; the
+// filter bar only preserves it across re-emits so it survives filter edits.
+const sortBy = ref('')
 const tags = ref('')
 const assignee = ref('')
 const dueDate = ref('')
@@ -310,7 +313,7 @@ const customFilterInput = ref<{ focus: () => void } | null>(null)
 let lastSyncedExtras = ''
 // Keys that have dedicated UI controls and must not fall through to the
 // custom-filter box. Derived from the grammar so aliases stay in one place.
-const CUSTOM_UI_KEYS = new Set(['q', 'order', ...GRAMMAR_KEYS.map((meta) => meta.key)])
+const CUSTOM_UI_KEYS = new Set(['q', 'order', 'sort_by', ...GRAMMAR_KEYS.map((meta) => meta.key)])
 // Normalized alias -> canonical field, shared with the grammar's alias table.
 const RESERVED_FIELD_ALIASES: Record<string, string> = (() => {
   const map: Record<string, string> = {
@@ -321,6 +324,8 @@ const RESERVED_FIELD_ALIASES: Record<string, string> = (() => {
     search: 'q',
     order: 'order',
     sort: 'order',
+    sort_by: 'sort_by',
+    sortby: 'sort_by',
   }
   for (const meta of GRAMMAR_KEYS) {
     for (const alias of meta.aliases) map[alias] = meta.key
@@ -586,7 +591,10 @@ onMounted(() => {
         dueDate.value = asText(saved.due)
         recent.value = asText(saved.recent)
         needs.value = asText(saved.needs)
-        order.value = (saved.order === 'asc' || saved.order === 'desc') ? saved.order : 'desc'
+        // Sort persistence has a single owner: the page's per-project sort
+        // storage (`lotar.tasks.sort::*`). Deliberately do NOT restore
+        // sort_by/order from this snapshot — a stale one must never override
+        // the page-restored sort on a plain route reload.
         const extras = Object.entries(saved)
           .filter(([key]) => !CUSTOM_UI_KEYS.has(key))
           .map(([key, value]) => `${key}=${value}`)
@@ -672,6 +680,7 @@ watchEffect(() => {
     needs.value = props.value.needs || ''
     const o = props.value.order
     order.value = (o === 'asc' || o === 'desc') ? o : order.value
+    sortBy.value = props.value.sort_by || ''
     const extras = Object.entries(props.value)
       .filter(([key]) => !CUSTOM_UI_KEYS.has(key))
       .map(([key, value]) => `${key}=${value}`)
@@ -1024,15 +1033,19 @@ function emitFilter(){
   if (dueDate.value) v.due = dueDate.value
   if (recent.value) v.recent = recent.value
   if (needs.value) v.needs = needs.value
-  if (showOrderSelect.value) {
-    v.order = order.value
+  v.order = order.value
+  if (sortBy.value) {
+    v.sort_by = sortBy.value
   }
   const parsed = parseCustomFilters(extraFilters.value)
   customFilterErrors.value = parsed.errors
   Object.entries(parsed.map).forEach(([key, value]) => {
     if (value) v[key] = value
   })
-  storageSetJson(FILTER_KEY.value, v)
+  // Persist the snapshot WITHOUT the sort keys (see the restore note above):
+  // the live emit carries them for the current page, the snapshot must not.
+  const { sort_by: _snapshotSortBy, order: _snapshotOrder, ...snapshot } = v
+  storageSetJson(FILTER_KEY.value, snapshot)
   emit('update:value', v)
 }
 function onClear(){
@@ -1049,22 +1062,19 @@ function onClear(){
   dueDate.value = ''
   recent.value = ''
   needs.value = ''
-  if (showOrderSelect.value) {
-    order.value = 'desc'
-  }
+  order.value = 'desc'
+  sortBy.value = ''
   extraFilters.value = ''
   lastSyncedExtras = ''
   customFilterErrors.value = []
   storageRemove(FILTER_KEY.value)
   const empty: Record<string,string> = {}
-  if (showOrderSelect.value) {
-    empty.order = 'desc'
-  }
+  empty.order = 'desc'
   emit('update:value', empty)
 }
 
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, sprintFilter, order, tags, extraFilters, assignee, dueDate, recent, needs], emitFilter, { deep: false })
+watch([query, project, status, priority, type, sprintFilter, order, sortBy, tags, extraFilters, assignee, dueDate, recent, needs], emitFilter, { deep: false })
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>

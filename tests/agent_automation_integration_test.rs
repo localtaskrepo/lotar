@@ -1910,7 +1910,17 @@ fn agent_assignee_does_not_leak_into_members() {
 }
 
 /// Async `run` with `wait: false` should spawn in the background and let the update
-/// return immediately. The command writes a file that we poll for.
+/// return immediately. The child is gated on a release file instead of sleeping a
+/// fixed 100ms, and it records how it exited: `done` only when the test opened the
+/// gate, `bail` when its own ~30s bound expired. A correctly async update returns
+/// while the marker is still absent no matter how slow the update itself was, so
+/// the not-blocked assertion cannot false-fail on load. Only the child finishing
+/// first fails: `done` is definitive blocking, and `bail` means the update
+/// outlasted a ~30s gated child - a blocking regression in practice, reported
+/// honestly as inconclusive if the environment could ever stall an async update
+/// that long. A Drop guard releases the gate on every exit path, so no spawned
+/// child leaks past the test and a blocking regression fails well inside the
+/// nextest slow-timeout.
 #[cfg(unix)]
 #[test]
 fn async_run_action_does_not_block() {
@@ -1919,14 +1929,26 @@ fn async_run_action_does_not_block() {
     let fixtures = TestFixtures::new();
 
     let marker = fixtures.get_temp_path().join("async_marker.txt");
+    let release = fixtures.get_temp_path().join("async_release.txt");
     let script = write_stub_agent_script(
         fixtures.get_temp_path(),
         "async-write.sh",
         &format!(
-            "#!/bin/sh\nsleep 0.1\necho done > \"{}\"\n",
+            "#!/bin/sh\nR=\"{}\"\nM=\"{}\"\ni=0\nwhile [ ! -f \"$R\" ] && [ $i -lt 1500 ]; do\n  sleep 0.02\n  i=$((i + 1))\ndone\nif [ -f \"$R\" ]; then\n  echo done > \"$M\"\nelse\n  echo bail > \"$M\"\nfi\n",
+            release.to_string_lossy(),
             marker.to_string_lossy()
         ),
     );
+
+    // Release the gated child on every exit path (assertion failures
+    // included) so it always finishes instead of lingering until its bound.
+    struct ReleaseGate(std::path::PathBuf);
+    impl Drop for ReleaseGate {
+        fn drop(&mut self) {
+            let _ = std::fs::write(&self.0, "release\n");
+        }
+    }
+    let _release_gate = ReleaseGate(release.clone());
 
     fixtures.create_config_in_dir(&fixtures.tasks_root, "");
     let automation_yaml = format!(
@@ -1947,7 +1969,8 @@ fn async_run_action_does_not_block() {
     )
     .expect("create task");
 
-    // Update returns immediately (before the script's 100ms sleep finishes)
+    // Update returns immediately while the child is still gated.
+    let update_start = std::time::Instant::now();
     TaskService::update(
         &mut storage,
         &created.id,
@@ -1957,21 +1980,37 @@ fn async_run_action_does_not_block() {
         },
     )
     .expect("update should not block");
+    let update_elapsed = update_start.elapsed();
 
-    // Marker should NOT exist yet (script sleeps 100ms)
+    // Only this test writes the release file, and it has not been written
+    // yet, so a child that already finished means the update outlasted it.
+    // `done` proves the child completed via a gate this test never opened:
+    // definitive blocking. `bail` means the child's own ~30s bound expired
+    // during the update: a blocking regression in practice, named honestly
+    // as inconclusive in case the environment ever stalls an async update
+    // that long. An absent marker proves the update returned first.
+    let observed = std::fs::read_to_string(&marker).unwrap_or_default();
     assert!(
-        !marker.exists(),
-        "async run should not block — marker file appeared too early"
+        !observed.contains("done"),
+        "async run blocked on the child: it completed via the gate before the test released it (update took {:.1}s)",
+        update_elapsed.as_secs_f64()
+    );
+    assert!(
+        observed.is_empty(),
+        "update outlasted the ~30s gated child (update took {:.1}s, child bailed):          either run blocked on the child or the environment stalled the update past the bound;          rerun to distinguish",
+        update_elapsed.as_secs_f64()
     );
 
-    // Poll until the script completes (max 2s)
+    // Open the gate and poll until the script completes (max 10s).
+    std::fs::write(&release, "release\n").unwrap();
     let start = std::time::Instant::now();
-    while !marker.exists() && start.elapsed() < std::time::Duration::from_secs(2) {
+    while !marker.exists() && start.elapsed() < std::time::Duration::from_secs(10) {
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
+    let final_state = std::fs::read_to_string(&marker).unwrap_or_default();
     assert!(
-        marker.exists(),
-        "async run command should eventually write the marker file"
+        final_state.trim() == "done",
+        "async run command should complete via the gate after release, got {final_state:?}"
     );
 }
 

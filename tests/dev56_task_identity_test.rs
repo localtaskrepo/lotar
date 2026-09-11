@@ -41,8 +41,16 @@ struct Dev56Fixture {
 }
 
 fn isolated_workspace() -> Dev56Fixture {
+    isolated_workspace_in(std::env::temp_dir().as_path())
+}
+
+/// Same hermetic workspace as [`isolated_workspace`], but rooted under `base`
+/// instead of the process temp dir. Used by the MCP store-lock test to place
+/// the workspace inside the checkout so repo-root discovery succeeds by
+/// ancestry in sandboxes that forbid creating any `.git` marker.
+fn isolated_workspace_in(base: &std::path::Path) -> Dev56Fixture {
     let _guard_fast = EnvVarGuard::set("LOTAR_TEST_FAST_IO", "1");
-    let tmp = tempfile::tempdir().unwrap();
+    let tmp = tempfile::tempdir_in(base).unwrap();
     let tasks_dir = tmp.path().join("main").join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
@@ -845,18 +853,67 @@ fn delete_event_emits_canonical_id_for_padded_alias() {
 
 #[test]
 fn mcp_single_file_reference_blocks_on_held_store_lock() {
-    let fx = isolated_workspace();
+    // File references resolve against the git repo root. find_repo_root
+    // accepts both a .git directory and a worktree-style .git file, so try a
+    // fixture-local marker (no git tooling involved) in both styles. When the
+    // sandbox denies creating every .git path, fall back to a workspace under
+    // CARGO_TARGET_TMPDIR inside the real checkout so repo-root discovery
+    // succeeds by ancestry; the store lock and blob still live in the
+    // fixture's own tasks root, never the real backlog. Only a genuinely
+    // repo-less build keeps the fail-closed-only arm (remaining gap tracked
+    // in DEV-79).
+    enum MarkerStyle {
+        Dir,
+        File,
+    }
+    fn probe_marker_style() -> Option<MarkerStyle> {
+        let probe = tempfile::tempdir().unwrap();
+        let marker = probe.path().join(".git");
+        if std::fs::create_dir_all(&marker).is_ok() {
+            return Some(MarkerStyle::Dir);
+        }
+        if std::fs::write(&marker, "gitdir: nowhere\n").is_ok() {
+            return Some(MarkerStyle::File);
+        }
+        None
+    }
+
+    let (fx, repo_root_available) = match probe_marker_style() {
+        Some(style) => {
+            let fx = isolated_workspace();
+            let git_marker = fx.tasks_dir.parent().unwrap().join(".git");
+            match style {
+                MarkerStyle::Dir => std::fs::create_dir_all(&git_marker).unwrap(),
+                MarkerStyle::File => std::fs::write(&git_marker, "gitdir: nowhere\n").unwrap(),
+            }
+            eprintln!("lock section via fixture-local .git marker");
+            (fx, true)
+        }
+        None => {
+            // No marker can be created in this sandbox: place the workspace
+            // under CARGO_TARGET_TMPDIR inside the real checkout and let
+            // repo-root discovery walk up to the existing .git instead. The
+            // fixture still owns its tasks root and attachments store, so
+            // the real backlog is never touched.
+            let fx = isolated_workspace_in(std::path::Path::new(env!("CARGO_TARGET_TMPDIR")));
+            let by_ancestry = lotar::utils::git::find_repo_root(&fx.tasks_dir).is_some();
+            if by_ancestry {
+                eprintln!("lock section via real repo root discovered by ancestry");
+            } else {
+                eprintln!(
+                    "skipping lock section: no .git marker creatable and no repo ancestor (repo-less build); remaining gap tracked in DEV-79"
+                );
+            }
+            (fx, by_ancestry)
+        }
+    };
     let api = server();
     let _tp1 = rest_create(&api, "TP", "Blob owner");
     let _tp2 = rest_create(&api, "TP", "Single MCP target");
-    // File references resolve against the git repo root; give the fixture a
-    // plain .git marker directory (no git tooling involved). Sandboxes that
-    // deny .git paths cannot host repo-rooted file references at all: assert
-    // the handler still fails closed (no task changes) and skip the lock
-    // section there, matching the git_available convention.
-    let git_marker = fx.tasks_dir.parent().unwrap().join(".git");
-    let repo_root_available = std::fs::create_dir_all(&git_marker).is_ok();
     if !repo_root_available {
+        // Repo-rooted file references are untestable here: assert the
+        // handler still fails closed (no task changes) and skip the lock
+        // section, matching the git_available convention.
         let resp = mcall(
             "task_reference_add",
             json!({"id": "TP-2", "kind": "file", "value": "@attachments/whatever.txt"}),
@@ -868,7 +925,6 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
         let storage = Storage::try_open(&fx.tasks_dir).unwrap();
         let tp2 = TaskService::get(&storage, "TP-2", None).unwrap();
         assert!(tp2.references.iter().all(|r| r.file.is_none()));
-        eprintln!("skipping lock section: .git marker unavailable in this sandbox");
         return;
     }
     // TP-1 receives a committed blob whose path the MCP client references.

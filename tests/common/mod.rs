@@ -1,6 +1,6 @@
 use assert_cmd::Command;
 use assert_cmd::cargo::{CargoError, cargo_bin_cmd};
-use ctor::ctor;
+use ctor::{ctor, dtor};
 use lotar::types::Priority;
 use lotar::{Storage, Task};
 use serde_json::Value;
@@ -30,6 +30,104 @@ pub fn lotar_cmd() -> Result<Command, CargoError> {
 #[ctor]
 unsafe fn init_lotar_test_environment() {
     reset_lotar_test_environment();
+    isolate_tmpdir_under_owned_scratch();
+}
+
+/// Process-owned scratch directory that TMPDIR is redirected to (DEV-90).
+static OWNED_SCRATCH: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+const SCRATCH_BASE_NAME: &str = ".lotar-test-scratch";
+
+/// Keep test fixtures from being siblings of unrelated workspaces (DEV-90).
+///
+/// `StorageLocator::candidate_task_roots` scans the visible sibling
+/// directories of a workspace for extra `.tasks` roots (monorepo discovery).
+/// Fixtures created directly under the shared session temp dir therefore sit
+/// next to every leftover scratch workspace: a sibling with its own `.tasks`
+/// and a colliding project prefix leaks phantom tasks into search results
+/// (six deterministic sync-suite failures during DEV-55 verification).
+///
+/// Redirect TMPDIR to a per-process scratch named `<pid>-<nanos>` nested
+/// under a dot-prefixed base — dot directories are invisible to the sibling
+/// scan. Under nextest every test runs in its own process, so fixtures of
+/// different tests stop being siblings of each other and of unrelated
+/// leftovers entirely; multiple fixtures inside one test remain siblings,
+/// exactly as before.
+///
+/// Cleanup: the `#[dtor]` removes this process's (normally empty) scratch on
+/// a regular exit, and each new process sweeps base entries whose owning pid
+/// is gone, because nextest kills finished test processes before their
+/// destructors run. Leaked scratches are invisible to sibling scans either
+/// way.
+fn isolate_tmpdir_under_owned_scratch() {
+    if OWNED_SCRATCH.get().is_some() {
+        return;
+    }
+    let base = std::env::temp_dir().join(SCRATCH_BASE_NAME);
+    sweep_scratches_of_dead_owners(&base);
+    let scratch = base.join(format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0),
+    ));
+    if std::fs::create_dir_all(&scratch).is_err() {
+        return; // keep the shared temp dir behavior on unusable filesystems
+    }
+    // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny;
+    // the ctor runs before any test thread exists.
+    unsafe {
+        std::env::set_var("TMPDIR", &scratch);
+    }
+    let _ = OWNED_SCRATCH.set(scratch);
+}
+
+/// Remove scratch directories whose creating process no longer exists. A
+/// scratch is owned by exactly one short-lived test process; a live owner (or
+/// a recycled pid) only makes the sweep skip an entry, never removes a dir
+/// still in use. Unix-only, like the fs2 locking these tests exercise.
+#[cfg(unix)]
+fn sweep_scratches_of_dead_owners(base: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(base) else {
+        return;
+    };
+    let own_pid = std::process::id();
+    for entry in entries.flatten() {
+        let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        let Some(owner) = name
+            .split('-')
+            .next()
+            .and_then(|pid| pid.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if owner == own_pid {
+            continue;
+        }
+        // Signal 0 probes existence only; ESRCH means the owner is gone.
+        let dead = unsafe { libc::kill(owner as i32, 0) == -1 }
+            && std::io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH);
+        if dead {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn sweep_scratches_of_dead_owners(_base: &std::path::Path) {}
+
+#[dtor]
+unsafe fn cleanup_owned_scratch() {
+    // Best effort: normally empty because every fixture temp dir removes its
+    // own tree on drop. Failures leave only an invisible dot-nested dir that
+    // a later process sweeps once this pid is gone.
+    if let Some(scratch) = OWNED_SCRATCH.get() {
+        let _ = std::fs::remove_dir(scratch);
+    }
 }
 
 /// Remove shared LOTAR environment variables and ignore home config for deterministic tests.

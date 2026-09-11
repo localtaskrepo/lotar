@@ -26,6 +26,17 @@ export interface TaskStoreState {
   /** Flat array view (derived from the map, recalculated on version bump). */
   readonly items: ComputedRef<TaskDTO[]>
   readonly count: ComputedRef<number>
+  /**
+   * Authority order ledger (DEV-57): insertion rank of every task in the LAST
+   * full hydration, i.e. the server's global response order. The ID-keyed map
+   * above cannot preserve order across SSE upserts, so pages that paginate
+   * read this ledger instead of re-sorting client-side. Ranks are rewritten
+   * only inside `hydrateAll`; SSE mutations never touch them (a task updated
+   * over SSE keeps its rank until the next refresh, a brand-new task has no
+   * rank and sorts last). This is deliberately NOT a keyed response cache —
+   * no DEV65-style invalidation is involved.
+   */
+  readonly orderIndex: ShallowRef<Map<string, number>>
   /** Total the server reported during the last full sync. */
   readonly serverTotal: ShallowRef<number>
   readonly status: ShallowRef<StoreStatus>
@@ -75,6 +86,7 @@ export interface HydrateOptions {
 
 function createTaskStore(client: ApiClient): TaskStoreState {
   const _map = shallowRef<Map<string, TaskDTO>>(new Map())
+  const orderIndex = shallowRef<Map<string, number>>(new Map())
   const version = shallowRef(0)
   const serverTotal = shallowRef(0)
   const status = shallowRef<StoreStatus>('idle')
@@ -126,6 +138,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
       let currentOffset = 0
       let expectedTotal = 0
       let pages = 0
+      const newOrder: Map<string, number> = new Map()
 
       while (pages < 10_000) {
         pages += 1
@@ -140,6 +153,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
         for (const task of batch) {
           newMap.set(task.id, task)
+          newOrder.set(task.id, newOrder.size)
         }
         currentOffset += batch.length
         if (expectedTotal && currentOffset >= expectedTotal) break
@@ -147,6 +161,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
       // Atomic swap — TransitionGroup sees old items → new items in one tick.
       _map.value = newMap
+      orderIndex.value = newOrder
       serverTotal.value = expectedTotal || newMap.size
       lastSyncAt.value = Date.now()
       status.value = 'ready'
@@ -341,6 +356,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
   return {
     _map,
+    orderIndex,
     version,
     items,
     count,

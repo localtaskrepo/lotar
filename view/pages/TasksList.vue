@@ -87,6 +87,16 @@
               </button>
             </div>
           </div>
+          <UiButton
+            type="button"
+            title="Export the current filtered view as CSV"
+            aria-label="Export CSV"
+            :disabled="exportDisabled"
+            @click="exportCsv"
+          >
+            <IconGlyph name="download" aria-hidden="true" />
+            <span>Export</span>
+          </UiButton>
           <ColumnsMenu
             :open="columnsMenuOpen"
             :options="fieldOptions"
@@ -136,6 +146,7 @@
         :tasks="shownTasks"
         :loading="loading || !selectionReady"
         :statuses="statuses"
+        :sort="tableSort"
         :selectable="bulk"
         :selected-ids="selectedIds"
         :show-bulk-controls="false"
@@ -146,6 +157,7 @@
         :has-sprints="hasSprints"
         :sprints-loading="sprintsLoading"
         v-model:bulk="bulk"
+        @update:sort="onTableSort"
         @bulk-assign="openBulkAssign"
         @bulk-unassign="bulkUnassign"
         @bulk-sprint-add="openBulkSprintAdd"
@@ -346,9 +358,16 @@ import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
+import type { ColKey } from '../composables/useColumns'
+import {
+    colKeyToSortBy,
+    normalizeSortBy,
+    normalizeSortOrder,
+    sortByToColKey,
+} from '../utils/taskSort'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { projectOf, titleCase } from '../utils/text'
-import { storageGet, storageSet } from '../utils/storage'
+import { storageGet, storageGetJson, storageRemove, storageSet, storageSetJson } from '../utils/storage'
 
 const router = useRouter()
 const store = useTaskStore()
@@ -455,10 +474,99 @@ watch(
 // The store's project key is owned by TaskTable (which resolves the concrete
 // project from the filter or the shown tasks), so the page must not override it.
 
-const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && !!value))
+const hasFilters = computed(() => Object.entries(filter.value).some(([key, value]) => key !== 'order' && key !== 'sort_by' && !!value))
 
+// ---------------------------------------------------------------------------
+// Sort ownership (DEV-57): the page owns the sort as part of the query so the
+// server orders globally before pagination and exports reuse the same order.
+// ---------------------------------------------------------------------------
+
+const SORT_STORAGE_KEY = 'lotar.tasks.sort'
+
+function sortStorageKey(project: string) {
+  return project ? `${SORT_STORAGE_KEY}::${project}` : SORT_STORAGE_KEY
+}
+
+function readSavedSort(project: string): { sort_by: string; order: 'asc' | 'desc' } {
+  const stored = storageGetJson<{ sort_by?: unknown; order?: unknown }>(sortStorageKey(project))
+  const sortBy = stored ? normalizeSortBy(stored.sort_by) : null
+  return {
+    sort_by: sortBy ?? '',
+    order: stored ? normalizeSortOrder(stored.order) : 'desc',
+  }
+}
+
+function persistSort(project: string, sortBy: string, order: 'asc' | 'desc') {
+  storageSetJson(sortStorageKey(project), { sort_by: sortBy, order })
+}
+
+const tableSort = computed<{ key: ColKey | null; dir: 'asc' | 'desc' }>(() => {
+  const sortBy = normalizeSortBy(filter.value.sort_by) ?? 'modified'
+  return { key: sortByToColKey(sortBy), dir: normalizeSortOrder(filter.value.order) }
+})
+
+function sortSnapshot(value: Record<string, string>) {
+  return JSON.stringify([normalizeSortBy(value.sort_by) ?? '', normalizeSortOrder(value.order)])
+}
+
+function applySortToFilter(sortBy: string, order: 'asc' | 'desc') {
+  const next = { ...filter.value }
+  if (sortBy) next.sort_by = sortBy
+  else delete next.sort_by
+  next.order = order
+  if (sortSnapshot(next) === sortSnapshot(filter.value)) return
+  filter.value = next
+  persistSort(filter.value.project || '', sortBy, order)
+}
+
+function onTableSort(next: { key: ColKey | null; dir: 'asc' | 'desc' }) {
+  const sortBy = next.key ? colKeyToSortBy(next.key) : null
+  applySortToFilter(sortBy ?? '', next.dir)
+}
+
+/** Reload the project-specific saved sort (or the default) on project switch. */
+function reloadSavedSort(project: string) {
+  const saved = readSavedSort(project)
+  const next = { ...filter.value }
+  if (saved.sort_by) next.sort_by = saved.sort_by
+  else delete next.sort_by
+  next.order = saved.order
+  // Raw key comparison (not the normalized snapshot): the default `desc`
+  // must become explicit so the query always carries a concrete order.
+  if (next.sort_by === (filter.value.sort_by ?? '') && next.order === filter.value.order) return
+  filter.value = next
+}
+
+watch(
+  () => filter.value.project,
+  (project, previous) => {
+    if (project === previous) return
+    // The FilterBar auto-selects the lone project on load ('' -> X); an
+    // explicit sort (e.g. from the URL) must survive that transition. Real
+    // project switches, and any narrowing onto a project with a stored sort,
+    // reload that scope's saved sort.
+    if (previous === undefined || previous === '') {
+      if (!readSavedSort(project || '').sort_by) return
+    }
+    reloadSavedSort(project || '')
+  },
+)
+
+// Server-side sorting is authoritative: the hydrate carries sort_by/order and
+// the store's order ledger preserves the response order across SSE upserts.
+// The page never re-sorts client-side, so mixed-offset timestamps and the
+// server's timezone-sensitive date handling can never diverge from what the
+// user sees — and the CSV export, produced from the same query, matches.
 const shownTasks = computed(() => {
-  const all = store.items.value || []
+  const ranks = store.orderIndex?.value
+  const items = store.items.value || []
+  const all = ranks && ranks.size
+    ? [...items].sort((a, b) => {
+        const ra = ranks.get(a.id) ?? Number.MAX_SAFE_INTEGER
+        const rb = ranks.get(b.id) ?? Number.MAX_SAFE_INTEGER
+        return ra - rb
+      })
+    : items
   const start = pageOffset.value
   const end = start + pageLimit.value
   return all.slice(start, end)
@@ -500,26 +608,40 @@ async function syncPaginationUrl(nav: 'push' | 'replace' = 'push') {
   }
 }
 
+function cancelPendingFilterApply() {
+  // Explicit pagination wins over a pending debounced re-apply: the route
+  // watcher re-applies the CURRENT filter after the offset syncs, so dropping
+  // the stale snapshot only prevents it from resetting the offset afterwards.
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+}
+
 async function prevPage() {
   if (!hasPrevPage.value) return
+  cancelPendingFilterApply()
   pageOffset.value = Math.max(0, pageOffset.value - pageLimit.value)
   await syncPaginationUrl()
 }
 
 async function nextPage() {
   if (!hasNextPage.value) return
+  cancelPendingFilterApply()
   pageOffset.value = pageOffset.value + pageLimit.value
   await syncPaginationUrl()
 }
 
 async function goToPage(page: number) {
   const clamped = Math.max(1, Math.min(page, totalPages.value))
+  cancelPendingFilterApply()
   pageOffset.value = (clamped - 1) * pageLimit.value
   await syncPaginationUrl()
 }
 
 function onFilterUpdate(v: Record<string,string>){ filter.value = v }
 function resetFilters(){
+  storageRemove(sortStorageKey(filter.value.project || ''))
   filter.value = {}
   selectedIds.value = []
   filterBarRef.value?.clear?.()
@@ -542,6 +664,7 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   const request = ++filterGeneration
   loadedFilterGeneration.value = -1
   if (disposed) return
+  lastFilterJson = filterJson(raw)
   const onTasksRoute = router.currentRoute.value.path === '/'
   if (!onTasksRoute) return
 
@@ -555,7 +678,6 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   const q = { ...raw }
   const { serverFilter: builtFilter, normalized: qnorm, extras: extraQuery } = buildServerFilter(q, '')
   if (qnorm.project) builtFilter.project = qnorm.project
-  if (qnorm.assignee === '__none__') builtFilter.assignee = '__none__'
   const nextQuery: Record<string, string> = { ...extraQuery, ...qnorm }
   if (pageOffset.value > 0) {
     nextQuery.offset = String(pageOffset.value)
@@ -579,11 +701,6 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
     }
   }
 
-  // Keys applied server-side but not part of the shared builder output
-  if (qnorm.due) builtFilter.due = qnorm.due
-  if (qnorm.recent) builtFilter.recent = qnorm.recent
-  if (qnorm.needs) builtFilter.needs = qnorm.needs
-  builtFilter.order = qnorm.order
   const serverFilter: any = builtFilter
 
   if (disposed || request !== filterGeneration) return
@@ -615,6 +732,52 @@ async function retry(){ await applyFilter(filter.value, 'none') }
 
 
 const view = (id: string) => openTask(id)
+
+// -- CSV export of the current display query --------------------------------
+
+function currentServerFilter() {
+  const q = { ...filter.value }
+  const { serverFilter } = buildServerFilter(q, '')
+  if (q.project) serverFilter.project = q.project
+  return serverFilter
+}
+
+const exportBusy = ref(false)
+const exportDisabled = computed(() => loading.value || !!error.value || !selectionReady.value || exportBusy.value)
+
+async function exportCsv() {
+  if (exportDisabled.value) return
+  exportBusy.value = true
+  try {
+    const response = await api.exportTasks(currentServerFilter())
+    if (!response.ok) {
+      let message = `Export failed (${response.status})`
+      try {
+        const body = await response.json()
+        message = body?.error?.message || message
+      } catch {
+        // non-JSON error body
+      }
+      showToast(message)
+      return
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `lotar-tasks-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    // The browser consumes the blob asynchronously once the click resolves;
+    // revoking immediately can cancel the in-flight download.
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (e: any) {
+    showToast(e?.message || 'Export failed')
+  } finally {
+    exportBusy.value = false
+  }
+}
 
 async function onUpdateTitle(payload: { id: string; title: string }){
   const { id, title } = payload
@@ -1164,11 +1327,19 @@ function registerSseHandlers() {
 onMounted(async () => {
   pageLimit.value = clampPageLimit(readTasksPageSizePreference())
   pageOffset.value = clampOffset(queryInt(route.query.offset, 0))
-  filter.value = Object.fromEntries(
+  const initialFilter = Object.fromEntries(
     Object.entries(route.query)
       .filter(([key]) => key !== 'offset')
       .map(([k, v]) => [k, queryString(v)]),
   )
+  // An explicit ?sort_by= wins for this visit; otherwise restore the sort
+  // saved for the routed project (or the global default).
+  if (!normalizeSortBy(initialFilter.sort_by)) {
+    const saved = readSavedSort(initialFilter.project || '')
+    if (saved.sort_by) initialFilter.sort_by = saved.sort_by
+    if (saved.order) initialFilter.order = saved.order
+  }
+  filter.value = initialFilter
   await refreshProjects()
   await refreshSprints(true)
   await applyFilter(filter.value, 'replace')
@@ -1272,6 +1443,15 @@ onMounted(() => {
 
 // Debounced fetch on any filter change; also sync URL and config
 let debounceTimer: any = null
+// Content signature of the filter the current page was loaded under. FilterBar
+// re-emits replace the filter object even when nothing changed; without this
+// guard the echo re-applies the query with resetOffset and yanks the user back
+// to page 1 right after a pagination click.
+let lastFilterJson = ''
+
+function filterJson(value: Record<string, string>): string {
+  return JSON.stringify(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+}
 
 watch(() => JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => a.localeCompare(b))), () => {
   filterGeneration += 1
@@ -1286,6 +1466,7 @@ watch(() => JSON.stringify(Object.entries(filter.value).sort(([a], [b]) => a.loc
 watch(filter, (q) => {
   if (suppressFilterWatch) return
   if (debounceTimer) clearTimeout(debounceTimer)
+  if (filterJson(q) === lastFilterJson) return
   const snapshot = { ...q }
   debounceTimer = setTimeout(() => {
     applyFilter(snapshot, 'push', { resetOffset: true }).catch((err) => {

@@ -241,3 +241,61 @@ describe('FilterBar', () => {
     expect(last?.project ?? '').toBe('')
   })
 })
+
+describe('FilterBar sort snapshot ownership (DEV-57)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    projectState.projectsRef!.value = [
+      { name: 'api-service', prefix: 'AS' },
+      { name: 'frontend-app', prefix: 'FA' },
+    ]
+  })
+
+  it('does not restore sort_by/order from its saved filter snapshot', async () => {
+    // A stale snapshot written before single-ownership must not resurrect a
+    // conflicting sort on a plain reload: the page's sort storage owns it.
+    localStorage.setItem(
+      'lotar.tasks.filter',
+      JSON.stringify({ status: 'todo', sort_by: 'status', order: 'asc' }),
+    )
+    const wrapper = mount(FilterBar, { props: { value: {} } })
+    await nextTick()
+    const events = wrapper.emitted('update:value') || []
+    const payloads = events.map((e) => e[0] as Record<string, string>)
+    for (const payload of payloads) {
+      expect(payload.sort_by).toBeUndefined()
+      expect(payload.order).toBe('desc')
+    }
+    const restoring = payloads.find((p) => p.status === 'todo')
+    expect(restoring).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('persists snapshots without the sort keys while emitting them live', async () => {
+    const wrapper = mount(FilterBar, { props: { value: {} } })
+    await nextTick()
+    await wrapper.setProps({ value: { status: 'todo', sort_by: 'custom:Rank', order: 'asc' } })
+    await nextTick()
+    wrapper.unmount()
+
+    const saved = JSON.parse(localStorage.getItem('lotar.tasks.filter') || '{}')
+    expect(saved.status).toBe('todo')
+    expect(saved.sort_by).toBeUndefined()
+    expect(saved.order).toBeUndefined()
+  })
+
+  it('round-trips sort_by and order live without emitting extra changes', async () => {
+    const wrapper = mount(FilterBar, { props: { value: {} } })
+    await nextTick()
+    ;(wrapper.emitted('update:value') || []).length = 0
+
+    await wrapper.setProps({ value: { status: 'todo', sort_by: 'priority', order: 'asc' } })
+    await nextTick()
+    const events = (wrapper.emitted('update:value') || []).map((e) => e[0] as Record<string, string>)
+    const last = events[events.length - 1]
+    expect(last?.sort_by).toBe('priority')
+    expect(last?.order).toBe('asc')
+    expect(last?.status).toBe('todo')
+    wrapper.unmount()
+  })
+})

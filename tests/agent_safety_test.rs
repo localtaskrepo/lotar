@@ -154,6 +154,10 @@ fn worker_process_waits_for_runner_and_finalization() {
 #[test]
 #[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
 fn enabled_worktree_failure_never_executes_in_main() {
+    if !common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let (fixture, ticket) = setup("touch executed-in-main", true);
     fs::write(fixture.get_temp_path().join("worktrees"), "not a directory").unwrap();
     let job =
@@ -285,6 +289,10 @@ fn cleanup(fixture: &TestFixtures) -> std::process::Output {
 #[test]
 #[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
 fn cli_cleanup_preserves_indeterminate_dirty_and_unmerged_worktrees() {
+    if !common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let (fixture, ticket) = setup("exit 0", true);
     let root = fixture.get_temp_path();
     let wt = root.join("worktrees").join(&ticket);
@@ -350,6 +358,10 @@ fn cli_cleanup_preserves_indeterminate_dirty_and_unmerged_worktrees() {
 #[test]
 #[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
 fn automatic_cleanup_preserves_missing_malformed_dirty_and_unmerged_worktrees() {
+    if !common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     for body in [
         "rm \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
         "printf 'title: malformed\\nstatus: Done\\ncreated: []\\n' > \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
@@ -387,6 +399,10 @@ fn automatic_cleanup_preserves_missing_malformed_dirty_and_unmerged_worktrees() 
 #[test]
 #[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
 fn cli_cleanup_accepts_clean_merged_worktree_with_project_done_status() {
+    if !common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let (fixture, ticket) = setup("exit 0", true);
     let root = fixture.get_temp_path();
     let wt = root.join("worktrees").join(&ticket);
@@ -619,6 +635,10 @@ fn dispatched_cancellation_hands_off_once_after_teardown() {
 #[test]
 #[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
 fn inherited_and_profile_git_overrides_cannot_redirect_setup_or_runner() {
+    if !common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let (fixture, ticket) = setup(
         "git rev-parse --show-toplevel > \"$LOTAR_TASKS_DIR/../runner-top\"\ngit rev-parse --path-format=absolute --git-common-dir > \"$LOTAR_TASKS_DIR/../runner-common\"",
         true,
@@ -782,6 +802,10 @@ automation:
 #[test]
 #[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
 fn inherited_git_dir_cannot_make_unmerged_cleanup_compare_branch_to_itself() {
+    if !common::git_available() {
+        eprintln!("skipping: git unavailable in this sandbox");
+        return;
+    }
     let (fixture, ticket) = setup("exit 0", true);
     let root = fixture.get_temp_path();
     let wt = root.join("worktrees").join(&ticket);

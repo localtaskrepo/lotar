@@ -1,10 +1,10 @@
 import { computed, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { TaskDTO, TaskListFilter } from '../api/types'
-import { MS_PER_DAY, parseTaskDate, startOfLocalDay } from '../utils/date'
+import type { TaskListFilter } from '../api/types'
+import { normalizeSortBy, normalizeSortOrder } from '../utils/taskSort'
 
 const BUILTIN_QUERY_KEYS = new Set([
-  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints',
+  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints', 'sort_by', 'order',
 ])
 
 
@@ -18,13 +18,20 @@ export function normalizeFilter(raw: Record<string, string>) {
   const source = raw || {}
   for (const [key, value] of Object.entries(source)) {
     if (!value || key === 'order') continue
+    if (key === 'sort_by') {
+      // Round-trip the raw value: valid keys normalize on the wire, invalid
+      // ones are forwarded so the server's strict parser surfaces the error
+      // instead of the UI silently re-sorting by default.
+      normalized.sort_by = value.trim()
+      continue
+    }
     if (BUILTIN_QUERY_KEYS.has(key)) {
       normalized[key] = value
     } else {
       extras[key] = value
     }
   }
-  normalized.order = source.order === 'asc' ? 'asc' : 'desc'
+  normalized.order = source.order && source.order.trim() ? source.order : 'desc'
   return { normalized, extras }
 }
 
@@ -43,57 +50,30 @@ export function buildServerFilter(
     if (normalized.status) serverFilter.status = listFromCsv(normalized.status)
     if (normalized.priority) serverFilter.priority = listFromCsv(normalized.priority)
     if (normalized.type) serverFilter.type = listFromCsv(normalized.type)
-    if (normalized.assignee && normalized.assignee !== '__none__') serverFilter.assignee = normalized.assignee
+    // Forwarded verbatim, including `__none__` (unassigned) and `@me`, both of
+    // which the server resolves.
+    if (normalized.assignee) serverFilter.assignee = normalized.assignee
     if (normalized.tags) serverFilter.tags = listFromCsv(normalized.tags)
-    if (normalized.sprints) serverFilter.sprints = listFromCsv(normalized.sprints).map(Number).filter(Number.isFinite)
+    if (normalized.sprints) {
+      // Strict sprints CSV (backend rejects invalid entries): forward parsed
+      // ids only when EVERY token is a positive integer; otherwise pass the
+      // raw value through so the API rejects the query instead of the UI
+      // silently widening it by dropping bad tokens.
+      const tokens = listFromCsv(normalized.sprints)
+      const ids = tokens.map((token) => Number(token))
+      const allValid = tokens.length > 0 && tokens.every((token, i) => /^\d+$/.test(token) && ids[i]! > 0)
+      serverFilter.sprints = allValid ? ids : normalized.sprints
+    }
+    if (normalized.due) serverFilter.due = normalized.due
+    if (normalized.recent) serverFilter.recent = normalized.recent
+    if (normalized.needs) serverFilter.needs = normalized.needs
+    const sortByRaw = (normalized.sort_by || '').trim()
+    if (sortByRaw) serverFilter.sort_by = normalizeSortBy(sortByRaw) ?? sortByRaw
+    // Forwarded verbatim — including invalid values — so explicit errors
+    // surface server-side instead of silently defaulting.
+    serverFilter.order = normalized.order as TaskListFilter['order']
     Object.assign(serverFilter, extras)
     return { serverFilter, normalized, extras }
-}
-
-export function applySmartFilters(
-  taskList: TaskDTO[],
-  q: Record<string, string>,
-): TaskDTO[] {
-  const wantsUnassigned = q.assignee === '__none__'
-  const due = q.due || ''
-  const recent = q.recent || ''
-  const needsSet = new Set(listFromCsv(q.needs || ''))
-  const now = new Date()
-  const today = startOfLocalDay(now)
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
-  const soonCutoff = new Date(today.getTime() + 7 * MS_PER_DAY)
-  const recentCutoff = new Date(now.getTime() - 7 * MS_PER_DAY)
-
-  if (!wantsUnassigned && !due && !recent && !needsSet.size) return taskList
-
-  return taskList.filter((task) => {
-    if (wantsUnassigned && (task.assignee || '').trim()) return false
-
-    if (due) {
-      const dueDate = parseTaskDate(task.due_date)
-      if (!dueDate) return false
-      const dueTime = startOfLocalDay(dueDate).getTime()
-      const todayStart = today.getTime()
-      const tomorrowStart = tomorrow.getTime()
-      const soonCutoffTime = startOfLocalDay(soonCutoff).getTime()
-      if (due === 'today' && (dueTime < todayStart || dueTime >= tomorrowStart)) return false
-      if (due === 'soon' && (dueTime < tomorrowStart || dueTime > soonCutoffTime)) return false
-      if (due === 'later' && dueTime <= soonCutoffTime) return false
-      if (due === 'overdue' && dueTime >= todayStart) return false
-    }
-
-    if (recent === '7d') {
-      const modified = parseTaskDate(task.modified)
-      if (!modified || modified.getTime() < recentCutoff.getTime()) return false
-    }
-
-    if (needsSet.size) {
-      if (needsSet.has('effort') && (task.effort || '').trim()) return false
-      if (needsSet.has('due') && (task.due_date || '').trim()) return false
-    }
-
-    return true
-  })
 }
 
 export function useProjectFilterSync(

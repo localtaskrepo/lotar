@@ -1,3 +1,5 @@
+mod common;
+
 use lotar::scanner::Scanner;
 use std::fs;
 use std::path::PathBuf;

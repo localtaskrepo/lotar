@@ -561,7 +561,7 @@ pub struct TaskSearchArgs {
     #[serde(default)]
     pub critical: bool,
 
-    /// Sort tasks by key (priority|due-date|created|modified|status|assignee|type|project|id)
+    /// Sort tasks by key (priority|status|effort|due-date|created|modified|assignee|reporter|title|type|project|id|tags|sprints, or field:<name>)
     #[arg(long, short = 'S')]
     pub sort_by: Option<String>,
 

@@ -161,6 +161,69 @@ describe('TaskStore', () => {
   })
 
   // =========================================================================
+  // Order ledger (DEV-57)
+  // =========================================================================
+
+  describe('order ledger', () => {
+    it('records the server response order across a multi-page full hydrate', async () => {
+      const t3 = makeTask('P-3')
+      const t1 = makeTask('P-1')
+      const t2 = makeTask('P-2')
+      mockClient.listTasks
+        .mockResolvedValueOnce({ total: 3, limit: 2, offset: 0, tasks: [t3, t1] })
+        .mockResolvedValueOnce({ total: 3, limit: 2, offset: 2, tasks: [t2] })
+
+      await store.hydrateAll({}, { pageSize: 2 })
+
+      // Response order, NOT id or map order.
+      expect([...store.orderIndex.value.entries()]).toEqual([
+        ['P-3', 0],
+        ['P-1', 1],
+        ['P-2', 2],
+      ])
+    })
+
+    it('rebuilds the ledger for a refiltered hydrate, dropping stale ranks', async () => {
+      mockClient.listTasks.mockResolvedValueOnce({
+        total: 2, limit: 200, offset: 0,
+        tasks: [makeTask('A-1'), makeTask('A-2')],
+      })
+      await store.hydrateAll({ project: 'A' })
+
+      mockClient.listTasks.mockResolvedValueOnce({
+        total: 1, limit: 200, offset: 0,
+        tasks: [makeTask('B-9')],
+      })
+      await store.hydrateAll({ project: 'B' })
+
+      // Only the new hydration's tasks carry ranks.
+      expect(store.orderIndex.value.has('A-1')).toBe(false)
+      expect(store.orderIndex.value.has('A-2')).toBe(false)
+      expect(store.orderIndex.value.get('B-9')).toBe(0)
+    })
+
+    it('keeps existing ranks stable when SSE updates or deletes tasks', async () => {
+      mockClient.listTasks.mockResolvedValueOnce({
+        total: 2, limit: 200, offset: 0,
+        tasks: [makeTask('P-1'), makeTask('P-2')],
+      })
+      await store.hydrateAll()
+
+      // An SSE update must not move the task in the authority order.
+      const updated = makeTask('P-1', { title: 'renamed' })
+      store.upsert(updated)
+      expect(store.orderIndex.value.get('P-1')).toBe(0)
+      expect(store.items.value.map((t) => t.id)).toEqual(['P-1', 'P-2'])
+
+      // Deleting removes the map entry; remaining ranks stay untouched.
+      mockClient.deleteTask.mockResolvedValueOnce({ ok: true } as any)
+      await store.remove('P-2')
+      expect(store.orderIndex.value.get('P-2')).toBe(1) // historical rank kept
+      expect(store.items.value.map((t) => t.id)).toEqual(['P-1'])
+    })
+  })
+
+  // =========================================================================
   // hydratePage
   // =========================================================================
 

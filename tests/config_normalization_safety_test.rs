@@ -1,3 +1,5 @@
+mod common;
+
 use lotar::config::{
     manager::ConfigManager,
     normalization::{

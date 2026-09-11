@@ -246,6 +246,19 @@ export interface TaskUpdate {
   sprints?: number[] | null
 }
 
+/**
+ * Server-side sort key for task list/export queries: one of the CLI sort
+ * fields (`priority`, `status`, `effort`, `due`, `created`, `modified`,
+ * `assignee`, `reporter`, `type`, `project`, `id`, `title`, `tags`,
+ * `sprints`) or `custom:<name>` for a custom field (the CLI accepts
+ * `field:<name>` as an alias). Omitted defaults to `modified`. Ties break by
+ * canonical task ID lexical ASC.
+ */
+export type TaskSortBy = string
+
+/** Sort direction for task queries; `desc` is the default. */
+export type TaskSortOrder = 'asc' | 'desc'
+
 export interface TaskListFilter {
   status?: TaskStatus[]
   priority?: Priority[]
@@ -256,8 +269,19 @@ export interface TaskListFilter {
   /** Any-of assignee equality filter; `__none__` requests unassigned tasks. */
   assignee?: string | string[]
   assignee_none?: boolean
-  sprints?: number[]
+  /** Sprint id CSV; a raw string is forwarded when tokens are invalid so the strict server parser rejects the query. */
+  sprints?: number[] | string
   custom_fields?: Record<string, string | string[]>
+  /** Server-side sort key; see {@link TaskSortBy}. */
+  sort_by?: TaskSortBy
+  /** Sort direction applied to `sort_by`; invalid raw values are forwarded so the strict server parser rejects the query. */
+  order?: TaskSortOrder | (string & {})
+  /** Smart due bucket: `today` | `soon` | `later` | `overdue`. */
+  due?: string
+  /** Smart recency window: `7d`. */
+  recent?: string
+  /** CSV of missing-field filters: `effort`, `due`. */
+  needs?: string
   [key: string]: any
 }
 

@@ -383,7 +383,7 @@
     "/api/tasks/list": {
       "get": {
         "summary": "List tasks",
-        "description": "Supports built-in filters via named query params (status, priority, type, assignee, tags, project, q). In addition, any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. An assignee of @me that cannot be resolved returns 400 INVALID_ARGUMENT.",
+        "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=7d (modified within the last 7 days, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>); order is asc|desc. Default: modified desc with a canonical-ID lexical ascending tiebreak that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-200).",
         "parameters": [
           {
             "name": "project",
@@ -430,7 +430,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "CSV of sprint IDs (e.g. 1,2,3). Only return tasks assigned to these sprints."
+            "description": "CSV of positive sprint IDs (e.g. 1,2,3). Only return tasks assigned to these sprints. Invalid entries return 400."
           },
           {
             "name": "assignee",
@@ -449,6 +449,14 @@
             "description": "Text search query"
           },
           {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
+          },
+          {
             "name": "order",
             "in": "query",
             "schema": {
@@ -458,7 +466,7 @@
                 "desc"
               ]
             },
-            "description": "Sort direction for the modified timestamp (default: desc)."
+            "description": "Sort direction for sort_by (default: desc). Ties always break by canonical task ID ascending."
           },
           {
             "name": "limit",
@@ -467,7 +475,7 @@
               "type": "integer",
               "format": "int32"
             },
-            "description": "Page size (synonyms: page_size, per_page)."
+            "description": "Page size (synonyms: page_size, per_page). Must be between 1 and 200; out-of-range values return 400 instead of clamping."
           },
           {
             "name": "offset",
@@ -482,25 +490,40 @@
             "name": "due",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "today",
+                "soon",
+                "later",
+                "overdue"
+              ]
             },
-            "description": "Smart filter: today|soon|later|overdue"
+            "description": "Smart filter on due date (local calendar buckets): today, soon (next 7 days excluding today), later (beyond 7 days), overdue (before today). Blank explicit values and invalid values return 400."
           },
           {
             "name": "recent",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "7d"
+              ]
             },
-            "description": "Smart filter: 7d"
+            "description": "Smart filter: only tasks modified in the last 7 days (inclusive lower bound). Blank explicit values and invalid values return 400."
           },
           {
             "name": "needs",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "enum": [
+                "effort",
+                "due",
+                "effort,due",
+                "due,effort"
+              ]
             },
-            "description": "Smart filter CSV: effort,due"
+            "description": "Smart filter CSV: keep tasks missing the listed fields (strict vocabulary: effort, due). Multiple entries are ANDed. Blank explicit values and invalid entries return 400."
           }
         ],
         "responses": {
@@ -2377,7 +2400,7 @@
     "/api/tasks/export": {
       "get": {
         "summary": "Export tasks",
-        "description": "Exports tasks in the requested format. Accepts the same filter query parameters as /api/tasks/list (status, priority, type, tags, q, sprints, assignee incl. @me and __none__, and declared custom fields); pagination parameters are ignored.",
+        "description": "Export tasks as CSV using the exact /api/tasks/list query grammar (DEV-57): status, priority, type, tags, q, sprints, assignee (incl. @me and __none__), declared custom fields, the due/recent/needs smart filters, sort_by, and order. The export applies the complete filter set and the requested global order (default modified desc, canonical-ID ascending tiebreak); pagination parameters are ignored (no page slicing). Invalid explicit filter/sort values return 400, matching list.",
         "responses": {
           "200": {
             "description": "OK"
@@ -2412,7 +2435,108 @@
             "schema": {
               "type": "string"
             },
-            "description": "Filter by status"
+            "description": "CSV of statuses; validated against project config."
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of priorities; validated against project config."
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of types; validated against project config."
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of tags."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Text search query."
+          },
+          {
+            "name": "sprints",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of positive sprint IDs. Invalid entries return 400."
+          },
+          {
+            "name": "assignee",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Assignee filter (supports @me; use __none__ for unassigned tasks). Unresolvable @me returns 400."
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Global sort key: priority, status, effort, due-date (alias due), created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the tag array lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending). Invalid values return 400."
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "description": "Sort direction (default desc). Ties break by canonical task ID ascending."
+          },
+          {
+            "name": "due",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "today",
+                "soon",
+                "later",
+                "overdue"
+              ]
+            },
+            "description": "Smart filter on due date; same buckets as /api/tasks/list. Blank explicit values and invalid values return 400."
+          },
+          {
+            "name": "recent",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d"
+              ]
+            },
+            "description": "Smart filter: only tasks modified in the last 7 days. Blank explicit values and invalid values return 400."
+          },
+          {
+            "name": "needs",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Smart filter CSV: tasks missing the listed fields (effort, due). Blank explicit values and invalid entries return 400."
           }
         ]
       }

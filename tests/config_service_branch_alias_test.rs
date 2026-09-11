@@ -1,3 +1,5 @@
+mod common;
+
 use std::collections::BTreeMap;
 
 use lotar::config::persistence::load_project_config_from_dir;

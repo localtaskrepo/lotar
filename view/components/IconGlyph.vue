@@ -51,6 +51,7 @@ type IconName =
   | 'search'
   | 'eye'
   | 'eye-off'
+  | 'download'
 
 type IconDef = {
   paths: string[]
@@ -63,6 +64,9 @@ type IconDef = {
 const ICONS: Record<IconName, IconDef> = {
   plus: {
     paths: ['M12 4v16', 'M4 12h16'],
+  },
+  download: {
+    paths: ['M12 3v12', 'M8 11l4 4 4-4', 'M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2'],
   },
   tag: {
     paths: ['M5 7V5a2 2 0 012-2h6l6 6-9 9-5-5A2 2 0 015 7z', 'M11 7h.01'],

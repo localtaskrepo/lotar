@@ -30,7 +30,7 @@ use crate::{
 };
 use chrono::Utc;
 use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 mod activity;
 mod agents;
@@ -317,6 +317,7 @@ pub(super) const TASK_LIST_KNOWN_KEYS: &[&str] = &[
     "q",
     "assignee",
     "order",
+    "sort_by",
     "limit",
     "offset",
     "page_size",
@@ -357,17 +358,35 @@ pub(super) fn parse_task_query(
             .unwrap_or_default()
     };
 
+    // Enum validation is scoped to the explicit project's resolved config
+    // when one is requested, so project-only enum values validate instead of
+    // being rejected against the base config (DEV-57). Cross-project queries
+    // (no `project` param) keep the base config.
+    let project_cfg_owner;
+    let enum_cfg = if let Some(project) = query
+        .get("project")
+        .map(|p| p.trim())
+        .filter(|p| !p.is_empty())
+    {
+        project_cfg_owner =
+            crate::config::resolution::config_for_project(tasks_root, Some(project))
+                .unwrap_or_else(|_| cfg.clone());
+        &project_cfg_owner
+    } else {
+        cfg
+    };
+
     let mut statuses = Vec::new();
     for s in parse_list("status") {
-        statuses.push(crate::types::TaskStatus::parse_with_config(&s, cfg)?);
+        statuses.push(crate::types::TaskStatus::parse_with_config(&s, enum_cfg)?);
     }
     let mut priorities = Vec::new();
     for s in parse_list("priority") {
-        priorities.push(crate::types::Priority::parse_with_config(&s, cfg)?);
+        priorities.push(crate::types::Priority::parse_with_config(&s, enum_cfg)?);
     }
     let mut types_vec = Vec::new();
     for s in parse_list("type") {
-        types_vec.push(crate::types::TaskType::parse_with_config(&s, cfg)?);
+        types_vec.push(crate::types::TaskType::parse_with_config(&s, enum_cfg)?);
     }
 
     let mut filter = crate::api_types::TaskListFilter {
@@ -377,14 +396,7 @@ pub(super) fn parse_task_query(
         project: query.get("project").cloned(),
         tags: parse_list("tags"),
         text_query: query.get("q").cloned(),
-        sprints: query
-            .get("sprints")
-            .map(|s| {
-                s.split(',')
-                    .filter_map(|p| p.trim().parse::<u32>().ok())
-                    .collect()
-            })
-            .unwrap_or_default(),
+        sprints: parse_strict_sprints_csv(query.get("sprints"))?,
         custom_fields: BTreeMap::new(),
         assignee: Vec::new(),
         assignee_none: false,
@@ -433,6 +445,32 @@ pub(super) fn parse_task_query(
     }
 
     Ok((filter, uf))
+}
+
+/// Strict `sprints` CSV parsing shared by list and export: every entry of a
+/// non-blank value must be a positive integer. Blank values mean "no sprint
+/// filter"; invalid or empty entries are rejected (DEV-57).
+pub(super) fn parse_strict_sprints_csv(raw: Option<&String>) -> Result<Vec<u32>, String> {
+    let Some(value) = raw else {
+        return Ok(Vec::new());
+    };
+    if value.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut ids = Vec::new();
+    for part in value.split(',') {
+        let part = part.trim();
+        let id = part.parse::<u32>().map_err(|_| {
+            format!("Invalid sprints entry: '{part}' (expected CSV of positive sprint ids)")
+        })?;
+        if id == 0 {
+            return Err(
+                "Invalid sprints entry: '0' (expected CSV of positive sprint ids)".to_string(),
+            );
+        }
+        ids.push(id);
+    }
+    Ok(ids)
 }
 
 /// Apply leftover unknown-key filters (fuzzy set matching) in memory.

@@ -318,7 +318,7 @@ import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useConfig } from '../composables/useConfig'
-import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { MS_PER_DAY } from '../utils/date'
 import { storageGet, storageGetJson, storageSet, storageSetJson } from '../utils/storage'
 import { useProjects } from '../composables/useProjects'
@@ -327,6 +327,7 @@ import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 import { useTaskStore } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
+import { sortTasks } from '../utils/taskSort'
 import { formatMember, memberColor, memberInitials } from '../utils/member'
 import { findLastStatusChangeAt } from '../utils/taskHistory'
 
@@ -572,11 +573,10 @@ const rawGrouped = computed<Record<string, TaskDTO[]>>(() => {
   const lookup = columnLookup.value
   const activeProject = project.value
   for (const { label } of columnsData.value) g[label] = []
-  // Apply smart filters (client-side) before grouping
+  // Smart filters (due/recent/needs/assignee) are applied server-side by the
+  // hydrate; only the deterministic display order is applied here.
   const { normalized } = buildServerFilter(filter.value, activeProject)
-  const filtered = applySmartFilters(items.value || [], normalized)
-  const dir = normalized.order === 'asc' ? 'asc' : 'desc'
-  filtered.sort((a, b) => (dir === 'desc' ? b.modified.localeCompare(a.modified) : a.modified.localeCompare(b.modified)))
+  const filtered = sortTasks(items.value || [], 'modified', normalized.order === 'asc' ? 'asc' : 'desc')
   for (const t of filtered) {
     if (!activeProject || !t.id.startsWith(`${activeProject}-`)) continue
     const key = lookup.get(normalizeStatusKey(t.status))

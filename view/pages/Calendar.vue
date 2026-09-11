@@ -225,7 +225,7 @@ import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import { useConfig } from '../composables/useConfig'
 import { useColumns } from '../composables/useColumns'
-import { applySmartFilters, buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
+import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints } from '../composables/useSprints'
@@ -409,9 +409,9 @@ const cells = computed(() => {
   const days: Array<{ date: Date; dateKey: string; inMonth: boolean; tasks: any[]; sprints: SprintCalendarDayEntry[] }> = []
   const month = cursor.value.getMonth()
 
-  // Apply smart filters (client-side) to store items
-  const { normalized } = buildServerFilter(filter.value, project.value)
-  const smartFiltered = applySmartFilters(store.items.value || [], normalized)
+  // Smart filters (due/recent/needs/assignee) are applied server-side by the
+  // hydrate; the calendar indexes the hydrated set directly.
+  const smartFiltered = store.items.value || []
 
   // Index tasks by due date for this window
   const byDate: Record<string, any[]> = {}

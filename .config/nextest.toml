@@ -14,16 +14,19 @@ profile.default.slow-timeout = "90s"
 
 # Mark slow tests here in the future if desired (no ignored tests per policy).
 
-# The agent automation suite spawns real worker processes (mock agents) that
-# poll the filesystem on wall-clock schedules. Under full num-cpus parallelism
-# those windows blow and the tests flake (passing standalone, failing under
-# load). Throttle this binary to limited concurrency and allow a couple of
-# retries so transient load spikes do not fail the gate; assertions are
-# unchanged and deterministic failures still fail all retries.
+# The agent automation and safety suites spawn real worker processes (mock
+# agents polling the filesystem or running shell loops) on wall-clock
+# schedules. Under full num-cpus parallelism those windows blow and the tests
+# flake (passing standalone, failing under load). Serialize both binaries in
+# this group (agent safety joined via DEV-78).
 [test-groups.agent-processes]
 max-threads = 1
 
+# Retries only dampen transient load spikes for plain test:rust runs;
+# test:agent forces --retries 0 and must pass on scheduling alone, so nothing
+# relies on them. Assertions are unchanged and deterministic failures still
+# fail all retries.
 [[profile.default.overrides]]
-filter = 'binary(agent_automation_integration_test)'
+filter = 'binary(agent_automation_integration_test) + binary(agent_safety_test)'
 test-group = 'agent-processes'
 retries = 2

@@ -67,9 +67,9 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Text payload like `deleted=true` or `deleted=false`.
 
 ### `task_list`
-- **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings.
-- **Errors:** `assignee: "@me"` that cannot be resolved returns JSON-RPC error `-32002` (fail closed — never returns the unfiltered list).
-- **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page.
+- **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `sprints`, `custom_fields`, smart filters `due` (`today|soon|later|overdue`), `recent` (`7d`), `needs` (CSV or array of `effort`,`due`), ordering `sort_by` (builtins `priority`,`status`,`effort`,`due-date`,`created`,`modified`,`assignee`,`reporter`,`title`,`type`,`project`,`id`,`tags`,`sprints` or `custom:<name>`/`field:<name>`; tags compare lexicographically and sprints numerically, empty first ascending) and `order` (`asc|desc`), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings.
+- **Errors:** `assignee: "@me"` that cannot be resolved returns JSON-RPC error `-32002` (fail closed — never returns the unfiltered list). Invalid explicit `status`/`priority`/`type` values (with enum hints), invalid `sprints` entries, and invalid `order`/`sort_by`/`due`/`recent`/`needs` values return `-32602` instead of being silently dropped, as do explicitly blank `due`/`recent`/`needs` strings. Enum filters validate against the explicit `project`'s resolved configuration when one is requested.
+- **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page. Pages iterate a deterministic global order (default `modified` desc, canonical-ID ascending tiebreak) identical to REST `/api/tasks/list` and `/api/tasks/export`.
 
 ## Sprint Tools
 

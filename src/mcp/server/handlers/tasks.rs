@@ -23,23 +23,33 @@ fn now_rfc3339() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
-fn parse_sprint_ids(value: Option<&Value>) -> Result<Vec<u32>, &'static str> {
-    fn parse_one(raw: &Value) -> Option<u32> {
-        match raw {
-            Value::Number(num) => num.as_u64().and_then(|v| u32::try_from(v).ok()),
+/// Strict `sprints` parsing for task_list (DEV-57): accepts the flexible
+/// MCP shapes (single number, '#<id>' string, or array) but every entry must
+/// be a positive integer — invalid entries error instead of being dropped.
+fn parse_sprint_ids_strict(value: Option<&Value>) -> Result<Vec<u32>, String> {
+    fn parse_one(raw: &Value) -> Result<u32, String> {
+        let parsed = match raw {
+            Value::Number(num) => num
+                .as_u64()
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or_else(|| "sprints entries must be positive integers".to_string())?,
             Value::String(text) => {
                 let trimmed = text.trim();
                 if trimmed.is_empty() {
-                    return None;
+                    return Err("sprints entries must be positive integers".to_string());
                 }
                 trimmed
                     .strip_prefix('#')
                     .unwrap_or(trimmed)
                     .parse::<u32>()
-                    .ok()
+                    .map_err(|_| "sprints entries must be positive integers".to_string())?
             }
-            _ => None,
+            _ => return Err("sprints entries must be positive integers".to_string()),
+        };
+        if parsed == 0 {
+            return Err("sprints entries must be positive integers".to_string());
         }
+        Ok(parsed)
     }
 
     let Some(v) = value else {
@@ -51,21 +61,15 @@ fn parse_sprint_ids(value: Option<&Value>) -> Result<Vec<u32>, &'static str> {
         Value::Null => {}
         Value::Array(items) => {
             for item in items {
-                if let Some(id) = parse_one(item)
-                    && id > 0
-                {
-                    out.push(id);
-                }
+                out.push(parse_one(item)?);
             }
         }
         Value::Number(_) | Value::String(_) => {
-            if let Some(id) = parse_one(v)
-                && id > 0
-            {
-                out.push(id);
-            }
+            out.push(parse_one(v)?);
         }
-        _ => return Err("sprints must be a sprint id, '#<id>', or an array of them"),
+        _ => {
+            return Err("sprints must be a sprint id, '#<id>', or an array of them".to_string());
+        }
     }
     out.sort_unstable();
     out.dedup();
@@ -1575,40 +1579,130 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let cfg = cfg_mgr.get_resolved_config();
-    let validator = CliValidator::new(cfg);
+    let base_cfg = cfg_mgr.get_resolved_config();
 
-    fn parse_vec<T, F>(v: Option<&Value>, f: F) -> Vec<T>
-    where
-        F: Fn(&str) -> Result<T, String>,
-    {
-        match v {
-            Some(Value::String(s)) => f(s).ok().into_iter().collect(),
-            Some(Value::Array(arr)) => arr
-                .iter()
-                .filter_map(|it| it.as_str().and_then(|s| f(s).ok()))
-                .collect(),
-            _ => vec![],
-        }
-    }
-
-    let status = parse_vec(req.params.get("status"), |s| validator.validate_status(s));
-    let priority = parse_vec(req.params.get("priority"), |s| {
-        validator.validate_priority(s)
-    });
-    let task_type = parse_vec(
-        req.params
-            .get("type")
-            .or_else(|| req.params.get("task_type")),
-        |s| validator.validate_task_type(s),
-    );
     let project = req
         .params
         .get("project")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    // Enum validation is scoped to the explicit project's resolved config
+    // when one is requested (project-only enum values validate; DEV-57);
+    // cross-project queries keep the base config.
+    let project_cfg_owner;
+    let cfg = if let Some(prefix) = project.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
+        project_cfg_owner =
+            crate::config::resolution::config_for_project(resolver.path.as_path(), Some(prefix))
+                .unwrap_or_else(|_| base_cfg.clone());
+        &project_cfg_owner
+    } else {
+        base_cfg
+    };
+    let validator = CliValidator::new(cfg);
     let project_scope: Vec<String> = project.iter().cloned().collect();
     let enum_hints = EnumHints::from_resolved_config(cfg, &project_scope);
+
+    // Strict multi-value enum parsing (DEV-57): an invalid explicit value is
+    // a -32602 error carrying enum suggestions, never a silently dropped
+    // filter that widens the result set.
+    fn parse_vec_strict<T, F>(
+        req_id: &Option<Value>,
+        v: Option<&Value>,
+        field: &str,
+        hints: Option<&EnumHints>,
+        allowed: fn(&EnumHints) -> &[String],
+        f: F,
+    ) -> Result<Vec<T>, JsonRpcResponse>
+    where
+        F: Fn(&str) -> Result<T, String>,
+    {
+        let values: Vec<String> = match v {
+            None | Some(Value::Null) => Vec::new(),
+            Some(Value::String(s)) => s
+                .split(',')
+                .map(|part| part.trim().to_string())
+                .filter(|part| !part.is_empty())
+                .collect(),
+            Some(Value::Array(arr)) => {
+                let mut collected = Vec::with_capacity(arr.len());
+                for item in arr {
+                    let Some(text) = item.as_str() else {
+                        return Err(err(
+                            req_id.clone(),
+                            -32602,
+                            &format!("{field} entries must be strings"),
+                            None,
+                        ));
+                    };
+                    collected.push(text.trim().to_string());
+                }
+                collected
+            }
+            Some(_) => {
+                return Err(err(
+                    req_id.clone(),
+                    -32602,
+                    &format!("{field} must be a string or array of strings"),
+                    None,
+                ));
+            }
+        };
+        let mut out = Vec::with_capacity(values.len());
+        for raw in values {
+            if raw.is_empty() {
+                continue;
+            }
+            match f(&raw) {
+                Ok(parsed) => out.push(parsed),
+                Err(e) => {
+                    let data = hints.and_then(|h| make_enum_error_data(field, &raw, allowed(h)));
+                    return Err(err(
+                        req_id.clone(),
+                        -32602,
+                        &format!("{} validation failed: {}", field.to_lowercase(), e),
+                        data,
+                    ));
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    let status = match parse_vec_strict(
+        &req.id,
+        req.params.get("status"),
+        "status",
+        enum_hints.as_ref(),
+        |h| h.statuses.as_slice(),
+        |s| validator.validate_status(s),
+    ) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+    let priority = match parse_vec_strict(
+        &req.id,
+        req.params.get("priority"),
+        "priority",
+        enum_hints.as_ref(),
+        |h| h.priorities.as_slice(),
+        |s| validator.validate_priority(s),
+    ) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
+    let task_type = match parse_vec_strict(
+        &req.id,
+        req.params
+            .get("type")
+            .or_else(|| req.params.get("task_type")),
+        "type",
+        enum_hints.as_ref(),
+        |h| h.types.as_slice(),
+        |s| validator.validate_task_type(s),
+    ) {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    };
     let tags = parse_tags_params(&req.params);
     let text_query = req
         .params
@@ -1668,9 +1762,9 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         project: project.clone(),
         tags,
         text_query,
-        sprints: match parse_sprint_ids(req.params.get("sprints")) {
+        sprints: match parse_sprint_ids_strict(req.params.get("sprints")) {
             Ok(v) => v,
-            Err(msg) => return err(req.id, -32602, msg, None),
+            Err(msg) => return err(req.id, -32602, &msg, None),
         },
         assignee: Vec::new(),
         assignee_none: false,
@@ -1705,11 +1799,108 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     }
 
+    // Shared strict query executor options (DEV-57): sort_by/order and the
+    // due/recent/needs smart filters, identical to the REST grammar.
+    fn opt_string_param(
+        req: &JsonRpcRequest,
+        key: &str,
+    ) -> Result<Option<String>, JsonRpcResponse> {
+        match req.params.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(s)) => Ok(Some(s.clone())),
+            Some(_) => Err(err(
+                req.id.clone(),
+                -32602,
+                &format!("{key} must be a string"),
+                None,
+            )),
+        }
+    }
+    #[allow(clippy::needless_pass_by_value)]
+    fn query_parse_error(req_id: &Option<Value>, msg: String) -> JsonRpcResponse {
+        err(req_id.clone(), -32602, &msg, None)
+    }
+
+    let mut query_options = crate::services::task_query::TaskQueryOptions::default();
+    if let Some(raw) = match opt_string_param(&req, "sort_by") {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    } {
+        match crate::services::task_query::parse_sort_by(&raw) {
+            Ok(spec) => query_options.sort = spec,
+            Err(msg) => return query_parse_error(&req.id, msg),
+        }
+    }
+    if let Some(raw) = match opt_string_param(&req, "order") {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    } {
+        match crate::services::task_query::parse_order(&raw) {
+            Ok(order) => query_options.order = order,
+            Err(msg) => return query_parse_error(&req.id, msg),
+        }
+    }
+    if let Some(raw) = match opt_string_param(&req, "due") {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    } {
+        match crate::services::task_query::parse_due(&raw) {
+            Ok(due) => query_options.due = Some(due),
+            Err(msg) => return query_parse_error(&req.id, msg),
+        }
+    }
+    if let Some(raw) = match opt_string_param(&req, "recent") {
+        Ok(v) => v,
+        Err(resp) => return resp,
+    } {
+        match crate::services::task_query::parse_recent(&raw) {
+            Ok(recent) => query_options.recent = Some(recent),
+            Err(msg) => return query_parse_error(&req.id, msg),
+        }
+    }
+    let needs_raw: Option<String> = match req.params.get("needs") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(Value::Array(items)) => {
+            let mut joined = Vec::with_capacity(items.len());
+            for item in items {
+                match item.as_str() {
+                    Some(text) => joined.push(text.trim().to_string()),
+                    None => {
+                        return err(
+                            req.id.clone(),
+                            -32602,
+                            "needs entries must be strings",
+                            None,
+                        );
+                    }
+                }
+            }
+            Some(joined.join(","))
+        }
+        Some(_) => {
+            return err(
+                req.id.clone(),
+                -32602,
+                "needs must be a string or array of strings",
+                None,
+            );
+        }
+    };
+    if let Some(raw) = needs_raw {
+        match crate::services::task_query::parse_needs(&raw) {
+            Ok(needs) => query_options.needs = needs,
+            Err(msg) => return query_parse_error(&req.id, msg),
+        }
+    }
+
     let storage = Storage::new(&resolver.path.clone());
-    let tasks = TaskService::list(&storage, &filter)
-        .into_iter()
-        .map(|(_, t)| t)
-        .collect::<Vec<_>>();
+    let mut tasks = TaskService::list(&storage, &filter);
+    // Smart filters + deterministic global ordering (default modified desc,
+    // canonical-ID lexical asc tiebreak) BEFORE pagination so pages are
+    // stable and match the REST list/export order.
+    crate::services::task_query::apply(&mut tasks, &query_options, chrono::Utc::now());
+    let tasks = tasks.into_iter().map(|(_, t)| t).collect::<Vec<_>>();
     let limit = match parse_limit_value(req.params.get("limit"), MCP_DEFAULT_TASK_LIST_LIMIT) {
         Ok(value) if (1..=MCP_MAX_TASK_LIST_LIMIT).contains(&value) => value,
         Ok(_) => {
