@@ -1,10 +1,11 @@
 title: Unify project-aware task mutation contracts and patch semantics
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.418447+00:00
-modified: 2026-09-08T14:02:10.726034+00:00
+modified: 2026-09-11T03:45:44.005215+00:00
 relationships:
   blocks:
   - DEV-55
@@ -19,6 +20,46 @@ relationships:
 comments:
 - date: 2026-09-08T14:02:10.726034+00:00
   text: 'Reproduced while validating DEV-14/DEV-85 docs with installed lotar 0.8.0 in an isolated APP workspace: config set issue_states Queued,Active,Review,Complete --project APP; CLI status APP-1 Active succeeds; MCP task_update {id:APP-1,patch:{status:Review}} returns -32602 with default Todo/InProgress/NeedsReview/Done suggestions. Rejected update leaves ticket unchanged; CLI status APP-1 Review succeeds. User-facing skill documents validated CLI fallback rather than altering project config. No backend changes in this guidance task.'
+- date: 2026-09-10T20:22:36.655912+00:00
+  text: |-
+    Plan (backend scope, view/smoke owned by follow-up agent):
+    1. Shared project-aware mutation validation: TaskService::create/update validate+canonicalize status/priority/type strings against the TARGET project's resolved config (fixes MCP/REST validating against global config). DTO enum fields become Option<String>; adapters pass raw strings. Custom-field names validated against config (wildcard default preserved).
+    2. Tri-state patch contract: omitted=no-op, null=clear, value=set for clearable fields (reporter/assignee/due_date/effort/description scalars; tags/acceptance_criteria/relationships/custom_fields/sprints collections). Empty-string/empty-collection clears stay compatible. status/priority/type/title: null=omitted no-op.
+    3. acceptance_criteria + custom_fields roundtrip: TaskDTO/TaskCreate/TaskUpdate gain acceptance_criteria; REST /api/tasks/add now honors custom_fields object (legacy fields kv still accepted).
+    4. Atomic validated initial status: TaskCreate.status (REST+MCP+CLI --status) validated before write; no add-then-status.
+    5. Creation failure safety: sprint ids pre-validated before task write; post-add sprint attach failure triggers best-effort task deletion (documented non-transactional limit, DEV-55 owns full transactions).
+    6. Sync contracts: docs/openapi.json, docs/help/api-quick-reference.md, docs/help/mcp-tools.md, MCP tools.rs schemas.
+    7. Regressions at public boundaries: two-project custom enums (REST create+update, MCP update/bulk), nullable clears, custom fields+criteria roundtrip, invalid create leaves no files.
+    Checks: targeted cargo nextest filters, cargo fmt, clippy fast loop; full gates deferred to parent.
+- date: 2026-09-10T20:58:07.146471+00:00
+  text: "Backend foundation complete (checkpoint for UI agent). \n\nIMPLEMENTED (src/**, tests/**, docs/** only):\n- Shared project-aware validation: new src/services/task_validation.rs; TaskService::create/update parse+canonicalize status/priority/type STRINGS against the target project's resolved config and validate custom-field names (wildcard default preserved). DTO enum fields are now Option<String> (src/api_types.rs). CliValidator custom-field/tag checks delegate to the shared module.\n- Tri-state patch contract: omitted=no-op, null=clear, value=set; empty string/empty collection clears preserved (due_date/description empty now also clear). title/status/priority/type treat null as omitted. tags/acceptance_criteria/relationships/custom_fields/sprints replace whole value.\n- acceptance_criteria on TaskDTO/TaskCreate/TaskUpdate with YAML roundtrip; REST /api/tasks/add now honors custom_fields object (legacy fields kv still accepted, object wins per key).\n- Atomic initial status: TaskCreate.status (REST+MCP) and CLI add --status validated against project config before write; /api/tasks/update now applies status (project-validated); /api/tasks/status retained.\n- Creation failure safety: sprint ids pre-checked before task write; post-write sprint attach failure triggers best-effort task deletion (non-transactional; DEV-55 owns full transactions). REST create maps ValidationError/SprintNotFound to 400.\n- MCP: handlers pass strings through; project-scoped pre-validation retains error.data.suggestions; hints now project-scoped; tools.rs schemas synced (status/acceptance_criteria/sprints + null semantics).\n- Sync pull folds status into atomic create (no add-then-status).\n- Docs: openapi.json (TaskCreate/TaskUpdate/TaskUpdateRequest/TaskDTO), api-quick-reference.md, task-model.md, serve.md, mcp-tools.md.\n\nVERIFICATION: 877/877 nextest (10 git-gated skips; agent_safety_test binary excluded due to sandbox git-init restriction, pre-existing). New regressions: tests/dev54_mutation_contract_test.rs (6 tests: two-project enums REST, nullable+empty clears, custom_fields+criteria roundtrip, invalid create leaves no files, CLI --status) and 2 MCP tests (project-only status accept/reject with project-scoped suggestions; two-project bulk per-item failures). cargo fmt clean; clippy -D warnings clean. Full npm gates (vue-tsc/clippy all-targets, UI vitest, smoke) deferred to parent per plan.\n\nREMAINING (UI agent): view/api/types.ts TaskCreate/TaskUpdate (status, acceptance_criteria, string enums, null-clear fields), TaskPanel persistence/autosave coalescing per contract, smoke coverage. Wire contract reported to parent for UI kickoff."
+- date: 2026-09-10T21:42:24.743888+00:00
+  text: |-
+    Review fixes round (backend/docs/Rust tests only; view+smoke edits in tree are the UI agent's concurrent work):
+
+    1. MCP scalar nulls: parse_task_update_patch now maps null->empty sentinel for reporter/assignee/due_date/effort/description, matching REST tri-state. Regressions: tools_call_task_update_null_clears_clearable_scalars + tools_call_task_bulk_update_null_clears.
+    2. custom_fields: service resolve_custom_fields canonicalizes configured keys (case-fold collision -> 400), passes through unchanged keys already on the task (config removal cannot reject replace-all echoes), rejects new undeclared keys under restricted configs; CLI edit now validates+canonicalizes before merge. Regression: rest_custom_fields_legacy_keys_survive_config_removal.
+    3. Explicit tags clear no longer resurrectes default_tags; get/list no longer re-apply default_tags on reads (persisted state is authoritative). Regression: rest_explicit_tags_clear_does_not_reapply_default_tags.
+    4. Blank/whitespace titles rejected at create+update (service guard, all adapters). Regression: rest_update_empty_title_rejected + MCP assertion.
+    5. sprints strictness unified: MCP create/update reject non-positive/non-integer entries (-32602) like REST, no silent drops. Regressions in MCP null-clears test.
+    6. Sync enum strictness intentional: documented required local-value mapping in docs/help/config-reference.md; regression sync_mapped_status_outside_project_enums_fails_loudly proves per-issue ValidationError with valid values and no orphan task.
+    7. MCP membership errors keep the operation envelope (-32000 'Task create failed' + data.message) while enum failures keep -32602+suggestions; mirrors mcp.members smoke expectation. Regression: tools_call_task_create_membership_error_keeps_operation_envelope.
+    8. Sprint precheck fails closed on SprintService::list errors before any task write. Limit documented in code: creation is validate-first + best-effort cleanup, NOT a transaction - a crash between task write and sprint writes can leave partial state (DEV-55).
+
+    VERIFICATION: 848/848 nextest (6 git-gated runtime skips; agent_safety_test binary excluded - sandbox git-init restriction, pre-existing). cargo fmt clean; clippy --all-targets -D warnings clean. Docs synced (openapi, api-quick-reference, mcp-tools, config-reference). Full gates incl. smoke still deferred to parent.
+- date: 2026-09-11T03:45:33.028713+00:00
+  text: |-
+    Handoff (closing backend + UI scope):
+
+    Outcome: Project-aware task mutation contracts unified across CLI/REST/MCP with a shared validator (src/services/task_validation.rs; TaskService create/update validate+canonicalize status/priority/type and custom-field keys against the target project's resolved config). Tri-state patch contract implemented: omitted=no-op, null=clear, value=set, with historical empty-string/empty-collection clears preserved; title/status/priority/type treat null as omitted and blank titles are rejected. acceptance_criteria and custom_fields round-trip (TaskDTO/TaskCreate/TaskUpdate + YAML), REST create honors custom_fields with legacy fields fallback. Atomic validated initial status on create (REST/MCP/CLI --status); REST /api/tasks/update applies status project-validated; /api/tasks/status retained. Invalid creation leaves no task file (enum/sprint pre-validation fail-closed incl. SprintService::list errors, plus best-effort cleanup). Explicit tags clears no longer re-apply default_tags; get/list show persisted tags. MCP: null clears, strict sprints, project-scoped enum suggestions, membership errors keep the operation envelope. Sync pull folds status into atomic create; strict enum mapping requirement documented (docs/help/config-reference.md). UI revision agent completed serialized/coalesced TaskPanel saves and view contract types.
+
+    Evidence: src/services/{task_validation,task_service,sync_service,automation_service}.rs, src/api_types.rs, src/routes/tasks.rs, src/mcp/server/{handlers/tasks,tools}.rs, src/cli/**, view/** (revision agent), docs/openapi.json + docs/help/*. Regressions: tests/dev54_mutation_contract_test.rs (9), MCP lib tests (project enum accept/reject+bulk, null clears single/bulk, membership envelope, sprints strictness), sync_service sync_mapped_status_outside_project_enums_fails_loudly. Final gates (single passing run): npm run lint:agent (vue-tsc, all-target/all-feature clippy -D warnings, fmt); npm run test:agent with Rust 863 passed / 6 explicit Git skips / retries=0 and UI 270 passed; smoke agent with PLAYWRIGHT_BROWSERS_PATH=$PWD/target/pw-browsers LOTAR_SMOKE_CHROMIUM_ARGS='--no-sandbox,--no-ygote single-process per env' 101 passed / 23 Git skips / zero failures after rebuild. Earlier mcp.members membership envelope failure fixed and covered by tools_call_task_create_membership_error_keeps_operation_envelope.
+
+    Remaining: Changes uncommitted and unintegrated (no commit authorized; developer controls integration). Multi-file transaction/crash durability and crash-orphan cleanup limits intentionally remain DEV-55 (creation is validate-first + best-effort cleanup, not a transaction). Broad Git/Windows/platform coverage remains DEV-79; the 6 Rust + 23 smoke Git skips are the documented exclusions. UI autosave queue handled by revision agent per its own verification.
+
+    Guidance: No durable guidance correction proven this cycle; none recorded.
+- date: 2026-09-11T03:45:43.972009+00:00
+  text: 'Correction to evidence above: exact smoke env was PLAYWRIGHT_BROWSERS_PATH=$PWD/target/pw-browsers and LOTAR_SMOKE_CHROMIUM_ARGS=''--no-sandbox,--no-zygote,--single-process'' (flag string mistyped in prior comment).'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S6 C10 M7 M8 M10 U3 U4.
@@ -34,3 +75,37 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-10T20:22:36.644799+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-10T20:22:36.655912+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-10T20:58:07.146471+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-10T21:42:24.743888+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T03:45:33.028713+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T03:45:43.972009+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T03:45:44.005215+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -447,6 +447,15 @@ impl CommandHandler for AddHandler {
             .ensure_task_membership(&task)
             .map_err(|e| format!("Member validation failed: {}", e))?;
 
+        // Explicit initial status is validated against the final project
+        // configuration so creation persists it atomically.
+        if let Some(status_arg) = args.status {
+            let validated = validator
+                .validate_status(&status_arg)
+                .map_err(|e| format!("Status validation failed: {}", e))?;
+            task.status = validated;
+        }
+
         // Save the task
         // Git-like behavior: if a parent tasks root is adopted, write to that parent (no child .tasks creation)
 

@@ -164,6 +164,7 @@ fn handle_set_assignee(
         effort: None,
         description: None,
         tags: None,
+        acceptance_criteria: None,
         relationships: None,
         custom_fields: None,
         sprints: None,

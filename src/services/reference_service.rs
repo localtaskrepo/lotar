@@ -781,6 +781,7 @@ mod tests {
             TaskCreate {
                 title: "Link reference test".to_string(),
                 project: Some("DEMO".to_string()),
+                status: None,
                 priority: None,
                 task_type: None,
                 reporter: None,
@@ -789,6 +790,7 @@ mod tests {
                 effort: None,
                 description: None,
                 tags: vec![],
+                acceptance_criteria: vec![],
                 relationships: None,
                 custom_fields: None,
                 sprints: vec![],
@@ -838,6 +840,7 @@ mod tests {
             TaskCreate {
                 title: "File reference test".to_string(),
                 project: Some("T".to_string()),
+                status: None,
                 ..TaskCreate::default()
             },
         )
@@ -885,6 +888,7 @@ mod tests {
             TaskCreate {
                 title: "Link reference scheme test".to_string(),
                 project: Some("DEMO".to_string()),
+                status: None,
                 priority: None,
                 task_type: None,
                 reporter: None,
@@ -893,6 +897,7 @@ mod tests {
                 effort: None,
                 description: None,
                 tags: vec![],
+                acceptance_criteria: vec![],
                 relationships: None,
                 custom_fields: None,
                 sprints: vec![],
@@ -924,6 +929,7 @@ mod tests {
             TaskCreate {
                 title: "Link reference safety test".to_string(),
                 project: Some("DEMO".to_string()),
+                status: None,
                 priority: None,
                 task_type: None,
                 reporter: None,
@@ -932,6 +938,7 @@ mod tests {
                 effort: None,
                 description: None,
                 tags: vec![],
+                acceptance_criteria: vec![],
                 relationships: None,
                 custom_fields: None,
                 sprints: vec![],
@@ -966,6 +973,7 @@ mod tests {
             TaskCreate {
                 title: "Code reference test".to_string(),
                 project: Some("DEMO".to_string()),
+                status: None,
                 priority: None,
                 task_type: None,
                 reporter: None,
@@ -974,6 +982,7 @@ mod tests {
                 effort: None,
                 description: None,
                 tags: vec![],
+                acceptance_criteria: vec![],
                 relationships: None,
                 custom_fields: None,
                 sprints: vec![],
@@ -1029,6 +1038,7 @@ mod tests {
             TaskCreate {
                 title: "Legacy format test".to_string(),
                 project: Some("DEMO".to_string()),
+                status: None,
                 ..TaskCreate::default()
             },
         )

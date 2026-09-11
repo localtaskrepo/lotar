@@ -3,7 +3,6 @@ use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintPlan};
-use lotar::types::{Priority, TaskStatus, TaskType};
 use lotar::utils::paths;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -52,8 +51,9 @@ issue.priorities: [Low, Medium, High]
         TaskCreate {
             title: "Model velocity".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("Medium")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("Medium".to_string()),
+            task_type: Some("Feature".to_string()),
             effort: Some("5pt".to_string()),
             sprints: vec![sprint_id],
             ..TaskCreate::default()
@@ -66,8 +66,9 @@ issue.priorities: [Low, Medium, High]
         TaskCreate {
             title: "Wire burndown dashboard".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("High")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("High".to_string()),
+            task_type: Some("Feature".to_string()),
             effort: Some("3pt".to_string()),
             sprints: vec![sprint_id],
             ..TaskCreate::default()
@@ -80,8 +81,9 @@ issue.priorities: [Low, Medium, High]
         TaskCreate {
             title: "Pair on automation".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("Low")),
-            task_type: Some(TaskType::from("Bug")),
+            status: None,
+            priority: Some("Low".to_string()),
+            task_type: Some("Bug".to_string()),
             effort: Some("4h".to_string()),
             sprints: vec![sprint_id],
             ..TaskCreate::default()
@@ -93,7 +95,7 @@ issue.priorities: [Low, Medium, High]
         &mut storage,
         &hours_task.id,
         TaskUpdate {
-            status: Some(TaskStatus::from("InProgress")),
+            status: Some("InProgress".to_string()),
             ..TaskUpdate::default()
         },
     )
@@ -177,8 +179,9 @@ issue.priorities: [Low, High]
         TaskCreate {
             title: "Sync with stakeholders".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("High")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("High".to_string()),
+            task_type: Some("Feature".to_string()),
             sprints: vec![sprint_id],
             ..TaskCreate::default()
         },
@@ -190,8 +193,9 @@ issue.priorities: [Low, High]
         TaskCreate {
             title: "Collect feedback".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("Low")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("Low".to_string()),
+            task_type: Some("Feature".to_string()),
             sprints: vec![sprint_id],
             ..TaskCreate::default()
         },
@@ -202,7 +206,7 @@ issue.priorities: [Low, High]
         &mut storage,
         &task_one.id,
         TaskUpdate {
-            status: Some(TaskStatus::from("InProgress")),
+            status: Some("InProgress".to_string()),
             ..TaskUpdate::default()
         },
     )
@@ -212,7 +216,7 @@ issue.priorities: [Low, High]
         &mut storage,
         &task_two.id,
         TaskUpdate {
-            status: Some(TaskStatus::from("Todo")),
+            status: Some("Todo".to_string()),
             ..TaskUpdate::default()
         },
     )

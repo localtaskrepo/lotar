@@ -142,12 +142,19 @@ fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "Create and persist a task. Any missing priority/type/status fall back to project defaults. reporter/assignee accept '@me'. relationships should follow the TaskRelationships shape (e.g. blocks/relates). Returns the saved task JSON with defaults applied.".to_string();
+    let description = "Create and persist a task. Enum values (status/priority/type) are validated against the target project's configuration. Any missing priority/type/status fall back to project defaults; an explicit status is stored atomically with creation. reporter/assignee accept '@me'. relationships should follow the TaskRelationships shape (e.g. blocks/relates). Returns the saved task JSON with defaults applied.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("title".into(), json!({"type": "string"}));
     properties.insert("description".into(), json!({"type": ["string", "null"]}));
     properties.insert("project".into(), json!({"type": ["string", "null"]}));
+    properties.insert(
+        "status".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Initial status validated against the project's issue_states."
+        }),
+    );
     properties.insert("priority".into(), json!({"type": ["string", "null"]}));
     properties.insert("type".into(), json!({"type": ["string", "null"]}));
     properties.insert("reporter".into(), json!({"type": ["string", "null"]}));
@@ -157,6 +164,14 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
     properties.insert(
         "tags".into(),
         json!({"type": "array", "items": {"type": "string"}}),
+    );
+    properties.insert(
+        "acceptance_criteria".into(),
+        json!({
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Initial acceptance criteria entries."
+        }),
     );
     properties.insert("relationships".into(), json!({"type": ["object", "null"]}));
     properties.insert(
@@ -183,6 +198,12 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         &mut field_hints,
         "project",
         enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    insert_field_hint(
+        &mut field_hints,
+        "status",
+        enum_hints.map(|h| h.statuses.as_slice()),
         false,
     );
     insert_field_hint(
@@ -228,6 +249,7 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
             &mut tool,
             &[
                 (hints.projects.as_slice(), "projects"),
+                (hints.statuses.as_slice(), "statuses"),
                 (hints.priorities.as_slice(), "priorities"),
                 (hints.types.as_slice(), "types"),
                 (hints.members.as_slice(), "members"),
@@ -272,28 +294,81 @@ fn make_task_get_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "Patch an existing task. Provide fields inside patch; omitted properties stay unchanged. Strings are validated against project config, and reporter/assignee accept '@me'. relationships replaces the full relationship map.".to_string();
+    let description = "Patch an existing task. Provide fields inside patch. Tri-state semantics: omitted properties stay unchanged, null clears (where clearing is allowed), and a value sets. status/priority/type are validated against the task's project configuration; their null means no-op. reporter/assignee accept '@me' and clear with null or empty string. tags/acceptance_criteria replace the list (null or [] clears). relationships and custom_fields replace the whole value (null or empty clears).".to_string();
 
     let mut patch_properties = JsonMap::new();
-    patch_properties.insert("title".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("description".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("status".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("priority".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("type".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("reporter".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("due_date".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("effort".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert(
+        "title".into(),
+        json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
+    );
+    patch_properties.insert(
+        "description".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "status".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Validated against the task's project issue_states; null is treated as omitted."
+        }),
+    );
+    patch_properties.insert(
+        "priority".into(),
+        json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
+    );
+    patch_properties.insert(
+        "type".into(),
+        json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
+    );
+    patch_properties.insert(
+        "reporter".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "assignee".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "due_date".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "effort".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
     patch_properties.insert(
         "tags".into(),
-        json!({"type": "array", "items": {"type": "string"}}),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "string"},
+            "description": "Replaces the list; null or [] clears."
+        }),
     );
-    patch_properties.insert("relationships".into(), json!({"type": ["object", "null"]}));
+    patch_properties.insert(
+        "acceptance_criteria".into(),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "string"},
+            "description": "Replaces the list; null or [] clears."
+        }),
+    );
+    patch_properties.insert(
+        "relationships".into(),
+        json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}),
+    );
     patch_properties.insert(
         "custom_fields".into(),
         json!({
-            "type": "object",
-            "description": "Assign custom_fields key/value pairs defined in config."
+            "type": ["object", "null"],
+            "description": "Replaces the whole custom_fields map; null or {} clears all."
+        }),
+    );
+    patch_properties.insert(
+        "sprints".into(),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "number"},
+            "description": "Replaces sprint memberships; null or [] clears them."
         }),
     );
 
@@ -590,19 +665,55 @@ fn make_task_comment_update_tool(_enum_hints: Option<&EnumHints>) -> Value {
 fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut patch_properties = JsonMap::new();
     patch_properties.insert("title".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("description".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("status".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert(
+        "description".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "status".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Validated per task against its project config; null is treated as omitted."
+        }),
+    );
     patch_properties.insert("priority".into(), json!({"type": ["string", "null"]}));
     patch_properties.insert("type".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("reporter".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("due_date".into(), json!({"type": ["string", "null"]}));
-    patch_properties.insert("effort".into(), json!({"type": ["string", "null"]}));
+    patch_properties.insert(
+        "reporter".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "assignee".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "due_date".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
+    patch_properties.insert(
+        "effort".into(),
+        json!({"type": ["string", "null"], "description": "null or empty string clears."}),
+    );
     patch_properties.insert(
         "tags".into(),
-        json!({"type": ["array", "null"], "items": {"type": "string"}}),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "string"},
+            "description": "Replaces the list; null or [] clears."
+        }),
     );
-    patch_properties.insert("relationships".into(), json!({"type": ["object", "null"]}));
+    patch_properties.insert(
+        "acceptance_criteria".into(),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "string"},
+            "description": "Replaces the list; null or [] clears."
+        }),
+    );
+    patch_properties.insert(
+        "relationships".into(),
+        json!({"type": ["object", "null"], "description": "Replaces the map; null or {} clears."}),
+    );
     patch_properties.insert(
         "custom_fields".into(),
         json!({"type": ["object", "null"], "description": "Set/clear custom_fields. Null clears all."}),

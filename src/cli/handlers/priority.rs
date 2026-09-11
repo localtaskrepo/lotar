@@ -80,7 +80,7 @@ fn handle_set_priority(
 
     renderer.log_debug("priority: persisting change via TaskService");
     let patch = crate::api_types::TaskUpdate {
-        priority: Some(validated_priority.clone()),
+        priority: Some(validated_priority.to_string()),
         ..Default::default()
     };
     crate::services::task_service::TaskService::update(&mut ctx.storage, full_id, patch)

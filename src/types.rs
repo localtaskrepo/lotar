@@ -454,6 +454,18 @@ pub fn custom_value_string<S: Into<String>>(s: S) -> serde_json::Value {
     serde_json::Value::String(s.into())
 }
 
+/// Convert a JSON custom field value into the configured `CustomFieldValue`
+/// representation so REST/MCP payloads round-trip identically.
+#[cfg(feature = "schema")]
+pub fn custom_value_from_json(value: &serde_json::Value) -> CustomFieldValue {
+    value.clone()
+}
+
+#[cfg(not(feature = "schema"))]
+pub fn custom_value_from_json(value: &serde_json::Value) -> CustomFieldValue {
+    serde_yaml_ng::to_value(value).unwrap_or(serde_yaml_ng::Value::Null)
+}
+
 /// Convert a custom field value to a comparable display string for sorting/filtering.
 #[cfg(feature = "schema")]
 pub fn custom_value_to_string(v: &CustomFieldValue) -> String {

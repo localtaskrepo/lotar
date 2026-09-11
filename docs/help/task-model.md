@@ -66,8 +66,8 @@ These extensions are separate from `custom_fields` and are not added to REST/MCP
 
 ## Create/update payloads
 
-- `TaskCreate` accepts `title`, optional `project`, and optional metadata for `priority`, `task_type`, `reporter`, `assignee`, `due_date`, `effort`, `description`, `tags`, `relationships`, `custom_fields`, and `sprints`. Missing properties are defaulted downstream.
-- `TaskUpdate` treats every field as optional and only patches values that are present in the JSON body. Passing `tags` replaces the entire list; omitting it leaves tags untouched.
+- `TaskCreate` accepts `title`, optional `project`, and optional metadata for `status`, `priority`, `task_type`, `reporter`, `assignee`, `due_date`, `effort`, `description`, `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, and `sprints`. Missing properties are defaulted downstream; enum strings are validated against the target project's configuration and an explicit `status` is stored atomically with creation.
+- `TaskUpdate` treats every field as optional with explicit null semantics: omitted = no-op, `null` = clear (where clearing is allowed), value = set. Empty string clears the clearable scalars (`reporter`, `assignee`, `due_date`, `effort`, `description`); empty array/object clears `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, and `sprints`. `title`, `status`, `priority`, and `task_type` treat `null` as omitted. List and map patches replace the whole value, and enum strings are validated against the task's project configuration.
 - Both structs share the same schema in `docs/openapi.json`.
 
 ## Invariants & best practices

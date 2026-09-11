@@ -13,9 +13,7 @@ use crate::errors::LoTaRError;
 use crate::services::reference_service::ReferenceService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
-use crate::types::{
-    CustomFieldValue, TaskChange, TaskChangeLogEntry, TaskComment, TaskRelationships,
-};
+use crate::types::{TaskChange, TaskChangeLogEntry, TaskComment, TaskRelationships};
 use crate::utils::git::find_repo_root;
 use crate::utils::identity;
 use crate::workspace::TasksDirectoryResolver;
@@ -109,11 +107,33 @@ fn parse_tags_params(params: &Value) -> Vec<String> {
     tags
 }
 
+/// Strict sprint id parsing shared by create and update: the value must be
+/// absent/null or an array of positive integers; invalid entries are rejected
+/// instead of silently dropped (matching REST).
+fn parse_strict_sprint_ids(value: Option<&Value>) -> Result<Vec<u32>, String> {
+    let Some(v) = value else {
+        return Ok(Vec::new());
+    };
+    match v {
+        Value::Null => Ok(Vec::new()),
+        Value::Array(items) => {
+            let mut ids = Vec::with_capacity(items.len());
+            for item in items {
+                let id = item
+                    .as_u64()
+                    .and_then(|raw| u32::try_from(raw).ok())
+                    .filter(|id| *id > 0)
+                    .ok_or_else(|| "sprints must be an array of positive integers".to_string())?;
+                ids.push(id);
+            }
+            Ok(ids)
+        }
+        _ => Err("sprints must be an array of positive integers".to_string()),
+    }
+}
+
 fn parse_task_update_patch(
     req_id: Option<Value>,
-    tasks_root: &std::path::Path,
-    validator: &CliValidator,
-    enum_hints: Option<&EnumHints>,
     patch_val: &Value,
 ) -> Result<TaskUpdate, JsonRpcResponse> {
     if !patch_val.is_object() {
@@ -127,34 +147,11 @@ fn parse_task_update_patch(
     }
 
     if let Some(s) = patch_val.get("status").and_then(|v| v.as_str()) {
-        match validator.validate_status(s) {
-            Ok(v) => patch.status = Some(v),
-            Err(e) => {
-                let data = enum_hints.and_then(|h| make_enum_error_data("status", s, &h.statuses));
-                return Err(err(
-                    req_id,
-                    -32602,
-                    &format!("Status validation failed: {}", e),
-                    data,
-                ));
-            }
-        }
+        patch.status = Some(s.to_string());
     }
 
     if let Some(s) = patch_val.get("priority").and_then(|v| v.as_str()) {
-        match validator.validate_priority(s) {
-            Ok(v) => patch.priority = Some(v),
-            Err(e) => {
-                let data =
-                    enum_hints.and_then(|h| make_enum_error_data("priority", s, &h.priorities));
-                return Err(err(
-                    req_id,
-                    -32602,
-                    &format!("Priority validation failed: {}", e),
-                    data,
-                ));
-            }
-        }
+        patch.priority = Some(s.to_string());
     }
 
     if let Some(s) = patch_val
@@ -162,65 +159,83 @@ fn parse_task_update_patch(
         .or_else(|| patch_val.get("task_type"))
         .and_then(|v| v.as_str())
     {
-        match validator.validate_task_type(s) {
-            Ok(v) => patch.task_type = Some(v),
-            Err(e) => {
-                let data = enum_hints.and_then(|h| make_enum_error_data("type", s, &h.types));
+        patch.task_type = Some(s.to_string());
+    }
+
+    // Clearable scalars: null clears (empty sentinel), string sets, matching
+    // the REST tri-state contract.
+    fn clearable_string(patch_val: &Value, key: &str) -> Option<String> {
+        match patch_val.get(key) {
+            Some(Value::Null) => Some(String::new()),
+            Some(Value::String(s)) => Some(s.clone()),
+            _ => None,
+        }
+    }
+    if let Some(v) = clearable_string(patch_val, "reporter") {
+        patch.reporter = Some(v);
+    }
+    if let Some(v) = clearable_string(patch_val, "assignee") {
+        patch.assignee = Some(v);
+    }
+    if let Some(v) = clearable_string(patch_val, "due_date") {
+        patch.due_date = Some(v);
+    }
+    if let Some(v) = clearable_string(patch_val, "effort") {
+        patch.effort = Some(v);
+    }
+    if let Some(v) = clearable_string(patch_val, "description") {
+        patch.description = Some(v);
+    }
+
+    if let Some(arr) = patch_val.get("tags") {
+        match arr {
+            Value::Null => patch.tags = Some(Vec::new()),
+            Value::Array(items) => {
+                patch.tags = Some(
+                    items
+                        .iter()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect(),
+                );
+            }
+            _ => {
                 return Err(err(
                     req_id,
                     -32602,
-                    &format!("Type validation failed: {}", e),
-                    data,
+                    "tags must be an array of strings or null",
+                    None,
                 ));
             }
         }
     }
 
-    if let Some(s) = patch_val.get("reporter").and_then(|v| v.as_str()) {
-        patch.reporter = identity::resolve_me_alias(s, Some(tasks_root)).map(|v| {
-            crate::utils::member::normalize_member_value(&v, |name| {
-                validator.config().agent_profiles.contains_key(name)
-            })
-        });
-    }
-    if let Some(s) = patch_val.get("assignee").and_then(|v| v.as_str()) {
-        patch.assignee = identity::resolve_me_alias(s, Some(tasks_root)).map(|v| {
-            crate::utils::member::normalize_member_value(&v, |name| {
-                validator.config().agent_profiles.contains_key(name)
-            })
-        });
-    }
-
-    if let Some(s) = patch_val.get("due_date").and_then(|v| v.as_str()) {
-        patch.due_date = Some(s.to_string());
-    }
-    if let Some(s) = patch_val.get("effort").and_then(|v| v.as_str()) {
-        patch.effort = Some(s.to_string());
-    }
-    if let Some(s) = patch_val.get("description").and_then(|v| v.as_str()) {
-        patch.description = Some(s.to_string());
-    }
-
-    if let Some(arr) = patch_val.get("tags").and_then(|v| v.as_array()) {
-        patch.tags = Some(
-            arr.iter()
-                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                .collect(),
-        );
+    if let Some(arr) = patch_val.get("acceptance_criteria") {
+        match arr {
+            Value::Null => patch.acceptance_criteria = Some(Vec::new()),
+            Value::Array(items) => {
+                patch.acceptance_criteria = Some(
+                    items
+                        .iter()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect(),
+                );
+            }
+            _ => {
+                return Err(err(
+                    req_id,
+                    -32602,
+                    "acceptance_criteria must be an array of strings or null",
+                    None,
+                ));
+            }
+        }
     }
 
     if let Some(rel_val) = patch_val.get("relationships") {
-        if rel_val.is_null() {
-            patch.relationships = Some(TaskRelationships::default());
-        } else {
-            match serde_json::from_value::<TaskRelationships>(rel_val.clone()) {
-                Ok(rel) => {
-                    if rel.is_empty() {
-                        patch.relationships = Some(TaskRelationships::default());
-                    } else {
-                        patch.relationships = Some(rel);
-                    }
-                }
+        match rel_val {
+            Value::Null => patch.relationships = Some(TaskRelationships::default()),
+            value => match serde_json::from_value::<TaskRelationships>(value.clone()) {
+                Ok(rel) => patch.relationships = Some(rel),
                 Err(e) => {
                     return Err(err(
                         req_id,
@@ -229,40 +244,28 @@ fn parse_task_update_patch(
                         None,
                     ));
                 }
-            }
+            },
         }
     }
 
     if let Some(custom_fields_val) = patch_val.get("custom_fields") {
-        let mut custom_fields_map = std::collections::HashMap::new();
-        if custom_fields_val.is_null() {
-            patch.custom_fields = Some(custom_fields_map);
-        } else {
-            let Some(obj) = custom_fields_val.as_object() else {
+        match custom_fields_val {
+            Value::Null => patch.custom_fields = Some(std::collections::HashMap::new()),
+            Value::Object(obj) => {
+                let mut custom_fields_map = std::collections::HashMap::new();
+                for (k, v) in obj.iter() {
+                    custom_fields_map.insert(k.clone(), crate::types::custom_value_from_json(v));
+                }
+                patch.custom_fields = Some(custom_fields_map);
+            }
+            _ => {
                 return Err(err(
                     req_id,
                     -32602,
                     "custom_fields must be an object or null",
                     None,
                 ));
-            };
-
-            fn json_to_custom(val: &serde_json::Value) -> CustomFieldValue {
-                #[cfg(feature = "schema")]
-                {
-                    val.clone()
-                }
-                #[cfg(not(feature = "schema"))]
-                {
-                    serde_yaml_ng::to_value(val).unwrap_or(serde_yaml_ng::Value::Null)
-                }
             }
-
-            for (k, v) in obj.iter() {
-                custom_fields_map.insert(k.clone(), json_to_custom(v));
-            }
-
-            patch.custom_fields = Some(custom_fields_map);
         }
     }
 
@@ -272,12 +275,19 @@ fn parse_task_update_patch(
             Some(Value::Array(items)) => {
                 let mut ids = Vec::new();
                 for item in items {
-                    if let Value::Number(num) = item
-                        && let Some(v) = num.as_u64().and_then(|v| u32::try_from(v).ok())
-                        && v > 0
-                    {
-                        ids.push(v);
+                    let valid = item
+                        .as_u64()
+                        .and_then(|v| u32::try_from(v).ok())
+                        .is_some_and(|v| v > 0);
+                    if !valid {
+                        return Err(err(
+                            req_id,
+                            -32602,
+                            "sprints must be an array of positive integers or null",
+                            None,
+                        ));
                     }
+                    ids.push(item.as_u64().unwrap() as u32);
                 }
                 patch.sprints = Some(ids);
             }
@@ -295,6 +305,64 @@ fn parse_task_update_patch(
     Ok(patch)
 }
 
+/// Best-effort enum hints scoped to a project's resolved configuration so
+/// validation errors can suggest the values that project actually allows.
+fn enum_hints_for_project(
+    tasks_root: &std::path::Path,
+    project: Option<&str>,
+) -> Option<EnumHints> {
+    let scope: Vec<String> = project.iter().map(|p| p.to_string()).collect();
+    let cfg = crate::config::resolution::config_for_project(tasks_root, project).ok()?;
+    EnumHints::from_resolved_config(&cfg, &scope)
+}
+
+/// Map a service failure to a JSON-RPC error response. Validation errors
+/// embed the project's allowed values in their message; `hint_data` carries
+/// optional structured enum suggestions for MCP hosts.
+fn task_mutation_error(
+    req_id: Option<Value>,
+    error: LoTaRError,
+    fallback_code: i64,
+    fallback_message: &str,
+    hint_data: Option<Value>,
+) -> JsonRpcResponse {
+    match error {
+        LoTaRError::TaskNotFound(id) => err(
+            req_id,
+            -32004,
+            "Task not found",
+            Some(json!({"message": format!("Task '{}' not found", id)})),
+        ),
+        LoTaRError::ValidationError(msg) => {
+            // Membership failures keep the operation envelope (`Task
+            // create/update failed` + `data.message`) clients already parse;
+            // other validation errors use the invalid-params code with
+            // optional enum suggestions.
+            if msg.contains("configured members") {
+                err(
+                    req_id,
+                    fallback_code,
+                    fallback_message,
+                    Some(json!({"message": msg})),
+                )
+            } else {
+                err(
+                    req_id,
+                    -32602,
+                    &format!("Validation failed: {}", msg),
+                    hint_data,
+                )
+            }
+        }
+        other => err(
+            req_id,
+            fallback_code,
+            fallback_message,
+            Some(json!({"message": other.to_string()})),
+        ),
+    }
+}
+
 pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
@@ -307,22 +375,9 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", e)})),
-            );
-        }
-    };
-    let cfg = cfg_mgr.get_resolved_config();
-    let validator = CliValidator::new(cfg);
 
     let title = match req.params.get("title").and_then(|v| v.as_str()) {
-        Some(s) if !s.is_empty() => s.to_string(),
+        Some(s) if !s.trim().is_empty() => s.to_string(),
         _ => return err(req.id, -32602, "Missing required field: title", None),
     };
     let project = req
@@ -330,80 +385,64 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         .get("project")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
-    let project_scope: Vec<String> = project.iter().cloned().collect();
-    let enum_hints = EnumHints::from_resolved_config(cfg, &project_scope);
-
-    let priority = if let Some(s) = req.params.get("priority").and_then(|v| v.as_str()) {
-        match validator.validate_priority(s) {
-            Ok(v) => Some(v),
-            Err(e) => {
-                let data = enum_hints
-                    .as_ref()
-                    .and_then(|h| make_enum_error_data("priority", s, &h.priorities));
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Priority validation failed: {}", e),
-                    data,
-                );
-            }
-        }
-    } else {
-        None
-    };
-    let task_type = if let Some(s) = req
+    let enum_hints = enum_hints_for_project(resolver.path.as_path(), project.as_deref());
+    let project_cfg =
+        crate::config::resolution::config_for_project(resolver.path.as_path(), project.as_deref())
+            .unwrap_or_else(|_| {
+                crate::config::types::ResolvedConfig::from_global(
+                    crate::config::types::GlobalConfig::default(),
+                )
+            });
+    // Pre-validate enums with the target project's config so failures carry
+    // structured suggestions; the service re-validates authoritatively.
+    if let Some(raw) = req.params.get("status").and_then(|v| v.as_str())
+        && let Err(e) = crate::types::TaskStatus::parse_with_config(raw, &project_cfg)
+    {
+        let data = enum_hints
+            .as_ref()
+            .and_then(|h| make_enum_error_data("status", raw, &h.statuses));
+        return err(
+            req.id,
+            -32602,
+            &format!("Status validation failed: {}", e),
+            data,
+        );
+    }
+    if let Some(raw) = req.params.get("priority").and_then(|v| v.as_str())
+        && let Err(e) = crate::types::Priority::parse_with_config(raw, &project_cfg)
+    {
+        let data = enum_hints
+            .as_ref()
+            .and_then(|h| make_enum_error_data("priority", raw, &h.priorities));
+        return err(
+            req.id,
+            -32602,
+            &format!("Priority validation failed: {}", e),
+            data,
+        );
+    }
+    let type_param = req
         .params
         .get("type")
         .or_else(|| req.params.get("task_type"))
-        .and_then(|v| v.as_str())
+        .and_then(|v| v.as_str());
+    if let Some(raw) = type_param
+        && let Err(e) = crate::types::TaskType::parse_with_config(raw, &project_cfg)
     {
-        match validator.validate_task_type(s) {
-            Ok(v) => Some(v),
-            Err(e) => {
-                let data = enum_hints
-                    .as_ref()
-                    .and_then(|h| make_enum_error_data("type", s, &h.types));
-                return err(
-                    req.id,
-                    -32602,
-                    &format!("Type validation failed: {}", e),
-                    data,
-                );
-            }
-        }
-    } else {
-        None
-    };
-    let normalize = |s: &str| -> Option<String> {
-        identity::resolve_me_alias(s, Some(resolver.path.as_path())).map(|v| {
-            crate::utils::member::normalize_member_value(&v, |name| {
-                cfg.agent_profiles.contains_key(name)
-            })
-        })
-    };
-    let assignee = req
+        let data = enum_hints
+            .as_ref()
+            .and_then(|h| make_enum_error_data("type", raw, &h.types));
+        return err(
+            req.id,
+            -32602,
+            &format!("Type validation failed: {}", e),
+            data,
+        );
+    }
+
+    let acceptance_criteria = req
         .params
-        .get("assignee")
-        .and_then(|v| v.as_str())
-        .and_then(normalize);
-    let due_date = req
-        .params
-        .get("due_date")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let effort = req
-        .params
-        .get("effort")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let description = req
-        .params
-        .get("description")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let tags = req
-        .params
-        .get("tags")
+        .get("acceptance_criteria")
         .and_then(|v| v.as_array())
         .map(|arr| {
             arr.iter()
@@ -412,17 +451,6 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         })
         .unwrap_or_default();
 
-    fn json_to_custom(val: &serde_json::Value) -> CustomFieldValue {
-        #[cfg(feature = "schema")]
-        {
-            val.clone()
-        }
-        #[cfg(not(feature = "schema"))]
-        {
-            serde_yaml_ng::to_value(val).unwrap_or(serde_yaml_ng::Value::Null)
-        }
-    }
-
     let custom_fields_map = req
         .params
         .get("custom_fields")
@@ -430,7 +458,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         .map(|o| {
             let mut m = std::collections::HashMap::new();
             for (k, v) in o.iter() {
-                m.insert(k.clone(), json_to_custom(v));
+                m.insert(k.clone(), crate::types::custom_value_from_json(v));
             }
             m
         })
@@ -462,29 +490,42 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
         None => None,
     };
 
+    fn opt_string(params: &Value, key: &str) -> Option<String> {
+        params
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    }
+
     let dto = TaskCreate {
         title,
         project,
-        priority,
-        task_type,
-        reporter: req
+        // Enum strings are validated project-aware inside TaskService::create.
+        status: opt_string(&req.params, "status"),
+        priority: opt_string(&req.params, "priority"),
+        task_type: opt_string(&req.params, "task_type").or_else(|| opt_string(&req.params, "type")),
+        reporter: opt_string(&req.params, "reporter"),
+        assignee: opt_string(&req.params, "assignee"),
+        due_date: opt_string(&req.params, "due_date"),
+        effort: opt_string(&req.params, "effort"),
+        description: opt_string(&req.params, "description"),
+        tags: req
             .params
-            .get("reporter")
-            .and_then(|v| v.as_str())
-            .and_then(normalize),
-        assignee,
-        due_date,
-        effort,
-        description,
-        tags,
+            .get("tags")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        acceptance_criteria,
         relationships,
         custom_fields,
-        sprints: req
-            .params
-            .get("sprints")
-            .cloned()
-            .and_then(|v| serde_json::from_value::<Vec<u32>>(v).ok())
-            .unwrap_or_default(),
+        sprints: match parse_strict_sprint_ids(req.params.get("sprints")) {
+            Ok(ids) => ids,
+            Err(msg) => return err(req.id, -32602, &msg, None),
+        },
     };
 
     let mut storage = Storage::new(&resolver.path.clone());
@@ -498,12 +539,7 @@ pub(crate) fn handle_task_create(req: JsonRpcRequest) -> JsonRpcResponse {
                 }),
             )
         }
-        Err(e) => err(
-            req.id,
-            -32000,
-            "Task create failed",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => task_mutation_error(req.id, e, -32000, "Task create failed", None),
     }
 }
 
@@ -641,31 +677,66 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", e)})),
-            );
-        }
-    };
-    let cfg = cfg_mgr.get_resolved_config();
-    let validator = CliValidator::new(cfg);
-    let enum_hints = EnumHints::from_resolved_config(cfg, &[]);
     let patch_val = req.params.get("patch").cloned().unwrap_or(json!({}));
-    let patch = match parse_task_update_patch(
-        req.id.clone(),
-        resolver.path.as_path(),
-        &validator,
-        enum_hints.as_ref(),
-        &patch_val,
-    ) {
+    let patch = match parse_task_update_patch(req.id.clone(), &patch_val) {
         Ok(patch) => patch,
         Err(resp) => return resp,
     };
+
+    // Pre-validate enum strings against the task's project configuration so
+    // failures carry structured suggestions; the service re-validates
+    // authoritatively with the same resolved config.
+    let project_prefix = id.split('-').next().unwrap_or("").to_string();
+    let project_cfg = crate::config::resolution::config_for_project(
+        resolver.path.as_path(),
+        Some(project_prefix.as_str()),
+    )
+    .unwrap_or_else(|_| {
+        crate::config::types::ResolvedConfig::from_global(
+            crate::config::types::GlobalConfig::default(),
+        )
+    });
+    let enum_hints = enum_hints_for_project(resolver.path.as_path(), Some(&project_prefix));
+    if let Some(raw) = patch.status.as_deref()
+        && let Err(e) = crate::types::TaskStatus::parse_with_config(raw, &project_cfg)
+    {
+        let data = enum_hints
+            .as_ref()
+            .and_then(|h| make_enum_error_data("status", raw, &h.statuses));
+        return err(
+            req.id,
+            -32602,
+            &format!("Status validation failed: {}", e),
+            data,
+        );
+    }
+    if let Some(raw) = patch.priority.as_deref()
+        && let Err(e) = crate::types::Priority::parse_with_config(raw, &project_cfg)
+    {
+        let data = enum_hints
+            .as_ref()
+            .and_then(|h| make_enum_error_data("priority", raw, &h.priorities));
+        return err(
+            req.id,
+            -32602,
+            &format!("Priority validation failed: {}", e),
+            data,
+        );
+    }
+    if let Some(raw) = patch.task_type.as_deref()
+        && let Err(e) = crate::types::TaskType::parse_with_config(raw, &project_cfg)
+    {
+        let data = enum_hints
+            .as_ref()
+            .and_then(|h| make_enum_error_data("type", raw, &h.types));
+        return err(
+            req.id,
+            -32602,
+            &format!("Type validation failed: {}", e),
+            data,
+        );
+    }
+
     let mut storage = Storage::new(&resolver.path.clone());
     match TaskService::update(&mut storage, id, patch) {
         Ok(task) => ok(
@@ -674,12 +745,7 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
                 "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
             }),
         ),
-        Err(e) => err(
-            req.id,
-            -32005,
-            "Task update failed",
-            Some(json!({"message": e.to_string()})),
-        ),
+        Err(e) => task_mutation_error(req.id, e, -32005, "Task update failed", None),
     }
 }
 
@@ -849,28 +915,10 @@ pub(crate) fn handle_task_bulk_update(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
     };
-    let cfg_mgr = match ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => {
-            return err(
-                req.id,
-                -32603,
-                "Internal error",
-                Some(json!({"message": format!("Failed to load config: {}", e)})),
-            );
-        }
-    };
-    let cfg = cfg_mgr.get_resolved_config();
-    let validator = CliValidator::new(cfg);
-    let enum_hints = EnumHints::from_resolved_config(cfg, &[]);
 
-    let patch = match parse_task_update_patch(
-        req.id.clone(),
-        resolver.path.as_path(),
-        &validator,
-        enum_hints.as_ref(),
-        &patch_val,
-    ) {
+    // Shape errors fail the whole call before any mutation; per-task enum
+    // validation happens inside TaskService against each task's project.
+    let patch = match parse_task_update_patch(req.id.clone(), &patch_val) {
         Ok(patch) => patch,
         Err(resp) => return resp,
     };

@@ -21,6 +21,8 @@ export interface TaskDTO {
   relationships: TaskRelationships
   comments: any[]
   references: ReferenceEntry[]
+  /** Acceptance criteria entries; omitted when empty. */
+  acceptance_criteria?: string[]
   sprints: number[]
   sprint_order?: Record<number, number>
   history: TaskHistoryEntry[]
@@ -188,21 +190,11 @@ export interface ActivityFeedItem {
 export interface TaskCreate {
   title: string
   project?: string
-  priority?: Priority
-  task_type?: TaskType
-  reporter?: string
-  assignee?: string
-  due_date?: string
-  effort?: string
-  description?: string
-  tags?: string[]
-  relationships?: TaskRelationships
-  custom_fields?: Record<string, unknown>
-  sprints?: number[]
-}
-
-export interface TaskUpdate {
-  title?: string
+  /**
+   * Initial status; validated against the target project's issue_states and
+   * stored atomically with creation. When omitted, branch inference or the
+   * project default applies. No add-then-status follow-up is needed.
+   */
   status?: TaskStatus
   priority?: Priority
   task_type?: TaskType
@@ -212,9 +204,46 @@ export interface TaskUpdate {
   effort?: string
   description?: string
   tags?: string[]
+  acceptance_criteria?: string[]
   relationships?: TaskRelationships
   custom_fields?: Record<string, unknown>
   sprints?: number[]
+}
+
+/**
+ * Patch payload with tri-state field semantics: omitted = no-op, null = clear
+ * (where clearing is allowed), value = set. Empty strings clear clearable
+ * scalars and empty arrays/maps clear collections. `title`, `status`,
+ * `priority`, and `task_type` cannot be cleared; null is treated as omitted.
+ * Enum strings are validated server-side against the task's project config.
+ * `tags`, `acceptance_criteria`, `relationships`, `custom_fields`, and
+ * `sprints` replace the whole value when set.
+ */
+export interface TaskUpdate {
+  title?: string
+  status?: TaskStatus
+  priority?: Priority
+  task_type?: TaskType
+  /** Supports @me; null or empty string clears. */
+  reporter?: string | null
+  /** Supports @me; null or empty string clears. */
+  assignee?: string | null
+  /** Null or empty string clears. */
+  due_date?: string | null
+  /** Null or empty string clears. */
+  effort?: string | null
+  /** Null or empty string clears. */
+  description?: string | null
+  /** Replaces the list; null or [] clears. */
+  tags?: string[] | null
+  /** Replaces the list; null or [] clears. */
+  acceptance_criteria?: string[] | null
+  /** Replaces the map; null or {} clears. */
+  relationships?: TaskRelationships | null
+  /** Replaces the whole map; null or {} clears all fields. */
+  custom_fields?: Record<string, unknown> | null
+  /** Replaces sprint memberships; null or [] clears them. */
+  sprints?: number[] | null
 }
 
 export interface TaskListFilter {

@@ -4,7 +4,7 @@ use crate::errors::{LoTaRError, LoTaRResult};
 use crate::scanner;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
-use crate::types::{CustomFields, Priority, TaskType, custom_value_string};
+use crate::types::{CustomFields, custom_value_string};
 use crate::utils::paths::repo_relative_display;
 use crate::utils::scan::{
     parse_inline_attributes, refresh_code_reference, validate_source_write, write_source,
@@ -257,14 +257,16 @@ impl ScanService {
                     let task_create = TaskCreate {
                         title,
                         project: Some(project_name.clone()),
-                        priority: inline_attrs.priority.map(Priority::from),
-                        task_type: inline_attrs.task_type.map(TaskType::from),
+                        status: None,
+                        priority: inline_attrs.priority,
+                        task_type: inline_attrs.task_type,
                         reporter: None,
                         assignee: inline_attrs.assignee,
                         due_date: inline_attrs.due,
                         effort: inline_attrs.effort,
                         description: None,
                         tags: inline_attrs.tags,
+                        acceptance_criteria: Vec::new(),
                         relationships: None,
                         custom_fields: build_custom_fields(inline_attrs.fields),
                         sprints: Vec::new(),

@@ -3,7 +3,6 @@ use common::env_mutex::EnvVarGuard;
 use lotar::api_types::{TaskCreate, TaskUpdate};
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
-use lotar::types::{Priority, TaskType};
 use lotar::utils::paths;
 
 fn write_minimal_config(tasks_dir: &std::path::Path) {
@@ -29,9 +28,11 @@ fn service_filters_blank_tags_on_create_and_update() {
     let req = TaskCreate {
         title: "Tag normalization".to_string(),
         project: Some("TEST".to_string()),
-        priority: Some(Priority::from("Medium")),
-        task_type: Some(TaskType::from("Feature")),
+        status: None,
+        priority: Some("Medium".to_string()),
+        task_type: Some("Feature".to_string()),
         tags: vec!["api".into(), " ".into(), "backend ".into(), "".into()],
+        acceptance_criteria: Vec::new(),
         ..TaskCreate::default()
     };
 

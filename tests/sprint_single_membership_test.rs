@@ -4,7 +4,6 @@ use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintPlan};
-use lotar::types::{Priority, TaskType};
 use lotar::utils::paths;
 
 fn write_minimal_config(tasks_dir: &std::path::Path) {
@@ -49,8 +48,9 @@ fn sprint_assignment_requires_force_to_replace_membership() {
         TaskCreate {
             title: "Sample work".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("Medium")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("Medium".to_string()),
+            task_type: Some("Feature".to_string()),
             ..TaskCreate::default()
         },
     )

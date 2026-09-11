@@ -2,97 +2,32 @@ use super::*;
 
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/add", |req: &HttpRequest| {
-    // Resolve tasks root via resolver
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-    };
-    let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-    // Map JSON to AddArgs, then reuse AddHandler flow by building Task via services
-    let add: crate::cli::TaskAddArgs = match serde_json::from_value(body.clone()) {
-        Ok(v) => v,
-        Err(e) => return bad_request(format!("Invalid body: {}", e)),
-    };
-    // Load config for validation/mapping
-    let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
-    };
-let cfg = cfg_mgr.get_resolved_config();
-    // Convert to TaskCreate DTO
-    let req_create = crate::api_types::TaskCreate {
-        title: add.title,
-        // Accept project from JSON body, fallback to query for backward-compat
-        project: body
-            .get("project")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .or_else(|| req.query.get("project").cloned()),
-        priority: match add.priority {
-            Some(ref p) => match crate::types::Priority::parse_with_config(p, cfg) {
-                Ok(v) => Some(v),
-                Err(e) => return bad_request(e),
-            },
-            None => None,
-        },
-        task_type: match add.task_type {
-            Some(ref t) => match crate::types::TaskType::parse_with_config(t, cfg) {
-                Ok(v) => Some(v),
-                Err(e) => return bad_request(e),
-            },
-            None => None,
-        },
-        reporter: body
-            .get("reporter")
-            .and_then(|v| v.as_str())
-            .map(|s| s.trim())
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string()),
-        assignee: add.assignee,
-        due_date: add.due,
-        effort: add.effort,
-        description: add.description,
-        tags: add.tags,
-        relationships: match body.get("relationships") {
-            Some(value) => match serde_json::from_value::<crate::types::TaskRelationships>(
-                value.clone(),
-            ) {
-                Ok(rel) => {
-                    if rel.is_empty() {
-                        None
-                    } else {
-                        Some(rel)
-                    }
-                }
-                Err(e) => return bad_request(format!("Invalid relationships payload: {}", e)),
-            },
-            None => None,
-        },
-        custom_fields: if add.fields.is_empty() {
-            None
-        } else {
-            let mut m = std::collections::HashMap::new();
-            for (k, v) in add.fields.into_iter() {
-                m.insert(k, crate::types::custom_value_string(v));
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let req_create = match parse_task_create_body(&body, req) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
+        match TaskService::create(&mut storage, req_create) {
+            Ok(task) => {
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_created(&task, actor.as_deref());
+                ok_json(201, json!({"data": task}))
             }
-            Some(m)
-        },
-        sprints: body
-            .get("sprints")
-            .cloned()
-            .and_then(|value| serde_json::from_value::<Vec<u32>>(value).ok())
-            .unwrap_or_default(),
-    };
-match TaskService::create(&mut storage, req_create) {
-        Ok(task) => {
-            let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-            crate::api_events::emit_task_created(&task, actor.as_deref());
-            ok_json(201, json!({"data": task}))
-        },
-        Err(e) => internal(json!({"error": {"code":"INTERNAL", "message": e.to_string()}})),
-    }
-});
+            Err(e) => match e {
+                LoTaRError::ValidationError(msg) => bad_request(msg),
+                LoTaRError::SprintNotFound(id) => bad_request(format!("Sprint not found: {}", id)),
+                other => {
+                    internal(json!({"error": {"code":"INTERNAL", "message": other.to_string()}}))
+                }
+            },
+        }
+    });
 
     // GET /api/tasks/list
 
@@ -803,142 +738,69 @@ match TaskService::create(&mut storage, req_create) {
     // POST /api/tasks/update
 
     api_server.register_handler("POST", "/api/tasks/update", |req: &HttpRequest| {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-    };
-    let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-    let edit: crate::cli::TaskEditArgs = match serde_json::from_value(body.clone()) {
-        Ok(v) => v,
-        Err(e) => return bad_request(format!("Invalid body: {}", e)),
-    };
-    // Config for validation
-    let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
-    };
-    let cfg = cfg_mgr.get_resolved_config();
-    // Build patch
-    let tags_override = match body.get("tags") {
-        Some(serde_json::Value::Array(items)) => {
-            let mut collected = Vec::with_capacity(items.len());
-            for item in items {
-                match item.as_str() {
-                    Some(s) => collected.push(s.to_string()),
-                    None => return bad_request("Invalid tags payload".into()),
-                }
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let id = match body.get("id").and_then(|v| v.as_str()) {
+            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+            _ => return bad_request("Missing id".into()),
+        };
+        let patch = match parse_task_update_body(&body) {
+            Ok(v) => v,
+            Err(msg) => return bad_request(msg),
+        };
+        match TaskService::update(&mut storage, &id, patch) {
+            Ok(task) => {
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&task, actor.as_deref());
+                ok_json(200, json!({"data": task}))
             }
-            Some(collected)
-        }
-        Some(serde_json::Value::Null) => Some(Vec::new()),
-        Some(_) => return bad_request("Invalid tags payload".into()),
-        None => None,
-    };
-    let patch = crate::api_types::TaskUpdate {
-        title: edit.title,
-        status: None, // status change uses TaskStatusArgs route; keep None here
-        priority: match edit.priority {
-            Some(ref p) => match crate::types::Priority::parse_with_config(p, cfg) { Ok(v) => Some(v), Err(e) => return bad_request(e) },
-            None => None,
-        },
-        task_type: match edit.task_type {
-            Some(ref t) => match crate::types::TaskType::parse_with_config(t, cfg) { Ok(v) => Some(v), Err(e) => return bad_request(e) },
-            None => None,
-        },
-        reporter: edit.reporter,
-        assignee: edit.assignee,
-        due_date: edit.due,
-        effort: edit.effort,
-        description: edit.description,
-        tags: tags_override.or(if edit.tags.is_empty() { None } else { Some(edit.tags) }),
-        relationships: match body.get("relationships") {
-            Some(value) => match serde_json::from_value::<crate::types::TaskRelationships>(
-                value.clone(),
-            ) {
-                Ok(rel) => {
-                    if rel.is_empty() {
-                        None
-                    } else {
-                        Some(rel)
-                    }
-                }
-                Err(e) => return bad_request(format!("Invalid relationships payload: {}", e)),
+            Err(e) => match e {
+                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                other => bad_request(other.to_string()),
             },
-            None => None,
-        },
-        custom_fields: if edit.fields.is_empty() { None } else {
-            let mut m = std::collections::HashMap::new();
-            for (k, v) in edit.fields.into_iter() { m.insert(k, crate::types::custom_value_string(v)); }
-            Some(m)
-        },
-        sprints: body
-            .get("sprints")
-            .cloned()
-            .and_then(|v| serde_json::from_value::<Vec<u32>>(v).ok()),
-    };
-    match TaskService::update(&mut storage, &edit.id, patch) {
-        Ok(task) => {
-            let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-            crate::api_events::emit_task_updated(&task, actor.as_deref());
-            ok_json(200, json!({"data": task}))
-        },
-        Err(e) => bad_request(e.to_string()),
-    }
-});
+        }
+    });
 
     // POST /api/tasks/status { id, status }
 
     api_server.register_handler("POST", "/api/tasks/status", |req: &HttpRequest| {
-    let resolver = match TasksDirectoryResolver::resolve(None, None) {
-        Ok(r) => r,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
-    };
-    let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
-    let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-    let id = match body.get("id").and_then(|v| v.as_str()) {
-        Some(s) if !s.is_empty() => s.to_string(),
-        _ => return bad_request("Missing id".into()),
-    };
-    let new_status = match body.get("status").and_then(|v| v.as_str()) {
-        Some(s) if !s.is_empty() => s.to_string(),
-        _ => return bad_request("Missing status".into()),
-    };
-    // Load config for validation
-    let cfg_mgr = match crate::config::manager::ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path) {
-        Ok(m) => m,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": format!("Failed to load config: {}", e)}})),
-    };
-    let cfg = cfg_mgr.get_resolved_config();
-    // Validate status
-    let parsed = match crate::types::TaskStatus::parse_with_config(&new_status, cfg) {
-        Ok(s) => s,
-        Err(msg) => return bad_request(msg),
-    };
-    let patch = crate::api_types::TaskUpdate {
-        title: None,
-        status: Some(parsed),
-        priority: None,
-        task_type: None,
-        reporter: None,
-        assignee: None,
-        due_date: None,
-        effort: None,
-        description: None,
-        tags: None,
-        relationships: None,
-        custom_fields: None,
-        sprints: None,
-    };
-    match TaskService::update(&mut storage, &id, patch) {
-        Ok(task) => {
-            let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
-            crate::api_events::emit_task_updated(&task, actor.as_deref());
-            ok_json(200, json!({"data": task}))
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path.clone());
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let id = match body.get("id").and_then(|v| v.as_str()) {
+            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+            _ => return bad_request("Missing id".into()),
+        };
+        let new_status = match body.get("status").and_then(|v| v.as_str()) {
+            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+            _ => return bad_request("Missing status".into()),
+        };
+        // Validation happens in the service against the task's project config.
+        let patch = crate::api_types::TaskUpdate {
+            status: Some(new_status),
+            ..Default::default()
+        };
+        match TaskService::update(&mut storage, &id, patch) {
+            Ok(task) => {
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&task, actor.as_deref());
+                ok_json(200, json!({"data": task}))
+            }
+            Err(e) => match e {
+                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                other => bad_request(other.to_string()),
+            },
         }
-        Err(e) => bad_request(e.to_string()),
-    }
-});
+    });
 
     // POST /api/tasks/comment { id, text }
 
@@ -1145,4 +1007,219 @@ match TaskService::create(&mut storage, req_create) {
             Err(e) => internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         }
     });
+}
+
+fn parse_string_field(body: &serde_json::Value, key: &str) -> Result<Option<String>, String> {
+    match body.get(key) {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::String(s)) => Ok(Some(s.clone())),
+        Some(_) => Err(format!("Invalid {} payload", key)),
+    }
+}
+
+fn parse_clearable_string_field(
+    body: &serde_json::Value,
+    keys: &[&str],
+) -> Result<Option<String>, String> {
+    for key in keys {
+        match body.get(*key) {
+            None => continue,
+            Some(serde_json::Value::Null) => return Ok(Some(String::new())),
+            Some(serde_json::Value::String(s)) => return Ok(Some(s.clone())),
+            Some(_) => return Err(format!("Invalid {} payload", key)),
+        }
+    }
+    Ok(None)
+}
+
+fn parse_string_list_field(
+    body: &serde_json::Value,
+    key: &str,
+) -> Result<Option<Vec<String>>, String> {
+    match body.get(key) {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(Some(Vec::new())),
+        Some(serde_json::Value::Array(items)) => {
+            let mut collected = Vec::with_capacity(items.len());
+            for item in items {
+                match item.as_str() {
+                    Some(s) => collected.push(s.to_string()),
+                    None => return Err(format!("Invalid {} payload", key)),
+                }
+            }
+            Ok(Some(collected))
+        }
+        Some(_) => Err(format!("Invalid {} payload", key)),
+    }
+}
+
+fn parse_sprints_field(body: &serde_json::Value) -> Result<Option<Vec<u32>>, String> {
+    match body.get("sprints") {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(Some(Vec::new())),
+        Some(serde_json::Value::Array(items)) => {
+            let mut collected = Vec::with_capacity(items.len());
+            for item in items {
+                let id = item
+                    .as_u64()
+                    .and_then(|v| u32::try_from(v).ok())
+                    .ok_or_else(|| "sprints must be an array of positive integers".to_string())?;
+                if id == 0 {
+                    return Err("sprints must be an array of positive integers".to_string());
+                }
+                collected.push(id);
+            }
+            Ok(Some(collected))
+        }
+        Some(_) => Err("sprints must be an array of positive integers".to_string()),
+    }
+}
+
+fn parse_relationships_field(
+    body: &serde_json::Value,
+    key: &str,
+) -> Result<Option<crate::types::TaskRelationships>, String> {
+    match body.get(key) {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(Some(crate::types::TaskRelationships::default())),
+        Some(value) => {
+            match serde_json::from_value::<crate::types::TaskRelationships>(value.clone()) {
+                Ok(rel) => Ok(Some(rel)),
+                Err(e) => Err(format!("Invalid relationships payload: {}", e)),
+            }
+        }
+    }
+}
+
+fn parse_custom_fields_body(
+    body: &serde_json::Value,
+) -> Result<Option<crate::types::CustomFields>, String> {
+    let mut merged: Option<crate::types::CustomFields> = None;
+
+    if let Some(fields) = body.get("fields")
+        && !fields.is_null()
+    {
+        let entries = parse_legacy_fields(fields)?;
+        let mut map = crate::types::CustomFields::new();
+        for (key, value) in entries {
+            map.insert(key, crate::types::custom_value_string(value));
+        }
+        merged = Some(map);
+    }
+
+    match body.get("custom_fields") {
+        None | Some(serde_json::Value::Null) => {}
+        Some(serde_json::Value::Object(obj)) => {
+            let map = merged.unwrap_or_default();
+            let mut map = map;
+            for (key, value) in obj {
+                map.insert(key.clone(), crate::types::custom_value_from_json(value));
+            }
+            merged = Some(map);
+        }
+        Some(_) => return Err("custom_fields must be an object".into()),
+    }
+
+    Ok(merged)
+}
+
+fn parse_legacy_fields(fields: &serde_json::Value) -> Result<Vec<(String, String)>, String> {
+    match fields {
+        serde_json::Value::Null => Ok(Vec::new()),
+        serde_json::Value::Object(map) => Ok(map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_str().unwrap_or(&v.to_string()).to_string()))
+            .collect()),
+        serde_json::Value::Array(items) => {
+            let mut out = Vec::with_capacity(items.len());
+            for item in items {
+                match item.as_str() {
+                    Some(entry) => match entry.split_once('=') {
+                        Some((k, v)) => out.push((k.trim().to_string(), v.trim().to_string())),
+                        None => {
+                            return Err(format!("Invalid key=value entry: {}", entry));
+                        }
+                    },
+                    None => {
+                        return Err("fields entries must be key=value strings".to_string());
+                    }
+                }
+            }
+            Ok(out)
+        }
+        _ => Err("fields must be an object or an array of key=value strings".to_string()),
+    }
+}
+
+fn parse_task_create_body(
+    body: &serde_json::Value,
+    req: &HttpRequest,
+) -> Result<crate::api_types::TaskCreate, String> {
+    let title = body
+        .get("title")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "Missing required field: title".to_string())?;
+
+    let project = body
+        .get("project")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .or_else(|| req.query.get("project").cloned());
+
+    Ok(crate::api_types::TaskCreate {
+        title,
+        project,
+        status: parse_string_field(body, "status")?,
+        priority: parse_string_field(body, "priority")?,
+        task_type: parse_string_field(body, "task_type")?.or(parse_string_field(body, "type")?),
+        reporter: parse_string_field(body, "reporter")?,
+        assignee: parse_string_field(body, "assignee")?,
+        due_date: parse_string_field(body, "due_date")?.or(parse_string_field(body, "due")?),
+        effort: parse_string_field(body, "effort")?,
+        description: parse_string_field(body, "description")?,
+        tags: parse_string_list_field(body, "tags")?.unwrap_or_default(),
+        acceptance_criteria: parse_string_list_field(body, "acceptance_criteria")?
+            .unwrap_or_default(),
+        relationships: match parse_relationships_field(body, "relationships")? {
+            None => None,
+            Some(rel) if rel.is_empty() => None,
+            Some(rel) => Some(rel),
+        },
+        custom_fields: parse_custom_fields_body(body)?,
+        sprints: parse_sprints_field(body)?.unwrap_or_default(),
+    })
+}
+
+fn parse_task_update_body(
+    body: &serde_json::Value,
+) -> Result<crate::api_types::TaskUpdate, String> {
+    Ok(crate::api_types::TaskUpdate {
+        title: parse_string_field(body, "title")?,
+        status: parse_string_field(body, "status")?,
+        priority: parse_string_field(body, "priority")?,
+        task_type: parse_string_field(body, "task_type")?.or(parse_string_field(body, "type")?),
+        reporter: parse_clearable_string_field(body, &["reporter"])?,
+        assignee: parse_clearable_string_field(body, &["assignee"])?,
+        due_date: parse_clearable_string_field(body, &["due_date", "due"])?,
+        effort: parse_clearable_string_field(body, &["effort"])?,
+        description: parse_clearable_string_field(body, &["description"])?,
+        tags: parse_string_list_field(body, "tags")?,
+        acceptance_criteria: parse_string_list_field(body, "acceptance_criteria")?,
+        relationships: parse_relationships_field(body, "relationships")?,
+        custom_fields: match body.get("custom_fields") {
+            None => parse_custom_fields_body(body)?,
+            Some(serde_json::Value::Null) => Some(crate::types::CustomFields::new()),
+            Some(serde_json::Value::Object(obj)) => {
+                let mut map = crate::types::CustomFields::new();
+                for (key, value) in obj {
+                    map.insert(key.clone(), crate::types::custom_value_from_json(value));
+                }
+                Some(map)
+            }
+            Some(_) => return Err("custom_fields must be an object or null".into()),
+        },
+        sprints: parse_sprints_field(body)?,
+    })
 }

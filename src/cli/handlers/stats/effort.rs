@@ -312,6 +312,7 @@ pub(crate) fn run(
                             relationships: task.relationships,
                             comments: task.comments,
                             references: task.references,
+                            acceptance_criteria: task.acceptance_criteria,
                             sprints,
                             sprint_order: std::collections::BTreeMap::new(),
                             history: task.history,

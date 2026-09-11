@@ -194,8 +194,11 @@ describe('TaskPanel with real config and persistence', () => {
     const wrapper = panel('A-1')
     await flushPromises()
     const save = deferred()
-    api.setStatus.mockReturnValueOnce(save.promise)
+    api.updateTask.mockReturnValueOnce(save.promise)
     const pending = (wrapper.vm as any).updateStatus('Done')
+    await flushPromises()
+    expect(api.updateTask).toHaveBeenCalledExactlyOnceWith('A-1', { status: 'Done' })
+    expect(api.setStatus).not.toHaveBeenCalled()
     await wrapper.setProps({ taskId: 'B-1' })
     await flushPromises()
     if (outcome === 'resolve') save.resolve({ ...task('A-1'), status: 'Done' })
@@ -249,7 +252,9 @@ describe('TaskPanel with real config and persistence', () => {
     vm.form.title = 'Unsaved B'
     create.resolve(task('A-2'))
     await pending
-    expect(api.setStatus).toHaveBeenCalledExactlyOnceWith('A-2', 'Done')
+    expect(api.addTask).toHaveBeenCalledTimes(1)
+    expect(api.addTask.mock.calls[0]![0]).toMatchObject({ status: 'Done' })
+    expect(api.setStatus).not.toHaveBeenCalled()
     expect(vm.form.title).toBe('Unsaved B')
     expect(vm.form.project).toBe('B')
     expect(wrapper.emitted('close')).toBeUndefined()

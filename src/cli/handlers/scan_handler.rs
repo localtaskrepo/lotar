@@ -301,6 +301,7 @@ impl CommandHandler for ScanHandler {
                                 title: entry.title.clone(),
                                 task_type: inline_attrs.task_type,
                                 priority: inline_attrs.priority,
+                                status: None,
                                 reporter: None,
                                 assignee: inline_attrs.assignee,
                                 effort: inline_attrs.effort,

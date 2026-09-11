@@ -44,7 +44,10 @@ impl<'a> CliValidator<'a> {
         } else if self.config.tags.values.contains(&normalized.to_string()) {
             Ok(normalized.to_string())
         } else {
-            let suggestion = find_closest_match(normalized, &self.config.tags.values);
+            let suggestion = crate::services::task_validation::find_closest_match(
+                normalized,
+                &self.config.tags.values,
+            );
             let suggestion_text = match suggestion {
                 Some(s) => format!(" Did you mean '{}'?", s),
                 None => String::new(),
@@ -61,39 +64,7 @@ impl<'a> CliValidator<'a> {
 
     /// Validate custom field name against project configuration
     pub fn validate_custom_field_name(&self, field_name: &str) -> Result<String, String> {
-        // M4: Collision guard - prevent using reserved built-in field names as custom fields
-        if let Some(canonical) = crate::utils::fields::is_reserved_field(field_name) {
-            return Err(format!(
-                "Field name '{}' collides with built-in field '{}'. Use the built-in option instead (e.g., --{}), or pick a different custom field name.",
-                field_name,
-                canonical,
-                canonical.replace('_', "-")
-            ));
-        }
-        if self.config.custom_fields.has_wildcard() {
-            // Any custom field is allowed
-            Ok(field_name.to_string())
-        } else if self
-            .config
-            .custom_fields
-            .values
-            .contains(&field_name.to_string())
-        {
-            Ok(field_name.to_string())
-        } else {
-            let suggestion = find_closest_match(field_name, &self.config.custom_fields.values);
-            let suggestion_text = match suggestion {
-                Some(s) => format!(" Did you mean '{}'?", s),
-                None => String::new(),
-            };
-
-            Err(format!(
-                "Custom field '{}' is not allowed in this project. Valid custom fields: {}.{}",
-                field_name,
-                self.config.custom_fields.values.join(", "),
-                suggestion_text
-            ))
-        }
+        crate::services::task_validation::validate_custom_field_name(field_name, self.config)
     }
 
     /// Validate custom field key-value pair
@@ -327,57 +298,6 @@ impl<'a> CliValidator<'a> {
     fn strict_members_misconfiguration_error() -> String {
         "Strict members are enabled but no members are configured. Add entries under members or disable strict_members.".to_string()
     }
-}
-
-/// Find the closest match for a string in a list (simple edit distance)
-fn find_closest_match(input: &str, candidates: &[String]) -> Option<String> {
-    if candidates.is_empty() {
-        return None;
-    }
-
-    let input_lower = input.to_lowercase();
-    let mut best_match = None;
-    let mut best_distance = usize::MAX;
-
-    for candidate in candidates {
-        let candidate_lower = candidate.to_lowercase();
-        let distance = edit_distance(&input_lower, &candidate_lower);
-
-        // Only suggest if the edit distance is reasonable (less than half the input length)
-        if distance < input.len() / 2 + 1 && distance < best_distance {
-            best_distance = distance;
-            best_match = Some(candidate.clone());
-        }
-    }
-
-    best_match
-}
-
-/// Simple edit distance calculation (Levenshtein distance)
-fn edit_distance(s1: &str, s2: &str) -> usize {
-    let len1 = s1.len();
-    let len2 = s2.len();
-    let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
-
-    // Initialize first row and column
-    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
-        row[0] = i;
-    }
-    for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
-        *cell = j;
-    }
-
-    // Fill the matrix
-    for (i, c1) in s1.chars().enumerate() {
-        for (j, c2) in s2.chars().enumerate() {
-            let cost = if c1 == c2 { 0 } else { 1 };
-            matrix[i + 1][j + 1] = (matrix[i][j + 1] + 1)
-                .min(matrix[i + 1][j] + 1)
-                .min(matrix[i][j] + cost);
-        }
-    }
-
-    matrix[len1][len2]
 }
 
 // inline tests moved to tests/cli_validation_unit_test.rs

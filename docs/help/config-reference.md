@@ -58,6 +58,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - remotes.<name>.mapping.<field>.default: string (apply when local value is empty)
 - remotes.<name>.mapping.<field>.add: string[] (append for list fields like tags/labels)
 - remotes.<name>.mapping.<field>.when_empty: enum (skip|clear)
+- Note: mapped local values for `status`, `priority`, and `type` are validated against the target project's `issue.states`/`issue.priorities`/`issue.types`. A remote value that maps to a local value outside those sets fails for that issue (recorded as a sync warning/failed entry listing the valid values) instead of being persisted silently — configure the project enums or extend the mapping values accordingly.
 - auth_profiles: map (home config only; ignored in project configs)
 - auth_profiles.<name>.provider: enum (jira|github)
 - auth_profiles.<name>.method: string

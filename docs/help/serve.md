@@ -69,7 +69,7 @@ Assets are served with compression: clients that send `Accept-Encoding: gzip` re
 - **Personalization** - Preferences view interacts solely with browser storage; no server-side config is modified.
 
 ### API Endpoints
-- `POST /api/tasks/add` - Create new task (body: TaskCreate; supports `@me` for people fields; auto-set reporter if enabled)
+- `POST /api/tasks/add` - Create new task (body: TaskCreate; supports `@me` for people fields; auto-set reporter if enabled; accepts atomic initial `status`, `custom_fields` map, and `acceptance_criteria`, all validated against the target project's config)
 - `GET /api/tasks/list` - List tasks
 	- Query params:
 		- `project` (prefix)
@@ -83,7 +83,7 @@ Assets are served with compression: clients that send `Accept-Encoding: gzip` re
 		- Invalid values for `status`, `priority`, or `type` return HTTP 400
 		- Any additional query key is treated as a property filter. Declared custom fields can be used directly (e.g., `?sprint=W35`). Multiple values allowed via CSV; matching is case- and separator-insensitive.
 - `GET /api/tasks/get?id=...` - Get task by id (returns HTTP 404 if not found)
-- `POST /api/tasks/update` - Update task (body: TaskUpdateRequest: flat fields with `id` + optional properties; supports `@me` for reporter/assignee)
+- `POST /api/tasks/update` - Update task (body: TaskUpdateRequest: flat fields with `id` + optional properties; supports `@me` for reporter/assignee; `status`/`priority`/`type` are validated against the task's project config, `null` clears clearable fields, and list/map patches replace the whole value)
 - `POST /api/tasks/delete` - Delete task (body: { id })
 - `GET /api/projects/list` - List projects
 - `GET /api/projects/stats?project=PREFIX` - Project stats

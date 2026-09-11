@@ -18,7 +18,6 @@ mod assignment {
     use lotar::api_types::{TaskCreate, TaskUpdate};
     use lotar::services::task_service::TaskService;
     use lotar::storage::manager::Storage;
-    use lotar::types::{Priority, TaskStatus, TaskType};
     use lotar::utils::paths;
 
     #[test]
@@ -39,8 +38,9 @@ mod assignment {
         let req = TaskCreate {
             title: "Auto reporter".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("High")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("High".to_string()),
+            task_type: Some("Feature".to_string()),
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -64,6 +64,7 @@ mod assignment {
         let req = TaskCreate {
             title: "No reporter".to_string(),
             project: Some("TEST".to_string()),
+            status: None,
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -84,6 +85,7 @@ mod assignment {
         let req = TaskCreate {
             title: "File reporter".to_string(),
             project: Some("TEST".to_string()),
+            status: None,
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -112,6 +114,7 @@ mod assignment {
         let req = TaskCreate {
             title: "Alias reporter".to_string(),
             project: Some("TEST".to_string()),
+            status: None,
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("service create");
@@ -140,6 +143,7 @@ mod assignment {
         let create = TaskCreate {
             title: "Needs assignee".to_string(),
             project: Some("TEST".to_string()),
+            status: None,
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, create).unwrap();
@@ -150,7 +154,7 @@ mod assignment {
             &mut storage,
             &created.id,
             TaskUpdate {
-                status: Some(TaskStatus::from("InProgress")),
+                status: Some("InProgress".to_string()),
                 ..Default::default()
             },
         )
@@ -174,6 +178,7 @@ mod assignment {
         let create = TaskCreate {
             title: "No auto assign".to_string(),
             project: Some("TEST".to_string()),
+            status: None,
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, create).unwrap();
@@ -184,7 +189,7 @@ mod assignment {
             &mut storage,
             &created.id,
             TaskUpdate {
-                status: Some(TaskStatus::from("Done")),
+                status: Some("Done".to_string()),
                 ..Default::default()
             },
         )
@@ -214,6 +219,7 @@ mod assignment {
             TaskCreate {
                 title: "Preset assignee".into(),
                 project: Some("AAA".into()),
+                status: None,
                 assignee: Some("sam".into()),
                 ..TaskCreate::default()
             },
@@ -226,7 +232,7 @@ mod assignment {
             &mut storage,
             &created.id,
             TaskUpdate {
-                status: Some(TaskStatus::from("InProgress")),
+                status: Some("InProgress".to_string()),
                 ..Default::default()
             },
         )
@@ -246,6 +252,7 @@ mod assignment {
         let req = TaskCreate {
             title: "Env reporter".to_string(),
             project: Some("TEST".to_string()),
+            status: None,
             ..TaskCreate::default()
         };
         let created = TaskService::create(&mut storage, req).expect("create");

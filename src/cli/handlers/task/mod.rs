@@ -65,6 +65,7 @@ impl CommandHandler for TaskHandler {
                     title: add_args.title,
                     task_type: add_args.task_type,
                     priority: add_args.priority,
+                    status: add_args.status,
                     reporter: add_args.reporter,
                     assignee: add_args.assignee,
                     effort: add_args.effort,

@@ -1147,17 +1147,17 @@ fn apply_set_action(
     if let Some(value) = set.status.as_ref()
         && let Ok(status) = TaskStatus::parse_with_config(&tmpl.expand(value), config)
     {
-        patch.status = Some(status);
+        patch.status = Some(status.to_string());
     }
     if let Some(value) = set.priority.as_ref()
         && let Ok(priority) = Priority::parse_with_config(&tmpl.expand(value), config)
     {
-        patch.priority = Some(priority);
+        patch.priority = Some(priority.to_string());
     }
     if let Some(value) = set.task_type.as_ref()
         && let Ok(task_type) = TaskType::parse_with_config(&tmpl.expand(value), config)
     {
-        patch.task_type = Some(task_type);
+        patch.task_type = Some(task_type.to_string());
     }
     if let Some(value) = set.title.as_ref() {
         patch.title = Some(tmpl.expand(value));
@@ -1491,7 +1491,7 @@ fn mark_task_blocked(
 ) -> LoTaRResult<()> {
     let mut patch = TaskUpdate::default();
     if let Ok(status) = TaskStatus::parse_with_config("HelpNeeded", config) {
-        patch.status = Some(status);
+        patch.status = Some(status.to_string());
     }
     if let Some(reporter) = task.reporter.as_ref() {
         patch.assignee = Some(reporter.clone());

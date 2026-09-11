@@ -2618,6 +2618,13 @@
               "$ref": "#/components/schemas/ReferenceEntry"
             }
           },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Acceptance criteria entries; omitted when empty."
+          },
           "sprints": {
             "type": "array",
             "items": {
@@ -2684,21 +2691,30 @@
       },
       "TaskCreate": {
         "type": "object",
+        "description": "Creation payload. Enum strings (status/priority/task_type) are validated against the target project's resolved configuration by the service; clients must not pre-validate against a global enum list.",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Required; blank titles are rejected."
           },
           "project": {
             "type": "string",
             "nullable": true
           },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "Initial status validated against the project's issue_states. Stored atomically with creation; when omitted, branch inference or the project default applies."
+          },
           "priority": {
-            "$ref": "#/components/schemas/Priority",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "description": "Validated against the project's issue_priorities."
           },
           "task_type": {
-            "$ref": "#/components/schemas/TaskType",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "description": "Validated against the project's issue_types. Accepts task_type or type in the request body."
           },
           "reporter": {
             "type": "string",
@@ -2729,14 +2745,24 @@
             },
             "default": []
           },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "description": "Initial acceptance criteria entries; empty entries are dropped."
+          },
           "relationships": {
-            "$ref": "#/components/schemas/TaskRelationships",
-            "nullable": true
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
           },
           "custom_fields": {
             "type": "object",
+            "nullable": true,
             "additionalProperties": true,
-            "nullable": true
+            "description": "Custom field map; wins per key over legacy fields key/value payloads."
           },
           "sprints": {
             "type": "array",
@@ -2753,61 +2779,80 @@
       },
       "TaskUpdate": {
         "type": "object",
+        "description": "Patch payload with explicit null semantics: omitted = no-op, null = clear (where clearing is allowed), value = set. Empty string clears clearable scalars; empty array/object clears collections. title/status/priority/task_type treat null as omitted because they cannot be cleared. Enum strings are validated against the task's project configuration. tags/acceptance_criteria/relationships/custom_fields/sprints replace the whole value.",
         "properties": {
           "title": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null is treated as omitted; blank values are rejected."
           },
           "status": {
-            "$ref": "#/components/schemas/TaskStatus",
+            "type": "string",
             "nullable": true,
-            "description": "Use /api/tasks/status for status transitions in REST."
+            "description": "Applied by /api/tasks/update and validated against the project's issue_states; /api/tasks/status remains available for status-only transitions."
           },
           "priority": {
-            "$ref": "#/components/schemas/Priority",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "description": "null is treated as omitted; validated against the project's issue_priorities."
           },
           "task_type": {
-            "$ref": "#/components/schemas/TaskType",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "description": "null is treated as omitted; accepts task_type or type. Validated against the project's issue_types."
           },
           "reporter": {
             "type": "string",
             "nullable": true,
-            "description": "Supports @me to resolve to current user"
+            "description": "Supports @me; null or empty string clears."
           },
           "assignee": {
             "type": "string",
             "nullable": true,
-            "description": "Supports @me to resolve to current user"
+            "description": "Supports @me; null or empty string clears."
           },
           "due_date": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null or empty string clears."
           },
           "effort": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null or empty string clears."
           },
           "description": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null or empty string clears."
           },
           "tags": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "nullable": true
+            "nullable": true,
+            "description": "Replaces the list; null or [] clears."
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "Replaces the list; null or [] clears."
           },
           "relationships": {
-            "$ref": "#/components/schemas/TaskRelationships",
-            "nullable": true
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Replaces the map; null or {} clears."
           },
           "custom_fields": {
             "type": "object",
+            "nullable": true,
             "additionalProperties": true,
-            "nullable": true
+            "description": "Replaces the whole map; null or {} clears all fields. Keys already on the task pass through unchanged even if removed from project config; configured keys are canonicalized to their configured spelling; new keys must be declared in the project config (or wildcard)."
           },
           "sprints": {
             "type": "array",
@@ -2815,68 +2860,91 @@
               "type": "integer",
               "format": "int32"
             },
-            "nullable": true
+            "nullable": true,
+            "description": "Replaces sprint memberships; null or [] clears them. Entries must be positive integers; invalid entries are rejected."
           }
         }
       },
       "TaskUpdateRequest": {
         "type": "object",
+        "description": "Request body for /api/tasks/update: the task id plus patch fields sharing the TaskUpdate null semantics.",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "Fully qualified task id (e.g., DEV-54)."
           },
           "title": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null is treated as omitted."
           },
           "status": {
-            "$ref": "#/components/schemas/TaskStatus",
+            "type": "string",
             "nullable": true,
-            "description": "Ignored by /api/tasks/update; use /api/tasks/status."
+            "description": "Applied by /api/tasks/update and validated against the project's issue_states; /api/tasks/status remains available for status-only transitions."
           },
           "priority": {
-            "$ref": "#/components/schemas/Priority",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "description": "null is treated as omitted; validated against the project's issue_priorities."
           },
           "task_type": {
-            "$ref": "#/components/schemas/TaskType",
-            "nullable": true
+            "type": "string",
+            "nullable": true,
+            "description": "null is treated as omitted; accepts task_type or type. Validated against the project's issue_types."
           },
           "reporter": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Supports @me; null or empty string clears."
           },
           "assignee": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Supports @me; null or empty string clears."
           },
           "due_date": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null or empty string clears."
           },
           "effort": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null or empty string clears."
           },
           "description": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "null or empty string clears."
           },
           "tags": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "nullable": true
+            "nullable": true,
+            "description": "Replaces the list; null or [] clears."
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "description": "Replaces the list; null or [] clears."
           },
           "relationships": {
-            "$ref": "#/components/schemas/TaskRelationships",
-            "nullable": true
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Replaces the map; null or {} clears."
           },
           "custom_fields": {
             "type": "object",
+            "nullable": true,
             "additionalProperties": true,
-            "nullable": true
+            "description": "Replaces the whole map; null or {} clears all fields."
           },
           "sprints": {
             "type": "array",
@@ -2884,7 +2952,8 @@
               "type": "integer",
               "format": "int32"
             },
-            "nullable": true
+            "nullable": true,
+            "description": "Replaces sprint memberships; null or [] clears them."
           }
         },
         "required": [

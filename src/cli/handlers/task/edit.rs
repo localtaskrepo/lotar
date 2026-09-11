@@ -61,7 +61,7 @@ impl CommandHandler for EditHandler {
                 .validate_task_type(&task_type)
                 .map_err(|e| format!("Task type validation failed: {}", e))?;
             task.task_type = validated.clone();
-            patch.task_type = Some(validated);
+            patch.task_type = Some(validated.to_string());
         }
 
         if let Some(priority) = priority {
@@ -69,7 +69,7 @@ impl CommandHandler for EditHandler {
                 .validate_priority(&priority)
                 .map_err(|e| format!("Priority validation failed: {}", e))?;
             task.priority = validated.clone();
-            patch.priority = Some(validated);
+            patch.priority = Some(validated.to_string());
         }
 
         if let Some(reporter) = reporter {
@@ -142,11 +142,15 @@ impl CommandHandler for EditHandler {
         }
 
         if !fields.is_empty() {
+            let mut merged = task.custom_fields.clone();
             for (key, value) in &fields {
-                task.custom_fields
-                    .insert(key.clone(), custom_value_string(value.clone()));
+                let validated_key = validator
+                    .validate_custom_field_name(key)
+                    .map_err(|e| format!("Custom field validation failed for '{}': {}", key, e))?;
+                merged.insert(validated_key, custom_value_string(value.clone()));
             }
-            patch.custom_fields = Some(task.custom_fields.clone());
+            task.custom_fields = merged.clone();
+            patch.custom_fields = Some(merged);
         }
 
         #[allow(clippy::drop_non_drop)]

@@ -2014,8 +2014,7 @@ fn perform_pull(
                 ),
             );
         } else {
-            let (create, status) =
-                build_task_create_from_issue(remote.provider, remote, &issue, project)?;
+            let create = build_task_create_from_issue(remote.provider, remote, &issue, project)?;
             if dry_run {
                 recorder.record(
                     SyncEntryStatus::Created,
@@ -2095,18 +2094,6 @@ fn perform_pull(
             journal.finish(pending, resolver)?;
             reference_index.insert(reference.clone(), created_task.id.clone());
             tasks_by_id.insert(created_task.id.clone(), created_task.clone());
-            if let Some(status) = status {
-                let update = TaskUpdate {
-                    status: Some(status),
-                    ..Default::default()
-                };
-                if let Err(err) = TaskService::update(&mut storage, &created_task.id, update) {
-                    warnings.push(format!(
-                        "Failed to update status for {}: {}",
-                        created_task.id, err
-                    ));
-                }
-            }
             recorder.record(
                 SyncEntryStatus::Created,
                 make_entry(
@@ -2898,15 +2885,16 @@ fn build_task_update_from_issue(
         .map(|fields| merge_custom_fields(existing.map(|task| &task.custom_fields), fields));
     let mut update = TaskUpdate {
         title: local.title,
-        status: local.status,
-        priority: local.priority,
-        task_type: local.task_type,
+        status: local.status.map(|status| status.to_string()),
+        priority: local.priority.map(|priority| priority.to_string()),
+        task_type: local.task_type.map(|task_type| task_type.to_string()),
         reporter: local.reporter,
         assignee: local.assignee,
         due_date: None,
         effort: None,
         description: local.description,
         tags: local.tags,
+        acceptance_criteria: None,
         relationships: None,
         custom_fields,
         sprints: None,
@@ -2919,13 +2907,13 @@ fn build_task_update_from_issue(
         if update.description.as_deref() == existing.description.as_deref() {
             update.description = None;
         }
-        if update.status.as_ref() == Some(&existing.status) {
+        if update.status.as_deref() == Some(existing.status.as_str()) {
             update.status = None;
         }
-        if update.priority.as_ref() == Some(&existing.priority) {
+        if update.priority.as_deref() == Some(existing.priority.as_str()) {
             update.priority = None;
         }
-        if update.task_type.as_ref() == Some(&existing.task_type) {
+        if update.task_type.as_deref() == Some(existing.task_type.as_str()) {
             update.task_type = None;
         }
         if update.assignee.as_deref() == existing.assignee.as_deref() {
@@ -2952,7 +2940,7 @@ fn build_task_create_from_issue(
     remote: &SyncRemoteConfig,
     issue: &JsonValue,
     project: &str,
-) -> LoTaRResult<(TaskCreate, Option<TaskStatus>)> {
+) -> LoTaRResult<TaskCreate> {
     let local = map_issue_to_local_fields(provider, remote, issue, None);
     let title = local
         .title
@@ -2965,19 +2953,21 @@ fn build_task_create_from_issue(
     let create = TaskCreate {
         title,
         project: Some(project.to_string()),
-        priority: local.priority,
-        task_type: local.task_type,
+        status: local.status.map(|status| status.to_string()),
+        priority: local.priority.map(|priority| priority.to_string()),
+        task_type: local.task_type.map(|task_type| task_type.to_string()),
         reporter: local.reporter,
         assignee: local.assignee,
         due_date: None,
         effort: None,
         description: local.description,
         tags: local.tags.unwrap_or_default(),
+        acceptance_criteria: Vec::new(),
         relationships: None,
         custom_fields: local.custom_fields,
         sprints: Vec::new(),
     };
-    Ok((create, local.status))
+    Ok(create)
 }
 
 fn map_issue_to_local_fields(
@@ -4342,6 +4332,7 @@ mod sync_mapping_tests {
             relationships: Default::default(),
             comments: vec![],
             references: vec![],
+            acceptance_criteria: vec![],
             sprints: vec![],
             sprint_order: Default::default(),
             history: vec![],
@@ -4459,6 +4450,74 @@ mod sync_mapping_tests {
     }
 
     #[test]
+    fn sync_mapped_status_outside_project_enums_fails_loudly() {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join(".tasks");
+        std::fs::create_dir_all(tasks_dir.join("SYNC")).unwrap();
+        std::fs::write(
+            tasks_dir.join("SYNC").join("config.yml"),
+            "issue_states: [Todo, Done]\n",
+        )
+        .unwrap();
+
+        let mut remote = SyncRemoteConfig {
+            provider: SyncProvider::Github,
+            project: None,
+            repo: Some("org/repo".to_string()),
+            filter: None,
+            auth_profile: None,
+            mapping: HashMap::new(),
+        };
+        remote.mapping.insert(
+            "status".to_string(),
+            SyncFieldMapping::Detailed(SyncFieldMappingDetail {
+                field: Some("state".to_string()),
+                values: HashMap::from([(
+                    String::from("Bogus"), // not in SYNC's issue_states
+                    String::from("open"),
+                )]),
+                ..Default::default()
+            }),
+        );
+
+        let issue = json!({"state": "open", "title": "Sync enum mismatch", "number": 1});
+        let create =
+            build_task_create_from_issue(SyncProvider::Github, &remote, &issue, "SYNC").unwrap();
+        assert_eq!(create.status.as_deref(), Some("Bogus"));
+
+        let mut storage = crate::storage::manager::Storage::new(&tasks_dir);
+        let err = TaskService::create(&mut storage, create)
+            .expect_err("status outside project enums must fail");
+        match err {
+            LoTaRError::ValidationError(msg) => {
+                assert!(
+                    msg.contains("not enabled") && msg.contains("Todo, Done"),
+                    "unexpected message: {msg}"
+                );
+            }
+            other => panic!("expected validation error, got {other:?}"),
+        }
+        let task_files = std::fs::read_dir(tasks_dir.join("SYNC"))
+            .unwrap()
+            .filter(|entry| {
+                entry
+                    .as_ref()
+                    .ok()
+                    .and_then(|e| {
+                        e.file_name()
+                            .to_str()
+                            .map(|n| n.ends_with(".yml") && n != "config.yml")
+                    })
+                    .unwrap_or(false)
+            })
+            .count();
+        assert_eq!(
+            task_files, 0,
+            "failed sync create must not leave a task file"
+        );
+    }
+
+    #[test]
     fn determine_reference_state_skips_other_provider_refs() {
         let remote = SyncRemoteConfig {
             provider: SyncProvider::Github,
@@ -4505,6 +4564,7 @@ mod tests {
             relationships: Default::default(),
             comments: vec![],
             references: vec![],
+            acceptance_criteria: vec![],
             sprints: vec![],
             sprint_order: Default::default(),
             history: vec![],

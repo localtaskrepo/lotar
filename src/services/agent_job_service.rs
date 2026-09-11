@@ -2115,6 +2115,7 @@ mod tests {
             relationships: Default::default(),
             comments: vec![],
             references: vec![],
+            acceptance_criteria: vec![],
             sprints: vec![],
             sprint_order: Default::default(),
             history: vec![],

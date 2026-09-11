@@ -12,7 +12,6 @@ use lotar::services::automation_service::{
 use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::{TaskService, TaskUpdateContext};
 use lotar::storage::sprint::{Sprint, SprintActual};
-use lotar::types::TaskStatus;
 use serde_yaml_ng::{Mapping as YamlMapping, Value as YamlValue};
 #[cfg(unix)]
 use std::fs;
@@ -307,6 +306,7 @@ exit 0\n",
         TaskCreate {
             title: "Auto agent run".to_string(),
             project: Some("AUTO".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -386,6 +386,7 @@ exit 1\n",
         TaskCreate {
             title: "Auto agent fail".to_string(),
             project: Some("FAIL".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -450,6 +451,7 @@ sleep 5\n",
         TaskCreate {
             title: "Auto agent cancel".to_string(),
             project: Some("CANCEL".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -550,6 +552,7 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
         TaskCreate {
             title: "Auto agent pipeline".to_string(),
             project: Some("PIPE".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -645,6 +648,7 @@ exit 0
         TaskCreate {
             title: "Shipped pipeline template".to_string(),
             project: Some("PIP".to_string()),
+            status: None,
             reporter: Some("Agent Tests".to_string()),
             ..Default::default()
         },
@@ -768,6 +772,7 @@ exit 0
         TaskCreate {
             title: "Shipped reviewed template".to_string(),
             project: Some("REV".to_string()),
+            status: None,
             reporter: Some("Agent Tests".to_string()),
             ..Default::default()
         },
@@ -901,6 +906,7 @@ fn command_runner_captures_output_and_completes() {
         TaskCreate {
             title: "Command runner test".to_string(),
             project: Some("CMD".to_string()),
+            status: None,
             reporter: Some("alice".to_string()),
             ..Default::default()
         },
@@ -970,6 +976,7 @@ fn command_runner_failure_fires_job_failed() {
         TaskCreate {
             title: "Cmd fail test".to_string(),
             project: Some("CMDF".to_string()),
+            status: None,
             reporter: Some("bob".to_string()),
             ..Default::default()
         },
@@ -1058,6 +1065,7 @@ exit 0\n",
         TaskCreate {
             title: "Template expansion test".to_string(),
             project: Some("TMPL".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1140,6 +1148,7 @@ fn event_hooks_assigned_and_legacy_start_both_fire() {
         TaskCreate {
             title: "Hook test".to_string(),
             project: Some("HOOK".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1200,6 +1209,7 @@ fn event_hook_created_fires_only_on_create() {
         TaskCreate {
             title: "Created hook test".to_string(),
             project: Some("CRHK".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1269,6 +1279,7 @@ fn previous_template_vars_in_updated_hook() {
         TaskCreate {
             title: "Previous vars test".to_string(),
             project: Some("PREV".to_string()),
+            status: None,
             assignee: Some("alice".to_string()),
             ..Default::default()
         },
@@ -1334,6 +1345,7 @@ fn command_runner_receives_lotar_env_vars() {
         TaskCreate {
             title: "Env vars test".to_string(),
             project: Some("ENV".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1416,6 +1428,7 @@ exit 0\n",
         TaskCreate {
             title: "Backward compat test".to_string(),
             project: Some("COMPAT".to_string()),
+            status: None,
             reporter: Some("reporter-user".to_string()),
             ..Default::default()
         },
@@ -1475,6 +1488,7 @@ automation:
         TaskCreate {
             title: "Comment test".to_string(),
             project: Some("CMT".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1547,6 +1561,7 @@ exit 0\n",
         TaskCreate {
             title: "Max iterations test".to_string(),
             project: Some("ITER".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1637,6 +1652,7 @@ automation:
         TaskCreate {
             title: "Cooldown test".into(),
             project: Some("COOL".into()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1680,7 +1696,7 @@ automation:
         &mut storage,
         &created.id,
         TaskUpdate {
-            priority: Some("Critical".into()),
+            priority: Some("High".into()),
             ..Default::default()
         },
     )
@@ -1719,6 +1735,7 @@ automation:
         TaskCreate {
             title: "Short cooldown test".into(),
             project: Some("COOL2".into()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1759,7 +1776,7 @@ automation:
         &mut storage,
         &created.id,
         TaskUpdate {
-            priority: Some("Critical".into()),
+            priority: Some("High".into()),
             ..Default::default()
         },
     )
@@ -1799,6 +1816,7 @@ automation:
         TaskCreate {
             title: "Simulate test".into(),
             project: Some("SIM".into()),
+            status: None,
             task_type: Some("Bug".into()),
             ..Default::default()
         },
@@ -1842,6 +1860,7 @@ fn agent_assignee_does_not_leak_into_members() {
         TaskCreate {
             title: "Member leak test".to_string(),
             project: Some("LEAK".to_string()),
+            status: None,
             reporter: Some("alice".to_string()),
             ..Default::default()
         },
@@ -1922,6 +1941,7 @@ fn async_run_action_does_not_block() {
         TaskCreate {
             title: "Async run test".to_string(),
             project: Some("ASYN".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -1985,6 +2005,7 @@ automation:
         TaskCreate {
             title: "Overdue task".to_string(),
             project: Some("DATE".to_string()),
+            status: None,
             due_date: Some("2020-01-01".to_string()),
             ..Default::default()
         },
@@ -2015,6 +2036,7 @@ automation:
         TaskCreate {
             title: "Future task".to_string(),
             project: Some("DATE".to_string()),
+            status: None,
             due_date: Some("2099-12-31".to_string()),
             ..Default::default()
         },
@@ -2067,6 +2089,7 @@ automation:
         TaskCreate {
             title: "Recent task".to_string(),
             project: Some("STALE".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -2116,6 +2139,7 @@ automation:
             TaskCreate {
                 title: format!("Round robin {i}"),
                 project: Some("RR".to_string()),
+                status: None,
                 ..Default::default()
             },
         )
@@ -2179,6 +2203,7 @@ automation:
             TaskCreate {
                 title: format!("Alice task {i}"),
                 project: Some("LB".to_string()),
+                status: None,
                 assignee: Some("alice".to_string()),
                 ..Default::default()
             },
@@ -2202,6 +2227,7 @@ automation:
         TaskCreate {
             title: "Least busy test".to_string(),
             project: Some("LB".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -2258,6 +2284,7 @@ automation:
         TaskCreate {
             title: "Sprint auto-add".to_string(),
             project: Some("SP".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -2278,6 +2305,7 @@ automation:
         TaskCreate {
             title: "Already in sprint".to_string(),
             project: Some("SP".to_string()),
+            status: None,
             sprints: vec![sprint_id],
             ..Default::default()
         },
@@ -2320,6 +2348,7 @@ automation:
         TaskCreate {
             title: "First task".to_string(),
             project: Some("RL".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -2331,6 +2360,7 @@ automation:
         TaskCreate {
             title: "Second task".to_string(),
             project: Some("RL".to_string()),
+            status: None,
             ..Default::default()
         },
     )
@@ -2373,7 +2403,7 @@ automation:
         &mut storage,
         &t2.id,
         TaskUpdate {
-            status: Some(lotar::types::TaskStatus::new("InProgress")),
+            status: Some("InProgress".to_string()),
             ..Default::default()
         },
     )
@@ -2418,6 +2448,7 @@ fn review_transitions_require_reporter_identity() {
         TaskCreate {
             title: "Human review gate".to_string(),
             project: Some("REV".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2428,7 +2459,7 @@ fn review_transitions_require_reporter_identity() {
         &mut storage,
         &created.id,
         TaskUpdate {
-            status: Some(TaskStatus::new("Review")),
+            status: Some("Review".to_string()),
             assignee: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2440,7 +2471,7 @@ fn review_transitions_require_reporter_identity() {
         &mut storage,
         &created.id,
         TaskUpdate {
-            status: Some(TaskStatus::new("InProgress")),
+            status: Some("InProgress".to_string()),
             assignee: Some("implement".to_string()),
             ..Default::default()
         },
@@ -2472,6 +2503,7 @@ fn reporter_can_advance_review_ticket() {
         TaskCreate {
             title: "Reporter review approval".to_string(),
             project: Some("REV".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2482,7 +2514,7 @@ fn reporter_can_advance_review_ticket() {
         &mut storage,
         &created.id,
         TaskUpdate {
-            status: Some(TaskStatus::new("Review")),
+            status: Some("Review".to_string()),
             assignee: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2494,7 +2526,7 @@ fn reporter_can_advance_review_ticket() {
         &mut storage,
         &created.id,
         TaskUpdate {
-            status: Some(TaskStatus::new("InProgress")),
+            status: Some("InProgress".to_string()),
             assignee: Some("implement".to_string()),
             ..Default::default()
         },
@@ -2526,6 +2558,7 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
         TaskCreate {
             title: "Clarification handoff".to_string(),
             project: Some("ASK".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2546,7 +2579,7 @@ fn clarification_handoff_to_reporter_survives_job_failure() {
         &mut storage,
         &created.id,
         TaskUpdate {
-            status: Some(TaskStatus::new("HelpNeeded")),
+            status: Some("HelpNeeded".to_string()),
             assignee: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2618,6 +2651,7 @@ exit 1\n",
         TaskCreate {
             title: "Clarification via running agent".to_string(),
             project: Some("ASK".to_string()),
+            status: None,
             reporter: Some("sam@example.com".to_string()),
             ..Default::default()
         },
@@ -2692,6 +2726,7 @@ exit 0\n",
         TaskCreate {
             title: "Worktree gated merge".to_string(),
             project: Some("MRG".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2702,7 +2737,7 @@ exit 0\n",
         &mut storage,
         &created.id,
         TaskUpdate {
-            status: Some(TaskStatus::new("Merging")),
+            status: Some("Merging".to_string()),
             assignee: Some("merge".to_string()),
             ..Default::default()
         },
@@ -2764,6 +2799,7 @@ exit 0\n",
         TaskCreate {
             title: "Serialized merge one".to_string(),
             project: Some("MRG".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2774,6 +2810,7 @@ exit 0\n",
         TaskCreate {
             title: "Serialized merge two".to_string(),
             project: Some("MRG".to_string()),
+            status: None,
             reporter: Some("sam".to_string()),
             ..Default::default()
         },
@@ -2785,7 +2822,7 @@ exit 0\n",
             &mut storage,
             ticket_id,
             TaskUpdate {
-                status: Some(TaskStatus::new("Merging")),
+                status: Some("Merging".to_string()),
                 assignee: Some("merge".to_string()),
                 ..Default::default()
             },

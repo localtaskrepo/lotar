@@ -522,7 +522,6 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         loading,
         apiClient: {
             addTask: api.addTask,
-            setStatus: api.setStatus,
             updateTask: api.updateTask,
             getTask: api.getTask,
         },
@@ -530,6 +529,9 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         buildRelationships,
         buildCustomFields,
         applyTask,
+        applyTaskCustomFields,
+        applyRelationshipsFromTask,
+        snapshotRelationshipsBaselineFromTask,
         validate,
         closePanel,
         resetActivity,

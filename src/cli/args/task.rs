@@ -149,6 +149,10 @@ pub struct AddArgs {
     #[arg(long, short = 'P')]
     pub priority: Option<String>,
 
+    /// Initial status (validated against project config)
+    #[arg(long)]
+    pub status: Option<String>,
+
     /// Reporter (username, email, or @directive like @me)
     #[arg(long, short = 'R')]
     pub reporter: Option<String>,
@@ -412,6 +416,10 @@ pub struct TaskAddArgs {
     /// Priority level
     #[arg(long, short = 'P')]
     pub priority: Option<String>,
+
+    /// Initial status (validated against project config)
+    #[arg(long)]
+    pub status: Option<String>,
 
     /// Reporter (username, email, or @directive like @me)
     #[arg(long, short = 'R')]

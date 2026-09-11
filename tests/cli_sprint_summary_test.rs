@@ -3,7 +3,6 @@ use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
-use lotar::types::{Priority, TaskStatus, TaskType};
 use lotar::utils::paths;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -58,14 +57,16 @@ issue.priorities: [Low, Medium, High]
         TaskCreate {
             title: "Complete onboarding flow".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("Medium")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("Medium".to_string()),
+            task_type: Some("Feature".to_string()),
             reporter: None,
             assignee: None,
             due_date: None,
             effort: None,
             description: None,
             tags: Vec::new(),
+            acceptance_criteria: Vec::new(),
             relationships: None,
             custom_fields: None,
             sprints: Vec::new(),
@@ -77,7 +78,7 @@ issue.priorities: [Low, Medium, High]
         &mut storage,
         &feature.id,
         TaskUpdate {
-            status: Some(TaskStatus::from("Done")),
+            status: Some("Done".to_string()),
             effort: Some("5pt".to_string()),
             sprints: Some(vec![sprint_id]),
             ..TaskUpdate::default()
@@ -90,14 +91,16 @@ issue.priorities: [Low, Medium, High]
         TaskCreate {
             title: "Fix API regression".to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("High")),
-            task_type: Some(TaskType::from("Bug")),
+            status: None,
+            priority: Some("High".to_string()),
+            task_type: Some("Bug".to_string()),
             reporter: None,
             assignee: None,
             due_date: None,
             effort: None,
             description: None,
             tags: Vec::new(),
+            acceptance_criteria: Vec::new(),
             relationships: None,
             custom_fields: None,
             sprints: Vec::new(),
@@ -111,7 +114,7 @@ issue.priorities: [Low, Medium, High]
         &mut storage,
         &blocker.id,
         TaskUpdate {
-            status: Some(TaskStatus::from("Blocked")),
+            status: Some("Blocked".to_string()),
             assignee: Some("alice@example.com".to_string()),
             effort: Some("4h".to_string()),
             sprints: Some(vec![sprint_id]),

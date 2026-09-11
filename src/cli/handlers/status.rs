@@ -161,7 +161,7 @@ fn handle_set_status(
 
     let patch = TaskUpdate {
         title: None,
-        status: Some(validated_status.clone()),
+        status: Some(validated_status.to_string()),
         priority: None,
         task_type: None,
         reporter: None,
@@ -170,6 +170,7 @@ fn handle_set_status(
         effort: None,
         description: None,
         tags: None,
+        acceptance_criteria: None,
         relationships: None,
         custom_fields: None,
         sprints: None,

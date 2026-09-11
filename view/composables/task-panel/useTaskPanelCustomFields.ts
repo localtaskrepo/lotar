@@ -26,7 +26,7 @@ export interface TaskPanelCustomFieldsApi {
     customFields: CustomFieldsMap
     customFieldKeys: CustomFieldKeysMap
     newField: NewFieldState
-    buildCustomFields: () => Record<string, string>
+    buildCustomFields: () => Record<string, unknown>
     commitCustomFields: () => Promise<void>
     addField: () => Promise<void>
     removeField: (key: string) => Promise<void>
@@ -44,14 +44,23 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
     const customFields = reactive<CustomFieldsMap>({})
     const customFieldKeys = reactive<CustomFieldKeysMap>({})
     const newField = reactive<NewFieldState>({ key: '', value: '' })
+    // Raw (non-string) JSON values loaded from the task, keyed by field name.
+    // Untouched values are resent verbatim so replace-all custom_fields
+    // patches never degrade numbers/booleans/objects to their string form.
+    const rawCustomFieldValues: Record<string, unknown> = {}
+
+    const displayValue = (value: unknown): string =>
+        value === undefined || value === null ? '' : String(value)
 
     const buildCustomFields = () => {
-        const out: Record<string, string> = {}
+        const out: Record<string, unknown> = {}
         Object.entries(customFields).forEach(([key, value]) => {
             const target = (customFieldKeys[key] || key || '').trim()
-            if (target) {
-                out[target] = value
+            if (!target) {
+                return
             }
+            const raw = rawCustomFieldValues[target]
+            out[target] = raw !== undefined && displayValue(raw) === value ? raw : value
         })
         return out
     }
@@ -78,12 +87,14 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
     const removeField = async (key: string) => {
         delete customFields[key]
         delete customFieldKeys[key]
+        delete rawCustomFieldValues[key]
         await commitCustomFields()
     }
 
     const resetCustomFields = () => {
         Object.keys(customFields).forEach((key) => delete customFields[key])
         Object.keys(customFieldKeys).forEach((key) => delete customFieldKeys[key])
+        Object.keys(rawCustomFieldValues).forEach((key) => delete rawCustomFieldValues[key])
         newField.key = ''
         newField.value = ''
     }
@@ -137,9 +148,11 @@ export function useTaskPanelCustomFields(options: UseTaskPanelCustomFieldsOption
         Object.entries(values).forEach(([rawKey, value]) => {
             const targetKey = (rawKey || '').trim()
             if (!targetKey) return
-            const strValue = value === undefined || value === null ? '' : String(value)
-            customFields[targetKey] = strValue
+            customFields[targetKey] = displayValue(value)
             customFieldKeys[targetKey] = targetKey
+            if (value !== null && value !== undefined && typeof value !== 'string') {
+                rawCustomFieldValues[targetKey] = value
+            }
         })
         ensureConfiguredCustomFields()
     }

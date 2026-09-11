@@ -3,7 +3,6 @@ use lotar::services::sprint_service::SprintService;
 use lotar::services::task_service::TaskService;
 use lotar::storage::manager::Storage;
 use lotar::storage::sprint::{Sprint, SprintActual, SprintCapacity, SprintPlan};
-use lotar::types::{Priority, TaskStatus, TaskType};
 use lotar::utils::paths;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -22,14 +21,16 @@ fn create_task(
         TaskCreate {
             title: title.to_string(),
             project: Some("TEST".to_string()),
-            priority: Some(Priority::from("Medium")),
-            task_type: Some(TaskType::from("Feature")),
+            status: None,
+            priority: Some("Medium".to_string()),
+            task_type: Some("Feature".to_string()),
             reporter: None,
             assignee: None,
             due_date: None,
             effort: None,
             description: None,
             tags: Vec::new(),
+            acceptance_criteria: Vec::new(),
             relationships: None,
             custom_fields: None,
             sprints: Vec::new(),
@@ -41,7 +42,7 @@ fn create_task(
         storage,
         &task.id,
         TaskUpdate {
-            status: Some(TaskStatus::from(status)),
+            status: Some(status.to_string()),
             effort: effort.map(|value| value.to_string()),
             sprints: Some(vec![sprint_id]),
             ..TaskUpdate::default()

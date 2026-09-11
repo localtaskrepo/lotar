@@ -19,8 +19,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `status`, `user`, and optional `explain` metadata.
 
 ### `task_create`
-- **Params:** `title` (required), optional `description`, `project`, `priority`, `type`, `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `relationships`, `custom_fields` map, and `sprints[]` (numeric IDs).
-- **Behavior:** Validates enums via `CliValidator`; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
+- **Params:** `title` (required), optional `description`, `project`, `priority`, `type`, `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, and `sprints[]` (numeric IDs).
+- **Behavior:** validates `status`/`priority`/`type` against the target project's configuration (project-only enum values are accepted; failures carry `error.data.suggestions` from that project); an explicit `status` is persisted atomically with creation; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
 - **Response:** JSON blob containing the saved `task` plus `metadata.appliedDefaults` (fields the server filled) and `metadata.enumHints` when available.
 
 ### `task_get`
@@ -28,7 +28,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Pretty-printed `TaskDTO` for the requested record.
 
 ### `task_update`
-- **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields and can be nulled/reset (e.g., `relationships: null` clears relationships).
+- **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields plus `acceptance_criteria` and `sprints`.
+- **Behavior:** tri-state semantics per key: omitted = no-op, `null` = clear, value = set. Empty string clears reporter/assignee/due_date/effort/description; empty array/object clears tags/acceptance_criteria/relationships/custom_fields/sprints. `title`/`status`/`priority`/`type` treat `null` as omitted and blank titles are rejected. Enum strings are validated against the task's project configuration (failures return `-32602` with `error.data.suggestions`); list and map patches replace the whole value; `sprints` must be an array of positive integers (invalid entries are rejected, not dropped); membership failures keep the `Task update failed` envelope with `data.message`.
 - **Response:** Updated `TaskDTO` serialized to JSON.
 
 ### `task_comment_add`
@@ -43,7 +44,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `task_bulk_update`
 - **Params:** `ids[]` (required), `patch` (required), optional `stop_on_error`.
-- **Behavior:** applies the same patch to multiple tasks. When `stop_on_error=true`, aborts after the first failure.
+- **Behavior:** applies the same patch to multiple tasks using the `task_update` tri-state semantics. Enum validation runs per task against its own project configuration, so a value valid in one project can fail in another (reported per id in `failed[]`). When `stop_on_error=true`, aborts after the first failure.
 - **Response:** JSON with `updated[]` and `failed[]` per task id.
 
 ### `task_bulk_comment_add`

@@ -1157,3 +1157,428 @@ fn event_affects_tooling_ignores_nested_task_files() {
     let nested_task = vec![tasks_dir.join("MCP").join("tasks").join("123.yml")];
     assert!(!event_affects_tooling(&nested_task, tasks_dir.as_path()));
 }
+
+#[test]
+fn tools_call_task_update_accepts_project_only_status() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    // Project MCP allows states that the global defaults do not include.
+    let mcp_dir = tasks_dir.join("MCP");
+    std::fs::create_dir_all(&mcp_dir).unwrap();
+    std::fs::write(
+        mcp_dir.join("config.yml"),
+        "issue_states: [Queued, Active, Review, Complete]\n",
+    )
+    .unwrap();
+    set_tasks_dir_env(&tasks_dir);
+
+    let create_resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(60)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": { "title": "Project status", "project": "MCP", "status": "Review" }
+        }),
+    });
+    assert!(create_resp.error.is_none(), "task_create failed");
+    let created = parse_tool_payload(&create_resp);
+    let id = created
+        .get("task")
+        .and_then(|task| task.get("id"))
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        created
+            .get("task")
+            .and_then(|task| task.get("status"))
+            .and_then(|v| v.as_str()),
+        Some("Review"),
+        "explicit project status must be created atomically"
+    );
+
+    // The reproduced DEV-54 failure: project-only status rejected with
+    // global-enum suggestions. It must now succeed.
+    let update_resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(61)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_update",
+            "arguments": { "id": id, "patch": { "status": "Active" } }
+        }),
+    });
+    assert!(
+        update_resp.error.is_none(),
+        "task_update with project status failed: {:?}",
+        update_resp.error
+    );
+    let updated = parse_tool_payload(&update_resp);
+    assert_eq!(
+        updated.get("status").and_then(|v| v.as_str()),
+        Some("Active")
+    );
+
+    // A status outside the project's set is rejected with suggestions from
+    // the project, not the global defaults.
+    let bad_resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(62)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_update",
+            "arguments": { "id": id, "patch": { "status": "Todo" } }
+        }),
+    });
+    let error = bad_resp
+        .error
+        .as_ref()
+        .expect("expected rejection for status outside project set");
+    assert_eq!(error.code, -32602);
+    let data = error.data.as_ref().expect("expected enum hint data");
+    let suggestions = data
+        .get("suggestions")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        suggestions.iter().any(|v| v.as_str() == Some("Queued")),
+        "expected project-scoped suggestions, got {:?}",
+        suggestions
+    );
+    assert!(
+        !suggestions.iter().any(|v| v.as_str() == Some("Todo")),
+        "global-only values must not be suggested for project MCP"
+    );
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn tools_call_task_bulk_update_reports_per_project_enum_failures() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    std::fs::create_dir_all(tasks_dir.join("MCP")).unwrap();
+    std::fs::write(
+        tasks_dir.join("MCP").join("config.yml"),
+        "issue_states: [Queued, Active, Review, Complete]\n",
+    )
+    .unwrap();
+    std::fs::create_dir_all(tasks_dir.join("MCP2")).unwrap();
+    std::fs::write(
+        tasks_dir.join("MCP2").join("config.yml"),
+        "issue_states: [Todo, InProgress, Done]\n",
+    )
+    .unwrap();
+    set_tasks_dir_env(&tasks_dir);
+
+    let make_task = |project: &str, call_id: i64| -> String {
+        let resp = dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(call_id)),
+            method: "tools/call".into(),
+            params: json!({
+                "name": "task_create",
+                "arguments": { "title": "bulk target", "project": project }
+            }),
+        });
+        assert!(resp.error.is_none(), "task_create failed");
+        parse_tool_payload(&resp)
+            .get("task")
+            .and_then(|task| task.get("id"))
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string()
+    };
+
+    let mcp_id = make_task("MCP", 70);
+    let mcp2_id = make_task("MCP2", 71);
+
+    let bulk_resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(72)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_bulk_update",
+            "arguments": { "ids": [mcp_id, mcp2_id], "patch": { "status": "Review" } }
+        }),
+    });
+    assert!(bulk_resp.error.is_none(), "bulk call failed");
+    let payload = parse_tool_payload(&bulk_resp);
+    let updated = payload
+        .get("updated")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let failed = payload
+        .get("failed")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(updated.len(), 1, "MCP task should accept Review: {payload}");
+    assert_eq!(
+        updated[0].get("status").and_then(|v| v.as_str()),
+        Some("Review")
+    );
+    assert_eq!(failed.len(), 1, "MCP2 task should reject Review: {payload}");
+    assert!(
+        failed[0]
+            .get("error")
+            .and_then(|v| v.as_str())
+            .is_some_and(|msg| msg.contains("not enabled")),
+        "failure should explain the invalid status: {payload}"
+    );
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn tools_call_task_update_null_clears_clearable_scalars() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    seed_single_project_config(&tasks_dir);
+    set_tasks_dir_env(&tasks_dir);
+
+    let created = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(80)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": {
+                "title": "MCP null clears",
+                "project": "MCP",
+                "assignee": "alice",
+                "effort": "3d",
+                "description": "to be cleared",
+                "tags": ["keepme"]
+            }
+        }),
+    });
+    assert!(created.error.is_none(), "task_create failed");
+    let payload = parse_tool_payload(&created);
+    let id = payload
+        .get("task")
+        .and_then(|task| task.get("id"))
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+
+    // Omitted fields stay; null clears the clearable scalars.
+    let update = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(81)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_update",
+            "arguments": {
+                "id": id,
+                "patch": { "assignee": null, "effort": null, "description": null }
+            }
+        }),
+    });
+    assert!(
+        update.error.is_none(),
+        "null clears failed: {:?}",
+        update.error
+    );
+    let updated = parse_tool_payload(&update);
+    assert!(updated.get("assignee").is_none() || updated["assignee"].is_null());
+    assert!(updated.get("effort").is_none() || updated["effort"].is_null());
+    assert!(
+        updated.get("description").is_none() || updated["description"].is_null(),
+        "null must clear description: {updated}"
+    );
+    assert_eq!(
+        updated
+            .get("tags")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len()),
+        Some(1),
+        "omitted tags stay unchanged: {updated}"
+    );
+
+    // Empty title is rejected instead of blanking the task.
+    let blank = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(82)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_update",
+            "arguments": { "id": id, "patch": { "title": "" } }
+        }),
+    });
+    let error = blank.error.as_ref().expect("blank title must be rejected");
+    assert_eq!(error.code, -32602);
+    assert!(error.message.contains("Title cannot be empty"));
+
+    // Invalid sprint entries are rejected rather than silently dropped.
+    for bad_sprints in [json!([0]), json!(["3"]), json!(3)] {
+        let bad = dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(83)),
+            method: "tools/call".into(),
+            params: json!({
+                "name": "task_update",
+                "arguments": { "id": id, "patch": { "sprints": bad_sprints } }
+            }),
+        });
+        let error = bad
+            .error
+            .as_ref()
+            .expect("invalid sprints must be rejected");
+        assert_eq!(error.code, -32602, "sprints payload: {bad_sprints}");
+    }
+
+    let bad_create = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(84)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": { "title": "bad sprints", "project": "MCP", "sprints": [0, 3] }
+        }),
+    });
+    let error = bad_create
+        .error
+        .as_ref()
+        .expect("invalid create sprints must be rejected");
+    assert_eq!(error.code, -32602, "create sprints must be strict");
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn tools_call_task_bulk_update_null_clears() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    seed_single_project_config(&tasks_dir);
+    set_tasks_dir_env(&tasks_dir);
+
+    let created = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(85)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": {
+                "title": "MCP bulk null clears",
+                "project": "MCP",
+                "reporter": "alice",
+                "effort": "2h"
+            }
+        }),
+    });
+    assert!(created.error.is_none(), "task_create failed");
+    let payload = parse_tool_payload(&created);
+    let id = payload
+        .get("task")
+        .and_then(|task| task.get("id"))
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+
+    let bulk = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(86)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_bulk_update",
+            "arguments": {
+                "ids": [id],
+                "patch": { "reporter": null, "effort": null }
+            }
+        }),
+    });
+    assert!(
+        bulk.error.is_none(),
+        "bulk null clears failed: {:?}",
+        bulk.error
+    );
+    let payload = parse_tool_payload(&bulk);
+    let updated = payload
+        .get("updated")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(updated.len(), 1, "bulk payload: {payload}");
+    let task = &updated[0];
+    assert!(task.get("reporter").is_none() || task["reporter"].is_null());
+    assert!(task.get("effort").is_none() || task["effort"].is_null());
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn tools_call_task_create_membership_error_keeps_operation_envelope() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    std::fs::write(
+        tasks_dir.join("config.yml"),
+        "default:\n  project: MCP\nmembers:\n  - alice\nstrict_members: true\nauto:\n  populate_members: false\n",
+    )
+    .unwrap();
+    set_tasks_dir_env(&tasks_dir);
+
+    let resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(90)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": {
+                "title": "Membership envelope",
+                "project": "MCP",
+                "reporter": "alice",
+                "assignee": "intruder"
+            }
+        }),
+    });
+    let error = resp
+        .error
+        .as_ref()
+        .expect("strict member violation must fail");
+    assert_eq!(error.code, -32000, "operation envelope code");
+    assert_eq!(error.message.as_str(), "Task create failed");
+    let message = error
+        .data
+        .as_ref()
+        .and_then(|data| data.get("message"))
+        .and_then(|v| v.as_str())
+        .expect("data.message detail");
+    assert!(
+        message.contains("Assignee 'intruder' is not in configured members"),
+        "unexpected detail: {message}"
+    );
+
+    // Enum failures keep the invalid-params code with suggestions.
+    let enum_resp = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(91)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": { "title": "Enum envelope", "project": "MCP", "status": "Bogus" }
+        }),
+    });
+    let error = enum_resp.error.as_ref().expect("invalid status must fail");
+    assert_eq!(error.code, -32602, "enum failures use invalid-params code");
+    assert!(
+        error.message.contains("Status validation failed"),
+        "unexpected message: {}",
+        error.message
+    );
+
+    clear_tasks_dir_env();
+}

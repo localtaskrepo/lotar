@@ -4,6 +4,7 @@ use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::AgentJobService;
 use crate::services::automation_service::AutomationService;
 use crate::services::sprint_service::{SprintRecord, SprintService};
+use crate::services::task_validation::{self as validation};
 use crate::storage::manager::Storage;
 use crate::storage::sprint::SprintTaskEntry;
 use crate::storage::task::Task;
@@ -55,6 +56,7 @@ impl TaskService {
         let TaskCreate {
             title,
             project,
+            status,
             priority,
             task_type,
             reporter,
@@ -63,10 +65,16 @@ impl TaskService {
             effort,
             description,
             tags,
+            acceptance_criteria,
             relationships,
             custom_fields,
             sprints,
         } = req;
+        if title.trim().is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Title cannot be empty.".to_string(),
+            ));
+        }
         let normalized_sprints = Self::normalize_sprint_ids(&sprints);
 
         // Prefer explicit project if provided; otherwise, derive from repo folder name
@@ -86,26 +94,47 @@ impl TaskService {
 
         let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), &project);
 
-        let resolved_priority = priority
+        let parsed_status = match status.as_deref() {
+            Some(raw) => Some(validation::parse_status(raw, &config)?),
+            None => None,
+        };
+        let parsed_priority = match priority.as_deref() {
+            Some(raw) => Some(validation::parse_priority(raw, &config)?),
+            None => None,
+        };
+        let parsed_type = match task_type.as_deref() {
+            Some(raw) => Some(validation::parse_task_type(raw, &config)?),
+            None => None,
+        };
+        let custom_fields = match custom_fields.as_ref() {
+            Some(cf) => Some(validation::resolve_custom_fields(cf, &config, None)?),
+            None => None,
+        };
+
+        let resolved_priority = parsed_priority
             .or_else(|| crate::utils::task_intel::infer_priority_from_branch(&config))
             .or_else(|| config.effective_default_priority())
             .unwrap_or_else(|| Priority::from("Medium"));
 
-        let mut resolved_type = task_type
+        let mut resolved_type = parsed_type
             .clone()
             .or_else(|| crate::utils::task_intel::infer_task_type_from_branch(&config))
             .or_else(|| config.effective_default_task_type())
             .unwrap_or_else(|| TaskType::from("Feature"));
 
-        if task_type.is_none() {
+        if parsed_type.is_none() {
             resolved_type.ensure_leading_uppercase();
         }
 
         let mut t = Task::new(storage.root_path.clone(), title, resolved_priority.clone());
         t.priority = resolved_priority;
         t.task_type = resolved_type;
-        // reporter: explicit or auto-detect (configurable)
-        t.status = crate::utils::task_intel::infer_status_from_branch(&config)
+        t.status = parsed_status
+            .or_else(|| {
+                crate::utils::task_intel::infer_status_from_branch(&config).filter(|status| {
+                    TaskStatus::parse_with_config(status.as_str(), &config).is_ok()
+                })
+            })
             .or_else(|| config.effective_default_status())
             .unwrap_or_else(|| TaskStatus::from("Todo"));
         let auto = config.auto_set_reporter;
@@ -157,7 +186,7 @@ impl TaskService {
                     }
                 })
             });
-        t.due_date = due_date;
+        t.due_date = due_date.filter(|v| !v.trim().is_empty());
 
         // Normalize member values: strip @ from non-directive usernames.
         let is_agent = |name: &str| config.agent_profiles.contains_key(name);
@@ -169,11 +198,14 @@ impl TaskService {
             .map(|v| crate::utils::member::normalize_member_value(&v, is_agent));
 
         // Normalize effort on write
-        t.effort = effort.map(|e| match crate::utils::effort::parse_effort(&e) {
-            Ok(parsed) => parsed.canonical,
-            Err(_) => e,
-        });
-        t.description = description;
+        t.effort =
+            effort.filter(|e| !e.trim().is_empty()).map(
+                |e| match crate::utils::effort::parse_effort(&e) {
+                    Ok(parsed) => parsed.canonical,
+                    Err(_) => e,
+                },
+            );
+        t.description = description.filter(|v| !v.is_empty());
         let mut normalized_tags = normalize_tags(tags);
         if normalized_tags.is_empty() {
             if !config.default_tags.is_empty() {
@@ -194,15 +226,31 @@ impl TaskService {
         if let Some(cf) = custom_fields {
             t.custom_fields = cf;
         }
+        t.acceptance_criteria = acceptance_criteria
+            .into_iter()
+            .map(|item| item.trim().to_string())
+            .filter(|item| !item.is_empty())
+            .collect();
 
-        Self::ensure_task_defaults(&mut t, &config);
+        Self::ensure_task_defaults(&mut t, &config, true);
         config =
             Self::maybe_auto_populate_members(storage.root_path.as_path(), &project, &t, config)?;
         Self::enforce_membership(&t, &config, &project)?;
 
+        // Validate sprint membership before writing the task file so an
+        // invalid sprint cannot orphan a created task; a sprint listing
+        // failure also blocks the write (fail closed). A failure after the
+        // task write triggers best-effort cleanup below — this is not a
+        // transaction: a crash between the task write and the sprint file
+        // writes can still leave partial state (DEV-55 owns transactions).
+        Self::ensure_sprints_exist(storage, &normalized_sprints)?;
+
         let id = storage.add(&t, &project, None)?;
-        if !normalized_sprints.is_empty() {
-            Self::replace_sprint_memberships(storage, &id, &normalized_sprints)?;
+        if !normalized_sprints.is_empty()
+            && let Err(err) = Self::replace_sprint_memberships(storage, &id, &normalized_sprints)
+        {
+            let _ = storage.delete(&id, &project);
+            return Err(err);
         }
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let dto = Self::to_dto(&id, t, Some(&sprint_lookup));
@@ -221,7 +269,7 @@ impl TaskService {
         match storage.get(id, &p) {
             Some(mut t) => {
                 let config = Self::resolve_config_for_project(storage.root_path.as_path(), &p);
-                Self::ensure_task_defaults(&mut t, &config);
+                Self::ensure_task_defaults(&mut t, &config, false);
                 let sprint_lookup = Self::load_sprint_lookup(storage);
                 Ok(Self::to_dto(id, t, Some(&sprint_lookup)))
             }
@@ -319,8 +367,40 @@ impl TaskService {
             .get(id, derived)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
+        let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
+
+        // Shared project-aware enum validation: raw patch strings are checked
+        // against this task's project configuration and canonicalized before
+        // any mutation is applied.
+        let parsed_status = match patch.status.as_deref() {
+            Some(raw) => Some(validation::parse_status(raw, &config)?),
+            None => None,
+        };
+        let parsed_priority = match patch.priority.as_deref() {
+            Some(raw) => Some(validation::parse_priority(raw, &config)?),
+            None => None,
+        };
+        let parsed_task_type = match patch.task_type.as_deref() {
+            Some(raw) => Some(validation::parse_task_type(raw, &config)?),
+            None => None,
+        };
+        let resolved_custom_fields = match patch.custom_fields.as_ref() {
+            Some(cf) => Some(validation::resolve_custom_fields(
+                cf,
+                &config,
+                Some(&existing.custom_fields),
+            )?),
+            None => None,
+        };
+
         if context.enforce_review_owner {
-            Self::enforce_review_owner_transition(storage, id, &existing, &patch)?;
+            Self::enforce_review_owner_transition(
+                storage,
+                id,
+                &existing,
+                parsed_status.as_ref(),
+                patch.assignee.as_deref(),
+            )?;
         }
 
         let current_job_can_mutate = Self::current_job_matches_ticket(id);
@@ -353,7 +433,7 @@ impl TaskService {
                     )));
                 }
             }
-            if let Some(next_status) = patch.status.as_ref()
+            if let Some(next_status) = parsed_status.as_ref()
                 && &existing.status != next_status
             {
                 return Err(LoTaRError::ValidationError(format!(
@@ -363,7 +443,6 @@ impl TaskService {
             }
         }
         let mut t = existing.clone();
-        let mut config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
         let mut changes: Vec<TaskChange> = Vec::new();
         let mut record_change = |field: &str, old: Option<String>, new: Option<String>| {
             if old != new {
@@ -376,13 +455,18 @@ impl TaskService {
         };
 
         if let Some(v) = patch.title {
+            if v.trim().is_empty() {
+                return Err(LoTaRError::ValidationError(
+                    "Title cannot be empty.".to_string(),
+                ));
+            }
             let previous = t.title.clone();
             if previous != v {
                 record_change("title", Some(previous), Some(v.clone()));
                 t.title = v;
             }
         }
-        if let Some(v) = patch.status {
+        if let Some(v) = parsed_status {
             let old_status = t.status.clone();
             let new_status = v;
             if old_status != new_status {
@@ -406,14 +490,14 @@ impl TaskService {
                 t.assignee = Some(me);
             }
         }
-        if let Some(v) = patch.priority {
+        if let Some(v) = parsed_priority {
             let previous = t.priority.clone();
             if previous != v {
                 record_change("priority", Some(previous.to_string()), Some(v.to_string()));
                 t.priority = v;
             }
         }
-        if let Some(v) = patch.task_type {
+        if let Some(v) = parsed_task_type {
             let previous = t.task_type.clone();
             if previous != v {
                 record_change("task_type", Some(previous.to_string()), Some(v.to_string()));
@@ -455,7 +539,12 @@ impl TaskService {
             }
         }
         if let Some(v) = patch.due_date {
-            let new_value = Some(v.clone());
+            let trimmed = v.trim();
+            let new_value = if trimmed.is_empty() {
+                None
+            } else {
+                Some(v.clone())
+            };
             let previous = t.due_date.clone();
             if previous != new_value {
                 record_change("due_date", previous, new_value.clone());
@@ -478,13 +567,30 @@ impl TaskService {
             }
         }
         if let Some(v) = patch.description {
-            let new_value = Some(v.clone());
+            let new_value = if v.is_empty() { None } else { Some(v.clone()) };
             let previous = t.description.clone();
             if previous != new_value {
                 record_change("description", previous, new_value.clone());
                 t.description = new_value;
             }
         }
+        if let Some(v) = patch.acceptance_criteria {
+            let new_criteria: Vec<String> = v
+                .into_iter()
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty())
+                .collect();
+            let previous = t.acceptance_criteria.clone();
+            if previous != new_criteria {
+                record_change(
+                    "acceptance_criteria",
+                    Some(previous.join("\n")),
+                    Some(new_criteria.join("\n")),
+                );
+                t.acceptance_criteria = new_criteria;
+            }
+        }
+        let explicit_tags = patch.tags.is_some();
         if let Some(v) = patch.tags {
             let new_tags = normalize_tags(v);
             let previous = t.tags.clone();
@@ -501,7 +607,7 @@ impl TaskService {
             record_change("relationships", old_json, new_json.clone());
             t.relationships = v;
         }
-        if let Some(v) = patch.custom_fields
+        if let Some(v) = resolved_custom_fields
             && t.custom_fields != v
         {
             let old_yaml = serde_yaml_ng::to_string(&t.custom_fields).ok();
@@ -537,7 +643,7 @@ impl TaskService {
             });
         }
 
-        Self::ensure_task_defaults(&mut t, &config);
+        Self::ensure_task_defaults(&mut t, &config, !explicit_tags);
         config =
             Self::maybe_auto_populate_members(storage.root_path.as_path(), derived, &t, config)?;
         Self::enforce_membership(&t, &config, derived)?;
@@ -584,17 +690,15 @@ impl TaskService {
         storage: &Storage,
         id: &str,
         existing: &Task,
-        patch: &TaskUpdate,
+        parsed_status: Option<&TaskStatus>,
+        patch_assignee: Option<&str>,
     ) -> LoTaRResult<()> {
         if !matches_review_state(&existing.status) {
             return Ok(());
         }
 
-        let status_changed = patch
-            .status
-            .as_ref()
-            .is_some_and(|next| next != &existing.status);
-        let assignee_changed = patch.assignee.as_ref().is_some_and(|next| {
+        let status_changed = parsed_status.is_some_and(|next| next != &existing.status);
+        let assignee_changed = patch_assignee.is_some_and(|next| {
             let trimmed = next.trim();
             let next_value = if trimmed.is_empty() {
                 None
@@ -694,7 +798,7 @@ impl TaskService {
                             &project_prefix,
                         )
                     });
-                Self::ensure_task_defaults(&mut t, config);
+                Self::ensure_task_defaults(&mut t, config, false);
                 (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup)))
             })
             .collect();
@@ -747,6 +851,7 @@ impl TaskService {
             relationships: task.relationships,
             comments: task.comments,
             references: task.references,
+            acceptance_criteria: task.acceptance_criteria,
             sprints,
             sprint_order,
             history: task.history,
@@ -798,6 +903,18 @@ impl TaskService {
     pub(crate) fn normalize_sprint_ids(ids: &[u32]) -> Vec<u32> {
         let normalized: BTreeSet<u32> = ids.iter().copied().filter(|id| *id > 0).collect();
         normalized.into_iter().collect()
+    }
+
+    fn ensure_sprints_exist(storage: &Storage, desired: &[u32]) -> LoTaRResult<()> {
+        if desired.is_empty() {
+            return Ok(());
+        }
+        let records = SprintService::list(storage)?;
+        let existing: BTreeSet<u32> = records.iter().map(|record| record.id).collect();
+        if let Some(missing) = desired.iter().copied().find(|id| !existing.contains(id)) {
+            return Err(LoTaRError::SprintNotFound(missing));
+        }
+        Ok(())
     }
 
     fn maybe_auto_populate_members(
@@ -949,7 +1066,7 @@ impl TaskService {
             })
     }
 
-    fn ensure_task_defaults(task: &mut Task, config: &ResolvedConfig) {
+    fn ensure_task_defaults(task: &mut Task, config: &ResolvedConfig, apply_default_tags: bool) {
         if task.status.is_empty()
             && let Some(default_status) = config.effective_default_status()
         {
@@ -968,7 +1085,9 @@ impl TaskService {
             default_type.ensure_leading_uppercase();
             task.task_type = default_type;
         }
-        if task.tags.is_empty() && !config.default_tags.is_empty() {
+        // An explicit tags patch (including a clear) must not resurrect
+        // configured default tags; only implicit emptiness does.
+        if apply_default_tags && task.tags.is_empty() && !config.default_tags.is_empty() {
             task.tags = config.default_tags.clone();
         }
         // Normalize legacy @-prefixed member values for display consistency.

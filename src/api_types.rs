@@ -41,6 +41,8 @@ pub struct TaskDTO {
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub references: Vec<crate::types::ReferenceEntry>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub acceptance_criteria: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sprints: Vec<u32>,
     #[serde(
         skip_serializing_if = "crate::api_types::btreemap_u32_is_empty",
@@ -73,41 +75,74 @@ where
     Ok(Some(inner))
 }
 
+/// Creation payload shared by REST, MCP, and UI clients.
+///
+/// Enum values (`status`, `priority`, `task_type`) are raw strings validated
+/// and canonicalized by the service against the target project's resolved
+/// configuration, so callers must not pre-validate against global config.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskCreate {
     pub title: String,
     pub project: Option<String>,
-    pub priority: Option<crate::types::Priority>,
-    pub task_type: Option<crate::types::TaskType>,
+    /// Initial status; validated against the target project's config. When
+    /// omitted, branch inference or the project default applies atomically.
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub task_type: Option<String>,
     pub reporter: Option<String>,
     pub assignee: Option<String>,
     pub due_date: Option<String>,
     pub effort: Option<String>,
     pub description: Option<String>,
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub acceptance_criteria: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub relationships: Option<crate::types::TaskRelationships>,
+    /// Object form wins per key over legacy `fields` key/value payloads.
     pub custom_fields: Option<crate::types::CustomFields>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub sprints: Vec<u32>,
 }
 
+/// Patch payload shared by REST, MCP, and UI clients.
+///
+/// Field presence is tri-state on the wire: omitted = no-op, `null` = clear,
+/// value = set. Internally `None` means no-op and the empty sentinel (empty
+/// string for scalars, empty collection/map for lists) means clear, matching
+/// the historical empty-clears behavior. Transport adapters translate `null`
+/// to the empty sentinel. `title`, `status`, `priority`, and `task_type`
+/// cannot be cleared: `null` is treated as omitted. Enum strings are
+/// validated and canonicalized by the service against the task's project
+/// configuration. `tags`, `acceptance_criteria`, `relationships`,
+/// `custom_fields`, and `sprints` replace the whole value when set.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskUpdate {
     pub title: Option<String>,
-    pub status: Option<crate::types::TaskStatus>,
-    pub priority: Option<crate::types::Priority>,
-    pub task_type: Option<crate::types::TaskType>,
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub task_type: Option<String>,
+    /// Empty string clears.
     pub reporter: Option<String>,
+    /// Empty string clears.
     pub assignee: Option<String>,
+    /// Empty string clears.
     pub due_date: Option<String>,
+    /// Empty string clears.
     pub effort: Option<String>,
+    /// Empty string clears.
     pub description: Option<String>,
-    pub tags: Option<Vec<String>>, // replace whole list
+    /// Replace whole list; empty list clears.
+    pub tags: Option<Vec<String>>,
+    /// Replace whole list; empty list clears.
+    pub acceptance_criteria: Option<Vec<String>>,
+    /// Replace whole map; empty map clears.
     pub relationships: Option<crate::types::TaskRelationships>,
+    /// Replace whole map; empty map clears all fields.
     pub custom_fields: Option<crate::types::CustomFields>,
+    /// Replace sprint memberships; empty list clears them.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub sprints: Option<Vec<u32>>,
 }
