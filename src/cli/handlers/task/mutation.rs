@@ -19,17 +19,27 @@ pub fn load_task(
         .map_err(|e| format!("Invalid task ID: {}", e))?;
 
     let mut full_id = ctx.resolve_full_task_id(raw_id, project)?;
-    let mut project_prefix = full_id.split('-').next().unwrap_or("").to_string();
+    let mut project_prefix = crate::storage::TaskId::parse(&full_id)
+        .map(|parsed| parsed.project)
+        .unwrap_or_default();
 
     let mut task_opt = ctx.storage.get(&full_id, &project_prefix);
 
-    if task_opt.is_none()
-        && raw_id.chars().all(|c| c.is_ascii_digit())
-        && let Some((actual_id, task)) = ctx.storage.find_task_by_numeric_id(raw_id)
-    {
-        project_prefix = actual_id.split('-').next().unwrap_or("").to_string();
-        full_id = actual_id;
-        task_opt = Some(task);
+    if task_opt.is_none() && raw_id.chars().all(|c| c.is_ascii_digit()) {
+        // Clear fail-closed diagnostics for numeric lookups: ambiguous
+        // numbers (stored by more than one project/root) are refused.
+        match ctx.storage.resolve_numeric_id(raw_id) {
+            Ok((actual_id, task)) => {
+                project_prefix = crate::storage::TaskId::parse(&actual_id)
+                    .map(|parsed| parsed.project)
+                    .unwrap_or_default();
+                full_id = actual_id;
+                task_opt = Some(task);
+            }
+            Err(err) => {
+                return Err(format!("Task '{}' not found: {}", raw_id, err));
+            }
+        }
     }
 
     let task = task_opt.ok_or_else(|| format!("Task '{}' not found", raw_id))?;

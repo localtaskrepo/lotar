@@ -549,12 +549,15 @@ fn handle_sse_connection(mut stream: TcpStream, query: &HashMap<String, String>)
                                     .map(|name| name == pf)
                                     .unwrap_or(false)
                             }
-                            // Task events include { id: "PREFIX-N" }
+                            // Task events include { id: "PREFIX-N" }; compare
+                            // against the canonical ID prefix (final numeric
+                            // suffix split) so hyphenated prefixes match.
                             _ => evt
                                 .data
                                 .get("id")
                                 .and_then(|v| v.as_str())
-                                .map(|id_str| id_str.split('-').next().unwrap_or("") == pf)
+                                .and_then(|id_str| crate::storage::TaskId::parse(id_str).ok())
+                                .map(|parsed| parsed.project == *pf)
                                 .unwrap_or(false),
                         };
                         if !matches_project {

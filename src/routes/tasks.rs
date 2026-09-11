@@ -1,5 +1,9 @@
 use super::*;
 
+#[cfg(test)]
+#[path = "../../tests/common/dev56_upload_coordination_cases.rs"]
+mod dev56_upload_coordination_cases;
+
 pub(super) fn register(api_server: &mut ApiServer) {
     api_server.register_handler("POST", "/api/tasks/add", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
@@ -284,17 +288,16 @@ pub(super) fn register(api_server: &mut ApiServer) {
         Err(e) => return bad_request(format!("Failed to load config: {}", e)),
     };
 
-    // Apply per-project overrides (if task id contains a project prefix)
-    let config = if let Some(dash_pos) = payload.id.find('-') {
-        let prefix = payload.id[..dash_pos].trim();
-        if prefix.is_empty() {
-            base_config
-        } else {
-            resolution::get_project_config(&base_config, prefix, resolver.path.as_path())
-                .unwrap_or(base_config)
-        }
-    } else {
-        base_config
+    // Apply per-project overrides using the canonical ID prefix (final
+    // numeric suffix split, so hyphenated prefixes like ABC-OPS resolve fully)
+    let config = match crate::storage::TaskId::parse(payload.id.trim()) {
+        Ok(parsed) => resolution::get_project_config(
+            &base_config,
+            &parsed.project,
+            resolver.path.as_path(),
+        )
+        .unwrap_or(base_config),
+        Err(_) => base_config,
     };
 
     // Enforce configured upload limit before decoding base64.
@@ -342,21 +345,91 @@ pub(super) fn register(api_server: &mut ApiServer) {
         Err(e) => return bad_request(e.to_string()),
     };
 
-    let stored = match AttachmentService::store_bytes(&root, &payload.filename, &bytes) {
-        Ok(name) => name,
-        Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e.to_string()}})),
+    // Identity and mutation access resolve BEFORE any file bytes are written:
+    // the ID must be canonical, exist exactly once, and be mutable from this
+    // workspace (uploads attach a reference, which is a mutation). Nested,
+    // unknown, or ambiguous targets must not leave orphaned upload files.
+    let task_id = payload.id.trim();
+    if let Err(err) = crate::storage::TaskId::parse(task_id) {
+        return bad_request(format!("Invalid task ID: {err}"));
+    }
+    {
+        let storage = crate::storage::manager::Storage::new(&resolver.path);
+        let refusal = match storage.resolve_task_location(task_id) {
+            Ok(location) if !location.is_in_root(&resolver.path) => Some(format!(
+                "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                location.full_id(),
+                location.root.display(),
+                resolver.path.display()
+            )),
+            Ok(_) => None,
+            Err(crate::storage::identity::TaskLookupError::NotFound(_)) => {
+                Some(format!("Task '{}' not found", task_id))
+            }
+            Err(err) => Some(err.to_string()),
+        };
+        drop(storage);
+        if let Some(message) = refusal {
+            if message.contains("not found") {
+                return not_found(message);
+            }
+            return bad_request(message);
+        }
+    }
+
+    // Serialize blob create/dedup + attach + failure cleanup for this
+    // attachments store ACROSS PROCESSES: a concurrent upload of identical
+    // content must never dedupe-and-attach a blob that this request might
+    // still roll back. Lock order is store-lock -> task-lock (see
+    // lock_store docs); contention fails closed after the standard bound.
+    let _store_guard = match AttachmentService::lock_store(&root) {
+        Ok(guard) => guard,
+        Err(e) => return bad_request(e.to_string()),
     };
 
+    let (stored, created) = match AttachmentService::store_bytes(&root, &payload.filename, &bytes)
+    {
+        Ok(result) => result,
+        Err(e) => {
+            return internal(
+                json!({"error": {"code": "INTERNAL", "message": e.to_string()}}),
+            )
+        }
+    };
+
+    #[cfg(test)]
+    crate::services::attachment_service::upload_fault::park_after_store_if_armed();
+
     let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-    match AttachmentService::attach_file_reference(&mut storage, &payload.id, &stored) {
+    #[cfg(test)]
+    let attach_outcome =
+        if crate::services::attachment_service::upload_fault::take_fail_next_attach() {
+            Err(LoTaRError::ValidationError(
+                "injected attach failure".to_string(),
+            ))
+        } else {
+            AttachmentService::attach_file_reference(&mut storage, task_id, &stored)
+        };
+    #[cfg(not(test))]
+    let attach_outcome = AttachmentService::attach_file_reference(&mut storage, task_id, &stored);
+    drop(storage);
+    match attach_outcome {
         Ok((task, attached)) => ok_json(
             200,
             json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached, task }}),
         ),
-        Err(e) => match e {
-            LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-            _ => bad_request(e.to_string()),
-        },
+        Err(e) => {
+            // The precheck passed, so a failure here is a write/lock error:
+            // remove the file this request created so no orphan remains.
+            // Deduped pre-existing content (created == false) is preserved.
+            if created {
+                AttachmentService::remove_created_file(&root, &stored);
+            }
+            match e {
+                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                _ => bad_request(e.to_string()),
+            }
+        }
     }
 });
 
@@ -390,19 +463,27 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(e) => return bad_request(format!("Failed to load config: {}", e)),
         };
 
-        let config = if let Some(dash_pos) = payload.id.find('-') {
-            let prefix = payload.id[..dash_pos].trim();
-            if prefix.is_empty() {
-                base_config
-            } else {
-                resolution::get_project_config(&base_config, prefix, resolver.path.as_path())
-                    .unwrap_or(base_config)
-            }
-        } else {
-            base_config
+        let config = match crate::storage::TaskId::parse(payload.id.trim()) {
+            Ok(parsed) => resolution::get_project_config(
+                &base_config,
+                &parsed.project,
+                resolver.path.as_path(),
+            )
+            .unwrap_or(base_config),
+            Err(_) => base_config,
         };
         let root = match AttachmentService::resolve_attachments_root(resolver.path.as_path(), &config) {
             Ok(p) => p,
+            Err(e) => return bad_request(e.to_string()),
+        };
+
+        // Hold the cross-process store lock across detach + reference
+        // re-check + blob deletion (store-lock -> task-lock order, matching
+        // the upload path) so a pending upload can never attach a blob this
+        // request is about to delete, and this delete can never race another
+        // remover's re-check.
+        let _store_guard = match AttachmentService::lock_store(&root) {
+            Ok(guard) => guard,
             Err(e) => return bad_request(e.to_string()),
         };
 
@@ -821,15 +902,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let dto = match TaskService::add_comment(&mut storage, &id, &text) {
             Ok(dto) => dto,
-            Err(err) => {
-                let msg = err.to_string();
-                if msg.contains("not found") {
+            Err(err) => match err {
+                LoTaRError::TaskNotFound(_) => {
                     return not_found(format!("Task '{}' not found", id));
                 }
-                return internal(json!({
-                    "error": { "code": "INTERNAL", "message": msg }
-                }));
-            }
+                // Malformed IDs (canonical parse failures) fail closed as 400.
+                _ => return bad_request(err.to_string()),
+            },
         };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_task_updated(&dto, actor.as_deref());
@@ -863,18 +942,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
         let dto = match TaskService::update_comment(&mut storage, &id, index, trimmed) {
             Ok(dto) => dto,
-            Err(err) => {
-                let msg = err.to_string();
-                if msg.contains("not found") {
+            Err(err) => match err {
+                LoTaRError::TaskNotFound(_) => {
                     return not_found(format!("Task '{}' not found", id));
                 }
-                if msg.contains("Invalid comment index") {
-                    return bad_request("Invalid comment index".into());
-                }
-                return internal(json!({
-                    "error": { "code": "INTERNAL", "message": msg }
-                }));
-            }
+                // Malformed IDs (canonical parse failures) fail closed as 400.
+                _ => return bad_request(err.to_string()),
+            },
         };
         let actor = crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
         crate::api_events::emit_task_updated(&dto, actor.as_deref());
@@ -901,17 +975,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ) {
             Ok(value) => value,
             Err(err) => {
-                return internal(json!({
-                    "error": {
-                        "code": "INTERNAL",
-                        "message": err.to_string(),
-                    }
-                }));
+                // Invalid IDs, project mismatches, ambiguity, and cross-root
+                // refusals are client errors, not internal failures.
+                return match err {
+                    LoTaRError::TaskNotFound(_) => not_found(err.to_string()),
+                    _ => bad_request(err.to_string()),
+                };
             }
         };
         if deleted {
+            // Emit the CANONICAL id: a padded request alias (TP-001) must not
+            // leak into UI event streams as a stale identity.
+            let canonical_id = crate::storage::TaskId::parse(del.id.trim())
+                .map(|parsed| parsed.canonical())
+                .unwrap_or_else(|_| del.id.clone());
             let actor = crate::utils::identity::resolve_current_user(None);
-            crate::api_events::emit_task_deleted(&del.id, actor.as_deref());
+            crate::api_events::emit_task_deleted(&canonical_id, actor.as_deref());
         }
         ok_json(200, json!({"data": {"deleted": deleted}}))
     });
@@ -938,17 +1017,14 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(p) => p.to_path_buf(),
             Err(_) => return bad_request("Tasks directory not inside repository".into()),
         };
-        // Derive project and numeric from ID
-        let project = match crate::storage::operations::StorageOperations::get_project_for_task(&id)
-        {
-            Some(p) => p,
-            None => return bad_request("Invalid task id".into()),
+        // Derive project and numeric from the canonical ID parse
+        let parsed = match crate::storage::TaskId::parse(&id) {
+            Ok(parsed) => parsed,
+            Err(_) => return bad_request("Invalid task id".into()),
         };
-        let numeric: u64 = match id.split('-').nth(1).and_then(|s| s.parse().ok()) {
-            Some(n) => n,
-            None => return bad_request("Invalid task id".into()),
-        };
-        let file_rel = tasks_rel.join(&project).join(format!("{}.yml", numeric));
+        let file_rel = tasks_rel
+            .join(&parsed.project)
+            .join(format!("{}.yml", parsed.number));
         let mut commits = match crate::services::audit_service::AuditService::list_commits_for_file(
             &repo_root, &file_rel,
         ) {
@@ -990,16 +1066,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok(p) => p.to_path_buf(),
             Err(_) => return bad_request("Tasks directory not inside repository".into()),
         };
-        let project = match crate::storage::operations::StorageOperations::get_project_for_task(&id)
-        {
-            Some(p) => p,
-            None => return bad_request("Invalid task id".into()),
+        let parsed = match crate::storage::TaskId::parse(&id) {
+            Ok(parsed) => parsed,
+            Err(_) => return bad_request("Invalid task id".into()),
         };
-        let numeric: u64 = match id.split('-').nth(1).and_then(|s| s.parse().ok()) {
-            Some(n) => n,
-            None => return bad_request("Invalid task id".into()),
-        };
-        let file_rel = tasks_rel.join(&project).join(format!("{}.yml", numeric));
+        let file_rel = tasks_rel
+            .join(&parsed.project)
+            .join(format!("{}.yml", parsed.number));
         match crate::services::audit_service::AuditService::show_file_diff(
             &repo_root, &commit, &file_rel,
         ) {

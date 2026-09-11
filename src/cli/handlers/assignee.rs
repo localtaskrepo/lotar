@@ -189,7 +189,8 @@ fn current_agent_job_matches_ticket(ticket_id: &str) -> bool {
         return false;
     };
 
-    current_ticket.trim() == ticket_id && !job_id.trim().is_empty()
+    crate::storage::identity::aliases_match(current_ticket.trim(), ticket_id)
+        && !job_id.trim().is_empty()
 }
 
 fn render_current_assignee(

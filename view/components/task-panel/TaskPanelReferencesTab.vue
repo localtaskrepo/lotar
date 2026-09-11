@@ -355,6 +355,7 @@ import UiButton from '../UiButton.vue'
 import UiCard from '../UiCard.vue'
 import UiInput from '../UiInput.vue'
 import UiLoader from '../UiLoader.vue'
+import { projectPrefixOfTaskId } from '../../utils/text'
 import { showToast } from '../toast'
 
 type ReferenceEntry = {
@@ -431,14 +432,6 @@ const codeFileDatalistId = 'task-panel-code-file-suggestions'
 let suggestFilesTimer: number | null = null
 let previewTimer: number | null = null
 
-function projectPrefixFromTaskId(id: string): string | null {
-  const trimmed = id.trim()
-  if (!trimmed) return null
-  const dash = trimmed.indexOf('-')
-  if (dash <= 0) return null
-  return trimmed.slice(0, dash).toUpperCase()
-}
-
 async function loadConfigInspect(prefix: string | null) {
   if (!prefix) {
     configInspect.value = null
@@ -455,7 +448,7 @@ async function loadConfigInspect(prefix: string | null) {
 }
 
 watch(taskId, (value) => {
-  const prefix = projectPrefixFromTaskId(value)
+  const prefix = projectPrefixOfTaskId(value)
   loadConfigInspect(prefix)
 }, { immediate: true })
 
@@ -931,8 +924,7 @@ function attachmentUrl(relPath: string): string {
   if (!stored) return '/api/attachments/get?path='
 
   const taskId = (props.task?.id || '').trim()
-  const dashPos = taskId.indexOf('-')
-  const project = dashPos > 0 ? taskId.slice(0, dashPos) : ''
+  const project = projectPrefixOfTaskId(taskId) || ''
 
   const hash = extractAttachmentHash(stored)
   const display = attachmentDisplayName(stored)

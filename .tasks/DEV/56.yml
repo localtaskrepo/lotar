@@ -1,13 +1,137 @@
 title: Canonicalize task IDs and locations across all storage roots and interfaces
-status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-57, DEV-61]
-  related: [DEV-4]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.463489+00:00
+modified: 2026-09-11T14:20:45.988284+00:00
+relationships:
+  blocks:
+  - DEV-57
+  - DEV-61
+  related:
+  - DEV-4
+  parent: DEV-53
+comments:
+- date: 2026-09-11T09:05:46.761669+00:00
+  text: |-
+    Plan (backend scope; src/tests/docs only, no git, no UI):
+    1) New src/storage/identity.rs: canonical TaskId (final numeric suffix via rsplit, prefix reuses is_valid_project_prefix grammar: Unicode alnum start, alnum/_/- body, <=64, exact case, leading zeros deliberate padded aliases) + TaskLocation (actual root/project/number/file). Fail closed: empty, no dash, malformed/non-digit suffix, +digit, traversal, u64 overflow.
+    2) Storage: operations get_file_path_for_id/get_project_for_task canonical parse; get resolves primary+sibling candidate roots (explicit project isolation preserved; duplicate full ID across roots -> fail closed, no arbitrary pick); edit/delete resolve location and clearly refuse cross-root mutation before side effects (DEV-55 txn stays root-scoped); manager numeric lookup reads each candidate root it scans (fixes scans-roots-reads-primary), single match only, ambiguity fail-closed with diagnostics via new resolver; search unfiltered branch scans candidate roots like filtered branch.
+    3) Call-site sweep to canonical parse: task_service, reference/attachment/automation/sprint(+assignment)/scan/agent_context (drop to_uppercase folding)/agent_job, routes/tasks (attachments config prefix, history/commit_diff), web_server SSE project filter, mcp tasks handlers, cli handlers (mod/add-render, task mutation/search, stats effort+distribution, custom_fields project value, project.rs extract_project_from_task_id reuses grammar instead of uppercase-only), sync resolve_project_prefix + DEV-53 pending guard (canonical parse, primary-root locked-workspace containment preserved via single-root read), canonical_sync_task_id keeps primary-root guard.
+    4) Scanner minimal fix: default ticket key + [ticket=] regexes capture full hyphenated uppercase keys (ABC-OPS-12, not OPS-12) consistent with canonical parse.
+    5) Tests: exhaustive parser unit tests first; tests/dev56_task_identity_test.rs at public boundaries (hyphenated CRUD/comment/status/sprint/ref/attachment, nested-root markers, ambiguous numeric/full-ID fail closed, malformed IDs, padded aliases); sync_service unit tests for canonical_sync_task_id hyphenated/padded; keep DEV-55 fault tests green. TMPDIR isolated under owned scratch per DEV90.
+    6) Docs: ID grammar (canonical form, exact case, no folding, padded aliases), multi-root lookup/mutation refusal semantics, scan default pattern note.
+    Not in scope: UI, REST DTO shape changes (string IDs unchanged), cross-root transactional writes (explicit refusal instead), remote Jira/GitHub reference parsing (stays separate).
+- date: 2026-09-11T09:50:51.673752+00:00
+  text: |-
+    Checkpoint: implementation complete, verification green; ticket stays InProgress (full gates/Done deferred).
+
+    Rust semantics:
+    - New src/storage/identity.rs: TaskId::parse = rsplit_once('-') final numeric suffix + prefix via is_valid_project_prefix (Unicode/digit/lower-case, exact case, <=64). Padded aliases TP-001==TP-1; empty/no-dash/non-digit/+digit/traversal/u64-overflow fail closed. TaskLocation{root,id,file}; resolve/resolve_numeric return single location or NotFound/Ambiguous(listing both files).
+    - operations.rs: get_file_path_for_id/get_project_for_task canonical; get = parse + explicit-project isolation + candidate-roots locate, ambiguous -> None; new get_in_root for locked single-root reads; edit/delete refuse cross-root or ambiguous before locks/side effects.
+    - manager.rs: resolve_numeric_id reads each candidate root it scans (fixes scans-roots-reads-primary); find_task_by_numeric_id delegates (None on ambiguity, never arbitrary pick).
+    - search.rs: unfiltered branch scans candidate roots like filtered branch.
+    - task_service: get uses actual-root config + canonical DTO id; update/add_comment/update_comment/delete derive canonical prefix; update refuses cross-root before txn (DEV-55 root scope intact); list resolves per-project config root; load_sprint_lookup merges sibling roots (primary wins).
+    - sync: pending guard + resolve_project_prefix + push identity use canonical parse; canonical_sync_task_id keeps primary-root lock via get_in_root.
+    - scanner: default ticket regexes capture full hyphenated uppercase keys (ABC-OPS-12, ABC-OPS-12-3), no more OPS-12 miscapture; [ticket=] same.
+    - agent_context_service drops to_uppercase folding (exact-case project dir).
+
+    Wire semantics: DTOs unchanged (string ids, no root field). REST comment/comment-update now 400 on malformed ids (was 500 fallback), 404 on TaskNotFound; openapi.json documents 400/404 for those two endpoints (no other contract change). Numeric resolution ambiguous -> explicit 'matches multiple storage locations' error at CLI/REST/sprint boundaries. Cross-root mutation -> 'cannot be modified from <root>; run the command inside that workspace'.
+
+    Files: src/storage/{identity(new),mod,operations,manager,search}.rs; services task/reference/attachment/automation/sprint/scan/agent_context/agent_job/sync/sprint_assignment; routes/tasks; web_server; mcp/server/handlers/tasks; cli handlers mod/task{mutation,search}/stats{effort,distribution}/scan_handler; cli/project.rs; utils/custom_fields; scanner.rs. Tests: tests/dev56_task_identity_test.rs (new, 9), tests/common/sync_retry_cases.rs + tests/cli_project_resolver_unit_test.rs updated to new contract, sync_service +5 unit tests, scanner hyphen test.
+
+    Verification (TMPDIR isolated under owned scratch per DEV90): full cargo nextest 938 passed/6 skipped (git-gated skips usual); cargo fmt --all --check OK; clippy --all-targets --all-features -D warnings clean; DEV-55 suites green.
+
+    Behavior changes to review: (1) lower-case/Unicode/digit prefixes now valid IDs (was uppercase-ASCII-only in cli extract); (2) agent context files no longer folder-folded to uppercase; (3) ambiguous numeric/duplicate-id lookups fail closed (was arbitrary first match); (4) sync legacy lenient aliases (+digit/trailing) now invalid ids — no-retry guarantee preserved, padded aliases kept.
+
+    Limits/concerns: cross-root mutation deliberately refused, not implemented (nested-root tasks read-only from primary workspace); list enumerates duplicate copies without dedup; concurrent_transactions_serialize test is load-sensitive under dense ad-hoc filters (passes standalone + full suite; transaction.rs untouched — pre-existing sensitivity); one pre-existing agent-suite flake recovered via configured retries; openapi.json rewritten via json.dump (semantic change limited to the two comment endpoints; contract test passes); 6 git-gated tests skipped in sandbox. Full npm lint/test/smoke gates and Done intentionally not run per instruction.
+- date: 2026-09-11T10:44:05.059563+00:00
+  text: |-
+    Review-fix checkpoint (all 6 review issues addressed; gates still deferred, ticket InProgress):
+
+    1 Delete isolation: StorageOperations::delete now enforces the central guard — explicit project must equal TaskId prefix ('refusing to cross projects'), before refuse_cross_root and any lock/file operation. get/get_in_root already enforced it; edit derives project from the id. Regression test: TP-5+DEV-5 exist; delete DEV-5 w/ project=TP refused at storage, REST (400), and MCP (-32006) with BOTH files byte-unchanged; correct pairing still deletes exactly DEV-5.
+    2 Padded-alias canonicalization at mutation boundary: update_with_context resolves canonical id once (parsed.canonical()) and uses it for membership compares, staging, prepare_task_edit, DTOs, events/automation; add_comment/update_comment return canonical DTO ids and edit canonical ids. apply_memberships_to_records + sprint_assignment add/remove/index match canonically (entry_matches_task): padded legacy entries are the same member (no duplicate spellings added), removal drops every spelling, canonically-unchanged membership sets cause NO sprint rewrite. load_sprint_lookup/build_membership_index key canonically (unparseable ids stay verbatim), so get/list never miss padded legacy memberships. resolve_task_identifier returns parsed.canonical(). Regression: hand-written sprint file with 'TP-001' entry — canonical DTO sprints=[1]; padded no-op update leaves file byte-identical; canonical removal drops padded spelling; REST sprint add via TP-001 persists exactly one '- TP-1' entry; comment DTO id TP-1.
+    3 Upload ordering: /api/tasks/attachments/upload resolves TaskId::parse + storage.resolve_task_location (unique + in primary root) BEFORE store_bytes; not-found 404, cross-root/ambiguous/malformed 400, zero bytes written in each case. store_bytes now returns (name, created); on attach failure after the precheck the route removes ONLY the file this request created (deduped pre-existing content preserved via created=false). Regression: unknown/nested/ambiguous uploads leave @attachments empty; duplicate content uploads store once; read-only-project-dir attach failure (unix) cleans the orphan while keeping the pre-existing dedup file.
+    4 REST delete mapping: TaskNotFound->404, validation/mismatch/ambiguity/cross-root->400 (was blanket 500), consistent with update; openapi.json documents 400/404 for delete and upload; api-quick-reference (help+developers) note delete error semantics. Ok(false) idempotent delete stays 200 {deleted:false}.
+    5 Agent context: append_messages refuses cross-root tickets BEFORE any fs write ('cannot be written from'); load is actual-root-aware (falls back to the resolved location's root when the primary path is absent). Audit: agent_log_service paths derive from job_id under a workspace logs dir (not ticket-root-scoped task data) — no equivalent loophole; no change. Regression: nested NEST-3 append refused with no NEST dir/file created in primary and no context anywhere; context placed beside the nested task file loads from the primary workspace.
+    6 Doc ordering: identity.rs locate() doc corrected — candidate roots come in StorageLocator's sorted order with no primary-first priority (single match required); task-model docs carry no ordering claim.
+
+    Files this round: src/storage/operations.rs, src/services/{task_service,sprint_assignment,attachment_service,agent_context_service}.rs, src/routes/tasks.rs, src/storage/identity.rs (doc), docs/{openapi.json,help/task-model untouched-ordering,help+developers/api-quick-reference}.md; tests/dev56_task_identity_test.rs (+4 tests, 13 total in binary).
+
+    Verification (TMPDIR isolated under owned scratch per DEV90): full cargo nextest 942 passed/6 git-gated skipped; cargo fmt --all --check OK; clippy --all-targets --all-features -D warnings clean; retry-safety + openapi suites green.
+
+    Remaining limits: idempotent delete of a missing task still returns 200 deleted:false (unchanged contract); upload cleanup covers the created-file case only (pre-existing dedup content intentionally kept); sprint respelling of legacy padded entries happens only when a record is rewritten for a real membership change (no churn otherwise).
+- date: 2026-09-11T11:05:28.362911+00:00
+  text: |-
+    Final reviewer-fix checkpoint (3 issues; ticket stays InProgress until coordinator):
+
+    1 Canonical delete event: routes/tasks.rs delete now parses the request id and emits emit_task_deleted(canonical) — padded alias TP-001 can no longer leak a stale identity into SSE. Regression: dev56 integration test subscribes via api_events::subscribe() and asserts the task_deleted event carries TP-1 after a TP-001 delete (drains unrelated events from the shared registry).
+
+    2 Active-job carveout: update_with_context now checks has_active_job(&canonical) and current_job_matches_ticket(&canonical); the env/job compare goes through a pure ticket_alias_matches helper (both spellings must parse canonically and denote the same ticket; anything unparseable matches nothing, preserving fail-closed for unrelated callers). Unit tests: ticket_alias_tests cover padded/canonical matches and reject different/malformed values.
+
+    3 Upload cleanup race (A creates blob, attach fails; B dedups A's blob and attaches; A deletes B's reference): implemented bounded per-attachment-store coordination — AttachmentService::acquire_store_lock(root) returns a per-root mutex from a global registry; the upload handler holds it across store_bytes (dedup/create) + attach + failure cleanup, so a concurrent identical upload is serialized behind the blob's fate: after A's rollback B re-creates fresh (created=true) and attaches; after A's success B dedups a committed blob. Lock order is store-lock -> .task-lock only (store_bytes called solely by the upload handler under the store lock; attach/cleanup paths never take the store lock after the task lock), and hold time is bounded by attachments IO + the timeout-bounded task storage lock — no production timeout changes, no refcount backlog. Poison-recovered (guards mutual exclusion only). Callers audited: store_bytes only routes/tasks.rs; attach_file_reference callers (routes upload under store lock; MCP/CLI/sync attach existing paths without blob creation or deletion and cannot participate in the rollback window). Deterministic regression: tests/common/dev56_upload_coordination_cases.rs included into routes/tasks.rs cfg(test) (DEV-55 #[path] pattern) — A parks between store and attach via thread-local upload_fault hooks (fail_next_attach + arm_park_after_store channels, compiled out of production), B starts while A is parked holding the store lock, then A released -> fails -> cleans up; asserts A!=200, B=200, exactly one blob (no orphan), B's task keeps a live file reference, A's task has none, and B's referenced blob exists on disk. Env isolated via EnvVarGuard set-before-spawn/restored-after-join.
+
+    Files: src/services/attachment_service.rs (store lock registry + upload_fault cfg(test)), src/routes/tasks.rs (guard + fault hook calls + canonical delete emit + cases include), src/services/task_service.rs (carveout canonical + ticket_alias_matches + tests), tests/common/dev56_upload_coordination_cases.rs (new), tests/dev56_task_identity_test.rs (+1).
+
+    Verification (TMPDIR isolated): full cargo nextest 946 passed/6 git-gated skipped; cargo fmt --all --check OK; clippy --all-targets --all-features -D warnings clean. Coordinator-reported gate flakiness (agent async/worker-drain/txn-2s-lock timing) not reproducible here and NOT papered over: no lock timeouts or retries changed; dev56/coordination/retry-safety suites green. No Done until coordinator sign-off.
+- date: 2026-09-11T13:51:01.002849+00:00
+  text: |-
+    Final blocker-fix checkpoint (agent job/queue canonicalization + cross-process attachment store lock):
+
+    A Agent job/queue padded registration:
+    - start_job_with_tasks_dir_mode canonicalizes ONCE at the creation boundary (parsed.canonical()): registry active_by_ticket key, AgentJobRecord.ticket_id, pending queue entry, and the spawned runner env all share one identity. Padded start (TP-001) now registers/locks canonical TP-1; duplicate alias starts refused ('already has an active job').
+    - Root safety BEFORE any spawn/log/registry side effect: identity::resolve refuses cross-root tickets ('cannot be managed from ...') and ambiguous identities; no registration occurs on refusal.
+    - agent_queue_service enqueue canonicalizes and dedupes alias-aware against legacy padded persisted entries; dequeued legacy entries canonicalize at start. automation count_terminal_jobs_for_ticket compares via identity::aliases_match. CLI status/assignee env carveouts + running_job_for_ticket use alias-aware matching (running_job_matches); task_service ticket_alias_matches delegates to the shared storage::identity::aliases_match predicate.
+    - Tests (agent_job_service unit, queue-mode config max_parallel_jobs=0 so no runner ever spawns): padded_start_registers_canonical_and_locks_canonical_updates (record canonical, has_active_job canonical, duplicate alias refused, canonical AND padded status updates locked with 'active agent job'), job_start_refuses_cross_root_ticket_before_registration (no registration side effect), running_job_matches_accepts_padded_spellings; queue tests enqueue_canonicalizes_padded_aliases + enqueue_deduplicates_padded_alias_against_legacy_entries.
+
+    B Cross-process attachment store lock:
+    - Replaced the process-local mutex with AttachmentService::lock_store: fs2 advisory lock via the SAME storage primitive (acquire_storage_lock, '.attachments-store.lock' in the store dir, 2s bounded contention retry, fail closed, lock file never removed; store dir created if absent so the canonical lock target always exists). No production time limits changed.
+    - Upload holds it across store_bytes/attach/cleanup; REST remove holds it across detach/refcheck/blob-delete; MCP file-reference batches and CLI file add/remove acquire it via lock_store_for_repo_path when the value resolves INSIDE the store (outside paths stay unlocked; unresolvable values pass through and fail in the service). Lock order is store->task everywhere; no function re-acquires the store lock (upload/remove attach+detach internals are lock-free), so no reentrancy or inversion; sync's attach paths write platform/report references outside the store and are unaffected (semantics preserved).
+    - Deterministic regressions (dev56_upload_coordination_cases, thread-local fault hooks, no subprocess): concurrent_failed_upload_cannot_break_a_deduping_peer (A parked mid-critical-section holding the lock, B serialized behind A's rollback; B=200, one blob, no dangling refs); upload_fails_closed_while_another_instance_holds_the_store_lock (independently held fs2 handle = other process: upload fails closed within the bound, zero bytes, succeeds after release); upload_rollback_and_remove_reclaim_serialize_on_the_store_lock (failing upload parked; concurrent remove of an unrelated committed attachment waits then completes; no orphan, no dangling ref, both blobs correctly gone).
+    - Docs: task-model.md (help+developers) document the store lock, covered cooperating surfaces, and explicitly-unsupported non-cooperating external writers.
+
+    Files: src/services/{agent_job_service,agent_queue_service,automation_service,task_service,attachment_service,reference_service}.rs, src/routes/tasks.rs, src/mcp/server/handlers/tasks.rs, src/cli/handlers/{agent,status,assignee,task/reference}.rs, src/storage/identity.rs, tests/common/dev56_upload_coordination_cases.rs, tests/dev56_task_identity_test.rs, docs/help+developers/task-model.md.
+
+    Verification (TMPDIR isolated): full cargo nextest 953 passed/6 git-gated skipped (1 known leaky sync/MCP thread flag); agent+MCP+dev56 focused suites green; cargo fmt --all --check OK; clippy --all-targets --all-features -D warnings clean. Ticket stays InProgress pending coordinator; no UI/view/smoke touched.
+- date: 2026-09-11T14:17:33.638149+00:00
+  text: |-
+    Final missing-caller fix + agent-gate results:
+
+    Missing participant fixed: MCP SINGLE-task reference handler (handle_task_reference_mutation, src/mcp/server/handlers/tasks.rs ~1387-1413 'file' add/remove arms) now acquires the same cross-process store guard via AttachmentService::lock_store_for_repo_path before attach/detach for managed-store paths (kind==file, value resolving inside the store; repo-root missing fails closed as before; other kinds/outside paths stay unlocked). Re-audited every direct attach_file_reference/detach_file_reference caller: routes upload (route-held guard), routes remove (route-held guard), MCP batch handler (guarded), MCP single handler (NOW guarded), CLI task/reference add+remove (guarded), reference_service unit tests (test-only, non-store src paths). No remaining unguarded single handlers.
+
+    Regression (tests/dev56_task_identity_test.rs mcp_single_file_reference_blocks_on_held_store_lock): seeds a committed blob, independently holds the fs2 store lock, then MCP single task_reference_add file-kind must fail closed with lock diagnostics and NO task changes; after release the same call attaches. In THIS sandbox .git marker creation is denied (documented sandbox_blocks_git restriction), so the test executes its always-runnable arm (file reference without repo root fails closed, task untouched) and skips the lock section with an eprintln per the repo git_available convention — the full lock section executes in unsandboxed gate runs. No hung-test risk: lock contention is bounded at the standard 2s.
+
+    Gate results (isolated TMPDIR):
+    - npm run lint:agent: PASS (vue-tsc clean, clippy --all-targets --all-features -D warnings clean, cargo fmt --all --check clean after fmt).
+    - cargo nextest run --cargo-profile ci --color never --test-threads 4: 954 passed / 6 skipped (git-gated) — previous 953 + this regression, as expected.
+    - npm run test:ui:agent: 291/291 passed (53 files).
+    - npm run test:smoke:agent (build-first, existing browser cache, no downloads): 67 passed / 36 failed / 23 skipped. ALL 36 failures are one environment cause: playwright-core 1.62.1 requires chromium_headless_shell-1234 which is absent from the existing cache (cached: 1181/1200/1217); each failure prints 'browserType.launch: Executable doesn't exist'. Zero logic failures; not fixed here per instruction to use the existing browser cache and not touch view/smoke (UI agent owns those).
+    - Honest flaky history preserved: coordinator-reported default-gate timing flakiness (agent async, worker drain, txn 2s lock under dense parallelism) did not reproduce in these isolated runs; no lock timeouts/retries changed; earlier session observations (concurrent_transactions_serialize load sensitivity under dense ad-hoc filters, one agent-suite flake recovered by configured retries, 1 leaky sync/MCP thread flag) stand as reported.
+
+    Ticket remains InProgress pending coordinator sign-off.
+- date: 2026-09-11T14:20:45.953419+00:00
+  text: |-
+    Outcome (coordinator-confirmed Done):
+    - Canonical task identity: final-numeric-suffix TaskId parse (prefix grammar = is_valid_project_prefix, Unicode/digit/lower-case, exact case, no folding) + TaskLocation (actual root/project) in src/storage/identity.rs; padded numeric aliases deliberate (TP-001==TP-1, canonical surface in DTOs/events/writes).
+    - Root-aware reads: get/list/search/numeric resolve primary + sibling workspace .tasks consistently; config/sprints/attachments from the root that actually holds the task; ambiguous full-ID/numeric duplicates fail closed listing both locations, never an arbitrary pick; nested-root writes refused before side effects (update/comment/delete/edit/upload/agent-job start/context writes); sync canonicalization stays locked to primary via get_in_root; DEV-53 pending guard canonical with local-root containment preserved; DEV-55 transactions untouched in root scope.
+    - Padded aliases canonical at every mutation boundary: task update/comment DTOs, sprint membership (match/dedupe/remove-all-spellings, no unnecessary rewrites), sprint assignment resolution, agent job registry/records/queue/runner env + duplicate alias refusal, CLI status/assignee carveouts, running-job matching, automation terminal count, delete SSE events.
+    - Managed attachment blobs: cross-process fs2 store guard (.attachments-store.lock via acquire_storage_lock, standard 2s bound, fail closed) held across upload store/dedup/attach/rollback-cleanup, REST remove detach/refcheck/blob-delete, MCP batch file references, MCP single file references, CLI file add/remove for store-internal paths; store->task lock order everywhere, no reentrancy; dedup semantics retained; docs state covered cooperating surfaces and explicitly-unsupported non-cooperating external writers.
+    - REST semantics: string DTOs unchanged; comment/comment-update malformed 500->400; delete 400/404 mapping; openapi.json + quick-reference synced; scanner default keys capture full hyphenated uppercase keys (ABC-OPS-12).
+
+    Evidence (final, current code, isolated TMPDIR):
+    - npm run lint:agent: PASS (vue-tsc + clippy --all-targets --all-features -D warnings + fmt --check).
+    - cargo nextest run --cargo-profile ci --color never --test-threads 4: 954 passed / 6 git-gated skips.
+    - npm run test:ui:agent: 291/291.
+    - FULL SMOKE VERIFIED (rebuilt): PLAYWRIGHT_BROWSERS_PATH=/var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/kilo/pw-browsers with sandbox args: 103 passed / 23 skipped / 0 failed. The earlier 36 browser failures were the wrong cache path (playwright 1.62.1 vs stale ms-playwright cache) and are SUPERSEDED by this verified run.
+    - Disclosure (not claiming default gates clean): earlier default-config agent-suite runs included known timing flakiness (one async_run_action_does_not_block flake recovered by its configured retries; concurrent_transactions_serialize_on_the_coordinated_locks sensitive under dense ad-hoc parallel filters) and one pre-existing leaky sync/MCP thread flag. These did not reproduce in the final verified runs and no production timeouts/retries were changed.
+
+    Remaining (verification limitations, explicit):
+    - The new MCP single-reference regression (mcp_single_file_reference_blocks_on_held_store_lock) returns early at the no-repo-root arm in this sandbox; its full lock-contention subsection is NOT verified locally. This subsection is NOT part of the smoke 23 skips nor the nextest 6 git-gated skips — it is an ADDITIONAL exclusion beyond both counts. The equivalent direct fs2 lock-contention concurrency tests (upload vs peer/remove, cross-instance held lock) DID pass, and the single-handler guard was code-reviewed against them.
+    - No power-loss durability claim: DEV-55 transaction safety contract inherited as-is.
+
+    Guidance: none new — no instruction correction proven by this ticket; no new follow-ups filed; nothing staged.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: C11 U12.
@@ -18,3 +142,46 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-11T09:05:46.751455+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-11T09:05:46.761669+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T09:50:51.673752+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T10:44:05.059563+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T11:05:28.362911+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T13:51:01.002849+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T14:17:33.638149+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T14:20:45.953419+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T14:20:45.988284+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

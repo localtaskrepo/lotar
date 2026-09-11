@@ -186,9 +186,19 @@ impl AgentJobService {
             ));
         }
 
-        let project_prefix = ticket_id.split('-').next().unwrap_or("");
-        let config = crate::config::resolution::config_for_project(tasks_dir, Some(project_prefix))
-            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        let parsed_ticket = crate::storage::TaskId::parse(&ticket_id).map_err(|err| {
+            LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
+        })?;
+        let project_prefix = parsed_ticket.project.clone();
+        // Canonicalize ONCE at this creation boundary: the registry key, the
+        // persisted record, the pending queue entry, the spawned runner env,
+        // and every active-job lookup then share one identity, so a job
+        // started through a padded alias (TP-001) locks the canonical ticket
+        // (TP-1) and duplicate alias jobs cannot be registered.
+        let ticket_id = parsed_ticket.canonical();
+        let config =
+            crate::config::resolution::config_for_project(tasks_dir, Some(&project_prefix))
+                .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
         let profile = resolve_profile(&config, &req)?;
         let runner_kind = profile.runner.parse::<AgentRunnerKind>().map_err(|_| {
@@ -200,6 +210,25 @@ impl AgentJobService {
 
         let storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, &ticket_id, None)?;
+        // Refuse root ambiguity and cross-root tickets BEFORE any spawn, log,
+        // or registry side effect: a job runs with this tasks_dir and must
+        // not mutate (or write logs about) a task stored in another root.
+        match crate::storage::identity::resolve(tasks_dir, &ticket_id) {
+            Ok(location) if !location.is_in_root(tasks_dir) => {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Ticket '{}' is stored in workspace tasks root {} and cannot be managed from {}; run the command inside that workspace",
+                    ticket_id,
+                    location.root.display(),
+                    tasks_dir.display()
+                )));
+            }
+            Ok(_) => {}
+            Err(err) => {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Ticket '{ticket_id}' could not be uniquely resolved in this workspace: {err}"
+                )));
+            }
+        }
         let is_merge_job = is_merge_job_candidate(&task, req.agent.as_deref());
 
         if is_merge_job && !config.agent_worktree.enabled {
@@ -1687,8 +1716,12 @@ fn finalize_cancelled_job(job_id: &str) {
         AutomationEvent::JobCancelled,
         job_context_for(job_id),
     );
-    let prefix = record.ticket_id.split('-').next();
-    if let Ok(config) = crate::config::resolution::config_for_project(&record.tasks_dir, prefix) {
+    let prefix = crate::storage::TaskId::parse(&record.ticket_id)
+        .ok()
+        .map(|parsed| parsed.project);
+    if let Ok(config) =
+        crate::config::resolution::config_for_project(&record.tasks_dir, prefix.as_deref())
+    {
         maybe_cleanup_worktree(
             job_id,
             &record.ticket_id,
@@ -2218,6 +2251,121 @@ mod tests {
             .unwrap();
         assert_eq!(loaded.messages.len(), 5);
         assert!(loaded.messages.last().unwrap().content.contains("msg-29"));
+    }
+
+    fn dev56_workspace() -> (tempfile::TempDir, std::path::PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join("main").join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        std::fs::write(
+            crate::utils::paths::global_config_path(&tasks_dir),
+            "default:\n  project: AJB\nissue:\n  states: [Todo, InProgress, Done]\n  priorities: [Low, Medium, High]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: false\n    max_parallel_jobs: 0\n",
+        )
+        .unwrap();
+        let mut storage = Storage::new(&tasks_dir);
+        storage
+            .add(
+                &crate::storage::task::Task::new(
+                    tasks_dir.clone(),
+                    "Padded job target".to_string(),
+                    crate::types::Priority::from("Medium"),
+                ),
+                "AJB",
+                None,
+            )
+            .unwrap();
+        (tmp, tasks_dir)
+    }
+
+    fn dev56_job_request(ticket: &str) -> AgentJobCreateRequest {
+        AgentJobCreateRequest {
+            ticket_id: ticket.to_string(),
+            prompt: "do the thing".to_string(),
+            runner: Some("command".to_string()),
+            agent: None,
+        }
+    }
+
+    #[test]
+    fn padded_job_start_registers_canonical_and_locks_canonical_updates() {
+        let (_tmp, tasks_dir) = dev56_workspace();
+
+        // Padded alias start registers the CANONICAL ticket (queue mode via
+        // max_parallel_jobs: 0 keeps the job pending, so no runner spawns).
+        let job =
+            AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-001"), &tasks_dir)
+                .unwrap();
+        assert_eq!(job.ticket_id, "AJB-1", "record carries canonical id");
+        assert!(
+            AgentJobService::has_active_job("AJB-1"),
+            "canonical lookup must see the padded-start registration"
+        );
+
+        // Duplicate alias jobs are refused.
+        let err = AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB-1"), &tasks_dir)
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("already has an active job"),
+            "{err}"
+        );
+
+        // Canonical and padded status/assignee updates from unrelated callers
+        // are locked out (other fields stay editable by design).
+        let mut storage = Storage::new(&tasks_dir);
+        for id in ["AJB-1", "AJB-001"] {
+            let err = crate::services::task_service::TaskService::update(
+                &mut storage,
+                id,
+                crate::api_types::TaskUpdate {
+                    status: Some("InProgress".to_string()),
+                    ..Default::default()
+                },
+            )
+            .unwrap_err();
+            assert!(
+                err.to_string().contains("active agent job"),
+                "update via {id} must be locked: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn job_start_refuses_cross_root_ticket_before_registration() {
+        let (_tmp, tasks_dir) = dev56_workspace();
+        // Sibling workspace holding the target ticket.
+        let workspace = tasks_dir.parent().unwrap().to_path_buf();
+        let sibling = workspace.join("sibling").join(".tasks");
+        std::fs::create_dir_all(sibling.join("AJB2")).unwrap();
+        std::fs::write(
+            sibling.join("AJB2").join("1.yml"),
+            "title: elsewhere\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
+        )
+        .unwrap();
+
+        let err =
+            AgentJobService::start_job_with_tasks_dir(dev56_job_request("AJB2-1"), &tasks_dir)
+                .unwrap_err();
+        assert!(err.to_string().contains("cannot be managed from"), "{err}");
+        assert!(
+            !AgentJobService::has_active_job("AJB2-1"),
+            "no registration side effect on refusal"
+        );
+    }
+
+    #[test]
+    fn running_job_matches_accepts_padded_spellings() {
+        assert!(crate::cli::handlers::agent::running_job_matches(
+            "TP-1", "TP-001"
+        ));
+        assert!(crate::cli::handlers::agent::running_job_matches(
+            "TP-001", "TP-1"
+        ));
+        assert!(!crate::cli::handlers::agent::running_job_matches(
+            "TP-1", "TP-2"
+        ));
+        assert!(!crate::cli::handlers::agent::running_job_matches(
+            "abc", "TP-1"
+        ));
     }
 
     #[test]

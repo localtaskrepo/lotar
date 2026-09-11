@@ -116,22 +116,15 @@ impl ProjectResolver {
         Ok(())
     }
 
-    /// Extract project prefix from task ID (e.g., "AUTH-123" -> "AUTH")
+    /// Extract the project prefix from a task ID via the canonical parse:
+    /// everything before the FINAL numeric suffix (e.g., "AUTH-123" -> "AUTH",
+    /// "ABC-OPS-12" -> "ABC-OPS"). Reuses the shared project-prefix grammar
+    /// (Unicode alphanumerics, digits, `_`/`-`, exact case) instead of an
+    /// uppercase-ASCII-only rule, so supported prefixes keep working.
     pub fn extract_project_from_task_id(&self, task_id: &str) -> Option<String> {
-        // Look for pattern: PREFIX-NUMBER (e.g., AUTH-123, TI-456, MOBILE-789)
-        if let Some(dash_pos) = task_id.find('-') {
-            let prefix = &task_id[..dash_pos];
-            // Verify it's all uppercase alphanumeric (letters or digits)
-            if !prefix.is_empty()
-                && prefix
-                    .chars()
-                    .all(|c| c.is_ascii_digit() || (c.is_ascii_uppercase()))
-            {
-                return Some(prefix.to_string());
-            }
-        }
-
-        None
+        crate::storage::TaskId::parse(task_id)
+            .ok()
+            .map(|parsed| parsed.project)
     }
 
     /// Get the resolved global configuration

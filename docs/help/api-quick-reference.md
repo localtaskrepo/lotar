@@ -6,7 +6,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/tasks/list -> { data: TaskDTO[], meta: { count } }
 - GET  /api/tasks/get?id=ID[&project=PREFIX] -> { data: TaskDTO }
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
-- POST /api/tasks/delete ({ id }) -> { data: { deleted: bool } }
+- POST /api/tasks/delete ({ id }[?project=PREFIX]) -> { data: { deleted: bool } }; 400 for invalid/mismatched/ambiguous/cross-root IDs, 404 when absent
 - POST /api/tasks/references/add (GenericReferenceAddRequest) -> { data: GenericReferenceAddResponse }
 - POST /api/tasks/references/remove (GenericReferenceRemoveRequest) -> { data: GenericReferenceRemoveResponse }
 - GET  /api/config/show[?project=PREFIX] -> { data: object }

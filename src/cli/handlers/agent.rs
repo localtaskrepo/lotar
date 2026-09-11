@@ -834,6 +834,12 @@ pub(crate) struct RunningAgentJob {
     pub runner: Option<String>,
 }
 
+/// Alias-aware match between a running job's ticket and the requested one
+/// (canonical or padded spelling of the same ticket).
+pub(crate) fn running_job_matches(job_ticket: &str, needle: &str) -> bool {
+    crate::storage::identity::aliases_match(job_ticket, needle)
+}
+
 pub(crate) fn running_job_for_ticket(ticket_id: &str) -> Option<RunningAgentJob> {
     let needle = ticket_id.trim();
     if needle.is_empty() {
@@ -842,7 +848,7 @@ pub(crate) fn running_job_for_ticket(ticket_id: &str) -> Option<RunningAgentJob>
     list_running_jobs().into_iter().find(|job| {
         job.ticket_id
             .as_deref()
-            .is_some_and(|value| value.eq_ignore_ascii_case(needle))
+            .is_some_and(|value| running_job_matches(value, needle))
     })
 }
 

@@ -186,7 +186,9 @@ impl SprintService {
             if task_id.is_empty() {
                 continue;
             }
-            let project = task_id.split('-').next().unwrap_or("").to_string();
+            let project = crate::storage::TaskId::parse(task_id)
+                .map(|parsed| parsed.project)
+                .unwrap_or_default();
             if project.is_empty() {
                 continue;
             }

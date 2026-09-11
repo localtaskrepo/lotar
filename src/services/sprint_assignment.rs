@@ -318,9 +318,12 @@ fn build_membership_index(sprint_map: &BTreeMap<u32, Sprint>) -> HashMap<String,
             if task_id.is_empty() {
                 continue;
             }
-            map.entry(task_id.to_string())
-                .or_default()
-                .insert(*sprint_id);
+            // Canonical keys: legacy padded spellings and canonical ids
+            // index the same member.
+            let key = crate::storage::TaskId::parse(task_id)
+                .map(|parsed| parsed.canonical())
+                .unwrap_or_else(|_| task_id.to_string());
+            map.entry(key).or_default().insert(*sprint_id);
         }
     }
     map
@@ -331,7 +334,19 @@ fn add_task_to_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
     if normalized.is_empty() {
         return false;
     }
-    if sprint.tasks.iter().any(|entry| entry.id == normalized) {
+    // Canonical containment: a legacy padded spelling (TP-001) already in the
+    // sprint means TP-1 is a member; never append a duplicate spelling.
+    let already = sprint.tasks.iter().any(|entry| {
+        let entry_id = entry.id.trim();
+        match (
+            crate::storage::TaskId::parse(entry_id),
+            crate::storage::TaskId::parse(normalized),
+        ) {
+            (Ok(entry), Ok(task)) => entry == task,
+            _ => entry_id == normalized,
+        }
+    });
+    if already {
         return false;
     }
     sprint.tasks.push(SprintTaskEntry {
@@ -343,7 +358,17 @@ fn add_task_to_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
 
 fn remove_task_from_sprint(sprint: &mut Sprint, task_id: &str) -> bool {
     let before = sprint.tasks.len();
-    sprint.tasks.retain(|entry| entry.id != task_id);
+    // Remove EVERY spelling of the member (TP-1 and TP-001 alike).
+    sprint.tasks.retain(|entry| {
+        let entry_id = entry.id.trim();
+        match (
+            crate::storage::TaskId::parse(entry_id),
+            crate::storage::TaskId::parse(task_id.trim()),
+        ) {
+            (Ok(entry), Ok(task)) => entry != task,
+            _ => entry_id != task_id.trim(),
+        }
+    });
     before != sprint.tasks.len()
 }
 
@@ -557,23 +582,24 @@ pub fn resolve_task_identifier(storage: &Storage, raw: &str) -> Result<String, S
     }
 
     if token.contains('-') {
-        let mut splitter = token.splitn(2, '-');
-        let project = splitter.next().unwrap_or("");
-        let project = project.to_string();
-        if storage.get(token, &project).is_some() {
-            return Ok(token.to_string());
-        }
-        return Err(format!("Task {} not found.", token));
+        return match crate::storage::TaskId::parse(token) {
+            // Canonicalize at this mutation boundary: padded spellings
+            // (TP-001) enter assignment flows as TP-1 so memberships are
+            // persisted and compared under one identity.
+            Ok(parsed) if storage.get(token, &parsed.project).is_some() => Ok(parsed.canonical()),
+            Ok(parsed) => Err(format!("Task {} not found.", parsed.canonical())),
+            Err(err) => Err(format!("Task identifier '{token}' is invalid: {err}")),
+        };
     }
 
-    if let Some((full_id, _)) = storage.find_task_by_numeric_id(token) {
-        return Ok(full_id);
+    match storage.resolve_numeric_id(token) {
+        Ok((full_id, _)) => Ok(full_id),
+        Err(crate::storage::identity::TaskLookupError::NotFound(_)) => Err(format!(
+            "Task {} not found. Use the fully-qualified identifier (e.g. TEST-123).",
+            token
+        )),
+        Err(err) => Err(err.to_string()),
     }
-
-    Err(format!(
-        "Task {} not found. Use the fully-qualified identifier (e.g. TEST-123).",
-        token
-    ))
 }
 
 pub fn likely_sprint_reference(storage: &Storage, records: &[SprintRecord], token: &str) -> bool {

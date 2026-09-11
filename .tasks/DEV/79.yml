@@ -1,12 +1,18 @@
 title: Make Git and platform test coverage explicit and validate safety cases
 status: Todo
-relationships:
-  parent: DEV-53
-  related: [DEV-46, DEV-47]
 priority: High
 type: Chore
 reporter: mallox
 created: 2026-09-06T11:10:31.848688+00:00
+modified: 2026-09-11T14:20:59.905749+00:00
+relationships:
+  related:
+  - DEV-46
+  - DEV-47
+  parent: DEV-53
+comments:
+- date: 2026-09-11T14:20:59.905749+00:00
+  text: 'DEV-56 handoff note (no status change): a new unexecuted test subsection exists that requires a supported runner environment. tests/dev56_task_identity_test.rs::mcp_single_file_reference_blocks_on_held_store_lock executes only its no-repo-root fail-closed arm where sandbox policy denies creating .git markers; the full fs2 lock-contention subsection (held store lock -> MCP single task_reference_add file kind fails closed with no task changes -> release -> attach succeeds) needs an environment that permits the repo-root marker (unsandboxed gate run or any supported CI/dev runner). This subsection is excluded from local verification and is NOT counted in the smoke 23 skips or the nextest 6 git-gated skips. The parallel direct-lock coverage (routes::tasks dev56 upload coordination cases) passed locally, so this is a coverage gap owned here, not a known failure.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T7.
@@ -17,3 +23,8 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-11T14:20:59.905749+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

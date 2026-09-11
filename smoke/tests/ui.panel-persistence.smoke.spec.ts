@@ -97,12 +97,24 @@ describe('UI task panel persistence contract', () => {
                     const firstGate = new Promise<void>(resolve => { releaseFirst = resolve; });
                     let updateCount = 0;
                     const updates: Record<string, unknown>[] = [];
+                    // Track in-flight route handlers so teardown can wait for
+                    // their completion; the no-op catch keeps a late
+                    // page-teardown abort from surfacing as an unhandled
+                    // rejection while allSettled still observes the outcome.
+                    const routeJobs = new Set<Promise<void>>();
+                    const runRouteJob = (job: Promise<void>) => {
+                        routeJobs.add(job);
+                        job.catch(() => {});
+                        job.finally(() => routeJobs.delete(job));
+                    };
                     await page.route('**/api/tasks/update', async route => {
-                        updateCount += 1;
-                        updates.push(route.request().postDataJSON());
-                        const response = await route.fetch();
-                        if (updateCount === 1) await firstGate;
-                        await route.fulfill({ response });
+                        runRouteJob((async () => {
+                            updateCount += 1;
+                            updates.push(route.request().postDataJSON());
+                            const response = await route.fetch();
+                            if (updateCount === 1) await firstGate;
+                            await route.fulfill({ response });
+                        })());
                     });
 
                     try {
@@ -144,14 +156,31 @@ describe('UI task panel persistence contract', () => {
                     });
 
                     // Durable: YAML reflects every change once the queue drains.
+                    // Poll the FULL end state: the title alone becomes durable
+                    // while patch #1's response is still held (its server-side
+                    // fetch ran before the gate), so polling only the title
+                    // could pass before patch #2 is even sent and the one-shot
+                    // reads below would race its server-side write.
                     await expect
-                        .poll(async () => workspace.readTaskYaml(seeded.id), { timeout: 10_000 })
-                        .toMatch(/title: Panel persistence edited/);
+                        .poll(async () => {
+                            const yaml = await workspace.readTaskYaml(seeded.id);
+                            return {
+                                title: /title: Panel persistence edited/.test(yaml),
+                                dueCleared: !yaml.includes('due_date:'),
+                                effortCleared: !yaml.includes('effort:'),
+                                productEdited: yaml.includes('product: Edited'),
+                            };
+                        }, { timeout: 10_000 })
+                        .toEqual({ title: true, dueCleared: true, effortCleared: true, productEdited: true });
                     const yaml = await workspace.readTaskYaml(seeded.id);
                     expect(yaml).not.toContain('due_date:');
                     expect(yaml).not.toContain('effort:');
                     expect(yaml).toContain('product: Edited');
 
+                    // Let any in-flight route handler finish and unregister the
+                    // route before navigation so teardown never aborts a fetch.
+                    await Promise.allSettled([...routeJobs]);
+                    await page.unroute('**/api/tasks/update');
                     await page.locator('button[aria-label="Close panel"]').click();
                     await panel.waitFor({ state: 'hidden', timeout: 10_000 });
 

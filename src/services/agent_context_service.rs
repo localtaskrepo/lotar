@@ -33,7 +33,14 @@ impl AgentContextService {
             return Ok(None);
         }
 
-        let path = resolve_context_path(tasks_dir, ticket_id, &config.agent_context_extension)?;
+        let mut path = resolve_context_path(tasks_dir, ticket_id, &config.agent_context_extension)?;
+        if !path.exists() {
+            // Actual-root-aware read: a task stored in a sibling workspace
+            // keeps its context next to its own task file.
+            if let Some(actual) = actual_context_root(tasks_dir, ticket_id) {
+                path = resolve_context_path(&actual, ticket_id, &config.agent_context_extension)?;
+            }
+        }
         if !path.exists() {
             return Ok(None);
         }
@@ -69,6 +76,18 @@ impl AgentContextService {
         }
         context.updated_at = Utc::now().to_rfc3339();
 
+        // Refuse cross-root writes BEFORE creating anything: the context file
+        // must land inside the workspace root that actually holds the ticket,
+        // next to its task file — never inside an unrelated primary root.
+        if let Some(actual) = actual_context_root(tasks_dir, ticket_id) {
+            return Err(LoTaRError::ValidationError(format!(
+                "Ticket '{}' is stored in workspace tasks root {} and its context cannot be written from {}; run the command inside that workspace",
+                ticket_id.trim(),
+                actual.display(),
+                tasks_dir.display()
+            )));
+        }
+
         let path = resolve_context_path(tasks_dir, ticket_id, &config.agent_context_extension)?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
@@ -97,6 +116,18 @@ pub fn build_assistant_message(content: &str) -> AgentContextMessage {
     }
 }
 
+/// The tasks root that actually holds `ticket_id`, when it differs from
+/// `tasks_dir`. Returns `None` when the ticket lives in `tasks_dir` itself,
+/// cannot be found, or is ambiguous (no root is guessed).
+fn actual_context_root(tasks_dir: &Path, ticket_id: &str) -> Option<PathBuf> {
+    let location = crate::storage::identity::resolve(tasks_dir, ticket_id.trim()).ok()?;
+    if location.is_in_root(tasks_dir) {
+        None
+    } else {
+        Some(location.root)
+    }
+}
+
 /// Resolve the context file path.
 /// Context files are stored at `<tasks_dir>/<PROJECT>/<TICKET_ID><extension>`,
 /// right next to the task file itself. This makes the relationship clear
@@ -120,8 +151,13 @@ fn resolve_context_path(
         return Err(LoTaRError::ValidationError("Invalid ticket id".to_string()));
     }
 
-    // Extract project prefix from ticket_id (e.g., "DICE-1" -> "DICE")
-    let project_prefix = trimmed.split('-').next().unwrap_or(trimmed).to_uppercase();
+    // Extract the project prefix from the canonical ID parse (e.g.,
+    // "DICE-1" -> "DICE", "abc-ops-12" -> "abc-ops"). Prefixes are exact
+    // case: no upper-case folding, so context files land in the project
+    // directory that actually exists on disk.
+    let project_prefix = crate::storage::TaskId::parse(trimmed)
+        .map_err(|err| LoTaRError::ValidationError(format!("Invalid ticket id: {err}")))?
+        .project;
 
     // Build path: <tasks_dir>/<PROJECT>/<TICKET_ID><extension>
     let project_dir = tasks_dir.join(&project_prefix);

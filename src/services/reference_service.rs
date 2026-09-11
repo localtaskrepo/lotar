@@ -53,7 +53,9 @@ impl ReferenceService {
         task_id: &str,
         url: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -98,7 +100,7 @@ impl ReferenceService {
             added = true;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, added))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
     }
 
     pub fn detach_link_reference(
@@ -106,7 +108,9 @@ impl ReferenceService {
         task_id: &str,
         url: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -131,7 +135,7 @@ impl ReferenceService {
             storage.edit(task_id, &task)?;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
     }
 
     pub fn attach_code_reference(
@@ -140,7 +144,9 @@ impl ReferenceService {
         task_id: &str,
         code: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -208,7 +214,7 @@ impl ReferenceService {
             added = true;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, added))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
     }
 
     pub fn detach_code_reference(
@@ -216,7 +222,9 @@ impl ReferenceService {
         task_id: &str,
         code: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -280,7 +288,7 @@ impl ReferenceService {
             storage.edit(task_id, &task)?;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
     }
 
     pub fn attach_platform_reference(
@@ -289,7 +297,9 @@ impl ReferenceService {
         kind: &str,
         value: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -357,7 +367,7 @@ impl ReferenceService {
             added = true;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, added))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
     }
 
     pub fn detach_platform_reference(
@@ -366,7 +376,9 @@ impl ReferenceService {
         kind: &str,
         value: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -411,7 +423,7 @@ impl ReferenceService {
             storage.edit(task_id, &task)?;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
     }
 
     pub fn attach_file_reference(
@@ -420,7 +432,9 @@ impl ReferenceService {
         task_id: &str,
         file: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -468,7 +482,7 @@ impl ReferenceService {
             added = true;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, added))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
     }
 
     pub fn detach_file_reference(
@@ -477,7 +491,9 @@ impl ReferenceService {
         task_id: &str,
         file: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -517,7 +533,7 @@ impl ReferenceService {
             storage.edit(task_id, &task)?;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, removed))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
     }
 
     pub fn snippet_for_code(
@@ -633,7 +649,7 @@ impl ReferenceService {
         numbers
     }
 
-    fn resolve_path(repo_root: &Path, raw_path: &str) -> Result<PathBuf, String> {
+    pub(crate) fn resolve_path(repo_root: &Path, raw_path: &str) -> Result<PathBuf, String> {
         let path = PathBuf::from(raw_path);
         let candidate = if path.is_absolute() {
             path

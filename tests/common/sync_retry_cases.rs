@@ -306,7 +306,9 @@ fn sync_ambiguous_remote_success_is_persisted_and_fails_closed() {
         assert!(warnings.iter().any(|s| s.contains("Indeterminate")));
         drop(journal);
         let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
-        for alias in ["TEST-01", "TEST-+1", "TEST-1-extra", "TEST-+0001-extra"] {
+        // DEV-56: padded spellings stay deliberate aliases and reconcile
+        // through the indeterminate fail-closed path.
+        for alias in ["TEST-01", "TEST-0001"] {
             assert!(Storage::new(&resolver.path).get(alias, "TEST").is_some());
             let error = journal
                 .reconcile(
@@ -318,6 +320,28 @@ fn sync_ambiguous_remote_success_is_persisted_and_fails_closed() {
                 )
                 .unwrap_err();
             assert!(error.to_string().contains("Creation will not be retried"));
+        }
+        // DEV-56: `+`-signed and trailing-segment suffixes are malformed and
+        // fail closed at both the storage and reconciliation boundaries.
+        for malformed in ["TEST-+1", "TEST-1-extra", "TEST-+0001-extra"] {
+            assert!(
+                Storage::new(&resolver.path)
+                    .get(malformed, "TEST")
+                    .is_none()
+            );
+            let error = journal
+                .reconcile(
+                    &resolver,
+                    &pending_scope(&remote, &client),
+                    Some("TEST"),
+                    Some(malformed),
+                    &remote,
+                )
+                .unwrap_err();
+            assert!(
+                error.to_string().contains("Invalid task ID"),
+                "expected fail-closed invalid-id error, got: {error}"
+            );
         }
         assert_eq!(server.creates.load(Ordering::SeqCst), 1);
     }
@@ -552,12 +576,13 @@ fn sync_loaded_journal_and_new_intents_use_storage_identity() {
         let client = server.client(provider);
         let task = local_task(&resolver);
         let mut journal = SyncJournal::open(&resolver.path, false).unwrap();
-        let alias = "TEST-+0001-extra";
+        // DEV-56: padded alias spelling; reads surface the canonical ID.
+        let alias = "TEST-0001";
         assert_eq!(
             TaskService::get(&Storage::new(&resolver.path), alias, Some("TEST"))
                 .unwrap()
                 .id,
-            alias
+            "TEST-1"
         );
         perform_push(
             &resolver,

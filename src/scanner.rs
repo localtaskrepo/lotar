@@ -378,11 +378,14 @@ impl Scanner {
     }
 
     fn build_ticket_regexes() -> (Regex, Regex) {
-        // [ticket=DEMO-123] or [ticket = DEMO-123]
-        let ticket_attr_regex = Regex::new(r"(?i)\[\s*ticket\s*=\s*([A-Z][A-Z0-9]+-\d+)\s*\]")
-            .unwrap_or_else(|_| Regex::new(r"\[ticket=([A-Z]+-\d+)\]").unwrap());
-        // Generic key like DEMO-123
-        let ticket_key_regex = Regex::new(r"\b([A-Z][A-Z0-9]+-\d+)\b")
+        // [ticket=DEMO-123] or [ticket = DEMO-123]; keys may contain hyphenated
+        // prefixes (ABC-OPS-12) consistent with the canonical ID grammar.
+        let ticket_attr_regex =
+            Regex::new(r"(?i)\[\s*ticket\s*=\s*([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\s*\]")
+                .unwrap_or_else(|_| Regex::new(r"\[ticket=([A-Z]+-\d+)\]").unwrap());
+        // Generic key like DEMO-123; capture the FULL hyphenated key
+        // (ABC-OPS-12, ABC-OPS-12-3) instead of the trailing slice (OPS-12).
+        let ticket_key_regex = Regex::new(r"\b([A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+)\b")
             .unwrap_or_else(|_| Regex::new(r"([A-Z]+-\d+)").unwrap());
         (ticket_attr_regex, ticket_key_regex)
     }
@@ -819,6 +822,30 @@ mod tests {
         assert!(signal.is_match("TODO something"));
         assert!(uuid.is_match("TODO (ABC-123): rest"));
         assert!(simple.is_match("TODO: rest"));
+    }
+
+    #[test]
+    fn ticket_key_extraction_captures_full_hyphenated_prefix() {
+        let s = Scanner::new(PathBuf::from("."));
+        // Hyphenated prefixes capture the FULL key, not the OPS-12 slice.
+        assert_eq!(
+            s.extract_ticket_key_from_line("// TODO fix [ticket=ABC-OPS-12]"),
+            Some("ABC-OPS-12".to_string())
+        );
+        assert_eq!(
+            s.extract_ticket_key_from_line("// TODO: tracked as ABC-OPS-12 later"),
+            Some("ABC-OPS-12".to_string())
+        );
+        // Multi-segment prefixes keep earlier numeric segments.
+        assert_eq!(
+            s.extract_ticket_key_from_line("ABC-OPS-12-3"),
+            Some("ABC-OPS-12-3".to_string())
+        );
+        // Classic single-segment keys unchanged.
+        assert_eq!(
+            s.extract_ticket_key_from_line("DEMO-123"),
+            Some("DEMO-123".to_string())
+        );
     }
 
     #[test]

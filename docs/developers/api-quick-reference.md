@@ -6,7 +6,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/tasks/list -> { data: TaskDTO[], meta: { count } }
 - GET  /api/tasks/get?id=ID[&project=PREFIX] -> { data: TaskDTO }
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
-- POST /api/tasks/delete ({ id }) -> { data: { deleted: bool } }
+- POST /api/tasks/delete ({ id }[?project=PREFIX]) -> { data: { deleted: bool } }; 400 for invalid/mismatched/ambiguous/cross-root IDs, 404 when absent
 - GET  /api/config/show[?project=PREFIX] -> { data: object }
 - POST /api/config/set ({ values, global?, project? }) -> { data: { updated: bool } }
 - GET  /api/events -> text/event-stream (see SSE Events)

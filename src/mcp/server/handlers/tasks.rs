@@ -686,7 +686,9 @@ pub(crate) fn handle_task_update(req: JsonRpcRequest) -> JsonRpcResponse {
     // Pre-validate enum strings against the task's project configuration so
     // failures carry structured suggestions; the service re-validates
     // authoritatively with the same resolved config.
-    let project_prefix = id.split('-').next().unwrap_or("").to_string();
+    let project_prefix = crate::storage::TaskId::parse(id)
+        .map(|parsed| parsed.project)
+        .unwrap_or_default();
     let project_cfg = crate::config::resolution::config_for_project(
         resolver.path.as_path(),
         Some(project_prefix.as_str()),
@@ -994,7 +996,10 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
     let mut failed: Vec<Value> = Vec::new();
 
     for id in ids {
-        let project_prefix = id.split('-').next().unwrap_or("").to_string();
+        let project_prefix = crate::storage::TaskId::parse(&id)
+            .ok()
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
         let mut task = match storage.get(&id, &project_prefix) {
             Some(task) => task,
             None => {
@@ -1127,6 +1132,43 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
 
     let mut updated: Vec<Value> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
+
+    // File references that live inside the attachments store participate in
+    // the blob lifecycle: hold the cross-process store lock across the whole
+    // batch (store-lock -> task-lock order) so adds/detaches serialize with
+    // upload creation and remove reclamation. Other kinds and outside paths
+    // stay unlocked.
+    let _store_guard = if kind == "file" {
+        let first_project = ids
+            .first()
+            .and_then(|id| crate::storage::TaskId::parse(id).ok())
+            .map(|parsed| parsed.project);
+        let cfg =
+            crate::config::resolution::config_for_project(&resolver.path, first_project.as_deref())
+                .unwrap_or_else(|_| {
+                    crate::config::types::ResolvedConfig::from_global(
+                        crate::config::types::GlobalConfig::default(),
+                    )
+                });
+        match crate::services::attachment_service::AttachmentService::lock_store_for_repo_path(
+            &resolver.path,
+            &cfg,
+            repo_root.as_deref().unwrap_or(&resolver.path),
+            &value,
+        ) {
+            Ok(guard) => guard,
+            Err(e) => {
+                return err(
+                    req.id,
+                    -32000,
+                    "Task reference update failed",
+                    Some(json!({"message": e.to_string()})),
+                );
+            }
+        }
+    } else {
+        None
+    };
 
     for id in ids {
         let normalized_id = if let Some(project_override) =
@@ -1321,6 +1363,60 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                 Some(json!({"message": e})),
             );
         }
+    };
+
+    // File references that live inside the attachments store participate in
+    // the blob lifecycle: hold the cross-process store lock across the
+    // mutation (store-lock -> task-lock order), exactly like the batch
+    // reference handler, REST upload/remove, and the CLI. Other kinds and
+    // outside paths stay unlocked.
+    let _store_guard = if kind == "file" {
+        let repo_root = match find_repo_root(resolver.path.as_path()) {
+            Some(root) => root,
+            None => {
+                return err(
+                    req.id,
+                    -32000,
+                    if is_add {
+                        "Task reference add failed"
+                    } else {
+                        "Task reference remove failed"
+                    },
+                    Some(json!({"message": "Unable to locate git repository"})),
+                );
+            }
+        };
+        let project = crate::storage::TaskId::parse(&full_id)
+            .ok()
+            .map(|parsed| parsed.project);
+        let cfg = crate::config::resolution::config_for_project(&resolver.path, project.as_deref())
+            .unwrap_or_else(|_| {
+                crate::config::types::ResolvedConfig::from_global(
+                    crate::config::types::GlobalConfig::default(),
+                )
+            });
+        match crate::services::attachment_service::AttachmentService::lock_store_for_repo_path(
+            &resolver.path,
+            &cfg,
+            &repo_root,
+            &value,
+        ) {
+            Ok(guard) => guard,
+            Err(e) => {
+                return err(
+                    req.id,
+                    -32000,
+                    if is_add {
+                        "Task reference add failed"
+                    } else {
+                        "Task reference remove failed"
+                    },
+                    Some(json!({"message": e.to_string()})),
+                );
+            }
+        }
+    } else {
+        None
     };
 
     let mut storage = Storage::new(&resolver.path);

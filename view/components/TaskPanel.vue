@@ -544,6 +544,7 @@ import {
     readTaskPanelShowAttachmentsPreference,
     readTaskPanelShowLinksInAttachmentsPreference,
 } from '../utils/preferences'
+import { projectPrefixOfTaskId } from '../utils/text'
 import ChipListField from './ChipListField.vue'
 import IconGlyph from './IconGlyph.vue'
 import MarkdownContent from './MarkdownContent.vue'
@@ -727,14 +728,6 @@ onUnmounted(() => {
   unsubscribePreferencesChanged = null
 })
 
-function projectPrefixFromTaskId(id: string): string | null {
-  const trimmed = id.trim()
-  if (!trimmed) return null
-  const dash = trimmed.indexOf('-')
-  if (dash <= 0) return null
-  return trimmed.slice(0, dash).toUpperCase()
-}
-
 async function loadSyncConfig(prefix: string | null) {
   if (!prefix) {
     syncConfigInspect.value = null
@@ -753,7 +746,7 @@ async function loadSyncConfig(prefix: string | null) {
 watch(
   taskId,
   (value) => {
-    const prefix = projectPrefixFromTaskId(value)
+    const prefix = projectPrefixOfTaskId(value)
     loadSyncConfig(prefix)
   },
   { immediate: true },
@@ -801,8 +794,7 @@ function attachmentUrl(relPath: string): string {
   if (!stored) return '/api/attachments/get?path='
 
   const taskId = (task.id || '').trim()
-  const dashPos = taskId.indexOf('-')
-  const project = dashPos > 0 ? taskId.slice(0, dashPos) : ''
+  const project = projectPrefixOfTaskId(taskId) || ''
 
   const hash = extractAttachmentHash(stored)
   const display = attachmentDisplayName(stored)
@@ -1559,7 +1551,7 @@ async function submitSyncDialog() {
   try {
     const request: SyncRequest = {
       remote,
-      project: projectPrefixFromTaskId(id) ?? undefined,
+      project: projectPrefixOfTaskId(id) ?? undefined,
       task_id: id,
       include_report: true,
       write_report: syncDialogWriteReport.value,

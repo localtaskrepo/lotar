@@ -66,7 +66,11 @@ pub fn resolve_task_filter_values<T: TaskFilterSource>(
 
     if let Some(canonical) = crate::utils::fields::is_reserved_field(raw) {
         if canonical == "project" {
-            return Some(vec![id.split('-').next().unwrap_or("").to_string()]);
+            return Some(vec![
+                crate::storage::TaskId::parse(id)
+                    .map(|parsed| parsed.project)
+                    .unwrap_or_default(),
+            ]);
         }
         return task.reserved_field_values(canonical);
     }

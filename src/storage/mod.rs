@@ -8,6 +8,7 @@
 // - filter: Task filtering utilities
 // - sprint: Sprint entity definition and helpers
 pub mod filter;
+pub mod identity;
 pub mod locator;
 pub mod manager;
 pub mod operations;
@@ -19,3 +20,4 @@ pub mod transaction;
 
 // Re-export commonly used types and operations for convenience
 pub use filter::TaskFilter;
+pub use identity::{TaskId, TaskLocation};

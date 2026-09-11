@@ -15,7 +15,7 @@
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username → project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
+        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter \u2192 git user \u2192 system username \u2192 project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
         "parameters": [
           {
             "name": "project",
@@ -905,7 +905,28 @@
             }
           },
           "400": {
-            "$ref": "#/components/responses/BadRequest"
+            "description": "Invalid task ID, project mismatch, ambiguity, or cross-root refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "error": {
+                    "summary": "Client error",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Task ID 'DEV-5' belongs to project 'DEV', not 'TP'; refusing to cross projects"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2499,6 +2520,30 @@
           "200": {
             "description": "OK"
           },
+          "400": {
+            "description": "Invalid task ID, project mismatch, ambiguity, or cross-root refusal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "error": {
+                    "summary": "Client error",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Task 'NEST-1' is stored in workspace tasks root /ws/sibling/.tasks and cannot be modified from /ws/main/.tasks; run the command inside that workspace"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
@@ -2525,6 +2570,30 @@
           "200": {
             "description": "OK"
           },
+          "400": {
+            "description": "Invalid task ID or request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "invalidTaskId": {
+                    "summary": "Malformed task ID",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Invalid task ID: TEST-+12: numeric suffix '+12' is invalid: expected decimal digits only"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
@@ -2537,6 +2606,30 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "400": {
+            "description": "Invalid task ID or request payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "invalidTaskId": {
+                    "summary": "Malformed task ID",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Invalid task ID: TEST-+12: numeric suffix '+12' is invalid: expected decimal digits only"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"

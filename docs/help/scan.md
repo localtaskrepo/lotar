@@ -93,7 +93,7 @@ Tweak the vocabulary via:
 
 - `LOTAR_SCAN_SIGNAL_WORDS="TODO,FIXME,DEBT"`
 - `scan.signal_words` in `.tasks/config.yml`, `.tasks/<PROJECT>/config.yml`, or `~/.lotar`
-- `scan.ticket_patterns` to add regex capture groups for custom ticket IDs
+- `scan.ticket_patterns` to add regex capture groups for custom ticket IDs. The built-in detector recognizes uppercase keys matching the canonical ID grammar, including full hyphenated prefixes (`ABC-OPS-12`, never just the `OPS-12` slice); configure custom patterns for lower-case, Unicode, or digit-leading key styles.
 - `scan.enable_ticket_words` / `scan.enable_mentions` to control whether bare ticket keys add anchors without creating new tasks
 
 ## Configuration cheat sheet

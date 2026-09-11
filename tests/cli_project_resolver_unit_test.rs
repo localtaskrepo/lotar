@@ -89,7 +89,21 @@ fn extract_project_from_task_id() {
         Some("MOBILE".to_string())
     );
     assert_eq!(resolver.extract_project_from_task_id("123"), None);
-    assert_eq!(resolver.extract_project_from_task_id("auth-123"), None);
+    // DEV-56: the shared ID grammar supports lower-case, digit-leading, and
+    // hyphenated prefixes; extraction reuses it instead of an
+    // uppercase-ASCII-only rule and preserves exact case.
+    assert_eq!(
+        resolver.extract_project_from_task_id("auth-123"),
+        Some("auth".to_string())
+    );
+    assert_eq!(
+        resolver.extract_project_from_task_id("ABC-OPS-12"),
+        Some("ABC-OPS".to_string())
+    );
+    assert_eq!(
+        resolver.extract_project_from_task_id("42-7"),
+        Some("42".to_string())
+    );
     assert_eq!(resolver.extract_project_from_task_id("AUTH123"), None);
     assert_eq!(resolver.extract_project_from_task_id("-123"), None);
 }

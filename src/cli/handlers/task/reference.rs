@@ -133,6 +133,32 @@ fn handle_remove_code(
     )
 }
 
+/// Take the attachments store lock when the referenced path lives inside the
+/// store (store-lock -> task-lock order); other paths stay unlocked.
+fn lock_store_for_file(
+    storage_root: &std::path::Path,
+    task_id: &str,
+    repo_root: &std::path::Path,
+    path: &str,
+) -> Result<Option<crate::services::attachment_service::AttachmentStoreGuard>, String> {
+    let project = crate::storage::TaskId::parse(task_id)
+        .ok()
+        .map(|parsed| parsed.project);
+    let config = crate::config::resolution::config_for_project(storage_root, project.as_deref())
+        .unwrap_or_else(|_| {
+            crate::config::types::ResolvedConfig::from_global(
+                crate::config::types::GlobalConfig::default(),
+            )
+        });
+    crate::services::attachment_service::AttachmentService::lock_store_for_repo_path(
+        storage_root,
+        &config,
+        repo_root,
+        path,
+    )
+    .map_err(|e| e.to_string())
+}
+
 fn handle_add_file(
     task_id: &str,
     path: &str,
@@ -146,6 +172,8 @@ fn handle_add_file(
     let repo_root = find_repo_root(ctx.storage_root())
         .ok_or_else(|| "Unable to locate git repository".to_string())?;
 
+    // Store-blob references serialize with upload/remove reclamation.
+    let _store_guard = lock_store_for_file(ctx.storage_root(), &loaded.full_id, &repo_root, path)?;
     let (task, added) = ReferenceService::attach_file_reference(
         &mut ctx.storage,
         &repo_root,
@@ -170,6 +198,8 @@ fn handle_remove_file(
     let repo_root = find_repo_root(ctx.storage_root())
         .ok_or_else(|| "Unable to locate git repository".to_string())?;
 
+    // Store-blob references serialize with upload/remove reclamation.
+    let _store_guard = lock_store_for_file(ctx.storage_root(), &loaded.full_id, &repo_root, path)?;
     let (task, removed) = ReferenceService::detach_file_reference(
         &mut ctx.storage,
         &repo_root,

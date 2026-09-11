@@ -5,6 +5,9 @@ use crate::services::agent_job_service::AgentJobService;
 use crate::services::automation_service::AutomationService;
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::task_validation::{self as validation};
+use crate::storage::TaskId;
+use crate::storage::identity::TaskLookupError;
+use crate::storage::locator::StorageLocator;
 use crate::storage::manager::Storage;
 use crate::storage::operations::StorageOperations;
 use crate::storage::sprint::SprintTaskEntry;
@@ -334,15 +337,25 @@ impl TaskService {
     }
 
     pub fn get(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
-        // If project not provided, derive prefix from ID (e.g., ABCD-1 -> ABCD)
-        let derived = id.split('-').next().unwrap_or("");
-        let p = project.unwrap_or(derived).to_string();
+        // Canonical parse: the project prefix is everything before the FINAL
+        // numeric suffix (ABCD-1 -> ABCD, ABC-OPS-12 -> ABC-OPS).
+        let parsed =
+            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let p = project.unwrap_or(&parsed.project).to_string();
         match storage.get(id, &p) {
             Some(mut t) => {
-                let config = Self::resolve_config_for_project(storage.root_path.as_path(), &p);
+                // Config and sprint memberships come from the tasks root that
+                // actually holds the task, not necessarily the primary one.
+                let config_root = match storage.resolve_task_location(id) {
+                    Ok(location) => location.root.clone(),
+                    Err(_) => storage.root_path.clone(),
+                };
+                let config = Self::resolve_config_for_project(config_root.as_path(), &p);
                 Self::ensure_task_defaults(&mut t, &config, false);
                 let sprint_lookup = Self::load_sprint_lookup(storage);
-                Ok(Self::to_dto(id, t, Some(&sprint_lookup)))
+                // Padded aliases (TP-001) surface the canonical spelling (TP-1)
+                // so all transports agree on the task identity.
+                Ok(Self::to_dto(&parsed.canonical(), t, Some(&sprint_lookup)))
             }
             None => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
@@ -350,9 +363,11 @@ impl TaskService {
 
     /// Add a comment to a task and fire `on.commented` automation rules.
     pub fn add_comment(storage: &mut Storage, id: &str, text: &str) -> LoTaRResult<TaskDTO> {
-        let derived = id.split('-').next().unwrap_or("");
+        let parsed =
+            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let canonical = parsed.canonical();
         let mut task = storage
-            .get(id, derived)
+            .get(id, &parsed.project)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
         let now = chrono::Utc::now().to_rfc3339();
@@ -373,11 +388,11 @@ impl TaskService {
             }],
         });
         task.modified = now;
-        storage.edit(id, &task)?;
+        storage.edit(&canonical, &task)?;
 
-        let config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(id, task, Some(&sprint_lookup));
+        let dto = Self::to_dto(&canonical, task, Some(&sprint_lookup));
         let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
         Ok(dto)
     }
@@ -390,9 +405,11 @@ impl TaskService {
         index: usize,
         text: &str,
     ) -> LoTaRResult<TaskDTO> {
-        let derived = id.split('-').next().unwrap_or("");
+        let parsed =
+            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let canonical = parsed.canonical();
         let mut task = storage
-            .get(id, derived)
+            .get(id, &parsed.project)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
         if index >= task.comments.len() {
@@ -415,11 +432,11 @@ impl TaskService {
                 }],
             });
             task.modified = now;
-            storage.edit(id, &task)?;
+            storage.edit(&canonical, &task)?;
         }
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Ok(Self::to_dto(id, task, Some(&sprint_lookup)))
+        Ok(Self::to_dto(&canonical, task, Some(&sprint_lookup)))
     }
 
     pub fn update(storage: &mut Storage, id: &str, patch: TaskUpdate) -> LoTaRResult<TaskDTO> {
@@ -432,23 +449,44 @@ impl TaskService {
         patch: TaskUpdate,
         context: TaskUpdateContext,
     ) -> LoTaRResult<TaskDTO> {
-        // Derive project prefix from ID (e.g., ABCD-1 -> ABCD) to locate the task
-        let derived = id.split('-').next().unwrap_or("");
-        // Cheap unlocked existence check keeps TaskNotFound lock-free.
-        storage
-            .get(id, derived)
-            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+        // Derive the project prefix from the canonical ID parse (final numeric
+        // suffix) to locate the task. `canonical` (padded aliases collapsed,
+        // e.g. TP-001 -> TP-1) is the single identity used for every
+        // comparison, staged write, event, automation run, and DTO response.
+        let parsed =
+            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let derived = parsed.project.clone();
+        let canonical = parsed.canonical();
+        // Cheap unlocked location check keeps TaskNotFound lock-free and
+        // refuses cross-root or ambiguous mutations before any side effect:
+        // transactions hold locks and a journal only for the primary root.
+        match storage.resolve_task_location(id) {
+            Ok(location) if !location.is_in_root(&storage.root_path) => {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                    id,
+                    location.root.display(),
+                    storage.root_path.display()
+                )));
+            }
+            Ok(_) => {}
+            Err(TaskLookupError::NotFound(_)) => {
+                return Err(LoTaRError::TaskNotFound(id.to_string()));
+            }
+            Err(err) => return Err(LoTaRError::ValidationError(err.to_string())),
+        }
 
         // Coordinated transaction (DEV-55): sprint memberships, task fields,
         // and any auto-populated project config validate fully and publish
         // together under the sprints + project locks. Errors leave every
         // affected file unchanged; automation runs strictly post-commit.
-        let mut txn = MultiFileTransaction::begin(&storage.root_path, &[derived.to_string()])?;
+        let mut txn =
+            MultiFileTransaction::begin(&storage.root_path, std::slice::from_ref(&derived))?;
         let existing = storage
-            .get(id, derived)
+            .get(id, &derived)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
 
-        let config = Self::resolve_config_for_project(storage.root_path.as_path(), derived);
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &derived);
 
         // Shared project-aware enum validation: raw patch strings are checked
         // against this task's project configuration and canonicalized before
@@ -484,9 +522,12 @@ impl TaskService {
             )?;
         }
 
-        let current_job_can_mutate = Self::current_job_matches_ticket(id);
+        // Canonical id for the active-job carveout: a job running for TP-1
+        // covers updates addressed through the padded alias TP-001, and the
+        // registry lookup must not miss it either.
+        let current_job_can_mutate = Self::current_job_matches_ticket(&canonical);
 
-        if AgentJobService::has_active_job(id)
+        if AgentJobService::has_active_job(&canonical)
             && !context.bypass_active_job_lock
             && !current_job_can_mutate
         {
@@ -705,7 +746,15 @@ impl TaskService {
             let records = SprintService::list(storage)?;
             let current_set: BTreeSet<u32> = records
                 .iter()
-                .filter(|record| record.sprint.tasks.iter().any(|entry| entry.id == id))
+                .filter(|record| {
+                    // Canonical match: legacy padded spellings (TP-001) count
+                    // as membership of the same task (TP-1).
+                    record
+                        .sprint
+                        .tasks
+                        .iter()
+                        .any(|entry| entry_matches_task(&entry.id, &canonical))
+                })
                 .map(|record| record.id)
                 .collect();
 
@@ -731,15 +780,18 @@ impl TaskService {
 
         Self::ensure_task_defaults(&mut t, &config, !explicit_tags);
         let (config, config_yaml) =
-            Self::plan_auto_populate_members(&storage.root_path, derived, &t, config)?;
-        Self::enforce_membership(&t, &config, derived)?;
+            Self::plan_auto_populate_members(&storage.root_path, &derived, &t, config)?;
+        Self::enforce_membership(&t, &config, &derived)?;
 
         t.sprints.clear();
 
         // Stage in deterministic order: sprints, config, task file.
         if let Some((mut records, desired_set)) = sprint_change {
-            let touched =
-                Self::apply_memberships_to_records(records.as_mut_slice(), id, &desired_set)?;
+            let touched = Self::apply_memberships_to_records(
+                records.as_mut_slice(),
+                &canonical,
+                &desired_set,
+            )?;
             for record in &records {
                 if touched.contains(&record.id) {
                     SprintService::stage_update(
@@ -753,12 +805,14 @@ impl TaskService {
         }
         let config_populated = config_yaml.is_some();
         if let Some(yaml) = config_yaml {
-            let config_path = crate::utils::paths::project_config_path(&storage.root_path, derived);
+            let config_path =
+                crate::utils::paths::project_config_path(&storage.root_path, &derived);
             txn.stage(&config_path, yaml)?;
         }
-        let project_path = storage.root_path.join(derived);
-        let (file_path, file_string) = StorageOperations::prepare_task_edit(&project_path, id, &t)
-            .map_err(crate::storage::manager::map_storage_error)?;
+        let project_path = storage.root_path.join(&derived);
+        let (file_path, file_string) =
+            StorageOperations::prepare_task_edit(&project_path, &canonical, &t)
+                .map_err(crate::storage::manager::map_storage_error)?;
         txn.stage(&file_path, file_string)?;
         txn.commit()?;
         if config_populated {
@@ -766,8 +820,8 @@ impl TaskService {
         }
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let previous_dto = Self::to_dto(id, existing, Some(&sprint_lookup));
-        let dto = Self::to_dto(id, t, Some(&sprint_lookup));
+        let previous_dto = Self::to_dto(&canonical, existing, Some(&sprint_lookup));
+        let dto = Self::to_dto(&canonical, t, Some(&sprint_lookup));
 
         if context.emit_api_event {
             let actor = resolve_current_user(Some(storage.root_path.as_path()));
@@ -790,12 +844,16 @@ impl TaskService {
             return false;
         };
         let trimmed_job_id = job_id.trim();
-        if trimmed_job_id.is_empty() || ticket_id.trim() != id {
+        // Canonical alias comparison: a job's env identity matches updates
+        // addressed through any valid padded alias of the same ticket.
+        // Unparseable values never match, keeping unrelated callers locked out.
+        if trimmed_job_id.is_empty() || !ticket_alias_matches(ticket_id.trim(), id) {
             return false;
         }
 
         AgentJobService::get_job(trimmed_job_id).is_some_and(|job| {
-            job.ticket_id == id && matches!(job.status.as_str(), "queued" | "running")
+            ticket_alias_matches(job.ticket_id.trim(), id)
+                && matches!(job.status.as_str(), "queued" | "running")
         })
     }
 
@@ -855,8 +913,10 @@ impl TaskService {
     }
 
     pub fn delete(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<bool> {
-        let derived = id.split('-').next().unwrap_or("");
-        let p = project.unwrap_or(derived);
+        let derived = TaskId::parse(id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?
+            .project;
+        let p = project.unwrap_or(&derived);
         storage.delete(id, p)
     }
 
@@ -902,14 +962,14 @@ impl TaskService {
                     .unwrap_or(false)
             })
             .map(|(id, mut t)| {
-                let project_prefix = id.split('-').next().unwrap_or("").to_string();
+                let project_prefix = TaskId::parse(&id)
+                    .map(|parsed| parsed.project)
+                    .unwrap_or_default();
                 let config = config_cache
                     .entry(project_prefix.clone())
                     .or_insert_with(|| {
-                        Self::resolve_config_for_project(
-                            storage.root_path.as_path(),
-                            &project_prefix,
-                        )
+                        let config_root = Self::config_root_for_prefix(storage, &project_prefix);
+                        Self::resolve_config_for_project(config_root.as_path(), &project_prefix)
                     });
                 Self::ensure_task_defaults(&mut t, config, false);
                 (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup)))
@@ -973,6 +1033,32 @@ impl TaskService {
     }
 
     pub(crate) fn load_sprint_lookup(storage: &Storage) -> HashMap<String, BTreeMap<u32, u32>> {
+        let mut map = Self::sprint_lookup_for_root(storage);
+
+        // DEV-56: merge sprint orders from sibling workspace roots so
+        // nested-root tasks resolve memberships from the root that actually
+        // holds them. Primary-root entries win when both roots mention the
+        // same task ID.
+        let primary = storage
+            .root_path
+            .canonicalize()
+            .unwrap_or_else(|_| storage.root_path.clone());
+        for candidate in StorageLocator::candidate_task_roots(&storage.root_path) {
+            if candidate == primary {
+                continue;
+            }
+            let sibling = Storage {
+                root_path: candidate,
+            };
+            for (task_id, orders) in Self::sprint_lookup_for_root(&sibling) {
+                map.entry(task_id).or_insert(orders);
+            }
+        }
+
+        map
+    }
+
+    fn sprint_lookup_for_root(storage: &Storage) -> HashMap<String, BTreeMap<u32, u32>> {
         let mut map: HashMap<String, BTreeMap<u32, u32>> = HashMap::new();
         let records = match SprintService::list(storage) {
             Ok(records) => records,
@@ -987,7 +1073,10 @@ impl TaskService {
                 if task_id.is_empty() {
                     continue;
                 }
-                let slot = map.entry(task_id.to_string()).or_default();
+                // Key canonically so legacy padded spellings (TP-001) are
+                // found by canonical lookups; unparseable ids stay verbatim.
+                let key = canonical_membership_key(task_id);
+                let slot = map.entry(key).or_default();
                 let order = entry.order.unwrap_or_else(|| {
                     let value = fallback_order;
                     fallback_order += 1;
@@ -998,6 +1087,23 @@ impl TaskService {
         }
 
         map
+    }
+
+    /// The tasks root that holds `prefix`; the primary root when the project
+    /// is missing or duplicated across roots (read-only display resolution).
+    fn config_root_for_prefix(storage: &Storage, prefix: &str) -> std::path::PathBuf {
+        if prefix.is_empty() {
+            return storage.root_path.clone();
+        }
+        let roots: Vec<std::path::PathBuf> =
+            StorageLocator::candidate_task_roots(&storage.root_path)
+                .into_iter()
+                .filter(|root| root.join(prefix).is_dir())
+                .collect();
+        match roots.as_slice() {
+            [single] => single.clone(),
+            _ => storage.root_path.clone(),
+        }
     }
 
     fn format_sprint_change(values: &BTreeSet<u32>) -> Option<String> {
@@ -1069,11 +1175,21 @@ impl TaskService {
         let mut found: BTreeSet<u32> = BTreeSet::new();
 
         for record in records.iter_mut() {
-            let contains = record.sprint.tasks.iter().any(|entry| entry.id == task_id);
+            // Canonical matching: legacy padded spellings (TP-001) are the
+            // same member as the canonical id (TP-1), so no duplicate
+            // entries are created and removal drops every spelling.
+            let contains = record
+                .sprint
+                .tasks
+                .iter()
+                .any(|entry| entry_matches_task(&entry.id, task_id));
             let should_have = desired.contains(&record.id);
 
             if contains && !should_have {
-                record.sprint.tasks.retain(|entry| entry.id != task_id);
+                record
+                    .sprint
+                    .tasks
+                    .retain(|entry| !entry_matches_task(&entry.id, task_id));
                 touched.insert(record.id);
             }
 
@@ -1276,7 +1392,56 @@ impl TaskService {
     }
 }
 
+/// Canonical membership comparison: two sprint entry ids denote the same
+/// member when their canonical parses agree. Unparseable ids compare
+/// verbatim so malformed legacy entries are still matched exactly.
+fn entry_matches_task(entry_id: &str, task_id: &str) -> bool {
+    match (
+        TaskId::parse(entry_id.trim()),
+        TaskId::parse(task_id.trim()),
+    ) {
+        (Ok(entry), Ok(task)) => entry == task,
+        _ => entry_id.trim() == task_id.trim(),
+    }
+}
+
+/// Canonical map key for a sprint membership entry id.
+fn canonical_membership_key(raw: &str) -> String {
+    TaskId::parse(raw.trim())
+        .map(|parsed| parsed.canonical())
+        .unwrap_or_else(|_| raw.trim().to_string())
+}
+
+/// Canonical alias equality for ticket identifiers (TP-1 == TP-001);
+/// unparseable values match nothing (fail closed).
+fn ticket_alias_matches(a: &str, b: &str) -> bool {
+    crate::storage::identity::aliases_match(a, b)
+}
+
 fn matches_review_state(status: &TaskStatus) -> bool {
     let value = status.as_str();
     value.eq_ignore_ascii_case("NeedsReview") || value.eq_ignore_ascii_case("Review")
+}
+
+#[cfg(test)]
+mod ticket_alias_tests {
+    use super::ticket_alias_matches;
+
+    #[test]
+    fn padded_aliases_match_their_canonical_ticket() {
+        assert!(ticket_alias_matches("TP-1", "TP-1"));
+        assert!(ticket_alias_matches("TP-001", "TP-1"));
+        assert!(ticket_alias_matches("TP-1", "TP-001"));
+        assert!(ticket_alias_matches("ABC-OPS-012", "ABC-OPS-12"));
+    }
+
+    #[test]
+    fn different_tickets_and_malformed_values_never_match() {
+        assert!(!ticket_alias_matches("TP-1", "TP-2"));
+        assert!(!ticket_alias_matches("TP-1", "DEV-1"));
+        assert!(!ticket_alias_matches("abc", "TP-1"));
+        assert!(!ticket_alias_matches("", "TP-1"));
+        assert!(!ticket_alias_matches("TP-+1", "TP-1"));
+        assert!(!ticket_alias_matches("TP-1-extra", "TP-1"));
+    }
 }

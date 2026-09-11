@@ -422,9 +422,11 @@ impl CommandHandler for ScanHandler {
                             // Movement/relocation resilience: if an existing key is present, ensure
                             // the corresponding task has a code reference for this file+line.
                             if let Some(task_id) = existing_key {
-                                let prefix = task_id.split('-').next().unwrap_or("");
+                                let prefix = crate::storage::TaskId::parse(&task_id)
+                                    .map(|parsed| parsed.project)
+                                    .unwrap_or_default();
                                 if crate::storage::manager::Storage::try_open(&_resolver.path)
-                                    .and_then(|storage| storage.get(&task_id, prefix))
+                                    .and_then(|storage| storage.get(&task_id, &prefix))
                                     .is_none()
                                 {
                                     // External ticket mentions do not imply a local task exists.

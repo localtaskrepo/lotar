@@ -152,7 +152,7 @@ impl SearchHandler {
                         .task_type
                         .to_string()
                         .cmp(&task_b.task_type.to_string()),
-                    "project" => id_a.split('-').next().cmp(&id_b.split('-').next()),
+                    "project" => project_prefix_of(id_a).cmp(&project_prefix_of(id_b)),
                     "id" => id_a.cmp(id_b),
                     other => {
                         let mut name_opt: Option<&str> = None;
@@ -300,9 +300,9 @@ impl SearchHandler {
         let display_tasks: Vec<crate::output::TaskDisplayInfo> = tasks
             .into_iter()
             .map(|(task_id, task)| {
-                let project = task_id
-                    .find('-')
-                    .map(|dash_pos| task_id[..dash_pos].to_string());
+                let project = crate::storage::TaskId::parse(&task_id)
+                    .ok()
+                    .map(|parsed| parsed.project);
 
                 crate::output::TaskDisplayInfo {
                     id: task_id,
@@ -602,4 +602,11 @@ impl<'a> TaskPostFilters<'a> {
 
         Ok(())
     }
+}
+
+fn project_prefix_of(id: &str) -> String {
+    crate::storage::TaskId::parse(id)
+        .ok()
+        .map(|parsed| parsed.project)
+        .unwrap_or_else(|| id.to_string())
 }

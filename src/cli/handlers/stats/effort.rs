@@ -101,14 +101,13 @@ pub(crate) fn run(
             }
         }
         tasks.retain(|(id, _t)| {
-            // Find the corresponding file for this task
-            let parts: Vec<&str> = id.split('-').collect();
-            if parts.len() < 2 {
+            // Find the corresponding file via the canonical ID parse
+            let Ok(parsed) = crate::storage::TaskId::parse(id) else {
                 return false;
-            }
-            let project = parts[0];
-            let num = parts[1];
-            let file_rel = tasks_rel.join(project).join(format!("{}.yml", num));
+            };
+            let file_rel = tasks_rel
+                .join(&parsed.project)
+                .join(format!("{}.yml", parsed.number));
             let mut commits =
                 match crate::services::audit_service::AuditService::list_commits_for_file(
                     &repo_root_real,

@@ -1,6 +1,6 @@
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::TaskFilter;
-use crate::storage::locator::StorageLocator;
+use crate::storage::identity::{self, TaskId, TaskLocation, TaskLookupError};
 use crate::storage::operations::StorageOperations;
 use crate::storage::search::StorageSearch;
 use crate::storage::task::Task;
@@ -59,74 +59,43 @@ impl Storage {
         StorageOperations::get(&self.root_path, id, project)
     }
 
+    /// Resolve a full task ID to its single storage location across the
+    /// primary and sibling workspace roots, failing closed (with diagnostics)
+    /// on malformed, unknown, or ambiguous identifiers.
+    pub fn resolve_task_location(&self, id: &str) -> Result<TaskLocation, TaskLookupError> {
+        identity::resolve(&self.root_path, id)
+    }
+
+    /// Resolve a bare numeric identifier to its single storage location,
+    /// failing closed when more than one project/root stores that number.
+    pub fn resolve_numeric_id(&self, numeric_id: &str) -> Result<(String, Task), TaskLookupError> {
+        let location = identity::resolve_numeric(&self.root_path, numeric_id)?;
+        if std::env::var("LOTAR_DEBUG_STATUS").is_ok() {
+            eprintln!(
+                "[lotar][debug]   matched numeric={} as {} under {}",
+                numeric_id,
+                location.full_id(),
+                location.root.display()
+            );
+        }
+        let task = StorageSearch::load_task_file(&location.file)
+            .ok_or_else(|| TaskLookupError::NotFound(location.full_id()))?;
+        Ok((location.full_id(), task))
+    }
+
+    /// Backward-compatible numeric lookup: `None` for not-found AND for
+    /// ambiguous numbers (never an arbitrary pick). Callers that can surface
+    /// a clear error should prefer [`Self::resolve_numeric_id`].
     pub fn find_task_by_numeric_id(&self, numeric_id: &str) -> Option<(String, Task)> {
         if !numeric_id.chars().all(|c| c.is_ascii_digit()) {
             return None;
         }
+        self.resolve_numeric_id(numeric_id).ok()
+    }
 
-        let debug_scan = std::env::var("LOTAR_DEBUG_STATUS").is_ok();
-
-        let candidate_roots = StorageLocator::candidate_task_roots(&self.root_path);
-
-        for root in candidate_roots {
-            if debug_scan {
-                eprintln!("[lotar][debug] scanning tasks root {}", root.display());
-                match std::fs::read_dir(&root) {
-                    Ok(entries) => {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            eprintln!(
-                                "[lotar][debug]   root entry: {} (dir={})",
-                                path.display(),
-                                path.is_dir()
-                            );
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!(
-                            "[lotar][debug]   unable to read root {}: {}",
-                            root.display(),
-                            err
-                        );
-                    }
-                }
-            }
-
-            for (prefix, dir_path) in crate::utils::filesystem::list_visible_subdirs(&root) {
-                if debug_scan {
-                    let candidate_file = dir_path.join(format!("{}.yml", numeric_id));
-                    eprintln!(
-                        "[lotar][debug]   probing numeric={} candidate_prefix={} dir={} exists={} file_exists={}",
-                        numeric_id,
-                        prefix,
-                        dir_path.display(),
-                        dir_path.exists(),
-                        candidate_file.exists()
-                    );
-                }
-
-                let full_id = format!("{}-{}", prefix, numeric_id);
-                if let Some(task) = StorageOperations::get(&self.root_path, &full_id, &prefix) {
-                    if debug_scan {
-                        eprintln!(
-                            "[lotar][debug]   matched numeric={} as {}",
-                            numeric_id, full_id
-                        );
-                    }
-                    return Some((full_id, task));
-                }
-            }
-        }
-
-        if debug_scan {
-            eprintln!(
-                "[lotar][debug] numeric={} not found under {}",
-                numeric_id,
-                self.root_path.display()
-            );
-        }
-
-        None
+    /// Parsed canonical identity, when the string is well-formed.
+    pub fn parse_task_id(&self, id: &str) -> Option<TaskId> {
+        TaskId::parse(id).ok()
     }
 
     pub fn edit(&mut self, id: &str, new_task: &Task) -> LoTaRResult<()> {

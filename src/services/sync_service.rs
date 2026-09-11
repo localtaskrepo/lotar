@@ -400,7 +400,9 @@ impl SyncJournal {
             };
             crate::storage::safety::validate_project_prefix(&link.project)
                 .map_err(LoTaRError::ValidationError)?;
-            if id.split('-').next() != Some(link.project.as_str())
+            let canonical_prefix_matches = crate::storage::TaskId::parse(id)
+                .is_ok_and(|parsed| parsed.project == link.project);
+            if !canonical_prefix_matches
                 || normalize_reference_for_remote(remote, reference).as_deref() != Some(reference)
             {
                 return Err(LoTaRError::ValidationError(
@@ -511,10 +513,12 @@ fn canonical_sync_project(root: &Path, project: &str) -> LoTaRResult<String> {
 
 fn canonical_sync_task_id(root: &Path, project: &str, id: &str) -> LoTaRResult<String> {
     use crate::storage::operations::StorageOperations;
-    // Do not duplicate the ID parser: storage currently accepts padding, a leading
-    // '+', and trailing segments. The actual resolved file is the operation key.
+    // Canonical ID parse (final numeric suffix; padded aliases like TP-001
+    // collapse to TP-1) plus a single-root existence check: sync
+    // canonicalization stays locked to the provided tasks workspace and never
+    // adopts a sibling-root task.
     if StorageOperations::get_project_for_task(id).as_deref() != Some(project)
-        || StorageOperations::get(root, id, project).is_none()
+        || StorageOperations::get_in_root(root, id, project).is_none()
     {
         return Err(LoTaRError::InvalidTaskId(id.to_string()));
     }
@@ -1019,11 +1023,10 @@ fn resolve_project_prefix(
         return Ok(Some(resolved));
     }
 
-    if let Some(task_id) = task_id {
-        let derived = task_id.split('-').next().unwrap_or("").trim();
-        if !derived.is_empty() {
-            return Ok(Some(derived.to_string()));
-        }
+    if let Some(task_id) = task_id
+        && let Ok(parsed) = crate::storage::TaskId::parse(task_id.trim())
+    {
+        return Ok(Some(parsed.project));
     }
 
     let default_project = mgr.get_resolved_config().default_project.trim().to_string();
@@ -1565,11 +1568,13 @@ fn perform_push(
                 let mut storage = Storage::new(&resolver.path.clone());
                 // Use the same identity prerequisites as the reference writer before
                 // issuing a non-idempotent remote request.
-                let local_project = task.id.split('-').next().unwrap_or("");
-                crate::storage::safety::validate_project_prefix(local_project)
+                let local_project = crate::storage::TaskId::parse(&task.id)
+                    .map_err(|err| LoTaRError::InvalidTaskId(format!("{}: {err}", task.id)))?
+                    .project;
+                crate::storage::safety::validate_project_prefix(&local_project)
                     .map_err(LoTaRError::ValidationError)?;
-                TaskService::get(&storage, &task.id, Some(local_project))?;
-                let task_path = sync_task_path(resolver, local_project, &task.id)?;
+                TaskService::get(&storage, &task.id, Some(&local_project))?;
+                let task_path = sync_task_path(resolver, &local_project, &task.id)?;
                 OpenOptions::new().write(true).open(&task_path)?;
                 if task_path
                     .parent()
@@ -1600,7 +1605,7 @@ fn perform_push(
                         })?;
                         let pending = journal.begin(PendingLink {
                             scope: pending_scope(remote, client),
-                            project: local_project.into(),
+                            project: local_project,
                             task_id: Some(task.id.clone()),
                             reference: None,
                         })?;
@@ -1678,7 +1683,7 @@ fn perform_push(
                         })?;
                         let pending = journal.begin(PendingLink {
                             scope: pending_scope(remote, client),
-                            project: local_project.into(),
+                            project: local_project,
                             task_id: Some(task.id.clone()),
                             reference: None,
                         })?;
@@ -4570,6 +4575,73 @@ mod tests {
             history: vec![],
             custom_fields: Default::default(),
         }
+    }
+
+    fn sync_workspace() -> (tempfile::TempDir, std::path::PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join(".tasks");
+        std::fs::create_dir_all(root.join("ABC-OPS")).unwrap();
+        std::fs::create_dir_all(root.join("TP")).unwrap();
+        std::fs::write(
+            root.join("ABC-OPS").join("12.yml"),
+            "title: nested\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("TP").join("1.yml"),
+            "title: padded\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
+        )
+        .unwrap();
+        (tmp, root)
+    }
+
+    #[test]
+    fn canonical_sync_task_id_accepts_hyphenated_prefix() {
+        let (_tmp, root) = sync_workspace();
+        let canonical = canonical_sync_task_id(&root, "ABC-OPS", "ABC-OPS-12").unwrap();
+        assert_eq!(canonical, "ABC-OPS-12");
+    }
+
+    #[test]
+    fn canonical_sync_task_id_collapses_padded_alias() {
+        let (_tmp, root) = sync_workspace();
+        // Padded spelling resolves to the same file and canonicalizes unpadded.
+        let canonical = canonical_sync_task_id(&root, "TP", "TP-001").unwrap();
+        assert_eq!(canonical, "TP-1");
+    }
+
+    #[test]
+    fn canonical_sync_task_id_rejects_wrong_project_for_hyphenated_id() {
+        let (_tmp, root) = sync_workspace();
+        // First-dash project ('ABC') must no longer satisfy the guard.
+        let err = canonical_sync_task_id(&root, "ABC", "ABC-OPS-12").unwrap_err();
+        assert!(matches!(err, LoTaRError::InvalidTaskId(_)), "{err}");
+    }
+
+    #[test]
+    fn canonical_sync_task_id_rejects_sibling_root_task() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Primary workspace: .tasks with a different project.
+        let primary = tmp.path().join("main").join(".tasks");
+        std::fs::create_dir_all(primary.join("DEV")).unwrap();
+        // Sibling workspace holding the target task.
+        let sibling = tmp.path().join("sibling").join(".tasks");
+        std::fs::create_dir_all(sibling.join("ABC-OPS")).unwrap();
+        std::fs::write(
+            sibling.join("ABC-OPS").join("12.yml"),
+            "title: elsewhere\nstatus: Todo\npriority: Medium\ntype: Feature\ncreated: 2026-01-01T00:00:00Z\n",
+        )
+        .unwrap();
+
+        let err = canonical_sync_task_id(&primary, "ABC-OPS", "ABC-OPS-12").unwrap_err();
+        assert!(matches!(err, LoTaRError::InvalidTaskId(_)), "{err}");
+    }
+
+    #[test]
+    fn canonical_sync_task_id_accepts_plain_primary_root_task() {
+        let (_tmp, root) = sync_workspace();
+        let canonical = canonical_sync_task_id(&root, "TP", "TP-1").unwrap();
+        assert_eq!(canonical, "TP-1");
     }
 
     #[test]

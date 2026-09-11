@@ -49,7 +49,15 @@ impl AttachmentService {
         Ok(root)
     }
 
-    pub fn store_bytes(root: &Path, original_filename: &str, bytes: &[u8]) -> LoTaRResult<String> {
+    /// Store `bytes` under `root`, deduplicated by content hash. Returns the
+    /// stored filename and whether this call created the file (false when an
+    /// identical file already existed), so callers can clean up orphaned
+    /// writes without deleting content other tasks still reference.
+    pub fn store_bytes(
+        root: &Path,
+        original_filename: &str,
+        bytes: &[u8],
+    ) -> LoTaRResult<(String, bool)> {
         fs::create_dir_all(root)?;
 
         let safe_original = sanitize_original_filename(original_filename);
@@ -86,12 +94,12 @@ impl AttachmentService {
         }
 
         if let Some((_path, name)) = existing_dot {
-            return Ok(name);
+            return Ok((name, false));
         }
 
         if let Some((dash_path, dash_name)) = existing_dash {
             let _ = dash_path;
-            return Ok(dash_name);
+            return Ok((dash_name, false));
         }
 
         let base_stem = if stem.is_empty() {
@@ -115,10 +123,76 @@ impl AttachmentService {
         {
             Ok(mut file) => {
                 file.write_all(bytes)?;
-                Ok(filename)
+                Ok((filename, true))
             }
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(filename),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok((filename, false)),
             Err(err) => Err(LoTaRError::IoError(err)),
+        }
+    }
+
+    /// Remove a stored attachment file this process just created. Only safe
+    /// for files reported as newly created by [`Self::store_bytes`]; deduped
+    /// pre-existing content must be preserved.
+    pub fn remove_created_file(root: &Path, stored_name: &str) {
+        let sanitized = sanitize_original_filename(stored_name);
+        let _ = fs::remove_file(root.join(sanitized));
+    }
+
+    /// Acquire the cross-process coordination lock for one attachments
+    /// store (root), backed by the same fs2 advisory locking as the task
+    /// storage locks (`.attachments-store.lock` inside the store directory,
+    /// bounded 2s contention retry, fail closed).
+    ///
+    /// Upload handlers hold it across `store_bytes` (dedup/create), the
+    /// reference attach, and failure cleanup; remove handlers hold it across
+    /// detach, reference re-check, and blob deletion — always in
+    /// store-lock -> task-lock order. A concurrent upload can never
+    /// dedupe-and-attach a blob that a failing request is still rolling
+    /// back, and a concurrent remove cannot delete a blob that an in-flight
+    /// attach is about to reference. Works across API processes because the
+    /// lock lives on the filesystem, not in process memory.
+    ///
+    /// The store directory is created if absent (idempotent; `store_bytes`
+    /// requires it too) so the lock target always exists; the lock file
+    /// itself is never removed.
+    pub fn lock_store(root: &Path) -> LoTaRResult<AttachmentStoreGuard> {
+        fs::create_dir_all(root)?;
+        let file = crate::storage::safety::acquire_storage_lock(root, "attachments-store")
+            .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+        Ok(AttachmentStoreGuard { _file: file })
+    }
+
+    /// Take the store coordination lock only when a file reference value
+    /// resolves INSIDE the attachments store, so attaching or detaching a
+    /// store blob from any surface (MCP, CLI) serializes with blob creation
+    /// and reclamation exactly like the REST upload/remove flows. Paths
+    /// outside the store return `None` and stay unlocked; unresolvable
+    /// values return `None` (the attach/detach call itself will reject them).
+    pub fn lock_store_for_repo_path(
+        tasks_root: &Path,
+        config: &crate::config::types::ResolvedConfig,
+        repo_root: &Path,
+        value: &str,
+    ) -> LoTaRResult<Option<AttachmentStoreGuard>> {
+        let Ok(store_root) = Self::resolve_attachments_root(tasks_root, config) else {
+            return Ok(None);
+        };
+        let repo_canonical = repo_root
+            .canonicalize()
+            .unwrap_or_else(|_| repo_root.to_path_buf());
+        let Ok(resolved) = crate::services::reference_service::ReferenceService::resolve_path(
+            &repo_canonical,
+            value.trim(),
+        ) else {
+            return Ok(None);
+        };
+        let store_canonical = store_root
+            .canonicalize()
+            .unwrap_or_else(|_| store_root.clone());
+        if resolved.starts_with(&store_canonical) {
+            Ok(Some(Self::lock_store(&store_root)?))
+        } else {
+            Ok(None)
         }
     }
 
@@ -127,7 +201,9 @@ impl AttachmentService {
         task_id: &str,
         file_rel: &str,
     ) -> LoTaRResult<TaskDTO> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -146,7 +222,7 @@ impl AttachmentService {
             storage.edit(task_id, &task)?;
         }
 
-        TaskService::get(storage, task_id, Some(derived))
+        TaskService::get(storage, task_id, Some(&derived))
     }
 
     pub fn extract_hash_tag(file_rel: &str) -> Option<String> {
@@ -299,7 +375,9 @@ impl AttachmentService {
         task_id: &str,
         file_rel: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
-        let derived = task_id.split('-').next().unwrap_or("");
+        let derived = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+            .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
@@ -325,7 +403,10 @@ impl AttachmentService {
             attached = true;
         }
 
-        Ok((TaskService::get(storage, task_id, Some(derived))?, attached))
+        Ok((
+            TaskService::get(storage, task_id, Some(&derived))?,
+            attached,
+        ))
     }
 
     pub fn resolve_attachment_path(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
@@ -416,4 +497,51 @@ fn truncate_component(value: &str, max_len: usize) -> String {
         return value.to_string();
     }
     value.chars().take(max_len).collect::<String>()
+}
+
+/// Guard for the per-store attachments coordination lock. Dropping it
+/// releases the underlying fs2 lock; the lock file itself stays behind.
+pub struct AttachmentStoreGuard {
+    _file: std::fs::File,
+}
+
+/// Test-only fault injection for the upload store/attach/cleanup sequence.
+/// Thread-local, like the DEV-55 transaction fault hooks: production code
+/// paths can never trigger it, and it is compiled out of release builds.
+#[cfg(test)]
+pub(crate) mod upload_fault {
+    use std::cell::{Cell, RefCell};
+    use std::sync::mpsc::{Receiver, Sender};
+
+    thread_local! {
+        static FAIL_NEXT_ATTACH: Cell<bool> = const { Cell::new(false) };
+        static PARK_AFTER_STORE: RefCell<Option<(Sender<()>, Receiver<()>)>> =
+            const { RefCell::new(None) };
+    }
+
+    /// Make the next attach on this thread fail after the blob was stored.
+    pub(crate) fn fail_next_attach() {
+        FAIL_NEXT_ATTACH.with(|cell| cell.set(true));
+    }
+
+    pub(crate) fn take_fail_next_attach() -> bool {
+        FAIL_NEXT_ATTACH.with(|cell| cell.replace(false))
+    }
+
+    /// Park the next store->attach transition on this thread: signal
+    /// `stored` once the blob exists, then block until `release`.
+    pub(crate) fn arm_park_after_store(stored: Sender<()>, release: Receiver<()>) {
+        PARK_AFTER_STORE.with(|slot| *slot.borrow_mut() = Some((stored, release)));
+    }
+
+    pub(crate) fn park_after_store_if_armed() {
+        PARK_AFTER_STORE.with(|slot| {
+            if let Some((stored, release)) = slot.borrow_mut().take() {
+                let _ = stored.send(());
+                // Bounded by the test, which always sends release or drops
+                // the sender (recv then errors and the park ends).
+                let _ = release.recv();
+            }
+        });
+    }
 }

@@ -47,6 +47,13 @@ impl AgentQueueService {
                 "Ticket id is required".to_string(),
             ));
         }
+        // Canonicalize at the queue boundary so dequeued starts and duplicate
+        // checks share one identity with the job registry.
+        let ticket_id = crate::storage::TaskId::parse(&ticket_id)
+            .map_err(|err| {
+                LoTaRError::ValidationError(format!("Invalid ticket id '{ticket_id}': {err}"))
+            })?
+            .canonical();
         let prompt = req.prompt.trim().to_string();
         if prompt.is_empty() {
             return Err(LoTaRError::ValidationError(
@@ -64,11 +71,12 @@ impl AgentQueueService {
 
         let mut inserted = false;
         with_locked_queue(tasks_dir, |state| {
-            if state
-                .pending
-                .iter()
-                .any(|item| item.ticket_id == ticket_id && item.agent == agent)
-            {
+            // Alias-aware duplicate check: legacy padded entries already in
+            // the persisted queue denote the same ticket.
+            if state.pending.iter().any(|item| {
+                crate::storage::identity::aliases_match(&item.ticket_id, &ticket_id)
+                    && item.agent == agent
+            }) {
                 return;
             }
             state.pending.push(entry.clone());
@@ -454,6 +462,63 @@ mod tests {
 
         assert!(AgentQueueService::enqueue(&tasks_dir, req.clone()).unwrap());
         assert!(!AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
+    }
+
+    #[test]
+    fn enqueue_canonicalizes_padded_aliases() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+
+        let req = AgentJobCreateRequest {
+            ticket_id: "TEST-001".to_string(),
+            prompt: "hello".to_string(),
+            runner: None,
+            agent: Some("implement".to_string()),
+        };
+        assert!(AgentQueueService::enqueue(&tasks_dir, req).unwrap());
+        let entries = dequeue_entries(&tasks_dir, 10).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].ticket_id, "TEST-1", "padded alias canonicalized");
+    }
+
+    #[test]
+    fn enqueue_deduplicates_padded_alias_against_legacy_entries() {
+        let dir = tempdir().unwrap();
+        let _guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DIR", dir.path().to_str().unwrap());
+        let _worker_guard = EnvGuard::set("LOTAR_AGENT_QUEUE_DISABLE_WORKER", "1");
+        let tasks_dir = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+
+        // Legacy persisted entry carrying a padded spelling.
+        AgentQueueService::enqueue(
+            &tasks_dir,
+            AgentJobCreateRequest {
+                ticket_id: "LEG-0007".to_string(),
+                prompt: "first".to_string(),
+                runner: None,
+                agent: Some("implement".to_string()),
+            },
+        )
+        .unwrap();
+        // Canonical spelling of the same ticket must not duplicate it.
+        let inserted = AgentQueueService::enqueue(
+            &tasks_dir,
+            AgentJobCreateRequest {
+                ticket_id: "LEG-7".to_string(),
+                prompt: "second".to_string(),
+                runner: None,
+                agent: Some("implement".to_string()),
+            },
+        )
+        .unwrap();
+        assert!(
+            !inserted,
+            "canonical spelling deduplicated against padded legacy entry"
+        );
         assert_eq!(pending_count(&tasks_dir).unwrap(), 1);
     }
 

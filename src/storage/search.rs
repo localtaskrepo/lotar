@@ -130,11 +130,21 @@ impl StorageSearch {
                 }
             }
         } else {
-            // Search across all projects
-            let subdirs = crate::utils::filesystem::list_visible_subdirs(root_path);
+            // Search across all projects of every candidate root (primary +
+            // sibling workspaces), matching the project-filtered branch so
+            // unfiltered queries discover the same nested-root tasks.
+            let subdirs = StorageLocator::candidate_task_roots(root_path)
+                .into_iter()
+                .flat_map(|candidate_root| {
+                    crate::utils::filesystem::list_visible_subdirs(&candidate_root)
+                        .into_iter()
+                        .map(move |(project_folder, dir_path)| {
+                            (project_folder, dir_path, candidate_root.clone())
+                        })
+                });
             let all_files: Vec<(String, std::path::PathBuf)> = subdirs
                 .into_iter()
-                .flat_map(|(project_folder, dir_path)| {
+                .flat_map(|(project_folder, dir_path, _root)| {
                     let files = crate::utils::filesystem::list_files_with_ext(&dir_path, "yml");
                     files.into_iter().map(move |p| (project_folder.clone(), p))
                 })

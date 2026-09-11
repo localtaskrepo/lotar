@@ -558,13 +558,12 @@ fn update_task_code_reference(
     code_ref: &str,
     live_refs: &[String],
 ) -> LoTaRResult<bool> {
-    let derived = task_id.split('-').next().unwrap_or("");
-    if derived.trim().is_empty() {
-        return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
-    }
+    let derived = crate::storage::TaskId::parse(task_id)
+        .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
+        .project;
 
     let mut task = storage
-        .get(task_id, derived)
+        .get(task_id, &derived)
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
 
     let changed = refresh_code_reference(&mut task.references, code_ref, live_refs);

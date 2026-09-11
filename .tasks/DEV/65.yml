@@ -1,14 +1,23 @@
 title: Separate task entities from query-scoped results and live updates
 status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-66, DEV-68]
-  depends_on: [DEV-57]
-  related: [DEV-43, DEV-51]
 priority: High
 type: Bug
 reporter: mallox
 created: 2026-09-06T11:10:31.612864+00:00
+modified: 2026-09-11T14:20:59.916096+00:00
+relationships:
+  depends_on:
+  - DEV-57
+  blocks:
+  - DEV-66
+  - DEV-68
+  related:
+  - DEV-43
+  - DEV-51
+  parent: DEV-53
+comments:
+- date: 2026-09-11T14:20:59.916096+00:00
+  text: 'DEV-56 smoke investigation confirmation (ticket stays Todo, not claimed fixed): the query-cache race is confirmed. Sequence: task-created SSE upserts the FRESH cache entry, then a BASE-scoped handleTaskCreated runs hydrateAll(clear:true) which replaces the shared query cache and drops the FRESH row; reproduced by holding a BASE-scoped list response open while the create lands. Interim mitigation applied in smoke only (appropriate query selection — selecting the FRESH cache before expecting the row), NOT a source fix. Full acceptance criteria for the real cache invalidation/scoping fix remain open here.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U6.
@@ -20,3 +29,8 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-11T14:20:59.916096+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

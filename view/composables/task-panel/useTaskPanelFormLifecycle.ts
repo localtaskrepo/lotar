@@ -2,6 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { nextTick, watch } from 'vue'
 import type { TaskDTO } from '../../api/types'
 import { toDateInputValue } from '../../utils/date'
+import { parseTaskId } from '../../utils/text'
 import type { TaskPanelFormState } from './useTaskPanelPersistence'
 
 type ActivityTab = 'comments' | 'relationships' | 'history' | 'commits' | 'references'
@@ -175,7 +176,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
 
     const applyTask = (data: TaskDTO) => {
         options.suppressWatch.value = true
-        const project = data.id ? data.id.split('-')[0] : options.form.project
+        const project = data.id ? (parseTaskId(data.id)?.project ?? '') : options.form.project
 
         options.form.id = data.id
         options.form.project = project || ''
@@ -227,7 +228,7 @@ export function useTaskPanelFormLifecycle(options: UseTaskPanelFormLifecycleOpti
 
     const projectForSuggestions = () => {
         if (options.form.project) return options.form.project
-        if (options.form.id) return options.form.id.split('-')[0] ?? ''
+        if (options.form.id) return parseTaskId(options.form.id)?.project ?? ''
         const initial = options.getInitialProject()
         if (initial) return initial
         if (options.defaults.value.project) return options.defaults.value.project

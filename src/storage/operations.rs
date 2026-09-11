@@ -1,5 +1,6 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
+use crate::storage::identity::{TaskId, TaskLocation};
 use crate::storage::safety::{atomic_write_file, validate_project_prefix, with_storage_lock};
 use crate::storage::task::Task;
 #[cfg(test)]
@@ -99,64 +100,97 @@ impl StorageOperations {
         })
     }
 
-    /// Get a task by ID
+    /// Get a task by ID, searching the primary root and sibling workspace
+    /// roots. Returns `None` when the ID is malformed, the explicit project
+    /// does not match the ID's prefix (project isolation), the task exists in
+    /// more than one root (ambiguous identity fails closed), or no root holds
+    /// it. Use [`Self::resolve`] for diagnostics on the failure cases.
     pub fn get(root_path: &Path, id: &str, project: &str) -> Option<Task> {
-        let read_task = |project_path: &Path| -> Option<Task> {
-            let file_path = Self::get_file_path_for_id(project_path, id)?;
-            // Route through the mtime-validated parse cache shared with search
-            crate::storage::search::StorageSearch::load_task_file(&file_path)
+        let parsed = match TaskId::parse(id) {
+            Ok(parsed) => parsed,
+            Err(_) => return None,
         };
 
-        if let Some(folder_from_id) = Self::get_project_for_task(id) {
-            // SECURITY: Enforce project isolation - verify the project folder from ID matches the provided project
-            let project_name: &str = if project.trim().is_empty() {
-                "default"
-            } else {
-                project
-            };
-
-            if !Self::is_safe_folder_name(project_name) {
-                return None;
-            }
-
-            // If the project folder extracted from ID doesn't match the provided project, deny access
-            if folder_from_id != project_name {
-                return None;
-            }
-
-            // Use filesystem-based file path resolution
-            let project_path = root_path.join(&folder_from_id);
-            if let Some(task) = read_task(&project_path) {
-                return Some(task);
-            }
-        }
-
-        // Fallback: try the provided project name (for backward compatibility)
+        // SECURITY: Enforce project isolation - verify the project prefix from
+        // the canonical ID parse matches the provided project
         let project_name: &str = if project.trim().is_empty() {
             "default"
         } else {
             project
         };
-
         if !Self::is_safe_folder_name(project_name) {
             return None;
         }
+        if parsed.project != project_name {
+            return None;
+        }
 
-        let project_path = root_path.join(project_name);
-        read_task(&project_path)
+        let locations = parsed.locate(root_path);
+        match locations.len() {
+            0 => None,
+            // Route through the mtime-validated parse cache shared with search
+            1 => crate::storage::search::StorageSearch::load_task_file(&locations[0].file),
+            // Duplicate ID across roots: identity is ambiguous, never guess.
+            _ => None,
+        }
+    }
+
+    /// Get a task restricted to a single tasks root, without sibling-root
+    /// discovery. Used where a caller must stay locked to one workspace
+    /// (sync canonicalization, project-scoped reads).
+    pub fn get_in_root(root_path: &Path, id: &str, project: &str) -> Option<Task> {
+        let parsed = match TaskId::parse(id) {
+            Ok(parsed) => parsed,
+            Err(_) => return None,
+        };
+        let project_name: &str = if project.trim().is_empty() {
+            "default"
+        } else {
+            project
+        };
+        if !Self::is_safe_folder_name(project_name) {
+            return None;
+        }
+        if parsed.project != project_name {
+            return None;
+        }
+        let file_path = root_path
+            .join(&parsed.project)
+            .join(format!("{}.yml", parsed.number));
+        if file_path.is_file() {
+            crate::storage::search::StorageSearch::load_task_file(&file_path)
+        } else {
+            None
+        }
+    }
+
+    /// Resolve a task ID to its single storage location across candidate
+    /// roots, with fail-closed ambiguity diagnostics.
+    pub fn resolve(
+        root_path: &Path,
+        id: &str,
+    ) -> Result<TaskLocation, crate::storage::identity::TaskLookupError> {
+        crate::storage::identity::resolve(root_path, id)
     }
 
     /// Edit an existing task
+    ///
+    /// Mutations are locked to the tasks root they are issued from: a task
+    /// stored in a sibling workspace root is refused before any side effect
+    /// (edit it from inside that workspace), and an ID duplicated across
+    /// roots is refused rather than guessed.
     pub fn edit(
         root_path: &Path,
         id: &str,
         new_task: &Task,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // Extract the project folder from the task ID
+        // Extract the project folder from the canonical task ID parse
         let project_folder = match Self::get_project_for_task(id) {
             Some(folder) => folder,
             None => return Err("Invalid task ID format".into()),
         };
+
+        Self::refuse_cross_root(root_path, id)?;
 
         let project_path = root_path.join(&project_folder);
 
@@ -199,6 +233,9 @@ impl StorageOperations {
     }
 
     /// Delete a task
+    ///
+    /// Like [`Self::edit`], deletion is locked to the issuing tasks root and
+    /// refuses cross-root or ambiguous targets before any side effect.
     pub fn delete(
         root_path: &Path,
         id: &str,
@@ -207,6 +244,24 @@ impl StorageOperations {
         if let Err(e) = validate_project_prefix(project) {
             return Err(e.into());
         }
+
+        // SECURITY: central project-isolation guard. The explicit project
+        // context must equal the ID's canonical prefix; the numeric suffix
+        // alone must never be re-targeted at a different project's folder
+        // (delete of DEV-5 with project=TP must not touch TP/5.yml).
+        let parsed = match TaskId::parse(id) {
+            Ok(parsed) => parsed,
+            Err(err) => return Err(format!("Invalid task ID '{id}': {err}").into()),
+        };
+        if parsed.project != project {
+            return Err(format!(
+                "Task ID '{id}' belongs to project '{}', not '{project}'; refusing to cross projects",
+                parsed.project
+            )
+            .into());
+        }
+
+        Self::refuse_cross_root(root_path, id)?;
 
         let project_path = root_path.join(project);
 
@@ -241,19 +296,18 @@ impl StorageOperations {
         file_path
     }
 
-    /// Get the file path for a task ID (relative to tasks root)
+    /// Get the file path for a task ID (relative to tasks root).
+    /// Uses the canonical parse: the FINAL dash-separated segment is the
+    /// numeric suffix, so hyphenated prefixes (`ABC-OPS-12`) resolve to
+    /// `ABC-OPS/12.yml`, and padded aliases (`TP-001`) resolve to `TP/1.yml`.
     pub fn get_file_path_for_id(project_path: &Path, task_id: &str) -> Option<PathBuf> {
-        // Extract numeric part from task ID (e.g., "TP-001" -> "1")
-        let parts: Vec<&str> = task_id.split('-').collect();
-        if parts.len() >= 2
-            && let Ok(numeric_id) = parts[1].parse::<u64>()
-        {
-            let file_path = project_path.join(format!("{}.yml", numeric_id));
-            if file_path.exists() {
-                return Some(file_path);
-            }
+        let id = TaskId::parse(task_id).ok()?;
+        let file_path = project_path.join(format!("{}.yml", id.number));
+        if file_path.exists() {
+            Some(file_path)
+        } else {
+            None
         }
-        None
     }
 
     /// Get the current highest task ID by scanning the project directory
@@ -269,14 +323,46 @@ impl StorageOperations {
             .unwrap_or(0)
     }
 
-    /// Get the actual project folder name for a given task ID
+    /// Get the actual project folder name for a given task ID, from the
+    /// canonical parse (e.g., "ABC-OPS-12" -> "ABC-OPS", "STAT-001" -> "STAT").
     pub fn get_project_for_task(task_id: &str) -> Option<String> {
-        // Extract the prefix from the task ID (e.g., "STAT-001" -> "STAT")
-        task_id
-            .split('-')
-            .next()
-            .filter(|prefix| crate::storage::safety::is_valid_project_prefix(prefix))
-            .map(|s| s.to_string())
+        TaskId::parse(task_id).ok().map(|id| id.project)
+    }
+
+    /// SECURITY: every id-bearing read/write helper that accepts an explicit
+    /// project context enforces that it equals the canonical ID prefix
+    /// (see [`Self::get`], [`Self::get_in_root`], [`Self::delete`]). Helpers
+    /// never silently substitute the provided project for the ID's own.
+    ///
+    /// Fail closed when `id` resolves to a task stored outside `root_path`,
+    /// or to more than one storage location. Mutations must not write through
+    /// a root whose locks and transaction journal they do not hold.
+    fn refuse_cross_root(root_path: &Path, id: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let parsed = match TaskId::parse(id) {
+            Ok(parsed) => parsed,
+            Err(_) => return Ok(()), // callers report invalid IDs themselves
+        };
+        let locations = parsed.locate(root_path);
+        match locations.as_slice() {
+            [] => Ok(()), // missing files surface as not-found downstream
+            [single] if single.is_in_root(root_path) => Ok(()),
+            [single] => Err(format!(
+                "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                single.full_id(),
+                single.root.display(),
+                root_path.display()
+            )
+            .into()),
+            many => Err(format!(
+                "Task ID '{}' matches multiple storage locations ({}); refusing to modify an arbitrary task",
+                id,
+                many.iter()
+                    .map(|location| location.file.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            )
+            .into()),
+        }
     }
 
     fn is_safe_folder_name(name: &str) -> bool {

@@ -609,12 +609,11 @@ impl AddHandler {
             let project_prefix = cli_project
                 .map(|name| resolve_project_input(name, resolver.path.as_path()))
                 .unwrap_or_else(|| {
-                    // Extract project from task ID (e.g., "TTF-1" -> "TTF")
-                    if let Some(dash_pos) = task_id.find('-') {
-                        task_id[..dash_pos].to_string()
-                    } else {
-                        crate::project::get_effective_project_name(resolver)
-                    }
+                    // Canonical project prefix from the ID's final numeric
+                    // suffix (e.g., "TTF-1" -> "TTF", "ABC-OPS-12" -> "ABC-OPS")
+                    crate::storage::TaskId::parse(task_id)
+                        .map(|parsed| parsed.project)
+                        .unwrap_or_else(|_| crate::project::get_effective_project_name(resolver))
                 });
 
             if let Some(task) = storage.get(task_id, &project_prefix) {

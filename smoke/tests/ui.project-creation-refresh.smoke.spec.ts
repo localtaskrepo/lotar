@@ -20,6 +20,33 @@ describe('UI project creation refresh', () => {
             const server = await startLotarServer(workspace);
             try {
                 await withPage(server.url, async page => {
+                    // Completion tracking for list hydrations: a pending
+                    // /api/tasks/list response is not a finished hydration.
+                    // The store replaces its map when a clear-hydrate
+                    // completes, so a list request still in flight at create
+                    // time could drop the optimistic upsert of the created
+                    // task and the row wait below would never pass.
+                    const pendingLists = new Set<unknown>();
+                    let seenLists = 0;
+                    page.on('request', request => {
+                        if (new URL(request.url()).pathname === '/api/tasks/list') {
+                            seenLists += 1;
+                            pendingLists.add(request);
+                        }
+                    });
+                    const trackResponse = (response: any) => {
+                        response
+                            .finished()
+                            .catch(() => {})
+                            .finally(() => pendingLists.delete(response.request()));
+                    };
+                    page.on('response', response => {
+                        if (new URL(response.url()).pathname === '/api/tasks/list') {
+                            trackResponse(response);
+                        }
+                    });
+                    page.on('requestfailed', request => pendingLists.delete(request));
+
                     await page.waitForSelector('text=DEV25 seed task', { timeout: 20_000 });
 
                     // Warm the always-mounted task panel's project snapshot.
@@ -65,9 +92,26 @@ describe('UI project creation refresh', () => {
                     const create = panel.getByRole('button', { name: 'Create task', exact: true });
                     await expect.poll(() => create.isEnabled(), { timeout: 10_000 }).toBe(true);
                     await panel.locator('input[placeholder="Title"]').fill('DEV25 task in fresh project');
+                    // Readiness gate: no list hydration may still be in
+                    // flight when the create commits.
+                    await expect
+                        .poll(() => pendingLists.size === 0 && seenLists > 0, { timeout: 10_000 })
+                        .toBe(true);
                     await create.click();
                     await panel.waitFor({ state: 'hidden', timeout: 10_000 });
 
+                    // The task list is scoped to the default project (BASE);
+                    // observing the created task through the FRESH project
+                    // filter waits on that refetch's completed state instead
+                    // of the default view, where the clearing hydrate races
+                    // SSE redelivery of the created task (reported separately).
+                    await page.click('[data-testid="filter-toggle"]');
+                    const projectFilter = page.locator('[data-testid="filter-project"]');
+                    await projectFilter.waitFor({ state: 'visible', timeout: 10_000 });
+                    await expect
+                        .poll(() => projectFilter.locator('option[value="FRESH"]').count(), { timeout: 10_000 })
+                        .toBeGreaterThan(0);
+                    await projectFilter.selectOption('FRESH');
                     await page.waitForSelector('text=DEV25 task in fresh project', { timeout: 15_000 });
                     expect(await page.evaluate(() => (window as any).__dev25NoReload)).toBe(true);
 

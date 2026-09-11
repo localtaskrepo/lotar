@@ -252,13 +252,15 @@ impl AutomationService {
         config: &ResolvedConfig,
     ) -> LoTaRResult<()> {
         let tasks_dir = storage.root_path.clone();
-        let project = current.id.split('-').next().unwrap_or("");
+        let project = crate::storage::TaskId::parse(&current.id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
         let (automation, _) = load_effective_automation(
             &tasks_dir,
             if project.is_empty() {
                 None
             } else {
-                Some(project)
+                Some(project.as_str())
             },
             Some(config),
         )?;
@@ -349,13 +351,15 @@ impl AutomationService {
         config: &ResolvedConfig,
     ) -> LoTaRResult<()> {
         let tasks_dir = storage.root_path.clone();
-        let project = task.id.split('-').next().unwrap_or("");
+        let project = crate::storage::TaskId::parse(&task.id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
         let (automation, _) = load_effective_automation(
             &tasks_dir,
             if project.is_empty() {
                 None
             } else {
-                Some(project)
+                Some(project.as_str())
             },
             Some(config),
         )?;
@@ -398,15 +402,14 @@ impl AutomationService {
         event: AutomationEvent,
         job_context: Option<AutomationJobContext>,
     ) -> LoTaRResult<()> {
-        let config =
-            resolve_config_for_project(tasks_dir, Some(ticket_id.split('-').next().unwrap_or("")))?;
+        let project_prefix = crate::storage::TaskId::parse(ticket_id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        let config = resolve_config_for_project(tasks_dir, Some(&project_prefix))?;
         let mut storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
-        let (automation, _) = load_effective_automation(
-            tasks_dir,
-            Some(ticket_id.split('-').next().unwrap_or("")),
-            Some(&config),
-        )?;
+        let (automation, _) =
+            load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
 
         let action_context = AutomationActionContext {
             event,
@@ -444,15 +447,14 @@ impl AutomationService {
         ticket_id: &str,
         event: AutomationEvent,
     ) -> LoTaRResult<SimulateResult> {
-        let config =
-            resolve_config_for_project(tasks_dir, Some(ticket_id.split('-').next().unwrap_or("")))?;
+        let project_prefix = crate::storage::TaskId::parse(ticket_id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        let config = resolve_config_for_project(tasks_dir, Some(&project_prefix))?;
         let storage = Storage::new(tasks_dir);
         let task = TaskService::get(&storage, ticket_id, None)?;
-        let (automation, _) = load_effective_automation(
-            tasks_dir,
-            Some(ticket_id.split('-').next().unwrap_or("")),
-            Some(&config),
-        )?;
+        let (automation, _) =
+            load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(&config))?;
 
         let active_sprints = compute_active_sprint_ids(&storage);
 
@@ -1315,9 +1317,11 @@ fn apply_sprint_action(
 
 /// Append a comment to a task via raw storage edit (used by automation comment action).
 fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -> LoTaRResult<()> {
-    let project_prefix = task_id.split('-').next().unwrap_or("");
+    let project_prefix = crate::storage::TaskId::parse(task_id)
+        .map(|parsed| parsed.project)
+        .unwrap_or_default();
     let mut task = storage
-        .get(task_id, project_prefix)
+        .get(task_id, &project_prefix)
         .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
     let now = chrono::Utc::now().to_rfc3339();
     task.comments.push(crate::types::TaskComment {
@@ -1386,11 +1390,13 @@ fn maybe_queue_agent_on_assignment(
     }
 
     // Check max_iterations safety net
-    if let Ok((automation, _)) = load_effective_automation(
-        tasks_dir,
-        Some(task.id.split('-').next().unwrap_or("")),
-        Some(config),
-    ) {
+    let project_prefix = crate::storage::TaskId::parse(&task.id)
+        .ok()
+        .map(|parsed| parsed.project)
+        .unwrap_or_default();
+    if let Ok((automation, _)) =
+        load_effective_automation(tasks_dir, Some(project_prefix.as_str()), Some(config))
+    {
         let limit = automation
             .automation
             .max_iterations()
@@ -1445,7 +1451,10 @@ fn maybe_queue_agent_on_assignment(
 fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
     AgentJobService::list_jobs()
         .iter()
-        .filter(|j| j.ticket_id == ticket_id && (j.status == "completed" || j.status == "failed"))
+        .filter(|j| {
+            crate::storage::identity::aliases_match(&j.ticket_id, ticket_id)
+                && (j.status == "completed" || j.status == "failed")
+        })
         .count()
 }
 
@@ -1466,9 +1475,11 @@ fn find_blocked_dependencies(
         if trimmed.is_empty() {
             continue;
         }
-        let prefix = trimmed.split('-').next().unwrap_or("");
+        let prefix = crate::storage::TaskId::parse(trimmed)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
         let status = storage
-            .get(trimmed, prefix)
+            .get(trimmed, &prefix)
             .map(|task| task.status)
             .map(|status| status.as_str().to_ascii_lowercase());
 

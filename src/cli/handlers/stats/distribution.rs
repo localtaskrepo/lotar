@@ -48,7 +48,9 @@ pub(crate) fn run(
             }
             crate::cli::args::stats::StatsDistributionField::Project => {
                 // Group by project prefix embedded in ID
-                let proj = t.id.split('-').next().unwrap_or("").to_string();
+                let proj = crate::storage::TaskId::parse(&t.id)
+                    .map(|parsed| parsed.project)
+                    .unwrap_or_default();
                 *freq.entry(proj).or_insert(0) += 1;
             }
             crate::cli::args::stats::StatsDistributionField::Tag => {
