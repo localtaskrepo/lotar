@@ -1,11 +1,11 @@
 title: 'Second-pass audit: safety fixes and contract consolidation'
-status: InProgress
+status: Done
 priority: High
 type: Feature
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T09:13:57.902147+00:00
-modified: 2026-09-06T13:19:38.915521+00:00
+modified: 2026-09-11T04:45:04.537670+00:00
 relationships:
   related:
   - DEV-17
@@ -77,6 +77,10 @@ comments:
   text: 'Checklist migration completed: all 27 TODO.md bullets are preserved verbatim in 26 existing DEV tickets, with full requirements added to descriptions and no duplicate tickets created. Line map: 1-5 -> DEV-1..5; 6 -> DEV-22; 7-22 -> DEV-6..21; 25 -> DEV-22; 26 -> DEV-23; 27 -> DEV-24; 28 -> DEV-25; 29 -> DEV-26. The duplicate comment-history entries share DEV-22. Preserved previously omitted details include template list selection (${{references[*].id}}), top-level/custom grouping plus per-group/grand totals, optional relationship inference respecting specific categories, and explicit default persistence in new ticket YAML. DEV-23 remains NeedsReview for the status/type ambiguity; a visible selector is not proof of the original serialization requirement. Original text was verified against the unchanged tracked checklist before deleting TODO.md. No live documentation links pointed to it; historical comments are retained. DEV is now the sole authoritative development backlog. Existing statuses and staged implementation changes were preserved.'
 - date: 2026-09-06T13:19:38.915521+00:00
   text: 'Backlog reconciliation and checklist migration verified: 84 DEV tickets total; 31 new scoped audit follow-ups; all 90 audit observations mapped; all 27 legacy checklist bullets preserved in 26 existing owners; 31 parent-child links and 20 reciprocal dependency edges with no cycles or dangling targets. Six stale Todos closed with evidence (DEV-11/22/24/26/27/29); DEV-14/23/25/28 remain NeedsReview for scope or verification. Totals: 50 Todo, 29 Done, 4 NeedsReview, 1 InProgress. TODO.md removed only after source-to-ticket wording verification. Only DEV ticket files and the checklist deletion are new working-tree changes; test/scenario projects and existing staged implementation changes were not altered. Native CLI parsing and structural validation passed; application test suites were not rerun for these metadata-only edits.'
+- date: 2026-09-11T04:41:37.418194+00:00
+  text: 'Reconciliation (ticket-mutation subagent, no git): the description CLOSURE clause retaining InProgress until the safety delivery is committed is obsolete under the current AGENTS.md completion policy: self-verified completed work is marked Done without waiting for commit or integration, and ticket completion is reported separately from commit state. That clause predates the current lifecycle and must not gate closure; no assertion is made here about the commit state of any delivery (DEV-54 comments cover different deliveries). The remaining closure conditions are substantiated by this ticket record: all 90 audit observations are mapped to explicit owners in the S/C/M/U/T/D coverage comments (31 scoped follow-ups DEV-54 through DEV-84 plus existing DEV-17/DEV-21), and each open child holds its own acceptance criteria and dependencies, so remaining obligations are explicitly transferred rather than implied by this umbrella. DEV-53 therefore represents the independently verified safety-wave scope (historical gates: lint clean; 844 Rust with 6 explicit Git skips; 262 UI; 98 smoke with 23 Git skips; 192 schema safety; platform/Git exclusions owned by DEV-79), not a claim that all children are fixed. Recommended evidence-based closure: mark DEV-53 Done once the coordinator confirms no untransferred obligation remains inside the safety scope; open children keep their scopes. Status intentionally left InProgress for that decision.'
+- date: 2026-09-11T04:45:04.515779+00:00
+  text: 'Closure: Outcome: safety-wave delivery closed Done as an independently verified, explicitly scoped delivery; this is not an umbrella claim that all audit findings are fixed, and deferred obligations stay open in their linked tickets. Evidence: historical verification gates recorded in this ticket description; description CLOSURE corrected via native CLI to the current self-verification/no-commit lifecycle with deferred owners named (transactions DEV-55, UI external-process/cross-tab refresh DEV-65, Git/platform coverage DEV-79, remaining DEV-54..DEV-84 follow-ups); the commit-gated closure clause is superseded. Coordinator final gates for the current reconciliation wave all pass: lint:agent, test:agent Rust 872 passed/6 skips/retries 0 and UI 275 passed, smoke:agent rebuilt 102 passed/23 skips/0 fail. Remaining: no child closed by this action; children keep their own scopes; Git/environment exclusions remain unverified under DEV-79. Guidance: no durable finding; no instruction edits required.'
 description: |-
   Second-pass audit umbrella and delivery log.
 
@@ -86,7 +90,7 @@ description: |-
 
   VERIFICATION: historical safety-wave gates passed (844 Rust with 6 explicit Git skips, 262 UI, 98 smoke with 23 Git skips, schema safety 192). DEV-79 owns excluded Git/Windows/platform coverage. Retry-assisted green runs do not prove determinism. Scanner remains conservative, with per-entry rollback and a non-locking-editor compare/rename gap. Ambiguous remote outcomes require manual reconciliation; Windows power-loss durability is not claimed. Crash-orphan temps are retained until DEV-84.
 
-  CLOSURE: retain InProgress until the safety delivery is committed and remaining obligations/verification are completed or explicitly transferred to their linked owners. Backlog reconciliation itself did not rerun application gates or modify implementation code.
+  CLOSURE: closed Done under the current self-verification lifecycle: the delivered safety wave was independently verified (see VERIFICATION) and ticket completion is independent of commit or integration timing; the earlier retain-InProgress-until-committed clause is obsolete and superseded. This closure covers only the delivered safety wave, not all audit findings: deferred obligations remain open in their linked tickets (transactions DEV-55, UI external-process/cross-tab refresh DEV-65, Git/platform coverage DEV-79, and the remaining DEV-54..DEV-84 follow-ups). Backlog reconciliation itself did not rerun application gates or modify implementation code.
 history:
 - at: 2026-09-06T09:14:44.455348+00:00
   actor: mallox
@@ -170,3 +174,41 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-11T04:41:37.418194+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:44:24.266772+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: |-
+      Second-pass audit umbrella and delivery log.
+
+      IMPLEMENTED: safety wave is reviewed/staged on main after committed DEV-52 (4f0ac4b), pending commit: config redaction/containment/typed normalization; fail-closed locks, task YAML preservation and safe atomic replacement; removed unsafe temp sweeps; scanner source/reference integrity; agent lifecycle/isolation/cancellation/output safety; selected UI scope/panel/selection guards; sync recovery and reports; noninteractive deletion confirmation; cooldown validation; selected assertions/docs. Prior comments retain the chronological worktree and transfer history.
+
+      REMAINING: DEV-54 through DEV-84 now hold scoped acceptance criteria and dependencies. Existing DEV-21 owns terminal-state configuration/analytics and DEV-17 owns README. This umbrella must not be interpreted as all audit findings fixed. Audit S/C/M/U/T/D ordinal coverage is recorded in comments below.
+
+      VERIFICATION: historical safety-wave gates passed (844 Rust with 6 explicit Git skips, 262 UI, 98 smoke with 23 Git skips, schema safety 192). DEV-79 owns excluded Git/Windows/platform coverage. Retry-assisted green runs do not prove determinism. Scanner remains conservative, with per-entry rollback and a non-locking-editor compare/rename gap. Ambiguous remote outcomes require manual reconciliation; Windows power-loss durability is not claimed. Crash-orphan temps are retained until DEV-84.
+
+      CLOSURE: retain InProgress until the safety delivery is committed and remaining obligations/verification are completed or explicitly transferred to their linked owners. Backlog reconciliation itself did not rerun application gates or modify implementation code.
+    new: |-
+      Second-pass audit umbrella and delivery log.
+
+      IMPLEMENTED: safety wave is reviewed/staged on main after committed DEV-52 (4f0ac4b), pending commit: config redaction/containment/typed normalization; fail-closed locks, task YAML preservation and safe atomic replacement; removed unsafe temp sweeps; scanner source/reference integrity; agent lifecycle/isolation/cancellation/output safety; selected UI scope/panel/selection guards; sync recovery and reports; noninteractive deletion confirmation; cooldown validation; selected assertions/docs. Prior comments retain the chronological worktree and transfer history.
+
+      REMAINING: DEV-54 through DEV-84 now hold scoped acceptance criteria and dependencies. Existing DEV-21 owns terminal-state configuration/analytics and DEV-17 owns README. This umbrella must not be interpreted as all audit findings fixed. Audit S/C/M/U/T/D ordinal coverage is recorded in comments below.
+
+      VERIFICATION: historical safety-wave gates passed (844 Rust with 6 explicit Git skips, 262 UI, 98 smoke with 23 Git skips, schema safety 192). DEV-79 owns excluded Git/Windows/platform coverage. Retry-assisted green runs do not prove determinism. Scanner remains conservative, with per-entry rollback and a non-locking-editor compare/rename gap. Ambiguous remote outcomes require manual reconciliation; Windows power-loss durability is not claimed. Crash-orphan temps are retained until DEV-84.
+
+      CLOSURE: closed Done under the current self-verification lifecycle: the delivered safety wave was independently verified (see VERIFICATION) and ticket completion is independent of commit or integration timing; the earlier retain-InProgress-until-committed clause is obsolete and superseded. This closure covers only the delivered safety wave, not all audit findings: deferred obligations remain open in their linked tickets (transactions DEV-55, UI external-process/cross-tab refresh DEV-65, Git/platform coverage DEV-79, and the remaining DEV-54..DEV-84 follow-ups). Backlog reconciliation itself did not rerun application gates or modify implementation code.
+- at: 2026-09-11T04:45:04.515779+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:45:04.537670+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

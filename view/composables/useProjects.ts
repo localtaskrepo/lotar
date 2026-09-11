@@ -1,8 +1,32 @@
-import { computed, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
 import type { ApiClient } from '../api/client'
 import { api } from '../api/client'
 import type { ProjectDTO, ProjectStatsDTO } from '../api/types'
 import { createResource } from './useResource'
+
+type ProjectsChangeListener = () => void | Promise<void>
+
+const projectsChangeListeners = new Set<ProjectsChangeListener>()
+
+/**
+ * Ask every live useProjects instance with an already-loaded snapshot to
+ * refresh, so mounted project selectors pick up mutations (e.g. a project
+ * created in ConfigView) without a browser reload. Instances that never
+ * loaded stay lazy and fetch on demand. Resolves once every listener has
+ * settled; one failing listener cannot break the others.
+ */
+export async function notifyProjectsChanged(): Promise<void> {
+  const listeners = [...projectsChangeListeners]
+  await Promise.all(
+    listeners.map(async (listener) => {
+      try {
+        await listener()
+      } catch (error) {
+        console.warn('useProjects: projects change listener failed', error)
+      }
+    }),
+  )
+}
 
 export function createUseProjects(client: ApiClient) {
   const total = ref(0)
@@ -68,6 +92,18 @@ export function createUseProjects(client: ApiClient) {
   async function loadStats(project: string) {
     const result = await statsResource.refresh(project)
     return result
+  }
+
+  function handleProjectsChanged() {
+    if (projectsResource.status.value === 'idle') return
+    return refresh()
+  }
+
+  projectsChangeListeners.add(handleProjectsChanged)
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      projectsChangeListeners.delete(handleProjectsChanged)
+    })
   }
 
   return {

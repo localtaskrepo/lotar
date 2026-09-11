@@ -436,10 +436,11 @@ import UiSelect from '../components/UiSelect.vue'
 import { showToast } from '../components/toast'
 import { useConfigForm } from '../composables/useConfigForm'
 import { useConfigScope } from '../composables/useConfigScope'
+import { notifyProjectsChanged } from '../composables/useProjects'
 import { formatProjectLabel } from '../utils/projectLabels'
 import { detectPrefixConflict, normalizePrefixInput, suggestUniquePrefix, validateProjectName, validateProjectPrefix } from '../utils/projectPrefix'
 
-const { projects, project, loading, error: loadError, inspectData, lastLoadedAt, reload, refreshProjects } = useConfigScope()
+const { projects, project, loading, error: loadError, inspectData, lastLoadedAt, reload } = useConfigScope()
 const saving = ref(false)
 const helpOpen = ref(false)
 const saveError = ref<string | null>(null)
@@ -554,7 +555,9 @@ async function submitCreateProject() {
     showToast(`Created project ${created.name}`)
     createOpen.value = false
     resetCreateDialog()
-    await refreshProjects()
+    // Refresh every live useProjects snapshot (this page plus always-mounted
+    // consumers like the task panel) so the new project appears without a reload.
+    await notifyProjectsChanged()
     project.value = created.prefix
     await reload(created.prefix)
   } catch (err: any) {

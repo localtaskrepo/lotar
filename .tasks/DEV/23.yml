@@ -1,11 +1,11 @@
 title: 'BUG: Default task type field missing on creation'
-status: NeedsReview
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.815112+00:00
-modified: 2026-09-06T13:12:54.177536+00:00
+modified: 2026-09-11T04:44:53.141246+00:00
 comments:
 - date: 2026-09-06T11:21:52.521107+00:00
   text: 'Backlog reconciliation: creation already exposes a type selector and applies configured defaults; backend effective_default_task_type exists. DEV-53 also has reviewed/staged project-load/readiness protection. NeedsReview for scope/reproduction, not a claim that every default-type issue is fixed: verify a non-first configured type, project switching and pending/failed config, and clarify whether the original report concerned the creation selector or config editor. Remaining cross-transport mutation/default validation is DEV-54.'
@@ -13,6 +13,10 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 26: When a ticket is created with the default type (ToDo), the field is missing. The configs should be implicit, but tickets should be explicit.
+- date: 2026-09-11T04:41:27.911335+00:00
+  text: 'Reconciliation evidence (ticket-mutation subagent, no git): explicit default persistence now has dedicated regression coverage. tests/task_creation_file_format_test.rs L50 verifies a defaults-only creation persists status/priority/type as explicit YAML keys (default priority Medium deliberately non-first) and a fresh-storage reload via TaskService::get agrees; L105 verifies project-configured non-first defaults (InProgress/High/Bug) serialize explicitly and survive reload. This covers the migrated acceptance, including the non-first configured-type case flagged earlier, at the service layer REST also uses. Status remains NeedsReview pending the coordinator full gate run; Done is justified once gates pass. Cross-transport mutation/default validation stays with DEV-54.'
+- date: 2026-09-11T04:44:53.117779+00:00
+  text: 'Closure: Outcome: default-valued creation persists resolved defaults (status, priority, task type) as explicit YAML keys, including project-configured non-first defaults, and reload agrees at the service layer REST also uses. Evidence: tests/task_creation_file_format_test.rs:50,105; coordinator gates all pass: npm run lint:agent (vue-tsc; clippy all-target and all-feature; fmt), npm run test:agent Rust 872 passed/6 skips/retries 0 and UI 275 passed, smoke:agent (pw-browsers path with chromium --no-sandbox,--no-zygote,--single-process) rebuilt 102 passed/23 skips/0 fail. Remaining: none in this scope; cross-transport mutation/default validation stays with DEV-54. Guidance: no durable finding.'
 description: |-
   Migrated checklist requirements:
   Clarified original symptom: newly created ticket files should persist explicit default values rather than rely on implicit configuration. This is not merely a missing UI selector. The original text calls ToDo a type although it resembles a status label; confirm which field(s) are affected. Acceptance: default-valued creation persists the intended explicit YAML fields and reload/API values agree. Keep NeedsReview until the serialized default case is verified; the presence of a type selector alone is insufficient. Coordinate DEV-54.
@@ -40,3 +44,17 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-11T04:41:27.911335+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:44:53.117779+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:44:53.141246+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: Done

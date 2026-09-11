@@ -1,11 +1,11 @@
 title: 'BUG: Creating a new project does not refresh the UI'
-status: NeedsReview
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.825888+00:00
-modified: 2026-09-06T13:12:54.221855+00:00
+modified: 2026-09-11T04:44:53.171857+00:00
 comments:
 - date: 2026-09-06T11:21:52.549652+00:00
   text: 'Backlog reconciliation: ConfigView creates a project, refreshes its own project list, selects it and reloads config. Other useProjects consumers have separate instances, so that does not prove whole-UI refresh. NeedsReview to identify the original failing surface and verify config/global selectors plus opening task creation without reload. Do not close on local ConfigView refresh alone. Broader query/entity scope work is DEV-65.'
@@ -13,6 +13,10 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 28: Creating a new project doesn't update the UI until the page is reloaded
+- date: 2026-09-11T04:41:27.898966+00:00
+  text: 'Reconciliation progress (ticket-mutation subagent, no git): implementation and coverage verified by reading current files; no source changes made. Delivered scope: shared invalidation registry in view/composables/useProjects.ts (notifyProjectsChanged at L18 refreshes every loaded mounted instance, keeps never-loaded instances lazy, contains per-listener failures; registration and scope-disposal unlisten at L97-107) and ConfigView create flow awaiting the notifier after createProject (view/pages/ConfigView.vue:558-562). Coverage: 5 unit tests in view/__tests__/useProjects.invalidation.spec.ts (loaded-instance refresh L39, laziness L62, per-instance error containment L88, dispose-unlisten L114, ConfigView propagation into a warmed second instance L225) plus durable warm-panel no-reload browser test smoke/tests/ui.project-creation-refresh.smoke.spec.ts (warms the always-mounted task panel snapshot, whose ensureProjectsLoaded only fetches when empty at view/composables/task-panel/useTaskPanelFormLifecycle.ts:222, then SPA-creates a project, reopens the panel, creates a task in it, and a window marker proves no reload). Static review of invalidation races and disposal: none found; createResource generation guard discards stale responses (view/composables/useResource.ts:42-72), the listener snapshot prevents mutation-during-iteration, and disposal mid-notify only drops the listener. Status set to InProgress while full gates run; closure to Done waits on coordinator-supplied npm run lint, npm test, and npm run smoke results including red/green evidence for the new smoke test. Broader query/entity invalidation remains DEV-65.'
+- date: 2026-09-11T04:44:53.152127+00:00
+  text: 'Closure: Outcome: project creation now propagates to every loaded mounted useProjects instance (always-mounted task panel, ConfigView scope selector, page consumers) without browser reload; lazy instances stay lazy, per-instance refresh failures are contained, listeners are disposed with their owner scope. Evidence: view/composables/useProjects.ts:18,97-107 and view/pages/ConfigView.vue:558-562; 5 unit tests view/__tests__/useProjects.invalidation.spec.ts; durable warm-panel no-reload smoke smoke/tests/ui.project-creation-refresh.smoke.spec.ts; implementing agent executed red (without fix: stale warmed dropdown fails) then green with fix, alongside coordinator gates all pass: npm run lint:agent, npm run test:agent Rust 872 passed/6 skips/retries 0 and UI 275 passed, smoke:agent rebuilt 102 passed/23 skips/0 fail. Remaining: external-process/cross-tab refresh and broader query/entity invalidation stay with DEV-65. Guidance: no durable finding.'
 description: |-
   Migrated checklist requirements:
   Verify project creation propagates to the intended already-mounted UI surfaces without browser reload. ConfigView refreshes locally, but that alone does not prove global selectors/task creation refresh. Keep NeedsReview and preserve the need for an exact failing-surface reproduction.
@@ -40,3 +44,23 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-11T04:40:56.042538+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: InProgress
+- at: 2026-09-11T04:41:27.898966+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:44:53.152127+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:44:53.171857+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

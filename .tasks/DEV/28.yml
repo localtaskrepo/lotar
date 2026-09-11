@@ -1,14 +1,18 @@
 title: 'BUG: CLI single-field commands bypass automation'
-status: NeedsReview
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
 assignee: mallox
 created: 2026-08-07T22:48:10.842304+00:00
-modified: 2026-09-06T11:21:52.598022+00:00
+modified: 2026-09-11T04:45:04.503718+00:00
 comments:
 - date: 2026-09-06T11:21:52.580269+00:00
   text: 'Backlog reconciliation: the blanket automation-bypass claim is stale. Committed status, priority, assignee, due-date and effort handlers use TaskService::update; status and assignee have smoke coverage. NeedsReview for confirming the original command inventory and priority/due/effort set-clear regressions, not renewed implementation of already-routed commands. DEV-77 owns focused coverage and DEV-54 remaining shared mutation validation.'
+- date: 2026-09-11T04:41:27.923002+00:00
+  text: 'Reconciliation evidence (ticket-mutation subagent, no git): tests/cli_single_field_automation_test.rs adds 7 DEV-28-tagged regressions driving the real lotar binary in isolated temporary workspaces with deterministic automation markers: priority set L160, priority no-op L179, due-date set L195, effort set+clear with unrelated-update non-refire L214, effort-clear no-op L249, status+assignee set L263, and nested task subcommand aliases across all five handlers with effort clear L294. Each asserts markers fired exactly once, persisted task YAML values, and getter reload agreement, confirming the single-field inventory routes through TaskService::update so on.updated automation observes changes. This closes the priority/due/effort set-clear regression gap previously kept open. Status remains NeedsReview pending the coordinator full gate run; broader focused coverage stays with DEV-77.'
+- date: 2026-09-11T04:45:04.481300+00:00
+  text: 'Closure: Outcome: all single-field CLI commands (status, priority, assignee, duedate, effort, plus nested task aliases) persist through TaskService::update so on.updated automation observes changes; no-op and clear-on-empty updates do not fire automation. Evidence: tests/cli_single_field_automation_test.rs 7 tests (L160, L179, L195, L214, L249, L263, L294) against the real binary; coordinator gates all pass: npm run lint:agent, npm run test:agent Rust 872 passed/6 skips/retries 0 and UI 275 passed, smoke:agent rebuilt 102 passed/23 skips/0 fail. Remaining: none in this scope; broader focused coverage stays with DEV-77 and shared mutation validation with DEV-54. Guidance: no durable finding.'
 history:
 - at: 2026-09-06T11:21:52.580269+00:00
   actor: mallox
@@ -22,3 +26,17 @@ history:
     new: NeedsReview
   - field: assignee
     new: mallox
+- at: 2026-09-11T04:41:27.923002+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:45:04.481300+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-11T04:45:04.503718+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: NeedsReview
+    new: Done
