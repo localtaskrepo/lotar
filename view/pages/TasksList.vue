@@ -121,10 +121,15 @@
       </FilterBar>
     </div>
 
+    <div v-if="error && hasTasks" class="card refresh-error" role="alert">
+      <span class="refresh-error__message">Refresh failed: {{ error }}</span>
+      <UiButton variant="ghost" type="button" :disabled="loading" @click="retry">Retry</UiButton>
+    </div>
+
     <div class="col" style="gap: 16px;">
       <UiLoader v-if="loading && !hasTasks" size="md" />
       <UiEmptyState
-        v-else-if="error"
+        v-else-if="error && !hasTasks"
         title="We couldn't load tasks"
         :description="error"
         primary-label="Retry"
@@ -334,7 +339,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
@@ -357,7 +362,7 @@ import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTaskStore } from '../composables/useTaskStore'
+import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import type { ColKey } from '../composables/useColumns'
 import {
     colKeyToSortBy,
@@ -371,8 +376,29 @@ import { storageGet, storageGetJson, storageRemove, storageSet, storageSetJson }
 
 const router = useRouter()
 const store = useTaskStore()
-const loading = computed(() => store.status.value === 'loading')
-const error = computed(() => store.error.value)
+// DEV-65: the page reads its keyed query handle instead of the shared flat
+// surface, so simultaneous consumers cannot overwrite each other's results.
+const tasksQuery = shallowRef<TaskQueryHandle | null>(null)
+let activeQueryHandle: TaskQueryHandle | null = null
+let activeQueryKey = ''
+function adoptQuery(handle: TaskQueryHandle) {
+  if (activeQueryKey === handle.key) return
+  activeQueryHandle?.release()
+  activeQueryHandle = handle
+  activeQueryKey = handle.key
+  handle.retain()
+  tasksQuery.value = handle
+}
+// A newly adopted key with no snapshot whose refresh has not started yet
+// (queued behind a prior hydration). Rows ALWAYS come from the adopted
+// handle — the previous key's rows are never rendered under a new filter;
+// the pending state shows an explicit loader instead of a false empty state.
+const pendingNewQuery = computed(() => {
+  const query = tasksQuery.value
+  return !!query && !query.hasSnapshot.value && query.status.value === 'idle'
+})
+const loading = computed(() => tasksQuery.value?.status.value === 'loading' || pendingNewQuery.value)
+const error = computed(() => tasksQuery.value?.error.value ?? null)
 const { openTaskPanel } = useTaskPanelController()
 
 const MAX_PAGE_LIMIT = 200
@@ -557,9 +583,10 @@ watch(
 // The page never re-sorts client-side, so mixed-offset timestamps and the
 // server's timezone-sensitive date handling can never diverge from what the
 // user sees — and the CSV export, produced from the same query, matches.
+const queryTasks = computed<TaskDTO[]>(() => tasksQuery.value?.tasks.value ?? [])
 const shownTasks = computed(() => {
-  const ranks = store.orderIndex?.value
-  const items = store.items.value || []
+  const ranks = tasksQuery.value?.ranks.value
+  const items = queryTasks.value
   const all = ranks && ranks.size
     ? [...items].sort((a, b) => {
         const ra = ranks.get(a.id) ?? Number.MAX_SAFE_INTEGER
@@ -572,7 +599,7 @@ const shownTasks = computed(() => {
   return all.slice(start, end)
 })
 const shownCount = computed(() => shownTasks.value.length)
-const totalCount = computed(() => store.count.value)
+const totalCount = computed(() => tasksQuery.value?.total.value ?? 0)
 const pageStart = computed(() => (totalCount.value > 0 ? pageOffset.value + 1 : 0))
 const pageEnd = computed(() => Math.min(pageOffset.value + shownCount.value, totalCount.value))
 const hasPrevPage = computed(() => pageOffset.value > 0)
@@ -706,11 +733,14 @@ async function applyFilter(raw: Record<string,string>, nav: NavMode = 'push', pa
   if (disposed || request !== filterGeneration) return
   await refreshConfig(serverFilter.project)
   if (disposed || request !== filterGeneration) return
-  // The shared store has no cancellation contract. Serialize our hydrations so
-  // an older query cannot replace a newer result after selection is enabled.
+  // DEV-65: adopt the keyed query for this server filter. The store rejects
+  // stale completions per query; the queue below still serializes our own
+  // hydrations so an older query cannot replace a newer result after
+  // selection is enabled.
+  adoptQuery(store.getQuery(serverFilter))
   hydrateQueue = hydrateQueue.catch(() => {}).then(async () => {
     if (disposed || request !== filterGeneration) return
-    await store.hydrateAll(serverFilter, { clear: true })
+    await activeQueryHandle?.refresh()
   })
   await hydrateQueue
   if (disposed || request !== filterGeneration) return
@@ -824,7 +854,9 @@ const bulkMenuPopover = ref<HTMLElement | null>(null)
 
 const scopedSelection = computed(() => {
   if (!selectionReady.value) return []
-  const ids = new Set(store.items.value.filter(task => !filter.value.project || projectOf(task.id) === filter.value.project).map(task => task.id))
+  // DEV-65: scope selection to the keyed query membership (the server's
+  // filtered set) instead of re-deriving a project-only predicate client-side.
+  const ids = new Set(queryTasks.value.map(task => task.id))
   return selectedIds.value.filter(id => ids.has(id))
 })
 const disableBulkActions = computed(() => !scopedSelection.value.length)
@@ -1246,24 +1278,14 @@ const { refresh: refreshProjects } = useProjects()
 
 let sse: { es: EventSource; close(): void; on(event: string, handler: (e: MessageEvent) => void): void; off(event: string, handler: (e: MessageEvent) => void): void } | null = null
 const sseUnsubscribers: Array<() => void> = []
-let refreshTimer: any = null
 let disposed = false
 let suppressRouteSync = false
 let suppressFilterWatch = false
 
-function scheduleRefresh() {
-  if (disposed) return
-  if (refreshTimer) return
-  refreshTimer = setTimeout(async () => {
-    refreshTimer = null
-    if (disposed) return
-    try {
-      await applyFilter(filter.value, 'none')
-    } catch (err) {
-      console.warn('Failed to refresh after SSE event', err)
-    }
-  }, 200)
-}
+// DEV-65: task data no longer refreshes through a page-local SSE loop. The
+// store schedules a debounced authoritative refresh of every retained query
+// (this page retains its handle in adoptQuery), so membership moves converge
+// without re-running the filter/URL pipeline on every event.
 
 function formatActivityMessage(kind: 'task_created' | 'task_updated' | 'task_deleted', payload: any) {
   const id = payload?.id as string | undefined
@@ -1300,7 +1322,6 @@ function handleTaskEvent(kind: 'task_created' | 'task_updated' | 'task_deleted',
     const activityKind = kind === 'task_created' ? 'create' : kind === 'task_deleted' ? 'delete' : 'update'
     addActivity({ kind: activityKind, message })
   }
-  scheduleRefresh()
 }
 
 function registerSseHandlers() {
@@ -1351,10 +1372,10 @@ onUnmounted(() => {
   disposed = true
   filterGeneration += 1
   if (debounceTimer) clearTimeout(debounceTimer)
-  if (refreshTimer) {
-    clearTimeout(refreshTimer)
-    refreshTimer = null
-  }
+  activeQueryHandle?.release()
+  activeQueryHandle = null
+  activeQueryKey = ''
+  tasksQuery.value = null
   sseUnsubscribers.splice(0).forEach((fn) => fn())
   if (sse) sse.close()
   if (stopPreferencesListener) stopPreferencesListener()
@@ -1516,6 +1537,19 @@ const handleTaskUpdated = (task: TaskDTO) => {
   flex-direction: column;
   gap: 12px;
   padding: 0;
+}
+
+.refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-left: 3px solid var(--color-danger, #c62828);
+}
+
+.refresh-error__message {
+  color: var(--color-danger-strong, var(--color-danger, #c62828));
 }
 
 .tasks-quick-row__checkbox {

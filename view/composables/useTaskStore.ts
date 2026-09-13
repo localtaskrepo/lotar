@@ -1,10 +1,37 @@
 /**
  * Centralised task store — singleton shared by all pages.
  *
- * Data lives in a `Map<id, TaskDTO>` wrapped in a `shallowRef`.
- * Views derive filtered/sorted arrays via `computed()`.
- * The store subscribes to SSE events so filesystem + API mutations
- * are reflected everywhere without per-page refresh loops.
+ * ## DEV-65 state contract
+ *
+ * The store is split into two layers:
+ *
+ * 1. **Entity layer** — `_map` is a normalized `Map<id, TaskDTO>` shared by
+ *    every consumer. Entities are written only through guarded helpers:
+ *    *live* writes (SSE DTOs, panel upserts, API mutation responses) always
+ *    apply, while *response* writes (hydrate/fetchOne completions) are checked
+ *    against a monotonic write clock and delete tombstones so a late response
+ *    can never overwrite a newer entity published by SSE/panel, nor resurrect
+ *    a task deleted after that request started.
+ *
+ * 2. **Query layer** — every server filter maps to a keyed query entry owning
+ *    the ordered result: membership IDs, a per-query rank ledger preserving
+ *    the DEV-57 server response order, the server total, status/error, and a
+ *    request generation counter. Only the server decides membership: entity
+ *    upserts (SSE/panel/fetchOne) never mutate query membership, and a query
+ *    refresh REPLACES membership with the authoritative response. Completions
+ *    from an older generation are rejected — including their status/error —
+ *    so out-of-order responses cannot publish old query data.
+ *
+ * Consumers obtain a `TaskQueryHandle` via `getQuery(filter)`. Handles can be
+ * `retain()`ed while their consumer is mounted; task SSE events then schedule
+ * a debounced authoritative refresh of every retained query, so tasks moving
+ * in or out of a filter converge without any client-side predicate engine
+ * (the server stays the only filter authority).
+ *
+ * The legacy flat surface (`items`/`count`/`orderIndex`/`serverTotal`/
+ * `status`/`error`/`lastSyncAt`/`hydrateAll`/`hydratePage`/`forceRefresh`)
+ * remains a view over the *active* (most recently hydrated) query, falling
+ * back to the raw entity map before any query exists.
  */
 import { computed, shallowRef, triggerRef, type ComputedRef, type ShallowRef } from 'vue'
 import type { ApiClient } from '../api/client'
@@ -18,50 +45,108 @@ import { useSse } from './useSse'
 
 export type StoreStatus = 'idle' | 'loading' | 'ready' | 'error'
 
-export interface TaskStoreState {
-  /** Internal map keyed by task ID.  Exposed as readonly for tests. */
-  readonly _map: ShallowRef<Map<string, TaskDTO>>
-  /** Monotonically increasing counter bumped on every mutation. */
-  readonly version: ShallowRef<number>
-  /** Flat array view (derived from the map, recalculated on version bump). */
-  readonly items: ComputedRef<TaskDTO[]>
-  readonly count: ComputedRef<number>
+export interface TaskQueryHandle {
+  /** Canonical key of the filter this query was created from. */
+  readonly key: string
   /**
-   * Authority order ledger (DEV-57): insertion rank of every task in the LAST
-   * full hydration, i.e. the server's global response order. The ID-keyed map
-   * above cannot preserve order across SSE upserts, so pages that paginate
-   * read this ledger instead of re-sorting client-side. Ranks are rewritten
-   * only inside `hydrateAll`; SSE mutations never touch them (a task updated
-   * over SSE keeps its rank until the next refresh, a brand-new task has no
-   * rank and sorts last). This is deliberately NOT a keyed response cache —
-   * no DEV65-style invalidation is involved.
+   * True once this query has published a good server snapshot. While a newly
+   * adopted query is still pending (no snapshot), consumers can keep
+   * rendering the previous query's rows instead of a false empty state.
    */
-  readonly orderIndex: ShallowRef<Map<string, number>>
-  /** Total the server reported during the last full sync. */
-  readonly serverTotal: ShallowRef<number>
+  readonly hasSnapshot: ShallowRef<boolean>
+  /** Ordered membership IDs from the last authoritative server response. */
+  readonly ids: ShallowRef<readonly string[]>
+  /**
+   * Authority order ledger (DEV-57): insertion rank of every task in the
+   * server's global response order for THIS query. SSE/entity writes never
+   * touch ranks; only a completed refresh rewrites them.
+   */
+  readonly ranks: ShallowRef<Map<string, number>>
+  /** Total the server reported for this query. */
+  readonly total: ShallowRef<number>
   readonly status: ShallowRef<StoreStatus>
   readonly error: ShallowRef<string | null>
   readonly lastSyncAt: ShallowRef<number>
+  /** Members resolved against the entity map, in `ids` order. */
+  readonly tasks: ComputedRef<TaskDTO[]>
+  /**
+   * Authoritative refresh: replaces membership with the full server response
+   * (all pages). Stale completions of earlier refreshes are rejected.
+   */
+  refresh(opts?: QueryRefreshOptions): Promise<void>
+  /**
+   * Live subscription. Retained queries are refreshed (debounced) after task
+   * SSE events so membership moves converge on every mounted consumer.
+   */
+  retain(): void
+  release(): void
+}
 
-  // -- Hydration / refresh --------------------------------------------------
-  /** Paginated fetch of ALL tasks matching `filter` into the store. */
+export interface QueryRefreshOptions {
+  /** Page size for the pagination loop (default 200). */
+  pageSize?: number
+}
+
+export interface TaskStoreState {
+  /**
+   * Normalized entity map keyed by task ID. Shared by all queries; query
+   * refreshes merge entities in but never clear unrelated entities.
+   * Exposed as readonly for tests.
+   */
+  readonly _map: ShallowRef<Map<string, TaskDTO>>
+  /** Monotonically increasing counter bumped on every entity mutation. */
+  readonly version: ShallowRef<number>
+  /**
+   * Flat array view over the ACTIVE query's membership (or, before any query
+   * exists, over the raw entity map). Foreign SSE entities are NOT included
+   * unless the server made them members.
+   */
+  readonly items: ComputedRef<TaskDTO[]>
+  readonly count: ComputedRef<number>
+  /**
+   * Authority order ledger of the ACTIVE query (DEV-57 server order; see
+   * `TaskQueryHandle.ranks` for the per-query contract).
+   */
+  readonly orderIndex: ComputedRef<Map<string, number>>
+  /** Total the server reported for the ACTIVE query. */
+  readonly serverTotal: ComputedRef<number>
+  readonly status: ComputedRef<StoreStatus>
+  readonly error: ComputedRef<string | null>
+  readonly lastSyncAt: ComputedRef<number>
+
+  // -- Keyed queries ----------------------------------------------------------
+  /** Get (or create) the keyed query handle for `filter`. */
+  getQuery(filter?: TaskListFilter): TaskQueryHandle
+
+  // -- Hydration / refresh ----------------------------------------------------
+  /**
+   * Paginated fetch of ALL tasks matching `filter` into the keyed query.
+   * `clear: true` (replace membership) is the scoped form used by pages;
+   * the default merge keeps legacy entity-union semantics.
+   */
   hydrateAll(filter?: TaskListFilter, opts?: HydrateOptions): Promise<void>
-  /** Fetch a single page (limit/offset) — does NOT clear the store. */
+  /** Fetch a single page (limit/offset) — merges entities, never replaces membership. */
   hydratePage(filter?: TaskListFilter): Promise<{ total: number }>
-  /** Fetch or re-fetch a single task by ID and upsert it into the store. */
+  /**
+   * Fetch or re-fetch a single task by ID and upsert it into the entity map.
+   * Only 404/410 evicts + tombstones; transient failures keep the entity and
+   * surface the message through `fetchOneError`.
+   */
   fetchOne(id: string): Promise<TaskDTO | null>
-  /** Force a full reload (clears store first). */
+  /** Last transient fetchOne failure message (entity was retained). Cleared on the next call. */
+  readonly fetchOneError: ShallowRef<string | null>
+  /** Force a full reload (clears entities first). */
   forceRefresh(filter?: TaskListFilter): Promise<void>
-  /** Returns true if the store has data (regardless of freshness). */
+  /** Returns true if the active query has data (regardless of freshness). */
   readonly hasData: ComputedRef<boolean>
 
   // -- Mutations (API + store) -----------------------------------------------
   add(payload: TaskCreate): Promise<TaskDTO>
   update(id: string, patch: TaskUpdate): Promise<TaskDTO>
   remove(id: string): Promise<void>
-  /** Optimistic upsert without an API call (used by TaskPanelHost, SSE). */
+  /** Optimistic entity upsert without an API call (TaskPanelHost, SSE). Never joins a query. */
   upsert(task: TaskDTO): void
-  /** Remove from local store without API call (SSE delete). */
+  /** Remove the entity without an API call (SSE delete). Tombstones the ID. */
   evict(id: string): void
 
   // -- SSE lifecycle ---------------------------------------------------------
@@ -76,7 +161,11 @@ export interface TaskStoreState {
 export interface HydrateOptions {
   /** Page size for pagination loop (default 200). */
   pageSize?: number
-  /** If true, clear existing data before hydrating. */
+  /**
+   * If true, membership is REPLACED by the response (scoped hydrate).
+   * If false/omitted, legacy merge semantics apply (union with existing
+   * membership / entity keys).
+   */
   clear?: boolean
 }
 
@@ -84,15 +173,74 @@ export interface HydrateOptions {
 // Implementation
 // ---------------------------------------------------------------------------
 
+interface QueryEntry {
+  key: string
+  /** Immutable filter snapshot this query is authoritative for. */
+  filter: TaskListFilter
+  /** Per-query request generation; older completions are rejected. */
+  generation: number
+  /** Number of completed refresh runs ( distinguishes the first merge seed ). */
+  runs: number
+  liveHandles: number
+  /** Currently running refreshes for this entry. */
+  inFlight: number
+  /** True once a good server snapshot has been published. */
+  hasSnapshot: ShallowRef<boolean>
+  refreshTimer: ReturnType<typeof setTimeout> | null
+  ids: ShallowRef<readonly string[]>
+  ranks: ShallowRef<Map<string, number>>
+  total: ShallowRef<number>
+  status: ShallowRef<StoreStatus>
+  error: ShallowRef<string | null>
+  lastSyncAt: ShallowRef<number>
+}
+
+const DEFAULT_PAGE_SIZE = 200
+const MAX_PAGES = 10_000
+/** Debounce for SSE-triggered authoritative refreshes of retained queries. */
+const LIVE_REFRESH_DEBOUNCE_MS = 250
+/** Debounce for fswatcher task_updated (ID-only) single-task fetches. */
+const FETCH_ONE_DEBOUNCE_MS = 150
+/** Paging params are per-request only; they must not fork the query key. */
+const PAGING_KEYS = new Set(['limit', 'offset', 'page'])
+
+function canonicalQueryKey(filter: TaskListFilter = {}): string {
+  const source = filter as Record<string, unknown>
+  const parts: string[] = []
+  for (const key of Object.keys(source).sort()) {
+    if (PAGING_KEYS.has(key)) continue
+    const value = source[key]
+    if (value === undefined || value === null || value === '') continue
+    if (Array.isArray(value)) {
+      const items = [...value].map((item) => String(item)).sort()
+      parts.push(`${key}=[${items.join(',')}]`)
+    } else if (typeof value === 'object') {
+      parts.push(`${key}=${JSON.stringify(value)}`)
+    } else {
+      parts.push(`${key}=${String(value)}`)
+    }
+  }
+  return parts.length ? parts.join('&') : '*'
+}
+
 function createTaskStore(client: ApiClient): TaskStoreState {
   const _map = shallowRef<Map<string, TaskDTO>>(new Map())
-  const orderIndex = shallowRef<Map<string, number>>(new Map())
   const version = shallowRef(0)
-  const serverTotal = shallowRef(0)
-  const status = shallowRef<StoreStatus>('idle')
-  const error = shallowRef<string | null>(null)
-  const lastSyncAt = shallowRef(0)
   const sseConnected = shallowRef(false)
+  const fetchOneError = shallowRef<string | null>(null)
+
+  // ---- entity guards (DEV-65) ---------------------------------------------
+  // Monotonic write clock: every entity write/delete stamps an increasing
+  // revision. In-flight requests capture the clock at start and their
+  // responses may only apply if nothing newer happened to that entity.
+  let writeClock = 0
+  const entityRevisions = new Map<string, number>()
+  const tombstones = new Map<string, number>()
+
+  // ---- keyed queries -------------------------------------------------------
+  const queries = new Map<string, QueryEntry>()
+  const queriesVersion = shallowRef(0)
+  const activeQueryKey = shallowRef<string | null>(null)
 
   // SSE connection handle
   let sseHandle: ReturnType<typeof useSse> | null = null
@@ -103,6 +251,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
   // Error listeners for task_error SSE events
   const errorListeners = new Set<(payload: { id: string; message: string }) => void>()
+
   // ---- helpers -----------------------------------------------------------
 
   function bump() {
@@ -110,146 +259,370 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     triggerRef(_map)
   }
 
-  // ---- derived state -----------------------------------------------------
+  /** Live entity write (SSE DTO, panel upsert, API mutation response). */
+  function writeEntity(task: TaskDTO): void {
+    if (!task?.id) return
+    _map.value.set(task.id, task)
+    entityRevisions.set(task.id, ++writeClock)
+    tombstones.delete(task.id)
+    bump()
+  }
 
-  const items = computed<TaskDTO[]>(() => {
-    // Touch version to re-evaluate when it changes.
-    void version.value
-    return Array.from(_map.value.values())
-  })
+  /**
+   * Delete + tombstone. The tombstone revision prevents a stale in-flight
+   * response from resurrecting the task.
+   */
+  function tombstoneEntity(id: string): void {
+    if (!_map.value.has(id)) {
+      if (!tombstones.has(id)) tombstones.set(id, ++writeClock)
+      return
+    }
+    _map.value.delete(id)
+    entityRevisions.delete(id)
+    tombstones.set(id, ++writeClock)
+    bump()
+  }
 
-  const count = computed(() => items.value.length)
-  const hasData = computed(() => _map.value.size > 0)
+  function compareModified(next: string | undefined, current: string | undefined): number {
+    const a = next ? Date.parse(next) : NaN
+    const b = current ? Date.parse(current) : NaN
+    if (Number.isNaN(a) || Number.isNaN(b)) return 0
+    return a < b ? -1 : a > b ? 1 : 0
+  }
 
-  // ---- hydration ---------------------------------------------------------
+  /**
+   * Apply an entity from an asynchronous RESPONSE, guarded against newer
+   * writes that happened while the request was in flight:
+   * - a tombstone stamped after the request started wins (no resurrection);
+   * - an entity written live after the request started (SSE/panel) wins on
+   *   ties and older response snapshots;
+   * - an older response snapshot than what we already hold is dropped.
+   */
+  function applyResponseEntity(task: TaskDTO, requestClock: number): boolean {
+    const id = task?.id
+    if (!id) return false
+    const tomb = tombstones.get(id)
+    if (tomb !== undefined && tomb >= requestClock) return false
+    const existing = _map.value.get(id)
+    if (existing) {
+      const existingRev = entityRevisions.get(id) ?? 0
+      const cmp = compareModified(task.modified, existing.modified)
+      if (existingRev > requestClock ? cmp <= 0 : cmp < 0) return false
+    }
+    writeEntity(task)
+    return true
+  }
 
-  async function hydrateAll(filter: TaskListFilter = {}, opts: HydrateOptions = {}) {
-    const pageSize = opts.pageSize ?? 200
-    status.value = 'loading'
-    error.value = null
+  function ensureQuery(filter: TaskListFilter = {}): QueryEntry {
+    const key = canonicalQueryKey(filter)
+    let entry = queries.get(key)
+    if (!entry) {
+      entry = {
+        key,
+        filter: { ...filter },
+        generation: 0,
+        runs: 0,
+        liveHandles: 0,
+        inFlight: 0,
+        hasSnapshot: shallowRef(false),
+        refreshTimer: null,
+        ids: shallowRef<readonly string[]>([]),
+        ranks: shallowRef<Map<string, number>>(new Map()),
+        total: shallowRef(0),
+        status: shallowRef<StoreStatus>('idle'),
+        error: shallowRef<string | null>(null),
+        lastSyncAt: shallowRef(0),
+      }
+      queries.set(key, entry)
+      queriesVersion.value += 1
+    }
+    return entry
+  }
+
+  function setActiveQuery(entry: QueryEntry): void {
+    if (activeQueryKey.value !== entry.key) activeQueryKey.value = entry.key
+  }
+
+  function clearEntryTimer(entry: QueryEntry): void {
+    if (entry.refreshTimer !== null) {
+      clearTimeout(entry.refreshTimer)
+      entry.refreshTimer = null
+    }
+  }
+
+  /**
+   * Invalidate one retained query: schedule a debounced authoritative
+   * refresh AND immediately supersede any in-flight refresh so its stale
+   * membership cannot publish during the debounce window. The entry stays
+   * `loading` until the successor runs, so it can never get stuck `ready`
+   * with stale rows or starve (each timer fires 250ms after it is set).
+   */
+  function invalidateEntry(entry: QueryEntry): void {
+    if (entry.liveHandles <= 0) return
+    if (entry.refreshTimer === null) {
+      entry.refreshTimer = setTimeout(() => {
+        entry.refreshTimer = null
+        if (entry.liveHandles <= 0) return
+        void runQueryRefresh(entry)
+      }, LIVE_REFRESH_DEBOUNCE_MS)
+    }
+    if (entry.inFlight > 0) entry.generation += 1
+  }
+
+  function invalidateRetainedQueries(): void {
+    for (const entry of queries.values()) invalidateEntry(entry)
+  }
+
+  async function runQueryRefresh(entry: QueryEntry, opts: QueryRefreshOptions & { merge?: boolean } = {}): Promise<void> {
+    const generation = ++entry.generation
+    const requestClock = writeClock
+    const pageSize = opts.pageSize ?? DEFAULT_PAGE_SIZE
+    const merge = opts.merge === true
+    entry.status.value = 'loading'
+    entry.error.value = null
+    entry.inFlight += 1
+
+    // Merge mode keeps the legacy union semantics: existing members (or, on
+    // the very first run, the raw entity keys) stay, response tasks append.
+    const seed: string[] = merge
+      ? entry.runs === 0 && entry.ids.value.length === 0
+        ? Array.from(_map.value.keys())
+        : [...entry.ids.value]
+      : []
+    const ids = new Set<string>(seed)
+    const ranks = new Map<string, number>()
 
     try {
-      // Build into a NEW map so the swap is atomic — avoids the empty-then-fill
-      // flash that breaks TransitionGroup animations when clear === true.
-      const newMap: Map<string, TaskDTO> = opts.clear
-        ? new Map()
-        : new Map(_map.value)
-
       let currentOffset = 0
       let expectedTotal = 0
       let pages = 0
-      const newOrder: Map<string, number> = new Map()
-
-      while (pages < 10_000) {
+      while (pages < MAX_PAGES) {
         pages += 1
         const response = await client.listTasks({
-          ...filter,
+          ...entry.filter,
           limit: pageSize,
           offset: currentOffset,
         } as any)
-        const batch = Array.isArray(response.tasks) ? response.tasks : []
-        expectedTotal = response.total ?? expectedTotal
-        if (batch.length === 0) break
-
+        if (generation !== entry.generation) return
+        const batch = Array.isArray(response?.tasks) ? response.tasks : []
+        expectedTotal = response?.total ?? expectedTotal
         for (const task of batch) {
-          newMap.set(task.id, task)
-          newOrder.set(task.id, newOrder.size)
+          if (!task?.id) continue
+          applyResponseEntity(task, requestClock)
+          ranks.set(task.id, ranks.size)
+          ids.add(task.id)
         }
+        if (batch.length === 0) break
         currentOffset += batch.length
         if (expectedTotal && currentOffset >= expectedTotal) break
       }
 
-      // Atomic swap — TransitionGroup sees old items → new items in one tick.
-      _map.value = newMap
-      orderIndex.value = newOrder
-      serverTotal.value = expectedTotal || newMap.size
-      lastSyncAt.value = Date.now()
-      status.value = 'ready'
+      if (generation !== entry.generation) return
+      entry.runs += 1
+      entry.ids.value = Array.from(ids)
+      entry.ranks.value = ranks
+      entry.total.value = expectedTotal || ids.size
+      entry.lastSyncAt.value = Date.now()
+      entry.hasSnapshot.value = true
+      entry.status.value = 'ready'
       bump()
     } catch (err: unknown) {
-      status.value = 'error'
-      error.value = err instanceof Error ? err.message : String(err)
+      if (generation !== entry.generation) return
+      entry.runs += 1
+      entry.status.value = 'error'
+      entry.error.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      entry.inFlight -= 1
     }
   }
 
+  function makeHandle(entry: QueryEntry): TaskQueryHandle {
+    const tasks = computed<TaskDTO[]>(() => {
+      void version.value
+      const out: TaskDTO[] = []
+      for (const id of entry.ids.value) {
+        const task = _map.value.get(id)
+        if (task) out.push(task)
+      }
+      return out
+    })
+    return {
+      key: entry.key,
+      hasSnapshot: entry.hasSnapshot,
+      ids: entry.ids,
+      ranks: entry.ranks,
+      total: entry.total,
+      status: entry.status,
+      error: entry.error,
+      lastSyncAt: entry.lastSyncAt,
+      tasks,
+      refresh: (opts?: QueryRefreshOptions) => runQueryRefresh(entry, opts),
+      retain: () => {
+        entry.liveHandles += 1
+      },
+      release: () => {
+        entry.liveHandles = Math.max(0, entry.liveHandles - 1)
+        if (entry.liveHandles === 0) {
+          clearEntryTimer(entry)
+          // Last owner left: an in-flight refresh must not publish either.
+          if (entry.inFlight > 0) entry.generation += 1
+        }
+      },
+    }
+  }
+
+  function getQuery(filter: TaskListFilter = {}): TaskQueryHandle {
+    return makeHandle(ensureQuery(filter))
+  }
+
+  // ---- derived (legacy) state ---------------------------------------------
+
+  const activeEntry = computed<QueryEntry | null>(() => {
+    void queriesVersion.value
+    const key = activeQueryKey.value
+    return key ? queries.get(key) ?? null : null
+  })
+
+  const items = computed<TaskDTO[]>(() => {
+    void version.value
+    const entry = activeEntry.value
+    if (!entry) return Array.from(_map.value.values())
+    void entry.ids.value
+    const out: TaskDTO[] = []
+    for (const id of entry.ids.value) {
+      const task = _map.value.get(id)
+      if (task) out.push(task)
+    }
+    return out
+  })
+
+  const count = computed(() => items.value.length)
+  const hasData = computed(() => items.value.length > 0)
+  const orderIndex = computed<Map<string, number>>(
+    () => activeEntry.value?.ranks.value ?? new Map<string, number>(),
+  )
+  const serverTotal = computed(() => activeEntry.value?.total.value ?? 0)
+  const status = computed<StoreStatus>(() => activeEntry.value?.status.value ?? 'idle')
+  const error = computed<string | null>(() => activeEntry.value?.error.value ?? null)
+  const lastSyncAt = computed(() => activeEntry.value?.lastSyncAt.value ?? 0)
+
+  // ---- hydration ---------------------------------------------------------
+
+  async function hydrateAll(filter: TaskListFilter = {}, opts: HydrateOptions = {}) {
+    const entry = ensureQuery(filter)
+    // Switch the legacy view immediately so a slow previous query's rows (or
+    // errors) cannot linger while the new query loads.
+    setActiveQuery(entry)
+    await runQueryRefresh(entry, {
+      merge: opts.clear !== true,
+      pageSize: opts.pageSize,
+    })
+  }
+
   async function hydratePage(filter: TaskListFilter = {}) {
-    status.value = 'loading'
-    error.value = null
+    const entry = ensureQuery(filter)
+    setActiveQuery(entry)
+    const generation = ++entry.generation
+    const requestClock = writeClock
+    entry.status.value = 'loading'
+    entry.error.value = null
+    const seed =
+      entry.runs === 0 && entry.ids.value.length === 0
+        ? Array.from(_map.value.keys())
+        : [...entry.ids.value]
 
     try {
       const response = await client.listTasks(filter)
-      const batch = Array.isArray(response.tasks) ? response.tasks : []
+      if (generation !== entry.generation) return { total: entry.total.value }
+      const batch = Array.isArray(response?.tasks) ? response.tasks : []
+      const ids = new Set<string>(seed)
       for (const task of batch) {
-        _map.value.set(task.id, task)
+        if (!task?.id) continue
+        applyResponseEntity(task, requestClock)
+        ids.add(task.id)
       }
-      serverTotal.value = response.total ?? serverTotal.value
-      status.value = 'ready'
+      entry.runs += 1
+      entry.ids.value = Array.from(ids)
+      if (typeof response?.total === 'number') entry.total.value = response.total
+      entry.lastSyncAt.value = Date.now()
+      entry.status.value = 'ready'
       bump()
-      return { total: response.total ?? 0 }
+      return { total: entry.total.value }
     } catch (err: unknown) {
-      status.value = 'error'
-      error.value = err instanceof Error ? err.message : String(err)
+      if (generation !== entry.generation) return { total: 0 }
+      entry.runs += 1
+      entry.status.value = 'error'
+      entry.error.value = err instanceof Error ? err.message : String(err)
       return { total: 0 }
     }
   }
 
   async function fetchOne(id: string): Promise<TaskDTO | null> {
+    const requestClock = writeClock
+    fetchOneError.value = null
     try {
       const task = await client.getTask(id)
       if (task && task.id) {
-        _map.value.set(task.id, task)
-        bump()
+        applyResponseEntity(task, requestClock)
         return task
       }
       return null
-    } catch {
-      // Task may have been deleted between event and fetch — evict it.
-      if (_map.value.has(id)) {
-        _map.value.delete(id)
-        bump()
+    } catch (err: unknown) {
+      const status = (err as { status?: unknown } | null | undefined)?.status
+      if (status === 404 || status === 410) {
+        // The task is gone: evict + tombstone so stale responses cannot
+        // resurrect it.
+        tombstoneEntity(id)
+      } else {
+        // Transient failure (network/5xx): retain the entity and surface the
+        // error instead of silently dropping data.
+        fetchOneError.value = err instanceof Error ? err.message : String(err)
       }
       return null
     }
   }
 
   async function forceRefresh(filter: TaskListFilter = {}) {
-    _map.value = new Map()
-    bump()
-    await hydrateAll(filter, { clear: false })
+    // DEV-65: force-refresh replaces THIS query's membership only. Clearing
+    // the shared entity map would evict entities other keyed queries still
+    // present; tombstones already protect against resurrection.
+    const entry = ensureQuery(filter)
+    setActiveQuery(entry)
+    await runQueryRefresh(entry)
   }
 
   // ---- mutations ----------------------------------------------------------
 
   async function add(payload: TaskCreate): Promise<TaskDTO> {
     const created = await client.addTask(payload)
-    _map.value.set(created.id, created)
-    bump()
+    writeEntity(created)
+    invalidateRetainedQueries()
     return created
   }
 
   async function update(id: string, patch: TaskUpdate): Promise<TaskDTO> {
     const updated = await client.updateTask(id, patch)
-    _map.value.set(updated.id, updated)
-    bump()
+    writeEntity(updated)
+    invalidateRetainedQueries()
     return updated
   }
 
   async function remove(id: string): Promise<void> {
     await client.deleteTask(id)
-    _map.value.delete(id)
-    bump()
+    tombstoneEntity(id)
+    invalidateRetainedQueries()
   }
 
   function upsert(task: TaskDTO) {
-    _map.value.set(task.id, task)
-    bump()
+    writeEntity(task)
+    // Local panel upserts must converge membership exactly like SSE events;
+    // applying a query response never schedules (no recursion).
+    invalidateRetainedQueries()
   }
 
   function evict(id: string) {
-    if (_map.value.has(id)) {
-      _map.value.delete(id)
-      bump()
-    }
+    tombstoneEntity(id)
+    invalidateRetainedQueries()
   }
 
   // ---- SSE ----------------------------------------------------------------
@@ -260,10 +633,12 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
     switch (kind) {
       case 'task_created': {
-        // API-triggered: payload is full TaskDTO
+        // API-triggered: payload is full TaskDTO. Entity-only: membership is
+        // decided by the authoritative refresh scheduled below.
         if (id && payload.title) {
-          upsert(payload as TaskDTO)
+          writeEntity(payload as TaskDTO)
         }
+        invalidateRetainedQueries()
         break
       }
       case 'task_updated': {
@@ -271,7 +646,8 @@ function createTaskStore(client: ApiClient): TaskStoreState {
         // API-triggered events include the full DTO (has title).
         // Filesystem-watcher events only include { id }.
         if (payload.title) {
-          upsert(payload as TaskDTO)
+          writeEntity(payload as TaskDTO)
+          invalidateRetainedQueries()
         } else {
           // Debounce per-ID so rapid writes don't flood single-task fetches.
           const existing = pendingFetches.get(id)
@@ -281,8 +657,9 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             setTimeout(() => {
               pendingFetches.delete(id)
               void fetchOne(id)
-            }, 150),
+            }, FETCH_ONE_DEBOUNCE_MS),
           )
+          invalidateRetainedQueries()
         }
         break
       }
@@ -294,8 +671,9 @@ function createTaskStore(client: ApiClient): TaskStoreState {
             clearTimeout(pending)
             pendingFetches.delete(id)
           }
-          evict(id)
+          tombstoneEntity(id)
         }
+        invalidateRetainedQueries()
         break
       }
       // config_updated / project_changed: views can listen separately if needed
@@ -304,10 +682,15 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
   function connectSse() {
     if (sseHandle) return
-    sseHandle = useSse('/api/events', {
-      kinds: 'task_created,task_updated,task_deleted,task_error',
-      ready: true,
-    })
+    sseHandle = useSse(
+      '/api/events',
+      { kinds: 'task_created,task_updated,task_deleted,task_error', ready: true },
+      {
+        // A reconnect may have missed events: refresh every retained query
+        // from the authoritative server before trusting membership again.
+        onReconnect: () => invalidateRetainedQueries(),
+      },
+    )
     sseConnected.value = true
 
     const kinds = ['task_created', 'task_updated', 'task_deleted'] as const
@@ -356,15 +739,17 @@ function createTaskStore(client: ApiClient): TaskStoreState {
 
   return {
     _map,
-    orderIndex,
     version,
+    fetchOneError,
     items,
     count,
+    orderIndex,
     serverTotal,
     status,
     error,
     lastSyncAt,
     hasData,
+    getQuery,
     hydrateAll,
     hydratePage,
     fetchOne,

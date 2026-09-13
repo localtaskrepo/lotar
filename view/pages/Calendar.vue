@@ -108,9 +108,14 @@
       </FilterBar>
     </div>
 
-    <div v-if="loadingTasks" style="margin: 12px 0;"><UiLoader>Loading calendar…</UiLoader></div>
+    <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading calendar…</UiLoader></div>
 
-    <div v-else class="calendar">
+    <template v-else>
+      <div v-if="loadError" class="card refresh-error" role="alert">
+        <span class="refresh-error__message">Calendar refresh failed: {{ loadError }}</span>
+        <UiButton variant="ghost" type="button" :disabled="loadingTasks" @click="refreshAll">Retry</UiButton>
+      </div>
+      <div class="calendar">
       <div class="grid header">
         <div v-for="d in weekDays" :key="d" class="cell head">{{ d }}</div>
       </div>
@@ -177,7 +182,8 @@
         </div>
         </div>
       </Transition>
-    </div>
+      </div>
+    </template>
 
     <UiModal :open="dayDialogOpen" aria-label="Day tasks" size="sm" @close="closeDayDialog">
           <header class="calendar-day-dialog__header row" style="justify-content: space-between; align-items: center; gap: 8px;">
@@ -212,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { TaskDTO } from '../api/types'
 import ColumnsMenu from '../components/ColumnsMenu.vue'
@@ -230,7 +236,7 @@ import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTaskStore } from '../composables/useTaskStore'
+import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay, toDateKey } from '../utils/date'
 import { buildSprintSchedule, type SprintCalendarDayEntry } from '../utils/sprintCalendar'
 
@@ -238,7 +244,30 @@ const route = useRoute()
 const router = useRouter()
 const { refresh: refreshProjects } = useProjects()
 const store = useTaskStore()
-const loadingTasks = computed(() => store.status.value === 'loading')
+// DEV-65: read the calendar's keyed query so other consumers cannot
+// overwrite its results, and SSE-triggered authoritative refreshes keep this
+// membership current while mounted.
+const calendarQuery = shallowRef<TaskQueryHandle | null>(null)
+let activeQueryHandle: TaskQueryHandle | null = null
+let activeQueryKey = ''
+function adoptQuery(handle: TaskQueryHandle) {
+  if (activeQueryKey === handle.key) return
+  activeQueryHandle?.release()
+  activeQueryHandle = handle
+  activeQueryKey = handle.key
+  handle.retain()
+  calendarQuery.value = handle
+}
+const loadingTasks = computed(() => calendarQuery.value?.status.value === 'loading')
+const loadError = computed(() => calendarQuery.value?.error.value ?? null)
+// Per-current-handle first load: the full-page loader covers the loading and
+// queued-idle phases of a key without a snapshot. Background refreshes
+// (SSE/live invalidation) of an established key keep the grid mounted.
+const initialLoading = computed(() => {
+  const query = calendarQuery.value
+  if (!query || query.hasSnapshot.value || query.error.value) return false
+  return query.status.value === 'loading' || query.status.value === 'idle'
+})
 const { sprints: sprintList, refresh: refreshSprints } = useSprints()
 const { openTaskPanel } = useTaskPanelController()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig } = useConfig()
@@ -410,8 +439,8 @@ const cells = computed(() => {
   const month = cursor.value.getMonth()
 
   // Smart filters (due/recent/needs/assignee) are applied server-side by the
-  // hydrate; the calendar indexes the hydrated set directly.
-  const smartFiltered = store.items.value || []
+  // hydrate; the calendar indexes the hydrated (query membership) set directly.
+  const smartFiltered = calendarQuery.value?.tasks.value ?? []
 
   // Index tasks by due date for this window
   const byDate: Record<string, any[]> = {}
@@ -445,7 +474,9 @@ const cells = computed(() => {
 async function refreshCalendarTasks(snapshot?: Record<string, string>) {
   const raw = snapshot ?? filter.value
   const { serverFilter } = buildServerFilter(raw, project.value)
-  await store.hydrateAll(serverFilter, { clear: true })
+  adoptQuery(store.getQuery(serverFilter))
+  // Refresh failures surface through the query's error state (loadError).
+  await activeQueryHandle!.refresh()
 }
 
 function prevMonth(){
@@ -587,6 +618,10 @@ onUnmounted(() => {
     clearTimeout(filterDebounce)
     filterDebounce = null
   }
+  activeQueryHandle?.release()
+  activeQueryHandle = null
+  activeQueryKey = ''
+  calendarQuery.value = null
   if (typeof window !== 'undefined') {
     window.removeEventListener('click', handleCalendarPopoverClick)
     window.removeEventListener('resize', recalcTaskListRowCapacities)
@@ -795,6 +830,19 @@ watch(showSprints, (enabled, previous) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-left: 3px solid var(--color-danger, #c62828);
+}
+
+.refresh-error__message {
+  color: var(--color-danger-strong, var(--color-danger, #c62828));
 }
 
 .calendar-day-dialog__header {

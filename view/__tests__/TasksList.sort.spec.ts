@@ -12,13 +12,32 @@ const projectsStore = {
 
 const _tasksItems = ref<any[]>([])
 const _orderIndex = ref<Map<string, number>>(new Map())
+const _status = ref('idle' as string)
+const _error = ref(null as string | null)
+const _hasSnapshot = ref(false)
+
+const tasksQueryHandle = {
+    key: 'tasks-test',
+    hasSnapshot: _hasSnapshot,
+    ids: computed(() => _tasksItems.value.map((t: any) => t.id)),
+    ranks: _orderIndex,
+    total: computed(() => _tasksItems.value.length),
+    status: _status,
+    error: _error,
+    lastSyncAt: ref(1),
+    tasks: computed(() => _tasksItems.value),
+    refresh: vi.fn(async () => { _hasSnapshot.value = true }),
+    retain: vi.fn(),
+    release: vi.fn(),
+}
 
 const tasksStore = {
     items: _tasksItems,
     orderIndex: _orderIndex,
     count: computed(() => _tasksItems.value.length),
-    status: ref('idle' as string),
-    error: ref(null as string | null),
+    status: _status,
+    error: _error,
+    getQuery: vi.fn(() => tasksQueryHandle),
     hydrateAll: vi.fn(async (_filter?: Record<string, unknown>) => { }),
     upsert: vi.fn(),
     remove: vi.fn(async () => { }),
@@ -26,6 +45,7 @@ const tasksStore = {
 
 /** Simulate a completed hydration: items + the authoritative response order. */
 function seedHydration(tasks: any[], orderedIds?: string[]) {
+    _hasSnapshot.value = true
     _tasksItems.value = tasks
     const order = orderedIds ?? [...tasks].sort((a, b) => a.id.localeCompare(b.id)).map((t) => t.id)
     const map = new Map<string, number>()
@@ -229,7 +249,9 @@ describe('TasksList server-authoritative sorting', () => {
         tasksStore.items.value = []
         _orderIndex.value = new Map()
         tasksStore.status.value = 'idle'
-        tasksStore.hydrateAll.mockClear()
+        _hasSnapshot.value = false
+        tasksStore.getQuery.mockClear()
+        tasksQueryHandle.refresh.mockClear()
 
         routerPushMock.mockClear()
         routerReplaceMock.mockClear()
@@ -250,8 +272,8 @@ describe('TasksList server-authoritative sorting', () => {
         const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
         await settle()
 
-        expect(tasksStore.hydrateAll).toHaveBeenCalled()
-        const calls = tasksStore.hydrateAll.mock.calls as unknown as Array<[Record<string, unknown>]>
+        expect(tasksStore.getQuery).toHaveBeenCalled()
+        const calls = tasksStore.getQuery.mock.calls as unknown as Array<[Record<string, unknown>]>
         const lastFilter = calls[calls.length - 1]![0]
         expect(lastFilter.sort_by).toBe('custom:Rank')
         expect(lastFilter.order).toBe('asc')
@@ -261,7 +283,7 @@ describe('TasksList server-authoritative sorting', () => {
     it('renders the authoritative server order across pages, immune to map-order drift', async () => {
         const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
         await settle()
-        tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
         const vm = wrapper.vm as any
 
         // Server responded with Rank-ascending order; the local map later
@@ -290,7 +312,7 @@ describe('TasksList server-authoritative sorting', () => {
     it('applies table header sorts to the query and persists them per project', async () => {
         const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
         await settle()
-        tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
         const vm = wrapper.vm as any
 
         vm.onTableSort({ key: 'due_date', dir: 'asc' })
@@ -299,7 +321,7 @@ describe('TasksList server-authoritative sorting', () => {
         expect(vm.filter.sort_by).toBe('due')
         expect(vm.filter.order).toBe('asc')
         expect(JSON.parse(localStorage.getItem('lotar.tasks.sort') || 'null')).toEqual({ sort_by: 'due', order: 'asc' })
-        const calls = tasksStore.hydrateAll.mock.calls as unknown as Array<[Record<string, unknown>]>
+        const calls = tasksStore.getQuery.mock.calls as unknown as Array<[Record<string, unknown>]>
         const lastFilter = calls[calls.length - 1]![0]
         expect(lastFilter.sort_by).toBe('due')
         expect(lastFilter.order).toBe('asc')
@@ -319,12 +341,12 @@ describe('TasksList server-authoritative sorting', () => {
         expect(vm.filter.order).toBe('asc')
 
         // Switching projects reloads that project's saved sort.
-        tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
         vm.filter = { project: 'PB' }
         await settle()
         expect(vm.filter.sort_by).toBe('priority')
         expect(vm.filter.order).toBe('desc')
-        const pbCalls = tasksStore.hydrateAll.mock.calls as unknown as Array<[Record<string, unknown>]>
+        const pbCalls = tasksStore.getQuery.mock.calls as unknown as Array<[Record<string, unknown>]>
         const pbFilter = pbCalls[pbCalls.length - 1]![0]
         expect(pbFilter.project).toBe('PB')
         expect(pbFilter.sort_by).toBe('priority')
@@ -351,7 +373,7 @@ describe('TasksList server-authoritative sorting', () => {
         await settle()
         expect(vm.filter.sort_by).toBe('priority')
         expect(vm.filter.order).toBe('asc')
-        const calls = tasksStore.hydrateAll.mock.calls as unknown as Array<[Record<string, unknown>]>
+        const calls = tasksStore.getQuery.mock.calls as unknown as Array<[Record<string, unknown>]>
         expect(calls[calls.length - 1]![0].sort_by).toBe('priority')
         wrapper.unmount()
     })
@@ -380,10 +402,10 @@ describe('TasksList server-authoritative sorting', () => {
         const wrapper = mount(TasksList, { global: { stubs: { Teleport: true } } })
         await settle()
         const vm = wrapper.vm as any
-        const calls = tasksStore.hydrateAll.mock.calls as unknown as Array<[Record<string, unknown>]>
+        const calls = tasksStore.getQuery.mock.calls as unknown as Array<[Record<string, unknown>]>
         expect(calls[calls.length - 1]![0].sort_by).toBe('bogus')
 
-        // Server rejection surfaces through the store error and disables export.
+        // Server rejection surfaces through the query error and disables export.
         tasksStore.error.value = "Invalid sort_by: 'bogus'"
         await flushPromises()
         expect(vm.exportDisabled).toBe(true)

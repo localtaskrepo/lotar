@@ -11,12 +11,32 @@ const projectsStore = {
 }
 
 const _tasksItems = ref<any[]>([])
+const _orderIndex = ref<Map<string, number>>(new Map())
+const _status = ref('idle' as string)
+const _error = ref(null as string | null)
+const _hasSnapshot = ref(false)
+
+const tasksQueryHandle = {
+    key: 'tasks-test',
+    hasSnapshot: _hasSnapshot,
+    ids: computed(() => _tasksItems.value.map((t: any) => t.id)),
+    ranks: _orderIndex,
+    total: computed(() => _tasksItems.value.length),
+    status: _status,
+    error: _error,
+    lastSyncAt: ref(1),
+    tasks: computed(() => _tasksItems.value),
+    refresh: vi.fn(async () => { _hasSnapshot.value = true }),
+    retain: vi.fn(),
+    release: vi.fn(),
+}
 
 const tasksStore = {
     items: _tasksItems,
     count: computed(() => _tasksItems.value.length),
-    status: ref('idle' as string),
-    error: ref(null as string | null),
+    status: _status,
+    error: _error,
+    getQuery: vi.fn(() => tasksQueryHandle),
     hydrateAll: vi.fn(async () => { }),
     upsert: vi.fn(),
     remove: vi.fn(async () => { }),
@@ -199,6 +219,9 @@ describe('TasksList counts', () => {
         routeState.query = {}
         tasksStore.items.value = []
         tasksStore.status.value = 'idle'
+        _hasSnapshot.value = false
+        tasksQueryHandle.refresh.mockClear()
+        tasksStore.getQuery.mockClear()
 
         routerPushMock.mockClear()
         routerReplaceMock.mockClear()
@@ -270,11 +293,11 @@ describe('TasksList counts', () => {
         const vm = wrapper.vm as any
         let finishA!: () => void
         let finishB!: () => void
-        tasksStore.hydrateAll.mockImplementationOnce(() => new Promise<void>(resolve => {
-            finishA = () => { tasksStore.items.value = [baseTask({ id: 'A-1' })]; resolve() }
+        tasksQueryHandle.refresh.mockImplementationOnce(() => new Promise<void>(resolve => {
+            finishA = () => { tasksStore.items.value = [baseTask({ id: 'A-1' })]; _hasSnapshot.value = true; resolve() }
         }))
-        tasksStore.hydrateAll.mockImplementationOnce(() => new Promise<void>(resolve => {
-            finishB = () => { tasksStore.items.value = [baseTask({ id: 'B-1' })]; resolve() }
+        tasksQueryHandle.refresh.mockImplementationOnce(() => new Promise<void>(resolve => {
+            finishB = () => { tasksStore.items.value = [baseTask({ id: 'B-1' })]; _hasSnapshot.value = true; resolve() }
         }))
         vm.filter = { project: 'A' }
         await vi.advanceTimersByTimeAsync(150)

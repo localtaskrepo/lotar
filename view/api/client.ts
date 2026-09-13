@@ -114,7 +114,11 @@ async function parseEnvelope<T>(method: 'GET' | 'POST', path: string, res: Respo
       (payload as any)?.message ||
       raw?.trim() ||
       `${res.status}`
-    throw new Error(`${method} ${path} failed: ${message}`)
+    // Carry the HTTP status so callers can distinguish not-found from
+    // transient failures without parsing messages.
+    const error = new Error(`${method} ${path} failed: ${message}`) as Error & { status?: number }
+    error.status = res.status
+    throw error
   }
 
   if (!payload) {

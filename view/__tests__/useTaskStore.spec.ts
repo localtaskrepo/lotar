@@ -17,20 +17,26 @@ vi.mock('../api/client', () => ({
   api: mockClient,
 }))
 
-// Mock useSse so we can simulate events
+// Mock useSse so we can simulate events and capture reconnect hooks
 const mockSseHandlers = new Map<string, (ev: MessageEvent) => void>()
 const mockSseClose = vi.fn()
+const mockSseOptions: Array<{ onReconnect?: () => void }> = []
 vi.mock('../composables/useSse', () => ({
-  useSse: vi.fn(() => ({
-    es: {},
-    on(event: string, handler: (e: MessageEvent) => void) {
-      mockSseHandlers.set(event, handler)
+  useSse: vi.fn(
+    (_path: string, _params: Record<string, unknown>, opts?: { onReconnect?: () => void }) => {
+      mockSseOptions.push(opts ?? {})
+      return {
+        es: {},
+        on(event: string, handler: (e: MessageEvent) => void) {
+          mockSseHandlers.set(event, handler)
+        },
+        off(event: string, _handler: (e: MessageEvent) => void) {
+          mockSseHandlers.delete(event)
+        },
+        close: mockSseClose,
+      }
     },
-    off(event: string, _handler: (e: MessageEvent) => void) {
-      mockSseHandlers.delete(event)
-    },
-    close: mockSseClose,
-  })),
+  ),
 }))
 
 function fireEvent(kind: string, data: Record<string, unknown> | TaskDTO) {
@@ -74,6 +80,7 @@ describe('TaskStore', () => {
     vi.useFakeTimers()
     mockSseHandlers.clear()
     mockSseClose.mockClear()
+    mockSseOptions.length = 0
     store = await freshStore()
   })
 
@@ -257,14 +264,30 @@ describe('TaskStore', () => {
       expect(store._map.value.get('P-42')?.title).toBe('Fetched')
     })
 
-    it('evicts task if fetch fails (task deleted between event and fetch)', async () => {
+    it('evicts + tombstones the task when the fetch fails with 404', async () => {
       store.upsert(makeTask('P-99'))
-      mockClient.getTask.mockRejectedValue(new Error('Not found'))
+      const notFound = new Error('GET /api/tasks/get failed: Not found') as Error & { status?: number }
+      notFound.status = 404
+      mockClient.getTask.mockRejectedValue(notFound)
 
       const result = await store.fetchOne('P-99')
 
       expect(result).toBeNull()
       expect(store._map.value.has('P-99')).toBe(false)
+      expect(store.fetchOneError.value).toBeNull()
+    })
+
+    it('retains the task and surfaces the error on transient fetch failures (503)', async () => {
+      store.upsert(makeTask('P-99'))
+      const unavailable = new Error('GET /api/tasks/get failed: Service unavailable') as Error & { status?: number }
+      unavailable.status = 503
+      mockClient.getTask.mockRejectedValue(unavailable)
+
+      const result = await store.fetchOne('P-99')
+
+      expect(result).toBeNull()
+      expect(store._map.value.has('P-99')).toBe(true)
+      expect(store.fetchOneError.value).toContain('Service unavailable')
     })
   })
 
@@ -273,7 +296,7 @@ describe('TaskStore', () => {
   // =========================================================================
 
   describe('forceRefresh', () => {
-    it('clears store and rehydrates', async () => {
+    it('replaces the query membership without clearing unrelated entities', async () => {
       store.upsert(makeTask('OLD-1'))
       mockClient.listTasks.mockResolvedValueOnce({
         total: 1, limit: 200, offset: 0,
@@ -283,7 +306,9 @@ describe('TaskStore', () => {
       await store.forceRefresh()
 
       expect(store.count.value).toBe(1)
-      expect(store._map.value.has('OLD-1')).toBe(false)
+      expect(store.items.value.map((t) => t.id)).toEqual(['FRESH-1'])
+      // DEV-65: entities other queries may still present are retained.
+      expect(store._map.value.has('OLD-1')).toBe(true)
       expect(store._map.value.has('FRESH-1')).toBe(true)
     })
   })
@@ -507,6 +532,356 @@ describe('TaskStore', () => {
       // Missing id field
       fireEvent('task_error', { message: 'oops' } as any)
       expect(spy).not.toHaveBeenCalled()
+    })
+  })
+
+
+  // =========================================================================
+  // DEV-65: entity/query separation and race guards
+  // =========================================================================
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void
+    let reject!: (reason?: unknown) => void
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+
+  function listResponse(tasks: TaskDTO[], total = tasks.length) {
+    return { total, limit: 200, offset: 0, tasks }
+  }
+
+  describe('DEV-65 entity/query separation', () => {
+    beforeEach(() => {
+      store.connectSse()
+    })
+
+    afterEach(() => {
+      store.disconnectSse()
+    })
+
+    it('a scoped (clear) hydrate replaces only its own query; other queries and entities survive', async () => {
+      // FRESH query result (e.g. the row an SSE create made visible)
+      const fresh = store.getQuery({ project: 'FRESH' })
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('FRESH-1')]))
+      await fresh.refresh()
+
+      // A BASE-scoped hydrateAll(clear: true) completing afterwards must not
+      // evict the FRESH entity or membership (the original smoke race).
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('BASE-1')]))
+      await store.hydrateAll({ project: 'BASE' }, { clear: true })
+
+      expect(fresh.tasks.value.map((t) => t.id)).toEqual(['FRESH-1'])
+      expect(store._map.value.has('FRESH-1')).toBe(true)
+      expect(store.items.value.map((t) => t.id)).toEqual(['BASE-1'])
+      expect(store.count.value).toBe(1)
+    })
+
+    it('an SSE-inserted foreign entity never joins query membership or inflates counts', async () => {
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('A-1')]))
+      await store.hydrateAll({ project: 'A' }, { clear: true })
+
+      fireEvent('task_created', makeTask('FOREIGN-1'))
+
+      expect(store._map.value.has('FOREIGN-1')).toBe(true)
+      expect(store.items.value.map((t) => t.id)).toEqual(['A-1'])
+      expect(store.count.value).toBe(1)
+      expect(store.serverTotal.value).toBe(1)
+    })
+
+    it('fetchOne/upsert/add never add query membership', async () => {
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('A-1')]))
+      await store.hydrateAll({}, { clear: true })
+
+      mockClient.getTask.mockResolvedValueOnce(makeTask('Z-9'))
+      await store.fetchOne('Z-9')
+      store.upsert(makeTask('PANEL-1'))
+      mockClient.addTask.mockResolvedValueOnce(makeTask('ADDED-1'))
+      await store.add({ title: 'x' } as any)
+
+      expect(store._map.value.has('Z-9')).toBe(true)
+      expect(store._map.value.has('PANEL-1')).toBe(true)
+      expect(store._map.value.has('ADDED-1')).toBe(true)
+      expect(store.items.value.map((t) => t.id)).toEqual(['A-1'])
+    })
+
+    it('a slow older query cannot publish over a newer one (late success)', async () => {
+      const slowA = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => slowA.promise)
+      const pendingA = store.hydrateAll({ project: 'A' }, { clear: true })
+
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('B-1')]))
+      await store.hydrateAll({ project: 'B' }, { clear: true })
+      expect(store.items.value.map((t) => t.id)).toEqual(['B-1'])
+      expect(store.status.value).toBe('ready')
+
+      slowA.resolve(listResponse([makeTask('A-1')]))
+      await pendingA
+
+      // The legacy active view stays on B; A publishes only to its own entry.
+      expect(store.items.value.map((t) => t.id)).toEqual(['B-1'])
+      expect(store.status.value).toBe('ready')
+      expect(store.error.value).toBeNull()
+      const queryA = store.getQuery({ project: 'A' })
+      expect(queryA.tasks.value.map((t) => t.id)).toEqual(['A-1'])
+    })
+
+    it('a slow older query failure cannot publish an error over a newer ready query', async () => {
+      const slowA = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => slowA.promise)
+      const pendingA = store.hydrateAll({ project: 'A' }, { clear: true })
+
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('B-1')]))
+      await store.hydrateAll({ project: 'B' }, { clear: true })
+
+      slowA.reject(new Error('A failed late'))
+      await pendingA
+
+      expect(store.status.value).toBe('ready')
+      expect(store.error.value).toBeNull()
+      expect(store.items.value.map((t) => t.id)).toEqual(['B-1'])
+    })
+
+    it('a stale same-key refresh cannot overwrite a newer refresh (success and error)', async () => {
+      const first = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => first.promise)
+      const pendingFirst = store.hydrateAll({}, { clear: true })
+
+      const second = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => second.promise)
+      const pendingSecond = store.hydrateAll({}, { clear: true })
+
+      second.resolve(listResponse([makeTask('NEW-1')]))
+      await pendingSecond
+      expect(store.items.value.map((t) => t.id)).toEqual(['NEW-1'])
+
+      first.resolve(listResponse([makeTask('OLD-1')]))
+      await pendingFirst
+      expect(store.items.value.map((t) => t.id)).toEqual(['NEW-1'])
+
+      const third = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => third.promise)
+      const pendingThird = store.hydrateAll({}, { clear: true })
+      const fourth = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => fourth.promise)
+      const pendingFourth = store.hydrateAll({}, { clear: true })
+      fourth.resolve(listResponse([makeTask('FINAL-1')]))
+      await pendingFourth
+      third.reject(new Error('stale failure'))
+      await pendingThird
+
+      expect(store.status.value).toBe('ready')
+      expect(store.error.value).toBeNull()
+      expect(store.items.value.map((t) => t.id)).toEqual(['FINAL-1'])
+    })
+
+    it('a failed NEW query shows no rows from the previous query and surfaces its error', async () => {
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('A-1')]))
+      await store.hydrateAll({ project: 'A' }, { clear: true })
+      expect(store.items.value.map((t) => t.id)).toEqual(['A-1'])
+
+      mockClient.listTasks.mockRejectedValueOnce(new Error('B exploded'))
+      await store.hydrateAll({ project: 'B' }, { clear: true })
+
+      expect(store.items.value).toEqual([])
+      expect(store.count.value).toBe(0)
+      expect(store.status.value).toBe('error')
+      expect(store.error.value).toBe('B exploded')
+
+      // Retry succeeds and replaces membership.
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('B-1')]))
+      await store.hydrateAll({ project: 'B' }, { clear: true })
+      expect(store.items.value.map((t) => t.id)).toEqual(['B-1'])
+      expect(store.status.value).toBe('ready')
+    })
+
+    it('a stale hydrate response cannot overwrite a newer SSE entity', async () => {
+      mockClient.listTasks.mockResolvedValueOnce(
+        listResponse([makeTask('T-1', { title: 'original', modified: '2025-01-01T00:00:00Z' })]),
+      )
+      await store.hydrateAll({}, { clear: true })
+
+      const response = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => response.promise)
+      const pending = store.hydrateAll({}, { clear: true })
+      // A newer SSE DTO lands while the response is in flight.
+      fireEvent('task_updated', makeTask('T-1', { title: 'SSE newer', modified: '2025-01-02T00:00:00Z' }))
+
+      response.resolve(
+        listResponse([makeTask('T-1', { title: 'server older', modified: '2025-01-01T00:00:00Z' })]),
+      )
+      await pending
+      expect(store._map.value.get('T-1')?.title).toBe('SSE newer')
+    })
+
+    it('a stale fetchOne response cannot overwrite a newer SSE entity', async () => {
+      store.upsert(makeTask('T-2', { title: 'old', modified: '2025-01-01T00:00:00Z' }))
+      const response = deferred<TaskDTO>()
+      mockClient.getTask.mockImplementationOnce(() => response.promise)
+      const pending = store.fetchOne('T-2')
+      fireEvent('task_updated', makeTask('T-2', { title: 'SSE newer', modified: '2025-01-02T00:00:00Z' }))
+
+      response.resolve(makeTask('T-2', { title: 'server older', modified: '2025-01-01T00:00:00Z' }))
+      await pending
+      expect(store._map.value.get('T-2')?.title).toBe('SSE newer')
+    })
+
+    it('a task deleted during an in-flight hydrate is not resurrected by the stale response', async () => {
+      const response = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => response.promise)
+      const pending = store.hydrateAll({ project: 'A' }, { clear: true })
+
+      fireEvent('task_deleted', { id: 'T-1' })
+
+      response.resolve(listResponse([makeTask('T-1')]))
+      await pending
+      expect(store._map.value.has('T-1')).toBe(false)
+      expect(store.items.value).toEqual([])
+    })
+
+    it('a task deleted during an in-flight fetchOne is not resurrected', async () => {
+      const response = deferred<TaskDTO>()
+      mockClient.getTask.mockImplementationOnce(() => response.promise)
+      const pending = store.fetchOne('T-3')
+
+      fireEvent('task_deleted', { id: 'T-3' })
+
+      response.resolve(makeTask('T-3'))
+      await pending
+      expect(store._map.value.has('T-3')).toBe(false)
+    })
+
+    it('retained queries converge membership via authoritative refresh after SSE moves, preserving server order', async () => {
+      const query = store.getQuery({ status: ['Todo'] } as TaskListFilter)
+      query.retain()
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('T-2'), makeTask('T-1')]))
+      await query.refresh()
+      expect(query.tasks.value.map((t) => t.id)).toEqual(['T-2', 'T-1'])
+      expect([...query.ranks.value.entries()]).toEqual([
+        ['T-2', 0],
+        ['T-1', 1],
+      ])
+
+      // An existing task moves out of the filter; a new matching task appears.
+      fireEvent('task_updated', makeTask('T-1', { status: 'Done' as any }))
+      fireEvent('task_created', makeTask('T-3'))
+
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('T-3'), makeTask('T-2')]))
+      await vi.advanceTimersByTimeAsync(300)
+      await vi.waitFor(() => {
+        expect(query.tasks.value.map((t) => t.id)).toEqual(['T-3', 'T-2'])
+      })
+      expect([...query.ranks.value.entries()]).toEqual([
+        ['T-3', 0],
+        ['T-2', 1],
+      ])
+      // The moved-out entity is retained for other consumers but is no member.
+      expect(store._map.value.has('T-1')).toBe(true)
+      expect(query.ids.value).not.toContain('T-1')
+      // The authoritative refresh re-issued the query filter verbatim.
+      expect(mockClient.listTasks).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: ['Todo'], limit: 200, offset: 0 }),
+      )
+      query.release()
+    })
+
+    it('released queries are not refreshed by SSE events', async () => {
+      const query = store.getQuery({ project: 'LIVE' })
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('L-1')]))
+      await query.refresh()
+      query.retain()
+      query.release()
+
+      fireEvent('task_created', makeTask('L-2'))
+      await vi.advanceTimersByTimeAsync(300)
+      expect(mockClient.listTasks).toHaveBeenCalledTimes(1)
+    })
+    it('local mutations (upsert/add/evict) invalidate retained queries without SSE', async () => {
+      const query = store.getQuery({ project: 'LOCAL' })
+      query.retain()
+      mockClient.listTasks.mockResolvedValue(listResponse([]))
+      await query.refresh()
+      expect(mockClient.listTasks).toHaveBeenCalledTimes(1)
+
+      store.upsert(makeTask('P-1'))
+      await vi.advanceTimersByTimeAsync(300)
+      await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(2))
+
+      mockClient.addTask.mockResolvedValueOnce(makeTask('P-2'))
+      await store.add({ title: 'x' } as any)
+      await vi.advanceTimersByTimeAsync(300)
+      await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(3))
+
+      store.evict('P-1')
+      await vi.advanceTimersByTimeAsync(300)
+      await vi.waitFor(() => expect(mockClient.listTasks).toHaveBeenCalledTimes(4))
+      query.release()
+    })
+
+    it('invalidation immediately supersedes an in-flight refresh before the debounce fires', async () => {
+      const query = store.getQuery({ project: 'A' })
+      query.retain()
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('A-1')]))
+      await query.refresh()
+      expect(query.tasks.value.map((t) => t.id)).toEqual(['A-1'])
+
+      const inFlight = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => inFlight.promise)
+      const pending = query.refresh()
+
+      // An SSE event invalidates while the manual refresh is in flight: it
+      // must be superseded NOW, not after the 250ms debounce successor.
+      fireEvent('task_updated', makeTask('A-1', { title: 'moved' }))
+      expect(query.status.value).toBe('loading')
+
+      inFlight.resolve(listResponse([makeTask('STALE-1')]))
+      await pending
+      expect(query.ids.value).toEqual(['A-1'])
+      expect(query.status.value).toBe('loading')
+
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('FRESH-1')]))
+      await vi.advanceTimersByTimeAsync(300)
+      await vi.waitFor(() => expect(query.tasks.value.map((t) => t.id)).toEqual(['FRESH-1']))
+      expect(query.status.value).toBe('ready')
+      query.release()
+    })
+
+    it('releasing the last owner stops pending and in-flight refreshes', async () => {
+      const query = store.getQuery({ project: 'SOLO' })
+      query.retain()
+      mockClient.listTasks.mockResolvedValueOnce(listResponse([makeTask('S-1')]))
+      await query.refresh()
+
+      const inFlight = deferred<{ total: number; tasks: TaskDTO[] }>()
+      mockClient.listTasks.mockImplementationOnce(() => inFlight.promise)
+      const pending = query.refresh()
+      query.release()
+
+      inFlight.resolve(listResponse([makeTask('S-2')]))
+      await pending
+      expect(query.ids.value).toEqual(['S-1'])
+      await vi.advanceTimersByTimeAsync(300)
+      expect(mockClient.listTasks).toHaveBeenCalledTimes(2)
+    })
+
+    it('an SSE reconnect refreshes retained queries to cover the missed gap', async () => {
+      const query = store.getQuery({ project: 'GAP' })
+      query.retain()
+      mockClient.listTasks.mockResolvedValue(listResponse([]))
+      await query.refresh()
+      const callsBefore = mockClient.listTasks.mock.calls.length
+
+      const opts = mockSseOptions[mockSseOptions.length - 1]
+      expect(typeof opts?.onReconnect).toBe('function')
+      opts!.onReconnect!()
+      await vi.advanceTimersByTimeAsync(300)
+      await vi.waitFor(() => {
+        expect(mockClient.listTasks.mock.calls.length).toBeGreaterThan(callsBefore)
+      })
+      query.release()
     })
   })
 

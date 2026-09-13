@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { h, ref, type Slots } from 'vue'
+import { computed, h, ref, type Slots } from 'vue'
 import type { SprintListItem } from '../api/types'
 
 const routeState: { query: Record<string, any> } = { query: { month: '2024-02', sprints: '1' } }
@@ -11,10 +11,84 @@ const projectsStore = {
     refresh: vi.fn(async () => { }),
 }
 
+const _calendarItems = ref<any[]>([])
+const _calendarStatus = ref('idle' as string)
+const _calendarError = ref(null as string | null)
+const _calendarHasSnapshot = ref(false)
+
+function createCalendarHandle(
+    key: string,
+    status: ReturnType<typeof ref<string>> = ref('idle' as string),
+    error: ReturnType<typeof ref<string | null>> = ref(null as string | null),
+    hasSnapshot: ReturnType<typeof ref<boolean>> = ref(false),
+) {
+    return {
+        key,
+        hasSnapshot,
+        ids: computed(() => _calendarItems.value.map((t: any) => t.id)),
+        ranks: ref(new Map<string, number>()),
+        total: computed(() => _calendarItems.value.length),
+        status,
+        error,
+        lastSyncAt: ref(1),
+        tasks: computed(() => _calendarItems.value),
+        refresh: vi.fn(async () => { status.value = 'ready'; hasSnapshot.value = true }),
+        retain: vi.fn(),
+        release: vi.fn(),
+    }
+}
+
+function calendarKeyOf(filter: Record<string, unknown> = {}): string {
+    const source: Record<string, unknown> = { order: 'desc', ...(filter ?? {}) }
+    return JSON.stringify(
+        Object.entries(source)
+            .filter(([k, v]) => !['limit', 'offset', 'page'].includes(k) && v !== undefined && v !== null && v !== '')
+            .sort(([a], [b]) => a.localeCompare(b)),
+    )
+}
+
+const calendarHandles = new Map<string, ReturnType<typeof createCalendarHandle>>()
+function calendarHandleFor(filter: Record<string, unknown> = {}) {
+    const key = calendarKeyOf(filter)
+    let handle = calendarHandles.get(key)
+    if (!handle) {
+        handle = createCalendarHandle(key)
+        calendarHandles.set(key, handle)
+    }
+    return handle
+}
+
 const tasksStore = {
-    items: ref<any[]>([]),
+    items: _calendarItems,
+    getQuery: vi.fn((filter?: Record<string, unknown>) => calendarHandleFor(filter)),
     hydrateAll: vi.fn(async () => { }),
-    status: ref('idle' as string),
+    status: _calendarStatus,
+}
+
+/** Defer every refresh of the given handles until `complete()` is called. */
+function deferHandleRefreshes(handles: Array<ReturnType<typeof createCalendarHandle>>) {
+    const resolvers: Array<() => void> = []
+    for (const handle of handles) {
+        handle.refresh.mockImplementation(() => {
+            handle.status.value = 'loading'
+            return new Promise<void>((resolve) => { resolvers.push(resolve) })
+        })
+    }
+    return {
+        complete() {
+            for (const handle of handles) {
+                handle.status.value = 'ready'
+                handle.hasSnapshot.value = true
+            }
+            resolvers.forEach((resolve) => resolve())
+        },
+    }
+}
+
+/** The handle the page adopted last. */
+function adoptedCalendarHandle() {
+    const results = tasksStore.getQuery.mock.results
+    return results[results.length - 1]?.value as ReturnType<typeof createCalendarHandle> | undefined
 }
 
 const sprintsStore = {
@@ -114,7 +188,11 @@ describe('Calendar sprint overlay', () => {
         projectsStore.projects.value = [{ prefix: 'ACME', name: 'Acme Co' }]
         tasksStore.items.value = []
         tasksStore.status.value = 'idle'
+        _calendarError.value = null
+        _calendarHasSnapshot.value = false
+        calendarHandles.clear()
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
         projectsStore.refresh.mockClear()
         sprintsStore.refresh.mockClear()
         routerPushMock.mockClear()
@@ -212,6 +290,11 @@ describe('Calendar task hover cards', () => {
     beforeEach(() => {
         routeState.query = { month: '2024-02', project: 'ACME' }
         localStorage.clear()
+        calendarHandles.clear()
+        tasksStore.getQuery.mockClear()
+        _calendarStatus.value = 'idle'
+        _calendarError.value = null
+        _calendarHasSnapshot.value = false
         tasksStore.items.value = [
             {
                 id: 'ACME-123',
@@ -307,4 +390,70 @@ describe('Calendar task hover cards', () => {
         const raw = hover.attributes('data-fields') || ''
         expect(raw).toContain('"tags":false')
     })
+  it('keeps the month grid mounted during background refreshes and surfaces refresh failures', async () => {
+    // The lone project is auto-selected, so the page's first query carries
+    // project ACME. Hold that handle's first refresh open.
+    // The mount may adopt the bare key and/or the auto-selected ACME key;
+    // defer every candidate so the first load is deterministically pending.
+    const deferred = deferHandleRefreshes([
+      calendarHandleFor({}),
+      calendarHandleFor({ project: 'ACME' }),
+    ])
+    const wrapper = mount(Calendar)
+    await flushPromises()
+    expect(wrapper.find('.loader').exists()).toBe(true)
+    expect(wrapper.find('.grid.body').exists()).toBe(false)
+
+    // First load completes (still in a loading state): the grid renders and
+    // stays mounted — background refreshes never unmount it.
+    deferred.complete()
+    await flushPromises()
+    expect(wrapper.find('.grid.body').exists()).toBe(true)
+    expect(wrapper.find('.loader').exists()).toBe(false)
+
+    // A refresh failure surfaces as a retry banner; the grid is retained.
+    const adopted = adoptedCalendarHandle()!
+    adopted.error.value = 'flaky network'
+    adopted.status.value = 'error'
+    await flushPromises()
+    expect(wrapper.find('.refresh-error').exists()).toBe(true)
+    expect(wrapper.find('.refresh-error').text()).toContain('flaky network')
+    expect(wrapper.find('.grid.body').exists()).toBe(true)
+    wrapper.unmount()
+  })
+  it('shows the first-load loader on a project switch until the new key publishes', async () => {
+    const wrapper = mount(Calendar)
+    await flushPromises()
+    expect(wrapper.find('.grid.body').exists()).toBe(true)
+
+    wrapper.unmount()
+    // The real FilterBar persists its snapshot and force-selects a LONE
+    // project; drop the snapshot and offer two projects so the next mount
+    // follows the routed project (BETA) instead of snapping back to ACME.
+    localStorage.clear()
+    projectsStore.projects.value = [
+        { prefix: 'ACME', name: 'Acme Co' },
+        { prefix: 'BETA', name: 'Beta Co' },
+    ]
+
+    // Switch projects (fresh mount on the new route): the new key's first
+    // refresh is held open.
+    const deferred = deferHandleRefreshes([
+      calendarHandleFor({}),
+      calendarHandleFor({ project: 'BETA' }),
+    ])
+    routeState.query = { month: '2024-02', sprints: '1', project: 'BETA' }
+    const wrapper2 = mount(Calendar)
+    await flushPromises()
+
+    // First load of the new key: loader shows, grid unmounted.
+    expect(wrapper2.find('.loader').exists()).toBe(true)
+    expect(wrapper2.find('.grid.body').exists()).toBe(false)
+
+    deferred.complete()
+    await flushPromises()
+    expect(wrapper2.find('.loader').exists()).toBe(false)
+    expect(wrapper2.find('.grid.body').exists()).toBe(true)
+    wrapper2.unmount()
+  })
 })

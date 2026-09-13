@@ -116,7 +116,21 @@
       </FilterBar>
     </div>
 
+    <div v-if="loadError && items.length" class="card refresh-error" role="alert">
+      <span class="refresh-error__message">Board refresh failed: {{ loadError }}</span>
+      <UiButton variant="ghost" type="button" :disabled="loadingTasks" @click="refreshBoardTasks()">Retry</UiButton>
+    </div>
+
     <div v-if="initialLoading" style="margin: 12px 0;"><UiLoader>Loading board…</UiLoader></div>
+
+    <div v-else-if="loadError && project && !items.length" style="margin: 12px 0;">
+      <UiEmptyState
+        title="We couldn't load board tasks"
+        :description="loadError"
+        primary-label="Retry"
+        @primary="refreshBoardTasks()"
+      />
+    </div>
 
     <div v-else-if="!project">
       <UiEmptyState title="Pick a project" description="Boards are per-project. Choose a project to view its board." />
@@ -303,7 +317,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
@@ -325,7 +339,7 @@ import { useProjects } from '../composables/useProjects'
 import { useSprintFormatting } from '../composables/useSprintFormatting'
 import { useSprintFilterOptions, useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { useTaskStore } from '../composables/useTaskStore'
+import { useTaskStore, type TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, startOfLocalDay } from '../utils/date'
 import { sortTasks } from '../utils/taskSort'
 import { formatMember, memberColor, memberInitials } from '../utils/member'
@@ -336,8 +350,23 @@ const { projects, refresh: refreshProjects } = useProjects()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const store = useTaskStore()
-const loadingTasks = computed(() => store.status.value === 'loading')
-const items = computed(() => store.items.value)
+// DEV-65: read the board's keyed query so other consumers (panel, routes in
+// flight) cannot overwrite this board's results, and so SSE-triggered
+// authoritative refreshes keep this membership current while mounted.
+const boardQuery = shallowRef<TaskQueryHandle | null>(null)
+let activeQueryHandle: TaskQueryHandle | null = null
+let activeQueryKey = ''
+function adoptQuery(handle: TaskQueryHandle) {
+  if (activeQueryKey === handle.key) return
+  activeQueryHandle?.release()
+  activeQueryHandle = handle
+  activeQueryKey = handle.key
+  handle.retain()
+  boardQuery.value = handle
+}
+const loadingTasks = computed(() => boardQuery.value?.status.value === 'loading')
+const loadError = computed(() => boardQuery.value?.error.value ?? null)
+const items = computed(() => boardQuery.value?.tasks.value ?? [])
 const { openTaskPanel } = useTaskPanelController()
 
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
@@ -371,9 +400,15 @@ function loadGroupBy(): GroupByMode {
 const groupBy = ref<GroupByMode>(loadGroupBy())
 function saveGroupBy() { storageSet(groupByKey(), groupBy.value) }
 
-// -- Initial loading (only shows spinner before first data arrives) --------
-const hasEverLoaded = ref(false)
-const initialLoading = computed(() => (loadingConfig.value || loadingTasks.value) && !hasEverLoaded.value)
+// -- Initial loading --------------------------------------------------------
+// Per-current-handle first load: the loader covers the loading, queued-idle,
+// and config phases of a key without a snapshot. A background refresh of an
+// established key (hasSnapshot) keeps the grid mounted.
+const initialLoading = computed(() => {
+  const query = boardQuery.value
+  if (!query || query.hasSnapshot.value || query.error.value) return false
+  return loadingConfig.value || query.status.value === 'loading' || query.status.value === 'idle'
+})
 
 // -- Ticket highlight on single click -------------------------------------
 const selectedTaskId = ref('')
@@ -514,13 +549,11 @@ async function refreshBoardTasks(snapshot?: Record<string, string>) {
     return
   }
   const raw = snapshot ?? filter.value
-  const { serverFilter, normalized } = buildServerFilter(raw, project.value)
-  try {
-    await store.hydrateAll(serverFilter, { clear: true })
-    hasEverLoaded.value = true
-  } catch (err: any) {
-    showToast(err?.message || 'Failed to load board tasks')
-  }
+  const { serverFilter } = buildServerFilter(raw, project.value)
+  adoptQuery(store.getQuery(serverFilter))
+  // Refresh failures surface through the query's error state (loadError);
+  // previously they were swallowed by the shared status with stale rows left behind.
+  await activeQueryHandle!.refresh()
 }
 
 function normalizeStatusKey(value: string | null | undefined) {
@@ -819,8 +852,8 @@ async function onDrop(targetStatus: string) {
   if (!id || !targetStatus || targetStatus === '__other__') return
   draggingId.value = ''
   try {
-    // Optimistic move via store
-    const existing = store.items.value.find(t => t.id === id)
+    // Optimistic move via store (resolved against this board's query)
+    const existing = items.value.find(t => t.id === id)
     if (existing) {
       store.upsert({ ...existing, status: targetStatus })
     }
@@ -906,6 +939,10 @@ onUnmounted(() => {
     clearTimeout(filterDebounce)
     filterDebounce = null
   }
+  activeQueryHandle?.release()
+  activeQueryHandle = null
+  activeQueryKey = ''
+  boardQuery.value = null
   if (typeof window !== 'undefined') {
     window.removeEventListener('click', handleBoardPopoverClick)
   }
@@ -1205,6 +1242,20 @@ onUnmounted(() => {
 }
 
 .board-col-header .warn { color: var(--color-danger-strong); font-weight: 600; }
+
+/* -- Refresh error banner ------------------------------------------------ */
+.refresh-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-left: 3px solid var(--color-danger, #c62828);
+}
+
+.refresh-error__message {
+  color: var(--color-danger-strong, var(--color-danger, #c62828));
+}
 
 /* -- Ticket selection --------------------------------------------------- */
 .task--selected {

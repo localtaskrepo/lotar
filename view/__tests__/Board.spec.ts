@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { computed, h, ref, shallowRef } from 'vue'
+import { computed, h, nextTick, ref, shallowRef } from 'vue'
 import type { SprintListItem, TaskDTO } from '../api/types'
 
 const routeState: { query: Record<string, any> } = { query: { project: 'ACME' } }
@@ -13,6 +13,44 @@ const projectsStore = {
 
 const taskMap = shallowRef(new Map<string, TaskDTO>())
 const taskVersion = shallowRef(0)
+function createBoardHandle(key: string, status = shallowRef('idle' as string), error = shallowRef(null as string | null), hasSnapshot = shallowRef(false)) {
+    return {
+        key,
+        hasSnapshot,
+        ids: computed(() => Array.from(taskMap.value.keys())),
+        ranks: shallowRef(new Map<string, number>()),
+        total: computed(() => taskMap.value.size),
+        status,
+        error,
+        lastSyncAt: shallowRef(0),
+        tasks: computed(() => { void taskVersion.value; return Array.from(taskMap.value.values()) }),
+        refresh: vi.fn(async () => { status.value = 'ready'; hasSnapshot.value = true }),
+        retain: vi.fn(),
+        release: vi.fn(),
+    }
+}
+
+function boardKeyOf(filter: Record<string, unknown> = {}): string {
+    const source: Record<string, unknown> = { order: 'desc', ...(filter ?? {}) }
+    return JSON.stringify(
+        Object.entries(source)
+            .filter(([k, v]) => !['limit', 'offset', 'page'].includes(k) && v !== undefined && v !== null && v !== '')
+            .sort(([a], [b]) => a.localeCompare(b)),
+    )
+}
+
+const boardQueryHandles = new Map<string, ReturnType<typeof createBoardHandle>>()
+function boardHandleFor(filter: Record<string, unknown> = {}) {
+    const key = boardKeyOf(filter)
+    let handle = boardQueryHandles.get(key)
+    if (!handle) {
+        handle = createBoardHandle(key)
+        boardQueryHandles.set(key, handle)
+    }
+    return handle
+}
+const boardQueryHandle = boardHandleFor({ project: 'ACME' })
+
 const tasksStore = {
     _map: taskMap,
     version: taskVersion,
@@ -23,6 +61,7 @@ const tasksStore = {
     error: shallowRef(null as string | null),
     lastSyncAt: shallowRef(0),
     hasData: computed(() => taskMap.value.size > 0),
+    getQuery: vi.fn((filter?: Record<string, unknown>) => boardHandleFor(filter)),
     hydrateAll: vi.fn(async () => {}),
     hydratePage: vi.fn(async () => ({ total: 0 })),
     fetchOne: vi.fn(async () => null),
@@ -184,7 +223,10 @@ describe('Board field visibility', () => {
         routeState.query = { project: 'ACME' }
         taskMap.value = new Map()
         taskVersion.value = 0
+        boardQueryHandles.clear()
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         projectsStore.refresh.mockClear()
         sprintsStore.refresh.mockClear()
         configStore.refresh.mockClear()
@@ -333,6 +375,8 @@ describe('Board group-by swimlanes', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -397,6 +441,8 @@ describe('Board member badges', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -425,6 +471,8 @@ describe('Board progressive disclosure', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -481,6 +529,8 @@ describe('Board group-by type', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -519,6 +569,8 @@ describe('Board collapsible groups', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -572,6 +624,8 @@ describe('Board ticket highlight', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -618,6 +672,8 @@ describe('Board aligned swimlanes', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -662,6 +718,8 @@ describe('Board grouping persistence', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -739,6 +797,8 @@ describe('Board overdue suppression for done tasks', () => {
         taskMap.value = new Map()
         taskVersion.value = 0
         tasksStore.hydrateAll.mockClear()
+        tasksStore.getQuery.mockClear()
+        boardQueryHandle.refresh.mockClear()
         // Configured statuses: Todo, Doing, Done — "Done" is the final/done status
         configStore.statuses.value = ['Todo', 'Doing', 'Done']
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
@@ -770,5 +830,77 @@ describe('Board overdue suppression for done tasks', () => {
         const card = wrapper.find('article.card.task')
         expect(card.text()).toContain('Due')
         expect(card.text()).not.toContain('Overdue')
+    })
+    it('shows a retry banner while retaining cards when a refresh fails with data', async () => {
+        const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+        expect(wrapper.findAll('article.card.task').length).toBeGreaterThan(0)
+
+        boardHandleFor({ project: 'ACME' }).error.value = 'flaky network'
+        await flushPromises()
+        expect(wrapper.find('.refresh-error').exists()).toBe(true)
+        expect(wrapper.find('.refresh-error').text()).toContain('flaky network')
+        expect(wrapper.findAll('article.card.task').length).toBeGreaterThan(0)
+        wrapper.unmount()
+    })
+
+    it('shows the full error state (no banner) when a refresh fails without rows', async () => {
+        taskMap.value = new Map()
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+        boardHandleFor({ project: 'ACME' }).error.value = 'hard failure'
+        await flushPromises()
+        expect(wrapper.find('.refresh-error').exists()).toBe(false)
+        expect(wrapper.find('.empty').exists()).toBe(true)
+        wrapper.unmount()
+    })
+    it('shows the first-load loader on a project switch until the new key publishes', async () => {
+        const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+        expect(wrapper.findAll('article.card.task').length).toBeGreaterThan(0)
+
+        wrapper.unmount()
+
+        // Switch projects (fresh mount on the new route): the new key's
+        // first refresh is held open.
+        const betaHandle = boardHandleFor({ project: 'BETA' })
+        let finishBeta!: () => void
+        betaHandle.refresh.mockImplementationOnce(() => {
+            betaHandle.status.value = 'loading'
+            return new Promise<void>((resolve) => { finishBeta = resolve })
+        })
+        routeState.query = { project: 'BETA' }
+        const wrapper2 = mount(Board)
+        await flushPromises()
+        await nextTick()
+
+        // First load of the new key: loader shows, grid is not rendered.
+        expect(wrapper2.find('.loader').exists()).toBe(true)
+        expect(wrapper2.find('.board.grid').exists()).toBe(false)
+        expect(wrapper2.findAll('article.card.task').length).toBe(0)
+
+        const betaTasks = [baseTask({ id: 'BETA-1', title: 'Beta task' })]
+        taskMap.value = new Map(betaTasks.map(t => [t.id, t]))
+        taskVersion.value++
+        betaHandle.hasSnapshot.value = true
+        betaHandle.status.value = 'ready'
+        finishBeta()
+        await flushPromises()
+        await nextTick()
+
+        expect(wrapper2.find('.loader').exists()).toBe(false)
+        expect(wrapper2.find('.board.grid').exists()).toBe(true)
+        expect(wrapper2.findAll('article.card.task').length).toBe(1)
+        wrapper2.unmount()
     })
 })

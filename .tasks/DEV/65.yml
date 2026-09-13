@@ -1,10 +1,11 @@
 title: Separate task entities from query-scoped results and live updates
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.612864+00:00
-modified: 2026-09-11T14:20:59.916096+00:00
+modified: 2026-09-13T08:09:24.546822+00:00
 relationships:
   depends_on:
   - DEV-57
@@ -18,6 +19,25 @@ relationships:
 comments:
 - date: 2026-09-11T14:20:59.916096+00:00
   text: 'DEV-56 smoke investigation confirmation (ticket stays Todo, not claimed fixed): the query-cache race is confirmed. Sequence: task-created SSE upserts the FRESH cache entry, then a BASE-scoped handleTaskCreated runs hydrateAll(clear:true) which replaces the shared query cache and drops the FRESH row; reproduced by holding a BASE-scoped list response open while the create lands. Interim mitigation applied in smoke only (appropriate query selection — selecting the FRESH cache before expecting the row), NOT a source fix. Full acceptance criteria for the real cache invalidation/scoping fix remain open here.'
+- date: 2026-09-13T06:12:10.030647+00:00
+  text: 'Plan (implementation authorized, view-only scope): (1) Rewrite view/composables/useTaskStore.ts into two layers: normalized entity map (guarded writes: live SSE/panel/API writes always apply; hydrate/fetchOne response writes checked against write-clock revisions + delete tombstones so stale responses cannot overwrite newer entities or resurrect deletions) and keyed query entries (canonical filter key -> ordered membership IDs, per-query rank ledger preserving DEV-57 server order, server total, status/error, per-query request generation rejecting stale completions incl. status/error). hydrateAll keeps legacy compat (clear:true = replace membership; default merge; active-query view backs legacy items/count/orderIndex/serverTotal/status/error). New getQuery(filter) handle API with retain/release: retained queries get a debounced authoritative server refresh after task SSE events (membership moves converge on Board/Calendar too, no client predicate engine). (2) Migrate TasksList/Board/Calendar to handles; add visible error UI on Board/Calendar; drop TasksList''s own SSE data-refresh loop (store invalidation replaces it); preserve page generation/selection/hydration-queue guards. ProjectInsights stays on legacy surface (DEV-66 owns its state). (3) Deterministic deferred-promise tests in useTaskStore.spec.ts + updated page spec mocks. Verification: focused UI specs + npm run lint:frontend, full test:ui if reasonable; no Rust/smoke/browser (later gates). No git commands.'
+- date: 2026-09-13T06:20:01.731452+00:00
+  text: 'Implementation complete (view scope); status stays InProgress until final gates. Outcome: useTaskStore.ts rewritten into a normalized entity layer (write-clock revisions + delete tombstones guard stale hydrate/fetchOne responses from overwriting newer SSE/panel entities or resurrecting deletions) and a keyed query layer (canonical filter key -> ordered membership IDs, per-query DEV-57 rank ledger, server total, status/error, per-query request generation rejecting stale completions incl. status/error). New getQuery(filter) handle API with retain/release; retained queries get a debounced (250ms) authoritative server refresh after task SSE events, so membership moves converge on Board/Calendar/Tasks without any client predicate engine. Legacy flat surface preserved as a view over the active query (hydrateAll clear:true = replace membership, default merge retains legacy union; forceRefresh clears entities, keeps tombstones). Pages: TasksList adopts its handle (pagination/ranks/total/scoped selection from query membership; page-local SSE data-refresh loop removed — store invalidation replaces it; page generation/selection/hydration-queue guards preserved), Board + Calendar adopt handles and gained visible retry-able error states; ProjectInsights intentionally left on the legacy surface for DEV-66. Evidence: view/__tests__/useTaskStore.spec.ts extended with 13 deterministic deferred-promise tests (BASE/FRESH survives scoped hydrate, foreign entity not membership, slow A-vs-B late success+error cross- and same-key, failed new query clears rows+surfaces error, SSE-newer vs stale hydrate/fetchOne, deletion vs stale async, retained-query membership convergence with order preserved, released query not refreshed) — 50/50 pass; page specs (TasksList.counts, TasksList.sort, Board, Calendar, App) updated for getQuery mocks and pass. npm run test:ui:agent 55 files/365 tests pass; npm run lint:frontend clean. Remaining: browser verification + Playwright smoke + full lint (clippy)/test gates before Done; recommended browser repro of the original race: open Tasks with a slow BASE list response, create a task matching a FRESH filter via panel/SSE, verify the row survives the BASE refresh; also verify moving a task out of the current filter via another client removes it from Board/Calendar within ~1s and a failed filter switch shows the error state with no stale rows.'
+- date: 2026-09-13T07:30:05.337756+00:00
+  text: 'Review fixes applied (view-only; still InProgress pending final gates): (1) Calendar now uses the initialLoading pattern — background/SSE refreshes keep the month grid mounted; failures show a retry banner with the grid retained. (2) TasksList presents the last snapshot query while a newly adopted key is pending (no false ''No tasks match''); a failed NEW key presents immediately so previous-key rows never show; same-key refresh failure keeps valid rows + visible retry banner; selection stays fail-closed (loading/error gate untouched, proven by test). (3) forceRefresh no longer clears the shared entity map/revisions — query-replace only (spec adjusted). (4) upsert/add/update/remove/evict now invalidate retained queries locally (query-response application never schedules — no recursion). (5) fetchOne evicts+tombstones only on 404/410; transient failures retain the entity and surface via store.fetchOneError; api client now attaches HTTP status to thrown errors (additive). (6) useSse gained an optional onReconnect hook (3rd arg, non-breaking); the store refreshes retained queries after a reconnect to cover the missed event gap. (7) Invalidation immediately supersedes an in-flight refresh (generation bump) so stale membership cannot publish during the 250ms debounce window; entries stay loading until the successor publishes (no stuck-ready, no starvation — single coalesced timer per entry); release of the last owner clears the timer and supersedes in-flight refreshes. (8) hasSnapshot added to query handles. New tests: store (local-mutation invalidation, immediate supersession, release-stops-refresh, reconnect refresh, fetchOne 404 vs 503) and page (TasksList.query.spec with distinct per-filter getQuery handles: pending switch keeps old rows, new-key failure shows error w/o old rows, same-key banner+retention+retry recovery, background refresh keeps table + selection fail-closed; Calendar grid stability + banner; Board banner with/without rows). Verification: npm run test:ui:agent = 56 files / 377 tests passed; npm run lint:frontend clean. Remaining: browser agent smoke + full lint (clippy)/test gates before Done.'
+- date: 2026-09-13T07:53:04.292591+00:00
+  text: 'Final recheck blockers fixed (view-only; InProgress pending final gates): (1) TasksList no longer presents the previous key''s rows under a new filter — presentedQuery removed; rows/ranks/total always read the newly adopted handle. A pending new key (no snapshot, refresh queued-idle or in-flight) shows the explicit loader via loading = status loading OR pendingNewQuery; ''No tasks match'' renders only after an actual completed zero result; new-key failure shows the error state with no old rows; same-key refresh failure retains valid rows + retry banner; selection/export/bulk stay inaccessible while pending (fail-closed guard unchanged). (2) Board/Calendar initialLoading is now per-current-handle hasSnapshot (was a global hasEverLoaded flag): first load of ANY key (loading or queued-idle, no snapshot) shows the loader; background refreshes of an established key never unmount the grid; same-key failures keep the grid + banner; first-load failure shows the error state/banner without stale rows. Tests: TasksList.query.spec rewritten to assert old rows ABSENT + loader visible + actions blocked during pending, completed-zero empty state, new-key failure without old rows, publish path; Board.spec/Calendar.spec moved to per-key getQuery handle registries with per-key deferred first-load tests (project switch -> loader until publish) — Calendar tests account for the real FilterBar snapshot persistence and lone-project auto-select (two-project scenario, storage cleared between mounts). Verification: npm run test:ui:agent = 56 files / 380 tests passed; npm run lint:frontend clean. Browser agent must rebuild before running the smoke suite since these changes postdate the last browser pass; full lint (clippy)/test gates still pending before Done.'
+- date: 2026-09-13T08:09:17.853731+00:00
+  text: |-
+    Final handoff (tracking finalization; no source edits in this step).
+
+    Outcome: DEV-65 delivered in view scope. useTaskStore.ts is now a normalized entity map (write-clock revisions + delete tombstones guard stale hydrate/fetchOne responses; fetchOne tombstones only on 404/410, transient errors retain the entity and surface via fetchOneError) plus keyed query entries (canonical filter key -> ordered membership IDs, per-query DEV-57 rank ledger, server total, status/error, per-query request generation rejecting stale completions incl. status/error, hasSnapshot). getQuery handles with retain/release; retained queries get debounced authoritative server refresh after local writes, task SSE events, and SSE reconnect (useSse onReconnect hook; api client errors now carry HTTP status — additive, no API wire change). TasksList/Board/Calendar migrated: new-key pending shows an explicit loader with previous-key rows never rendered, completed-zero only then shows the empty state, new-key failure shows the error state with no old rows, same-key refresh failure retains valid rows + visible retry banner; background refreshes never unmount grids (per-handle hasSnapshot initialLoading). Selection safety stays fail-closed during loading/error/pending; DEV-57 order/export contracts preserved; ProjectInsights left on the legacy surface (DEV-66 owns it); no DEV-68 Other-column changes.
+
+    Evidence: Final gates (review signoff, both recheck blockers closed): npm run lint:agent PASS; npm run test:agent (default concurrency, --retries 0): Rust 981 passed, 6 explicit ignored (17 additional git-dependent test files cfg-compiled out, not part of count), UI 380 passed across 56 files. Full build-first npm run test:smoke:agent: 114 passed / 23 skipped / 137 total, 38 files (33 pass, 5 skip per-file); new DEV-65 query-isolation suite 5 executed, 5 pass, 0 skip, 0 manual fallback, mutations via REST with explicit SSE (fs-watcher-independent). An earlier full-smoke failure (stale Calendar selector plus agent-owned zzdbg x3 replicas) was removed and the selector updated (strict new-query old-row absent + Retry recovery); superseded by the clean full gate above. No production changes after lint/test — only the smoke-test fix and cleanup. Store/page specs: useTaskStore.spec.ts 55 tests incl. deterministic deferred-promise race/regression suites; TasksList.query.spec distinct per-filter handles (pending loader/actions-blocked, publish, new-key failure, same-key banner+retry, background stability); Board/Calendar per-key deferred first-load tests.
+
+    Remaining: (a) Diagnostic observation, explicitly NOT a verified defect and out of DEV-65 scope: the smoke agent's standalone probe suggested the server-side filesystem watcher may very rarely drop a disk-write event (~1/20); REST-emitted SSE paths are verified reliable. No existing watcher follow-up ticket matches, so it is recorded here rather than as a new task; investigate under a dedicated ticket only if it reproduces with a root cause. (b) smoke/tests/ui.query-isolation.smoke.spec.ts lines ~21-26 carry a speculative watcher-evidence note in the header; move/trim it into ticket tracking next time source edits are authorized (left untouched now per tracking-only instruction). (c) Entities/queries accumulate for the session by design (no GC): practical bound is query-key cardinality plus task count per session; no infinite-retention fidelity claim is made. (d) Work remains uncommitted/unintegrated — no commit was authorized in this scope.
+
+    Guidance: no durable guidance correction proven; no instruction edits.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U6.
@@ -34,3 +54,37 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-13T06:02:02.042214+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-13T06:12:10.030647+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T06:20:01.731452+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T07:30:05.337756+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T07:53:04.292591+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T08:09:17.853731+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T08:09:24.546822+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

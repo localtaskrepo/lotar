@@ -28,10 +28,12 @@ describe('UI project creation refresh', () => {
                     // task and the row wait below would never pass.
                     const pendingLists = new Set<unknown>();
                     let seenLists = 0;
+                    const listUrls: string[] = [];
                     page.on('request', request => {
                         if (new URL(request.url()).pathname === '/api/tasks/list') {
                             seenLists += 1;
                             pendingLists.add(request);
+                            listUrls.push(request.url());
                         }
                     });
                     const trackResponse = (response: any) => {
@@ -113,6 +115,22 @@ describe('UI project creation refresh', () => {
                         .toBeGreaterThan(0);
                     await projectFilter.selectOption('FRESH');
                     await page.waitForSelector('text=DEV25 task in fresh project', { timeout: 15_000 });
+                    // DEV-65 strengthening (the FRESH-filter expectation above
+                    // stays): the scope switch transiently runs unscoped list
+                    // queries, so gate on a settled FRESH-scoped hydration
+                    // before asserting the BASE seed row cannot leak into the
+                    // project-filtered results.
+                    await expect
+                        .poll(
+                            () =>
+                                pendingLists.size === 0 &&
+                                listUrls.some(url => new URL(url).searchParams.get('project') === 'FRESH'),
+                            { timeout: 10_000 },
+                        )
+                        .toBe(true);
+                    await expect
+                        .poll(() => page.locator('tbody tr', { hasText: 'DEV25 seed task' }).count())
+                        .toBe(0);
                     expect(await page.evaluate(() => (window as any).__dev25NoReload)).toBe(true);
 
                     await expect
