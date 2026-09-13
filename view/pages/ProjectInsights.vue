@@ -76,7 +76,7 @@
           :loading="refreshing"
           label="Refresh insights"
           title="Refresh insights"
-          @click="refreshData"
+          @click="refreshData({ forceStats: true })"
         />
       </div>
     </div>
@@ -98,6 +98,18 @@
       <UiLoader>Loading insights…</UiLoader>
     </div>
 
+    <template v-else>
+    <div v-if="tasksError && hasTaskSnapshot" class="insights-refresh-error" role="alert">
+      <span class="insights-refresh-error__message">Refresh failed: {{ tasksError }}</span>
+      <UiButton variant="ghost" type="button" :disabled="refreshing" @click="retry">Retry</UiButton>
+    </div>
+    <UiEmptyState
+      v-if="tasksError && !hasTaskSnapshot"
+      title="We couldn't load tasks"
+      :description="tasksError"
+      primary-label="Retry"
+      @primary="retry"
+    />
     <template v-else>
     <div v-if="!filteredTasks.length" class="muted" style="padding: 24px; text-align: center;">No tasks match the current filters.</div>
     <div v-else class="insights-grid">
@@ -256,26 +268,30 @@
         </UiCard>
       </div>
     </template>
+    </template>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, watchEffect } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, shallowRef, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
-import type { ProjectDTO, ProjectStatsDTO, TaskDTO } from '../api/types'
+import type { ProjectDTO, ProjectStatsDTO, TaskDTO, TaskListFilter } from '../api/types'
 import BarChart from '../components/BarChart.vue'
 import PieChart from '../components/PieChart.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
+import UiEmptyState from '../components/UiEmptyState.vue'
 import UiInput from '../components/UiInput.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useActivity } from '../composables/useActivity'
+import type { ActivityFeedHandle } from '../composables/useActivity'
 import { useProjects } from '../composables/useProjects'
 import { useTaskStore } from '../composables/useTaskStore'
+import type { TaskQueryHandle } from '../composables/useTaskStore'
 import { parseTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
 import { useSuggestList } from '../composables/useSuggestList'
 import { formatMember } from '../utils/member'
@@ -288,7 +304,14 @@ const route = useRoute()
 
 const { projects, refresh: refreshProjects } = useProjects()
 const store = useTaskStore()
-const tasksLoading = computed(() => store.status.value === 'loading')
+// DEV-66: Insights owns a retained DEV-65 query handle for its exact task
+// filter instead of mutating the store's global active query.
+const taskQueryHandle = shallowRef<TaskQueryHandle | null>(null)
+const tasksLoading = computed(() => taskQueryHandle.value?.status.value === 'loading')
+// D1: the task query's own error/snapshot state drives the failure UX — a
+// failed scope is distinct from a truly empty one.
+const tasksError = computed(() => taskQueryHandle.value?.error.value ?? null)
+const hasTaskSnapshot = computed(() => taskQueryHandle.value?.hasSnapshot.value ?? false)
 
 const singleProject = computed(() => (projects.value.length === 1 ? projects.value[0] : null))
 const hasSingleProject = computed(() => !!singleProject.value)
@@ -303,14 +326,27 @@ const windowDays = ref<number>(30)
 const timeWindows = [14, 30, 60, 90]
 
 const projectStats = ref<ProjectStatsDTO | null>(null)
-const projectStatsLoading = ref(false)
 const projectStatsMap = reactive<Record<string, ProjectStatsDTO>>({})
 
 const refreshing = ref(false)
 const lastUpdated = ref<Date | null>(null)
+// DEV-66: orchestration generations — a newer project/window refresh
+// supersedes older runs, whose successes, errors, and finally blocks must
+// not publish under the new scope.
+let refreshGeneration = 0
+let refreshInFlight = 0
+// D2: set on unmount; every asynchronous continuation must check it (or its
+// run generation) before issuing further requests, adopting handles,
+// publishing state, or toasting.
+let insightsDisposed = false
+const projectStatsRequests = new Map<string, number>()
+
+function isStaleRun(generation: number): boolean {
+  return insightsDisposed || generation !== refreshGeneration
+}
 const mounted = ref(false)
 
-const tasksBase = computed<TaskDTO[]>(() => store.items.value ?? [])
+const tasksBase = computed<TaskDTO[]>(() => taskQueryHandle.value?.tasks.value ?? [])
 const tagFilters = computed<string[]>(() => parseTagInput(tagFilterInput.value))
 const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map(tag => normaliseTag(tag)))
 
@@ -371,16 +407,47 @@ const {
 const activityChartHost = ref<HTMLElement | null>(null)
 const activityChartWidth = ref(640)
 let activityResizeObserver: ResizeObserver | null = null
-const {
-  feed: sharedActivityFeed,
-  feedLoading: sharedActivityFeedLoading,
-  feedError: sharedActivityFeedError,
-  refreshFeed: refreshSharedActivityFeed,
-} = useActivity()
+// DEV-66: the activity chart reads its own keyed feed handle, scoped to the
+// selected project/window, so other consumers (activity drawer, different
+// windows) can never contaminate or drop this data.
+const ACTIVITY_FEED_LIMIT = 400
+const activityFeedHandle = shallowRef<ActivityFeedHandle | null>(null)
+const activityFeed = computed(() => activityFeedHandle.value?.items.value ?? [])
+const activityFeedLoading = computed(() => activityFeedHandle.value?.loading.value ?? false)
+const activityFeedError = computed(() => activityFeedHandle.value?.error.value ?? null)
 
-const activityFeed = sharedActivityFeed
-const activityFeedLoading = sharedActivityFeedLoading
-const activityFeedError = sharedActivityFeedError
+function currentTaskFilter(): TaskListFilter {
+  return selectedProject.value ? { project: selectedProject.value } : {}
+}
+
+function adoptTaskQuery(): TaskQueryHandle {
+  const next = store.getQuery(currentTaskFilter())
+  const current = taskQueryHandle.value
+  if (current && current.key === next.key) return current
+  next.retain()
+  current?.release()
+  taskQueryHandle.value = next
+  return next
+}
+
+const { getFeedQuery } = useActivity()
+
+function adoptActivityFeedQuery(): ActivityFeedHandle {
+  const next = getFeedQuery({
+    project: selectedProject.value || undefined,
+    windowDays: windowDays.value,
+    limit: ACTIVITY_FEED_LIMIT,
+  })
+  const current = activityFeedHandle.value
+  if (current && current.key === next.key) {
+    // getFeedQuery acquires ownership; re-adopting the same scope must not leak it.
+    next.release()
+    return current
+  }
+  current?.release()
+  activityFeedHandle.value = next
+  return next
+}
 
 function updateActivityChartWidth(widthOverride?: number) {
   const host = activityChartHost.value
@@ -413,14 +480,10 @@ watchEffect(() => {
 
 const filteredTasks = computed(() => {
   if (!tagFiltersNormalized.value.length) return tasksBase.value
-  const includeUntagged = tagFiltersNormalized.value.includes('untagged')
   const requiredTags = tagFiltersNormalized.value.filter(tag => tag !== 'untagged')
   return tasksBase.value.filter(task => {
-    const tags = (task.tags || []).map(tag => normaliseTag(tag))
-    if (!tags.length) {
-      return includeUntagged && requiredTags.length === 0
-    }
-    if (!requiredTags.length) return true
+    const tags = (task.tags || []).map(tag => normaliseTag(tag)).filter(tag => tag.length > 0)
+    if (!requiredTags.length) return tags.length === 0
     return requiredTags.every((filterTag: string) => tags.includes(filterTag))
   })
 })
@@ -461,7 +524,7 @@ const activitySeries = computed(() => {
   const dayBuckets = new Map<string, Record<string, number>>()
 
   activityFeed.value.forEach(item => {
-    if (visibleTasks.size && !visibleTasks.has(item.task_id)) return
+    if (!visibleTasks.has(item.task_id)) return
     item.history.forEach(entry => {
       const entryDate = new Date(entry.at)
       if (Number.isNaN(entryDate.getTime())) return
@@ -724,36 +787,37 @@ function formatRelativeTimestamp(value: string | null | undefined) {
   return `${diffYears} yr${diffYears === 1 ? '' : 's'} ago`
 }
 
-async function refreshData() {
-  if (refreshing.value) return
+async function refreshData(opts: { forceStats?: boolean } = {}) {
+  if (insightsDisposed) return
+  const generation = ++refreshGeneration
+  refreshInFlight += 1
   refreshing.value = true
-  const filter: Record<string, string> = {}
-  if (selectedProject.value) filter.project = selectedProject.value
   try {
-    await store.hydrateAll(filter, { clear: true })
-    await loadSelectedProjectStats()
-    if (!selectedProject.value) await ensureProjectStatsMap()
+    await adoptTaskQuery().refresh()
+    if (isStaleRun(generation)) return
+    await loadSelectedProjectStats(generation)
+    if (isStaleRun(generation)) return
+    if (!selectedProject.value) await ensureProjectStatsMap({ force: opts.forceStats === true })
+    if (isStaleRun(generation)) return
     await refreshActivityFeedWindow()
+    if (isStaleRun(generation)) return
     lastUpdated.value = new Date()
   } catch (error: any) {
+    if (isStaleRun(generation)) return
     showToast(error?.message || 'Failed to refresh insights')
   } finally {
-    refreshing.value = false
+    refreshInFlight -= 1
+    if (refreshInFlight === 0) refreshing.value = false
   }
 }
 
+async function retry() {
+  await refreshData({ forceStats: true })
+}
+
 async function refreshActivityFeedWindow() {
-  const now = new Date()
-  const sinceDate = startOfLocalDay(addDays(now, -(windowDays.value - 1)))
-  const params: Record<string, any> = {
-    since: sinceDate.toISOString(),
-    until: now.toISOString(),
-    limit: 400,
-  }
-  if (selectedProject.value) {
-    params.project = selectedProject.value
-  }
-  await refreshSharedActivityFeed(params)
+  if (insightsDisposed) return
+  await adoptActivityFeedQuery().refresh()
 }
 
 function applyTagFilters(next: string[]) {
@@ -774,32 +838,50 @@ function clearTagFilter() {
   applyTagFilters([])
 }
 
-async function loadSelectedProjectStats() {
-  if (!selectedProject.value) {
-    projectStats.value = null
-    return
-  }
-  projectStatsLoading.value = true
+async function fetchProjectStats(prefix: string): Promise<ProjectStatsDTO | null> {
+  const generation = (projectStatsRequests.get(prefix) ?? 0) + 1
+  projectStatsRequests.set(prefix, generation)
   try {
-    const stats = await api.projectStats(selectedProject.value)
-    projectStats.value = stats
-    projectStatsMap[selectedProject.value] = stats
-  } catch (error: any) {
-    showToast(error?.message || 'Failed to load project stats')
-  } finally {
-    projectStatsLoading.value = false
+    const stats = await api.projectStats(prefix)
+    if (insightsDisposed || projectStatsRequests.get(prefix) !== generation) return null
+    projectStatsMap[prefix] = stats
+    return stats
+  } catch (error: unknown) {
+    if (insightsDisposed || projectStatsRequests.get(prefix) !== generation) return null
+    throw error
   }
 }
 
-async function ensureProjectStatsMap() {
-  const pending = projects.value.filter(project => !projectStatsMap[project.prefix])
-  if (!pending.length) return
-  await Promise.all(pending.map(async project => {
+async function loadSelectedProjectStats(generation: number) {
+  const project = selectedProject.value
+  if (!project) {
+    if (!isStaleRun(generation)) projectStats.value = null
+    return
+  }
+  try {
+    const stats = await fetchProjectStats(project)
+    if (!stats) return
+    if (isStaleRun(generation) || selectedProject.value !== project) return
+    projectStats.value = stats
+  } catch (error: any) {
+    if (isStaleRun(generation) || selectedProject.value !== project) return
+    showToast(error?.message || 'Failed to load project stats')
+  }
+}
+
+async function ensureProjectStatsMap(opts: { force?: boolean } = {}) {
+  if (insightsDisposed) return
+  const prefixes = (opts.force
+    ? projects.value.map(project => project.prefix)
+    : projects.value.filter(project => !projectStatsMap[project.prefix]).map(project => project.prefix)
+  )
+  if (!prefixes.length) return
+  await Promise.all(prefixes.map(async prefix => {
     try {
-      const stats = await api.projectStats(project.prefix)
-      projectStatsMap[project.prefix] = stats
+      await fetchProjectStats(prefix)
     } catch (error: any) {
-      showToast(error?.message || `Failed to load stats for ${project.prefix}`)
+      if (insightsDisposed) return
+      showToast(error?.message || `Failed to load stats for ${prefix}`)
     }
   }))
 }
@@ -901,10 +983,19 @@ watch(windowDays, async () => {
 })
 
 onBeforeUnmount(() => {
+  // Invalidate every in-flight orchestration first: a slow task query (or
+  // stats/feed request) resolving after unmount must not continue the run,
+  // adopt new handles, publish state, or toast.
+  insightsDisposed = true
+  refreshGeneration += 1
   if (tagBlurTimer) {
     clearTimeout(tagBlurTimer)
     tagBlurTimer = null
   }
+  taskQueryHandle.value?.release()
+  taskQueryHandle.value = null
+  activityFeedHandle.value?.release()
+  activityFeedHandle.value = null
   if (activityResizeObserver) {
     activityResizeObserver.disconnect()
     activityResizeObserver = null
@@ -919,7 +1010,8 @@ onMounted(async () => {
   if (routeTags.value.length) {
     applyTagFilters(routeTags.value)
   }
-  await ensureProjectStatsMap()
+  adoptTaskQuery()
+  adoptActivityFeedQuery()
   await refreshData()
   mounted.value = true
   if (route.path !== '/insights') {
@@ -974,6 +1066,21 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
+}
+.insights-refresh-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-base);
+  color: var(--color-danger-strong, var(--color-danger));
+}
+.insights-refresh-error__message {
+  font-size: 13px;
 }
 .card-head {
   display: flex;

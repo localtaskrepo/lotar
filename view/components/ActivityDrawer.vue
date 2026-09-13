@@ -27,8 +27,8 @@
           </UiButton>
         </div>
       </div>
+      <div v-if="error" class="error" role="alert">{{ error }}</div>
       <div v-if="loading" class="muted" style="padding: 12px 0;">Loading activity…</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
       <ul v-else class="feed">
         <li v-for="item in feed" :key="item.commit + ':' + item.task_id" class="feed-item">
           <header class="feed-item__header">
@@ -68,10 +68,10 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onScopeDispose, watch } from 'vue'
 import { useActivity } from '../composables/useActivity'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { MS_PER_DAY, formatDateTime, startOfLocalDay } from '../utils/date'
+import { formatDateTime } from '../utils/date'
 import IconGlyph from './IconGlyph.vue'
 import ReloadButton from './ReloadButton.vue'
 import UiButton from './UiButton.vue'
@@ -81,34 +81,24 @@ import { titleCase } from '../utils/text'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 
-const { feed: sharedFeed, feedLoading, feedError, refreshFeed } = useActivity()
 const { openTaskPanel } = useTaskPanelController()
 
-const feed = sharedFeed
-const loading = computed(() => feedLoading.value)
-const error = computed(() => feedError.value || null)
-
+// DEV-66: the drawer owns its feed scope (global, 30 days, capped at 200)
+// instead of mutating a shared feed slice, so opening it can never alter
+// another consumer's data (e.g. the Insights activity chart).
 const WINDOW_DAYS = 30
+const FEED_LIMIT = 200
+const feedQuery = useActivity().getFeedQuery({ windowDays: WINDOW_DAYS, limit: FEED_LIMIT })
+onScopeDispose(() => feedQuery.release())
 
-function nowIso() {
-  return new Date().toISOString()
-}
+const feed = computed(() => feedQuery.items.value)
+const loading = computed(() => feedQuery.loading.value)
+const error = computed(() => feedQuery.error.value || null)
 
-function sinceIso() {
-  const now = new Date()
-  const offset = new Date(now.getTime() - (WINDOW_DAYS - 1) * MS_PER_DAY)
-  const start = startOfLocalDay(offset)
-  return start.toISOString()
-}
-
-async function loadIfNeeded() {
-  if (!props.open) return
-  if (loading.value) return
-  await refreshFeed({ since: sinceIso(), until: nowIso(), limit: 200 })
-}
-
+// Latest-wins refreshes: no busy guard, so an open or manual refresh during
+// an in-flight load cannot silently drop the newer request.
 async function refresh() {
-  await refreshFeed({ since: sinceIso(), until: nowIso(), limit: 200 })
+  await feedQuery.refresh()
 }
 
 const formatDate = (value: string | Date) => formatDateTime(value, { empty: 'Unknown time' })
@@ -144,9 +134,9 @@ function openTask(taskId: string) {
 
 watch(
   () => props.open,
-  async (value) => {
+  (value) => {
     if (value) {
-      await loadIfNeeded()
+      void refresh()
     }
   },
   { immediate: true },

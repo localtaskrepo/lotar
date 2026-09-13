@@ -4,7 +4,7 @@ priority: High
 type: Chore
 reporter: mallox
 created: 2026-09-06T11:10:31.848688+00:00
-modified: 2026-09-11T19:30:50.410076+00:00
+modified: 2026-09-13T17:32:39.632467+00:00
 relationships:
   related:
   - DEV-46
@@ -25,6 +25,8 @@ comments:
     - MCP single-contention coverage: closed locally — the case now genuinely executes (~2s) through real repo ancestry in an isolated fixture store (prior state: silently skipped). The repo-less-artifact variant remains a fail-closed arm only (not coverage) until a supported runner executes it.
 
     Final whole-gate evidence for the covered portion: lint:agent clean; test:agent Rust 981+6 skips; UI 352; build-first smoke 109 passed / 23 skips. No git operations.
+- date: 2026-09-13T17:32:39.632467+00:00
+  text: 'Coverage correction (DEV-66 finalization evidence; no status change): the earlier 2026-09-11 record''s ''17 additional git-dependent test FILES cfg-compiled-out'' is imprecise. Actual accounting at the current gates: 13 whole Rust test files carry #![cfg(not(no_git_tests))]; 4 further files have only PARTIAL inline cfg exclusion (their non-git portions still compile and run); the six agent_safety cases are the runtime-ignored set when Git is unavailable (the 6 explicit ignores in the 981-passed Rust run). Precise statement: 13 whole-file + portions of 4, not 17 whole files. Environment-coverage requirement for a supported runner is unchanged.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T7.
@@ -45,6 +47,10 @@ history:
   changes:
   - field: comment_added
 - at: 2026-09-11T19:30:50.410076+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T17:32:39.632467+00:00
   actor: mallox
   changes:
   - field: comment_added

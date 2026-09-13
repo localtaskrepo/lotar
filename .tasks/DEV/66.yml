@@ -1,13 +1,71 @@
 title: Give Insights and activity consumers query-scoped refreshable state
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-65]
-  related: [DEV-21]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.629552+00:00
+modified: 2026-09-13T17:32:56.224543+00:00
+relationships:
+  depends_on:
+  - DEV-65
+  related:
+  - DEV-21
+  parent: DEV-53
+comments:
+- date: 2026-09-13T16:37:16.547997+00:00
+  text: |-
+    Plan (DEV-66):
+    - Scope: view/composables/useActivity.ts, view/components/ActivityDrawer.vue, view/pages/ProjectInsights.vue + unit tests. No backend/API/store changes expected; DEV-21 terminal predicates and DEV-68 Board Other stay out.
+    - useActivity: keep singleton local log (items/touches/add/markTaskTouch...) for TasksList; replace the single global feed slice with keyed per-query feed handles (key = project|windowDays|limit, timestamps computed per request) with latest-wins generations covering loading/error/success, release invalidating in-flight work.
+    - ActivityDrawer: consume its own feed handle scoped to {global, 30d, 200}; manual refresh always genuinely refetches.
+    - ProjectInsights: consume a feed handle keyed to {selectedProject, windowDays, 400}; migrate tasks source to DEV-65 store.getQuery handle with retain/release; request generations for stats + refresh orchestration so stale successes/errors cannot publish under a new project/window; Reload refetches visible project stats (latest wins per prefix).
+    - Fix tag filtering: zero visible tasks must not count the whole feed; untagged-only filter must not include tagged tasks when requiredTags is empty.
+    - Tests: deferred/out-of-order project+window requests, concurrent drawer/insights feeds, refresh overlap, stats reload/stale guard, tag zero/untagged, retain/release + failure isolation; keep existing DEV-65/53 suites green.
+    - Checks: focused vitest, then npm run test:ui and npm run lint:frontend (isolated TMPDIR). No Rust/smoke now.
+- date: 2026-09-13T16:59:34.436340+00:00
+  text: |-
+    Progress (DEV-66) — implementation complete:
+
+    Files changed:
+    - view/composables/useActivity.ts: replaced the single global feed slice (feed/feedLoading/feedError/refreshFeed, busy-guarded, no generations) with keyed ActivityFeedHandle queries via useActivity().getFeedQuery({project, windowDays, limit}). since/until are computed per refresh (never part of the key), so manual refresh genuinely refetches without unbounded key growth. Latest-wins generations cover success/error/loading; background errors preserve the last snapshot; release() invalidates in-flight work when the last owner leaves. Local log/touches API for TasksList unchanged. _resetActivityStore() added for tests.
+    - view/components/ActivityDrawer.vue: owns a global 30d/limit-200 handle (released on scope dispose); open and manual refresh always issue a real request; error banner renders alongside the preserved snapshot.
+    - view/pages/ProjectInsights.vue: activity chart uses its own keyed handle (project/windowDays/limit 400, adopted+released symmetrically); tasks migrated off the global active query to a retained DEV-65 store.getQuery handle (retain/release, refresh replaces membership); refreshData now generation-based (no busy-guard drops, stale successes/errors/finally publish nothing, stage bails between phases); per-prefix stats generations with Reload forcing refetch of ALL visible projects while older fill-missing responses cannot overwrite fresh values; tag fixes: zero tag matches count no feed activity, untagged-only no longer includes tagged tasks.
+
+    Tests:
+    - view/__tests__/useActivity.feed.spec.ts rewritten (9 tests): scoped request shape, first-load failure, background error keeps snapshot, latest-wins overlap incl. stale failure drop, cross-scope isolation (drawer vs insights), release invalidation, fresh key isolation, local log compat.
+    - view/__tests__/ActivityDrawer.spec.ts new (4): request shape on open (global, 30d, 200), no fetch while closed, genuine manual refresh, error + snapshot.
+    - view/__tests__/ProjectInsights.spec.ts new (9): global mount/overview fill, tag-zero counts nothing (avg/day tile), untagged-only, rapid project switch out-of-order settle, failed query no stale rows under new label, Reload force + stale fill guard, window switch stale-publish guard, feed failure surfaced, unmount releases (late response inert).
+
+    Checks: focused specs green; npm run test:ui:agent full suite 58 files / 400 tests passed; npm run lint:frontend (vue-tsc) clean. Rust tests and full smoke descoped per developer instruction for this pass; worktree also carries prior DEV-65 edits and staged approved work, untouched and uncommitted.
+- date: 2026-09-13T16:59:43.091973+00:00
+  text: |-
+    Handoff (DEV-66):
+    Outcome: Insights and activity consumers now own query-scoped, refreshable state — keyed activity feed handles with latest-wins generations (errors/loading/release included), a retained DEV-65 task query handle in Insights, generation-guarded stats/refresh orchestration with Reload forcing visible-project refetches, and correct zero-tag/untagged-only filtering. Opening the drawer can no longer alter chart data; rapid project/date changes settle on the selected scope; Reload updates totals.
+    Evidence: view/composables/useActivity.ts, view/components/ActivityDrawer.vue, view/pages/ProjectInsights.vue; specs view/__tests__/useActivity.feed.spec.ts (9), ActivityDrawer.spec.ts (4), ProjectInsights.spec.ts (9); npm run test:ui:agent = 58 files / 400 tests passed; npm run lint:frontend clean; preserved suites (useTaskStore, TasksList.query/sort/counts, frontendScopeSafety, App) green.
+    Remaining: browser verification pending — with npm run seed:test-tasks fixtures, open Insights, note the Activity (avg/day) tile, then open the drawer and refresh it: the Insights chart and avg/day must not change; switch projects rapidly (UiSelect .insights-controls select) and toggle 14/30/60/90d (.chart-controls button) — totals settle on the last selection; click Reload (button[title='Refresh insights']) and watch the Projects overview open_count column (tbody tr th .link-btn rows) refresh. Full smoke + Rust gates deferred per developer instruction for this pass; changes uncommitted alongside prior DEV-65 edits and staged approved work.
+    Guidance: no durable instruction finding; existing root/frontend/workflow/tracking/testing guidance applied cleanly.
+- date: 2026-09-13T17:00:24.776320+00:00
+  text: 'Status correction: reverted premature Done; ticket stays InProgress until final gates. Verified so far: focused new/rewritten specs (useActivity.feed 9, ActivityDrawer 4, ProjectInsights 9) plus preserved DEV-65/53 suites green, full UI unit gate npm run test:ui:agent passed (58 files / 400 tests), npm run lint:frontend (vue-tsc) clean. Still pending before completion: review, browser verification of the acceptance flows, and the required repository lint/test/smoke gates (Rust lint+nextest and full smoke were deferred earlier this pass). No further test runs in this step.'
+- date: 2026-09-13T17:21:12.765618+00:00
+  text: |-
+    Review fixes (frontend + unit tests only; ticket stays InProgress):
+
+    D1 (task query error UX): ProjectInsights now surfaces taskQueryHandle.error — a failed NEW scope (no snapshot) renders the DEV-65-style UiEmptyState ('We couldn't load tasks' + Retry) instead of a false 'No tasks match'; a failed SAME-scope refresh keeps the valid rows with a role=alert banner ('Refresh failed: …' + Retry). Startup keeps the queued loader (loading/refreshing) rather than a false empty. retry() = refreshData({forceStats:true}). The test that enshrined the false-empty bug was replaced.
+
+    D2 (unmount invalidation): onBeforeUnmount now sets insightsDisposed and bumps refreshGeneration before releasing handles; all async continuations guarded via isStaleRun(generation)/disposed — refreshData stages/catch/toast, refreshActivityFeedWindow entry, fetchProjectStats map publication and error rethrow, loadSelectedProjectStats publish/toast, ensureProjectStatsMap entry/toast. A slow task query resolving after unmount can no longer continue stats/feed requests, adopt an unreleased feed handle, or toast.
+
+    P1 (feed key hardening): useActivity uses an unambiguous JSON tuple key [project|null, windowDays, limit] and normalizes the project ONCE (trimmed) for both key and request params; a literal '*' project stays an explicit filter (rejected as-is by the API if invalid) and never collides with the global feed.
+
+    P2/P3 left as-is (out of scope; DEV-21 predicates untouched). Smoke agent's new browser file untouched.
+
+    Tests: useActivity.feed.spec +2 (trim consistency, literal '*' non-collision); ProjectInsights.spec failure test replaced + same-key banner, initial-failure queued loader, strengthened unmount (zero post-unmount stats/feed calls, no toast, no publication into released query). Focused 26/26; npm run test:ui:agent 58 files / 404 tests passed; npm run lint:frontend clean. Source changed since smoke run — fresh build required for final gates; review/browser/full lint+test+smoke still pending; ticket remains InProgress.
+- date: 2026-09-13T17:32:51.702652+00:00
+  text: |-
+    Handoff (final):
+    Outcome: Insights and activity consumers own query-scoped, refreshable state — keyed ActivityFeedHandle queries with latest-wins generations (success/error/loading/release), drawer-scoped global 30d/200 feed, Insights' own project/window feed handle, retained DEV-65 task query handle with retryable error UX, generation/disposed-guarded stats and refresh orchestration with Reload forcing visible-project refetches, unambiguous JSON tuple feed keys with normalized project, and zero-tag/untagged-only fixes. Review blockers D1 (error+Retry vs false empty; same-key rows+banner), D2 (unmount invalidates async stats/feed continuation, no orphan handle/toast/publication), P1 (key normalization, literal '*' never global) fixed and signed off by independent review.
+    Evidence: view/composables/useActivity.ts, view/components/ActivityDrawer.vue, view/pages/ProjectInsights.vue; specs useActivity.feed.spec.ts (11), ActivityDrawer.spec.ts (4), ProjectInsights.spec.ts (11); smoke agent's own new browser file. Gates: lint:agent PASS (Rust clippy + frontend + fmt); test:agent DEFAULT concurrency --retries 0 — Rust 981 passed / 6 explicitly ignored, UI 404 passed / 58 files; full FRESH build-first smoke 119 passed / 23 skipped of 142 total, 39 files (34 passed / 5 skipped). DEV-66's five new browser cases all pass, 0 skip: 3 controlled-mock activity-feed cases (deterministic real-browser isolation/races/tag coverage; gitless fixtures because the backend feed requires Git) + 2 actual-backend scenarios including request scope with explicit project. Explicitly NOT claiming full real-backend activity-feed coverage. Remaining: DEV-21 terminal/overdue policy unchanged (out of scope); DEV-68 Board Other not started. Optional nonblockers acknowledged, not fixed: combined untagged+named-tag semantics, and the feed chart hiding on a same-key feed error (snapshot retained in the activity store) — no claim that all tag combinations are fixed. Changes remain uncommitted by design; staged/prior DEV-65 work preserved. Process limitation disclosed by the coordinator: the verification agent ran 3 read-only Git status invocations despite the explicit no-Git instruction (git status --porcelain | wc -l twice, git status --porcelain once; no Git writes); recorded here for honesty, not a policy change — instructions were already clear.
+    Guidance: no durable guidance correction proven; no new ticket.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U10.
@@ -19,3 +77,54 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-13T16:37:04.770147+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-13T16:37:16.547997+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T16:59:34.436340+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T16:59:43.091973+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T16:59:43.114501+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-09-13T17:00:18.228962+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Done
+    new: InProgress
+- at: 2026-09-13T17:00:24.776320+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T17:21:12.765618+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T17:32:51.702652+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T17:32:56.224543+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -1,0 +1,7 @@
+title: Insights page is missing filters
+status: Todo
+priority: Medium
+type: Feature
+reporter: mallox
+created: 2026-09-13T16:31:45.693630+00:00
+description: The insights page currently only allows to filter by project and tags, however, there are more filters that make sense, such as filtering between time intervals, and potentially other filters that make sense.
