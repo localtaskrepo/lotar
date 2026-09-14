@@ -72,7 +72,7 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
 fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_reference_add",
-        "description": "Attach a reference to a task. kind must be one of: link, file, code, jira, github. For link, value is a URL. For file, value is a repo-relative file path. For code, value is a code reference like src/lib.rs#10-12. Returns {task, changed}.",
+        "description": "Attach a reference to a task. kind must be one of: link, file, code, jira, github, attachment. For link, value is a URL. For file, value is a repo-relative file path (never an attachments-store blob). For code, value is a code reference like src/lib.rs#10-12. For attachment, value is a stored attachments blob name. Returns {task, changed}.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -99,6 +99,7 @@ fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
         "code".to_string(),
         "jira".to_string(),
         "github".to_string(),
+        "attachment".to_string(),
     ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
@@ -108,7 +109,7 @@ fn make_task_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
 fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_reference_remove",
-        "description": "Detach a reference from a task. kind must be one of: link, file, code, jira, github. value should match the stored reference string. Returns {task, changed}.",
+        "description": "Detach a reference from a task. kind must be one of: link, file, code, jira, github, attachment. value should match the stored reference string. Returns {task, changed}.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -135,6 +136,7 @@ fn make_task_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value {
         "code".to_string(),
         "jira".to_string(),
         "github".to_string(),
+        "attachment".to_string(),
     ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
@@ -861,6 +863,7 @@ fn make_task_bulk_reference_add_tool(enum_hints: Option<&EnumHints>) -> Value {
         "code".to_string(),
         "jira".to_string(),
         "github".to_string(),
+        "attachment".to_string(),
     ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);
@@ -898,6 +901,7 @@ fn make_task_bulk_reference_remove_tool(enum_hints: Option<&EnumHints>) -> Value
         "code".to_string(),
         "jira".to_string(),
         "github".to_string(),
+        "attachment".to_string(),
     ];
     insert_field_hint(&mut field_hints, "kind", Some(kinds.as_slice()), false);
     attach_field_hints(&mut tool, field_hints);

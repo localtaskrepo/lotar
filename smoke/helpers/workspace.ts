@@ -1,4 +1,5 @@
 import fs from 'fs-extra';
+import { mkdtemp } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { dir, DirectoryResult } from 'tmp-promise';
@@ -9,6 +10,11 @@ import { initGitRepository, runGitCommand, type GitCommandOptions } from './git.
 export interface WorkspaceOptions {
     readonly name?: string;
     readonly seedFiles?: Record<string, string>;
+    /// Parent directory for the temp workspace. Defaults to the OS temp dir;
+    /// tests that need repo ancestry place it inside the checkout (e.g.
+    /// under `target/`) so backend repo-root discovery walks to the real
+    /// `.git` without any git command.
+    readonly parentDir?: string;
 }
 
 export interface LotarCommandOptions {
@@ -33,6 +39,19 @@ export interface CreatedTask {
 
 export class SmokeWorkspace {
     static async create(options: WorkspaceOptions = {}): Promise<SmokeWorkspace> {
+        if (options.parentDir) {
+            // The tmp library only accepts `dir` inside the OS temp root, so
+            // repo-anchored workspaces create their directory directly and
+            // clean it up with fs.remove.
+            await fs.ensureDir(options.parentDir);
+            const root = await mkdtemp(path.join(options.parentDir, options.name ?? 'lotar-smoke-'));
+            const workspace = new SmokeWorkspace(
+                { path: root, cleanup: async () => fs.remove(root) } as DirectoryResult,
+                options,
+            );
+            await workspace.bootstrap(options.seedFiles ?? {});
+            return workspace;
+        }
         const tmp = await dir({ prefix: options.name ?? 'lotar-smoke-', unsafeCleanup: true });
         const workspace = new SmokeWorkspace(tmp, options);
         await workspace.bootstrap(options.seedFiles ?? {});

@@ -5,6 +5,7 @@ use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::cli::handlers::task::errors::TaskStorageAction;
 use crate::cli::handlers::task::mutation::load_task;
 use crate::output::{OutputFormat, OutputRenderer};
+use crate::services::attachment_service::AttachmentService;
 use crate::services::reference_service::ReferenceService;
 use crate::utils::git::find_repo_root;
 use crate::workspace::TasksDirectoryResolver;
@@ -24,6 +25,9 @@ pub fn handle_reference(
             TaskReferenceKindAdd::File { id, path } => {
                 handle_add_file(&id, &path, project, resolver, renderer)
             }
+            TaskReferenceKindAdd::Attachment { id, name } => {
+                handle_add_attachment(&id, &name, project, resolver, renderer)
+            }
             TaskReferenceKindAdd::Code { id, code } => {
                 handle_add_code(&id, &code, project, resolver, renderer)
             }
@@ -34,6 +38,9 @@ pub fn handle_reference(
             }
             TaskReferenceKindRemove::File { id, path } => {
                 handle_remove_file(&id, &path, project, resolver, renderer)
+            }
+            TaskReferenceKindRemove::Attachment { id, name } => {
+                handle_remove_attachment(&id, &name, project, resolver, renderer)
             }
             TaskReferenceKindRemove::Code { id, code } => {
                 handle_remove_code(&id, &code, project, resolver, renderer)
@@ -133,14 +140,8 @@ fn handle_remove_code(
     )
 }
 
-/// Take the attachments store lock when the referenced path lives inside the
-/// store (store-lock -> task-lock order); other paths stay unlocked.
-fn lock_store_for_file(
-    storage_root: &std::path::Path,
-    task_id: &str,
-    repo_root: &std::path::Path,
-    path: &str,
-) -> Result<Option<crate::services::attachment_service::AttachmentStoreGuard>, String> {
+/// Resolve the attachments store root configured for the task's project.
+fn attachments_root_for(storage_root: &std::path::Path, task_id: &str) -> std::path::PathBuf {
     let project = crate::storage::TaskId::parse(task_id)
         .ok()
         .map(|parsed| parsed.project);
@@ -150,13 +151,8 @@ fn lock_store_for_file(
                 crate::config::types::GlobalConfig::default(),
             )
         });
-    crate::services::attachment_service::AttachmentService::lock_store_for_repo_path(
-        storage_root,
-        &config,
-        repo_root,
-        path,
-    )
-    .map_err(|e| e.to_string())
+    AttachmentService::resolve_attachments_root(storage_root, &config)
+        .unwrap_or_else(|_| storage_root.join("@attachments"))
 }
 
 fn handle_add_file(
@@ -172,8 +168,8 @@ fn handle_add_file(
     let repo_root = find_repo_root(ctx.storage_root())
         .ok_or_else(|| "Unable to locate git repository".to_string())?;
 
-    // Store-blob references serialize with upload/remove reclamation.
-    let _store_guard = lock_store_for_file(ctx.storage_root(), &loaded.full_id, &repo_root, path)?;
+    // Repository file references can never target the attachments store
+    // (the service guard rejects store paths), so no store lock is taken.
     let (task, added) = ReferenceService::attach_file_reference(
         &mut ctx.storage,
         &repo_root,
@@ -198,8 +194,8 @@ fn handle_remove_file(
     let repo_root = find_repo_root(ctx.storage_root())
         .ok_or_else(|| "Unable to locate git repository".to_string())?;
 
-    // Store-blob references serialize with upload/remove reclamation.
-    let _store_guard = lock_store_for_file(ctx.storage_root(), &loaded.full_id, &repo_root, path)?;
+    // Repository file references can never target the attachments store
+    // (the service guard rejects store paths), so no store lock is taken.
     let (task, removed) = ReferenceService::detach_file_reference(
         &mut ctx.storage,
         &repo_root,
@@ -214,6 +210,68 @@ fn handle_remove_file(
         "file",
         &loaded.full_id,
         path,
+        removed,
+        &task,
+    )
+}
+
+/// Managed attachment references serialize with upload/remove reclamation
+/// under the store coordination lock (store-lock -> task-lock order).
+fn handle_add_attachment(
+    task_id: &str,
+    name: &str,
+    project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
+    let loaded = load_task(&mut ctx, task_id, project)?;
+
+    let root = attachments_root_for(ctx.storage_root(), &loaded.full_id);
+    let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
+    // Fail closed when the named blob is not present in the store.
+    AttachmentService::resolve_attachment_path(&root, name).map_err(|e| e.to_string())?;
+
+    let (task, added) =
+        AttachmentService::attach_managed_reference(&mut ctx.storage, &loaded.full_id, name)
+            .map_err(|e| e.to_string())?;
+
+    emit_reference_result(
+        renderer,
+        "add",
+        "attachment",
+        &loaded.full_id,
+        name,
+        added,
+        &task,
+    )
+}
+
+/// Managed attachment reference detach; store lock held for parity with
+/// upload/remove reclamation, though detach itself never deletes blobs.
+fn handle_remove_attachment(
+    task_id: &str,
+    name: &str,
+    project: Option<&str>,
+    resolver: &TasksDirectoryResolver,
+    renderer: &OutputRenderer,
+) -> Result<(), String> {
+    let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
+    let loaded = load_task(&mut ctx, task_id, project)?;
+
+    let root = attachments_root_for(ctx.storage_root(), &loaded.full_id);
+    let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
+
+    let (task, removed) =
+        AttachmentService::detach_managed_reference(&mut ctx.storage, &loaded.full_id, name)
+            .map_err(|e| e.to_string())?;
+
+    emit_reference_result(
+        renderer,
+        "remove",
+        "attachment",
+        &loaded.full_id,
+        name,
         removed,
         &task,
     )

@@ -29,10 +29,20 @@ export interface TaskDTO {
   custom_fields: Record<string, unknown>
 }
 
+/**
+ * Typed external reference entry aligned with `ReferenceEntry` in
+ * src/types.rs. Each entry carries exactly one kind: `code` and `file` are
+ * repository-relative paths (`code` carries a `#N[-M]` line anchor),
+ * `attachment` is a managed attachments-store blob name, and
+ * `link`/`jira`/`github` are external values. The file-ish kinds are
+ * distinct on purpose (DEV-61): managed blobs are never stored under
+ * `file` and repository files never under `attachment`.
+ */
 export interface ReferenceEntry {
   code?: string | null
   link?: string | null
   file?: string | null
+  attachment?: string | null
   jira?: string | null
   github?: string | null
 }
@@ -120,6 +130,27 @@ export interface CodeReferenceRemoveRequest {
 }
 
 export interface CodeReferenceRemoveResponse {
+  task: TaskDTO
+  removed: boolean
+}
+
+export interface FileReferenceAddRequest {
+  id: string
+  /** Repository-relative file path (never a managed attachments-store blob). */
+  path: string
+}
+
+export interface FileReferenceAddResponse {
+  task: TaskDTO
+  added: boolean
+}
+
+export interface FileReferenceRemoveRequest {
+  id: string
+  path: string
+}
+
+export interface FileReferenceRemoveResponse {
   task: TaskDTO
   removed: boolean
 }

@@ -7,6 +7,12 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/tasks/get?id=ID[&project=PREFIX] -> { data: TaskDTO }
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
 - POST /api/tasks/delete ({ id }[?project=PREFIX]) -> { data: { deleted: bool } }; 400 for invalid/mismatched/ambiguous/cross-root IDs, 404 when absent
+- POST /api/tasks/references/file/add (FileReferenceAddRequest) -> { data: FileReferenceAddResponse }; 400 when the path resolves inside the managed attachments store
+- POST /api/tasks/references/file/remove (FileReferenceRemoveRequest) -> { data: FileReferenceRemoveResponse }; repository files are never deleted
+- POST /api/tasks/attachments/upload (AttachmentUploadRequest) -> { data: AttachmentUploadResponse }; uploads attach typed `attachment` references
+- POST /api/tasks/attachments/remove (AttachmentRemoveRequest) -> { data: AttachmentRemoveResponse }; 400 when the task lacks the managed `attachment` reference (blob untouched)
+- GET  /api/attachments/get?path=<stored-leaf>[&project=PREFIX][&download=1|true] -> file bytes (Content-Disposition inline/attachment); 404 when absent
+- GET  /api/attachments/h/<32-hex-hash>/<filename>[?project=PREFIX][&download=1|true] -> file bytes looked up by content hash
 - POST /api/tasks/references/add (GenericReferenceAddRequest) -> { data: GenericReferenceAddResponse }
 - POST /api/tasks/references/remove (GenericReferenceRemoveRequest) -> { data: GenericReferenceRemoveResponse }
 - GET  /api/config/show[?project=PREFIX] -> { data: object }

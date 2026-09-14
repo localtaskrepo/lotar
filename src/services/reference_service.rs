@@ -177,6 +177,17 @@ impl ReferenceService {
             ));
         }
 
+        // Store targets are rejected like `file` references: unresolvable
+        // paths fall through to the snippet reader, which reports the
+        // missing file; existing store blobs fail closed here.
+        let repo_root_canonical = repo_root
+            .canonicalize()
+            .unwrap_or_else(|_| repo_root.to_path_buf());
+        if let Ok(resolved) = Self::resolve_path(&repo_root_canonical, &raw_path) {
+            Self::ensure_outside_attachments_store(&storage.root_path, &resolved)
+                .map_err(LoTaRError::ValidationError)?;
+        }
+
         let snippet = Self::snippet_for_code(repo_root, trimmed, 0, 0)
             .map_err(LoTaRError::ValidationError)?;
 
@@ -456,6 +467,8 @@ impl ReferenceService {
             .unwrap_or_else(|_| repo_root.to_path_buf());
         let resolved = Self::resolve_path(&repo_root_canonical, trimmed)
             .map_err(LoTaRError::ValidationError)?;
+        Self::ensure_outside_attachments_store(&storage.root_path, &resolved)
+            .map_err(LoTaRError::ValidationError)?;
         let rel = resolved
             .strip_prefix(&repo_root_canonical)
             .unwrap_or(&resolved);
@@ -510,6 +523,8 @@ impl ReferenceService {
             .unwrap_or_else(|_| repo_root.to_path_buf());
         let normalized = match Self::resolve_path(&repo_root_canonical, trimmed) {
             Ok(resolved) => {
+                Self::ensure_outside_attachments_store(&storage.root_path, &resolved)
+                    .map_err(LoTaRError::ValidationError)?;
                 let rel = resolved
                     .strip_prefix(&repo_root_canonical)
                     .unwrap_or(&resolved);
@@ -534,6 +549,127 @@ impl ReferenceService {
         }
 
         Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+    }
+
+    /// Repository `file` references must never point into the configured
+    /// attachments store (DEV-61): managed blobs are only reachable as
+    /// typed `attachment` references. The check resolves the task project's
+    /// configured store (custom `attachments_dir`, absolute or relative,
+    /// symlinked entries included via canonicalization on both sides) and
+    /// fails closed when the resolved target lands inside it.
+    /// Repository-path reference kinds (`file`, `code`) must never point
+    /// into a managed attachments store (DEV-61): managed blobs are only
+    /// reachable as typed `attachment` references, and aliasing them as
+    /// repo paths would dangle after blob reclamation. The check covers
+    /// EVERY store configured under this tasks root - the base store plus
+    /// each project's `attachments.dir` override (absolute or relative,
+    /// symlinked targets included via canonicalization) - so a task cannot
+    /// reach around its own store by targeting another project's.
+    fn ensure_outside_attachments_store(tasks_root: &Path, resolved: &Path) -> Result<(), String> {
+        if Self::path_inside_managed_stores(tasks_root, resolved)? {
+            return Err(
+                "Reference target is inside the managed attachments store; use attachment references for stored blobs instead of file references"
+                    .to_string(),
+            );
+        }
+        Ok(())
+    }
+
+    /// True when `resolved` (an existing, canonicalized repository path)
+    /// lies inside any managed attachments store configured under
+    /// `tasks_root`. Nonexistent store directories cannot contain files,
+    /// so unresolvable roots are simply skipped.
+    pub(crate) fn path_inside_managed_stores(
+        tasks_root: &Path,
+        resolved: &Path,
+    ) -> Result<bool, String> {
+        Ok(Self::managed_store_roots(tasks_root)?
+            .iter()
+            .any(|store| resolved.starts_with(store)))
+    }
+
+    /// All distinct managed attachment store roots configured under
+    /// `tasks_root`: the base store plus every project directory's
+    /// overridden store, canonicalized when present and deduped in stable
+    /// discovery order. FAILS CLOSED: any configuration load/parse error
+    /// (global or per-project) or an invalid `attachments.dir` value is
+    /// propagated so callers deny the reference instead of silently
+    /// operating with an unverified store set — an unknown custom store
+    /// might contain the very blob being aliased. A store directory that
+    /// does not exist yet cannot hold blobs, so its un-canonicalized path
+    /// is kept without error.
+    pub(crate) fn managed_store_roots(tasks_root: &Path) -> Result<Vec<PathBuf>, String> {
+        // The merged chain deliberately swallows unreadable global config
+        // layers, but this guard must fail closed: an existing-but-invalid
+        // `.tasks/config.yml` could hide a custom attachments.dir, so its
+        // parse failure denies the reference. A genuinely missing file is
+        // the standard default and is fine.
+        let global_path = crate::utils::paths::global_config_path(tasks_root);
+        if global_path.exists() {
+            crate::config::persistence::load_global_config(Some(tasks_root)).map_err(|e| {
+                format!("Failed to load task configuration for attachment store guard: {e}")
+            })?;
+        }
+        let base =
+            crate::config::resolution::load_and_merge_configs(Some(tasks_root)).map_err(|e| {
+                format!("Failed to load task configuration for attachment store guard: {e}")
+            })?;
+        let mut roots: Vec<PathBuf> = Vec::new();
+        let mut push_store = |cfg: &crate::config::types::ResolvedConfig| -> Result<(), String> {
+            let root =
+                crate::services::attachment_service::AttachmentService::compute_attachments_root(
+                    tasks_root, cfg,
+                )
+                .map_err(|e| format!("Invalid attachments store configuration: {e}"))?;
+            let canonical = root.canonicalize().unwrap_or(root);
+            if !roots.contains(&canonical) {
+                roots.push(canonical);
+            }
+            Ok(())
+        };
+        push_store(&base)?;
+        let entries = fs::read_dir(tasks_root)
+            .map_err(|e| format!("Failed to enumerate projects for attachment store guard: {e}"))?;
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let Some(name) = name.to_str() else { continue };
+            if name.starts_with('@') || !entry.path().is_dir() {
+                continue;
+            }
+            let cfg = crate::config::resolution::get_project_config(&base, name, tasks_root)
+                .map_err(|e| {
+                    format!("Failed to load project '{name}' configuration for attachment store guard: {e}")
+                })?;
+            push_store(&cfg)?;
+        }
+        Ok(roots)
+    }
+
+    /// Snippet preview with the managed-store guard applied: store blobs
+    /// are never previewed as repository code (they render through the
+    /// attachment download routes instead), so a `code` value that
+    /// resolves into any configured store fails closed. Unresolvable
+    /// paths delegate to [`Self::snippet_for_code`]'s own errors.
+    pub fn snippet_for_code_guarded(
+        tasks_root: &Path,
+        repo_root: &Path,
+        code: &str,
+        context_before: usize,
+        context_after: usize,
+    ) -> Result<ReferenceSnippetDTO, String> {
+        let (raw_path, _start, _end) = Self::split_reference(code);
+        let repo_root_canonical = repo_root
+            .canonicalize()
+            .unwrap_or_else(|_| repo_root.to_path_buf());
+        if let Ok(resolved) = Self::resolve_path(&repo_root_canonical, &raw_path)
+            && Self::path_inside_managed_stores(tasks_root, &resolved)?
+        {
+            return Err(
+                "Reference target is inside the managed attachments store; use attachment download routes for stored blobs instead of code references"
+                    .to_string(),
+            );
+        }
+        Self::snippet_for_code(repo_root, code, context_before, context_after)
     }
 
     pub fn snippet_for_code(

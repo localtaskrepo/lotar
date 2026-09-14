@@ -27,8 +27,10 @@ const apiFixtures = vi.hoisted(() => {
         } as any,
         comments: [] as any[],
         references: [
-            { file: 'reports/notes.txt' },
-            { file: 'photo.0123456789abcdef0123456789abcdef.png' },
+            // DEV-61: managed blobs moved from the legacy `file` key to the
+            // typed `attachment` key; these fixtures always described blobs.
+            { attachment: 'reports/notes.txt' },
+            { attachment: 'photo.0123456789abcdef0123456789abcdef.png' },
         ],
         history: [],
         custom_fields: {},

@@ -176,3 +176,106 @@ fn task_reference_add_and_remove_link_file_and_code() {
             .any(|r| r.code.as_deref() == Some("src/example.rs#1"))
     );
 }
+
+#[test]
+fn task_reference_add_and_remove_attachment_kind() {
+    // Managed attachment references never resolve the repository root, so
+    // this contract test runs even in sandboxes without `.git` markers.
+    let temp = TempDir::new().unwrap();
+
+    let _ = std::fs::create_dir_all(temp.path().join(".git"));
+
+    let tasks_dir = temp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    write_minimal_config(&tasks_dir);
+
+    let _guard = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
+
+    let mut storage = Storage::new(&tasks_dir.clone());
+    let created = TaskService::create(
+        &mut storage,
+        TaskCreate {
+            title: "Attachment CLI".to_string(),
+            project: Some("TEST".to_string()),
+            ..TaskCreate::default()
+        },
+    )
+    .expect("create task");
+
+    // Seed a managed blob in the store the way an upload would.
+    let store_root = tasks_dir.join("@attachments");
+    let (stored_name, created_blob) =
+        lotar::services::attachment_service::AttachmentService::store_bytes(
+            &store_root,
+            "evidence.txt",
+            b"cli-attachment-blob",
+        )
+        .expect("store blob");
+    assert!(created_blob);
+
+    // Add managed attachment reference.
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(temp.path())
+        .args([
+            "task",
+            "reference",
+            "add",
+            "attachment",
+            &created.id,
+            &stored_name,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("reference updated"));
+
+    let storage = Storage::new(&tasks_dir.clone());
+    let task = storage.get(&created.id, "TEST").expect("task should exist");
+    assert!(
+        task.references
+            .iter()
+            .any(|r| r.attachment.as_deref() == Some(stored_name.as_str())),
+        "attachment kind writes the typed attachment key: {:?}",
+        task.references
+    );
+
+    // Remove detaches the reference without deleting the blob.
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(temp.path())
+        .args([
+            "task",
+            "reference",
+            "remove",
+            "attachment",
+            &created.id,
+            &stored_name,
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("reference updated"));
+
+    let storage = Storage::new(&tasks_dir.clone());
+    let task = storage.get(&created.id, "TEST").expect("task should exist");
+    assert!(
+        task.references
+            .iter()
+            .all(|r| r.attachment.as_deref() != Some(stored_name.as_str()))
+    );
+    assert!(
+        store_root.join(&stored_name).exists(),
+        "CLI attachment detach is reference-only; the blob stays"
+    );
+
+    // Adding an unknown blob fails closed.
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(temp.path())
+        .args([
+            "task",
+            "reference",
+            "add",
+            "attachment",
+            &created.id,
+            "missing.0123456789abcdef0123456789abcdef.txt",
+        ])
+        .assert()
+        .failure();
+}

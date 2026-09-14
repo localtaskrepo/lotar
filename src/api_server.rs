@@ -25,6 +25,7 @@ struct ApiHandler {
 struct ApiPrefixHandler {
     method: String,
     prefix: String,
+    template: String,
     callback: Box<HandlerFn>,
 }
 
@@ -61,14 +62,27 @@ impl ApiServer {
         );
     }
 
-    pub fn register_prefix_handler<F>(&mut self, method: &str, prefix: &str, callback: F)
+    /// Register a prefix-matching handler using the route's OpenAPI-style
+    /// TEMPLATE (e.g. `/api/attachments/h/{hash}/{filename}`). The
+    /// dispatch prefix is derived from the template's static head (up to
+    /// the first `{`), and the full template is kept so route
+    /// introspection (`registered_routes`) surfaces the same shape the
+    /// spec documents — prefix handlers are part of the public contract,
+    /// not hidden from it.
+    pub fn register_prefix_handler<F>(&mut self, method: &str, template: &str, callback: F)
     where
         F: Fn(&HttpRequest) -> HttpResponse + Send + Sync + 'static,
     {
-        let normalized_prefix = prefix.trim_end_matches('/').to_lowercase();
+        let normalized_template = template.trim_end_matches('/').to_lowercase();
+        let prefix = normalized_template
+            .split_once('{')
+            .map(|(head, _)| head)
+            .unwrap_or(&normalized_template)
+            .trim_end_matches('/');
         self.prefix_handlers.push(ApiPrefixHandler {
             method: method.to_uppercase(),
-            prefix: normalized_prefix,
+            prefix: prefix.to_string(),
+            template: normalized_template.clone(),
             callback: Box::new(callback),
         });
     }
@@ -102,9 +116,10 @@ impl ApiServer {
         format!("{} {}", method.to_uppercase(), p)
     }
 
-    /// All registered exact-match routes as sorted `(METHOD, path)` pairs.
-    /// Used by the OpenAPI contract test to keep `docs/openapi.json` in sync
-    /// with the actual server surface.
+    /// All registered routes as sorted `(METHOD, path)` pairs: exact-match
+    /// routes plus prefix handlers represented by their full templates.
+    /// Used by the OpenAPI contract test to keep `docs/openapi.json` in
+    /// sync with the actual server surface, prefix routes included.
     pub fn registered_routes(&self) -> Vec<(String, String)> {
         let mut routes: Vec<(String, String)> = self
             .handlers
@@ -113,8 +128,14 @@ impl ApiServer {
                 let (method, path) = key.split_once(' ').unwrap_or((key, ""));
                 (method.to_string(), path.to_string())
             })
+            .chain(
+                self.prefix_handlers
+                    .iter()
+                    .map(|handler| (handler.method.clone(), handler.template.clone())),
+            )
             .collect();
         routes.sort();
+        routes.dedup();
         routes
     }
 }

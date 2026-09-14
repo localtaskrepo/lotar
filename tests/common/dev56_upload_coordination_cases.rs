@@ -130,16 +130,22 @@ fn concurrent_failed_upload_cannot_break_a_deduping_peer() {
     assert_eq!(count_stored_files(&attachments), 1, "no orphan, one blob");
 
     // B's task references the stored blob; A's task references nothing.
+    // Uploads attach typed `attachment` entries (DEV-61), never `file`.
     let storage = crate::storage::manager::Storage::try_open(&tasks_dir).unwrap();
     let b_task = crate::services::task_service::TaskService::get(&storage, "TP-2", None).unwrap();
     assert!(
-        b_task.references.iter().any(|r| r.file.is_some()),
+        b_task.references.iter().any(|r| r.attachment.is_some()),
         "B keeps its reference: {:?}",
+        b_task.references
+    );
+    assert!(
+        b_task.references.iter().all(|r| r.file.is_none()),
+        "uploads never write repository file entries: {:?}",
         b_task.references
     );
     let a_task = crate::services::task_service::TaskService::get(&storage, "TP-1", None).unwrap();
     assert!(
-        a_task.references.iter().all(|r| r.file.is_none()),
+        a_task.references.iter().all(|r| r.attachment.is_none()),
         "A must not keep a dangling reference: {:?}",
         a_task.references
     );
@@ -148,7 +154,7 @@ fn concurrent_failed_upload_cannot_break_a_deduping_peer() {
     let stored_path = b_task
         .references
         .iter()
-        .find_map(|r| r.file.clone())
+        .find_map(|r| r.attachment.clone())
         .unwrap();
     let leaf = stored_path
         .rsplit('/')
@@ -286,12 +292,12 @@ fn upload_rollback_and_remove_reclaim_serialize_on_the_store_lock() {
         "rollback blob reaped, committed blob reclaimed"
     );
 
-    // Neither task keeps a dangling file reference.
+    // Neither task keeps a dangling managed attachment reference.
     let storage = crate::storage::manager::Storage::try_open(&tasks_dir).unwrap();
     for id in ["TP-1", "TP-3"] {
         let dto = crate::services::task_service::TaskService::get(&storage, id, None).unwrap();
         assert!(
-            dto.references.iter().all(|r| r.file.is_none()),
+            dto.references.iter().all(|r| r.attachment.is_none()),
             "{id} must not keep a dangling reference: {:?}",
             dto.references
         );

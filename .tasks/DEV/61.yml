@@ -1,13 +1,32 @@
 title: Distinguish repository-file references from managed attachments
-status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-82]
-  depends_on: [DEV-56]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.545403+00:00
+modified: 2026-09-13T22:40:22.077066+00:00
+relationships:
+  depends_on:
+  - DEV-56
+  blocks:
+  - DEV-82
+  parent: DEV-53
+comments:
+- date: 2026-09-13T20:50:37.457387+00:00
+  text: 'Revised acceptance (user-authorized, 2026-09-13): backward compatibility for legacy file-key attachments is DROPPED; clean typed contract instead. (1) ReferenceEntry gains an explicit ''attachment'' key for managed stored_paths (attachment store blobs); ''file'' remains repo-relative file references (CLI/MCP semantics unchanged); ''code'' stays canonical path#N[-M] (accepts #L input). No legacy guess-read, no dual compatibility shim. (2) Attachment upload/remove, hash-refcount scan, and dedup/reclamation operate on ''attachment'' entries only; attachment remove requires typed managed membership on the task before blob cleanup (missing managed ref fails closed; wrong-kind value can never delete a blob or repo file). (3) Repo ''file'' add/remove (REST endpoints /api/tasks/references/file/add + /remove, and CLI/MCP file kind) reject paths resolving inside the configured attachments store (symlink/config aware) so blobs are attachment-only; repo files are never deleted on detach. (4) CLI/MCP gain an explicit ''attachment'' kind (reference-only attach/detach by stored name) under the same cross-process store lock, preserving supported managed access; DEV-56 store-lock -> task-lock ordering, rollback, and contention contracts preserved. (5) Sync src/api_types.rs + docs/openapi.json + help docs; view/** handled by frontend agent against frozen contract; smoke out of scope here. Local data verified with real YAML parser across all 8 projects (264 task files, 0 parse failures): zero file/attachment reference entries and empty .tasks/@attachments store => local migration is a verified no-op.'
+- date: 2026-09-13T21:08:56.669524+00:00
+  text: 'Backend implementation complete (uncommitted). Contract: ReferenceEntry now has typed keys code/link/file/attachment/jira/github; managed blobs live ONLY under ''attachment'' (uploads, dedup, refcount, reclamation), ''file'' stays repo-relative (store paths rejected on add/remove incl. symlinks + custom attachments_dir, canonicalized both sides), ''code'' canonical path#N[-M] unchanged. New REST endpoints POST /api/tasks/references/file/add and /remove ({id,path} -> {data:{task,added|removed}}), 400 on store paths, 404 unknown task. Attachment remove now requires typed managed membership before blob cleanup (missing ref => 400, store untouched); AttachmentRemoveResponse shape unchanged. MCP task_reference_add/remove + bulk accept kind ''attachment'' (value = stored blob name; add fails closed on missing blob; detach reference-only; store-lock -> task-lock coordination kept; file kind no longer locks since it can never target the store). CLI: ''lotar task reference add|remove attachment <id> <name>'' with store lock + existence check. Files: src/types.rs, src/services/attachment_service.rs (attach/detach_managed_reference, validate_managed_name, typed is_hash_referenced, lock_store_for_attachments), src/services/reference_service.rs (ensure_outside_attachments_store), src/api_types.rs, src/routes/tasks.rs, src/cli/args/task.rs, src/cli/handlers/task/reference.rs, src/mcp/server/handlers/tasks.rs, src/mcp/server/tools.rs, docs/openapi.json (attachment prop + file endpoints + FileReference schemas), docs/help/{task-model,mcp-tools,api-quick-reference}.md, docs/developers/task-model.md. Tests: new tests/dev61_reference_kinds_test.rs (10 tests: REST file roundtrip, store-path + custom-store + symlink rejection, membership fail-closed, wrong-kind never deletes blob/repo file, dedup/refcount, same-basename coexistence, YAML/DTO serialization, managed-name validation, MCP file+attachment parity incl. bulk lock contention), CLI attachment-kind roundtrip added to tests/cli_task_references_test.rs, dev56 store-lock test reworked to attachment kind without weakening contention assertions, upload coordination cases assert typed key. Verification: cargo nextest full suite 1038/1038 passed (9 git-gated DEV-61 tests skip via runtime probe in this sandbox per repo convention); cargo fmt --all --check clean; clippy --all-targets --all-features -D warnings clean. Local data migration verified NO-OP with real YAML parser before and after: 8 projects, 264 task files, 0 parse failures, 19 reference entries all code/jira/github (0 file, 0 attachment), .tasks/@attachments real dir (non-symlink, inside tasks root) with 0 entries; no production migration code added. Remaining: view/** (frontend agent owns view/api/types.ts + TaskPanel rendering against frozen contract), then npm run lint (vue-tsc) + smoke gates before Done; keeping InProgress until full gates/review.'
+- date: 2026-09-13T21:42:37.761360+00:00
+  text: 'Review fixes (B1/B2/N1/N2/N3) implemented, uncommitted. B1: MCP bulk attachment processing is now PER ITEM — each id resolves its canonical storage location (DEV-56 fail-closed on malformed/unknown/ambiguous), loads ITS project config from its actual root, locks THAT store (store-lock -> task-lock, one lock at a time so no ordering hazard), verifies blob existence in that store for adds only, then mutates; per-item errors keep the bulk updated/failed contract, no whole-batch abort. B2: bulk remove no longer existence-prechecks the blob; detach is reference-only and works for missing/stale blobs (idempotent changed=false). N1 FIXED: is_hash_referenced(storage, store_root, hash) is store-aware — only attachment references whose task resolves to the SAME canonical store root count; shared stores still protect each other; any resolution failure (bad id, ambiguous location, config/store error) counts conservatively as referenced so blobs are never deleted on uncertain grounds. Cross-store same-hash leaf names no longer leak (verified by test). N2 FIXED: code attach and the /api/references/snippet preview route now reject targets resolving inside ANY managed store configured under the tasks root (base + every project attachments.dir override, canonicalized; symlink aliases covered) via shared ReferenceService::managed_store_roots/path_inside_managed_stores; the file-kind guard uses the same all-stores set; stale code/file detach still works when the target file is gone. N3 FIXED: docs/openapi.json now documents GET /api/attachments/get (path/project/download query params) and GET /api/attachments/h/{hash}/{filename} (project/download) with binary responses and 400/404; api-quick-reference lists both download routes. Tests added: tests/dev61_reference_kinds_test.rs now covers mixed-project relative attachments.dir stores (blob only in A must not attach B and vice versa), per-store lock contention while another store''s item succeeds, missing-blob bulk remove per item, cross-store refcount reclamation, and code/preview store rejection + stale detach. Note for fixture authors: attachments.dir values starting with @ must be quoted in YAML. Verification: nextest focused 88/88 passed (dev61 + dev56 + coordination + cli references + mcp + reference/attachment/snippet suites); cargo fmt --all --check clean; clippy --all-targets --all-features -D warnings clean. Known bounded limit (unchanged): single-task MCP attachment handler resolves the store from the primary root''s project config; nested-root tasks fail closed at edit with the DEV-56 cross-root message. Full rust suite + UI/smoke gates deferred until frontend lands. Still InProgress.'
+- date: 2026-09-13T22:02:27.782886+00:00
+  text: 'Review round 2 blockers fixed (uncommitted). Blocker 1: mcp_file_and_attachment_kinds_follow_the_contract now asserts the per-item contract under a held store lock — tool-level ok, updated empty, BOTH ids (TP-1, TP-2) in failed[] with attachments-store/busy diagnostics, zero new references while locked, full success after release; bulk_attachment_lock_contention_is_per_store now asserts the store-B blob exists before locking and that the TQ-1 failure message is the LOCK (attachments-store/busy) and NOT a missing-blob ''not found''. Blocker 2: ReferenceService::managed_store_roots returns Result and FAILS CLOSED — the merged config chain swallows unreadable global layers, so the guard explicitly parses an existing .tasks/config.yml via load_global_config and denies on error (missing file = standard default, allowed); per-project config load/parse errors and invalid attachments.dir values propagate; read_dir failure denies. While any config under the tasks root is invalid, file attach, code attach, and snippet preview are denied everywhere (service/REST/MCP) — new test store_guard_fails_closed_on_invalid_configuration covers invalid global config, invalid unrelated-project config, denial surfaces, no mutation of user data, and recovery after the config is fixed. Bounded limit: an invalid ~/.lotar home config remains swallowed by the chain (out-of-checkout user file; denying on it is not observable here). Critical verification: the dev61 fixture now places its workspace under CARGO_TARGET_TMPDIR so find_repo_root resolves by ancestry to the checkout''s existing .git — filesystem path discovery only, no git commands, no .git marker creation (blocked in this sandbox). All 16 dev61 tests EXECUTED (0 runtime early-returns; skip path repo_root_available=false never triggered; two identical passing runs); repo-relative values expressed via fx.rel() and direct service calls use the discovered fx.repo_root. task_reference_add_and_remove_attachment_kind (CLI) no longer needs a repo root and executes here. Remaining sandbox skips are pre-existing, not new-contract: cli_task_references task_reference_add_and_remove_link_file_and_code (real binary cwd in temp dir, ancestry inapplicable) and mcp_server_tests tools_call_reference_add_and_remove (no_git_tests build gate). Verification: nextest focused 21/21 + 17/17 passed (dev61 full binary + dev56 + upload coordination + cli references + snippet/mcp names); cargo fmt --all --check clean; clippy --all-targets --all-features -D warnings clean. Local data re-verified unchanged (0 file/attachment refs, empty store). Still InProgress.'
+- date: 2026-09-13T22:34:23.995705+00:00
+  text: 'Final-gate fixes (uncommitted). (1) OpenAPI contract failure root-caused and fixed in PRODUCTION introspection: ApiServer::register_prefix_handler now takes the route''s OpenAPI-style template (/api/attachments/h/{hash}/{filename}); the dispatch prefix derives from the template''s static head, and registered_routes() surfaces exact routes PLUS prefix templates (deduped), so prefix handlers are part of the visible contract instead of hidden. No doc deletion, no test exception hardcoding; both openapi_contract_test directions pass unchanged. New regression hash_prefix_route_downloads_blob_contract exercises the real prefix dispatch: 200 + exact bytes + inline disposition, download=1 forces attachment disposition, unknown hash 404s, and registered_routes contains the exact template string. (2) dev61 durability: removed the whole-file #![cfg(not(no_git_tests))] gate (the suite needs no Git init — ancestry-only discovery) and replaced the last git_available probe in file_reference_rejects_custom_configured_store_location with the fixture''s repo_root_available check. Verified after forcing a fresh build-script probe (no_git_tests SET in this sandbox, cli_task_references compiled out as designed): cargo nextest list shows exactly 17 dev61 tests compiled; all 17 executed and passed with ZERO runtime early-returns (nocapture grep confirms no ''skipping'' lines), twice. Full-suite gates: npm run test:rust:agent 998/998 passed (6 skips are the pre-existing git-gated probes elsewhere; dev61 included in the 998), cargo clippy --all-targets --all-features -D warnings clean, cargo fmt --all --check clean. Docs unchanged this round. Smoke + full npm run lint rerun happens at the final gate after the concurrent smoke-helper fix lands. Still InProgress.'
+- date: 2026-09-13T22:39:26.817302+00:00
+  text: 'Outcome: Typed reference contract shipped — ReferenceEntry distinguishes managed ''attachment'' (uploads, dedup, store-aware hash refcount, typed-membership-gated reclamation) from repository ''file'' (REST /api/tasks/references/file/add|remove + UI anchorless preview via snippet route; repo files never deleted on detach) and ''code'' path#N[-M]; explicit CLI/MCP ''attachment'' kind coordinates per-item actual stores (store-lock -> task-lock, per-task project config from its canonical root); file/code attach and preview reject ALL managed stores (base + per-project attachments.dir, symlink-aware) and the guard fails closed on invalid checkout configs; JSON/TS/OpenAPI/help synced with prefix-route introspection (/api/attachments/h/{hash}/{filename} template surfaced by registered_routes; hash download route verified against real dispatch). User-approved breaking change with no compat shim; local data migration verified NO-OP: 8 projects, 264 task files, 19 refs (9 code, 10 platform; 0 file, 0 attachment), empty real non-symlink @attachments store — no old ambiguous refs, no rewrites/backups needed; seed/test fixtures updated to the typed keys. Evidence: final full gates ALL PASS — npm run lint:agent (vue-tsc + clippy -D warnings + fmt clean); npm run test:agent default concurrency --retries 0: Rust 998 passed / 6 skipped, UI 411 tests across 159 files; fresh-build-first npm run test:smoke:agent: 146 total, 123 passed / 23 skipped across 40 files (35 pass, 5 skip), including 4 new browser cases against the actual backend (0 fake, 0 capability skips): managed lifecycle view/download/detach, repo add with anchorless preview + #L detach with file preserved and zero attachment requests, typed coexist/wrong-kind rejection, per-project custom store URLs; prior browser env failure and the mkds helper / OpenAPI contract failures superseded by the clean full gate. All 17 DEV-61 Rust cases genuinely executed (final junit + focused success output, zero early-return traces; no whole-file Git cfg — tests remain compiled under no_git_tests). Review final signoff: all blockers solved, including UI same-value typed-v-for-key regression. Baseline coverage note for DEV-79: 13 whole Rust test files + parts of 4 others cfg-excluded plus 6 explicit ignores — DEV-79 stays supported (runner coverage not fixed here). This DEV-61 implementation used no Git commands; nothing staged or committed. Remaining: work uncommitted/unintegrated (commit reference to be appended if/when authorized). DEV-82 (broader OpenAPI/quick-reference repair) remains Todo and is now unblocked — do not auto-start. Optional pre-existing, non-blocking UI observations reported in review, out of scope here (existing-remove/upload snapshot race; preview expand response ordering + ref-file suggestion guards); invalid ~/.lotar home config chain-swallowing is broader/outside this checkout and not claimed fixed. Guidance: no durable instruction finding; no guidance change needed.'
+- date: 2026-09-13T22:40:22.077066+00:00
+  text: 'Correction to the closing comment above: UI suite is 411 tests across 59 files (not 159 — typo in the evidence line; all other numbers and conclusions unchanged).'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: D7.
@@ -19,3 +38,46 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-13T20:50:37.447935+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-13T20:50:37.457387+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T21:08:56.669524+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T21:42:37.761360+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T22:02:27.782886+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T22:34:23.995705+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T22:39:26.817302+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-13T22:39:26.846283+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-09-13T22:40:22.077066+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

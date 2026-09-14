@@ -347,6 +347,8 @@ pub enum TaskReferenceKindAdd {
     Link { id: String, url: String },
     /// Add a file reference (repo-relative path)
     File { id: String, path: String },
+    /// Add a managed attachment reference (stored attachments blob name)
+    Attachment { id: String, name: String },
     /// Add a code reference (e.g. src/lib.rs#10-12)
     Code { id: String, code: String },
 }
@@ -363,6 +365,8 @@ pub enum TaskReferenceKindRemove {
     Link { id: String, url: String },
     /// Remove a file reference (repo-relative path)
     File { id: String, path: String },
+    /// Remove a managed attachment reference (stored attachments blob name)
+    Attachment { id: String, name: String },
     /// Remove a code reference (e.g. src/lib.rs#10-12)
     Code { id: String, code: String },
 }

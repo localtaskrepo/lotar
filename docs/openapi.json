@@ -15,7 +15,7 @@
     "/api/tasks/add": {
       "post": {
         "summary": "Create a new task",
-        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter \u2192 git user \u2192 system username \u2192 project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
+        "description": "Creates a task using project validation and smart defaults. People fields support @me (resolved via config.default_reporter → git user → system username → project manifest author as last resort). If auto.set_reporter is enabled in config, reporter is set automatically when not provided. Project may be provided via the JSON body field 'project' (preferred) or the query parameter 'project' (deprecated).",
         "parameters": [
           {
             "name": "project",
@@ -1089,6 +1089,80 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeCodeReferenceRemoveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/references/file/add": {
+      "post": {
+        "summary": "Attach a repository-file reference to a task",
+        "description": "Adds a repository-relative file reference to task.references unless it already exists. Paths resolving inside the configured attachments store are rejected; use the attachment endpoints for managed blobs.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileReferenceAddRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeFileReferenceAddResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/tasks/references/file/remove": {
+      "post": {
+        "summary": "Remove a repository-file reference from a task",
+        "description": "Removes a repository-relative file reference from task.references if present. Repository files are never deleted; paths resolving inside the configured attachments store are rejected.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileReferenceRemoveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeFileReferenceRemoveResponse"
                 }
               }
             }
@@ -2276,15 +2350,8 @@
     },
     "/api/attachments/get": {
       "get": {
-        "summary": "Fetch attachment content",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "500": {
-            "$ref": "#/components/responses/InternalError"
-          }
-        },
+        "summary": "Fetch a managed attachment by stored path",
+        "description": "Streams a managed attachment blob from the project's configured attachments store. `project` selects per-project attachments.dir overrides. Store blobs are only reachable through the attachment routes, never as repository file/code references.",
         "parameters": [
           {
             "name": "path",
@@ -2293,9 +2360,53 @@
             "schema": {
               "type": "string"
             },
-            "description": "Attachment-relative path"
+            "description": "Stored attachment leaf name (e.g. name.<hash>.ext) as returned by upload."
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional project prefix for per-project attachments.dir configuration."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "When 1/true, Content-Disposition forces a download instead of inline display."
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "OK - file bytes; Content-Type varies by extension, Content-Disposition is inline or attachment based on the download flag",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
       }
     },
     "/api/config/inspect": {
@@ -2664,6 +2775,76 @@
                 }
               }
             }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/attachments/h/{hash}/{filename}": {
+      "get": {
+        "summary": "Fetch a managed attachment by content hash",
+        "description": "Streams a managed attachment blob looked up by its 32-hex content-hash tag, primarily for browser Save-Link-As ergonomics. The trailing filename is cosmetic; the hash selects the blob. Honors the project's configured attachments store via the project query parameter.",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "32-character hex content-hash tag embedded in the stored filename."
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Display filename; used for Content-Disposition only."
+          },
+          {
+            "name": "project",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional project prefix for per-project attachments.dir configuration."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "true"
+              ]
+            },
+            "description": "When 1/true, Content-Disposition forces a download instead of inline display."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK - file bytes; Content-Type varies by extension, Content-Disposition is inline or attachment based on the download flag",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -3327,6 +3508,67 @@
           "removed"
         ]
       },
+      "FileReferenceAddRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "Repository-relative file path; must resolve inside the repository root and outside the managed attachments store."
+          }
+        },
+        "required": [
+          "id",
+          "path"
+        ]
+      },
+      "FileReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "added": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "added"
+        ]
+      },
+      "FileReferenceRemoveRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "path"
+        ]
+      },
+      "FileReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "task",
+          "removed"
+        ]
+      },
       "GenericReferenceAddRequest": {
         "type": "object",
         "properties": {
@@ -3516,7 +3758,8 @@
         "properties": {
           "code": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Repository-relative code location in the form path#line or path#start-end."
           },
           "link": {
             "type": "string",
@@ -3524,7 +3767,13 @@
           },
           "file": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Repository-relative file path (never a managed attachments-store blob)."
+          },
+          "attachment": {
+            "type": "string",
+            "nullable": true,
+            "description": "Managed attachments-store blob name (typed managed attachment; never a repository path)."
           },
           "jira": {
             "type": "string",
@@ -6144,6 +6393,28 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/CodeReferenceRemoveResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeFileReferenceAddResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FileReferenceAddResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeFileReferenceRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FileReferenceRemoveResponse"
           }
         },
         "required": [

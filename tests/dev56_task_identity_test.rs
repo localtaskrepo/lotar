@@ -927,7 +927,9 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
         assert!(tp2.references.iter().all(|r| r.file.is_none()));
         return;
     }
-    // TP-1 receives a committed blob whose path the MCP client references.
+    // TP-1 receives a committed blob whose stored name the MCP client
+    // references through the typed `attachment` kind (DEV-61: store blobs
+    // are no longer reachable as repository `file` references).
     let content = base64_encode(b"mcp-single-blob");
     let resp = api.handle_request(&mk_req(
         "POST",
@@ -942,19 +944,15 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
         .to_string();
     let attachments = fx.tasks_dir.join("@attachments");
 
-    // The value must resolve under the discovered repo root; absolute paths
-    // are accepted and the blob lives below this workspace.
-    let blob_abs = attachments.join(&filename);
-
     // Independently held fs2 store lock == another LoTaR process.
     let held =
         lotar::storage::safety::acquire_storage_lock(&attachments, "attachments-store").unwrap();
 
-    // Single-task MCP file add must fail closed while the store is locked,
-    // leaving the task untouched.
+    // Single-task MCP attachment add must fail closed while the store is
+    // locked, leaving the task untouched.
     let resp = mcall(
         "task_reference_add",
-        json!({"id": "TP-2", "kind": "file", "value": blob_abs.to_string_lossy()}),
+        json!({"id": "TP-2", "kind": "attachment", "value": filename}),
     );
     assert!(
         resp.get("error").is_some(),
@@ -972,23 +970,45 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
     let storage = Storage::try_open(&fx.tasks_dir).unwrap();
     let tp2 = TaskService::get(&storage, "TP-2", None).unwrap();
     assert!(
-        tp2.references.iter().all(|r| r.file.is_none()),
+        tp2.references.iter().all(|r| r.attachment.is_none()),
         "no task changes while locked: {:?}",
         tp2.references
     );
 
-    // After release the same MCP call succeeds.
+    // After release the same MCP call succeeds and lands on the typed key.
     drop(held);
     let resp = mcall(
         "task_reference_add",
-        json!({"id": "TP-2", "kind": "file", "value": blob_abs.to_string_lossy()}),
+        json!({"id": "TP-2", "kind": "attachment", "value": filename}),
     );
     assert!(resp.get("error").is_none(), "after release: {resp}");
     let storage = Storage::try_open(&fx.tasks_dir).unwrap();
     let tp2 = TaskService::get(&storage, "TP-2", None).unwrap();
     assert!(
-        tp2.references.iter().any(|r| r.file.is_some()),
+        tp2.references.iter().any(|r| r.attachment.is_some()),
         "reference attached after release: {:?}",
         tp2.references
     );
+    assert!(
+        tp2.references.iter().all(|r| r.file.is_none()),
+        "attachment kind never writes file entries: {:?}",
+        tp2.references
+    );
+
+    // The store blob must not be reachable as a repository file reference
+    // even by its repo-relative or absolute path.
+    for value in [
+        attachments.join(&filename).to_string_lossy().to_string(),
+        format!(".tasks/@attachments/{filename}"),
+        filename.clone(),
+    ] {
+        let resp = mcall(
+            "task_reference_add",
+            json!({"id": "TP-2", "kind": "file", "value": value}),
+        );
+        assert!(
+            resp.get("error").is_some(),
+            "store paths must not be attachable as file references: {resp}"
+        );
+    }
 }

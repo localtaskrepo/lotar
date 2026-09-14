@@ -30,20 +30,20 @@
         <ul v-else class="task-panel__references-list">
           <li
             v-for="(reference, index) in references"
-            :key="reference.code || reference.link || reference.file || reference.jira || reference.github || index"
+            :key="referenceStableKey(reference) || index"
             :class="[
               'task-panel__reference-item',
-              { 'task-panel__reference-item--interactive': !!reference.code }
+              { 'task-panel__reference-item--interactive': !!referencePreviewKey(reference) }
             ]"
-            :tabindex="reference.code ? 0 : undefined"
-            @mouseenter="handleReferenceEnter(reference.code, $event)"
-            @mouseleave="handleReferenceLeave(reference.code)"
-            @focus="handleReferenceEnter(reference.code, $event)"
-            @blur="handleReferenceLeave(reference.code)"
+            :tabindex="referencePreviewKey(reference) ? 0 : undefined"
+            @mouseenter="handleReferenceEnter(referencePreviewKey(reference), $event)"
+            @mouseleave="handleReferenceLeave(referencePreviewKey(reference))"
+            @focus="handleReferenceEnter(referencePreviewKey(reference), $event)"
+            @blur="handleReferenceLeave(referencePreviewKey(reference))"
           >
             <span
               class="task-panel__reference-kind"
-              :title="reference.file ? 'File reference' : reference.link ? 'Link reference' : reference.github ? 'GitHub reference' : reference.jira ? 'Jira reference' : reference.code ? 'Code reference' : 'Reference'"
+              :title="reference.attachment ? 'Attachment reference' : reference.file ? 'Repository file reference' : reference.link ? 'Link reference' : reference.github ? 'GitHub reference' : reference.jira ? 'Jira reference' : reference.code ? 'Code reference' : 'Reference'"
               aria-hidden="true"
             >
               <IconGlyph :name="referenceIcon(reference)" />
@@ -58,15 +58,22 @@
               {{ reference.link }}
             </a>
             <a
-              v-else-if="reference.file"
+              v-else-if="reference.attachment"
               class="task-panel__reference-link"
-              :href="attachmentUrl(reference.file)"
+              :href="attachmentUrl(reference.attachment)"
               target="_blank"
               rel="noopener"
-              :title="attachmentHoverTitle(reference.file)"
+              :title="attachmentHoverTitle(reference.attachment)"
             >
-              {{ attachmentDisplayName(reference.file) }}
+              {{ attachmentDisplayName(reference.attachment) }}
             </a>
+            <span
+              v-else-if="reference.file"
+              class="task-panel__reference-text"
+              :title="`Repository file: ${reference.file}`"
+            >
+              {{ reference.file }}
+            </span>
             <a
               v-else-if="reference.github && referenceLink(reference)"
               class="task-panel__reference-text"
@@ -110,8 +117,8 @@
               variant="ghost"
               icon-only
               type="button"
-              :aria-label="reference.link ? 'Remove link' : reference.file ? 'Remove attachment' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
-              :title="reference.link ? 'Remove link' : reference.file ? 'Remove attachment' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
+              :aria-label="reference.link ? 'Remove link' : reference.attachment ? 'Remove attachment' : reference.file ? 'Remove repository file' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
+              :title="reference.link ? 'Remove link' : reference.attachment ? 'Remove attachment' : reference.file ? 'Remove repository file' : reference.github ? 'Remove GitHub reference' : reference.jira ? 'Remove Jira reference' : reference.code ? 'Remove code reference' : 'Remove reference'"
               :disabled="!taskId || removingReferenceKey === referenceStableKey(reference)"
               @click.prevent.stop="removeReference(reference)"
             >
@@ -189,9 +196,7 @@
           :class="[
             'task-panel-dialog__overlay',
             'task-panel__references-dialog',
-            addReferenceTab === 'link'
-              ? 'task-panel__references-dialog--link'
-              : 'task-panel__references-dialog--code',
+            `task-panel__references-dialog--${addReferenceTab}`,
             {
               'task-panel__references-dialog--has-preview':
                 addReferenceTab === 'code' && !!addCodePreviewSnippet,
@@ -243,6 +248,17 @@
                 >
                   Code
                 </button>
+                <button
+                  type="button"
+                  class="task-panel__tab"
+                  :class="{ 'task-panel__tab--active': addReferenceTab === 'file' }"
+                  role="tab"
+                  data-testid="references-add-tab-file"
+                  :aria-selected="addReferenceTab === 'file'"
+                  @click="selectAddReferenceTab('file')"
+                >
+                  File
+                </button>
               </div>
 
               <template v-if="addReferenceTab === 'link'">
@@ -254,6 +270,23 @@
                     v-model="addLinkUrl"
                     placeholder="https://example.com"
                   />
+                </label>
+              </template>
+
+              <template v-else-if="addReferenceTab === 'file'">
+                <label class="task-panel-dialog__field" for="task-panel-add-file-input">
+                  <span class="muted">Repository path</span>
+                  <UiInput
+                    id="task-panel-add-file-input"
+                    ref="addFileInputRef"
+                    v-model="addFilePath"
+                    :list="fileDatalistId"
+                    placeholder="docs/notes.md"
+                    autocomplete="off"
+                  />
+                  <datalist :id="fileDatalistId">
+                    <option v-for="item in addFileSuggestions" :key="item" :value="item" />
+                  </datalist>
                 </label>
               </template>
 
@@ -330,7 +363,7 @@
                   type="submit"
                   :disabled="addReferenceSubmitting || !addReferencePayloadReady"
                 >
-                  {{ addReferenceSubmitting ? 'Adding…' : addReferenceTab === 'code' ? 'Add code' : 'Add link' }}
+                  {{ addReferenceSubmitting ? 'Adding…' : addReferenceTab === 'code' ? 'Add code' : addReferenceTab === 'file' ? 'Add file' : 'Add link' }}
                 </UiButton>
                 <UiButton variant="ghost" type="button" :disabled="addReferenceSubmitting" @click="closeAddReferenceDialog">
                   Cancel
@@ -362,11 +395,12 @@ type ReferenceEntry = {
   code?: string | null
   link?: string | null
   file?: string | null
+  attachment?: string | null
   jira?: string | null
   github?: string | null
 }
 
-type ReferenceIconName = 'file' | 'github' | 'jira' | 'send' | 'list'
+type ReferenceIconName = 'file' | 'download' | 'github' | 'jira' | 'send' | 'list'
 
 const props = defineProps<{
   mode: 'create' | 'edit'
@@ -400,13 +434,13 @@ const references = computed(() =>
   (props.task?.references || []).filter((reference) =>
     Boolean(
       reference &&
-        (reference.code || reference.link || reference.file || reference.github || reference.jira),
+        (reference.code || reference.link || reference.attachment || reference.file || reference.github || reference.jira),
     ),
   ),
 )
 
 const addReferenceDialogOpen = ref(false)
-const addReferenceTab = ref<'link' | 'code'>('link')
+const addReferenceTab = ref<'link' | 'code' | 'file'>('link')
 
 const addLinkUrl = ref('')
 const addLinkSubmitting = ref(false)
@@ -418,6 +452,11 @@ const addCodeEndLine = ref('')
 const addCodeSubmitting = ref(false)
 const addCodeFileInputRef = ref<HTMLElement | null>(null)
 const addCodeFileSuggestions = ref<string[]>([])
+
+const addFilePath = ref('')
+const addFileSubmitting = ref(false)
+const addFileInputRef = ref<HTMLElement | null>(null)
+const addFileSuggestions = ref<string[]>([])
 const addCodePreviewLoading = ref(false)
 const addCodePreviewError = ref<string | null>(null)
 const addCodePreviewSnippet = ref<ReferenceSnippet | null>(null)
@@ -426,9 +465,12 @@ const addCodePreviewScrollFocus = ref<'start' | 'end' | null>(null)
 
 const removingReferenceKey = ref<string | null>(null)
 
-const addReferenceSubmitting = computed(() => addLinkSubmitting.value || addCodeSubmitting.value)
+const addReferenceSubmitting = computed(
+  () => addLinkSubmitting.value || addCodeSubmitting.value || addFileSubmitting.value,
+)
 
 const codeFileDatalistId = 'task-panel-code-file-suggestions'
+const fileDatalistId = 'task-panel-file-suggestions'
 let suggestFilesTimer: number | null = null
 let previewTimer: number | null = null
 
@@ -458,6 +500,8 @@ function resetAddReferenceForm() {
   addCodeStartLine.value = ''
   addCodeEndLine.value = ''
   addCodeFileSuggestions.value = []
+  addFilePath.value = ''
+  addFileSuggestions.value = []
   addCodePreviewSnippet.value = null
   addCodePreviewError.value = null
   addCodePreviewLoading.value = false
@@ -480,11 +524,13 @@ function closeAddReferenceDialog() {
   addReferenceDialogOpen.value = false
 }
 
-function selectAddReferenceTab(tab: 'link' | 'code') {
+function selectAddReferenceTab(tab: 'link' | 'code' | 'file') {
   addReferenceTab.value = tab
   nextTick(() => {
     if (tab === 'link') {
       ;(addLinkInputRef.value as any)?.focus?.()
+    } else if (tab === 'file') {
+      ;(addFileInputRef.value as any)?.focus?.()
     } else {
       ;(addCodeFileInputRef.value as any)?.focus?.()
     }
@@ -521,6 +567,9 @@ const addReferencePayloadReady = computed(() => {
   if (addReferenceTab.value === 'link') {
     return addLinkUrl.value.trim().length > 0
   }
+  if (addReferenceTab.value === 'file') {
+    return addFilePath.value.trim().length > 0
+  }
   return !!addCodePayload.value
 })
 
@@ -529,7 +578,31 @@ async function submitAddReference() {
     await submitAddLink()
     return
   }
+  if (addReferenceTab.value === 'file') {
+    await submitAddFile()
+    return
+  }
   await submitAddCode()
+}
+
+async function submitAddFile() {
+  const id = taskId.value
+  if (!id) return
+  const path = addFilePath.value.trim()
+  if (!path) return
+
+  addFileSubmitting.value = true
+  try {
+    const response = await api.addTaskFileReference({ id, path })
+    emit('updated', response.task)
+    showToast(response.added ? 'Repository file reference added' : 'Repository file reference already attached')
+    addReferenceDialogOpen.value = false
+  } catch (error: any) {
+    console.warn('Failed to add repository file reference', error)
+    showToast(error?.message || 'Failed to add repository file reference')
+  } finally {
+    addFileSubmitting.value = false
+  }
 }
 
 function scrollAddCodePreviewToFocusedLine(focus: 'start' | 'end') {
@@ -581,29 +654,38 @@ async function submitAddCode() {
   }
 }
 
-async function refreshFileSuggestions(query: string) {
+async function refreshFileSuggestions(query: string, target: 'code' | 'file') {
   const cleaned = query.trim()
   if (!cleaned) {
-    addCodeFileSuggestions.value = []
+    if (target === 'code') addCodeFileSuggestions.value = []
+    else addFileSuggestions.value = []
     return
   }
   try {
-    addCodeFileSuggestions.value = await api.suggestReferenceFiles(cleaned, 30)
+    const suggestions = await api.suggestReferenceFiles(cleaned, 30)
+    if (target === 'code') addCodeFileSuggestions.value = suggestions
+    else addFileSuggestions.value = suggestions
   } catch {
-    addCodeFileSuggestions.value = []
+    if (target === 'code') addCodeFileSuggestions.value = []
+    else addFileSuggestions.value = []
   }
 }
 
-watch(addCodeFile, (value) => {
-  if (!(addReferenceDialogOpen.value && addReferenceTab.value === 'code')) return
-  if (suggestFilesTimer !== null && typeof window !== 'undefined') {
-    window.clearTimeout(suggestFilesTimer)
-  }
-  if (typeof window === 'undefined') return
-  suggestFilesTimer = window.setTimeout(() => {
-    refreshFileSuggestions(value)
-  }, 120)
-})
+function watchFileSuggestions(source: typeof addCodeFile, target: 'code' | 'file') {
+  watch(source, (value) => {
+    if (!(addReferenceDialogOpen.value && addReferenceTab.value === target)) return
+    if (suggestFilesTimer !== null && typeof window !== 'undefined') {
+      window.clearTimeout(suggestFilesTimer)
+    }
+    if (typeof window === 'undefined') return
+    suggestFilesTimer = window.setTimeout(() => {
+      refreshFileSuggestions(value, target)
+    }, 120)
+  })
+}
+
+watchFileSuggestions(addCodeFile, 'code')
+watchFileSuggestions(addFilePath, 'file')
 
 function schedulePreviewFetch() {
   if (previewTimer !== null && typeof window !== 'undefined') {
@@ -688,6 +770,8 @@ function referenceStableKey(reference: ReferenceEntry): string {
   if (!reference) return ''
   const link = typeof reference.link === 'string' ? reference.link.trim() : ''
   if (link) return `link:${link}`
+  const attachment = typeof reference.attachment === 'string' ? reference.attachment.trim() : ''
+  if (attachment) return `attachment:${attachment}`
   const file = typeof reference.file === 'string' ? reference.file.trim() : ''
   if (file) return `file:${file}`
   const github = typeof reference.github === 'string' ? reference.github.trim() : ''
@@ -700,11 +784,24 @@ function referenceStableKey(reference: ReferenceEntry): string {
 }
 
 function referenceIcon(reference: ReferenceEntry): ReferenceIconName {
+  if (typeof reference.attachment === 'string' && reference.attachment.trim()) return 'download'
   if (typeof reference.file === 'string' && reference.file.trim()) return 'file'
   if (typeof reference.github === 'string' && reference.github.trim()) return 'github'
   if (typeof reference.jira === 'string' && reference.jira.trim()) return 'jira'
   if (typeof reference.link === 'string' && reference.link.trim()) return 'send'
   return 'list'
+}
+
+// Hover-preview key: code refs keep their anchored form, repository files
+// preview anchorless through the same snippet endpoint. Managed attachments
+// and external references have no repository preview.
+function referencePreviewKey(reference: ReferenceEntry): string | null {
+  if (!reference) return null
+  const code = typeof reference.code === 'string' ? reference.code.trim() : ''
+  if (code) return code
+  const file = typeof reference.file === 'string' ? reference.file.trim() : ''
+  if (file) return file
+  return null
 }
 
 function referenceLink(reference: ReferenceEntry): string | undefined {
@@ -857,15 +954,17 @@ async function removeReference(reference: ReferenceEntry) {
   if (!key) return
   if (removingReferenceKey.value) return
 
-  // If we're removing the currently-hovered code ref, dismiss the preview immediately.
-  if (reference.code && props.hoveredReferenceCode === reference.code) {
-    props.onReferenceLeave(reference.code)
-    props.onReferencePreviewLeave(reference.code)
+  // If we're removing the currently-hovered previewed ref, dismiss the preview immediately.
+  const previewKey = referencePreviewKey(reference)
+  if (previewKey && props.hoveredReferenceCode === previewKey) {
+    props.onReferenceLeave(previewKey)
+    props.onReferencePreviewLeave(previewKey)
   }
 
   removingReferenceKey.value = key
   try {
     const link = typeof reference.link === 'string' ? reference.link.trim() : ''
+    const attachment = typeof reference.attachment === 'string' ? reference.attachment.trim() : ''
     const file = typeof reference.file === 'string' ? reference.file.trim() : ''
     const code = typeof reference.code === 'string' ? reference.code.trim() : ''
     const github = typeof reference.github === 'string' ? reference.github.trim() : ''
@@ -878,8 +977,8 @@ async function removeReference(reference: ReferenceEntry) {
       return
     }
 
-    if (file) {
-      const response = await api.removeTaskAttachment({ id, stored_path: file })
+    if (attachment) {
+      const response = await api.removeTaskAttachment({ id, stored_path: attachment })
       emit('updated', response.task)
       if (response.deleted) {
         showToast('Attachment removed')
@@ -888,6 +987,13 @@ async function removeReference(reference: ReferenceEntry) {
       } else {
         showToast('Attachment removed (file may already be gone)')
       }
+      return
+    }
+
+    if (file) {
+      const response = await api.removeTaskFileReference({ id, path: file })
+      emit('updated', response.task)
+      showToast(response.removed ? 'Repository file reference removed' : 'Repository file reference already removed')
       return
     }
 

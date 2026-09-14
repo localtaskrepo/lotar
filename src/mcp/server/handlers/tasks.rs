@@ -1137,42 +1137,14 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
     let mut updated: Vec<Value> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
 
-    // File references that live inside the attachments store participate in
-    // the blob lifecycle: hold the cross-process store lock across the whole
-    // batch (store-lock -> task-lock order) so adds/detaches serialize with
-    // upload creation and remove reclamation. Other kinds and outside paths
-    // stay unlocked.
-    let _store_guard = if kind == "file" {
-        let first_project = ids
-            .first()
-            .and_then(|id| crate::storage::TaskId::parse(id).ok())
-            .map(|parsed| parsed.project);
-        let cfg =
-            crate::config::resolution::config_for_project(&resolver.path, first_project.as_deref())
-                .unwrap_or_else(|_| {
-                    crate::config::types::ResolvedConfig::from_global(
-                        crate::config::types::GlobalConfig::default(),
-                    )
-                });
-        match crate::services::attachment_service::AttachmentService::lock_store_for_repo_path(
-            &resolver.path,
-            &cfg,
-            repo_root.as_deref().unwrap_or(&resolver.path),
-            &value,
-        ) {
-            Ok(guard) => guard,
-            Err(e) => {
-                return err(
-                    req.id,
-                    -32000,
-                    "Task reference update failed",
-                    Some(json!({"message": e.to_string()})),
-                );
-            }
-        }
-    } else {
-        None
-    };
+    // Managed attachment references are processed PER ITEM below: each
+    // task resolves its own canonical storage location (DEV-56 fail-closed
+    // rules) and its own project-configured store, then takes that store's
+    // cross-process lock (store-lock -> task-lock) before any mutation. A
+    // whole-batch lock would use the wrong store for mixed-project batches
+    // where each project configures a different `attachments.dir`.
+    // Repository `file` references can never resolve inside any store
+    // (rejected by the service guard), so they stay unlocked.
 
     for id in ids {
         let normalized_id = if let Some(project_override) =
@@ -1201,6 +1173,21 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         } else {
             id.clone()
         };
+
+        if kind == "attachment" {
+            match attachment_bulk_item(&mut storage, &normalized_id, &value, is_add) {
+                Ok((task, changed)) => {
+                    updated.push(json!({"id": normalized_id, "changed": changed, "task": task}))
+                }
+                Err(error) => {
+                    failed.push(json!({"id": normalized_id, "error": error}));
+                    if stop_on_error {
+                        break;
+                    }
+                }
+            }
+            continue;
+        }
 
         let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
             ("link", true) => {
@@ -1274,7 +1261,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
                     req.id,
                     -32602,
                     "Invalid kind",
-                    Some(json!({"message": "kind must be one of: link, file, code, jira, github"})),
+                    Some(json!({"message": "kind must be one of: link, file, code, jira, github, attachment"})),
                 );
             }
         }
@@ -1308,6 +1295,50 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
             "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
         }),
     )
+}
+
+/// Process ONE managed attachment reference item in a bulk batch. The
+/// task's canonical storage location is resolved first and fails closed
+/// (malformed, unknown, or ambiguous identity aborts only this item);
+/// the store and its cross-process lock come from the task's own
+/// project config at its actual root, so mixed-project batches with
+/// different `attachments.dir` stores never lock or precheck the wrong
+/// root. Adds require the named blob in THAT store; removes are
+/// reference-only and work with missing/stale blobs.
+fn attachment_bulk_item(
+    storage: &mut Storage,
+    full_id: &str,
+    value: &str,
+    is_add: bool,
+) -> Result<(TaskDTO, bool), String> {
+    let location = storage
+        .resolve_task_location(full_id)
+        .map_err(|e| e.to_string())?;
+    let project = location.id.project.clone();
+    let cfg = crate::config::resolution::config_for_project(&location.root, Some(&project))
+        .map_err(|e| format!("Failed to load project config: {e}"))?;
+    let root = crate::services::attachment_service::AttachmentService::resolve_attachments_root(
+        &location.root,
+        &cfg,
+    )
+    .map_err(|e| e.to_string())?;
+    let _guard = crate::services::attachment_service::AttachmentService::lock_store(&root)
+        .map_err(|e| e.to_string())?;
+    if is_add {
+        crate::services::attachment_service::AttachmentService::resolve_attachment_path(
+            &root, value,
+        )?;
+    }
+    if is_add {
+        crate::services::attachment_service::AttachmentService::attach_managed_reference(
+            storage, full_id, value,
+        )
+    } else {
+        crate::services::attachment_service::AttachmentService::detach_managed_reference(
+            storage, full_id, value,
+        )
+    }
+    .map_err(|e| e.to_string())
 }
 
 pub(crate) fn handle_task_reference_add(req: JsonRpcRequest) -> JsonRpcResponse {
@@ -1369,27 +1400,13 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
         }
     };
 
-    // File references that live inside the attachments store participate in
-    // the blob lifecycle: hold the cross-process store lock across the
-    // mutation (store-lock -> task-lock order), exactly like the batch
-    // reference handler, REST upload/remove, and the CLI. Other kinds and
-    // outside paths stay unlocked.
-    let _store_guard = if kind == "file" {
-        let repo_root = match find_repo_root(resolver.path.as_path()) {
-            Some(root) => root,
-            None => {
-                return err(
-                    req.id,
-                    -32000,
-                    if is_add {
-                        "Task reference add failed"
-                    } else {
-                        "Task reference remove failed"
-                    },
-                    Some(json!({"message": "Unable to locate git repository"})),
-                );
-            }
-        };
+    // Managed attachment references participate in the blob lifecycle:
+    // hold the cross-process store lock across the mutation (store-lock ->
+    // task-lock order), exactly like the batch reference handler, REST
+    // upload/remove, and the CLI. Repository `file` references can never
+    // resolve inside the store (rejected by the service guard) and stay
+    // unlocked.
+    let _store_guard = if kind == "attachment" {
         let project = crate::storage::TaskId::parse(&full_id)
             .ok()
             .map(|parsed| parsed.project);
@@ -1399,13 +1416,41 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                     crate::config::types::GlobalConfig::default(),
                 )
             });
-        match crate::services::attachment_service::AttachmentService::lock_store_for_repo_path(
-            &resolver.path,
-            &cfg,
-            &repo_root,
-            &value,
-        ) {
-            Ok(guard) => guard,
+        let root =
+            match crate::services::attachment_service::AttachmentService::resolve_attachments_root(
+                &resolver.path,
+                &cfg,
+            ) {
+                Ok(root) => root,
+                Err(e) => {
+                    return err(
+                        req.id,
+                        -32000,
+                        if is_add {
+                            "Task reference add failed"
+                        } else {
+                            "Task reference remove failed"
+                        },
+                        Some(json!({"message": e.to_string()})),
+                    );
+                }
+            };
+        // Fail closed when the named blob is not present in the store.
+        if is_add
+            && let Err(message) =
+                crate::services::attachment_service::AttachmentService::resolve_attachment_path(
+                    &root, &value,
+                )
+        {
+            return err(
+                req.id,
+                -32000,
+                "Task reference add failed",
+                Some(json!({"message": message})),
+            );
+        }
+        match crate::services::attachment_service::AttachmentService::lock_store(&root) {
+            Ok(guard) => Some(guard),
             Err(e) => {
                 return err(
                     req.id,
@@ -1470,6 +1515,20 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
             };
             ReferenceService::detach_file_reference(&mut storage, &repo_root, &full_id, &value)
         }
+        ("attachment", true) => {
+            crate::services::attachment_service::AttachmentService::attach_managed_reference(
+                &mut storage,
+                &full_id,
+                &value,
+            )
+        }
+        ("attachment", false) => {
+            crate::services::attachment_service::AttachmentService::detach_managed_reference(
+                &mut storage,
+                &full_id,
+                &value,
+            )
+        }
         ("jira", true) => {
             ReferenceService::attach_platform_reference(&mut storage, &full_id, "jira", &value)
         }
@@ -1487,7 +1546,7 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                 req.id,
                 -32602,
                 "Invalid kind",
-                Some(json!({"message": "kind must be one of: link, file, code, jira, github"})),
+                Some(json!({"message": "kind must be one of: link, file, code, jira, github, attachment"})),
             );
         }
     }

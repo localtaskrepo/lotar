@@ -332,10 +332,10 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 "injected attach failure".to_string(),
             ))
         } else {
-            AttachmentService::attach_file_reference(&mut storage, task_id, &stored)
+            AttachmentService::attach_managed_reference(&mut storage, task_id, &stored)
         };
     #[cfg(not(test))]
-    let attach_outcome = AttachmentService::attach_file_reference(&mut storage, task_id, &stored);
+    let attach_outcome = AttachmentService::attach_managed_reference(&mut storage, task_id, &stored);
     drop(storage);
     match attach_outcome {
         Ok((task, attached)) => ok_json(
@@ -412,15 +412,26 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match AttachmentService::detach_file_reference(
+        match AttachmentService::detach_managed_reference(
             &mut storage,
             &payload.id,
             &payload.stored_path,
         ) {
-            Ok(task) => {
+            Ok((task, removed)) => {
+                // Typed-membership gate before any blob cleanup (DEV-61):
+                // only a task that actually carried the managed attachment
+                // reference may trigger reclamation. A missing managed
+                // reference — including a same-named repository `file`
+                // entry — fails closed with the store untouched.
+                if !removed {
+                    return bad_request(format!(
+                        "Task '{}' does not reference attachment '{}'",
+                        payload.id, payload.stored_path
+                    ));
+                }
                 let hash_tag = AttachmentService::extract_hash_tag(&payload.stored_path);
                 let still_referenced = match hash_tag.as_deref() {
-                    Some(hash) => AttachmentService::is_hash_referenced(&storage, hash),
+                    Some(hash) => AttachmentService::is_hash_referenced(&storage, &root, hash),
                     None => false,
                 };
 
@@ -601,6 +612,102 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Ok((task, removed)) => ok_json(
                 200,
                 json!({"data": crate::api_types::CodeReferenceRemoveResponse { task, removed }}),
+            ),
+            Err(e) => match e {
+                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                _ => bad_request(e.to_string()),
+            },
+        }
+    },
+);
+
+    // POST /api/tasks/references/file/add
+
+    api_server.register_handler(
+        "POST",
+        "/api/tasks/references/file/add",
+        |req: &HttpRequest| {
+            let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+            let payload: crate::api_types::FileReferenceAddRequest =
+                match serde_json::from_value(body) {
+                    Ok(v) => v,
+                    Err(e) => return bad_request(format!("Invalid body: {}", e)),
+                };
+
+            if payload.id.trim().is_empty() {
+                return bad_request("Missing task id".into());
+            }
+            if payload.path.trim().is_empty() {
+                return bad_request("Missing file path".into());
+            }
+
+            let resolver = match TasksDirectoryResolver::resolve(None, None) {
+                Ok(r) => r,
+                Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+            };
+            let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
+                Some(root) => root,
+                None => return bad_request("Unable to locate git repository".into()),
+            };
+
+            let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+            match ReferenceService::attach_file_reference(
+                &mut storage,
+                &repo_root,
+                &payload.id,
+                &payload.path,
+            ) {
+                Ok((task, added)) => ok_json(
+                    200,
+                    json!({"data": crate::api_types::FileReferenceAddResponse { task, added }}),
+                ),
+                Err(e) => match e {
+                    LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+                    _ => bad_request(e.to_string()),
+                },
+            }
+        },
+    );
+
+    // POST /api/tasks/references/file/remove
+
+    api_server.register_handler(
+    "POST",
+    "/api/tasks/references/file/remove",
+    |req: &HttpRequest| {
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let payload: crate::api_types::FileReferenceRemoveRequest =
+            match serde_json::from_value(body) {
+                Ok(v) => v,
+                Err(e) => return bad_request(format!("Invalid body: {}", e)),
+            };
+
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing task id".into());
+        }
+        if payload.path.trim().is_empty() {
+            return bad_request("Missing file path".into());
+        }
+
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let repo_root = match crate::utils::git::find_repo_root(&resolver.path) {
+            Some(root) => root,
+            None => return bad_request("Unable to locate git repository".into()),
+        };
+
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        match ReferenceService::detach_file_reference(
+            &mut storage,
+            &repo_root,
+            &payload.id,
+            &payload.path,
+        ) {
+            Ok((task, removed)) => ok_json(
+                200,
+                json!({"data": crate::api_types::FileReferenceRemoveResponse { task, removed }}),
             ),
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),

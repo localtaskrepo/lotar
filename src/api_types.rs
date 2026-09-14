@@ -445,6 +445,36 @@ pub struct CodeReferenceRemoveResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileReferenceAddRequest {
+    pub id: String,
+    /// Repository-relative file path (never a managed attachments-store
+    /// blob; store content is referenced through attachment endpoints).
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileReferenceAddResponse {
+    pub task: TaskDTO,
+    pub added: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileReferenceRemoveRequest {
+    pub id: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct FileReferenceRemoveResponse {
+    pub task: TaskDTO,
+    pub removed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct GenericReferenceAddRequest {
     pub id: String,
     pub kind: String,

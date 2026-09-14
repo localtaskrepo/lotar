@@ -415,7 +415,12 @@ pub struct TaskChangeLogEntry {
 }
 
 // Typed external references attached to a task/ticket.
-// Minimal schema for now: support code references and generic links.
+// `code` and `file` are repository-relative paths (`code` carries a
+// `#N[-M]` line anchor); `attachment` is a managed attachments-store
+// blob name; `link`/`jira`/`github` are external values. The two
+// file-ish kinds are distinct on purpose (DEV-61): managed blobs are
+// never stored under `file` and repository files never under
+// `attachment`, so kind confusion cannot cross storage roots.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct ReferenceEntry {
@@ -425,6 +430,8 @@ pub struct ReferenceEntry {
     pub link: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub attachment: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub jira: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]

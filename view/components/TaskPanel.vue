@@ -121,26 +121,26 @@
                   </div>
 
                   <ul class="task-panel__attachments-list">
-                    <li v-for="entry in attachments" :key="entry.file || ''" class="task-panel__attachment">
+                    <li v-for="entry in attachments" :key="entry.attachment || ''" class="task-panel__attachment">
                       <div class="task-panel__attachment-chip">
                         <a
                           class="task-panel__attachment-link"
-                          :href="attachmentUrl(entry.file || '')"
+                          :href="attachmentUrl(entry.attachment || '')"
                           target="_blank"
                           rel="noopener"
-                          :title="attachmentHoverTitle(entry.file || '')"
+                          :title="attachmentHoverTitle(entry.attachment || '')"
                         >
                           <span class="task-panel__attachment-icon" aria-hidden="true">
                             <img
-                              v-if="isImageAttachment(entry.file || '')"
+                              v-if="isImageAttachment(entry.attachment || '')"
                               class="task-panel__attachment-thumb"
-                              :src="attachmentUrl(entry.file || '')"
+                              :src="attachmentUrl(entry.attachment || '')"
                               alt=""
                               loading="lazy"
                             />
-                            <IconGlyph v-else name="file" />
+                            <IconGlyph v-else name="download" />
                           </span>
-                          <span class="task-panel__attachment-name">{{ attachmentDisplayName(entry.file || '') }}</span>
+                          <span class="task-panel__attachment-name">{{ attachmentDisplayName(entry.attachment || '') }}</span>
                         </a>
                         <UiButton
                           variant="ghost"
@@ -149,8 +149,8 @@
                           class="task-panel__attachment-remove"
                           aria-label="Remove attachment"
                           title="Remove attachment"
-                          :disabled="attachmentsUploading || removingAttachmentPath === (entry.file || '')"
-                          @click.prevent.stop="removeAttachment(entry.file || '')"
+                          :disabled="attachmentsUploading || removingAttachmentPath === (entry.attachment || '')"
+                          @click.prevent.stop="removeAttachment(entry.attachment || '')"
                         >
                           <IconGlyph name="close" />
                         </UiButton>
@@ -764,9 +764,11 @@ const attachmentsDropLabel = computed(() => {
   return 'Drop files to attach'
 })
 
+// Managed attachments-store blobs. Repository-file references (`file`) are
+// intentionally excluded: they are never managed blobs (DEV-61).
 const attachments = computed(() => {
   const list = Array.isArray(task.references) ? task.references : []
-  return list.filter((entry) => typeof entry?.file === 'string' && (entry.file || '').trim().length > 0)
+  return list.filter((entry) => typeof entry?.attachment === 'string' && (entry.attachment || '').trim().length > 0)
 })
 
 const linkReferences = computed(() => {
@@ -855,15 +857,6 @@ function linkDisplayName(rawUrl: string): string {
   } catch {
     return cleaned
   }
-}
-
-function attachmentPathSet(value: { references?: Array<{ file?: string | null }> | null }): Set<string> {
-  const refs = Array.isArray(value?.references) ? value.references : []
-  return new Set(
-    refs
-      .map((entry) => (typeof entry?.file === 'string' ? entry.file.trim() : ''))
-      .filter((file) => file.length > 0),
-  )
 }
 
 async function removeAttachment(relPath: string) {

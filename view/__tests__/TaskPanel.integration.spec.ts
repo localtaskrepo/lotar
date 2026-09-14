@@ -673,12 +673,13 @@ describe('TaskPanel attachments-area link preferences', () => {
         expect(wrapper.find('.task-panel__attachments').exists()).toBe(false)
     })
 
-    it('keeps file attachments visible when showLinksInAttachments is disabled', async () => {
+    it('keeps managed attachments visible when showLinksInAttachments is disabled', async () => {
         localStorage.setItem('lotar.preferences.taskPanel.showAttachments', 'true')
         localStorage.setItem('lotar.preferences.taskPanel.showLinksInAttachments', 'false')
         localStorage.setItem('lotar.preferences.taskPanel.autoDetectLinks', 'false')
 
-        apiFixtures.baseTask.references = [{ file: 'demo/attachment.txt' }, { link: 'https://example.com/foo' }] as any
+        // DEV-61: managed blobs live under the typed `attachment` key.
+        apiFixtures.baseTask.references = [{ attachment: 'demo/attachment.txt' }, { link: 'https://example.com/foo' }] as any
         const wrapper = await mountTaskPanel()
 
         const attachmentsArea = wrapper.find('.task-panel__attachments')

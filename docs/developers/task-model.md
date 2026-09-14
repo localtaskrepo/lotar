@@ -11,7 +11,7 @@ Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI
 - **Exact case, no folding:** IDs and project prefixes match exactly (`abc` and `ABC` are different projects).
 - **Padded aliases are deliberate:** `TP-001` and `TP-1` denote the same task file (`TP/1.yml`); reads surface the canonical unpadded spelling in DTO `id` fields. Malformed IDs (empty, missing numeric suffix, non-digit suffix such as `TP-+12` or `TP-1-extra`, path traversal, `u64` overflow) fail closed.
 - **Multiple storage roots:** `StorageLocator::candidate_task_roots` (primary + sibling workspace `.tasks`) drives unfiltered search, project-filtered search, full-ID get, and numeric resolution consistently. Config, sprint memberships, and attachments for a nested-root task come from the root that actually holds it.
-- **Attachment store concurrency:** all LoTaR surfaces (REST upload/remove, MCP and CLI file references that point inside the attachments store) serialize blob creation, dedup, reference attach/detach, reclamation checks, and rollback cleanup on a cross-process advisory lock (`.attachments-store.lock` inside the store directory, fs2-backed, bounded contention retry that fails closed). Lock order is always store-lock -> task-lock. Cooperating LoTaR processes are covered; external non-cooperating writers that create or delete blobs in the store directory directly are explicitly unsupported and can produce orphans or dangling references.
+- **Attachment store concurrency:** all LoTaR surfaces that touch managed attachments (REST upload/remove and the MCP/CLI `attachment` reference kind) serialize blob creation, dedup, reference attach/detach, reclamation checks, and rollback cleanup on a cross-process advisory lock (`.attachments-store.lock` inside the store directory, fs2-backed, bounded contention retry that fails closed). Lock order is always store-lock -> task-lock. Cooperating LoTaR processes are covered; external non-cooperating writers that create or delete blobs in the store directory directly are explicitly unsupported and can produce orphans or dangling references. Repository `file` references can never resolve inside the store (store paths are rejected on add/remove), so they take no store lock.
 - **Ambiguity fails closed:** duplicate full IDs or numbers across roots never resolve to an arbitrary task; resolvers report the candidate locations. Mutations refuse cross-root targets before any side effect (edit the task from inside its own workspace); `canonical_sync_task_id` keeps sync locked to the primary workspace via single-root reads. Listing endpoints enumerate every stored copy (duplicates appear as separate entries) rather than deduplicating an identity they cannot prove.
 
 ## TaskDTO fields
@@ -34,7 +34,7 @@ Field | Type | Notes
 `tags` | `string[]` | Normalized, unique tags. Empty array when unset.
 `relationships` | `TaskRelationships` | Structured references to other tasks (see below).
 `comments` | `TaskComment[]` | Each comment carries `{ date, text }`.
-`references` | `ReferenceEntry[]` | Code locations (`code`) and/or external URLs (`link`).
+`references` | `ReferenceEntry[]` | Code locations (`code`), external URLs (`link`), repository files (`file`), managed attachments (`attachment`), or platform references (`jira`, `github`).
 `sprints` | `u32[]` | Numeric sprint IDs the task belongs to.
 `sprint_order` | `BTreeMap<u32, u32>` | Optional manual ordering per sprint (task id → order index).
 `history` | `TaskChangeLogEntry[]` | Chronological change log entries (field deltas, actor, timestamp).
@@ -44,7 +44,7 @@ Field | Type | Notes
 
 - `TaskRelationships` exposes dedicated arrays for `depends_on`, `blocks`, `related`, `children`, `fixes`, plus single-value `parent` and `duplicate_of`. All properties are optional; empty collections are dropped on serialization.
 - `TaskComment` holds `{ date: RFC3339, text: string }`. Comments do not store authorship today.
-- `ReferenceEntry` supports either `code` (e.g., `src/lib.rs:120`) or `link` (URL). Multiple references may be attached to track external systems.
+- `ReferenceEntry` supports `code` (e.g., `src/lib.rs#120`, stored canonically as `path#line` or `path#start-end`), `link` (URL), `file` (repository-relative path; store paths rejected), `attachment` (managed attachments-store blob name), and `jira`/`github` platform references. The two file-ish kinds are distinct: managed blobs live only under `attachment`, repository files only under `file`.
 - `TaskChangeLogEntry` captures `{ at, actor?, changes[] }`, where each `TaskChange` includes `field`, `old`, and `new` values for audit review.
 
 ### Custom fields

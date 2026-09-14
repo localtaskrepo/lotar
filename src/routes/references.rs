@@ -29,7 +29,13 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Some(root) => root,
             None => return bad_request("Unable to locate git repository".into()),
         };
-        match ReferenceService::snippet_for_code(&repo_root, &code, before, after) {
+        match ReferenceService::snippet_for_code_guarded(
+            &resolver.path,
+            &repo_root,
+            &code,
+            before,
+            after,
+        ) {
             Ok(snippet) => ok_json(200, json!({"data": snippet})),
             Err(msg) => bad_request(msg),
         }

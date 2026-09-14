@@ -162,51 +162,40 @@ impl AttachmentService {
         Ok(AttachmentStoreGuard { _file: file })
     }
 
-    /// Take the store coordination lock only when a file reference value
-    /// resolves INSIDE the attachments store, so attaching or detaching a
-    /// store blob from any surface (MCP, CLI) serializes with blob creation
-    /// and reclamation exactly like the REST upload/remove flows. Paths
-    /// outside the store return `None` and stay unlocked; unresolvable
-    /// values return `None` (the attach/detach call itself will reject them).
-    pub fn lock_store_for_repo_path(
+    /// Take the store coordination lock for the configured attachments
+    /// store so managed attachment reference attach/detach from any
+    /// surface (MCP, CLI) serializes with blob creation, dedup, and
+    /// reclamation exactly like the REST upload/remove flows. The lock is
+    /// taken unconditionally: managed operations always target the store
+    /// (DEV-61 keeps store blobs reachable only through the typed
+    /// `attachment` kind), unlike repository `file` references which can
+    /// never resolve inside the store.
+    pub fn lock_store_for_attachments(
         tasks_root: &Path,
         config: &crate::config::types::ResolvedConfig,
-        repo_root: &Path,
-        value: &str,
-    ) -> LoTaRResult<Option<AttachmentStoreGuard>> {
-        let Ok(store_root) = Self::resolve_attachments_root(tasks_root, config) else {
-            return Ok(None);
-        };
-        let repo_canonical = repo_root
-            .canonicalize()
-            .unwrap_or_else(|_| repo_root.to_path_buf());
-        let Ok(resolved) = crate::services::reference_service::ReferenceService::resolve_path(
-            &repo_canonical,
-            value.trim(),
-        ) else {
-            return Ok(None);
-        };
-        let store_canonical = store_root
-            .canonicalize()
-            .unwrap_or_else(|_| store_root.clone());
-        if resolved.starts_with(&store_canonical) {
-            Ok(Some(Self::lock_store(&store_root)?))
-        } else {
-            Ok(None)
-        }
+    ) -> LoTaRResult<AttachmentStoreGuard> {
+        let store_root = Self::resolve_attachments_root(tasks_root, config)?;
+        Self::lock_store(&store_root)
     }
 
-    pub fn detach_file_reference(
+    /// Detach a MANAGED attachment reference (typed `attachment` entry).
+    /// Returns whether this task actually carried the reference so callers
+    /// can gate blob cleanup on typed membership: a task that never held
+    /// the managed reference (or only holds a same-named repository `file`
+    /// entry) must never trigger store reclamation. Repository `file`
+    /// entries are never touched by this call.
+    pub fn detach_managed_reference(
         storage: &mut Storage,
         task_id: &str,
-        file_rel: &str,
-    ) -> LoTaRResult<TaskDTO> {
+        stored_name: &str,
+    ) -> LoTaRResult<(TaskDTO, bool)> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
+        let name = Self::validate_managed_name(stored_name)?;
 
         let project = derived.to_string();
         let mut task = storage
@@ -215,14 +204,43 @@ impl AttachmentService {
 
         let before_len = task.references.len();
         task.references
-            .retain(|r| r.file.as_deref() != Some(file_rel));
+            .retain(|r| r.attachment.as_deref() != Some(name));
 
-        if task.references.len() != before_len {
+        let removed = task.references.len() != before_len;
+        if removed {
             task.modified = chrono::Utc::now().to_rfc3339();
             storage.edit(task_id, &task)?;
         }
 
-        TaskService::get(storage, task_id, Some(&derived))
+        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+    }
+
+    /// Managed attachment values are bare store leaf names. Reject path
+    /// shapes (separators, `.`/`..`, absolute prefixes) so a managed value
+    /// can never be smuggled in as a path into — or out of — the store.
+    pub fn validate_managed_name(stored: &str) -> LoTaRResult<&str> {
+        let trimmed = stored.trim();
+        if trimmed.is_empty() {
+            return Err(LoTaRError::ValidationError(
+                "Missing attachment name".to_string(),
+            ));
+        }
+        if trimmed.len() > 4096 {
+            return Err(LoTaRError::ValidationError(
+                "Attachment name is too long (max 4096 characters)".to_string(),
+            ));
+        }
+        let path = Path::new(trimmed);
+        if trimmed.contains(['/', '\\'])
+            || path
+                .components()
+                .any(|c| !matches!(c, Component::Normal(_)))
+        {
+            return Err(LoTaRError::ValidationError(
+                "Attachment reference must be a stored file name, not a path".to_string(),
+            ));
+        }
+        Ok(trimmed)
     }
 
     pub fn extract_hash_tag(file_rel: &str) -> Option<String> {
@@ -262,21 +280,57 @@ impl AttachmentService {
         Some(hash.to_ascii_lowercase())
     }
 
-    pub fn is_hash_referenced(storage: &Storage, hash_tag: &str) -> bool {
+    /// Typed refcount over MANAGED `attachment` entries that belong to the
+    /// SAME attachments store as `store_root`. Repository `file` entries
+    /// never keep a blob alive, and neither do same-hash references whose
+    /// tasks resolve to a different project-configured store: content-hash
+    /// names are only unique within one store, so a blob re-created in
+    /// another store must not block reclamation here (and vice versa).
+    /// Tasks sharing one configured store root still protect each other.
+    /// Any resolution failure (unparseable id, ambiguous location, config
+    /// or store error) counts conservatively as a live reference so a blob
+    /// is never deleted on uncertain grounds.
+    pub fn is_hash_referenced(storage: &Storage, store_root: &Path, hash_tag: &str) -> bool {
         let target = hash_tag.trim();
         if target.len() != 32 || !target.bytes().all(|b: u8| b.is_ascii_hexdigit()) {
             return false;
         }
         let target = target.to_ascii_lowercase();
+        let store_canonical = store_root
+            .canonicalize()
+            .unwrap_or_else(|_| store_root.to_path_buf());
         let all = storage.search(&TaskFilter::default());
-        for (_id, task) in all {
-            for reference in &task.references {
-                if let Some(file_rel) = reference.file.as_deref()
-                    && let Some(hash) = Self::extract_hash_tag(file_rel)
-                    && hash == target
-                {
-                    return true;
-                }
+        for (id, task) in all {
+            let has_match = task.references.iter().any(|reference| {
+                reference
+                    .attachment
+                    .as_deref()
+                    .and_then(Self::extract_hash_tag)
+                    .is_some_and(|hash| hash == target)
+            });
+            if !has_match {
+                continue;
+            }
+            // Which store does this task's attachment belong to? Failures
+            // conservatively count as referencing THIS store's blob.
+            let Ok(parsed) = crate::storage::TaskId::parse(&id) else {
+                return true;
+            };
+            let Ok(location) = storage.resolve_task_location(&id) else {
+                return true;
+            };
+            let Ok(cfg) = crate::config::resolution::config_for_project(
+                &location.root,
+                Some(&parsed.project),
+            ) else {
+                return true;
+            };
+            let Ok(root) = Self::resolve_attachments_root(&location.root, &cfg) else {
+                return true;
+            };
+            let canonical = root.canonicalize().unwrap_or(root);
+            if canonical == store_canonical {
+                return true;
             }
         }
         false
@@ -370,10 +424,14 @@ impl AttachmentService {
         }
     }
 
-    pub fn attach_file_reference(
+    /// Attach a MANAGED attachment reference (typed `attachment` entry
+    /// holding the stored blob name). Dedup is exact-string over the typed
+    /// key: a repository `file` entry with the same text never counts as
+    /// membership and is never conflated with the managed reference.
+    pub fn attach_managed_reference(
         storage: &mut Storage,
         task_id: &str,
-        file_rel: &str,
+        stored_name: &str,
     ) -> LoTaRResult<(TaskDTO, bool)> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
@@ -381,6 +439,7 @@ impl AttachmentService {
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
+        let name = Self::validate_managed_name(stored_name)?;
 
         let project = derived.to_string();
         let mut task = storage
@@ -390,12 +449,12 @@ impl AttachmentService {
         let already = task
             .references
             .iter()
-            .any(|r| r.file.as_deref() == Some(file_rel));
+            .any(|r| r.attachment.as_deref() == Some(name));
 
         let mut attached = false;
         if !already {
             task.references.push(ReferenceEntry {
-                file: Some(file_rel.to_string()),
+                attachment: Some(name.to_string()),
                 ..Default::default()
             });
             task.modified = chrono::Utc::now().to_rfc3339();
