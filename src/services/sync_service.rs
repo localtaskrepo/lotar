@@ -985,6 +985,7 @@ impl SyncService {
             "sync_completed",
             json!({
                 "run_id": report_meta.id.clone(),
+                "project": report_meta.project.clone(),
                 "report": report_meta.clone(),
                 "finished_at": Utc::now().to_rfc3339(),
             }),

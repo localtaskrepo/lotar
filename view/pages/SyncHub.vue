@@ -16,7 +16,7 @@
           </UiSelect>
         </div>
         <ReloadButton
-          :loading="loading"
+          :loading="scopeLoading"
           label="Reload sync settings"
           title="Reload sync settings"
           @click="handleReload"
@@ -24,9 +24,9 @@
       </div>
     </div>
 
-    <p v-if="error" class="sync-error">{{ error }}</p>
+    <p v-if="scopeLoadError" class="sync-error" data-testid="scope-load-error">{{ scopeLoadError }}</p>
 
-    <div v-if="loading" class="sync-loading">
+    <div v-if="scopeLoading && !scopedInspect" class="sync-loading">
       <UiLoader>Loading sync settings…</UiLoader>
     </div>
 
@@ -37,7 +37,7 @@
               <h3>Remotes & actions</h3>
             </div>
             <div class="card-actions">
-              <UiButton type="button" variant="primary" @click="openAddRemoteDialog">Add remote</UiButton>
+              <UiButton type="button" variant="primary" :disabled="!scopeValid" @click="openAddRemoteDialog">Add remote</UiButton>
               <label class="option-row option-row--inline">
                 <input v-model="writeReport" type="checkbox" />
                 <span>Write report to disk</span>
@@ -47,12 +47,18 @@
           </div>
 
           <div class="card-body">
-            <p v-if="!remoteEntries.length" class="muted">No remotes configured for this scope.</p>
+            <p v-if="!scopeValid" class="muted" data-testid="scope-unavailable">{{ scopeUnavailableHint }}</p>
+            <p v-else-if="!remoteEntries.length" class="muted">No remotes configured for this scope.</p>
             <div v-else class="remote-stack">
               <div v-for="entry in remoteEntries" :key="entry.name" class="remote-row">
                 <div class="remote-main">
                   <div class="remote-title">
                     <strong>{{ entry.name }}</strong>
+                    <span
+                      v-if="project && entry.origin === 'global'"
+                      class="pill pill--muted remote-origin-chip"
+                      title="Defined in the Global config; inherited by this project"
+                    >inherited</span>
                     <span class="remote-provider">
                       <IconGlyph :name="remoteProviderIcon(entry.remote)" />
                       <span>{{ remoteProviderLabel(entry.remote) }}</span>
@@ -84,10 +90,10 @@
                   </div>
                 </div>
                 <div class="remote-actions">
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteBusy(entry.name)" @click="runSync('pull', entry)">Pull</UiButton>
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteBusy(entry.name)" @click="runSync('push', entry)">Push</UiButton>
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteBusy(entry.name)" @click="runSync('check', entry)">Check</UiButton>
-                  <UiButton class="remote-action" type="button" :disabled="isRemoteBusy(entry.name)" @click="openEditRemoteDialog(entry)">Edit</UiButton>
+                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="runSync('pull', entry)">Pull</UiButton>
+                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="runSync('push', entry)">Push</UiButton>
+                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="runSync('check', entry)">Check</UiButton>
+                  <UiButton class="remote-action" type="button" :disabled="isRemoteNameBusy(entry.name)" @click="openEditRemoteDialog(entry)">Edit</UiButton>
                 </div>
               </div>
             </div>
@@ -132,7 +138,7 @@
                 <UiInput v-model="reportEntrySearch" placeholder="Task ID, reference, or message" />
               </label>
             </div>
-            <p v-if="reportsLoading" class="muted">Loading reports…</p>
+            <p v-if="reportsLoading && !reportListItems.length" class="muted">Loading reports…</p>
             <p v-else-if="!reportListItems.length" class="muted">No reports yet.</p>
             <p v-else-if="!filteredReportItems.length" class="muted">No reports match the selected range.</p>
             <div v-else class="reports-grid">
@@ -156,6 +162,8 @@
                       >
                         {{ reportStatusLabel(report.status) }}
                       </span>
+                      <span v-if="report.source === 'external'" class="pill pill--muted report-item__status-chip">External</span>
+                      <span v-else-if="!project && report.project" class="pill pill--muted report-item__status-chip">{{ report.project }}</span>
                     </div>
                     <span class="muted report-item__date">{{ formatTimestamp(report.created_at) }}</span>
                   </div>
@@ -243,7 +251,7 @@
               variant="ghost"
               icon-only
               type="button"
-              :disabled="remoteDialogSubmitting"
+              :disabled="remoteDialogSubmitting || remoteDialogDeleting"
               aria-label="Close dialog"
               title="Close dialog"
               @click="closeRemoteDialog"
@@ -252,76 +260,93 @@
             </UiButton>
           </header>
 
-          <div class="form-grid">
-            <label class="sync-remote-dialog__field">
-              <span class="muted">Name</span>
-              <UiInput v-model="remoteForm.name" placeholder="jira-home" />
-            </label>
-            <label class="sync-remote-dialog__field">
-              <span class="muted">Provider</span>
-              <UiSelect v-model="remoteForm.provider">
-                <option value="jira">Jira</option>
-                <option value="github">GitHub</option>
-              </UiSelect>
-            </label>
-            <label v-if="remoteForm.provider === 'jira'" class="sync-remote-dialog__field">
-              <span class="muted">Project key</span>
-              <UiInput v-model="remoteForm.project" placeholder="DEMO" />
-            </label>
-            <label v-else class="sync-remote-dialog__field">
-              <span class="muted">Repository</span>
-              <UiInput v-model="remoteForm.repo" placeholder="owner/repo" />
-            </label>
-            <label class="sync-remote-dialog__field">
-              <span class="muted">Auth profile</span>
-              <UiInput v-model="remoteForm.auth_profile" :placeholder="authProfilePlaceholder" list="sync-auth-profile-options" />
-            </label>
-            <label class="sync-remote-dialog__field">
-              <span class="sync-remote-dialog__label">
-                <span class="muted">Filter</span>
-                <button
-                  type="button"
-                  class="sync-remote-dialog__help"
-                  :aria-expanded="filterHelpOpen"
-                  aria-label="Filter format help"
-                  @click="filterHelpOpen = !filterHelpOpen"
-                >
-                  <IconGlyph name="help" />
-                </button>
-              </span>
-              <UiInput v-model="remoteForm.filter" placeholder="Optional filter" />
-              <p v-if="filterHelpOpen" class="muted sync-remote-dialog__hint">
-                {{ filterHelpText }}
-              </p>
-            </label>
+          <p class="sync-remote-dialog__target" data-testid="remote-dialog-target">{{ dialogTargetBanner }}</p>
+
+          <div v-if="dialogNeedsTargetChoice" class="sync-remote-dialog__choice" data-testid="remote-dialog-choice">
+            <p class="muted">This remote is inherited from the Global config. Choose where your changes apply:</p>
+            <div class="sync-remote-dialog__choice-buttons">
+              <UiButton type="button" variant="primary" @click="chooseDialogTarget('override-project')">
+                Override in project {{ project }}
+              </UiButton>
+              <UiButton type="button" @click="chooseDialogTarget('inherit-global')">Edit in Global scope</UiButton>
+            </div>
           </div>
 
-          <label class="sync-remote-dialog__field">
-            <span class="muted">Mapping (YAML)</span>
-            <textarea
-              v-model="remoteForm.mapping"
-              class="input sync-textarea"
-              :rows="mappingRows"
-              placeholder="title: summary\nstatus:\n  field: status\n  values:\n    Todo: 'To Do'\n    InProgress: 'In Progress'"
-            ></textarea>
-          </label>
-          <p class="muted sync-remote-dialog__hint">Saved to {{ scopeLabel }} as YAML. Mapping is required to sync fields.</p>
+          <fieldset
+            class="sync-remote-dialog__fieldset"
+            :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice"
+          >
+            <div class="form-grid">
+              <label class="sync-remote-dialog__field">
+                <span class="muted">Name</span>
+                <UiInput v-model="remoteForm.name" placeholder="jira-home" />
+              </label>
+              <label class="sync-remote-dialog__field">
+                <span class="muted">Provider</span>
+                <UiSelect v-model="remoteForm.provider">
+                  <option value="jira">Jira</option>
+                  <option value="github">GitHub</option>
+                </UiSelect>
+              </label>
+              <label v-if="remoteForm.provider === 'jira'" class="sync-remote-dialog__field">
+                <span class="muted">Project key</span>
+                <UiInput v-model="remoteForm.project" placeholder="DEMO" />
+              </label>
+              <label v-else class="sync-remote-dialog__field">
+                <span class="muted">Repository</span>
+                <UiInput v-model="remoteForm.repo" placeholder="owner/repo" />
+              </label>
+              <label class="sync-remote-dialog__field">
+                <span class="muted">Auth profile</span>
+                <UiInput v-model="remoteForm.auth_profile" :placeholder="authProfilePlaceholder" list="sync-auth-profile-options" />
+              </label>
+              <label class="sync-remote-dialog__field">
+                <span class="sync-remote-dialog__label">
+                  <span class="muted">Filter</span>
+                  <button
+                    type="button"
+                    class="sync-remote-dialog__help"
+                    :aria-expanded="filterHelpOpen"
+                    aria-label="Filter format help"
+                    @click="filterHelpOpen = !filterHelpOpen"
+                  >
+                    <IconGlyph name="help" />
+                  </button>
+                </span>
+                <UiInput v-model="remoteForm.filter" placeholder="Optional filter" />
+                <p v-if="filterHelpOpen" class="muted sync-remote-dialog__hint">
+                  {{ filterHelpText }}
+                </p>
+              </label>
+            </div>
+
+            <label class="sync-remote-dialog__field">
+              <span class="muted">Mapping (YAML)</span>
+              <textarea
+                v-model="remoteForm.mapping"
+                class="input sync-textarea"
+                :rows="mappingRows"
+                placeholder="title: summary\nstatus:\n  field: status\n  values:\n    Todo: 'To Do'\n    InProgress: 'In Progress'"
+              ></textarea>
+            </label>
+          </fieldset>
+          <p class="muted sync-remote-dialog__hint">Saved to {{ dialogTargetLabel }} as YAML. Mapping is required to sync fields.</p>
           <p v-if="mappingErrorPreview.length" class="error">{{ mappingErrorPreview.join(' ') }}</p>
-          <p v-if="remoteFormError" class="error">{{ remoteFormError }}</p>
+          <p v-if="remoteFormError" class="error" data-testid="remote-dialog-error">{{ remoteFormError }}</p>
 
           <footer class="form-actions">
             <div class="form-actions__group">
               <UiButton
                 variant="primary"
                 type="submit"
-                :disabled="remoteDialogSubmitting || remoteDialogValidating"
+                :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice || editorBlocked || dialogTargetInvalid"
               >
                 {{ remoteDialogSubmitting ? 'Saving…' : remoteDialogMode === 'add' ? 'Add remote' : 'Save remote' }}
               </UiButton>
               <UiButton
                 variant="ghost"
                 type="button"
-                :disabled="remoteDialogSubmitting || remoteDialogValidating"
+                :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice || editorBlocked || dialogTargetInvalid"
                 @click="validateRemoteDialog"
               >
                 {{ remoteDialogValidating ? 'Validating…' : 'Validate' }}
@@ -331,9 +356,21 @@
                 {{ remoteDialogValidationMessage }}
               </span>
             </div>
-            <UiButton variant="ghost" type="button" :disabled="remoteDialogSubmitting" @click="closeRemoteDialog">
-              Cancel
-            </UiButton>
+            <div class="form-actions__group">
+              <UiButton
+                v-if="remoteDialogMode === 'edit' && dialogTargetScope === dialogDefOriginScope"
+                variant="ghost"
+                type="button"
+                class="sync-remote-dialog__delete"
+                :disabled="remoteDialogSubmitting || remoteDialogValidating || remoteDialogDeleting || dialogNeedsTargetChoice || editorBlocked || dialogTargetInvalid"
+                @click="deleteRemoteDialog"
+              >
+                {{ remoteDialogDeleting ? 'Removing…' : `Remove from ${dialogTargetLabel}` }}
+              </UiButton>
+              <UiButton variant="ghost" type="button" :disabled="remoteDialogSubmitting || remoteDialogDeleting" @click="closeRemoteDialog">
+                Cancel
+              </UiButton>
+            </div>
           </footer>
         </form>
       </UiCard>
@@ -349,6 +386,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { api } from '../api/client'
 import type {
+  ConfigInspectResult,
   SyncFieldMapping,
   SyncProvider,
   SyncRemoteConfig,
@@ -367,25 +405,81 @@ import UiInput from '../components/UiInput.vue'
 import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useConfigScope } from '../composables/useConfigScope'
-import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
+import {
+  useSyncRuns,
+  type ExternalSyncRun,
+  type SyncAction,
+  type SyncRun,
+  type SyncRunOriginContext,
+  type SyncScope,
+} from '../composables/useSyncRuns'
 import { formatProjectLabel } from '../utils/projectLabels'
 
-const { projects, project, loading, error, inspectData, reload } = useConfigScope()
+const { projects, project } = useConfigScope()
 const { openTaskPanel } = useTaskPanelController()
 
-const scope = computed(() => (project.value ? 'project' : 'global'))
+const scope = computed<SyncScope>(() => project.value || '')
 
-const globalRemotes = computed<Record<string, SyncRemoteConfig>>(() => inspectData.value?.global_raw?.remotes ?? {})
-const projectRemotes = computed<Record<string, SyncRemoteConfig>>(() => inspectData.value?.project_raw?.remotes ?? {})
-const effectiveRemotes = computed<Record<string, SyncRemoteConfig>>(() => inspectData.value?.effective?.remotes ?? {})
-const scopedRemotes = computed<Record<string, SyncRemoteConfig>>(() => (project.value ? projectRemotes.value : globalRemotes.value))
+let alive = true
+
+// ---- Scope-stamped config ----------------------------------------------------
+//
+// The shared useConfigScope keeps its last inspectData during reloads and on
+// failures. Displaying remotes from it would show the previous scope's rows
+// (clickable) while the new scope is still loading or has failed to load, and
+// a run started from such a row would execute the NEW scope's definition.
+// SyncHub therefore renders only from its own stamped snapshot: rows exist
+// exactly when the displayed data belongs to the current scope.
+const scopedInspect = ref<ConfigInspectResult | null>(null)
+const inspectStamp = ref<SyncScope | null>(null)
+const scopeLoading = ref(false)
+const scopeLoadError = ref<string | null>(null)
+let inspectGen = 0
+
+const scopeValid = computed(() => inspectStamp.value !== null && inspectStamp.value === scope.value)
+
+const scopeUnavailableHint = computed(() =>
+  scopeLoading.value
+    ? 'Loading sync settings for this scope…'
+    : `Sync settings for ${scopeLabelFor(scope.value)} are unavailable (load failed or was superseded). Actions are disabled until a successful reload.`,
+)
+
+async function loadScopeConfig(scopeKey: SyncScope = scope.value) {
+  const gen = ++inspectGen
+  scopeLoading.value = true
+  scopeLoadError.value = null
+  try {
+    const fresh = await api.inspectConfig(scopeKey || undefined)
+    if (!alive || gen !== inspectGen) return
+    scopedInspect.value = fresh
+    inspectStamp.value = scopeKey
+  } catch (err: any) {
+    if (!alive || gen !== inspectGen) return
+    // Keep the previous stamp: a failed load never validates a scope's rows.
+    scopeLoadError.value = err?.message || `Failed to load ${scopeLabelFor(scopeKey)} config`
+  } finally {
+    if (gen === inspectGen) {
+      scopeLoading.value = false
+    }
+  }
+}
+
+const globalRemotes = computed<Record<string, SyncRemoteConfig>>(() => scopedInspect.value?.global_raw?.remotes ?? {})
+const projectRemotes = computed<Record<string, SyncRemoteConfig>>(() => scopedInspect.value?.project_raw?.remotes ?? {})
+const effectiveRemotes = computed<Record<string, SyncRemoteConfig>>(() => scopedInspect.value?.effective?.remotes ?? {})
 
 const remoteEntries = computed(() =>
   Object.entries(effectiveRemotes.value)
-    .map(([name, remote]) => ({ name, remote }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(([name, remote]) => ({
+      name,
+      remote,
+      origin: projectRemotes.value[name] ? ('project' as const) : ('global' as const),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name)),
 )
+
+// ---- Remote editor ----------------------------------------------------------
 
 type RemoteDialogMode = 'add' | 'edit'
 type RemoteFormState = {
@@ -402,6 +496,7 @@ const remoteDialogOpen = ref(false)
 const remoteDialogMode = ref<RemoteDialogMode>('add')
 const remoteDialogSubmitting = ref(false)
 const remoteDialogValidating = ref(false)
+const remoteDialogDeleting = ref(false)
 const remoteDialogValidationStatus = ref<'idle' | 'ok' | 'warn'>('idle')
 const remoteDialogValidationMessage = ref<string | null>(null)
 const remoteFormError = ref<string | null>(null)
@@ -416,10 +511,26 @@ const remoteForm = ref<RemoteFormState>({
   mapping: '',
 })
 
+/** Bumped on every dialog open/close so late async results cannot leak across sessions. */
+let remoteDialogGen = 0
+/** Config scope the dialog will write to; captured when the dialog opens or an explicit target is chosen. */
+const dialogTargetScope = ref<SyncScope>('')
+/** Inherited remotes require an explicit override/edit-in-global choice before fields unlock. */
+const dialogNeedsTargetChoice = ref(false)
+const dialogRemoteInherited = ref(false)
+/** Serialized remote definition at dialog open, used to detect concurrent edits (no server CAS exists). */
+const dialogBaseDefYaml = ref<string | null>(null)
+/**
+ * Scope the edited definition actually lives in ('' global / project prefix).
+ * When the dialog target differs from this scope the save is an override/add
+ * in the target map, not a version-checked replacement.
+ */
+const dialogDefOriginScope = ref<SyncScope>('')
+
 const filterHelpOpen = ref(false)
 
 const authProfileOptions = computed(() => {
-  const profiles = inspectData.value?.auth_profiles ?? {}
+  const profiles = scopedInspect.value?.auth_profiles ?? {}
   const provider = remoteForm.value.provider
   return Object.entries(profiles)
     .filter(([, profile]) => !profile?.provider || profile.provider === provider)
@@ -469,7 +580,27 @@ const remoteDialogTitle = computed(() =>
   remoteDialogMode.value === 'add' ? 'Add remote' : 'Edit remote',
 )
 
-const scopeLabel = computed(() => (project.value ? `Project ${project.value}` : 'Global'))
+/** Saving is paused while the scope config is (re)loading, e.g. during a project switch. */
+const editorBlocked = computed(() => scopeLoading.value)
+/** A dialog targeting the current scope is blocked while that scope's data is not validated. */
+const dialogTargetInvalid = computed(() => dialogTargetScope.value === scope.value && !scopeValid.value)
+
+function scopeLabelFor(scopeKey: SyncScope): string {
+  return scopeKey ? `Project ${scopeKey}` : 'Global'
+}
+
+const dialogTargetLabel = computed(() => scopeLabelFor(dialogTargetScope.value))
+
+const dialogTargetBanner = computed(() => {
+  if (dialogNeedsTargetChoice.value) {
+    return 'Inherited from Global — choose where changes apply before editing.'
+  }
+  if (remoteDialogMode.value === 'add') return `Adds the remote to ${dialogTargetLabel.value} config.`
+  if (dialogRemoteInherited.value && dialogTargetScope.value) {
+    return `Saves a project override in ${dialogTargetLabel.value} config (inherited definition stays in Global).`
+  }
+  return `Saves the remote in ${dialogTargetLabel.value} config.`
+})
 
 function hasValue(value?: string | null): boolean {
   return String(value ?? '').trim().length > 0
@@ -506,21 +637,38 @@ function resetRemoteForm() {
   remoteDialogValidationMessage.value = null
 }
 
+function resetRemoteDialogFlags() {
+  remoteDialogSubmitting.value = false
+  remoteDialogValidating.value = false
+  remoteDialogDeleting.value = false
+}
+
 function openAddRemoteDialog() {
+  if (!scopeValid.value) return
+  remoteDialogGen += 1
   remoteDialogMode.value = 'add'
   remoteFormOriginalName.value = null
   remoteFormError.value = null
   resetRemoteForm()
+  resetRemoteDialogFlags()
+  dialogTargetScope.value = scope.value
+  dialogNeedsTargetChoice.value = false
+  dialogRemoteInherited.value = false
+  dialogBaseDefYaml.value = null
+  dialogDefOriginScope.value = scope.value
   remoteDialogOpen.value = true
 }
 
-function openEditRemoteDialog(entry: { name: string; remote: SyncRemoteConfig }) {
+function openEditRemoteDialog(entry: { name: string; remote: SyncRemoteConfig; origin: 'project' | 'global' }) {
+  if (!scopeValid.value) return
+  remoteDialogGen += 1
   remoteDialogMode.value = 'edit'
   remoteFormOriginalName.value = entry.name
   remoteFormError.value = null
   filterHelpOpen.value = false
   remoteDialogValidationStatus.value = 'idle'
   remoteDialogValidationMessage.value = null
+  resetRemoteDialogFlags()
   remoteForm.value = {
     name: entry.name,
     provider: entry.remote.provider,
@@ -530,12 +678,39 @@ function openEditRemoteDialog(entry: { name: string; remote: SyncRemoteConfig })
     auth_profile: entry.remote.auth_profile ?? '',
     mapping: formatMapping(entry.remote.mapping),
   }
+  dialogBaseDefYaml.value = stringifyYaml(remoteDefFromForm(entry.remote)).trim()
+  const inherited = Boolean(scope.value) && entry.origin === 'global'
+  dialogDefOriginScope.value = inherited ? '' : scope.value
+  dialogRemoteInherited.value = inherited
+  dialogNeedsTargetChoice.value = inherited
+  dialogTargetScope.value = inherited ? '' : scope.value
   remoteDialogOpen.value = true
 }
 
+function remoteDefFromForm(remote: SyncRemoteConfig): SyncRemoteConfig {
+  return {
+    provider: remote.provider,
+    project: remote.project ?? null,
+    repo: remote.repo ?? null,
+    filter: remote.filter ?? null,
+    auth_profile: remote.auth_profile ?? null,
+    mapping: remote.mapping ?? {},
+  }
+}
+
+function chooseDialogTarget(target: 'override-project' | 'inherit-global') {
+  dialogTargetScope.value = target === 'override-project' ? scope.value : ''
+  dialogNeedsTargetChoice.value = false
+  remoteFormError.value = null
+  remoteDialogValidationStatus.value = 'idle'
+  remoteDialogValidationMessage.value = null
+}
+
 function closeRemoteDialog() {
-  if (remoteDialogSubmitting.value) return
+  if (remoteDialogSubmitting.value || remoteDialogDeleting.value) return
+  remoteDialogGen += 1
   remoteDialogOpen.value = false
+  dialogNeedsTargetChoice.value = false
 }
 
 function formatMapping(mapping?: Record<string, SyncFieldMapping>): string {
@@ -654,8 +829,22 @@ function formatMappingErrors(errors: string[]): string {
   return `${preview.join(' ')} (${errors.length - preview.length} more)`
 }
 
+/**
+ * Fresh inspect of the CAPTURED target scope right before writing; merges the
+ * single-remote delta into the latest server state. There is no server-side
+ * compare-and-swap, so a small race window remains between this fetch and the
+ * setConfig write; unrelated concurrent edits are preserved, and same-name
+ * changes are detected and surfaced instead of silently overwritten.
+ */
+async function fetchFreshTargetRemotes(targetScope: SyncScope): Promise<Record<string, SyncRemoteConfig>> {
+  const fresh = await api.inspectConfig(targetScope || undefined)
+  const raw = targetScope ? fresh.project_raw : fresh.global_raw
+  return raw?.remotes ?? {}
+}
+
 async function submitRemoteDialog() {
-  if (remoteDialogSubmitting.value) return
+  if (remoteDialogSubmitting.value || remoteDialogValidating.value || remoteDialogDeleting.value) return
+  if (dialogNeedsTargetChoice.value || dialogTargetInvalid.value) return
   remoteFormError.value = null
 
   const name = remoteForm.value.name.trim()
@@ -670,41 +859,135 @@ async function submitRemoteDialog() {
     return
   }
 
-  const remote = config
-
-  const updatedRemotes: Record<string, SyncRemoteConfig> = { ...scopedRemotes.value }
+  const gen = remoteDialogGen
+  const target = dialogTargetScope.value
   const originalName = remoteFormOriginalName.value
-  if (originalName && originalName !== name) {
-    delete updatedRemotes[originalName]
-  }
-  updatedRemotes[name] = remote
-
-  const remotesPayload = Object.keys(updatedRemotes).length
-    ? stringifyYaml(updatedRemotes).trim()
-    : ''
+  const baseDefYaml = dialogBaseDefYaml.value
 
   remoteDialogSubmitting.value = true
   try {
-    const payload = project.value
-      ? { values: { remotes: remotesPayload }, project: project.value }
-      : { values: { remotes: remotesPayload }, global: true }
-    const response = await api.setConfig(payload)
+    const freshRemotes = await fetchFreshTargetRemotes(target)
+    if (!alive || gen !== remoteDialogGen || !remoteDialogOpen.value) return
+
+    // Adding, renaming, or overriding in a different scope is an add in the
+    // target map: the name must be free there. Only a replacement in the
+    // definition's own scope is version-checked against the open snapshot.
+    const defOrigin = remoteDialogMode.value === 'edit' ? dialogDefOriginScope.value : target
+    const isAddInTarget = remoteDialogMode.value === 'add' || defOrigin !== target
+    if ((isAddInTarget || (originalName && originalName !== name)) && freshRemotes[name]) {
+      remoteFormError.value = `Remote '${name}' already exists in ${scopeLabelFor(target)} config.`
+      return
+    }
+
+    if (remoteDialogMode.value === 'edit' && originalName && !isAddInTarget) {
+      const freshDefYaml = freshRemotes[originalName]
+        ? stringifyYaml(remoteDefFromForm(freshRemotes[originalName])).trim()
+        : null
+      if (freshDefYaml !== baseDefYaml) {
+        remoteFormError.value =
+          freshDefYaml === null
+            ? `Remote '${originalName}' no longer exists in ${scopeLabelFor(target)} config; close and reopen.`
+            : `Remote '${originalName}' changed in ${scopeLabelFor(target)} config since this dialog opened; close and reopen to merge.`
+        return
+      }
+    }
+
+    const merged: Record<string, SyncRemoteConfig> = { ...freshRemotes }
+    if (remoteDialogMode.value === 'edit' && originalName && originalName !== name) {
+      delete merged[originalName]
+    }
+    merged[name] = config
+
+    const remotesPayload = Object.keys(merged).length ? stringifyYaml(merged).trim() : ''
+    const response = await api.setConfig(
+      target
+        ? { values: { remotes: remotesPayload }, project: target }
+        : { values: { remotes: remotesPayload }, global: true },
+    )
+    if (!alive || gen !== remoteDialogGen || !remoteDialogOpen.value) return
     if (response.errors?.length) {
       remoteFormError.value = response.errors.join(' ')
       return
     }
-    await reload()
     remoteDialogOpen.value = false
+    remoteDialogGen += 1
+    await loadScopeConfig()
     showToast(response.warnings?.length ? 'Remote saved with warnings' : 'Remote saved')
-  } catch (error: any) {
-    remoteFormError.value = error?.message || 'Failed to save remote'
+  } catch (err: any) {
+    if (alive && gen === remoteDialogGen && remoteDialogOpen.value) {
+      remoteFormError.value = err?.message || 'Failed to save remote'
+    }
   } finally {
-    remoteDialogSubmitting.value = false
+    // Reset for the current session, or when the dialog already closed so a
+    // stuck busy flag cannot leak into a later session.
+    if (gen === remoteDialogGen || !remoteDialogOpen.value) {
+      remoteDialogSubmitting.value = false
+    }
+  }
+}
+
+async function deleteRemoteDialog() {
+  if (remoteDialogSubmitting.value || remoteDialogValidating.value || remoteDialogDeleting.value) return
+  if (remoteDialogMode.value !== 'edit' || dialogNeedsTargetChoice.value || dialogTargetInvalid.value) return
+  if (dialogTargetScope.value !== dialogDefOriginScope.value) return
+  remoteFormError.value = null
+
+  const gen = remoteDialogGen
+  const target = dialogTargetScope.value
+  const originalName = remoteFormOriginalName.value
+  if (!originalName) return
+  const baseDefYaml = dialogBaseDefYaml.value
+
+  remoteDialogDeleting.value = true
+  try {
+    const freshRemotes = await fetchFreshTargetRemotes(target)
+    if (!alive || gen !== remoteDialogGen || !remoteDialogOpen.value) return
+
+    const freshDefYaml = freshRemotes[originalName]
+      ? stringifyYaml(remoteDefFromForm(freshRemotes[originalName])).trim()
+      : null
+    if (freshDefYaml === null) {
+      remoteFormError.value = `Remote '${originalName}' was already removed from ${scopeLabelFor(target)} config.`
+      return
+    }
+    if (freshDefYaml !== baseDefYaml) {
+      remoteFormError.value = `Remote '${originalName}' changed in ${scopeLabelFor(target)} config since this dialog opened; close and reopen.`
+      return
+    }
+
+    const merged: Record<string, SyncRemoteConfig> = { ...freshRemotes }
+    delete merged[originalName]
+    const remotesPayload = Object.keys(merged).length ? stringifyYaml(merged).trim() : ''
+    const response = await api.setConfig(
+      target
+        ? { values: { remotes: remotesPayload }, project: target }
+        : { values: { remotes: remotesPayload }, global: true },
+    )
+    if (!alive || gen !== remoteDialogGen || !remoteDialogOpen.value) return
+    if (response.errors?.length) {
+      remoteFormError.value = response.errors.join(' ')
+      return
+    }
+    remoteDialogOpen.value = false
+    remoteDialogGen += 1
+    await loadScopeConfig()
+    showToast('Remote removed')
+  } catch (err: any) {
+    if (alive && gen === remoteDialogGen && remoteDialogOpen.value) {
+      remoteFormError.value = err?.message || 'Failed to remove remote'
+    }
+  } finally {
+    // Reset for the current session, or when the dialog already closed so a
+    // stuck busy flag cannot leak into a later session.
+    if (gen === remoteDialogGen || !remoteDialogOpen.value) {
+      remoteDialogDeleting.value = false
+    }
   }
 }
 
 async function validateRemoteDialog() {
-  if (remoteDialogValidating.value) return
+  if (remoteDialogValidating.value || remoteDialogSubmitting.value || remoteDialogDeleting.value) return
+  if (dialogNeedsTargetChoice.value || dialogTargetInvalid.value) return
   remoteFormError.value = null
   remoteDialogValidationStatus.value = 'idle'
   remoteDialogValidationMessage.value = null
@@ -715,47 +998,38 @@ async function validateRemoteDialog() {
     return
   }
 
+  const gen = remoteDialogGen
   remoteDialogValidating.value = true
   try {
     const payload = {
       remote: remoteForm.value.name.trim() || undefined,
-      project: project.value || undefined,
+      project: dialogTargetScope.value || undefined,
       auth_profile: remoteForm.value.auth_profile.trim() || undefined,
       remote_config: config,
     }
     const result = await api.syncValidate(payload)
+    if (!alive || gen !== remoteDialogGen || !remoteDialogOpen.value) return
     const warningCount = result.warnings?.length ?? 0
     remoteDialogValidationStatus.value = warningCount ? 'warn' : 'ok'
     remoteDialogValidationMessage.value = warningCount
       ? `Validated with ${warningCount} warning${warningCount === 1 ? '' : 's'}`
       : 'Validated'
-  } catch (error: any) {
-    remoteFormError.value = error?.message || 'Validation failed'
-    remoteDialogValidationStatus.value = 'idle'
-    remoteDialogValidationMessage.value = null
+  } catch (err: any) {
+    if (alive && gen === remoteDialogGen && remoteDialogOpen.value) {
+      remoteFormError.value = err?.message || 'Validation failed'
+      remoteDialogValidationStatus.value = 'idle'
+      remoteDialogValidationMessage.value = null
+    }
   } finally {
-    remoteDialogValidating.value = false
+    // Reset for the current session, or when the dialog already closed so a
+    // stuck busy flag cannot leak into a later session.
+    if (gen === remoteDialogGen || !remoteDialogOpen.value) {
+      remoteDialogValidating.value = false
+    }
   }
 }
 
-type SyncAction = 'pull' | 'push' | 'check'
-
-type SyncRun = {
-  id: string
-  remote: string
-  action: SyncAction
-  actionLabel: string
-  status: 'running' | 'success' | 'error'
-  startedAt: string
-  finishedAt?: string
-  summary?: SyncResponse['summary']
-  report?: SyncReportMeta | null
-  reportEntries?: SyncReportEntry[]
-  dry_run?: boolean
-  error?: string
-  warnings?: string[]
-  info?: string[]
-}
+// ---- Sync runs (scoped state, persistent SSE) --------------------------------
 
 type SyncLiveEvent = SyncReportEntry & {
   runId: string
@@ -763,27 +1037,64 @@ type SyncLiveEvent = SyncReportEntry & {
   action: SyncAction
 }
 
+type ReportItemSource = 'listed' | 'run' | 'external'
+
 type ReportListItem = SyncReportMeta & {
   runId?: string
   entries?: SyncReportEntry[]
+  source: ReportItemSource
+  /** Scope whose reports root resolves stored_path (query-scope, not report.project). */
+  queryScope: SyncScope
 }
 
-const syncRuns = ref<SyncRun[]>([])
 const liveEvents = ref<SyncLiveEvent[]>([])
 const writeReport = ref(true)
 
 const reportsLoading = ref(false)
 const reportsError = ref<string | null>(null)
-const reports = ref<SyncReportMeta[]>([])
+const reports = ref<ReportListItem[]>([])
 const selectedReport = ref<SyncReport | null>(null)
+const selectedReportItem = ref<ReportListItem | null>(null)
 const selectedReportPath = ref<string | null>(null)
 const reportRangeStart = ref('')
 const reportRangeEnd = ref('')
 const reportEntryFilter = ref<'all' | SyncReportStatus>('all')
 const reportEntrySearch = ref('')
 
-function isRemoteBusy(name: string): boolean {
-  return syncRuns.value.some((run) => run.remote === name && run.status === 'running')
+let reportsGen = 0
+let detailGen = 0
+
+const {
+  knownRuns,
+  connect,
+  disconnect,
+  startRun,
+  settleRunFromResponse,
+  failRun,
+  isRemoteBusy,
+  lastUnknownRunFor,
+  runsForScope,
+  externalRunsForScope,
+  reconcileFromList,
+} = useSyncRuns({
+  onRunProgress: (run) => updateLiveSelectedFromRun(run),
+  onRunFinalized: (run) => {
+    void handleRunFinalized(run)
+  },
+  onExternalFinalized: () => {
+    if (alive) void loadReports()
+  },
+  onReconnect: () => {
+    if (alive) void loadReports()
+  },
+})
+
+connect()
+
+const runsInScope = computed(() => runsForScope(scope.value))
+
+function isRemoteNameBusy(name: string): boolean {
+  return isRemoteBusy(scope.value, name) || isPreflightBusy(scope.value, name)
 }
 
 function runStatus(name: string): SyncRun['status'] | null {
@@ -804,12 +1115,13 @@ function statusLabel(status: SyncRun['status']): string {
   if (status === 'running') return 'Running'
   if (status === 'error') return 'Failed'
   if (status === 'success') return 'Success'
-  return ''
+  return 'Unknown'
 }
 
 function statusClass(status: SyncRun['status']): string {
   if (status === 'success') return 'pill--success'
   if (status === 'error') return 'pill--danger'
+  if (status === 'unknown') return 'pill--warn'
   return 'pill--muted'
 }
 
@@ -849,6 +1161,7 @@ function reportStatusClass(status?: string | null): string {
   if (normalized === 'success' || normalized === 'ok') return 'pill--success'
   if (normalized === 'failed') return 'pill--danger'
   if (normalized === 'running') return 'pill--info'
+  if (normalized === 'unknown') return 'pill--warn'
   return 'pill--muted'
 }
 
@@ -881,7 +1194,7 @@ function openLatestTaskByRemote(remote: string) {
 
 const lastRunByRemote = computed<Record<string, SyncRun>>(() => {
   const map: Record<string, SyncRun> = {}
-  for (const run of syncRuns.value) {
+  for (const run of runsInScope.value) {
     if (!map[run.remote]) {
       map[run.remote] = run
     }
@@ -889,7 +1202,7 @@ const lastRunByRemote = computed<Record<string, SyncRun>>(() => {
   return map
 })
 
-const reportsDir = computed(() => inspectData.value?.effective?.sync_reports_dir || '@reports')
+const reportsDir = computed(() => scopedInspect.value?.effective?.sync_reports_dir || '@reports')
 const reportsDirLabel = computed(() => {
   const dir = String(reportsDir.value || '@reports').trim()
   if (!dir) return '.tasks/@reports'
@@ -905,6 +1218,7 @@ const emptySummary: SyncResponse['summary'] = { created: 0, updated: 0, skipped:
 function reportStatusFromRun(run: SyncRun): string {
   if (run.status === 'running') return 'running'
   if (run.status === 'error') return 'failed'
+  if (run.status === 'unknown') return 'unknown'
   return run.report?.status || 'success'
 }
 
@@ -920,8 +1234,8 @@ function buildReportItemFromRun(run: SyncRun): ReportListItem {
     direction,
     provider,
     remote: report?.remote || run.remote,
-    project: report?.project || project.value || null,
-    dry_run: report?.dry_run ?? run.dry_run ?? run.action === 'check',
+    project: report?.project ?? run.context.expectedExecProject ?? null,
+    dry_run: report?.dry_run ?? run.dryRun ?? run.action === 'check',
     summary,
     warnings: report?.warnings || run.warnings || [],
     info: report?.info || run.info || [],
@@ -929,15 +1243,48 @@ function buildReportItemFromRun(run: SyncRun): ReportListItem {
     stored_path: report?.stored_path || null,
     runId: run.id,
     entries: run.reportEntries,
+    source: 'run',
+    queryScope: run.context.reportQueryScope,
+  }
+}
+
+function buildReportItemFromExternal(ext: ExternalSyncRun): ReportListItem {
+  const report = ext.report
+  const status =
+    ext.status === 'running'
+      ? 'running'
+      : ext.status === 'error'
+        ? 'failed'
+        : ext.status === 'unknown'
+          ? 'unknown'
+          : report?.status || 'success'
+  return {
+    id: report?.id || ext.id,
+    created_at: report?.created_at || ext.startedAt,
+    status,
+    direction: report?.direction || (ext.action === 'check' ? 'pull' : ext.action),
+    provider: report?.provider || 'jira',
+    remote: report?.remote || ext.remote,
+    project: report?.project ?? ext.execProject ?? null,
+    dry_run: report?.dry_run ?? false,
+    summary: report?.summary || emptySummary,
+    warnings: report?.warnings || [],
+    info: report?.info || [],
+    entries_total: report?.entries_total ?? ext.reportEntries?.length ?? 0,
+    stored_path: report?.stored_path || null,
+    runId: ext.id,
+    entries: ext.reportEntries,
+    source: 'external',
+    queryScope: ext.execProject || '',
   }
 }
 
 const reportListItems = computed<ReportListItem[]>(() => {
   const map = new Map<string, ReportListItem>()
   reports.value.forEach((report) => {
-    map.set(report.id, { ...report })
+    map.set(report.id, report)
   })
-  syncRuns.value.forEach((run) => {
+  runsInScope.value.forEach((run) => {
     const item = buildReportItemFromRun(run)
     const existing = map.get(item.id)
     if (!existing) {
@@ -955,6 +1302,11 @@ const reportListItems = computed<ReportListItem[]>(() => {
       merged.status = 'running'
     }
     map.set(item.id, merged)
+  })
+  externalRunsForScope(scope.value).forEach((ext) => {
+    const item = buildReportItemFromExternal(ext)
+    if (map.has(item.id)) return
+    map.set(item.id, item)
   })
 
   return Array.from(map.values()).sort((a, b) => {
@@ -1001,9 +1353,33 @@ function parseReportRangeValue(value: string): Date | null {
   return parsed
 }
 
+/**
+ * The remote definition behind "Fields synced" must come from a map that is
+ * known to describe the report's scope. A global-aggregator item for another
+ * project, or an external run of unclear origin, must not infer fields from
+ * the current scope's homonym definition.
+ */
+function fieldsAttributionKnown(item: ReportListItem | null): boolean {
+  if (!item) return false
+  if (item.source === 'run') {
+    // Run items are built from runs of the current scope only.
+    return true
+  }
+  if (item.source === 'listed') {
+    // A global-listed report carrying a project may be defined by that
+    // project's override, which the global map cannot see.
+    return !(scope.value === '' && !!item.project)
+  }
+  // External: attribute only when the task project is the current scope, or
+  // when it is project-less in the global view.
+  if (scope.value === '') return !item.project
+  return item.project === scope.value
+}
+
 const selectedReportFields = computed(() => {
   const report = selectedReport.value
   if (!report) return []
+  if (!fieldsAttributionKnown(selectedReportItem.value)) return []
   const remote = effectiveRemotes.value?.[report.remote]
   const mapping = remote?.mapping ?? {}
   const fields = Object.entries(mapping).map(([local, detail]) => {
@@ -1017,22 +1393,35 @@ const selectedReportFields = computed(() => {
 })
 
 function ensureWriteReportDefault() {
-  const configured = inspectData.value?.effective?.sync_write_reports
+  const configured = scopedInspect.value?.effective?.sync_write_reports
   if (typeof configured === 'boolean') {
     writeReport.value = configured
   }
 }
 
 async function loadReports() {
+  const gen = ++reportsGen
+  const scopeNow = scope.value
   reportsLoading.value = true
-  reportsError.value = null
   try {
-    const payload = await api.syncReportsList({ project: project.value || undefined })
-    reports.value = payload.reports
+    const payload = await api.syncReportsList({ project: scopeNow || undefined })
+    if (!alive || gen !== reportsGen) return
+    reports.value = payload.reports.map((report) => ({
+      ...report,
+      source: 'listed' as const,
+      queryScope: scopeNow,
+    }))
+    reportsError.value = null
+    reconcileFromList(scopeNow, payload.reports)
   } catch (err: any) {
+    if (!alive || gen !== reportsGen) return
+    // A failed same-scope refresh keeps the previous valid list (no false
+    // empty state); stale cross-scope responses are dropped by the guard above.
     reportsError.value = err?.message || 'Failed to load reports'
   } finally {
-    reportsLoading.value = false
+    if (gen === reportsGen) {
+      reportsLoading.value = false
+    }
   }
 }
 
@@ -1053,284 +1442,302 @@ function buildReportFromItem(item: ReportListItem, entries: SyncReportEntry[]): 
   }
 }
 
+function dedupeScopes(candidates: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined) continue
+    if (seen.has(candidate)) continue
+    seen.add(candidate)
+    out.push(candidate)
+  }
+  return out
+}
+
 function openReportItem(item: ReportListItem) {
   if (item.stored_path) {
-    openReport(item)
+    void openReportByItem(item)
     return
   }
 
-  const run = item.runId ? syncRuns.value.find((entry) => entry.id === item.runId) : null
+  const run = item.runId ? knownRuns.value.find((entry) => entry.id === item.runId) : null
   const entries = run?.reportEntries || item.entries || []
+  selectedReportItem.value = item
   selectedReport.value = buildReportFromItem(item, entries)
-  selectedReportPath.value = item.stored_path || null
+  selectedReportPath.value = null
   reportsError.value = null
 }
 
-async function openReport(meta: SyncReportMeta) {
-  if (!meta?.stored_path) {
-    selectedReport.value = null
-    selectedReportPath.value = null
+/**
+ * Resolve a stored report through the scope roots that may hold it: the query
+ * scope the item was produced under first, then the report's task project and
+ * the global root. A project param resolves a project reports dir override;
+ * the global aggregator always keeps its own query root.
+ */
+async function openReportByItem(item: ReportListItem) {
+  const storedPath = item.stored_path
+  if (!storedPath) {
     reportsError.value = 'Report file not available for this run.'
     return
   }
-  selectedReportPath.value = meta.stored_path
+  const gen = ++detailGen
   reportsError.value = null
-  try {
-    const report = await api.syncReportGet(meta.stored_path)
-    selectedReport.value = report
-  } catch (err: any) {
-    selectedReport.value = null
-    reportsError.value = err?.message || 'Failed to load report'
-  }
-}
-
-function upsertRun(runId: string, updater: (run: SyncRun) => SyncRun) {
-  const idx = syncRuns.value.findIndex((run) => run.id === runId)
-  if (idx === -1) {
-    syncRuns.value = [updater({
-      id: runId,
-      remote: 'unknown',
-      action: 'pull',
-      actionLabel: 'PULL',
-      status: 'running',
-      startedAt: new Date().toISOString(),
-    }), ...syncRuns.value].slice(0, 20)
-    return
-  }
-  const current = syncRuns.value[idx]
-  if (!current) return
-  const updated = updater(current)
-  if (!updated) return
-  const next = syncRuns.value.slice()
-  next.splice(idx, 1, updated)
-  syncRuns.value = next
-}
-
-function handleSyncStarted(payload: any) {
-  const runId = String(payload?.run_id || '').trim()
-  const direction = String(payload?.direction || 'pull') as SyncAction
-  if (!runId) return
-  upsertRun(runId, (run) => ({
-    ...run,
-    id: runId,
-    remote: String(payload?.remote || run.remote),
-    action: direction,
-    actionLabel: direction.toUpperCase(),
-    status: 'running',
-    startedAt: String(payload?.started_at || run.startedAt || new Date().toISOString()),
-    dry_run: typeof payload?.dry_run === 'boolean' ? payload.dry_run : run.dry_run,
-    error: undefined,
-  }))
-}
-
-function handleSyncProgress(payload: any) {
-  const runId = String(payload?.run_id || '').trim()
-  const direction = String(payload?.direction || 'pull') as SyncAction
-  const entry = payload?.entry as SyncReportEntry | undefined
-  if (!runId || !entry) return
-  upsertRun(runId, (run) => {
-    const nextEntries = [entry, ...(run.reportEntries || [])].slice(0, 200)
-    return {
-      ...run,
-      action: direction,
-      actionLabel: direction.toUpperCase(),
-      summary: payload?.summary || run.summary,
-      dry_run: typeof payload?.dry_run === 'boolean' ? payload.dry_run : run.dry_run,
-      reportEntries: nextEntries,
+  const candidates = dedupeScopes([item.queryScope, item.project, ''])
+  let lastError: any = null
+  for (const candidate of candidates) {
+    if (!alive || gen !== detailGen) return
+    try {
+      const report = await api.syncReportGet(storedPath, candidate || undefined)
+      if (!alive || gen !== detailGen) return
+      selectedReportItem.value = item
+      selectedReport.value = { ...report, entries: report.entries ?? [] }
+      selectedReportPath.value = storedPath
+      return
+    } catch (err) {
+      lastError = err
     }
-  })
+  }
+  if (!alive || gen !== detailGen) return
+  // Keep the previous valid selection; surface the load failure instead.
+  reportsError.value = lastError?.message || 'Failed to load report'
+}
 
+function recordLiveEvent(run: SyncRun) {
+  const entry = run.reportEntries?.[0]
+  if (!entry) return
   liveEvents.value = [
     {
       ...entry,
-      runId,
-      remote: String(payload?.remote || 'unknown'),
-      action: direction,
+      runId: run.id,
+      remote: run.remote,
+      action: run.action,
     },
     ...liveEvents.value,
   ].slice(0, 50)
+}
 
-  if (selectedReport.value?.id === runId && !selectedReportPath.value) {
-    selectedReport.value = {
-      ...selectedReport.value,
-      status: 'running',
-      dry_run:
-        typeof payload?.dry_run === 'boolean'
-          ? payload.dry_run
-          : selectedReport.value.dry_run,
-      summary: payload?.summary || selectedReport.value.summary,
-      entries: [entry, ...selectedReport.value.entries].slice(0, 200),
-    }
+function updateLiveSelectedFromRun(run: SyncRun) {
+  recordLiveEvent(run)
+  const current = selectedReport.value
+  if (!current || current.id !== run.id || selectedReportPath.value) return
+  if (scope.value !== run.context.originScope) return
+  selectedReport.value = {
+    ...current,
+    status: run.status === 'running' ? 'running' : current.status,
+    dry_run: run.dryRun ?? current.dry_run,
+    summary: run.summary || current.summary,
+    entries: run.reportEntries || current.entries,
   }
 }
 
-function handleSyncCompleted(payload: any) {
-  const runId = String(payload?.run_id || '').trim()
-  const report = payload?.report as SyncReportMeta | undefined
-  if (!runId) return
-  upsertRun(runId, (run) => ({
-    ...run,
-    status: 'success',
-    finishedAt: String(payload?.finished_at || new Date().toISOString()),
-    summary: report?.summary || run.summary,
-    warnings: report?.warnings || run.warnings,
-    info: report?.info || run.info,
-    report: report || run.report,
-    dry_run: report?.dry_run ?? run.dry_run,
-  }))
-  if (selectedReport.value?.id === runId && !selectedReportPath.value) {
-    if (report?.stored_path) {
-      openReport(report)
-    } else if (selectedReport.value) {
-      selectedReport.value = {
-        ...selectedReport.value,
-        status: report?.status || 'success',
-        summary: report?.summary || selectedReport.value.summary,
-        warnings: report?.warnings || selectedReport.value.warnings,
-        info: report?.info || selectedReport.value.info,
-        dry_run: report?.dry_run ?? selectedReport.value.dry_run,
+function shouldAutoSelectRunReport(run: SyncRun): boolean {
+  if (scope.value !== run.context.originScope) return false
+  const current = selectedReport.value
+  return !current || current.id === run.id
+}
+
+async function handleRunFinalized(run: SyncRun) {
+  if (!alive) return
+  await loadReports()
+  if (!alive) return
+  if (!shouldAutoSelectRunReport(run)) return
+  const meta = run.report
+  if (meta?.stored_path) {
+    await openReportByItem(buildReportItemFromRun(run))
+    return
+  }
+  const current = selectedReport.value
+  if (current?.id === run.id) {
+    selectedReportItem.value = buildReportItemFromRun(run)
+    selectedReport.value = {
+      ...current,
+      status: run.status === 'error' ? 'failed' : reportStatusFromRun(run),
+      summary: run.summary || current.summary,
+      warnings:
+        run.status === 'error'
+          ? [...(current.warnings || []), run.error || 'Sync failed']
+          : run.report?.warnings || current.warnings,
+      info: run.report?.info || current.info,
+      dry_run: run.dryRun ?? current.dry_run,
+      entries: run.reportEntries || current.entries,
+    }
+  } else if (!current && (run.reportEntries?.length || run.report)) {
+    const item = buildReportItemFromRun(run)
+    selectedReportItem.value = item
+    selectedReport.value = buildReportFromItem(item, run.reportEntries || [])
+  }
+}
+
+/**
+ * Mirror the backend's project resolution (sync_service resolve_project_prefix
+ * and resolve_pull_project_prefix) so the origin scope, expected execution
+ * project, and report root are captured together at request time.
+ */
+function computeRunContext(action: SyncAction, originScope: SyncScope, remote: SyncRemoteConfig): SyncRunOriginContext {
+  if (originScope) {
+    return { originScope, reportQueryScope: originScope, expectedExecProject: originScope }
+  }
+  const defaultProject = String(scopedInspect.value?.global_effective?.default_project ?? '').trim()
+  if (defaultProject) {
+    return { originScope, reportQueryScope: defaultProject, expectedExecProject: defaultProject }
+  }
+  if (action !== 'push' && remote.provider === 'jira') {
+    const jiraProject = String(remote.project ?? '').trim()
+    if (jiraProject) {
+      return { originScope, reportQueryScope: '', expectedExecProject: jiraProject }
+    }
+  }
+  return { originScope, reportQueryScope: '', expectedExecProject: null }
+}
+
+const preflightBusyKeys = ref<Set<string>>(new Set())
+
+function preflightKey(scopeKey: SyncScope, remote: string): string {
+  return `${scopeKey}::${remote}`
+}
+
+function isPreflightBusy(scopeKey: SyncScope, remote: string): boolean {
+  return preflightBusyKeys.value.has(preflightKey(scopeKey, remote))
+}
+
+function setPreflightBusy(scopeKey: SyncScope, remote: string) {
+  preflightBusyKeys.value = new Set(preflightBusyKeys.value).add(preflightKey(scopeKey, remote))
+}
+
+function clearPreflightBusy(key: string) {
+  const next = new Set(preflightBusyKeys.value)
+  next.delete(key)
+  preflightBusyKeys.value = next
+}
+
+/**
+ * A run started from the Global scope without an explicit project resolves
+ * remotes through the default project's EFFECTIVE config on the server, so a
+ * project override with the same name would silently replace the definition
+ * the user sees. Preflight inspects the default project and blocks the run on
+ * divergence with an actionable message instead of executing the wrong
+ * remote. Failures fail closed; navigation away aborts.
+ */
+async function verifyDefaultProjectRemote(action: SyncAction, remoteName: string, displayedRemote: SyncRemoteConfig, originScope: SyncScope): Promise<boolean> {
+  const defaultProject = String(scopedInspect.value?.global_effective?.default_project ?? '').trim()
+  if (!defaultProject) return true
+
+  const actionLabelNow = action === 'check' ? 'CHECK' : action.toUpperCase()
+  const busyKey = preflightKey(originScope, remoteName)
+  setPreflightBusy(originScope, remoteName)
+  const gen = inspectGen
+  try {
+    const fresh = await api.inspectConfig(defaultProject)
+    if (!alive) return false
+    if (gen !== inspectGen || scope.value !== originScope || inspectStamp.value !== originScope) {
+      // Scope navigated or its data lost validity while verifying: abort.
+      return false
+    }
+    const overrideRemote = fresh.effective?.remotes?.[remoteName]
+    if (overrideRemote) {
+      const displayedYaml = stringifyYaml(remoteDefFromForm(displayedRemote)).trim()
+      const overrideYaml = stringifyYaml(remoteDefFromForm(overrideRemote)).trim()
+      if (overrideYaml !== displayedYaml) {
+        showToast(
+          `Remote '${remoteName}' is overridden in default project ${defaultProject}, so a Global run would execute that override. Switch to ${defaultProject} to run it, or align the definitions.`,
+        )
+        return false
       }
     }
-  }
-  loadReports()
-}
-
-function handleSyncFailed(payload: any) {
-  const runId = String(payload?.run_id || '').trim()
-  const message = String(payload?.error || 'Sync failed')
-  if (!runId) return
-  upsertRun(runId, (run) => ({
-    ...run,
-    status: 'error',
-    finishedAt: String(payload?.finished_at || new Date().toISOString()),
-    error: message,
-  }))
-  if (selectedReport.value?.id === runId && !selectedReportPath.value) {
-    selectedReport.value = {
-      ...selectedReport.value,
-      status: 'failed',
-      warnings: [...(selectedReport.value.warnings || []), message],
+    showToast(`${actionLabelNow} runs through default project ${defaultProject}; its effective config applies.`)
+    return true
+  } catch (err: any) {
+    if (alive && scope.value === originScope) {
+      showToast(
+        `Cannot verify remote '${remoteName}' against default project ${defaultProject}: ${err?.message || 'inspection failed'}. ${actionLabelNow} was blocked.`,
+      )
     }
+    return false
+  } finally {
+    clearPreflightBusy(busyKey)
   }
-}
-
-let sse: { es: EventSource; close(): void; on(event: string, handler: (e: MessageEvent) => void): void; off(event: string, handler: (e: MessageEvent) => void): void } | null = null
-const sseUnsubscribers: Array<() => void> = []
-
-function setupSse() {
-  sseUnsubscribers.splice(0).forEach((fn) => fn())
-  if (sse) sse.close()
-
-  const params: Record<string, string> = {
-    kinds: 'sync_started,sync_progress,sync_completed,sync_failed',
-  }
-  if (project.value) {
-    params.project = project.value
-  }
-  sse = useSse('/api/events', params)
-
-  const bindings: Array<[string, (payload: any) => void]> = [
-    ['sync_started', handleSyncStarted],
-    ['sync_progress', handleSyncProgress],
-    ['sync_completed', handleSyncCompleted],
-    ['sync_failed', handleSyncFailed],
-  ]
-  bindings.forEach(([kind, handler]) => {
-    const wrapped = (ev: MessageEvent) => {
-      if (!ev.data) return
-      try {
-        const payload = JSON.parse(ev.data)
-        handler(payload)
-      } catch (err) {
-        console.warn('Failed to parse sync SSE payload', err)
-      }
-    }
-    sse?.on(kind, wrapped)
-    sseUnsubscribers.push(() => sse?.off(kind, wrapped))
-  })
 }
 
 async function runSync(action: SyncAction, entry: { name: string; remote: SyncRemoteConfig }) {
   if (!entry?.name) return
   const remoteName = entry.name
-  if (isRemoteBusy(remoteName)) return
-  const actionLabel = action === 'check' ? 'CHECK' : action.toUpperCase()
-  const runId = `sync-${remoteName}-${Date.now()}`
-  const run: SyncRun = {
-    id: runId,
-    remote: remoteName,
-    action,
-    actionLabel,
-    status: 'running',
-    startedAt: new Date().toISOString(),
-    dry_run: action === 'check',
-  }
-  syncRuns.value = [run, ...syncRuns.value].slice(0, 20)
+  const originScope = scope.value
+  if (inspectStamp.value !== originScope) return
+  if (isRemoteBusy(originScope, remoteName) || isPreflightBusy(originScope, remoteName)) return
 
-  try {
-    const projectOverride = scope.value === 'project' ? project.value || undefined : undefined
-    if (action !== 'push' && !projectOverride) {
-      const defaultProject = String(inspectData.value?.global_effective?.default_project ?? '').trim()
-      if (!defaultProject) {
-        if (entry.remote.provider === 'jira') {
-          const jiraProject = String(entry.remote.project ?? '').trim()
-          if (jiraProject) {
-            showToast(`Pull without project will use Jira project ${jiraProject} as the local prefix.`)
-          } else {
-            showToast('Pull requires a project scope or default_project.')
-            throw new Error('Project scope required')
-          }
-        } else {
-          showToast('Pull for GitHub requires a project scope or default_project.')
-          throw new Error('Project scope required')
+  const unknownRun = lastUnknownRunFor(originScope, remoteName)
+  if (unknownRun && action !== 'check') {
+    showToast(
+      `Previous ${unknownRun.actionLabel} for ${remoteName} has unknown status; re-running may duplicate in-flight work`,
+    )
+  }
+
+  if (!originScope) {
+    const defaultProject = String(scopedInspect.value?.global_effective?.default_project ?? '').trim()
+    if (defaultProject) {
+      const allowed = await verifyDefaultProjectRemote(action, remoteName, entry.remote, originScope)
+      if (!allowed) return
+    } else if (action !== 'push') {
+      if (entry.remote.provider === 'jira') {
+        const jiraProject = String(entry.remote.project ?? '').trim()
+        if (!jiraProject) {
+          showToast('Pull requires a project scope or default_project.')
+          return
         }
+        showToast(`Pull without project will use Jira project ${jiraProject} as the local prefix.`)
+      } else {
+        showToast('Pull for GitHub requires a project scope or default_project.')
+        return
       }
     }
+  }
 
-    const payload: { remote: string; project?: string; dry_run?: boolean; include_report?: boolean; write_report?: boolean; client_run_id?: string } = {
-      remote: remoteName,
-      project: projectOverride,
-    }
-    if (action === 'check') {
-      payload.dry_run = true
-    }
-    payload.include_report = true
-    payload.write_report = writeReport.value
-    payload.client_run_id = runId
+  const context = computeRunContext(action, originScope, entry.remote)
+  const run = startRun({ action, remote: remoteName, context })
 
+  const payload: { remote: string; project?: string; dry_run?: boolean; include_report?: boolean; write_report?: boolean; client_run_id?: string } = {
+    remote: remoteName,
+    project: originScope || undefined,
+  }
+  if (action === 'check') {
+    payload.dry_run = true
+  }
+  payload.include_report = true
+  payload.write_report = writeReport.value
+  payload.client_run_id = run.id
+
+  try {
     const result = action === 'push'
       ? await api.syncPush(payload)
       : await api.syncPull(payload)
-
-    syncRuns.value = syncRuns.value.map((entry) =>
-      entry.id === run.id
-        ? {
-          ...entry,
-          status: 'success',
-          finishedAt: new Date().toISOString(),
-          summary: result.summary,
-          warnings: result.warnings,
-          info: result.info,
-          report: result.report,
-          reportEntries: result.report_entries,
-          dry_run: result.dry_run,
+    if (!alive) return
+    const outcome = settleRunFromResponse(run.id, result)
+    if (outcome.finalized === 'now' && shouldAutoSelectRunReport(run)) {
+      if (result.report && result.report_entries?.length) {
+        selectedReportItem.value = {
+          ...result.report,
+          source: 'run',
+          queryScope: context.reportQueryScope,
+          runId: run.id,
         }
-        : entry,
-    )
-
-    if (result.report && result.report_entries?.length) {
-      selectedReport.value = {
-        ...result.report,
-        entries: result.report_entries,
+        selectedReport.value = {
+          ...result.report,
+          entries: result.report_entries,
+        }
+        selectedReportPath.value = result.report.stored_path || null
+      } else if (result.report?.stored_path) {
+        await openReportByItem({
+          ...result.report,
+          source: 'run',
+          queryScope: context.reportQueryScope,
+          runId: run.id,
+        })
       }
-      selectedReportPath.value = result.report.stored_path || null
-    } else if (result.report?.stored_path) {
-      await openReport(result.report)
     }
     await loadReports()
 
     showToast(
-      `${actionLabel} ${result.remote}: ${result.summary.created} created, ${result.summary.updated} updated, ${result.summary.skipped} skipped, ${result.summary.failed} failed`,
+      `${run.actionLabel} ${result.remote}: ${result.summary.created} created, ${result.summary.updated} updated, ${result.summary.skipped} skipped, ${result.summary.failed} failed`,
     )
     if (result.warnings?.length) {
       result.warnings.forEach((warning) => showToast(warning))
@@ -1339,39 +1746,40 @@ async function runSync(action: SyncAction, entry: { name: string; remote: SyncRe
       result.info.forEach((note) => showToast(note))
     }
   } catch (err: any) {
+    if (!alive) return
     const message = err?.message || `Failed to ${action} ${remoteName}`
-    syncRuns.value = syncRuns.value.map((entry) =>
-      entry.id === run.id
-        ? {
-          ...entry,
-          status: 'error',
-          finishedAt: new Date().toISOString(),
-          error: message,
-        }
-        : entry,
-    )
-    showToast(message)
+    failRun(run.id, `Request failed: ${message}`, true)
+    showToast(`Request failed: ${message}`)
   }
 }
 
 watch(
-  () => inspectData.value?.effective?.sync_write_reports,
+  () => scopedInspect.value?.effective?.sync_write_reports,
   () => ensureWriteReportDefault(),
   { immediate: true },
 )
 
 watch(
   project,
-  async () => {
-    setupSse()
-    await loadReports()
+  () => {
+    // Invalidate in-flight report work from the previous scope before loading
+    // the new one; selections never survive a scope switch.
+    reportsGen += 1
+    detailGen += 1
+    reports.value = []
+    selectedReport.value = null
+    selectedReportItem.value = null
+    selectedReportPath.value = null
+    reportsError.value = null
+    void loadScopeConfig(scope.value)
+    void loadReports()
   },
   { immediate: true },
 )
 
 onUnmounted(() => {
-  sseUnsubscribers.splice(0).forEach((fn) => fn())
-  if (sse) sse.close()
+  alive = false
+  disconnect()
 })
 
 function formatTimestamp(value: string): string {
@@ -1381,7 +1789,7 @@ function formatTimestamp(value: string): string {
 }
 
 async function handleReload() {
-  await reload()
+  await loadScopeConfig()
 }
 </script>
 
@@ -1512,6 +1920,51 @@ async function handleReload() {
   gap: 8px;
 }
 
+.sync-remote-dialog__target {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: color-mix(in oklab, var(--color-surface-contrast) 70%, transparent);
+  font-size: 0.85rem;
+}
+
+.sync-remote-dialog__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+}
+
+.sync-remote-dialog__choice p {
+  margin: 0;
+}
+
+.sync-remote-dialog__choice-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sync-remote-dialog__fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sync-remote-dialog__fieldset:disabled {
+  opacity: 0.7;
+}
+
+.sync-remote-dialog__delete {
+  color: var(--color-danger);
+}
+
 .sync-remote-dialog__field {
   display: flex;
   flex-direction: column;
@@ -1580,6 +2033,10 @@ async function handleReload() {
   flex-wrap: wrap;
 }
 
+.remote-origin-chip {
+  font-size: 0.65rem;
+}
+
 .remote-provider {
   display: inline-flex;
   align-items: center;
@@ -1623,83 +2080,6 @@ async function handleReload() {
   border-radius: 8px;
 }
 
-.connections-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.connection-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
-}
-
-.connection-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.connection-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.connection-form,
-.connection-status {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.connection-device {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px dashed var(--color-border);
-  background: color-mix(in oklab, var(--color-surface) 70%, transparent);
-}
-
-.device-code {
-  font-family: var(--font-mono);
-  font-size: 1.25rem;
-  letter-spacing: 0.2em;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--color-surface-contrast);
-  border: 1px solid var(--color-border);
-  text-align: center;
-}
-
-.link-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-contrast);
-  color: var(--color-fg);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.link-button:hover {
-  text-decoration: none;
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
 .pill {
   display: inline-flex;
   align-items: center;
@@ -1725,6 +2105,12 @@ async function handleReload() {
   border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-border));
 }
 
+.pill--warn {
+  color: var(--color-danger);
+  background: color-mix(in oklab, var(--color-danger) 12%, transparent);
+  border-color: color-mix(in oklab, var(--color-danger) 30%, var(--color-border));
+}
+
 .pill--danger {
   color: var(--color-danger);
   background: color-mix(in oklab, var(--color-danger) 18%, transparent);
@@ -1744,50 +2130,6 @@ async function handleReload() {
 .pill--interactive:hover {
   color: var(--color-accent);
   border-color: color-mix(in oklab, var(--color-accent) 40%, var(--color-border));
-}
-
-.connection-select {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.connection-generator {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.generator-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-}
-
-.generator-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
-}
-
-.generator-card h5 {
-  margin: 0;
-}
-
-.code-block {
-  margin: 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: var(--color-surface-contrast);
-  border: 1px solid var(--color-border);
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  white-space: pre-wrap;
-  word-break: break-word;
 }
 
 .list-stack {
@@ -1823,12 +2165,6 @@ async function handleReload() {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
   flex: 1 1 320px;
-}
-
-.list-item__actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .detail {
@@ -1945,17 +2281,6 @@ async function handleReload() {
   -webkit-box-orient: vertical;
   overflow: hidden;
   max-width: 260px;
-}
-
-.summary-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  background: color-mix(in oklab, var(--color-surface-contrast) 80%, transparent);
-  border: 1px solid var(--color-border);
-  color: var(--color-muted);
 }
 
 .report-item {
@@ -2189,7 +2514,6 @@ async function handleReload() {
     grid-template-columns: 1fr;
     grid-template-areas:
       "remotes"
-      "monitor"
       "reports";
   }
 }

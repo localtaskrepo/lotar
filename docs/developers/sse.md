@@ -16,7 +16,7 @@ The server responds with `text/event-stream`, sends an initial `retry: 1000` hin
 |-----------|---------|
 | `debounce_ms` | Debounce window (default 100 ms). Left blank, the server falls back to `LOTAR_SSE_DEBOUNCE_MS`. Values below 20 ms are clamped when fast-IO mode is enabled. |
 | `kinds` / `topic` | Comma-separated, case-insensitive list of kinds to keep. Valid kinds: `task_created`, `task_updated`, `task_deleted`, `config_updated`, `project_changed`, `sync_started`, `sync_progress`, `sync_completed`, `sync_failed`, `agent_job_started`, `agent_job_progress`, `agent_job_message`, `agent_job_input`, `agent_job_completed`, `agent_job_failed`, `agent_job_cancelled`. When omitted, all events flow through. `topic` is a legacy alias retained for compatibility. |
-| `project` | Filter events to a specific project prefix. Task events match when the task ID (e.g., `TEST-42`) shares that prefix; filesystem events match on their `{ "name": "<PROJECT>" }` payload. |
+| `project` | Filter events to a specific project prefix. Task events match when the task ID (e.g., `TEST-42`) shares that prefix; filesystem events match on their `{ "name": "<PROJECT>" }` payload; sync events match their top-level `project` payload (`null` never matches). |
 | `ready` | `true`/`1` requests a one-time `ready` event. Only honored when `LOTAR_SSE_READY=1` is set on the server. |
 
 Combine filters freely: e.g., subscribe to only `task_created` from project `ENG` with a 50 ms debounce.
@@ -29,7 +29,7 @@ Combine filters freely: e.g., subscribe to only `task_created` from project `ENG
 - `project_changed` — `{ "name": "<PROJECT>" }`; raised by the `.tasks` watcher whenever YAML files are created, modified, or removed under that project.
 - `sync_started` — `{ "run_id": "sync-...", "direction": "pull|push", "provider": "jira|github", "remote": "<remote>", "project": "<PREFIX>", "dry_run": true|false, "started_at": "..." }`.
 - `sync_progress` — `{ "run_id": "sync-...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "entry": {"status":"created|updated|skipped|failed", "task_id": "PREFIX-1", "reference": "owner/repo#123", "message": "...", "at": "..."}, "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.
-- `sync_completed` — `{ "run_id": "sync-...", "report": { "id": "...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "stored_path": "sync-...json", ... }, "finished_at": "..." }`.
+- `sync_completed` — `{ "run_id": "sync-...", "project": "<PREFIX>"|null, "report": { "id": "...", "summary": {"created":0,"updated":0,"skipped":0,"failed":0}, "stored_path": "sync-...json", ... }, "finished_at": "..." }`. `project` mirrors the report's resolved execution project (runs without an explicit project fall back to the configured default project) and is `null` when none resolves; `null` never matches a `project` filter.
 - `sync_failed` — `{ "run_id": "sync-...", "error": "...", "finished_at": "...", "project": "<PREFIX>", "remote": "<remote>", "direction": "pull|push" }`.
 - `agent_job_started` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "runner": "copilot|codex|claude|gemini|command", "status": "running", "created_at": "...", "started_at": "..." }`.
 - `agent_job_progress` — `{ "id": "job-...", "ticket_id": "<PROJECT-N>", "status": "running", "message": "..." }`.

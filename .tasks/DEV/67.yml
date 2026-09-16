@@ -1,11 +1,47 @@
 title: Scope SyncHub live runs reports and selections by project
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.646514+00:00
+modified: 2026-09-16T21:10:54.796743+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-09-16T20:01:13.144+00:00
+  text: |-
+    Plan (frontend; implementation deferred, no source edits yet; backend sync_service/SSE-docs/Rust-test owned by separate agent):
+    1. SSE: replace per-scope filtered stream with ONE persistent unfiltered sync-kind stream (no project param) set up once on mount; client-side scope attribution; onReconnect reconciles reports and marks still-running known runs unknown (connection lost). Project switch never closes/reopens SSE.
+    2. Run identity: run_id (client_run_id passthrough) is the stable key. UI-started runs capture originScope (global or project prefix) at request time; remote busy/pills keyed by originScope+remote name so homonyms stay independent. External/unknown-origin events (CLI, other tabs) never mark remotes busy and never relabel scope; they surface only via report items carrying server report.project.
+    3. Semantics: config origin (scope whose remotes map the user clicked) is distinct from execution task project (report.project; global-origin pulls may fall back to default_project, and backend then resolves remotes from that project effective config - sync_service resolve_project_prefix/run). UI attributes by captured origin, shows report.project as data, and displays an informational hint when global runs will fall back to default project. No guessing origin for external events.
+    4. Reports: loadReports gets generation guard (drop stale A-B-A responses); same-scope refresh failure keeps previous list plus error banner; scope switch clears selection and list. syncReportGet(path, project) passes the scope that listed the item (project param already accepted by backend route). Global view stays an unfiltered aggregator list.
+    5. Editor: origin-aware editing - project-inherited remotes open read-only with explicit choice (edit in Global vs override in project); dialog captures target scope at open, no dynamic project read at save; save does fresh reload then single-remote delta merge preserving unrelated/concurrent remotes, conflicts surfaced; generation guards on every async dialog flag (validate/submit/close/delete); saving blocked during scope switches or loading.
+    6. runSync: REST completion only touches selection when still on the run origin scope; transport failure (request failed) distinguished from server sync_failed.
+    7. Tests: extend view/__tests__/SyncHub.spec.ts with fake-SSE harness (handler capture + onReconnect): attribution, homonym busy/pills, A-B-A stale drops, report detail scope/path, editor validation errors and no wrong-scope save after switch, direct pull/push failure scope headers, teardown late-await. Browser smoke later with real HTTP sync start (local stub remote for success, dead endpoint for failure); CLI api_events are process-local and never reach HTTP SSE.
+    Backend contract requested from backend agent (alignment, minimal): add top-level project to sync_completed payload for parity with started/progress/failed (filtered SSE currently drops completed at web_server.rs:545) plus SSE docs and Rust test; no other SSE schema expansion needed - unfiltered frontend uses report.project; reports/get already accepts project so no REST shape change.
+    Files: view/pages/SyncHub.vue, view/api/client.ts, view/__tests__/SyncHub.spec.ts (docs only if help text needs it).
+    Checks before handoff: targeted npm run test:ui, npm run lint:frontend, then full lint/test/smoke gates and browser verification.
+- date: 2026-09-16T20:23:18.984405+00:00
+  text: |-
+    Frontend implementation landed (still InProgress; browser pass + backend contract + full gates remain). Files: view/pages/SyncHub.vue (rewritten), view/composables/useSyncRuns.ts (new scoped run/SSE state), view/api/client.ts (syncReportGet path+project), view/__tests__/SyncHub.spec.ts (24 tests), docs/developers/sync.md (reports endpoint project note; sse.md intentionally untouched - backend agent owns).
+    Design: one persistent UNFILTERED sync SSE opened once per mount (never reopened on scope switch); attribution client-side by run_id (client_run_id passthrough, counter+random id). Known runs capture originScope + reportQueryScope + expectedExecProject at request time mirroring backend resolve_project_prefix/pull fallback, so a global-origin run into default project ALPHA never touches the ALPHA homonym remote state and its report resolves through the ALPHA root. External (CLI/other client) runs tracked separately: never busy/pill, surface as External-tagged report items visible in global aggregator or matching project only. Late REST cannot regress SSE-finalized runs (success or error) and never steals a user selection; transport failures labeled Request-failed vs server sync_failed. Reconnect: per-run direct root query finalizes missed completions, otherwise truthful Unknown (not busy, rerun warns about duplication); scope activation reconciles from the fresh list without marking unknown. Reports: generation-guarded loads (A-B-A stale drop), same-scope refresh failure keeps list + error banner, selections cleared on switch, stored reports resolved via candidate root chain [listing scope, report.project, global]. Editor: explicit captured target scope (inherited remotes require Override-in-project vs Edit-in-global choice, read-only until chosen), dialog survives scope switches but saves to captured target, save/delete do fresh inspect + single-remote delta merge (no server CAS - concurrent same-remote change detected and refused, name collisions refused, concurrent removal reported honestly), validate/delete/submit all generation-guarded, save blocked while scope config reloads.
+    Verification: npm run test:ui:agent -- view/__tests__/SyncHub.spec.ts => 24/24 passed; npm run test:ui:agent full => 438/438 in 60 files; npm run lint:frontend => clean. No git commands used.
+    Remaining: browser smoke by dedicated agent after UI is stable (needs real HTTP sync start for real SSE; CLI api_events are process-local), backend agent sync_completed project payload + SSE docs + Rust test, then full lint/test/smoke gates.
+- date: 2026-09-16T20:57:32.458356+00:00
+  text: |-
+    Independent review findings resolved (frontend only, no backend API change; still InProgress).
+    B1 stale-config wrong-remote (BLOCKER, fixed): SyncHub no longer renders from the shared useConfigScope inspectData (which persists across reloads and failures). New scope-stamped snapshot (scopedInspect + inspectStamp + generation in loadScopeConfig) is the sole source for remotes/auth/reports-dir/default_project. Rows render only when stamp === current scope; mismatched scopes hide rows with an unavailable notice and disable Add remote - during load AND permanently after a failed switch. Same-scope reload failure keeps valid rows + scope-load-error banner. Mutations guarded in-function and on buttons (Pull/Push/Check/Edit/Add/delete/validate): runSync aborts unless stamp matches, dialog ops block a target that equals an unvalidated current scope. A-B-A late inspect responses never re-stamp (generation guard). Shared composable unchanged.
+    B2 global default-project homonym (BLOCKER, fixed): runs from Global scope with a default_project now preflight inspectConfig(defaultProject) and compare its effective remote definition with the displayed global one. Divergence blocks the run BEFORE any request with toast: Remote 'X' is overridden in default project ALPHA ... Switch to ALPHA to run it, or align the definitions. Matching definitions proceed for ALL actions incl Push with hint: <ACTION> runs through default project ALPHA; its effective config applies. Preflight failures fail closed (blocked); scope navigation during the pending preflight aborts; scope-keyed preflight-busy prevents double-clicks (buttons disabled, correct key released). No-default Jira-key fallback behavior preserved.
+    B3 external entries (browser-found, fixed): useSyncRuns handleCompleted external branch now preserves accumulated progress entries (deep-copied) and startedAt like handleFailed.
+    Secondary: selectedReportFields attributes the remote definition - global-aggregator items carrying another project (and external runs of unclear origin) hide Fields-synced chips instead of inferring the current homonym; reconcile distinguishes lookup-failure unknown ('Connection uncertain...') from confirmed-absent unknown ('No stored report was found...'); dialog busy flags reset when the dialog closed even if generation advanced.
+    Evidence: view/__tests__/SyncHub.spec.ts now 35 tests (24 prior + 11 regressions: B1 pending-switch hide/failed-switch permanent-hide/A-B-A no re-stamp/same-scope-failure keeps rows; B2 divergence block no-request, match pull+push with hint, inspect-failure fail-closed, navigate-away abort, preflight busy double-start; B3 stored-path root attribution + pathless entries preserved; fields attribution hide/show). Full UI suite 449/449 in 60 files; npm run lint:frontend clean. Browser agent owns smoke files (external-entries assertion to be restored next wave, noted as pending-mandatory after this fix). Files touched: view/pages/SyncHub.vue, view/composables/useSyncRuns.ts, view/__tests__/SyncHub.spec.ts. No git commands.
+- date: 2026-09-16T21:10:47.477703+00:00
+  text: |-
+    Outcome: SyncHub scoped by project with honest run semantics. State keyed by captured config-origin scope vs execution task project (distinct, never conflated); report roots resolved via caller-passed project param; one persistent unfiltered SSE with client-side attribution and truthful reconnect handling; origin-aware editor with explicit inherited-target choice (edit in Global vs override in project), fresh-inspect merge preserving unrelated maps with name/version conflict guards; B1 scope-stamped config (stale/failed loads hide rows and guard all mutations incl Add/Edit/delete), B2 default-project homonym divergence preflight blocking all actions incl Push with actionable notice (match proceeds with exec-project hint, fail-closed, navigate-abort, preflight-busy), B3 external run entries preserved through completion. Backend agent (parallel): sync_completed top-level project parity + 3 Rust tests + SSE docs, no REST shape change. Browser verification: 8 scenarios all pass, external-entries assertion restored (no NOTE); real local Jira API stub over real HTTP SSE in isolated home with fake auth; only mocked item was the BETA inspect-500 case; no external real network. Independent review blockers resolved and signed off.
+    Evidence: view/pages/SyncHub.vue, view/composables/useSyncRuns.ts, view/api/client.ts, view/__tests__/SyncHub.spec.ts (35 tests), docs/developers/sync.md; backend counterpart in src/services/sync_service.rs + SSE docs + Rust tests (backend agent). Final integrated gates, all FIRST PASS: npm run lint:agent exit 0 (vue-tsc view only, clippy --all-targets --all-features -D warnings, fmt clean); npm run test:agent (nextest default concurrency, --retries 0) Rust 1039 passed / 6 skipped across 120 binaries (+3 vs prior 1036), UI 449/449 in 60 files (SyncHub 35/35); fresh-build npm run test:smoke:agent 134 passed / 23 skipped of 157 tests in 42 files (37 files pass / 5 skip), +8 vs prior 126. New Rust tests are runnable under the no-git cfg exclusions. Baseline accounting: 13 whole Rust test files + parts of 4 cfg-compiled-out, 6 ignored (agent safety baseline); 23 smoke skips are baseline git skips - unverified, not passes. Historical targeted browser/harness failures were resolved and documented; they are not final-gate failures. Known preexisting debt persists: smoke tsconfig TS config errors (unchanged).
+    Remaining: none within DEV-67 scope; changes remain uncommitted/unintegrated (no git operations were performed by this work). Explicit limitations: (1) no server run registry - after reconnect a run stays Unknown until a completion event or stored report appears; never faked as failed. (2) report directories follow per-project sync_reports_dir overrides; the global aggregator list is not a full all-roots enumeration. (3) no server CAS - the fresh-inspect to config-write race remains for generic concurrent editing, including same-scope snapshot staleness when config changes externally; same-name conflicts are detected/refused and unrelated maps preserved. (4) one duplicate unused useConfigScope inspect request per scope load remains (low; no correctness claim). (5) external entry preservation uses shallow entry copies; fields are never mutated - do not claim deep copy.
+    Guidance: no durable guidance finding; no instruction edits.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U11 T11.
@@ -16,3 +52,34 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-16T20:00:58.135532+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-16T20:01:13.144+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T20:23:18.984405+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T20:57:32.458356+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T21:10:47.477703+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T21:10:54.796743+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

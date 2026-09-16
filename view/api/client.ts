@@ -211,7 +211,7 @@ export const api = {
   syncReportsList(params: { project?: string; limit?: number; offset?: number } = {}): Promise<SyncReportListResponse> {
     return get('/api/sync/reports/list', params as any)
   },
-  syncReportGet(path: string): Promise<SyncReport> { return get('/api/sync/reports/get', { path }) },
+  syncReportGet(path: string, project?: string): Promise<SyncReport> { return get('/api/sync/reports/get', { path, project }) },
 
   // Scan
   scanRun(payload: ScanRequest): Promise<ScanResponse> { return post('/api/scan/run', payload) },
