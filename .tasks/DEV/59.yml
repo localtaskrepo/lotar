@@ -1,13 +1,69 @@
 title: Compose automation actions against current task state without lost updates
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-54]
-  related: [DEV-11]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.512163+00:00
+modified: 2026-09-16T05:30:20.935388+00:00
+relationships:
+  depends_on:
+  - DEV-54
+  related:
+  - DEV-11
+  parent: DEV-53
+comments:
+- date: 2026-09-16T05:00:03.221946+00:00
+  text: |-
+    Plan (implementation not started; research verified against current checkout):
+
+    Problem (verified): apply_task_update/apply_comment_event/apply_job_event (src/services/automation_service.rs:248/347/399) pass one immutable task snapshot to every rule/hook. apply_action (:1040) clones current.tags/custom_fields/relationships, mutates per single action, then commits the whole collection replacement via TaskService::update_with_context(..., automation_disabled()) (:1097). A later rule re-clones the original snapshot, so its Some(collection) patch clobbers earlier rules' add/remove results.
+
+    Fix approach: refresh the mutation base from freshest persisted state before each action across all three dispatchers (re-read task via TaskService::get per action; includes sprint/comment/run/agent side effects already committed), while condition matching and templates keep the original event previous/current and alias semantics (@assignee etc. resolve against the event snapshot). Keep: DEV-55 postcommit dispatch points, automation_disabled() recursion guard + cooldown/max_iterations, existing error propagation policy, deterministic ordering (rules in file order; events Updated,Assigned,SprintChanged then legacy start; within action set->add->remove; set.tags/set.custom_fields remain full replacements with last-writer-wins). No locks held across dispatch (per-action re-read; no long-lived storage lock).
+
+    Files: src/services/automation_service.rs; new tests/dev59_automation_composition_test.rs (isolated tempdir fixtures, no git init, no cfg(not(no_git_tests)) gate, no external agent processes); docs/help/automation.md minimal execution-semantics section.
+
+    Regression coverage: (1) two+ rules add/remove tags, custom_fields, relationships -> all preserved, deterministic; (2) same rule firing multiple hooks + legacy start composes; (3) set replacement + scalar last-writer-wins ordering; (4) conditions/templates see original event values incl previous.* even after earlier actions mutated the task; (5) commented dispatch composes; (6) job-event dispatch composes (direct apply_job_event calls, no real jobs); (7) non-recursion: action-triggered writes do not re-fire automation, single application.
+
+    Out of scope: DEV-60 bulk pipeline, DEV-83 docs reconciliation, runtime/REST changes, simulate redesign, unrelated fidelity repairs. Concurrency explicitly limited: composition is sequential per dispatch; not atomic between actions against independent concurrent writers - docs will state this limitation rather than claim a complete concurrency fix.
+
+    Gates: npm run lint:agent; npm run test:agent (default concurrency, --retries 0); npm run test:smoke:agent (fresh build) with PATH ~/.cargo/bin, unique nested TMPDIR, PLAYWRIGHT_BROWSERS_PATH=/var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/kilo/pw-browsers, LOTAR_SMOKE_CHROMIUM_ARGS='--no-sandbox,--no-zygote,--single-process'.
+
+    Dependencies: DEV-54 Done (mutation contracts), DEV-55 Done (transactional + postcommit), DEV-11/DEV-53 Done. Next: implement refresh-per-action in automation_service.rs.
+- date: 2026-09-16T05:12:27.687797+00:00
+  text: |-
+    Implemented (awaiting independent review; full gates not yet run per developer instruction):
+
+    - src/services/automation_service.rs apply_action: reads the fresh persisted task once per action via TaskService::get before cloning tags/custom_fields/relationships; collection comparisons, the update_with_context(automation_disabled) commit, and the maybe_queue_agent_on_assignment previous-assignee baseline now use that base. Event-time `current` still drives templates and assignee alias resolution; condition matching in all three dispatchers is untouched (event snapshot + ChangeSet). Single shared change covers apply_task_update, apply_comment_event, and apply_job_event paths.
+    - docs/help/automation.md: new "Execution and composition semantics" section documenting file-order rule execution, per-action persisted composition, set.tags whole-list replacement + scalar last-writer-wins, set.custom_fields per-key merge, in-action set->add->remove order, event-time condition/template/alias values, and the non-atomicity caveat for concurrent writers.
+    - tests/dev59_automation_composition_test.rs: 11 tests via the public pipeline (TaskService create/update/add_comment + direct AutomationService::apply_job_event with no job processes): multi-rule tag add/remove composition with dedup, custom-field per-key merge, relationship composition without duplicates, same-rule multi-hook + legacy start fan-out, set-replacement + scalar last-writer ordering, condition/template event-value retention against earlier mutations (previous.status/ticket.status), comment-event composition with comment.text template, job-event composition, comment-only rule preserving earlier updates, and ping-pong non-recursion guard. Isolated tempdirs, no git, no agent subprocesses, no cfg gating.
+
+    Verification (nextest --cargo-profile ci --retries 0, default concurrency): dev59_automation_composition 11/11 passed; cli_single_field_automation_test + dev82_contract_semantics_test + cli_init_behavior_test 36/36 passed; agent_automation_integration_test 29/29 passed; agent_safety_test 9 passed / 6 skipped (pre-existing skips). cargo fmt --all --check clean; lint:backend:fast (clippy lib+bins) clean. Not yet run: lint:agent full, test:agent full, test:smoke:agent.
+
+    Remaining: independent review, then full gates before handoff.
+- date: 2026-09-16T05:27:41.214640+00:00
+  text: |-
+    Review fixes applied (docs accuracy + test discrimination; no production changes):
+
+    - docs/help/automation.md "Action fields": add/remove now accurately lists tags/labels, sprint membership (sprint: <sprint reference or @active>), and relationships (depends_on, blocks, related), matching AutomationTagAction.
+    - docs/help/automation.md template table: previous.* clarified as available on update-derived hooks (updated, assigned, sprint_changed, legacy start which also covers creation where it resolves empty), not on commented or job hooks — matches AutomationActionContext construction in the three dispatchers.
+    - tests/dev59_automation_composition_test.rs: strengthened sequential_rules_tag_additions_compose (rule 1 adds rule-one-only which rule 2 never repeats; rule 2 re-adds overlap alpha for dedup; exact-order assert [alpha, rule-one-only, beta]) and relationships_compose_across_rules_without_duplicates (rule 1 adds first_only to depends_on AND blocks; rule 2 only re-adds overlap and removes a seeded depends_on member; asserts depend_on [overlap, first_only] and blocks [first_only]). Count stays 11 (in-place strengthening).
+    - Counterfactual verified by code reading (no revert): on the original stale-snapshot base, rule 2 cloned event-time collections (tags [], relationships {depends_on: [seeded], blocks: []}) and the whole-collection replacement commit would drop rule-one-only and first_only from both relationship collections, failing the new asserts.
+
+    Coverage gap (reported, not claimed): the fresh-base previous-assignee baseline in maybe_queue_agent_on_assignment has no direct regression test; covering it needs real agent job queueing, which is outside this ticket's no-agent-process test scope.
+
+    Verification: cargo fmt --all --check clean; npm run lint:agent passed (vue-tsc, clippy --all-targets --all-features -D warnings incl. test code, fmt); nextest -E binary(dev59_automation_composition_test) --retries 0 default concurrency: 11/11 passed. Full UI and smoke results from the earlier gate run remain valid (docs/test-only changes since; no runtime code touched).
+
+    Status: InProgress pending final review signoff.
+- date: 2026-09-16T05:30:14.190903+00:00
+  text: |-
+    Outcome: AutomationService::apply_action now composes every action against a fresh persisted mutation base (single TaskService::get per action shared by the apply_task_update, apply_comment_event, and apply_job_event dispatch paths) while the event-time task continues to drive condition matching, templates, and assignee aliases; deterministic rule/event ordering, the automation_disabled recursion guard, and existing error policy are preserved. docs/help/automation.md documents the actual execution/composition semantics, and tests/dev59_automation_composition_test.rs pins them with 11 tests (isolated fixtures, no git, no cfg gating, no agent processes). Independent final review signoff received: all blockers resolved; 9 of 11 strengthened fixtures discriminate the original stale-snapshot bug, 2 pin guard/no-op behavior; docs confirmed accurate.
+
+    Evidence: Full gates: npm run lint:agent passed; npm run test:agent (default concurrency, --retries 0): Rust 1022 passed / 6 skipped across 118 binaries, UI 415 passed across 60 files; fresh-build npm run test:smoke:agent: 123 passed / 23 skipped = 146 tests across 40 files (35 pass / 5 skip). Baseline exclusions, not a coverage claim: 13 whole Rust test files plus parts of 4 more are cfg-excluded (no_git_tests) and 6 are ignored; the 23 smoke skips are pre-existing with no new fallbacks. After the docs/test-only refinement: lint:agent and targeted nextest of the 11 dev59 tests (--retries 0, default concurrency) passed. No commits, staging, or Git commands were used for DEV-59; pre-existing README/DEV-82 edits preserved.
+
+    Remaining: Composition is not atomic across action transactions for independent concurrent writers (unchanged, documented limitation). The fresh-base queue-comparison baseline in maybe_queue_agent_on_assignment was reviewed but has no direct queuing test - no coverage claimed. Automation simulate first-matching behavior unchanged and out of scope. Work is complete and uncommitted/integrated-pending by policy; no commit reference to append.
+
+    Guidance: No durable guidance finding; documentation changes describe user-facing behavior only, not agent policy.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S7.
@@ -19,3 +75,34 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-16T04:59:35.675698+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-16T05:00:03.221946+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T05:12:27.687797+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T05:27:41.214640+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T05:30:14.190903+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T05:30:20.935388+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

@@ -1037,6 +1037,14 @@ fn execute_run_action(
     Ok(())
 }
 
+/// Apply one automation action.
+///
+/// Collection updates (tags, custom fields, relationships) compose against
+/// the freshest persisted task state so sequential actions across rules and
+/// hooks in one dispatch keep earlier committed changes instead of
+/// overwriting them with event-time snapshots. `current` stays the
+/// event-time snapshot: templates and assignee alias tokens keep resolving
+/// the pre-change values that conditions were matched against.
 fn apply_action(
     storage: &mut Storage,
     current: &TaskDTO,
@@ -1044,15 +1052,20 @@ fn apply_action(
     action: &AutomationAction,
     action_context: &AutomationActionContext,
 ) -> LoTaRResult<()> {
+    // Compose against the latest persisted state, including side effects of
+    // earlier actions in this dispatch (collection commits, sprint
+    // assignment, comments).
+    let base = TaskService::get(storage, &current.id, None)?;
+
     let tmpl = TemplateContext::from_task(current)
         .with_previous(action_context.previous.as_ref())
         .with_job(action_context.job.as_ref())
         .with_comment(action_context.comment_text.as_deref());
 
     let mut patch = TaskUpdate::default();
-    let mut updated_tags = current.tags.clone();
-    let mut custom_fields = current.custom_fields.clone();
-    let mut updated_relationships = current.relationships.clone();
+    let mut updated_tags = base.tags.clone();
+    let mut custom_fields = base.custom_fields.clone();
+    let mut updated_relationships = base.relationships.clone();
 
     if let Some(set) = action.set.as_ref() {
         apply_set_action(
@@ -1082,13 +1095,13 @@ fn apply_action(
         }
     }
 
-    if patch.tags.is_none() && updated_tags != current.tags {
+    if patch.tags.is_none() && updated_tags != base.tags {
         patch.tags = Some(updated_tags);
     }
-    if patch.custom_fields.is_none() && custom_fields != current.custom_fields {
+    if patch.custom_fields.is_none() && custom_fields != base.custom_fields {
         patch.custom_fields = Some(custom_fields);
     }
-    if patch.relationships.is_none() && updated_relationships != current.relationships {
+    if patch.relationships.is_none() && updated_relationships != base.relationships {
         patch.relationships = Some(updated_relationships);
     }
 
@@ -1096,7 +1109,7 @@ fn apply_action(
     if patch_has_changes(&patch) {
         next_task = Some(TaskService::update_with_context(
             storage,
-            &current.id,
+            &base.id,
             patch,
             TaskUpdateContext::automation_disabled(),
         )?);
@@ -1104,14 +1117,14 @@ fn apply_action(
     if let Some(updated) = next_task.as_ref() {
         maybe_queue_agent_on_assignment(
             storage.root_path.as_path(),
-            current.assignee.as_deref(),
+            base.assignee.as_deref(),
             updated.assignee.as_deref(),
             updated,
             config,
         );
     }
 
-    let task_for_env = next_task.as_ref().unwrap_or(current);
+    let task_for_env = next_task.as_ref().unwrap_or(&base);
 
     if let Some(comment_template) = action.comment.as_ref() {
         let text = tmpl.expand(comment_template);

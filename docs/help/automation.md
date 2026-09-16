@@ -106,7 +106,7 @@ on:
 ### Action fields
 
 - `set`: any task field (status, assignee, reporter, priority, type, title, description, due_date, effort, tags, custom_fields)
-- `add/remove`: currently only tags/labels
+- `add/remove`: tags/labels, sprint membership (`sprint: <sprint reference or @active>`), and relationships (`depends_on`, `blocks`, `related`)
 - `run`: execute a command when the action fires
 - `comment`: add a comment to the task
 
@@ -175,7 +175,7 @@ Available variables:
 | Prefix | Variables |
 |--------|-----------|
 | `ticket.*` | `id`, `title`, `status`, `priority`, `type`, `assignee`, `reporter`, `description`, `due_date`, `effort`, `tags`, `field:<name>` |
-| `previous.*` | Same as `ticket.*` but for the pre-change state (available on `start`, `sprint_changed`) |
+| `previous.*` | Same as `ticket.*` but for the pre-change state (available on the update-derived hooks `updated`, `assigned`, `sprint_changed`, and the legacy `start`, which also covers task creation where no prior state exists; not available on `commented` or job hooks) |
 | `comment.*` | `text` (available on `commented` events) |
 | `agent.*` | `job_id`, `runner`, `profile`, `worktree_path`, `worktree_branch` (available on job events) |
 
@@ -188,6 +188,14 @@ on:
   commented:
     run: "echo ${{comment.text}}"
 ```
+
+## Execution and composition semantics
+
+- Rules run in file order. A matching rule fires its event hook(s) (`created`, `updated`, `assigned`, `sprint_changed`, `commented`, or the job hooks) and then the legacy `start` catch-all. Each action is committed before the next one applies.
+- Every action composes against the task's latest persisted state: tag and relationship `add`/`remove` operations from earlier rules and hooks accumulate instead of overwriting each other, and `set.custom_fields` writes only the listed keys (existing keys keep their values; writing the same key twice keeps the last write).
+- Explicit replacement still wins: `set.tags`/`set.labels` replaces the whole tag list, and scalar `set` fields overwrite. When several rules set the same field, the last rule in file order wins. Within a single action, `set` applies before `add`, which applies before `remove`.
+- Conditions, template variables (`ticket.*`, `previous.*`, `comment.*`), and assignee alias tokens resolve against the task as it was when the event fired, not against values written by earlier actions in the same dispatch.
+- Actions in one dispatch run sequentially but are not atomic: another writer editing the task between two actions can still interleave with the sequence.
 
 ## Cooldown
 

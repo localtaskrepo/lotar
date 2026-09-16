@@ -3,7 +3,7 @@
 > A git-integrated task management system that lives in your repository.
 
 [![Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)](docs/README.md)
-[![Tests](https://github.com/localtaskrepo/lotar/actions/workflows/test.yml/badge.svg)](https://github.com/localtaskrepo/lotar/actions/workflows/test.yml)
+[![Tests](https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml/badge.svg)](https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
 
 ## 🚀 Quick Start

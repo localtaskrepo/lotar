@@ -194,7 +194,7 @@ lotar task at PROJ-1 <sha>
 
 ## Testing & Quality
 
-- **Comprehensive test suite** across all components (see [CI status](https://github.com/localtaskrepo/lotar/actions/workflows/test.yml))
+- **Comprehensive test suite** across all components (see [CI status](https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml))
 - **Handler Unit Tests**: CLI command handlers
 - **CLI Integration**: End-to-end workflows
 - **Experimental CLI**: Real command execution
