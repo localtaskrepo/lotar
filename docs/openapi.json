@@ -528,11 +528,48 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Task page; the tasks key is omitted when the page is empty",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvelopeTaskList"
+                },
+                "examples": {
+                  "empty": {
+                    "summary": "Empty page (tasks omitted)",
+                    "value": {
+                      "data": {
+                        "total": 0,
+                        "limit": 50,
+                        "offset": 0
+                      }
+                    }
+                  },
+                  "populated": {
+                    "summary": "Populated page",
+                    "value": {
+                      "data": {
+                        "total": 1,
+                        "limit": 50,
+                        "offset": 0,
+                        "tasks": [
+                          {
+                            "id": "DEV-42",
+                            "title": "Wire attachment upload contract",
+                            "status": "Todo",
+                            "priority": "Medium",
+                            "task_type": "Feature",
+                            "assignee": "alice",
+                            "created": "2026-09-15T10:00:00+00:00",
+                            "modified": "2026-09-15T11:30:00+00:00",
+                            "tags": [
+                              "api"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2654,10 +2691,87 @@
     },
     "/api/automation/simulate": {
       "post": {
-        "summary": "Simulate automation rules against a change",
+        "summary": "Simulate automation rules for an event",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Simulation result (task_after null when no rule matched)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAutomationSimulateResponse"
+                },
+                "examples": {
+                  "matched": {
+                    "summary": "A rule matched and would set the status",
+                    "value": {
+                      "data": {
+                        "matched": true,
+                        "rule_name": "Move verify work forward",
+                        "actions": [
+                          {
+                            "action": "set_status",
+                            "description": "Set status to 'InProgress'"
+                          }
+                        ],
+                        "task_before": {
+                          "id": "DEV-42",
+                          "title": "Wire attachment upload contract",
+                          "status": "Todo",
+                          "priority": "Medium",
+                          "task_type": "Feature",
+                          "assignee": "alice",
+                          "created": "2026-09-15T10:00:00+00:00",
+                          "modified": "2026-09-15T11:30:00+00:00",
+                          "tags": [
+                            "api"
+                          ]
+                        },
+                        "task_after": {
+                          "id": "DEV-42",
+                          "title": "Wire attachment upload contract",
+                          "status": "InProgress",
+                          "priority": "Medium",
+                          "task_type": "Feature",
+                          "assignee": "alice",
+                          "created": "2026-09-15T10:00:00+00:00",
+                          "modified": "2026-09-15T11:30:00+00:00",
+                          "tags": [
+                            "api"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "noRules": {
+                    "summary": "No automation rules configured",
+                    "value": {
+                      "data": {
+                        "matched": false,
+                        "rule_name": null,
+                        "actions": [],
+                        "task_before": {
+                          "id": "DEV-42",
+                          "title": "Wire attachment upload contract",
+                          "status": "Todo",
+                          "priority": "Medium",
+                          "task_type": "Feature",
+                          "assignee": "alice",
+                          "created": "2026-09-15T10:00:00+00:00",
+                          "modified": "2026-09-15T11:30:00+00:00",
+                          "tags": [
+                            "api"
+                          ]
+                        },
+                        "task_after": null
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2668,31 +2782,98 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": [
-                  "ticket_id"
-                ],
-                "properties": {
-                  "ticket_id": {
-                    "type": "string"
-                  },
-                  "change": {
-                    "type": "object",
-                    "description": "Field changes to simulate (field -> value)"
+                "$ref": "#/components/schemas/AutomationSimulateRequest"
+              },
+              "examples": {
+                "canonicalEvent": {
+                  "summary": "Canonical event name",
+                  "value": {
+                    "ticket_id": "DEV-42",
+                    "event": "updated"
+                  }
+                },
+                "legacyAlias": {
+                  "summary": "Case-insensitive legacy alias",
+                  "value": {
+                    "ticket_id": "DEV-42",
+                    "event": "job_start"
                   }
                 }
               }
             }
           }
-        }
+        },
+        "description": "Previews which automation rule would match the ticket's current state for the given event and the actions it would perform, without applying any changes. The automation scope (project vs global rules) is resolved from the ticket's project prefix; the optional project field is ignored. Event names are case-insensitive and accept the legacy aliases job_start, complete, success, error, failure, and cancel. The response always carries matched, rule_name, actions, task_before, and task_after (null when no rule matched)."
       }
     },
     "/api/sprints/create": {
       "post": {
         "summary": "Create a sprint",
+        "description": "Creates a sprint from the provided fields. Unless skip_defaults is true, configured sprint defaults (capacity_points, capacity_hours, length, overdue_after) fill unset fields; applied_defaults lists every default that fired. A new sprint without dates starts in the pending state.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintCreateRequest"
+              },
+              "examples": {
+                "withDefaults": {
+                  "summary": "Create with configured defaults applied",
+                  "value": {
+                    "label": "W42",
+                    "goal": "Ship the DEV-82 contract repair",
+                    "plan_length": "1w"
+                  }
+                },
+                "skipDefaults": {
+                  "summary": "Create without applying sprint defaults",
+                  "value": {
+                    "label": "Hotfix",
+                    "skip_defaults": true
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Sprint created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintCreate"
+                },
+                "examples": {
+                  "created": {
+                    "summary": "Sprint created with one default applied",
+                    "value": {
+                      "data": {
+                        "status": "ok",
+                        "sprint": {
+                          "id": 1,
+                          "label": "W42",
+                          "display_name": "W42",
+                          "state": "pending",
+                          "created": "2026-09-15T12:00:00+00:00",
+                          "modified": "2026-09-15T12:00:00+00:00",
+                          "goal": "Ship the DEV-82 contract repair",
+                          "plan_length": "1w",
+                          "capacity_points": 20
+                        },
+                        "applied_defaults": [
+                          "capacity_points"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2703,22 +2884,26 @@
     "/api/sprints/delete": {
       "post": {
         "summary": "Delete a sprint",
-        "description": "Deletes the sprint record; tasks keep their data (sprint membership is removed).",
+        "description": "Deletes the sprint record; tasks keep their data (sprint membership is removed). With cleanup_missing true, dangling sprint references on tasks are cleaned up and the response reports the removed references. Returns 404 for an unknown sprint id.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "required": [
-                  "id"
-                ],
-                "properties": {
-                  "id": {
-                    "type": "integer"
-                  },
-                  "confirm": {
-                    "type": "boolean"
+                "$ref": "#/components/schemas/SprintDeleteRequest"
+              },
+              "examples": {
+                "delete": {
+                  "summary": "Delete and clean dangling references",
+                  "value": {
+                    "sprint": 1,
+                    "cleanup_missing": true
+                  }
+                },
+                "deleteOnly": {
+                  "summary": "Delete without cleanup",
+                  "value": {
+                    "sprint": 1
                   }
                 }
               }
@@ -2727,7 +2912,42 @@
         },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Sprint deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintDelete"
+                },
+                "examples": {
+                  "deleted": {
+                    "summary": "Sprint deleted with reference cleanup",
+                    "value": {
+                      "data": {
+                        "status": "ok",
+                        "deleted": true,
+                        "sprint_id": 1,
+                        "sprint_label": "W42",
+                        "removed_references": 3,
+                        "updated_tasks": 2,
+                        "integrity": {
+                          "auto_cleanup": {
+                            "removed_references": 3,
+                            "updated_tasks": 2
+                          }
+                        }
+                      },
+                      "summary": "Sprint deleted with reference cleanup (integrity reports the cleanup summary)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2738,9 +2958,66 @@
     "/api/sprints/update": {
       "post": {
         "summary": "Update sprint fields",
+        "description": "Updates the sprint identified by the required sprint id. Omitted fields are unchanged; null clears the nullable capacity/actual-timestamp fields. Returns 400 for an unknown sprint id, sprint 0, or an invalid body.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SprintUpdateRequest"
+              },
+              "examples": {
+                "relabel": {
+                  "summary": "Rename the sprint",
+                  "value": {
+                    "sprint": 1,
+                    "label": "W43"
+                  }
+                },
+                "nullClearCapacity": {
+                  "summary": "Clear the points capacity with null",
+                  "value": {
+                    "sprint": 1,
+                    "capacity_points": null
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Sprint updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeSprintUpdate"
+                },
+                "examples": {
+                  "updated": {
+                    "summary": "Relabeled sprint (capacity cleared)",
+                    "value": {
+                      "data": {
+                        "status": "ok",
+                        "sprint": {
+                          "id": 1,
+                          "label": "W43",
+                          "display_name": "W43",
+                          "state": "pending",
+                          "created": "2026-09-15T12:00:00+00:00",
+                          "modified": "2026-09-15T12:00:00+00:00",
+                          "goal": "Ship the DEV-82 contract repair",
+                          "plan_length": "1w"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -2753,7 +3030,43 @@
         "summary": "Upload an attachment for a task",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Attachment stored and attached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAttachmentUploadResponse"
+                },
+                "examples": {
+                  "uploaded": {
+                    "summary": "Blob stored (content-hash leaf) and attached",
+                    "value": {
+                      "data": {
+                        "stored_path": "release-notes.9f86d081884c7d659a2feaa0c55ad015.md",
+                        "attached": true,
+                        "task": {
+                          "id": "DEV-42",
+                          "title": "Wire attachment upload contract",
+                          "status": "Todo",
+                          "priority": "Medium",
+                          "task_type": "Feature",
+                          "assignee": "alice",
+                          "created": "2026-09-15T10:00:00+00:00",
+                          "modified": "2026-09-15T11:30:00+00:00",
+                          "tags": [
+                            "api"
+                          ],
+                          "references": [
+                            {
+                              "attachment": "release-notes.9f86d081884c7d659a2feaa0c55ad015.md"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid task ID, project mismatch, ambiguity, or cross-root refusal",
@@ -2781,6 +3094,26 @@
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentUploadRequest"
+              },
+              "examples": {
+                "upload": {
+                  "summary": "Upload a text file as a managed attachment",
+                  "value": {
+                    "id": "DEV-42",
+                    "filename": "release-notes.md",
+                    "content_base64": "IyBSZWxlYXNlIG5vdGVzCg=="
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2860,10 +3193,84 @@
         "summary": "Remove an attachment from a task",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Attachment detached; blob reclaimed when unreferenced",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvelopeAttachmentRemoveResponse"
+                },
+                "examples": {
+                  "removed": {
+                    "summary": "Reference detached and blob deleted",
+                    "value": {
+                      "data": {
+                        "task": {
+                          "id": "DEV-42",
+                          "title": "Wire attachment upload contract",
+                          "status": "Todo",
+                          "priority": "Medium",
+                          "task_type": "Feature",
+                          "assignee": "alice",
+                          "created": "2026-09-15T10:00:00+00:00",
+                          "modified": "2026-09-15T11:30:00+00:00",
+                          "tags": [
+                            "api"
+                          ]
+                        },
+                        "deleted": true,
+                        "still_referenced": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
+          },
+          "400": {
+            "description": "Invalid body, or the task does not carry the managed attachment reference (the blob is untouched)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                },
+                "examples": {
+                  "wrongKind": {
+                    "summary": "Task references the path as a repository file, not a managed attachment",
+                    "value": {
+                      "error": {
+                        "code": "INVALID_ARGUMENT",
+                        "message": "Task 'DEV-42' does not reference attachment 'release-notes.9f86d081884c7d659a2feaa0c55ad015.md'"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachmentRemoveRequest"
+              },
+              "examples": {
+                "remove": {
+                  "summary": "Detach a managed attachment and reclaim the blob",
+                  "value": {
+                    "id": "DEV-42",
+                    "stored_path": "release-notes.9f86d081884c7d659a2feaa0c55ad015.md"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2965,12 +3372,10 @@
           },
           "reporter": {
             "type": "string",
-            "nullable": true,
             "description": "Supports @me to resolve to current user"
           },
           "assignee": {
             "type": "string",
-            "nullable": true,
             "description": "Supports @me to resolve to current user"
           },
           "created": {
@@ -2980,20 +3385,16 @@
             "type": "string"
           },
           "due_date": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "effort": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "subtitle": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "description": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "tags": {
             "type": "array",
@@ -3077,14 +3478,14 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TaskDTO"
-            }
+            },
+            "description": "TaskDTOs for the requested page. Omitted when the page is empty (serde skips empty arrays); treat a missing tasks key as an empty page."
           }
         },
         "required": [
           "total",
           "limit",
-          "offset",
-          "tasks"
+          "offset"
         ]
       },
       "TaskCreate": {
@@ -3647,6 +4048,87 @@
           "removed"
         ]
       },
+      "AttachmentUploadRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Task ID the uploaded blob is attached to as a managed attachment reference."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Original filename; sanitized into the stored leaf name."
+          },
+          "content_base64": {
+            "type": "string",
+            "description": "Standard base64 encoding of the file bytes."
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "content_base64"
+        ]
+      },
+      "AttachmentUploadResponse": {
+        "type": "object",
+        "properties": {
+          "stored_path": {
+            "type": "string",
+            "description": "Attachments-store leaf name (content-hash tagged) of the stored blob."
+          },
+          "attached": {
+            "type": "boolean",
+            "description": "Whether the managed attachment reference was newly attached to the task."
+          },
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          }
+        },
+        "required": [
+          "stored_path",
+          "attached",
+          "task"
+        ]
+      },
+      "AttachmentRemoveRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Task ID to detach the managed attachment reference from."
+          },
+          "stored_path": {
+            "type": "string",
+            "description": "Attachments-store leaf name previously returned by upload."
+          }
+        },
+        "required": [
+          "id",
+          "stored_path"
+        ]
+      },
+      "AttachmentRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "Whether the blob was reclaimed (no task still references its content hash)."
+          },
+          "still_referenced": {
+            "type": "boolean",
+            "description": "Whether another task still references the same content hash."
+          }
+        },
+        "required": [
+          "task",
+          "deleted",
+          "still_referenced"
+        ]
+      },
       "TaskRelationships": {
         "type": "object",
         "properties": {
@@ -3669,8 +4151,7 @@
             }
           },
           "parent": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "children": {
             "type": "array",
@@ -3685,17 +4166,10 @@
             }
           },
           "duplicate_of": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         },
-        "required": [
-          "depends_on",
-          "blocks",
-          "related",
-          "children",
-          "fixes"
-        ]
+        "required": []
       },
       "TaskComment": {
         "type": "object",
@@ -3719,12 +4193,10 @@
             "type": "string"
           },
           "old": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "new": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         },
         "required": [
@@ -3738,8 +4210,7 @@
             "type": "string"
           },
           "actor": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "changes": {
             "type": "array",
@@ -3749,8 +4220,7 @@
           }
         },
         "required": [
-          "at",
-          "changes"
+          "at"
         ]
       },
       "ReferenceEntry": {
@@ -3758,30 +4228,24 @@
         "properties": {
           "code": {
             "type": "string",
-            "nullable": true,
             "description": "Repository-relative code location in the form path#line or path#start-end."
           },
           "link": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "file": {
             "type": "string",
-            "nullable": true,
             "description": "Repository-relative file path (never a managed attachments-store blob)."
           },
           "attachment": {
             "type": "string",
-            "nullable": true,
             "description": "Managed attachments-store blob name (typed managed attachment; never a repository path)."
           },
           "jira": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "github": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           }
         }
       },
@@ -3854,32 +4318,15 @@
       },
       "TaskStatus": {
         "type": "string",
-        "enum": [
-          "TODO",
-          "IN_PROGRESS",
-          "VERIFY",
-          "BLOCKED",
-          "DONE"
-        ]
+        "description": "Task status. Canonicalized against the project's configured issue_states; default set: Todo, InProgress, NeedsReview, Done."
       },
       "Priority": {
         "type": "string",
-        "enum": [
-          "LOW",
-          "MEDIUM",
-          "HIGH",
-          "CRITICAL"
-        ]
+        "description": "Task priority. Canonicalized against the project's configured priorities; default set: Low, Medium, High."
       },
       "TaskType": {
         "type": "string",
-        "enum": [
-          "feature",
-          "bug",
-          "epic",
-          "spike",
-          "chore"
-        ]
+        "description": "Task type. Canonicalized against the project's configured issue_types; default set: Feature, Bug, Chore."
       },
       "ConfigSetRequest": {
         "type": "object",
@@ -4046,68 +4493,54 @@
             "format": "int32"
           },
           "label": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "display_name": {
             "type": "string"
           },
           "created": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "modified": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "state": {
             "type": "string"
           },
           "planned_start": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "planned_end": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "actual_start": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "actual_end": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "computed_end": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "goal": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "plan_length": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "overdue_after": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "notes": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "capacity_points": {
             "type": "integer",
-            "format": "int32",
-            "nullable": true
+            "format": "int32"
           },
           "capacity_hours": {
             "type": "integer",
-            "format": "int32",
-            "nullable": true
+            "format": "int32"
           },
           "warnings": {
             "type": "array",
@@ -4203,42 +4636,69 @@
         "type": "object",
         "properties": {
           "label": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "goal": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "plan_length": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "ends_at": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "starts_at": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "capacity_points": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int32",
-            "nullable": true
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "capacity_hours": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int32",
-            "nullable": true
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "overdue_after": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "notes": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "skip_defaults": {
             "type": "boolean",
@@ -4259,13 +4719,15 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Omitted when empty."
           },
           "applied_defaults": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Defaults applied from configuration; omitted when empty."
           }
         },
         "required": [
@@ -4278,7 +4740,9 @@
         "properties": {
           "sprint": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "minimum": 1,
+            "description": "Sprint id to delete; must be >= 1 (unknown or 0 ids return 404)."
           },
           "cleanup_missing": {
             "type": "boolean",
@@ -4303,8 +4767,7 @@
             "format": "int32"
           },
           "sprint_label": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "removed_references": {
             "type": "integer",
@@ -4315,8 +4778,7 @@
             "format": "int32"
           },
           "integrity": {
-            "$ref": "#/components/schemas/SprintIntegrityDiagnostics",
-            "nullable": true
+            "$ref": "#/components/schemas/SprintIntegrityDiagnostics"
           }
         },
         "required": [
@@ -4406,53 +4868,88 @@
         "properties": {
           "sprint": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "description": "Sprint id to update; must be >= 1 (0 is rejected with 400).",
+            "minimum": 1
           },
           "label": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "goal": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "plan_length": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "ends_at": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "starts_at": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "capacity_points": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int32",
-            "nullable": true
+            "description": "null clears the stored value; omitted leaves it unchanged."
           },
           "capacity_hours": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "format": "int32",
-            "nullable": true
+            "description": "null clears the stored value; omitted leaves it unchanged."
           },
           "overdue_after": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "notes": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null is accepted and treated as omitted (no clear)."
           },
           "actual_started_at": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null clears the stored value; omitted leaves it unchanged."
           },
           "actual_closed_at": {
-            "type": "string",
-            "nullable": true
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "null clears the stored value; omitted leaves it unchanged."
           }
         },
         "required": [
@@ -4472,7 +4969,8 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "description": "Omitted when empty."
           }
         },
         "required": [
@@ -5021,8 +5519,7 @@
           },
           "tasks_with_missing": {
             "type": "integer",
-            "format": "int32",
-            "nullable": true
+            "format": "int32"
           },
           "auto_cleanup": {
             "$ref": "#/components/schemas/SprintCleanupSummary"
@@ -6333,6 +6830,97 @@
           "errors"
         ]
       },
+      "AutomationSimulateRequest": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "description": "The task ID to simulate against. The automation scope (project vs global rules) is resolved from this ticket's project prefix."
+          },
+          "event": {
+            "type": "string",
+            "description": "Event to simulate. Canonical events: created, updated, assigned, commented, sprint_changed, job_started, job_completed, job_failed, job_cancelled. Matching is case-insensitive and legacy aliases are accepted (job_start, complete, success, error, failure, cancel).",
+            "examples": [
+              "created",
+              "updated",
+              "job_started",
+              "job_start"
+            ]
+          },
+          "project": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Ignored: the automation scope always follows the ticket's project prefix. null is accepted and treated as omitted (no clear)."
+          }
+        },
+        "required": [
+          "ticket_id",
+          "event"
+        ]
+      },
+      "AutomationSimulateResponse": {
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "boolean",
+            "description": "Whether any rule matched."
+          },
+          "rule_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the matched rule; null when no rule matched."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationSimulatedAction"
+            },
+            "description": "Actions the matched rule would perform; empty when no rule matched."
+          },
+          "task_before": {
+            "$ref": "#/components/schemas/TaskDTO"
+          },
+          "task_after": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Simulated task state after the actions; null when no rule matched."
+          }
+        },
+        "required": [
+          "matched",
+          "rule_name",
+          "actions",
+          "task_before",
+          "task_after"
+        ]
+      },
+      "AutomationSimulatedAction": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Action type, e.g. set_status, set_priority, set_type, set_assignee, set_reporter, add_tag."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of what would change."
+          }
+        },
+        "required": [
+          "action",
+          "description"
+        ]
+      },
       "EnvelopeAutomationInspectResponse": {
         "type": "object",
         "properties": {
@@ -6349,6 +6937,17 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/AutomationSetResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAutomationSimulateResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AutomationSimulateResponse"
           }
         },
         "required": [
@@ -6839,6 +7438,28 @@
           "data"
         ]
       },
+      "EnvelopeAttachmentUploadResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AttachmentUploadResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "EnvelopeAttachmentRemoveResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AttachmentRemoveResponse"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
       "EnvelopeConfig": {
         "type": "object",
         "properties": {
@@ -6893,9 +7514,7 @@
               "message": {
                 "type": "string"
               },
-              "details": {
-                "nullable": true
-              }
+              "details": {}
             },
             "required": [
               "code",

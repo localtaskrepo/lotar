@@ -1,13 +1,26 @@
 title: Reconcile remaining user and developer guides with implemented behavior
 status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-82]
-  related: [DEV-17, DEV-30]
 priority: Medium
 type: Chore
 reporter: mallox
 created: 2026-09-06T11:10:31.914397+00:00
+modified: 2026-09-15T22:28:00.326290+00:00
+relationships:
+  depends_on:
+  - DEV-82
+  related:
+  - DEV-17
+  - DEV-30
+  parent: DEV-53
+comments:
+- date: 2026-09-15T22:28:00.326290+00:00
+  text: |-
+    TRIAGE context handoff from DEV-82 (Done; no scope or status change intended here, DEV-83 remains Todo and is now unblocked):
+
+    1. docs/openapi.json still carries 157 inert OpenAPI 3.0 nullable:true occurrences in components OUTSIDE the DEV-82 seven-path closure (spec declares 3.1.0 where nullable is inert). DEV-82's scoped guard test (in_scope_closure_carries_no_legacy_nullable in tests/dev82_contract_semantics_test.rs) pins the closure boundary and can be widened as migration proceeds.
+    2. view/api/types.ts TaskDTO app-wide drift: tags/relationships/comments/references/sprints/history/custom_fields are typed required while the server omits them when empty, and reporter/assignee/due_date/effort/subtitle/description carry | null the wire never emits. Pre-existing, consumer-touching scope (many mocks/components) - beyond DEV-82's owned interfaces.
+
+    Both are candidates for triage under this ticket or successors; they are NOT auto-accepted into DEV-83's current acceptance scope (stale docs/guides reconciliation) - coordinator to decide placement.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: D4 D9 D11 D12 D13 D15.
@@ -19,3 +32,8 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-15T22:28:00.326290+00:00
+  actor: mallox
+  changes:
+  - field: comment_added

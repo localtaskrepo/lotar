@@ -320,7 +320,8 @@ export interface TaskListResponse {
   total: number
   limit: number
   offset: number
-  tasks: TaskDTO[]
+  /** Page of tasks; omitted (not `[]`) by the server when the page is empty — treat missing as empty. */
+  tasks?: TaskDTO[]
 }
 
 export interface TaskSelection {
@@ -363,43 +364,54 @@ export interface SprintDeleteResponse {
   status: string
   deleted: boolean
   sprint_id: number
-  sprint_label?: string | null
+  sprint_label?: string
   removed_references: number
   updated_tasks: number
   integrity?: SprintIntegrityDiagnostics
 }
 
+/**
+ * Optional fields accept `null`, treated as omitted (no clear); the server
+ * skips unset values when serializing sprint responses.
+ */
 export interface SprintCreateRequest {
-  label?: string
-  goal?: string
-  plan_length?: string
-  ends_at?: string
-  starts_at?: string
-  capacity_points?: number
-  capacity_hours?: number
-  overdue_after?: string
-  notes?: string
+  label?: string | null
+  goal?: string | null
+  plan_length?: string | null
+  ends_at?: string | null
+  starts_at?: string | null
+  capacity_points?: number | null
+  capacity_hours?: number | null
+  overdue_after?: string | null
+  notes?: string | null
   skip_defaults?: boolean
 }
 
 export interface SprintCreateResponse {
   status: string
   sprint: SprintListItem
-  warnings: string[]
-  applied_defaults: string[]
+  /** Omitted when empty. */
+  warnings?: string[]
+  /** Defaults applied from configuration; omitted when empty. */
+  applied_defaults?: string[]
 }
 
+/**
+ * Single-value optional fields accept `null` treated as omitted (no clear);
+ * `capacity_points`/`capacity_hours`/`actual_started_at`/`actual_closed_at`
+ * are double-options where `null` explicitly clears the stored value.
+ */
 export interface SprintUpdateRequest {
   sprint: number
-  label?: string
-  goal?: string
-  plan_length?: string
-  ends_at?: string
-  starts_at?: string
+  label?: string | null
+  goal?: string | null
+  plan_length?: string | null
+  ends_at?: string | null
+  starts_at?: string | null
   capacity_points?: number | null
   capacity_hours?: number | null
-  overdue_after?: string
-  notes?: string
+  overdue_after?: string | null
+  notes?: string | null
   actual_started_at?: string | null
   actual_closed_at?: string | null
 }
@@ -407,7 +419,8 @@ export interface SprintUpdateRequest {
 export interface SprintUpdateResponse {
   status: string
   sprint: SprintListItem
-  warnings: string[]
+  /** Omitted when empty. */
+  warnings?: string[]
 }
 
 export interface SprintCleanupMetric {
@@ -418,35 +431,42 @@ export interface SprintCleanupMetric {
 export interface SprintCleanupSummary {
   removed_references: number
   updated_tasks: number
-  removed_by_sprint: SprintCleanupMetric[]
-  remaining_missing: number[]
+  /** Omitted when empty. */
+  removed_by_sprint?: SprintCleanupMetric[]
+  /** Omitted when empty. */
+  remaining_missing?: number[]
 }
 
 export interface SprintIntegrityDiagnostics {
-  missing_sprints: number[]
+  /** Omitted when empty. */
+  missing_sprints?: number[]
   tasks_with_missing?: number
   auto_cleanup?: SprintCleanupSummary
 }
 
+/**
+ * Optional members are omitted (not `null`) by the server when unset and
+ * omitted when empty for `warnings`.
+ */
 export interface SprintListItem {
   id: number
-  label?: string | null
+  label?: string
   display_name: string
-  created?: string | null
-  modified?: string | null
+  created?: string
+  modified?: string
   state: 'pending' | 'active' | 'overdue' | 'complete'
-  planned_start?: string | null
-  planned_end?: string | null
-  actual_start?: string | null
-  actual_end?: string | null
-  computed_end?: string | null
-  goal?: string | null
-  plan_length?: string | null
-  overdue_after?: string | null
-  notes?: string | null
-  capacity_points?: number | null
-  capacity_hours?: number | null
-  warnings: string[]
+  planned_start?: string
+  planned_end?: string
+  actual_start?: string
+  actual_end?: string
+  computed_end?: string
+  goal?: string
+  plan_length?: string
+  overdue_after?: string
+  notes?: string
+  capacity_points?: number
+  capacity_hours?: number
+  warnings?: string[]
 }
 
 export interface SprintListResponse {
@@ -1084,7 +1104,8 @@ export interface AgentProfilesResponse {
 export interface AutomationSimulateRequest {
   ticket_id: string
   event: string
-  project?: string
+  /** Accepted but ignored: scope follows the ticket's project prefix. */
+  project?: string | null
 }
 
 export interface AutomationSimulatedAction {
@@ -1092,11 +1113,16 @@ export interface AutomationSimulatedAction {
   description: string
 }
 
+/**
+ * The server always serializes all five keys (hand-built JSON):
+ * `rule_name` is `null` when no rule matched and `task_after` is `null`
+ * when no rule matched; `task_before` is always a task object.
+ */
 export interface AutomationSimulateResponse {
   matched: boolean
-  rule_name?: string | null
+  rule_name: string | null
   actions: AutomationSimulatedAction[]
-  task_before?: TaskDTO | null
-  task_after?: TaskDTO | null
+  task_before: TaskDTO
+  task_after: TaskDTO | null
 }
 

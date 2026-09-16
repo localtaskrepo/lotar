@@ -83,8 +83,6 @@ describe('sprint calendar helpers', () => {
             state: 'pending',
             planned_start: '2024-05-01',
             plan_length: '14d',
-            planned_end: null,
-            computed_end: null,
         })
         const window = __test_only_normalizeSprintWindow(sprint)
         expect(window).toBeTruthy()

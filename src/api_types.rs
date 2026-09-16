@@ -262,9 +262,14 @@ pub struct AutomationSetResponse {
 pub struct AutomationSimulateRequest {
     /// The task ID to simulate against
     pub ticket_id: String,
-    /// The event to simulate: "job_start", "complete", "error"
+    /// The event to simulate. Canonical names: "created", "updated",
+    /// "assigned", "commented", "sprint_changed", "job_started",
+    /// "job_completed", "job_failed", "job_cancelled". Matching is
+    /// case-insensitive and legacy aliases are accepted ("job_start",
+    /// "complete", "success", "error", "failure", "cancel").
     pub event: String,
-    /// Optional project scope
+    /// Optional in the payload but ignored: the automation scope always
+    /// follows the ticket's project prefix.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub project: Option<String>,
 }

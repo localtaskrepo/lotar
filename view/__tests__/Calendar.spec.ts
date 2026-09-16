@@ -161,23 +161,13 @@ vi.mock('../composables/useTaskPanelController', () => ({
 import Calendar from '../pages/Calendar.vue'
 
 function baseSprint(overrides: Partial<SprintListItem> = {}): SprintListItem {
+    // Matches the wire shape: unset optional members are omitted, never null.
     return {
         id: 1,
         display_name: 'Sprint',
         state: 'active',
         planned_start: '2024-02-01',
         planned_end: '2024-02-05',
-        plan_length: null,
-        actual_start: null,
-        actual_end: null,
-        computed_end: null,
-        warnings: [],
-        label: null,
-        goal: null,
-        overdue_after: null,
-        notes: null,
-        capacity_points: null,
-        capacity_hours: null,
         ...overrides,
     }
 }
@@ -205,7 +195,7 @@ describe('Calendar sprint overlay', () => {
                 id: 501,
                 display_name: 'Plan Length Sprint',
                 planned_start: '2024-02-05',
-                planned_end: null,
+                planned_end: undefined,
                 plan_length: '10d',
             }),
         ]

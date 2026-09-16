@@ -13,6 +13,11 @@ use tempfile::TempDir;
 // Re-export shared environment mutex for tests that mutate global env vars.
 pub mod env_mutex;
 
+// Minimal OpenAPI schema validator for semantic contract tests (DEV-82).
+// Compiled into every test binary via `mod common`; only contract tests use it.
+#[allow(dead_code)]
+pub mod openapi_semantics;
+
 /// Test fixtures to create isolated work directories per test.
 pub struct TestFixtures {
     pub temp_dir: TempDir,
