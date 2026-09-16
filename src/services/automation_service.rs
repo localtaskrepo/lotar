@@ -14,7 +14,7 @@ use crate::services::automation_matching::{ChangeSet, MatchMode, matches_rule};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
 use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::sprint_service::SprintService;
-use crate::services::task_service::{TaskService, TaskUpdateContext};
+use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
 use crate::storage::manager::Storage;
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::utils::identity::resolve_me_alias;
@@ -1328,30 +1328,13 @@ fn apply_sprint_action(
     Ok(())
 }
 
-/// Append a comment to a task via raw storage edit (used by automation comment action).
+/// Append a comment to a task through the shared comment pipeline (used
+/// by the automation comment action). The comment is recorded under the
+/// `automation` actor and never re-dispatches `on.commented` rules, so
+/// comment actions cannot recurse.
 fn append_automation_comment(storage: &mut Storage, task_id: &str, text: &str) -> LoTaRResult<()> {
-    let project_prefix = crate::storage::TaskId::parse(task_id)
-        .map(|parsed| parsed.project)
-        .unwrap_or_default();
-    let mut task = storage
-        .get(task_id, &project_prefix)
-        .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-    let now = chrono::Utc::now().to_rfc3339();
-    task.comments.push(crate::types::TaskComment {
-        date: now.clone(),
-        text: text.to_string(),
-    });
-    task.history.push(crate::types::TaskChangeLogEntry {
-        at: now.clone(),
-        actor: Some("automation".to_string()),
-        changes: vec![crate::types::TaskChange {
-            field: "comment_added".into(),
-            old: None,
-            new: None,
-        }],
-    });
-    task.modified = now;
-    storage.edit(task_id, &task)
+    TaskService::add_comment_with_context(storage, task_id, text, CommentContext::automation())
+        .map(|_| ())
 }
 
 fn patch_has_changes(patch: &TaskUpdate) -> bool {

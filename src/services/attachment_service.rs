@@ -1,6 +1,5 @@
-use crate::api_types::TaskDTO;
 use crate::errors::{LoTaRError, LoTaRResult};
-use crate::services::task_service::TaskService;
+use crate::services::reference_service::{ReferenceMutationOutcome, ReferenceService};
 use crate::storage::TaskFilter;
 use crate::storage::manager::Storage;
 use crate::types::ReferenceEntry;
@@ -159,7 +158,17 @@ impl AttachmentService {
         fs::create_dir_all(root)?;
         let file = crate::storage::safety::acquire_storage_lock(root, "attachments-store")
             .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+        #[cfg(test)]
+        STORE_LOCKS_HELD.with(|cell| cell.set(cell.get() + 1));
         Ok(AttachmentStoreGuard { _file: file })
+    }
+
+    /// Test-only count of attachment store locks currently held on this
+    /// thread. `ReferenceService::dispatch_post_commit` asserts it is zero
+    /// so reference automation provably runs only after store locks drop.
+    #[cfg(test)]
+    pub fn store_locks_held() -> usize {
+        STORE_LOCKS_HELD.with(|cell| cell.get())
     }
 
     /// Take the store coordination lock for the configured attachments
@@ -188,31 +197,34 @@ impl AttachmentService {
         storage: &mut Storage,
         task_id: &str,
         stored_name: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
-        let name = Self::validate_managed_name(stored_name)?;
+        let name = Self::validate_managed_name(stored_name)?.to_string();
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let before_len = task.references.len();
-        task.references
-            .retain(|r| r.attachment.as_deref() != Some(name));
-
-        let removed = task.references.len() != before_len;
-        if removed {
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+        // Reference-only detach: works for missing/stale blobs (idempotent
+        // changed=false); blob cleanup stays with the caller, gated on the
+        // typed-membership signal in the returned outcome.
+        ReferenceService::commit_reference_change(
+            storage,
+            task_id,
+            "attachment",
+            false,
+            move |task, changed_values| {
+                let before_len = task.references.len();
+                task.references
+                    .retain(|r| r.attachment.as_deref() != Some(name.as_str()));
+                if task.references.len() == before_len {
+                    return false;
+                }
+                changed_values.push(name.clone());
+                true
+            },
+        )
     }
 
     /// Managed attachment values are bare store leaf names. Reject path
@@ -432,40 +444,36 @@ impl AttachmentService {
         storage: &mut Storage,
         task_id: &str,
         stored_name: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
         if derived.trim().is_empty() {
             return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
         }
-        let name = Self::validate_managed_name(stored_name)?;
+        let name = Self::validate_managed_name(stored_name)?.to_string();
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let already = task
-            .references
-            .iter()
-            .any(|r| r.attachment.as_deref() == Some(name));
-
-        let mut attached = false;
-        if !already {
-            task.references.push(ReferenceEntry {
-                attachment: Some(name.to_string()),
-                ..Default::default()
-            });
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-            attached = true;
-        }
-
-        Ok((
-            TaskService::get(storage, task_id, Some(&derived))?,
-            attached,
-        ))
+        ReferenceService::commit_reference_change(
+            storage,
+            task_id,
+            "attachment",
+            true,
+            move |task, changed_values| {
+                let already = task
+                    .references
+                    .iter()
+                    .any(|r| r.attachment.as_deref() == Some(name.as_str()));
+                if already {
+                    return false;
+                }
+                task.references.push(ReferenceEntry {
+                    attachment: Some(name.clone()),
+                    ..Default::default()
+                });
+                changed_values.push(name.clone());
+                true
+            },
+        )
     }
 
     pub fn resolve_attachment_path(root: &Path, rel_path: &str) -> Result<PathBuf, String> {
@@ -562,6 +570,21 @@ fn truncate_component(value: &str, max_len: usize) -> String {
 /// releases the underlying fs2 lock; the lock file itself stays behind.
 pub struct AttachmentStoreGuard {
     _file: std::fs::File,
+}
+
+impl Drop for AttachmentStoreGuard {
+    fn drop(&mut self) {
+        #[cfg(test)]
+        STORE_LOCKS_HELD.with(|cell| cell.set(cell.get().saturating_sub(1)));
+    }
+}
+
+// Test-only count of attachment store locks currently held on this thread.
+// ReferenceService::dispatch_post_commit asserts it is zero so reference
+// automation provably runs only after store locks drop.
+#[cfg(test)]
+thread_local! {
+    static STORE_LOCKS_HELD: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Test-only fault injection for the upload store/attach/cleanup sequence.

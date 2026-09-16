@@ -10,18 +10,14 @@ use crate::cli::project::ProjectResolver;
 use crate::cli::validation::CliValidator;
 use crate::config::manager::ConfigManager;
 use crate::errors::LoTaRError;
-use crate::services::reference_service::ReferenceService;
+use crate::services::reference_service::{ReferenceMutationOutcome, ReferenceService};
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
-use crate::types::{TaskChange, TaskChangeLogEntry, TaskComment, TaskRelationships};
+use crate::types::TaskRelationships;
 use crate::utils::git::find_repo_root;
 use crate::utils::identity;
 use crate::workspace::TasksDirectoryResolver;
 use std::collections::BTreeMap;
-
-fn now_rfc3339() -> String {
-    chrono::Utc::now().to_rfc3339()
-}
 
 /// Strict `sprints` parsing for task_list (DEV-57): accepts the flexible
 /// MCP shapes (single number, '#<id>' string, or array) but every entry must
@@ -999,47 +995,13 @@ pub(crate) fn handle_task_bulk_comment_add(req: JsonRpcRequest) -> JsonRpcRespon
     let mut updated: Vec<TaskDTO> = Vec::new();
     let mut failed: Vec<Value> = Vec::new();
 
+    // Delegate per item to the shared comment pipeline so bulk comments
+    // record identical history/timestamps and fire `on.commented`
+    // automation exactly once per task, matching the single-task handler.
+    // Malformed or unknown ids surface as per-item failures through the
+    // service's own errors; stop_on_error aborts the batch.
     for id in ids {
-        let project_prefix = crate::storage::TaskId::parse(&id)
-            .ok()
-            .map(|parsed| parsed.project)
-            .unwrap_or_default();
-        let mut task = match storage.get(&id, &project_prefix) {
-            Some(task) => task,
-            None => {
-                failed.push(json!({"id": id, "error": "Task not found"}));
-                if stop_on_error {
-                    break;
-                }
-                continue;
-            }
-        };
-
-        let now = now_rfc3339();
-        task.comments.push(TaskComment {
-            date: now.clone(),
-            text: text.clone(),
-        });
-        task.history.push(TaskChangeLogEntry {
-            at: now.clone(),
-            actor: identity::resolve_current_user(Some(resolver.path.as_path())),
-            changes: vec![TaskChange {
-                field: "comment_added".into(),
-                old: None,
-                new: None,
-            }],
-        });
-        task.modified = now;
-
-        if let Err(error) = storage.edit(&id, &task) {
-            failed.push(json!({"id": id, "error": error.to_string()}));
-            if stop_on_error {
-                break;
-            }
-            continue;
-        }
-
-        match TaskService::get(&storage, &id, Some(&project_prefix)) {
+        match TaskService::add_comment(&mut storage, &id, &text) {
             Ok(dto) => updated.push(dto),
             Err(error) => {
                 failed.push(json!({"id": id, "error": error.to_string()}));
@@ -1114,22 +1076,13 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
     };
 
     let mut storage = Storage::new(&resolver.path.clone());
+    // The repo root is resolved once but required only per arm: code ADD
+    // and both `file` operations resolve repository-relative paths, while
+    // code REMOVE matches stored values only and works outside Git (same
+    // rule as the single-task handler). A missing root fails just the
+    // items that need it instead of aborting the whole batch.
     let repo_root = if kind == "code" || kind == "file" {
-        match find_repo_root(storage.root_path.as_path()) {
-            Some(root) => Some(root),
-            None => {
-                return err(
-                    req.id,
-                    -32000,
-                    if is_add {
-                        "Task reference add failed"
-                    } else {
-                        "Task reference remove failed"
-                    },
-                    Some(json!({"message": "Unable to locate git repository"})),
-                );
-            }
-        }
+        find_repo_root(storage.root_path.as_path())
     } else {
         None
     };
@@ -1175,9 +1128,12 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         };
 
         if kind == "attachment" {
+            // The per-item store lock is acquired and released inside
+            // attachment_bulk_item, so post-commit hooks run after it here.
             match attachment_bulk_item(&mut storage, &normalized_id, &value, is_add) {
-                Ok((task, changed)) => {
-                    updated.push(json!({"id": normalized_id, "changed": changed, "task": task}))
+                Ok(outcome) => {
+                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                    updated.push(json!({"id": normalized_id, "changed": outcome.changed, "task": outcome.task}))
                 }
                 Err(error) => {
                     failed.push(json!({"id": normalized_id, "error": error}));
@@ -1189,7 +1145,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
             continue;
         }
 
-        let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
+        let result: Result<ReferenceMutationOutcome, String> = match (kind.as_str(), is_add) {
             ("link", true) => {
                 ReferenceService::attach_link_reference(&mut storage, &normalized_id, &value)
             }
@@ -1204,7 +1160,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
                     &value,
                 ),
                 None => Err(LoTaRError::ValidationError(
-                    "unable to locate git repository".to_string(),
+                    "Unable to locate git repository".to_string(),
                 )),
             },
             ("code", false) => {
@@ -1218,7 +1174,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
                     &value,
                 ),
                 None => Err(LoTaRError::ValidationError(
-                    "unable to locate git repository".to_string(),
+                    "Unable to locate git repository".to_string(),
                 )),
             },
             ("file", false) => match repo_root.as_deref() {
@@ -1229,7 +1185,7 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
                     &value,
                 ),
                 None => Err(LoTaRError::ValidationError(
-                    "unable to locate git repository".to_string(),
+                    "Unable to locate git repository".to_string(),
                 )),
             },
             ("jira", true) => ReferenceService::attach_platform_reference(
@@ -1268,8 +1224,13 @@ fn handle_task_bulk_reference_mutation(req: JsonRpcRequest, is_add: bool) -> Jso
         .map_err(|e| e.to_string());
 
         match result {
-            Ok((task, changed)) => {
-                updated.push(json!({"id": normalized_id, "changed": changed, "task": task}))
+            Ok(outcome) => {
+                // link/code/file/platform items hold no store lock; hook
+                // dispatch here is already after every relevant lock.
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                updated.push(
+                    json!({"id": normalized_id, "changed": outcome.changed, "task": outcome.task}),
+                )
             }
             Err(error) => {
                 failed.push(json!({"id": normalized_id, "error": error}));
@@ -1310,7 +1271,7 @@ fn attachment_bulk_item(
     full_id: &str,
     value: &str,
     is_add: bool,
-) -> Result<(TaskDTO, bool), String> {
+) -> Result<ReferenceMutationOutcome, String> {
     let location = storage
         .resolve_task_location(full_id)
         .map_err(|e| e.to_string())?;
@@ -1400,23 +1361,27 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
         }
     };
 
-    // Managed attachment references participate in the blob lifecycle:
-    // hold the cross-process store lock across the mutation (store-lock ->
-    // task-lock order), exactly like the batch reference handler, REST
-    // upload/remove, and the CLI. Repository `file` references can never
-    // resolve inside the store (rejected by the service guard) and stay
-    // unlocked.
-    let _store_guard = if kind == "attachment" {
-        let project = crate::storage::TaskId::parse(&full_id)
-            .ok()
-            .map(|parsed| parsed.project);
-        let cfg = crate::config::resolution::config_for_project(&resolver.path, project.as_deref())
-            .unwrap_or_else(|_| {
-                crate::config::types::ResolvedConfig::from_global(
-                    crate::config::types::GlobalConfig::default(),
-                )
-            });
-        let root =
+    let mut storage = Storage::new(&resolver.path);
+    let result: Result<ReferenceMutationOutcome, String> = {
+        // Managed attachment references participate in the blob lifecycle:
+        // hold the cross-process store lock across the mutation (store-lock ->
+        // task-lock order), exactly like the batch reference handler, REST
+        // upload/remove, and the CLI. The guard is scoped so it drops before
+        // post-commit hooks run. Repository `file` references can never
+        // resolve inside the store (rejected by the service guard) and stay
+        // unlocked.
+        let _store_guard = if kind == "attachment" {
+            let project = crate::storage::TaskId::parse(&full_id)
+                .ok()
+                .map(|parsed| parsed.project);
+            let cfg =
+                crate::config::resolution::config_for_project(&resolver.path, project.as_deref())
+                    .unwrap_or_else(|_| {
+                        crate::config::types::ResolvedConfig::from_global(
+                            crate::config::types::GlobalConfig::default(),
+                        )
+                    });
+            let root =
             match crate::services::attachment_service::AttachmentService::resolve_attachments_root(
                 &resolver.path,
                 &cfg,
@@ -1435,41 +1400,44 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
                     );
                 }
             };
-        // Fail closed when the named blob is not present in the store.
-        if is_add
-            && let Err(message) =
-                crate::services::attachment_service::AttachmentService::resolve_attachment_path(
-                    &root, &value,
-                )
-        {
-            return err(
-                req.id,
-                -32000,
-                "Task reference add failed",
-                Some(json!({"message": message})),
-            );
-        }
-        match crate::services::attachment_service::AttachmentService::lock_store(&root) {
-            Ok(guard) => Some(guard),
-            Err(e) => {
-                return err(
-                    req.id,
-                    -32000,
-                    if is_add {
-                        "Task reference add failed"
-                    } else {
-                        "Task reference remove failed"
-                    },
-                    Some(json!({"message": e.to_string()})),
-                );
+            match crate::services::attachment_service::AttachmentService::lock_store(&root) {
+                Ok(guard) => {
+                    // Fail closed when the named blob is not present in the
+                    // store — checked UNDER the store lock (matching the
+                    // bulk handler and CLI) so a concurrent remove cannot
+                    // delete the blob between the check and the attach.
+                    if is_add
+                        && let Err(message) = crate::services::attachment_service::AttachmentService::resolve_attachment_path(
+                            &root, &value,
+                        )
+                    {
+                        return err(
+                            req.id,
+                            -32000,
+                            "Task reference add failed",
+                            Some(json!({"message": message})),
+                        );
+                    }
+                    Some(guard)
+                }
+                Err(e) => {
+                    return err(
+                        req.id,
+                        -32000,
+                        if is_add {
+                            "Task reference add failed"
+                        } else {
+                            "Task reference remove failed"
+                        },
+                        Some(json!({"message": e.to_string()})),
+                    );
+                }
             }
-        }
-    } else {
-        None
-    };
+        } else {
+            None
+        };
 
-    let mut storage = Storage::new(&resolver.path);
-    let result: Result<(TaskDTO, bool), String> = match (kind.as_str(), is_add) {
+        match (kind.as_str(), is_add) {
         ("link", true) => ReferenceService::attach_link_reference(&mut storage, &full_id, &value),
         ("link", false) => ReferenceService::detach_link_reference(&mut storage, &full_id, &value),
         ("code", true) => {
@@ -1550,13 +1518,18 @@ fn handle_task_reference_mutation(req: JsonRpcRequest, is_add: bool) -> JsonRpcR
             );
         }
     }
-    .map_err(|e| e.to_string());
+    .map_err(|e| e.to_string())
+    }; // the store guard (if any) has dropped: hooks are safe to run
+
+    if let Ok(outcome) = &result {
+        ReferenceService::dispatch_post_commit(&mut storage, outcome);
+    }
 
     match result {
-        Ok((task, changed)) => {
+        Ok(outcome) => {
             let payload = json!({
-                "task": task,
-                "changed": changed,
+                "task": outcome.task,
+                "changed": outcome.changed,
                 "action": if is_add { "add" } else { "remove" },
                 "kind": kind,
                 "value": value,

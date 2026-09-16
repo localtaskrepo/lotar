@@ -56,6 +56,40 @@ impl Default for TaskUpdateContext {
     }
 }
 
+/// Execution context for comment mutations, shared by every surface so
+/// single and bulk operations record identical history and fire identical
+/// post-commit hooks.
+#[derive(Debug, Clone)]
+pub struct CommentContext {
+    /// Overrides the actor recorded in history (e.g. `automation`); when
+    /// absent the current user is resolved as usual.
+    pub actor_override: Option<String>,
+    /// Whether to fire `on.commented` automation rules post-commit.
+    /// Comments written by automation itself disable this so comment
+    /// actions can never recurse.
+    pub fire_commented: bool,
+}
+
+impl Default for CommentContext {
+    fn default() -> Self {
+        Self {
+            actor_override: None,
+            fire_commented: true,
+        }
+    }
+}
+
+impl CommentContext {
+    /// Context for comments written by automation: recorded under the
+    /// `automation` actor, never re-dispatching `on.commented` rules.
+    pub fn automation() -> Self {
+        Self {
+            actor_override: Some("automation".to_string()),
+            fire_commented: false,
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "../../tests/common/dev55_transaction_cases.rs"]
 mod dev55_transaction_cases;
@@ -363,42 +397,67 @@ impl TaskService {
 
     /// Add a comment to a task and fire `on.commented` automation rules.
     pub fn add_comment(storage: &mut Storage, id: &str, text: &str) -> LoTaRResult<TaskDTO> {
+        Self::add_comment_with_context(storage, id, text, CommentContext::default())
+    }
+
+    /// Add a comment through the shared locked mutation pipeline, honoring
+    /// the given [`CommentContext`] for actor attribution and
+    /// `on.commented` dispatch. Bulk surfaces delegate here so single and
+    /// bulk operations produce identical history, timestamps, and
+    /// automation behavior. The comment append and its history entry are
+    /// applied to the freshest persisted state under the project task lock,
+    /// so concurrent reference (or other) writes can never be lost.
+    pub fn add_comment_with_context(
+        storage: &mut Storage,
+        id: &str,
+        text: &str,
+        context: CommentContext,
+    ) -> LoTaRResult<TaskDTO> {
         let parsed =
             TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
-        let mut task = storage
-            .get(id, &parsed.project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+        Self::ensure_local_task(storage, id)?;
 
-        let now = chrono::Utc::now().to_rfc3339();
-        let actor = resolve_current_user(Some(storage.root_path.as_path()));
-        task.comments.push(crate::types::TaskComment {
-            date: now.clone(),
-            text: text.to_string(),
-        });
-        // Record that a comment was added without copying the body into the
-        // changelog (the comment itself is the audit trail).
-        task.history.push(TaskChangeLogEntry {
-            at: now.clone(),
-            actor,
-            changes: vec![TaskChange {
-                field: "comment_added".into(),
-                old: None,
-                new: None,
-            }],
-        });
-        task.modified = now;
-        storage.edit(&canonical, &task)?;
+        let root_path = storage.root_path.clone();
+        let outcome = storage.mutate_task(&canonical, move |task| {
+            let now = chrono::Utc::now().to_rfc3339();
+            let actor = context
+                .actor_override
+                .clone()
+                .or_else(|| resolve_current_user(Some(root_path.as_path())));
+            task.comments.push(crate::types::TaskComment {
+                date: now.clone(),
+                text: text.to_string(),
+            });
+            // Record that a comment was added without copying the body into
+            // the changelog (the comment itself is the audit trail).
+            task.history.push(TaskChangeLogEntry {
+                at: now.clone(),
+                actor,
+                changes: vec![TaskChange {
+                    field: "comment_added".into(),
+                    old: None,
+                    new: None,
+                }],
+            });
+            task.modified = now;
+            Ok(true)
+        })?;
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(&canonical, task, Some(&sprint_lookup));
-        let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
+        let dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup));
+        if context.fire_commented {
+            let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
+        }
         Ok(dto)
     }
 
-    /// Edit an existing comment (0-based index) and record a `comment#N` history entry.
-    /// Returns the unchanged task when the new text equals the old one.
+    /// Edit an existing comment (0-based index) and record a `comment#N`
+    /// history entry through the shared locked mutation pipeline. Returns
+    /// the unchanged task (no write, no history, no timestamp churn) when
+    /// the new text equals the old one. Comment edits deliberately do not
+    /// fire `on.commented`; that trigger belongs to new comments only.
     pub fn update_comment(
         storage: &mut Storage,
         id: &str,
@@ -408,23 +467,25 @@ impl TaskService {
         let parsed =
             TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
         let canonical = parsed.canonical();
-        let mut task = storage
-            .get(id, &parsed.project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+        Self::ensure_local_task(storage, id)?;
 
-        if index >= task.comments.len() {
-            return Err(LoTaRError::ValidationError(format!(
-                "Invalid comment index {index}"
-            )));
-        }
+        let root_path = storage.root_path.clone();
+        let outcome = storage.mutate_task(&canonical, move |task| {
+            if index >= task.comments.len() {
+                return Err(LoTaRError::ValidationError(format!(
+                    "Invalid comment index {index}"
+                )));
+            }
 
-        let previous = task.comments[index].text.clone();
-        if previous != text {
+            let previous = task.comments[index].text.clone();
+            if previous == text {
+                return Ok(false);
+            }
             task.comments[index].text = text.to_string();
             let now = chrono::Utc::now().to_rfc3339();
             task.history.push(TaskChangeLogEntry {
                 at: now.clone(),
-                actor: resolve_current_user(Some(storage.root_path.as_path())),
+                actor: resolve_current_user(Some(root_path.as_path())),
                 changes: vec![TaskChange {
                     field: format!("comment#{}", index + 1),
                     old: Some(previous),
@@ -432,11 +493,36 @@ impl TaskService {
                 }],
             });
             task.modified = now;
-            storage.edit(&canonical, &task)?;
-        }
+            Ok(true)
+        })?;
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Ok(Self::to_dto(&canonical, task, Some(&sprint_lookup)))
+        Ok(Self::to_dto(
+            &canonical,
+            outcome.after,
+            Some(&sprint_lookup),
+        ))
+    }
+
+    /// Fail fast for comment/reference mutations addressed to a task that
+    /// is missing, ambiguous, or stored in another workspace root.
+    /// Missing/ambiguous identities surface as [`LoTaRError::TaskNotFound`]
+    /// (matching the previous unlocked `storage.get` lookup); cross-root
+    /// refusals keep the actionable "run the command inside that workspace"
+    /// message.
+    pub(crate) fn ensure_local_task(storage: &Storage, id: &str) -> LoTaRResult<()> {
+        match storage.resolve_task_location(id) {
+            Ok(location) if !location.is_in_root(&storage.root_path) => {
+                Err(LoTaRError::ValidationError(format!(
+                    "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                    location.full_id(),
+                    location.root.display(),
+                    storage.root_path.display()
+                )))
+            }
+            Ok(_) => Ok(()),
+            Err(_) => Err(LoTaRError::TaskNotFound(id.to_string())),
+        }
     }
 
     pub fn update(storage: &mut Storage, id: &str, patch: TaskUpdate) -> LoTaRResult<TaskDTO> {
@@ -991,6 +1077,26 @@ impl TaskService {
         results
     }
 
+    /// Build a DTO from an in-memory task state exactly the way
+    /// [`Self::get`] normalizes it (actual-root config defaults plus the
+    /// sprint lookup), without re-reading the file. Used for the
+    /// previous/current receipt pair of locked reference mutations so both
+    /// DTOs describe one linearized mutation.
+    pub(crate) fn dto_from_task(storage: &Storage, canonical_id: &str, task: Task) -> TaskDTO {
+        let project = TaskId::parse(canonical_id)
+            .map(|parsed| parsed.project)
+            .unwrap_or_default();
+        let config_root = match storage.resolve_task_location(canonical_id) {
+            Ok(location) => location.root.clone(),
+            Err(_) => storage.root_path.clone(),
+        };
+        let config = Self::resolve_config_for_project(config_root.as_path(), &project);
+        let mut task = task;
+        Self::ensure_task_defaults(&mut task, &config, false);
+        let sprint_lookup = Self::load_sprint_lookup(storage);
+        Self::to_dto(canonical_id, task, Some(&sprint_lookup))
+    }
+
     fn to_dto(
         id: &str,
         task: Task,
@@ -1271,7 +1377,10 @@ impl TaskService {
         missing
     }
 
-    fn resolve_config_for_project(tasks_root: &Path, project_prefix: &str) -> ResolvedConfig {
+    pub(crate) fn resolve_config_for_project(
+        tasks_root: &Path,
+        project_prefix: &str,
+    ) -> ResolvedConfig {
         crate::config::resolution::config_for_project(tasks_root, Some(project_prefix))
             .unwrap_or_else(|_| {
                 let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());

@@ -1,4 +1,5 @@
 use crate::config::{ConfigManager, types::ProjectConfig};
+use crate::errors::{LoTaRError, LoTaRResult};
 use crate::output::{LogLevel, OutputFormat, OutputRenderer};
 use crate::storage::identity::{TaskId, TaskLocation};
 use crate::storage::safety::{atomic_write_file, validate_project_prefix, with_storage_lock};
@@ -7,6 +8,25 @@ use crate::storage::task::Task;
 use crate::utils::project::generate_project_prefix;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// Outcome of a locked read-modify-write on a single task file.
+///
+/// `before` is the task exactly as parsed from disk before the mutation
+/// closure ran; `after` carries the closure's changes (and equals `before`
+/// when the closure reported no change).
+pub struct TaskMutationOutcome {
+    pub before: Task,
+    pub after: Task,
+    pub changed: bool,
+}
+
+impl TaskMutationOutcome {
+    /// The pre-mutation state, provided only when the mutation changed the
+    /// task, so post-commit hooks can diff previous vs current.
+    pub fn previous(&self) -> Option<&Task> {
+        self.changed.then_some(&self.before)
+    }
+}
 
 /// Core CRUD operations for task storage
 pub struct StorageOperations;
@@ -201,6 +221,66 @@ impl StorageOperations {
             // No longer need to update index - simplified architecture
 
             Ok(())
+        })
+    }
+
+    /// Read-modify-write a task file under the project task lock.
+    ///
+    /// Unlike [`Self::edit`], which publishes a caller snapshot that may
+    /// already be stale, the file is parsed fresh INSIDE the lock and the
+    /// closure mutates that fresh state, so concurrent writers touching
+    /// other fields (comments, references, ...) can never be silently
+    /// overwritten. The closure returns whether anything changed; unchanged
+    /// mutations skip the write entirely so the file bytes stay identical.
+    /// Cross-root and pending DEV-55 transaction-journal refusals, lock
+    /// scope, and YAML serialization all match [`Self::edit`] exactly.
+    pub fn mutate<F>(root_path: &Path, id: &str, mutation: F) -> LoTaRResult<TaskMutationOutcome>
+    where
+        F: FnOnce(&mut Task) -> LoTaRResult<bool>,
+    {
+        let project_folder = match Self::get_project_for_task(id) {
+            Some(folder) => folder,
+            None => {
+                return Err(LoTaRError::ValidationError(
+                    "Invalid task ID format".to_string(),
+                ));
+            }
+        };
+
+        Self::refuse_cross_root(root_path, id)
+            .map_err(|err| LoTaRError::ValidationError(err.to_string()))?;
+
+        let project_path = root_path.join(&project_folder);
+
+        with_storage_lock(&project_path, "task", || {
+            let file_path = match Self::get_file_path_for_id(&project_path, id) {
+                Some(path) => path,
+                None => {
+                    return Err(LoTaRError::ValidationError(
+                        "Task file not found".to_string(),
+                    ));
+                }
+            };
+            let content = fs::read_to_string(&file_path)?;
+            let before =
+                crate::storage::task::parse_task_yaml_tolerant(&content).ok_or_else(|| {
+                    LoTaRError::ValidationError(
+                        "Cannot safely edit malformed task YAML; repair the task file first"
+                            .to_string(),
+                    )
+                })?;
+            let mut after = before.clone();
+            let changed = mutation(&mut after)?;
+            if changed {
+                let file_string = serde_yaml_ng::to_string(&after)
+                    .map_err(|err| LoTaRError::SerializationError(err.to_string()))?;
+                atomic_write_file(&file_path, &file_string)?;
+            }
+            Ok(TaskMutationOutcome {
+                before,
+                after,
+                changed,
+            })
         })
     }
 

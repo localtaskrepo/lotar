@@ -1,7 +1,7 @@
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::storage::TaskFilter;
 use crate::storage::identity::{self, TaskId, TaskLocation, TaskLookupError};
-use crate::storage::operations::StorageOperations;
+use crate::storage::operations::{StorageOperations, TaskMutationOutcome};
 use crate::storage::search::StorageSearch;
 use crate::storage::task::Task;
 use std::fs;
@@ -100,6 +100,17 @@ impl Storage {
 
     pub fn edit(&mut self, id: &str, new_task: &Task) -> LoTaRResult<()> {
         StorageOperations::edit(&self.root_path, id, new_task).map_err(map_storage_error)
+    }
+
+    /// Locked read-modify-write of a task file (see
+    /// [`StorageOperations::mutate`]): the closure mutates the freshest
+    /// on-disk state under the project task lock, and the file is rewritten
+    /// only when the closure reports a change.
+    pub fn mutate_task<F>(&mut self, id: &str, mutation: F) -> LoTaRResult<TaskMutationOutcome>
+    where
+        F: FnOnce(&mut Task) -> LoTaRResult<bool>,
+    {
+        StorageOperations::mutate(&self.root_path, id, mutation)
     }
 
     pub fn delete(&mut self, id: &str, project: &str) -> LoTaRResult<bool> {

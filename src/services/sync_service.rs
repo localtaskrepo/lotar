@@ -562,7 +562,13 @@ fn attach_sync_reference(
     if FAIL_SYNC_LINK.replace(false) {
         return Err(std::io::Error::other("injected sync link failure").into());
     }
-    ReferenceService::attach_platform_reference(storage, id, provider, reference)
+    let outcome = ReferenceService::attach_platform_reference(storage, id, provider, reference)?;
+    // Sync holds no attachment store locks for platform references, so
+    // post-commit hooks run here with the same semantics as every other
+    // surface (consistent with task creation during sync already firing
+    // automation).
+    ReferenceService::dispatch_post_commit(storage, &outcome);
+    Ok((outcome.task, outcome.changed))
 }
 
 impl SyncService {

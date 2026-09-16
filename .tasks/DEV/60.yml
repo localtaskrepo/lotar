@@ -1,13 +1,81 @@
 title: Route bulk comments and reference changes through the shared mutation pipeline
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-54]
-  related: [DEV-11, DEV-27]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.528547+00:00
+modified: 2026-09-16T09:10:15.499476+00:00
+relationships:
+  depends_on:
+  - DEV-54
+  related:
+  - DEV-11
+  - DEV-27
+  parent: DEV-53
+comments:
+- date: 2026-09-16T06:08:38.611002+00:00
+  text: |-
+    Plan (research verified in current checkout; implementation not started):
+
+    Verified problems: (1) MCP bulk comments (mcp/server/handlers/tasks.rs:962-1065) inline-duplicate the comment write with NO on.commented automation and an improper id fallback (TaskId::parse().ok().unwrap_or_default()); single CLI/REST/MCP all delegate to TaskService::add_comment (fires once, history comment_added, modified bumped, REST emits task_updated). (2) All reference mutations (ReferenceService link/code/platform/file attach+detach, AttachmentService attach/detach_managed_reference) load-clone-edit with no history entry, no automation, no SSE; REST reference routes (8 plus upload/remove) emit nothing; append_automation_comment (automation_service.rs:1332) is a third raw comment duplicate (actor automation, intentionally non-recursive). (3) storage.edit re-reads fresh under the task lock but merges ONLY extra_fields, so caller snapshots can overwrite concurrent comment/reference writes (lost updates); MCP bulk reference gate demands a repo root for kind code||file regardless of direction, so bulk code detach fails outside Git although the single MCP code-remove arm and CLI need no root.
+
+    Design: (A) Storage mutation primitive Storage/StorageOperations::apply_task_mutation(root,id,closure): refuse_cross_root, with_storage_lock(project,task) preserving the DEV-55 pending-journal refusal (NO MultiFileTransaction, no nested locks), parse fresh YAML inside the lock, clone pre-state for the previous DTO, closure mutates and returns changed, serialize ONLY when changed (no-op leaves bytes identical; single now reused for history at + modified). (B) Comments: TaskService::add_comment_with_context(id,text,CommentContext{actor_override,fire_commented}); add_comment = default context (fires on.commented post-commit in-service; no store locks involved); update_comment and append_automation_comment route through the same primitive, automation comment uses actor=automation + fire_commented=false (non-recursion preserved); MCP bulk comment delegates per item to add_comment preserving updated/failed/stop_on_error envelopes, malformed/unknown ids become per-item service errors (no fallback). (C) References: all attach/detach reworked onto the primitive; each changed op records ONE history entry reference_added/reference_removed (old/new kind:value), bumps modified once, preserves every typed guard (managed/file/code membership, store-path rejection, code normalization, platform validation); no-op = no write, no history, no timestamp churn; functions return a receipt (previous DTO, current DTO, changed) and do NOT run hooks in-service because attachment kinds execute under caller store locks. (D) Post-commit dispatch helper runs AutomationService::apply_task_update(storage,Some(prev),cur,config) for CHANGED reference ops only, at call sites AFTER all relevant locks drop: store-guard scope blocks in REST upload/remove, MCP single attachment arm, CLI attachment add/remove, per-item after attachment_bulk_item returns (lock already dropped); REST reference routes additionally emit api_events::emit_task_updated once per changed mutation; MCP/CLI emit no SSE (unchanged; MCP watcher id-only notifications stay a separate preexisting channel - exactly-once claimed for programmatic api_events emission only, no cross-channel dedup claim). (E) Automation decision, evidence-based: trigger vocabulary is created/updated/assigned/commented/sprint_changed/job_* (no reference trigger); ChangeSet::new cannot represent references and unknown condition fields fail closed (automation_matching.rs), so reference changes fire on.updated with an empty field changeset: bare on.updated and legacy start rules fire meaningfully, conditioned rules correctly stay silent. Not-firing (status quo) rejected: ticket description explicitly lists automation among omitted reference behaviors; the pipeline supports this subset with no rule-schema change. Extending condition vocabulary to references is out of scope (schema change; follow-up if wanted). (F) Sync: attach_sync_reference routes through the shared primitive (gains history + no lost updates) with the same post-commit dispatch - consistent with sync creation already firing on.created via TaskService::create (task_service.rs:278); envelope unchanged. (G) Bulk reference gate becomes per-arm: code ADD, file ADD, file REMOVE need a repo root; code REMOVE does not; missing root for a needing arm is a per-item failed entry (stop_on_error respected); response envelope unchanged.
+
+    Files: wave 1 src/storage/operations.rs (+manager wrapper), src/services/task_service.rs, reference_service.rs, attachment_service.rs, automation_service.rs (append_automation_comment only; DEV-59 apply_action untouched). Wave 2 src/routes/tasks.rs, src/mcp/server/handlers/tasks.rs, src/cli/handlers/task/reference.rs + comment.rs (dispatch only), src/services/sync_service.rs. Wave 3 docs/help/task-model.md + docs/developers/task-model.md (reference history vocabulary, event semantics, watcher caveat), docs/help/automation.md (on.updated on reference changes + condition limitation), docs/help/mcp-tools.md (bulk behavior consistency). NO REST DTO/OpenAPI/view changes (contract tests must stay green).
+
+    Tests: new tests/dev60_shared_mutation_test.rs - comment exactly-once single+bulk (on.commented once per task, one comment_added history, actor guards, automation-comment non-recursion); reference no-op byte-equal (file unchanged, no history/modified/event, changed=false); changed reference = one history entry + one modified bump + exactly one task_updated via api_events::subscribe + bare on.updated fires exactly once; concurrent comment+reference on one task lose nothing; per-item failure + stop_on_error envelopes; padded-alias canonicalization; Gitless bulk code detach (fixture outside any repo ancestry) with bulk code ADD failing per-item; dev61 (typed membership, refcount, store-lock contention) and sync suites stay green. Isolated tempdirs, no git init, no cfg gating, no agent processes.
+
+    Checks: targeted nextest (dev60/dev61/dev56/dev59 filters), then full gates npm run lint:agent, npm run test:agent, npm run test:smoke:agent (fresh build). Hazards: store-guard scope restructure in REST upload/remove must preserve cleanup-on-failure semantics; sync tests asserting exact task bytes may need expectation updates (history now recorded); automation during bulk performs N rule loads (accepted, matches per-item service pattern); exactly-once scope excludes the watcher channel (documented).
+- date: 2026-09-16T07:37:26.987532+00:00
+  text: |-
+    Implemented (awaiting independent review; full gates deferred per instruction; status stays InProgress):
+
+    Core: (1) Storage mutation primitive StorageOperations::mutate / Storage::mutate_task (src/storage/operations.rs, src/storage/manager.rs): refuse_cross_root + with_storage_lock (DEV-55 pending-journal refusal preserved, NO MultiFileTransaction, no nested storage.edit), fresh YAML parse INSIDE the project task lock, closure mutates the fresh state (concurrent writes to other fields cannot be lost), serialize+atomic-write only when changed (no-op leaves bytes identical), same serialization/extra_fields behavior as edit. TaskMutationOutcome{before,after,changed} with previous() only when changed. (2) Comments: TaskService CommentContext{actor_override,fire_commented} (Default fires on.commented; ::automation() = actor automation, no recursion); add_comment_with_context + update_comment run through mutate_task (single now reused for history at+modified); AutomationService::append_automation_comment delegates (third raw duplicate removed; DEV-59 apply_action untouched). (3) References: ReferenceMutationOutcome #[must_use]{task,changed,previous:Option} + ReferenceService::commit_reference_change (typed guards preserved per kind; ONE reference_added/reference_removed history entry with kind:value old/new; modified bumped once; no-op = no write/history/timestamp/hooks) + dispatch_post_commit (skips unchanged; apply_task_update(prev,cur) fires updated + legacy start; cfg(test) asserts attachment store locks held == 0). All 8 ReferenceService fns + AttachmentService attach/detach_managed_reference return outcomes.
+
+    Surfaces: REST upload/remove restructured so the store guard drops after the LAST blob operation (failure cleanup stays inside the lock, only-created blobs removed, typed membership gate + refcount/delete preserved) and hooks/events run after; 8 reference routes dispatch + emit exactly one task_updated per changed op (upload attached=false = store-only change, no task event; response shapes unchanged). MCP bulk_comment_add delegates per item to add_comment (envelopes updated/failed/stop_on_error preserved; malformed ids per-item errors, padded aliases canonical in DTOs); bulk reference gate now per-arm (code ADD/file ADD/file REMOVE require repo root per item with "Unable to locate git repository"; code REMOVE works Gitless); bulk + single reference handlers dispatch after per-item/single store locks drop; attachment_bulk_item returns outcome. CLI reference handlers (all kinds) dispatch after scoped store guards. sync attach_sync_reference dispatches with unchanged (TaskDTO,bool) envelope.
+
+    Tests: new tests/dev60_shared_mutation_test.rs (12 tests: bulk on.commented exactly-once per task w/ actor+modified/history, alias+malformed+stop envelopes, automation comment actor/no-recursion, update_comment silent on on.commented + byte-equal no-op, reference history/timestamp/event exactly-once + byte-equal no-op + failure no-hooks, bare on.updated fires once + conditioned rule silent on empty changeset, 6-thread concurrent refs+comments lose nothing, Gitless bulk code remove + per-item root failures, bulk reference envelopes/alias/stop, upload+MCP attachment hooks fire after store-lock release (rule effect observable per firing), upload no-op store-only no-event + membership fail-closed) + tests/common/dev60_lock_order_cases.rs included into reference_service cfg(test) (dispatch refuses under a held store lock via catch_unwind, deterministic counter, runs after drop). fixtures: unique repo-anchored (CARGO_TARGET_TMPDIR) + Gitless (plain tempdir, no .git ancestry), no git init, no cfg gating. dev61 call sites updated to outcome type.
+
+    Docs: docs/help/mcp-tools.md (bulk comment/reference semantics + per-arm repo-root), docs/help/automation.md (reference changes dispatch updated with empty changeset; automation comments never re-dispatch), docs/help/task-model.md + docs/developers/task-model.md (change-log vocabulary reference_added/removed kind:value, no-op byte-equality, event exactly-once + store-only upload semantics, watcher no cross-channel dedup, locked mutator). No REST/OpenAPI/view changes.
+
+    Verification (PATH ~/.cargo/bin): cargo nextest run --cargo-profile ci --retries 0: dev60+dev61+dev59+dev56+dev82+cli_single_field_automation+openapi_contract 68/68; sync/mcp/bulk/comment/reference/upload/attachment/storage_path_safety/retry_safety 164/164; full suite --no-fail-fast 1035 passed / 6 known git-gated skips (one intermittent pre-existing leaky-thread flag, not reproducing, consistent with the known sync/MCP diagnostic); dev60 suite 13/13 after final clippy fix. cargo clippy --all-targets --all-features -D warnings clean; npm run lint:backend:fast clean; cargo fmt --all --check clean.
+
+    Outstanding: independent review, then the full-gates wave (lint:agent, test:agent Rust+UI, test:smoke:agent fresh build). No browser smoke spec added: SSE semantics are pinned by in-process real-route assertions (api_events registry); existing SSE smoke covers the channel. No commits/staging/git used; prior README/82/59 work untouched.
+- date: 2026-09-16T08:03:41.121063+00:00
+  text: |-
+    Review fixes round (independent review: no implementation blockers; smoke separately blocked, see below):
+
+    1. docs/help/automation.md reference-changes bullet corrected: only change-dependent predicates (changes group, short-form field conditions, custom-field conditions - all require the named field to have changed) stay silent on the empty reference changeset; current-state predicates (sprint conditions, date-window before/within/older_than on due_date) keep normal matching and can fire. Previous "rules with when conditions stay silent" wording was incorrect.
+    2. MCP single-task attachment add (src/mcp/server/handlers/tasks.rs): blob-existence check moved INSIDE the store lock (lock first, then resolve_attachment_path), matching the bulk handler and CLI, closing the check-then-attach deletion race. Error envelopes unchanged. New deterministic regression mcp_single_attachment_add_checks_blob_under_the_store_lock (tests/dev60_shared_mutation_test.rs): independently holds the store lock, calls the real MCP tool with a missing blob, asserts the LOCK contention error surfaces (proving acquisition precedes the check; bounded by the standard 2s wait, no sleeps), then after release asserts the fail-closed "Attachment not found" path and that nothing was attached. dev60 suite now 14 tests.
+
+    Caveat documented (not fixed, preexisting, out of scope): REST POST /api/tasks/comment/update emits task_updated even when the new text equals the old one (the service no-ops byte-equal but the route emits). DEV-60 no-op silence claims are scoped to reference/attachment mutations only; no REST/MCP event or API shape was touched for comments.
+
+    Verification after fixes: npm run lint:agent PASS (vue-tsc clean, clippy --all-targets --all-features -D warnings clean, cargo fmt --all --check clean). cargo nextest run --cargo-profile ci --retries 0 (default concurrency) -E dev60+dev61+dev59+mcp+bulk: 89/89 passed. Reviewer gates: test:agent 1035 passed / 6 known git-gated Rust skips + 415 UI passed; lint:agent passed on the pre-fix tree and re-passed after these fixes.
+
+    Browser gate BLOCKED, not claimed: two smoke attempts failed on environment port collisions with orphaned server processes (sandbox cannot kill them); coordinator is investigating separately. No smoke harness change and no smoke run attempted here. Smoke verification remains UNVERIFIED in this environment - no guarantee claimed. Remaining: coordinator-owned smoke/browser verification when the environment is clean, then closure. Status stays InProgress. No git commands, staging, or commits; prior work untouched.
+- date: 2026-09-16T09:03:46.215852+00:00
+  text: |-
+    Smoke sole-failure triage + fix (test adaptation, user-authorized; no production change):
+
+    Root cause CONFIRMED as false assertion, not a server/writer bug: smoke ui.reference-kinds test 1 polled raw task YAML .includes("attachment:") for ABSENCE after end-to-end detach. DEV-60 intentionally records the removal as an audit history entry whose old value is "attachment:<stored name>", so the substring legitimately persists in the file forever while typed membership is gone. The prior verification wave misread that substring as a persistent reference. Production exonerated on the parsed artifact: after the UI detach the parsed YAML references list is EMPTY (no attachment entry), exactly ONE reference_removed history entry exists with old "attachment:<storedPath>" and new null, the chip detaches, and the blob is reclaimed from the store.
+
+    Fix (smoke/tests/ui.reference-kinds.smoke.spec.ts only, minimal): (1) test 1 detach now polls typed membership from parsed YAML (parse from the existing yaml dependency, matching cli.relationships/mcp.members helper pattern) - references.some(entry => entry.attachment === storedPath) must become false, references list length 0, plus asserts exactly one reference_removed entry with old "attachment:<storedPath>" / new null (audit trail proven). (2) test 2 file detach had the same latent vulnerable pattern (raw substring absence) and got the same discipline: typed file-membership absence + exactly one reference_removed with old "file:<repoFile>" + preserved repo file unchanged. Positive .toContain assertions elsewhere in the file are not vulnerable to the history false-signal (history old values carry no space after the kind colon; membership lines do) and were left unchanged. Helpers typedReferences/historyChanges/readParsedTask added; removed a duplicate import slip during the edit.
+
+    Environment note (user-authorized, recorded for accuracy): the smoke helper host-matching/port fix was user-authorized and applied in the coordinator wave (not by this agent); with it, smoke runs have zero port errors - 3 new harness tests passed there. Full latest smoke before this fix: 125 passed / 1 failed (this false assertion) / 23 skipped = 149 across 41 files; the two earlier smoke failures are historical/superseded. After the spec fix, targeted real-browser rerun on the current binary (no rebuild): npm run test:smoke:quick -- smoke/tests/ui.reference-kinds.smoke.spec.ts => 4/4 passed in 10.7s with PLAYWRIGHT_BROWSERS_PATH + sandbox chromium args. Full smoke gate rerun deferred to the next wave per instruction.
+
+    Counts for the record: DEV-60 adds 13 integration tests (tests/dev60_shared_mutation_test.rs) + 1 lib test (dev60_lock_order_cases include) = 14; Rust total is now 1036 passed / 6 known git-gated skips (1022 was the pre-DEV-60 baseline from DEV-59). Full final gates from review wave: lint PASS, Rust 1036/6, UI 415. Status stays InProgress pending the full smoke rerun. No git commands, staging, or commits; no core changes (no actual bug found; reported before any change as required).
+- date: 2026-09-16T09:10:05.815072+00:00
+  text: |-
+    Closing record (final review signoff: production/docs, authorized harness fix, and adapted reference spec confirmed; full final smoke PASS):
+
+    Outcome: Bulk comments and reference/attachment mutations now route through one shared locked mutation pipeline. Storage::mutate_task parses the task fresh INSIDE the project task lock and applies mutations to that state (concurrent writers to comments/references/other fields cannot lose each other), preserving cross-root/canonical refusal and the DEV-55 pending-journal fail-closed behavior with identical serialization and extra_fields handling; unchanged mutations skip the write entirely (byte-identical). Comments: TaskService CommentContext (interactive default fires on.commented post-commit; automation comments record actor=automation and never re-dispatch - DEV-59 apply_action composition untouched); MCP bulk comments delegate per item with updated/failed/stop_on_error envelopes, canonical DTO ids for padded aliases, per-item malformed-id failures. References: all kinds (link/code/file/jira/github/attachment, all surfaces incl. sync) record exactly one reference_added/reference_removed history entry with kind:value old/new per CHANGED op, bump modified once, dispatch on.updated (+legacy start) post-commit with prev/current receipts strictly AFTER every lock drops (attachment store guard scoped after the last blob operation; deterministic held-lock refusal test), and rich REST task_updated events exactly once per changed op; no-op reference ops are fully silent; bulk code detach works outside Git while code ADD and file ops keep the per-item repo-root requirement; typed file/attachment store guards, refcount reclamation, and cleanup-on-failure semantics from DEV-61/56 preserved. The MCP single attachment add blob check moved under the store lock. Raw-YAML smoke assertions fixed to parsed typed membership + exact audit entries. No REST/MCP API shape changes; existing shapes verified unchanged.
+
+    Evidence: 14 new Rust tests (13 in tests/dev60_shared_mutation_test.rs + 1 lib include tests/common/dev60_lock_order_cases.rs) - bulk on.commented exactly-once per task with actor/history/timestamps, alias+malformed+stop envelopes, automation-comment actor and recursion suppression, update_comment silent on on.commented + byte-equal no-op, reference history/timestamp/event exactly-once + byte-equal no-op + failure-no-hooks, bare on.updated fires once with conditioned rules silent (empty changeset; current-state predicates documented as still matching), 6-thread concurrent refs+comments lose nothing, Gitless bulk code remove + per-item root failures, bulk reference envelopes, upload/MCP attachment hooks after store-lock release, upload no-op store-only no-event + membership fail-closed, MCP single attachment lock-before-check ordering (deterministic, held fs2 lock, no sleeps). Final gates: npm run lint:agent PASS; test:agent default concurrency --retries 0: Rust 1036 passed / 6 skipped across 119 binaries (1022 pre-DEV-60 baseline + 14) and UI 415 passed across 60 files (valid unchanged since; only the smoke spec was adapted afterward); freshly built full smoke npm run test:smoke:agent exit 0: 126 passed / 23 skipped = 149 across 41 files (36 pass / 5 skip), ZERO bind errors, 3 new harness tests + 4 adapted reference-kinds browser tests passed. Smoke history disclosed: 121/2 and 109/14 failed runs were environment port collisions with orphaned servers (coordinator-fixed via the user-authorized host-matching probe; not substantiated that all 153 orphans existed - ~103 listeners verified; cleanup was denied and no existing servers stopped); 125/1 was the raw-YAML false assertion (verifier initially misinferred a persistent reference/REST rewriter; corrected to parsed-membership verification - no persistence bug) before the final 126-pass run.
+
+    Remaining (known limits, explicit): 13 whole Rust test files plus parts of 4 more are cfg-excluded (no_git_tests) and 6 ignored - not counted as verified; 23 smoke skips are pre-existing git-gated exclusions. Direct tsc over the smoke tsconfig fails TS5107 (node10) and, with a bundler override, surfaces 21 pre-existing typing errors across 12 files outside the changed files; lint:agent typechecks only view/ via vue-tsc, so no all-TypeScript health is claimed. The smoke host probe retains a close->bind TOCTOU window and prints readiness before binding (context left on DEV-76, comment only). Identical-text comment edits still emit a preexisting REST task_updated; the no-op silence guarantee is references/attachments only. No power-loss durability claims beyond DEV-55. Work uncommitted/unintegrated by policy; no commit reference to append.
+
+    Guidance: No durable guidance correction proven this cycle; none recorded. Other backlog tickets remain untouched/unstarted except the comment-only context note added to DEV-76.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: S11 M12 M13.
@@ -19,3 +87,38 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-16T05:58:06.767578+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-16T06:08:38.611002+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T07:37:26.987532+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T08:03:41.121063+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T09:03:46.215852+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T09:10:05.815072+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T09:10:15.499476+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

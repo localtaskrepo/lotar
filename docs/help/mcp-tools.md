@@ -49,17 +49,17 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 
 ### `task_bulk_comment_add`
 - **Params:** `ids[]` (required), `text` (required), optional `stop_on_error`.
-- **Behavior:** appends the same comment to multiple tasks.
+- **Behavior:** appends the same comment to multiple tasks through the same pipeline as the single-task tool: identical `comment_added` history entries and timestamps, and `on.commented` automation fires exactly once per task. Malformed or unknown ids are reported per id in `failed[]` (padded aliases like `TP-001` canonicalize). When `stop_on_error=true`, aborts after the first failure.
 - **Response:** JSON with `updated[]` and `failed[]`.
 
 ### `task_bulk_reference_add`
 - **Params:** `ids[]` (required), optional `project`, `kind` (required: `link|file|code|jira|github|attachment`), `value` (required), optional `stop_on_error`.
-- **Behavior:** attaches the same reference to multiple tasks. `file` values are repository-relative paths (attachments-store paths are rejected); `attachment` values are stored blob names, fail closed when the blob is missing, and serialize on the store lock.
+- **Behavior:** attaches the same reference to multiple tasks. `file` values are repository-relative paths (attachments-store paths are rejected); `attachment` values are stored blob names, fail closed when the blob is missing, and serialize on the store lock. `code` and `file` adds resolve repository-relative paths and therefore require a repository root — a missing root fails those items individually with `Unable to locate git repository` instead of aborting the batch. Every changed item records one `reference_added` history entry and fires the same post-commit automation as the single-task tool.
 - **Response:** JSON with `updated[]` and `failed[]`.
 
 ### `task_bulk_reference_remove`
 - **Params:** `ids[]` (required), optional `project`, `kind` (required: `link|file|code|jira|github|attachment`), `value` (required), optional `stop_on_error`.
-- **Behavior:** detaches the same reference from multiple tasks. `attachment` detach is reference-only and never deletes blobs.
+- **Behavior:** detaches the same reference from multiple tasks. `attachment` detach is reference-only and never deletes blobs. `code` removal matches stored values and works outside a Git repository (like the single-task tool); `file` removal still requires a repository root, failing per item when it is missing. Every changed item records one `reference_removed` history entry and fires the same post-commit automation as the single-task tool.
 - **Response:** JSON with `updated[]` and `failed[]`.
 
 ### `task_delete`

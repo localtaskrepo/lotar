@@ -59,11 +59,19 @@ fn handle_add_link(
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let (task, added) =
-        ReferenceService::attach_link_reference(&mut ctx.storage, &loaded.full_id, url)
-            .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::attach_link_reference(&mut ctx.storage, &loaded.full_id, url)
+        .map_err(|e| e.to_string())?;
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(renderer, "add", "link", &loaded.full_id, url, added, &task)
+    emit_reference_result(
+        renderer,
+        "add",
+        "link",
+        &loaded.full_id,
+        url,
+        outcome.changed,
+        &outcome.task,
+    )
 }
 
 fn handle_remove_link(
@@ -76,9 +84,9 @@ fn handle_remove_link(
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let (task, removed) =
-        ReferenceService::detach_link_reference(&mut ctx.storage, &loaded.full_id, url)
-            .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::detach_link_reference(&mut ctx.storage, &loaded.full_id, url)
+        .map_err(|e| e.to_string())?;
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
     emit_reference_result(
         renderer,
@@ -86,8 +94,8 @@ fn handle_remove_link(
         "link",
         &loaded.full_id,
         url,
-        removed,
-        &task,
+        outcome.changed,
+        &outcome.task,
     )
 }
 
@@ -104,15 +112,24 @@ fn handle_add_code(
     let repo_root = find_repo_root(ctx.storage_root())
         .ok_or_else(|| "Unable to locate git repository".to_string())?;
 
-    let (task, added) = ReferenceService::attach_code_reference(
+    let outcome = ReferenceService::attach_code_reference(
         &mut ctx.storage,
         &repo_root,
         &loaded.full_id,
         code,
     )
     .map_err(|e| e.to_string())?;
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(renderer, "add", "code", &loaded.full_id, code, added, &task)
+    emit_reference_result(
+        renderer,
+        "add",
+        "code",
+        &loaded.full_id,
+        code,
+        outcome.changed,
+        &outcome.task,
+    )
 }
 
 fn handle_remove_code(
@@ -125,9 +142,9 @@ fn handle_remove_code(
     let mut ctx = TaskCommandContext::new(resolver, project, Some(task_id))?;
     let loaded = load_task(&mut ctx, task_id, project)?;
 
-    let (task, removed) =
-        ReferenceService::detach_code_reference(&mut ctx.storage, &loaded.full_id, code)
-            .map_err(|e| e.to_string())?;
+    let outcome = ReferenceService::detach_code_reference(&mut ctx.storage, &loaded.full_id, code)
+        .map_err(|e| e.to_string())?;
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
     emit_reference_result(
         renderer,
@@ -135,8 +152,8 @@ fn handle_remove_code(
         "code",
         &loaded.full_id,
         code,
-        removed,
-        &task,
+        outcome.changed,
+        &outcome.task,
     )
 }
 
@@ -170,15 +187,24 @@ fn handle_add_file(
 
     // Repository file references can never target the attachments store
     // (the service guard rejects store paths), so no store lock is taken.
-    let (task, added) = ReferenceService::attach_file_reference(
+    let outcome = ReferenceService::attach_file_reference(
         &mut ctx.storage,
         &repo_root,
         &loaded.full_id,
         path,
     )
     .map_err(|e| e.to_string())?;
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
-    emit_reference_result(renderer, "add", "file", &loaded.full_id, path, added, &task)
+    emit_reference_result(
+        renderer,
+        "add",
+        "file",
+        &loaded.full_id,
+        path,
+        outcome.changed,
+        &outcome.task,
+    )
 }
 
 fn handle_remove_file(
@@ -196,13 +222,14 @@ fn handle_remove_file(
 
     // Repository file references can never target the attachments store
     // (the service guard rejects store paths), so no store lock is taken.
-    let (task, removed) = ReferenceService::detach_file_reference(
+    let outcome = ReferenceService::detach_file_reference(
         &mut ctx.storage,
         &repo_root,
         &loaded.full_id,
         path,
     )
     .map_err(|e| e.to_string())?;
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
     emit_reference_result(
         renderer,
@@ -210,8 +237,8 @@ fn handle_remove_file(
         "file",
         &loaded.full_id,
         path,
-        removed,
-        &task,
+        outcome.changed,
+        &outcome.task,
     )
 }
 
@@ -228,13 +255,16 @@ fn handle_add_attachment(
     let loaded = load_task(&mut ctx, task_id, project)?;
 
     let root = attachments_root_for(ctx.storage_root(), &loaded.full_id);
-    let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
-    // Fail closed when the named blob is not present in the store.
-    AttachmentService::resolve_attachment_path(&root, name).map_err(|e| e.to_string())?;
+    let outcome = {
+        let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
+        // Fail closed when the named blob is not present in the store.
+        AttachmentService::resolve_attachment_path(&root, name).map_err(|e| e.to_string())?;
 
-    let (task, added) =
         AttachmentService::attach_managed_reference(&mut ctx.storage, &loaded.full_id, name)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+    };
+    // The store guard has dropped: post-commit hooks are safe to run.
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
     emit_reference_result(
         renderer,
@@ -242,8 +272,8 @@ fn handle_add_attachment(
         "attachment",
         &loaded.full_id,
         name,
-        added,
-        &task,
+        outcome.changed,
+        &outcome.task,
     )
 }
 
@@ -260,11 +290,14 @@ fn handle_remove_attachment(
     let loaded = load_task(&mut ctx, task_id, project)?;
 
     let root = attachments_root_for(ctx.storage_root(), &loaded.full_id);
-    let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
+    let outcome = {
+        let _store_guard = AttachmentService::lock_store(&root).map_err(|e| e.to_string())?;
 
-    let (task, removed) =
         AttachmentService::detach_managed_reference(&mut ctx.storage, &loaded.full_id, name)
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.to_string())?
+    };
+    // The store guard has dropped: post-commit hooks are safe to run.
+    ReferenceService::dispatch_post_commit(&mut ctx.storage, &outcome);
 
     emit_reference_result(
         renderer,
@@ -272,8 +305,8 @@ fn handle_remove_attachment(
         "attachment",
         &loaded.full_id,
         name,
-        removed,
-        &task,
+        outcome.changed,
+        &outcome.task,
     )
 }
 

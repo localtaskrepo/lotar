@@ -1,15 +1,139 @@
 use crate::api_types::{ReferenceSnippetDTO, ReferenceSnippetLineDTO, TaskDTO};
 use crate::errors::{LoTaRError, LoTaRResult};
+use crate::services::automation_service::AutomationService;
 use crate::services::task_service::TaskService;
 use crate::storage::manager::Storage;
-use crate::types::ReferenceEntry;
+use crate::storage::task::Task;
+use crate::types::{ReferenceEntry, TaskChange, TaskChangeLogEntry};
 use ignore::WalkBuilder;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub struct ReferenceService;
 
+/// Result of a single reference or managed-attachment mutation, carrying
+/// everything callers need to run post-commit hooks exactly once for
+/// changed operations. Dropping the outcome silently would skip those
+/// hooks, so it is `#[must_use]`.
+#[must_use]
+#[derive(Debug, Clone)]
+pub struct ReferenceMutationOutcome {
+    /// Task after the mutation attempt (equals the previous state when
+    /// `changed` is false).
+    pub task: TaskDTO,
+    /// Whether a reference was actually added or removed.
+    pub changed: bool,
+    /// Task state before the mutation; present only when `changed` is true.
+    pub previous: Option<TaskDTO>,
+}
+
+#[cfg(test)]
+#[path = "../../tests/common/dev60_lock_order_cases.rs"]
+mod dev60_lock_order_cases;
+
 impl ReferenceService {
+    /// Run post-commit hooks for a reference mutation: changed operations
+    /// dispatch automation with the previous/current task pair, firing the
+    /// generic `updated` event (plus the legacy `start` catch-all).
+    /// Reference values are not part of the automation condition
+    /// vocabulary, so rules with change conditions correctly stay silent
+    /// while bare `on.updated` rules fire exactly once. Unchanged
+    /// operations do nothing.
+    ///
+    /// Callers must invoke this only after every lock they hold has been
+    /// released — in particular the cross-process attachment store lock —
+    /// because automation re-enters task storage and may mutate further.
+    pub fn dispatch_post_commit(storage: &mut Storage, outcome: &ReferenceMutationOutcome) {
+        #[cfg(test)]
+        assert_eq!(
+            crate::services::attachment_service::AttachmentService::store_locks_held(),
+            0,
+            "reference post-commit hooks must run after the attachment store lock is released"
+        );
+        let Some(previous) = outcome.previous.as_ref() else {
+            return;
+        };
+        let Ok(parsed) = crate::storage::TaskId::parse(&outcome.task.id) else {
+            return;
+        };
+        let config =
+            TaskService::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
+        let _ =
+            AutomationService::apply_task_update(storage, Some(previous), &outcome.task, &config);
+    }
+
+    /// Shared locked commit for reference mutations: parses the canonical
+    /// id, refuses non-local targets, then applies the typed mutation to
+    /// the freshest task state under the project task lock (concurrent
+    /// writers to other fields can never be lost). Changed operations
+    /// record exactly one `reference_added`/`reference_removed` history
+    /// entry (old/new carry `kind:value` displays) and bump `modified`
+    /// once; unchanged operations leave the file bytes identical and skip
+    /// history, timestamps, and post-commit hooks.
+    pub(crate) fn commit_reference_change<F>(
+        storage: &mut Storage,
+        task_id: &str,
+        kind: &str,
+        added: bool,
+        apply: F,
+    ) -> LoTaRResult<ReferenceMutationOutcome>
+    where
+        F: FnOnce(&mut Task, &mut Vec<String>) -> bool,
+    {
+        let parsed = crate::storage::TaskId::parse(task_id)
+            .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?;
+        if parsed.project.trim().is_empty() {
+            return Err(LoTaRError::InvalidTaskId(task_id.to_string()));
+        }
+        let canonical = parsed.canonical();
+        TaskService::ensure_local_task(storage, task_id)?;
+
+        let root_path = storage.root_path.clone();
+        let history_field = if added {
+            "reference_added"
+        } else {
+            "reference_removed"
+        };
+        let outcome = storage.mutate_task(&canonical, move |task| {
+            let mut changed_values = Vec::new();
+            if !apply(task, &mut changed_values) {
+                return Ok(false);
+            }
+            let display = changed_values
+                .iter()
+                .map(|value| format!("{kind}:{value}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let (old, new) = if added {
+                (None, Some(display))
+            } else {
+                (Some(display), None)
+            };
+            let now = chrono::Utc::now().to_rfc3339();
+            task.history.push(TaskChangeLogEntry {
+                at: now.clone(),
+                actor: crate::utils::identity::resolve_current_user(Some(root_path.as_path())),
+                changes: vec![TaskChange {
+                    field: history_field.into(),
+                    old,
+                    new,
+                }],
+            });
+            task.modified = now;
+            Ok(true)
+        })?;
+
+        let previous = outcome
+            .previous()
+            .map(|before| TaskService::dto_from_task(storage, &canonical, before.clone()));
+        let task = TaskService::dto_from_task(storage, &canonical, outcome.after.clone());
+        Ok(ReferenceMutationOutcome {
+            task,
+            changed: outcome.changed,
+            previous,
+        })
+    }
+
     pub fn suggest_repo_files(repo_root: &Path, query: &str, limit: usize) -> Vec<String> {
         let needle = query.trim().to_ascii_lowercase();
         if needle.is_empty() || limit == 0 {
@@ -52,7 +176,7 @@ impl ReferenceService {
         storage: &mut Storage,
         task_id: &str,
         url: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -79,35 +203,35 @@ impl ReferenceService {
             ));
         }
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let already = task
-            .references
-            .iter()
-            .any(|r| r.link.as_deref() == Some(trimmed));
-
-        let mut added = false;
-        if !already {
-            task.references.push(ReferenceEntry {
-                link: Some(trimmed.to_string()),
-                ..Default::default()
-            });
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-            added = true;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
+        let target = trimmed.to_string();
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            "link",
+            true,
+            move |task, changed_values| {
+                let already = task
+                    .references
+                    .iter()
+                    .any(|r| r.link.as_deref() == Some(target.as_str()));
+                if already {
+                    return false;
+                }
+                task.references.push(ReferenceEntry {
+                    link: Some(target.clone()),
+                    ..Default::default()
+                });
+                changed_values.push(target.clone());
+                true
+            },
+        )
     }
 
     pub fn detach_link_reference(
         storage: &mut Storage,
         task_id: &str,
         url: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -120,22 +244,23 @@ impl ReferenceService {
             return Err(LoTaRError::ValidationError("Missing url".to_string()));
         }
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let before_len = task.references.len();
-        task.references
-            .retain(|r| r.link.as_deref() != Some(trimmed));
-
-        let removed = task.references.len() != before_len;
-        if removed {
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+        let target = trimmed.to_string();
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            "link",
+            false,
+            move |task, changed_values| {
+                let before_len = task.references.len();
+                task.references
+                    .retain(|r| r.link.as_deref() != Some(target.as_str()));
+                if task.references.len() == before_len {
+                    return false;
+                }
+                changed_values.push(target.clone());
+                true
+            },
+        )
     }
 
     pub fn attach_code_reference(
@@ -143,7 +268,7 @@ impl ReferenceService {
         repo_root: &Path,
         task_id: &str,
         code: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -204,35 +329,34 @@ impl ReferenceService {
             snippet.path.clone()
         };
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let already = task
-            .references
-            .iter()
-            .any(|r| r.code.as_deref() == Some(normalized.as_str()));
-
-        let mut added = false;
-        if !already {
-            task.references.push(ReferenceEntry {
-                code: Some(normalized),
-                ..Default::default()
-            });
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-            added = true;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            "code",
+            true,
+            move |task, changed_values| {
+                let already = task
+                    .references
+                    .iter()
+                    .any(|r| r.code.as_deref() == Some(normalized.as_str()));
+                if already {
+                    return false;
+                }
+                task.references.push(ReferenceEntry {
+                    code: Some(normalized.clone()),
+                    ..Default::default()
+                });
+                changed_values.push(normalized.clone());
+                true
+            },
+        )
     }
 
     pub fn detach_code_reference(
         storage: &mut Storage,
         task_id: &str,
         code: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -277,29 +401,29 @@ impl ReferenceService {
             }
         }
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let before_len = task.references.len();
         candidates.sort();
         candidates.dedup();
 
-        task.references.retain(|r| {
-            let Some(stored) = r.code.as_deref() else {
-                return true;
-            };
-            !candidates.iter().any(|candidate| candidate == stored)
-        });
-
-        let removed = task.references.len() != before_len;
-        if removed {
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            "code",
+            false,
+            move |task, changed_values| {
+                let before_len = task.references.len();
+                task.references.retain(|r| {
+                    let Some(stored) = r.code.as_deref() else {
+                        return true;
+                    };
+                    if candidates.iter().any(|candidate| candidate == stored) {
+                        changed_values.push(stored.to_string());
+                        return false;
+                    }
+                    true
+                });
+                task.references.len() != before_len
+            },
+        )
     }
 
     pub fn attach_platform_reference(
@@ -307,7 +431,7 @@ impl ReferenceService {
         task_id: &str,
         kind: &str,
         value: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -338,47 +462,42 @@ impl ReferenceService {
             }
         };
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let already = match kind.trim().to_ascii_lowercase().as_str() {
-            "jira" => task
-                .references
-                .iter()
-                .any(|r| r.jira.as_deref() == Some(normalized.as_str())),
-            "github" => task
-                .references
-                .iter()
-                .any(|r| r.github.as_deref() == Some(normalized.as_str())),
-            _ => false,
-        };
-
-        let mut added = false;
-        if !already {
-            let entry = match kind.trim().to_ascii_lowercase().as_str() {
-                "jira" => ReferenceEntry {
-                    jira: Some(normalized),
-                    ..Default::default()
-                },
-                "github" => ReferenceEntry {
-                    github: Some(normalized),
-                    ..Default::default()
-                },
-                _ => {
-                    return Err(LoTaRError::ValidationError(
-                        "Unsupported reference kind".to_string(),
-                    ));
+        let field_kind = kind.trim().to_ascii_lowercase();
+        let kind_label = field_kind.clone();
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            &kind_label,
+            true,
+            move |task, changed_values| {
+                let already = if field_kind == "jira" {
+                    task.references
+                        .iter()
+                        .any(|r| r.jira.as_deref() == Some(normalized.as_str()))
+                } else {
+                    task.references
+                        .iter()
+                        .any(|r| r.github.as_deref() == Some(normalized.as_str()))
+                };
+                if already {
+                    return false;
                 }
-            };
-            task.references.push(entry);
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-            added = true;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
+                let entry = if field_kind == "jira" {
+                    ReferenceEntry {
+                        jira: Some(normalized.clone()),
+                        ..Default::default()
+                    }
+                } else {
+                    ReferenceEntry {
+                        github: Some(normalized.clone()),
+                        ..Default::default()
+                    }
+                };
+                task.references.push(entry);
+                changed_values.push(normalized.clone());
+                true
+            },
+        )
     }
 
     pub fn detach_platform_reference(
@@ -386,7 +505,7 @@ impl ReferenceService {
         task_id: &str,
         kind: &str,
         value: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -412,29 +531,29 @@ impl ReferenceService {
             }
         };
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let before_len = task.references.len();
-        match kind.trim().to_ascii_lowercase().as_str() {
-            "jira" => task
-                .references
-                .retain(|r| r.jira.as_deref() != Some(normalized.as_str())),
-            "github" => task
-                .references
-                .retain(|r| r.github.as_deref() != Some(normalized.as_str())),
-            _ => {}
-        }
-
-        let removed = task.references.len() != before_len;
-        if removed {
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+        let field_kind = kind.trim().to_ascii_lowercase();
+        let kind_label = field_kind.clone();
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            &kind_label,
+            false,
+            move |task, changed_values| {
+                let before_len = task.references.len();
+                if field_kind == "jira" {
+                    task.references
+                        .retain(|r| r.jira.as_deref() != Some(normalized.as_str()));
+                } else {
+                    task.references
+                        .retain(|r| r.github.as_deref() != Some(normalized.as_str()));
+                }
+                if task.references.len() == before_len {
+                    return false;
+                }
+                changed_values.push(normalized.clone());
+                true
+            },
+        )
     }
 
     pub fn attach_file_reference(
@@ -442,7 +561,7 @@ impl ReferenceService {
         repo_root: &Path,
         task_id: &str,
         file: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -474,28 +593,27 @@ impl ReferenceService {
             .unwrap_or(&resolved);
         let normalized = Self::normalize_path_for_display(rel);
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let already = task
-            .references
-            .iter()
-            .any(|r| r.file.as_deref() == Some(normalized.as_str()));
-
-        let mut added = false;
-        if !already {
-            task.references.push(ReferenceEntry {
-                file: Some(normalized),
-                ..Default::default()
-            });
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-            added = true;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, added))
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            "file",
+            true,
+            move |task, changed_values| {
+                let already = task
+                    .references
+                    .iter()
+                    .any(|r| r.file.as_deref() == Some(normalized.as_str()));
+                if already {
+                    return false;
+                }
+                task.references.push(ReferenceEntry {
+                    file: Some(normalized.clone()),
+                    ..Default::default()
+                });
+                changed_values.push(normalized.clone());
+                true
+            },
+        )
     }
 
     pub fn detach_file_reference(
@@ -503,7 +621,7 @@ impl ReferenceService {
         repo_root: &Path,
         task_id: &str,
         file: &str,
-    ) -> LoTaRResult<(TaskDTO, bool)> {
+    ) -> LoTaRResult<ReferenceMutationOutcome> {
         let derived = crate::storage::TaskId::parse(task_id)
             .map_err(|err| LoTaRError::InvalidTaskId(format!("{task_id}: {err}")))?
             .project;
@@ -533,22 +651,22 @@ impl ReferenceService {
             Err(_) => trimmed.to_string(),
         };
 
-        let project = derived.to_string();
-        let mut task = storage
-            .get(task_id, &project)
-            .ok_or_else(|| LoTaRError::TaskNotFound(task_id.to_string()))?;
-
-        let before_len = task.references.len();
-        task.references
-            .retain(|r| r.file.as_deref() != Some(normalized.as_str()));
-
-        let removed = task.references.len() != before_len;
-        if removed {
-            task.modified = chrono::Utc::now().to_rfc3339();
-            storage.edit(task_id, &task)?;
-        }
-
-        Ok((TaskService::get(storage, task_id, Some(&derived))?, removed))
+        Self::commit_reference_change(
+            storage,
+            task_id,
+            "file",
+            false,
+            move |task, changed_values| {
+                let before_len = task.references.len();
+                task.references
+                    .retain(|r| r.file.as_deref() != Some(normalized.as_str()));
+                if task.references.len() == before_len {
+                    return false;
+                }
+                changed_values.push(normalized.clone());
+                true
+            },
+        )
     }
 
     /// Repository `file` references must never point into the configured
@@ -856,6 +974,10 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
+    fn unpack(outcome: ReferenceMutationOutcome) -> (TaskDTO, bool) {
+        (outcome.task, outcome.changed)
+    }
+
     #[test]
     fn snippet_for_code_returns_expected_context() {
         let temp = tempfile::tempdir().unwrap();
@@ -952,7 +1074,7 @@ mod tests {
 
         let url = "https://example.com/docs";
         let (updated, added) =
-            ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap();
+            unpack(ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap());
         assert!(added);
         assert!(
             updated
@@ -962,11 +1084,11 @@ mod tests {
         );
 
         let (_updated2, added2) =
-            ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap();
+            unpack(ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap());
         assert!(!added2);
 
         let (updated3, removed) =
-            ReferenceService::detach_link_reference(&mut storage, &task.id, url).unwrap();
+            unpack(ReferenceService::detach_link_reference(&mut storage, &task.id, url).unwrap());
         assert!(removed);
         assert!(
             !updated3
@@ -998,13 +1120,15 @@ mod tests {
         )
         .unwrap();
 
-        let (task, added) = ReferenceService::attach_file_reference(
-            &mut storage,
-            repo_root,
-            &task.id,
-            "src/example.rs",
-        )
-        .unwrap();
+        let (task, added) = unpack(
+            ReferenceService::attach_file_reference(
+                &mut storage,
+                repo_root,
+                &task.id,
+                "src/example.rs",
+            )
+            .unwrap(),
+        );
         assert!(added);
         assert!(
             task.references
@@ -1012,13 +1136,15 @@ mod tests {
                 .any(|r| r.file.as_deref() == Some("src/example.rs"))
         );
 
-        let (task, removed) = ReferenceService::detach_file_reference(
-            &mut storage,
-            repo_root,
-            &task.id,
-            "src/example.rs",
-        )
-        .unwrap();
+        let (task, removed) = unpack(
+            ReferenceService::detach_file_reference(
+                &mut storage,
+                repo_root,
+                &task.id,
+                "src/example.rs",
+            )
+            .unwrap(),
+        );
         assert!(removed);
         assert!(
             !task
@@ -1059,7 +1185,7 @@ mod tests {
 
         let url = "ftp://example.com/path/to/file";
         let (updated, added) =
-            ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap();
+            unpack(ReferenceService::attach_link_reference(&mut storage, &task.id, url).unwrap());
         assert!(added);
         assert!(
             updated
@@ -1143,9 +1269,10 @@ mod tests {
         .unwrap();
 
         let ref_code = "src/example.rs#2-3";
-        let (updated, added) =
+        let (updated, added) = unpack(
             ReferenceService::attach_code_reference(&mut storage, repo_root, &task.id, ref_code)
-                .unwrap();
+                .unwrap(),
+        );
         assert!(added);
         assert!(
             updated
@@ -1154,13 +1281,15 @@ mod tests {
                 .any(|r| r.code.as_deref() == Some(ref_code))
         );
 
-        let (_updated2, added2) =
+        let (_updated2, added2) = unpack(
             ReferenceService::attach_code_reference(&mut storage, repo_root, &task.id, ref_code)
-                .unwrap();
+                .unwrap(),
+        );
         assert!(!added2);
 
-        let (updated3, removed) =
-            ReferenceService::detach_code_reference(&mut storage, &task.id, ref_code).unwrap();
+        let (updated3, removed) = unpack(
+            ReferenceService::detach_code_reference(&mut storage, &task.id, ref_code).unwrap(),
+        );
         assert!(removed);
         assert!(
             !updated3
@@ -1199,9 +1328,10 @@ mod tests {
         let legacy = "src/example.rs#L2-L3";
         let canonical = "src/example.rs#2-3";
 
-        let (updated, added) =
+        let (updated, added) = unpack(
             ReferenceService::attach_code_reference(&mut storage, repo_root, &task.id, legacy)
-                .unwrap();
+                .unwrap(),
+        );
         assert!(added);
         assert!(
             updated
@@ -1210,8 +1340,9 @@ mod tests {
                 .any(|r| r.code.as_deref() == Some(canonical))
         );
 
-        let (updated2, removed) =
-            ReferenceService::detach_code_reference(&mut storage, &task.id, legacy).unwrap();
+        let (updated2, removed) = unpack(
+            ReferenceService::detach_code_reference(&mut storage, &task.id, legacy).unwrap(),
+        );
         assert!(removed);
         assert!(
             !updated2

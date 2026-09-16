@@ -72,6 +72,8 @@ Field | Type | Notes
 ## Invariants & best practices
 
 - `created <= modified` (enforced by `TaskService`).
+- Comments and reference mutations run through a locked read-modify-write primitive (`Storage::mutate_task`): the task file is re-parsed under the project task lock, the mutation applies to that fresh state (concurrent writes to other fields cannot be lost), and unchanged operations skip the write entirely. Pending DEV-55 transaction journals still fail these writes closed.
+- Change-log vocabulary: `comment_added` (comment append), `comment#N` (comment edit, old/new text), and `reference_added`/`reference_removed` (one entry per changed reference operation, old/new as `kind:value` displays). Changed reference operations bump `modified` once and dispatch post-commit automation (`updated` event, empty change set) plus one `task_updated` SSE event per server surface — strictly after any attachments-store lock drops. Automation comments are recorded under the `automation` actor and never re-dispatch `on.commented`.
 - `tags`, `comments`, `references`, `history`, and `relationships.*` are always arrays even when empty, simplifying client iteration.
 - Explicit `assignee` values persist across status transitions; automation must clear them deliberately if needed.
 - When exporting/importing YAML directly, keep field names lower_snake_case to match the DTOs. Unknown keys are preserved by serde but ignored by CLI readers.

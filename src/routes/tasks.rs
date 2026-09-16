@@ -301,59 +301,78 @@ pub(super) fn register(api_server: &mut ApiServer) {
         }
     }
 
-    // Serialize blob create/dedup + attach + failure cleanup for this
-    // attachments store ACROSS PROCESSES: a concurrent upload of identical
-    // content must never dedupe-and-attach a blob that this request might
-    // still roll back. Lock order is store-lock -> task-lock (see
-    // lock_store docs); contention fails closed after the standard bound.
-    let _store_guard = match AttachmentService::lock_store(&root) {
-        Ok(guard) => guard,
-        Err(e) => return bad_request(e.to_string()),
+    let (attach_outcome, stored) = {
+        // Serialize blob create/dedup + attach + failure cleanup for this
+        // attachments store ACROSS PROCESSES: a concurrent upload of
+        // identical content must never dedupe-and-attach a blob that this
+        // request might still roll back. Lock order is store-lock ->
+        // task-lock (see lock_store docs); contention fails closed after
+        // the standard bound. The guard drops with this block, after the
+        // LAST blob operation and before any post-commit hook runs.
+        let _store_guard = match AttachmentService::lock_store(&root) {
+            Ok(guard) => guard,
+            Err(e) => return bad_request(e.to_string()),
+        };
+
+        let (stored, created) =
+            match AttachmentService::store_bytes(&root, &payload.filename, &bytes) {
+                Ok(result) => result,
+                Err(e) => {
+                    return internal(
+                        json!({"error": {"code": "INTERNAL", "message": e.to_string()}}),
+                    )
+                }
+            };
+
+        #[cfg(test)]
+        crate::services::attachment_service::upload_fault::park_after_store_if_armed();
+
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        #[cfg(test)]
+        let outcome =
+            if crate::services::attachment_service::upload_fault::take_fail_next_attach() {
+                Err(LoTaRError::ValidationError(
+                    "injected attach failure".to_string(),
+                ))
+            } else {
+                AttachmentService::attach_managed_reference(&mut storage, task_id, &stored)
+            };
+        #[cfg(not(test))]
+        let outcome =
+            AttachmentService::attach_managed_reference(&mut storage, task_id, &stored);
+        drop(storage);
+
+        // The precheck passed, so a failure here is a write/lock error:
+        // remove the file this request created so no orphan remains, still
+        // under the store lock. Deduped pre-existing content
+        // (created == false) is preserved.
+        if outcome.is_err() && created {
+            AttachmentService::remove_created_file(&root, &stored);
+        }
+        (outcome, stored)
     };
 
-    let (stored, created) = match AttachmentService::store_bytes(&root, &payload.filename, &bytes)
-    {
-        Ok(result) => result,
-        Err(e) => {
-            return internal(
-                json!({"error": {"code": "INTERNAL", "message": e.to_string()}}),
+    // The store guard has dropped: post-commit hooks are safe to run.
+    let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+    match attach_outcome {
+        Ok(outcome) => {
+            ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+            // A no-op attach (already referenced; attached=false) changed
+            // only the blob store, not the task, so it emits no task event.
+            if outcome.changed {
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+            }
+            ok_json(
+                200,
+                json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached: outcome.changed, task: outcome.task }}),
             )
         }
-    };
-
-    #[cfg(test)]
-    crate::services::attachment_service::upload_fault::park_after_store_if_armed();
-
-    let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-    #[cfg(test)]
-    let attach_outcome =
-        if crate::services::attachment_service::upload_fault::take_fail_next_attach() {
-            Err(LoTaRError::ValidationError(
-                "injected attach failure".to_string(),
-            ))
-        } else {
-            AttachmentService::attach_managed_reference(&mut storage, task_id, &stored)
-        };
-    #[cfg(not(test))]
-    let attach_outcome = AttachmentService::attach_managed_reference(&mut storage, task_id, &stored);
-    drop(storage);
-    match attach_outcome {
-        Ok((task, attached)) => ok_json(
-            200,
-            json!({"data": crate::api_types::AttachmentUploadResponse { stored_path: stored, attached, task }}),
-        ),
-        Err(e) => {
-            // The precheck passed, so a failure here is a write/lock error:
-            // remove the file this request created so no orphan remains.
-            // Deduped pre-existing content (created == false) is preserved.
-            if created {
-                AttachmentService::remove_created_file(&root, &stored);
-            }
-            match e {
-                LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
-                _ => bad_request(e.to_string()),
-            }
-        }
+        Err(e) => match e {
+            LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
+            _ => bad_request(e.to_string()),
+        },
     }
 });
 
@@ -401,53 +420,71 @@ pub(super) fn register(api_server: &mut ApiServer) {
             Err(e) => return bad_request(e.to_string()),
         };
 
-        // Hold the cross-process store lock across detach + reference
-        // re-check + blob deletion (store-lock -> task-lock order, matching
-        // the upload path) so a pending upload can never attach a blob this
-        // request is about to delete, and this delete can never race another
-        // remover's re-check.
-        let _store_guard = match AttachmentService::lock_store(&root) {
-            Ok(guard) => guard,
-            Err(e) => return bad_request(e.to_string()),
-        };
-
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match AttachmentService::detach_managed_reference(
-            &mut storage,
-            &payload.id,
-            &payload.stored_path,
-        ) {
-            Ok((task, removed)) => {
-                // Typed-membership gate before any blob cleanup (DEV-61):
-                // only a task that actually carried the managed attachment
-                // reference may trigger reclamation. A missing managed
-                // reference — including a same-named repository `file`
-                // entry — fails closed with the store untouched.
-                if !removed {
-                    return bad_request(format!(
-                        "Task '{}' does not reference attachment '{}'",
-                        payload.id, payload.stored_path
-                    ));
-                }
-                let hash_tag = AttachmentService::extract_hash_tag(&payload.stored_path);
-                let still_referenced = match hash_tag.as_deref() {
-                    Some(hash) => AttachmentService::is_hash_referenced(&storage, &root, hash),
-                    None => false,
-                };
+        let removed = {
+            // Hold the cross-process store lock across detach + reference
+            // re-check + blob deletion (store-lock -> task-lock order,
+            // matching the upload path) so a pending upload can never
+            // attach a blob this request is about to delete, and this
+            // delete can never race another remover's re-check. The guard
+            // drops with this block, after the LAST blob operation and
+            // before any post-commit hook runs.
+            let _store_guard = match AttachmentService::lock_store(&root) {
+                Ok(guard) => guard,
+                Err(e) => return bad_request(e.to_string()),
+            };
 
-                let mut deleted = false;
-                if !still_referenced {
-                    if let Some(hash) = hash_tag.as_deref() {
-                        deleted = AttachmentService::delete_all_by_hash(&root, hash) > 0;
-                    } else if let Ok(path) =
-                        AttachmentService::resolve_attachment_path(&root, &payload.stored_path)
-                    {
-                        deleted = std::fs::remove_file(path).is_ok();
+            match AttachmentService::detach_managed_reference(
+                &mut storage,
+                &payload.id,
+                &payload.stored_path,
+            ) {
+                Ok(outcome) => {
+                    // Typed-membership gate before any blob cleanup (DEV-61):
+                    // only a task that actually carried the managed attachment
+                    // reference may trigger reclamation. A missing managed
+                    // reference — including a same-named repository `file`
+                    // entry — fails closed with the store untouched.
+                    if !outcome.changed {
+                        return bad_request(format!(
+                            "Task '{}' does not reference attachment '{}'",
+                            payload.id, payload.stored_path
+                        ));
                     }
+                    let hash_tag = AttachmentService::extract_hash_tag(&payload.stored_path);
+                    let still_referenced = match hash_tag.as_deref() {
+                        Some(hash) => {
+                            AttachmentService::is_hash_referenced(&storage, &root, hash)
+                        }
+                        None => false,
+                    };
+
+                    let mut deleted = false;
+                    if !still_referenced {
+                        if let Some(hash) = hash_tag.as_deref() {
+                            deleted = AttachmentService::delete_all_by_hash(&root, hash) > 0;
+                        } else if let Ok(path) =
+                            AttachmentService::resolve_attachment_path(&root, &payload.stored_path)
+                        {
+                            deleted = std::fs::remove_file(path).is_ok();
+                        }
+                    }
+                    Ok((outcome, still_referenced, deleted))
                 }
+                Err(e) => Err(e),
+            }
+        };
+        // The store guard has dropped: post-commit hooks and the task event
+        // are safe to run (the success path always changed the task).
+        match removed {
+            Ok((outcome, still_referenced, deleted)) => {
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                let actor =
+                    crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
                 ok_json(
                     200,
-                    json!({"data": crate::api_types::AttachmentRemoveResponse { task, deleted, still_referenced }}),
+                    json!({"data": crate::api_types::AttachmentRemoveResponse { task: outcome.task, deleted, still_referenced }}),
                 )
             }
             Err(e) => match e {
@@ -485,10 +522,18 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
             match ReferenceService::attach_link_reference(&mut storage, &payload.id, &payload.url) {
-                Ok((task, added)) => ok_json(
-                    200,
-                    json!({"data": crate::api_types::LinkReferenceAddResponse { task, added }}),
-                ),
+                Ok(outcome) => {
+                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                    if outcome.changed {
+                        let actor =
+                            crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                    }
+                    ok_json(
+                        200,
+                        json!({"data": crate::api_types::LinkReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
+                    )
+                }
                 Err(e) => match e {
                     LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                     _ => bad_request(e.to_string()),
@@ -523,10 +568,18 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_link_reference(&mut storage, &payload.id, &payload.url) {
-            Ok((task, removed)) => ok_json(
-                200,
-                json!({"data": crate::api_types::LinkReferenceRemoveResponse { task, removed }}),
-            ),
+            Ok(outcome) => {
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                if outcome.changed {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                }
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::LinkReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
+                )
+            }
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                 _ => bad_request(e.to_string()),
@@ -565,16 +618,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
             };
 
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            match ReferenceService::attach_code_reference(
-                &mut storage,
-                &repo_root,
-                &payload.id,
-                &payload.code,
-            ) {
-                Ok((task, added)) => ok_json(
-                    200,
-                    json!({"data": crate::api_types::CodeReferenceAddResponse { task, added }}),
-                ),
+            match ReferenceService::attach_code_reference(&mut storage,
+&repo_root,
+&payload.id,
+&payload.code,) {
+                Ok(outcome) => {
+                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                    if outcome.changed {
+                        let actor =
+                            crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                    }
+                    ok_json(
+                        200,
+                        json!({"data": crate::api_types::CodeReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
+                    )
+                }
                 Err(e) => match e {
                     LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                     _ => bad_request(e.to_string()),
@@ -609,10 +668,18 @@ pub(super) fn register(api_server: &mut ApiServer) {
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         match ReferenceService::detach_code_reference(&mut storage, &payload.id, &payload.code) {
-            Ok((task, removed)) => ok_json(
-                200,
-                json!({"data": crate::api_types::CodeReferenceRemoveResponse { task, removed }}),
-            ),
+            Ok(outcome) => {
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                if outcome.changed {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                }
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::CodeReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
+                )
+            }
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                 _ => bad_request(e.to_string()),
@@ -651,16 +718,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
             };
 
             let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-            match ReferenceService::attach_file_reference(
-                &mut storage,
-                &repo_root,
-                &payload.id,
-                &payload.path,
-            ) {
-                Ok((task, added)) => ok_json(
-                    200,
-                    json!({"data": crate::api_types::FileReferenceAddResponse { task, added }}),
-                ),
+            match ReferenceService::attach_file_reference(&mut storage,
+&repo_root,
+&payload.id,
+&payload.path,) {
+                Ok(outcome) => {
+                    ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                    if outcome.changed {
+                        let actor =
+                            crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                        crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                    }
+                    ok_json(
+                        200,
+                        json!({"data": crate::api_types::FileReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
+                    )
+                }
                 Err(e) => match e {
                     LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                     _ => bad_request(e.to_string()),
@@ -699,16 +772,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match ReferenceService::detach_file_reference(
-            &mut storage,
-            &repo_root,
-            &payload.id,
-            &payload.path,
-        ) {
-            Ok((task, removed)) => ok_json(
-                200,
-                json!({"data": crate::api_types::FileReferenceRemoveResponse { task, removed }}),
-            ),
+        match ReferenceService::detach_file_reference(&mut storage,
+&repo_root,
+&payload.id,
+&payload.path,) {
+            Ok(outcome) => {
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                if outcome.changed {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                }
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::FileReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
+                )
+            }
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                 _ => bad_request(e.to_string()),
@@ -748,16 +827,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match ReferenceService::attach_platform_reference(
-            &mut storage,
-            &payload.id,
-            &kind,
-            &payload.value,
-        ) {
-            Ok((task, added)) => ok_json(
-                200,
-                json!({"data": crate::api_types::GenericReferenceAddResponse { task, added }}),
-            ),
+        match ReferenceService::attach_platform_reference(&mut storage,
+&payload.id,
+&kind,
+&payload.value,) {
+            Ok(outcome) => {
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                if outcome.changed {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                }
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::GenericReferenceAddResponse { task: outcome.task, added: outcome.changed }}),
+                )
+            }
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                 _ => bad_request(e.to_string()),
@@ -799,16 +884,22 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
 
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
-        match ReferenceService::detach_platform_reference(
-            &mut storage,
-            &payload.id,
-            &kind,
-            &payload.value,
-        ) {
-            Ok((task, removed)) => ok_json(
-                200,
-                json!({"data": crate::api_types::GenericReferenceRemoveResponse { task, removed }}),
-            ),
+        match ReferenceService::detach_platform_reference(&mut storage,
+&payload.id,
+&kind,
+&payload.value,) {
+            Ok(outcome) => {
+                ReferenceService::dispatch_post_commit(&mut storage, &outcome);
+                if outcome.changed {
+                    let actor =
+                        crate::utils::identity::resolve_current_user(Some(resolver.path.as_path()));
+                    crate::api_events::emit_task_updated(&outcome.task, actor.as_deref());
+                }
+                ok_json(
+                    200,
+                    json!({"data": crate::api_types::GenericReferenceRemoveResponse { task: outcome.task, removed: outcome.changed }}),
+                )
+            }
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
                 _ => bad_request(e.to_string()),

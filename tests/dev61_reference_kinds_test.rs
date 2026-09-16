@@ -641,13 +641,13 @@ fn managed_names_reject_path_shapes() {
         );
     }
 
-    let (task, added) =
-        lotar::services::attachment_service::AttachmentService::attach_managed_reference(
-            &mut storage,
-            "TP-1",
-            "  name.abc.def.ext  ",
-        )
-        .unwrap();
+    let outcome = lotar::services::attachment_service::AttachmentService::attach_managed_reference(
+        &mut storage,
+        "TP-1",
+        "  name.abc.def.ext  ",
+    )
+    .unwrap();
+    let (task, added) = (outcome.task, outcome.changed);
     assert!(added);
     assert!(
         task.references
@@ -1161,23 +1161,23 @@ fn code_references_reject_store_paths_and_stale_detach_still_works() {
     // Stale cleanup stays possible: attach a real code reference, delete
     // the file, detach still works without requiring the file to exist.
     let example_ref = format!("{}#1", fx.rel("src/example.rs"));
-    let (_task, added) =
-        lotar::services::reference_service::ReferenceService::attach_code_reference(
-            &mut storage,
-            &fx.repo_root,
-            "TP-1",
-            &example_ref,
-        )
-        .unwrap();
+    let outcome = lotar::services::reference_service::ReferenceService::attach_code_reference(
+        &mut storage,
+        &fx.repo_root,
+        "TP-1",
+        &example_ref,
+    )
+    .unwrap();
+    let added = outcome.changed;
     assert!(added);
     std::fs::remove_file(fx.workspace.join("src/example.rs")).unwrap();
-    let (_task2, removed) =
-        lotar::services::reference_service::ReferenceService::detach_code_reference(
-            &mut storage,
-            "TP-1",
-            &example_ref,
-        )
-        .unwrap();
+    let removed = lotar::services::reference_service::ReferenceService::detach_code_reference(
+        &mut storage,
+        "TP-1",
+        &example_ref,
+    )
+    .unwrap()
+    .changed;
     assert!(removed, "stale code detach must not require the file");
 }
 
@@ -1209,9 +1209,9 @@ fn store_guard_fails_closed_on_invalid_configuration() {
         );
         let err = match outcome {
             Err(e) => e,
-            Ok((task, added)) => panic!(
-                "{context}: expected denial but attach succeeded (added={added}) refs={:?}",
-                task.references
+            Ok(outcome) => panic!(
+                "{context}: expected denial but attach succeeded (added={}) refs={:?}",
+                outcome.changed, outcome.task.references
             ),
         };
         assert!(
@@ -1304,14 +1304,14 @@ fn store_guard_fails_closed_on_invalid_configuration() {
     )
     .unwrap();
     let mut storage = lotar::storage::manager::Storage::new(&fx.tasks_dir);
-    let (task, added) =
-        lotar::services::reference_service::ReferenceService::attach_file_reference(
-            &mut storage,
-            &fx.repo_root,
-            "TP-1",
-            &example,
-        )
-        .unwrap();
+    let outcome = lotar::services::reference_service::ReferenceService::attach_file_reference(
+        &mut storage,
+        &fx.repo_root,
+        "TP-1",
+        &example,
+    )
+    .unwrap();
+    let (task, added) = (outcome.task, outcome.changed);
     assert!(added, "valid config restores ordinary file references");
     assert!(
         task.references

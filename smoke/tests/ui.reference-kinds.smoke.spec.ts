@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'vitest';
+import { parse } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
 import { withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
@@ -89,6 +90,24 @@ function repoRelPath(workspace: SmokeWorkspace, workspaceRelative: string): stri
 
 function repoFileLine(line: number): string {
     return line === 3 ? ANCHOR_LINE_TEXT : `repo file line ${String(line).padStart(2, '0')}`;
+}
+
+// Typed reference membership from the parsed task YAML. Whole-file
+// substring checks are wrong for absence: the DEV-60 audit trail records
+// reference removals as history entries (`old: 'attachment:<name>'`), so
+// the raw text legitimately keeps containing the kind prefix afterwards.
+function typedReferences(task: Record<string, any>): Array<Record<string, any>> {
+    return Array.isArray(task.references) ? task.references : [];
+}
+
+function historyChanges(task: Record<string, any>): Array<Record<string, any>> {
+    return (Array.isArray(task.history) ? task.history : []).flatMap((entry: any) =>
+        Array.isArray(entry?.changes) ? entry.changes : [],
+    );
+}
+
+async function readParsedTask(workspace: SmokeWorkspace, taskId: string): Promise<any> {
+    return parse(await workspace.readTaskYaml(taskId)) as Record<string, any>;
 }
 
 async function seedRepoFile(workspace: SmokeWorkspace): Promise<void> {
@@ -239,12 +258,27 @@ describe('UI reference kinds (DEV-61)', () => {
                         .click();
                     await chip.waitFor({ state: 'detached', timeout: 15_000 });
                     await expect.poll(() => fs.pathExists(blobPath), { timeout: 15_000 }).toBe(false);
+                    // Detach proves out through typed membership on the parsed
+                    // YAML (never a whole-file substring), and the DEV-60 audit
+                    // trail records exactly one reference_removed entry with
+                    // the managed kind/value as its old state.
                     await expect
                         .poll(
-                            async () => (await workspace.readTaskYaml(task.id)).includes('attachment:'),
+                            async () =>
+                                typedReferences(await readParsedTask(workspace, task.id)).some(
+                                    (entry) => entry.attachment === storedPath,
+                                ),
                             { timeout: 15_000 },
                         )
                         .toBe(false);
+                    const detached = await readParsedTask(workspace, task.id);
+                    expect(typedReferences(detached)).toHaveLength(0);
+                    const removals = historyChanges(detached).filter(
+                        (change) => change.field === 'reference_removed',
+                    );
+                    expect(removals).toHaveLength(1);
+                    expect(removals[0].old).toBe(`attachment:${storedPath}`);
+                    expect(removals[0].new ?? null).toBe(null);
 
                     const removeCall = apiCalls.find(
                         (call) => call.path === '/api/tasks/attachments/remove',
@@ -332,13 +366,26 @@ describe('UI reference kinds (DEV-61)', () => {
                     );
                     expect(removeCall?.body).toMatchObject({ id: task.id, path: repoFile });
 
+                    // Same typed-membership discipline: absence must be
+                    // judged on parsed references, not raw text (the
+                    // reference_removed history keeps `file:<repoFile>` in
+                    // the file), plus the audit entry for the removal.
                     await expect
                         .poll(
                             async () =>
-                                (await workspace.readTaskYaml(task.id)).includes(`file: ${repoFile}`),
+                                typedReferences(await readParsedTask(workspace, task.id)).some(
+                                    (entry) => entry.file === repoFile,
+                                ),
                             { timeout: 15_000 },
                         )
                         .toBe(false);
+                    const detached = await readParsedTask(workspace, task.id);
+                    expect(typedReferences(detached)).toHaveLength(0);
+                    const removals = historyChanges(detached).filter(
+                        (change) => change.field === 'reference_removed',
+                    );
+                    expect(removals).toHaveLength(1);
+                    expect(removals[0].old).toBe(`file:${repoFile}`);
                     const preserved = await workspace.read(SCRATCH_FILE);
                     expect(preserved).toContain(ANCHOR_LINE_TEXT);
                     expect(preserved.split('\n').length).toBeGreaterThanOrEqual(REPO_FILE_LINES);

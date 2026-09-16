@@ -35,13 +35,21 @@ async function waitForServerReady(child: ResultPromise): Promise<void> {
     }
 }
 
+export async function resolveServerBind(options: LotarServerOptions = {}): Promise<{
+    host: string;
+    port: number;
+}> {
+    const host = options.host ?? '127.0.0.1';
+    const port = options.port ?? (await getPort({ host }));
+    return { host, port };
+}
+
 export async function startLotarServer(
     workspace: SmokeWorkspace,
     options: LotarServerOptions = {},
 ): Promise<LotarServer> {
     const binary = await ensureBinaryExists();
-    const host = options.host ?? '127.0.0.1';
-    const port = options.port ?? (await getPort());
+    const { host, port } = await resolveServerBind(options);
     const env = {
         ...workspace.env,
         // Default to embedded UI in smoke tests to ensure we test the bundled assets.
