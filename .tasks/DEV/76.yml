@@ -4,7 +4,7 @@ priority: High
 type: Bug
 reporter: mallox
 created: 2026-09-06T11:10:31.799720+00:00
-modified: 2026-09-16T09:09:34.236299+00:00
+modified: 2026-09-16T22:25:33.518539+00:00
 relationships:
   blocks:
   - DEV-77
@@ -13,6 +13,8 @@ relationships:
 comments:
 - date: 2026-09-16T09:09:34.236299+00:00
   text: 'Context from DEV-60 final smoke verification (comment only; no status/scope change): the user-authorized narrow fix in smoke/helpers/server.ts (getPort({ host }) host-matching probe instead of 127.0.0.1-only) landed with 3 new harness tests and eliminated bind/port-collision errors (final full smoke: zero bind errors, exit 0). Remaining hardening that fits this ticket scope: (1) the host probe still has a close->bind TOCTOU window (port can be taken between probe and bind); (2) the readiness banner is emitted before the actual bind, so a failed bind can follow a "ready" line; (3) orphaned server processes from earlier failed runs were NOT all verified - approximately 103 smoke-workspace listeners were verified; the earlier all-153-orphan claim was not substantiated, a cleanup attempt was denied, and no existing servers were stopped. Suggested shape already in scope here: owned listener/actual port (bind first, then advertise), bounded readiness, lifecycle-owner teardown joining children.'
+- date: 2026-09-16T22:25:33.518539+00:00
+  text: 'Verification follow-up from DEV-71 final gates (comment only; no status/scope/acceptance change, no autostart): the final npm run test:agent run (nextest, default concurrency, --retries 0) reported 1079 passed / 6 skipped / 121 binaries with exactly 1 LEAKY classification; the immediately prior run of the same suites showed no leaky flag. The leaky test name was not identified in the low-noise output. Evidence retained: /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/kilo/dev71-verify2-20260917-035114-16743/test-agent.log and nested junit at target/nextest/default/target/nextest/junit.xml (junit file is overwritable by later runs). No root cause assumed; DEV-71 closed on gates-exit-0 plus review signoff and does not claim the leak resolved.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T3 T8.
@@ -25,6 +27,10 @@ tags:
 - audit-pass-2
 history:
 - at: 2026-09-16T09:09:34.236299+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T22:25:33.518539+00:00
   actor: mallox
   changes:
   - field: comment_added

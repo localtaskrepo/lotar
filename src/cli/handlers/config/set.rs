@@ -1,5 +1,7 @@
 use super::ConfigHandler;
 use crate::config::ConfigManager;
+use crate::config::candidate::{self, ConfigScope, ConfigSetRequest};
+use crate::config::operations::canonicalize_field_name;
 use crate::output::OutputRenderer;
 use crate::types::{Priority, TaskStatus};
 use crate::utils::project::resolve_project_input;
@@ -17,116 +19,113 @@ impl ConfigHandler {
         mut global: bool,
         project: Option<&str>,
     ) -> Result<(), String> {
-        // Auto-detect global-only fields
-        let global_only_fields = ["server_port", "default_project"];
-        if global_only_fields.contains(&field) && !global {
+        let trimmed_field = field.trim();
+
+        // Fields that exist only in the global configuration — including
+        // their dotted canonical aliases such as `server.port` — are applied
+        // to the global scope automatically.
+        if !global
+            && let Some(canonical) =
+                crate::config::operations::is_global_only_field_name(trimmed_field)
+        {
             global = true;
             if !dry_run {
                 renderer.emit_info(format_args!(
-                    "Automatically treating '{}' as global configuration field",
-                    field
+                    "Automatically treating '{}' (-> {}) as global configuration field",
+                    trimmed_field, canonical
                 ));
             }
         }
 
-        if dry_run {
-            renderer.emit_info(format_args!("DRY RUN: Would set {} = {}", field, value));
+        // Validate the name for the resolved scope up front so an unknown
+        // field never falls back to default-project resolution or writes
+        // anything, in dry-run and forced runs alike.
+        let canonical = canonicalize_field_name(trimmed_field, global)
+            .map_err(|e| format!("Validation error: {}", e))?;
 
-            // Check for validation conflicts
-            let conflicts = Self::check_validation_conflicts(resolver, field, value, global)?;
-            if !conflicts.is_empty() {
-                renderer.emit_warning("WARNING: This change would cause validation conflicts:");
-                for conflict in conflicts {
-                    renderer.emit_raw_stdout(format_args!("  • {}", conflict));
+        // Determine the project scope without bootstrapping configuration:
+        // read-only resolution plus a read-only prefix auto-detection pass.
+        let scope = if global {
+            ConfigScope::Global
+        } else {
+            let explicit = project.and_then(|p| {
+                let trimmed = p.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(resolve_project_input(trimmed, &resolver.path))
                 }
-                if !force {
-                    renderer
-                        .emit_info("Use --force to apply anyway, or fix conflicting values first.");
-                    return Ok(());
+            });
+            let prefix = match explicit {
+                Some(prefix) => prefix,
+                None => {
+                    let readonly =
+                        ConfigManager::new_manager_with_tasks_dir_readonly(&resolver.path)
+                            .map_err(|e| format!("Failed to load config: {}", e))?;
+                    let default_project = readonly.get_resolved_config().default_project.clone();
+                    if !default_project.is_empty() {
+                        default_project
+                    } else if let Some(detected) =
+                        crate::config::persistence::auto_detect_prefix(&resolver.path)
+                    {
+                        detected
+                    } else {
+                        return Err(
+                            "No default project set. Use --global flag or set a default project first."
+                                .to_string(),
+                        );
+                    }
+                }
+            };
+            ConfigScope::Project(prefix)
+        };
+
+        // One candidate: schema, config, resolved, and real-task validation
+        // before a single atomic write. Dry runs omit only the write.
+        let result = candidate::apply_config_set(
+            &resolver.path,
+            &scope,
+            &ConfigSetRequest {
+                entries: vec![(trimmed_field.to_string(), value.to_string())],
+                force,
+                dry_run,
+            },
+        )
+        .map_err(|e| format!("Configuration change rejected: {}", e))?;
+
+        let warnings: Vec<String> = result
+            .validation
+            .warnings
+            .iter()
+            .map(|w| w.to_string())
+            .collect();
+
+        if dry_run {
+            renderer.emit_info(format_args!("DRY RUN: Would set {} = {}", canonical, value));
+            if !warnings.is_empty() {
+                renderer.emit_warning("Validation warnings this change would carry:");
+                for warning in &warnings {
+                    renderer.emit_warning(warning);
                 }
             }
-
             renderer.emit_success(
                 "Dry run completed. Use the same command without --dry-run to apply.",
             );
             return Ok(());
         }
 
-        renderer.emit_info(format_args!("Setting configuration: {} = {}", field, value));
-
-        // Check for validation conflicts unless forced
-        if !force {
-            let conflicts = Self::check_validation_conflicts(resolver, field, value, global)?;
-            if !conflicts.is_empty() {
-                renderer.emit_warning("WARNING: This change would cause validation conflicts:");
-                for conflict in conflicts {
-                    renderer.emit_raw_stdout(format_args!("  • {}", conflict));
-                }
-                renderer.emit_info(
-                    "Use --dry-run to see what would change, or --force to apply anyway.",
-                );
-                return Err("Configuration change blocked due to validation conflicts".to_string());
-            }
-        }
-
-        // Validate field name and value
-        ConfigManager::validate_field_name(field, global)
-            .map_err(|e| format!("Validation error: {}", e))?;
-        ConfigManager::validate_field_value(field, value)
-            .map_err(|e| format!("Validation error: {}", e))?;
-
-        // Determine project prefix if not global
-        let project_prefix = if global {
-            None
-        } else if let Some(explicit_project) = project.and_then(|p| {
-            let trimmed = p.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(resolve_project_input(trimmed, &resolver.path))
-            }
-        }) {
-            Some(explicit_project)
-        } else {
-            let config_manager =
-                ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path)
-                    .map_err(|e| format!("Failed to load config: {}", e))?;
-            let default_project = config_manager.get_resolved_config().default_project.clone();
-
-            if !default_project.is_empty() {
-                Some(default_project)
-            } else {
-                return Err(
-                    "No default project set. Use --global flag or set a default project first."
-                        .to_string(),
-                );
-            }
-        };
-
-        let mut validation_warnings: Vec<String> = Vec::new();
-
-        let validation = ConfigManager::update_config_field(
-            &resolver.path,
-            field,
-            value,
-            project_prefix.as_deref(),
-        )
-        .map_err(|e| format!("Failed to update config: {}", e))?;
-
-        validation_warnings.extend(validation.warnings.iter().map(|w| w.to_string()));
-
-        if project_prefix.is_some()
-            && Self::check_matches_global_default(field, value, &resolver.path)
+        if matches!(scope, ConfigScope::Project(_))
+            && Self::check_matches_global_default(&canonical, value, &resolver.path)
         {
             renderer.emit_info(
                 "Note: This project setting matches the global default. This project will now use this explicit value and won't inherit future global changes to this field.",
             );
         }
-        renderer.emit_success(format_args!("Successfully updated {}", field));
+        renderer.emit_success(format_args!("Successfully updated {}", canonical));
 
-        if !validation_warnings.is_empty() {
+        if !warnings.is_empty() {
             renderer.emit_warning("Validation warnings detected after applying the change:");
-            for warning in validation_warnings {
+            for warning in warnings {
                 renderer.emit_warning(&warning);
             }
         }
@@ -155,23 +154,5 @@ impl ConfigHandler {
             }
         }
         false
-    }
-
-    fn check_validation_conflicts(
-        _resolver: &TasksDirectoryResolver,
-        field: &str,
-        new_value: &str,
-        _global: bool,
-    ) -> Result<Vec<String>, String> {
-        let mut conflicts = Vec::new();
-
-        if field == "issue_states.values" && new_value.contains("In-Progress") {
-            conflicts.push(
-                "Task PROJ-1 has status 'InProgress' which doesn't match new 'In-Progress'"
-                    .to_string(),
-            );
-        }
-
-        Ok(conflicts)
     }
 }

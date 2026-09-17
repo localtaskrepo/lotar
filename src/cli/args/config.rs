@@ -43,7 +43,7 @@ pub struct ConfigSetArgs {
     #[arg(long)]
     pub dry_run: bool,
 
-    /// Skip validation warnings
+    /// Apply despite task-compatibility conflicts with existing tasks (schema errors still block)
     #[arg(long)]
     pub force: bool,
 

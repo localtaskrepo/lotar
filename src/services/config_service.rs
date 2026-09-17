@@ -9,6 +9,7 @@ use crate::errors::{LoTaRError, LoTaRResult};
 use crate::workspace::TasksDirectoryResolver;
 use std::collections::BTreeMap;
 
+#[derive(Debug)]
 pub struct ConfigSetOutcome {
     pub updated: bool,
     pub validation: ValidationResult,
@@ -240,264 +241,296 @@ impl ConfigService {
         })
     }
 
-    /// Set one or more fields with validation; returns aggregate result information
+    /// Set one or more fields with validation; returns aggregate result
+    /// information.
+    ///
+    /// Builds ONE candidate through the shared DEV-71 pipeline: names are
+    /// canonicalized (flat and dotted), schema/config/resolved/real-task
+    /// validation runs against a precedence-faithful snapshot, and a single
+    /// atomic write persists all entries together — all-or-nothing even when
+    /// some entries are valid and a later one is rejected. No configuration
+    /// artifacts are created before validation succeeds. REST and MCP callers
+    /// have no force escape: task conflicts reject the request.
     pub fn set(
         resolver: &TasksDirectoryResolver,
         values: &std::collections::BTreeMap<String, String>,
         global: bool,
         project: Option<&str>,
     ) -> LoTaRResult<ConfigSetOutcome> {
-        let mgr = ConfigManager::new_manager_with_tasks_dir_ensure_config(&resolver.path).map_err(
-            |e| LoTaRError::ValidationError(format!("Failed to init config manager: {}", e)),
-        )?;
+        use crate::config::candidate::{self, ConfigScope, ConfigSetRequest};
 
-        // Validate keys first
-        for (k, v) in values {
-            ConfigManager::validate_field_name(k, global).map_err(|e| {
-                LoTaRError::ValidationError(format!("Invalid field '{}': {}", k, e))
-            })?;
-            ConfigManager::validate_field_value(k, v).map_err(|e| {
-                LoTaRError::ValidationError(format!("Invalid value for '{}': {}", k, e))
-            })?;
-        }
+        let tasks_dir = resolver.path.as_path();
 
-        // Determine project prefix if needed
-        let target_project = if global {
-            None
+        let scope = if global {
+            ConfigScope::Global
         } else {
-            Some(
-                project
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| mgr.get_resolved_config().default_project.clone()),
-            )
+            let explicit = project
+                .map(str::trim)
+                .filter(|trimmed| !trimmed.is_empty())
+                .map(str::to_string);
+            let prefix = explicit.unwrap_or_else(|| {
+                // Read-only default-project resolution: no config bootstrap
+                // before validation, matching the CLI behavior.
+                ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
+                    .ok()
+                    .and_then(|mgr| {
+                        let default = mgr.get_resolved_config().default_project.clone();
+                        if default.is_empty() {
+                            None
+                        } else {
+                            Some(default)
+                        }
+                    })
+                    .or_else(|| crate::config::persistence::auto_detect_prefix(tasks_dir))
+                    .unwrap_or_default()
+            });
+            if prefix.is_empty() {
+                return Err(LoTaRError::ValidationError(
+                    "No default project set. Provide 'project' in the request or set a default project first."
+                        .to_string(),
+                ));
+            }
+            ConfigScope::Project(prefix)
         };
 
-        let mut combined = ValidationResult::new();
-        let mut updated = false;
+        // Canonicalize and schema-validate the RAW values before any rewrite —
+        // including the dedup-to-clear conversion below — so REST/MCP share
+        // the CLI's exact invalid-value contract: a malformed CSV such as
+        // "Todo,,Done" can never normalize its way into an accepted clear.
+        let is_global = matches!(scope, ConfigScope::Global);
+        let canonical_entries = candidate::canonicalize_entries(
+            &values
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Vec<_>>(),
+            is_global,
+        )
+        .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+        candidate::validate_raw_entries(&canonical_entries, is_global)
+            .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
 
-        // When setting project fields, avoid storing duplicates of global values.
-        if let Some(proj) = target_project.as_deref() {
-            let g = mgr.get_resolved_config();
-            let csv = |s: &str| -> Vec<String> {
-                s.split(',')
-                    .map(|p| p.trim())
-                    .filter(|p| !p.is_empty())
-                    .map(|p| p.to_string())
-                    .collect()
-            };
-            let join = |v: &Vec<String>| -> String { v.join(",") };
-            let parse_bool = |raw: &str| -> Option<bool> {
-                match raw.trim().to_lowercase().as_str() {
-                    "true" => Some(true),
-                    "false" => Some(false),
-                    _ => None,
-                }
-            };
-            let parse_alias_pairs = |raw: &str| -> Option<Vec<(String, String)>> {
-                let trimmed = raw.trim();
-                if trimmed.is_empty() {
-                    return Some(Vec::new());
-                }
-                if let Ok(map) =
-                    serde_yaml_ng::from_str::<std::collections::HashMap<String, String>>(trimmed)
+        let mut entries: Vec<(String, String)> = Vec::with_capacity(canonical_entries.len());
+        if let ConfigScope::Project(_) = &scope {
+            // When setting project fields, avoid storing duplicates of global
+            // values: an empty entry clears the override instead.
+            let resolved_global = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
+                .map_err(|e| LoTaRError::ValidationError(format!("Failed to load config: {}", e)))?
+                .get_resolved_config()
+                .clone();
+            for (field, value) in &canonical_entries {
+                if value.trim().is_empty()
+                    || Self::value_matches_global(&resolved_global, field, value)
                 {
-                    let mut vec: Vec<(String, String)> = map
-                        .into_iter()
-                        .map(|(k, v)| (k.to_lowercase(), v.trim().to_string()))
-                        .collect();
-                    vec.sort();
-                    return Some(vec);
-                }
-                let mut vec: Vec<(String, String)> = Vec::new();
-                for entry in trimmed.split([',', ';', '\n']) {
-                    let entry = entry.trim();
-                    if entry.is_empty() {
-                        continue;
-                    }
-                    let (alias, target) =
-                        entry.split_once('=').or_else(|| entry.split_once(':'))?;
-                    vec.push((alias.trim().to_lowercase(), target.trim().to_string()));
-                }
-                vec.sort();
-                Some(vec)
-            };
-
-            for (k, v) in values {
-                let v_trim = v.trim();
-
-                // Empty means clear the override for project scope (where applicable)
-                if v_trim.is_empty() {
-                    crate::config::operations::clear_project_field(&resolver.path, proj, k)
-                        .map_err(|e| {
-                            LoTaRError::ValidationError(format!("Failed to clear '{}': {}", k, e))
-                        })?;
-                    updated = true;
-                    continue;
-                }
-
-                let is_equal_to_global = match k.as_str() {
-                    // enum list overrides
-                    "issue_states" => {
-                        // Normalize to canonical enum strings before comparison
-                        let lv: Vec<String> = csv(v)
-                            .into_iter()
-                            .filter_map(|s| s.parse::<crate::types::TaskStatus>().ok())
-                            .map(|e| e.to_string())
-                            .collect();
-                        let gv: Vec<String> = g
-                            .issue_states
-                            .values
-                            .iter()
-                            .map(|x| x.to_string())
-                            .collect();
-                        lv == gv
-                    }
-                    "issue_types" => {
-                        let lv: Vec<String> = csv(v)
-                            .into_iter()
-                            .filter_map(|s| s.parse::<crate::types::TaskType>().ok())
-                            .map(|e| e.to_string())
-                            .collect();
-                        let gv: Vec<String> =
-                            g.issue_types.values.iter().map(|x| x.to_string()).collect();
-                        lv == gv
-                    }
-                    "issue_priorities" => {
-                        let lv: Vec<String> = csv(v)
-                            .into_iter()
-                            .filter_map(|s| s.parse::<crate::types::Priority>().ok())
-                            .map(|e| e.to_string())
-                            .collect();
-                        let gv: Vec<String> = g
-                            .issue_priorities
-                            .values
-                            .iter()
-                            .map(|x| x.to_string())
-                            .collect();
-                        lv == gv
-                    }
-                    "tags" => {
-                        let gv: Vec<String> = g.tags.values.clone();
-                        csv(v) == gv
-                    }
-                    "custom_fields" => {
-                        let gv: Vec<String> = g.custom_fields.values.clone();
-                        csv(v) == gv
-                    }
-                    // scalar defaults
-                    "default_priority" => match v_trim.parse::<crate::types::Priority>() {
-                        Ok(p) => g.default_priority.to_string() == p.to_string(),
-                        Err(_) => false,
-                    },
-                    "default_status" => match v_trim.parse::<crate::types::TaskStatus>() {
-                        Ok(sv) => {
-                            g.default_status.as_ref().map(|s| s.to_string()).as_deref()
-                                == Some(&sv.to_string())
-                        }
-                        Err(_) => false,
-                    },
-                    "default_assignee" => {
-                        g.default_assignee
-                            .as_ref()
-                            .map(|s| s.to_string())
-                            .unwrap_or_default()
-                            == v_trim
-                    }
-                    "default_reporter" => {
-                        g.default_reporter
-                            .as_ref()
-                            .map(|s| s.to_string())
-                            .unwrap_or_default()
-                            == v_trim
-                    }
-                    "default_tags" => {
-                        let gv: String = join(&g.default_tags);
-                        let lv = csv(v);
-                        join(&lv) == gv
-                    }
-                    "auto_set_reporter" => parse_bool(v_trim) == Some(g.auto_set_reporter),
-                    "auto_assign_on_status" => parse_bool(v_trim) == Some(g.auto_assign_on_status),
-                    "scan_signal_words" => csv(v) == g.scan_signal_words,
-                    "scan_ticket_patterns" => {
-                        let lv = csv(v);
-                        let gv = g.scan_ticket_patterns.clone().unwrap_or_else(Vec::new);
-                        lv == gv
-                    }
-                    "scan_enable_ticket_words" => {
-                        parse_bool(v_trim) == Some(g.scan_enable_ticket_words)
-                    }
-                    "scan_enable_mentions" => parse_bool(v_trim) == Some(g.scan_enable_mentions),
-                    "scan_strip_attributes" => parse_bool(v_trim) == Some(g.scan_strip_attributes),
-                    "branch_type_aliases" => {
-                        let lv = parse_alias_pairs(v).unwrap_or_default();
-                        let mut gv: Vec<(String, String)> = g
-                            .branch_type_aliases
-                            .iter()
-                            .map(|(k, val)| (k.to_lowercase(), val.to_string()))
-                            .collect();
-                        gv.sort();
-                        lv == gv
-                    }
-                    "branch_status_aliases" => {
-                        let lv = parse_alias_pairs(v).unwrap_or_default();
-                        let mut gv: Vec<(String, String)> = g
-                            .branch_status_aliases
-                            .iter()
-                            .map(|(k, val)| (k.to_lowercase(), val.to_string()))
-                            .collect();
-                        gv.sort();
-                        lv == gv
-                    }
-                    "branch_priority_aliases" => {
-                        let lv = parse_alias_pairs(v).unwrap_or_default();
-                        let mut gv: Vec<(String, String)> = g
-                            .branch_priority_aliases
-                            .iter()
-                            .map(|(k, val)| (k.to_lowercase(), val.to_string()))
-                            .collect();
-                        gv.sort();
-                        lv == gv
-                    }
-                    // project_name has no global equivalent
-                    "project_name" => false,
-                    _ => false,
-                };
-
-                if is_equal_to_global {
-                    crate::config::operations::clear_project_field(&resolver.path, proj, k)
-                        .map_err(|e| {
-                            LoTaRError::ValidationError(format!("Failed to clear '{}': {}", k, e))
-                        })?;
-                    updated = true;
+                    entries.push((field.clone(), String::new()));
                 } else {
-                    let validation =
-                        ConfigManager::update_config_field(&resolver.path, k, v, Some(proj))
-                            .map_err(|e| {
-                                LoTaRError::ValidationError(format!(
-                                    "Failed to update '{}': {}",
-                                    k, e
-                                ))
-                            })?;
-                    combined.merge(validation);
-                    updated = true;
+                    entries.push((field.clone(), value.clone()));
                 }
             }
         } else {
-            // Global scope: apply updates directly
-            for (k, v) in values {
-                let validation = ConfigManager::update_config_field(&resolver.path, k, v, None)
-                    .map_err(|e| {
-                        LoTaRError::ValidationError(format!("Failed to update '{}': {}", k, e))
-                    })?;
-                combined.merge(validation);
-                updated = true;
-            }
+            entries = canonical_entries;
         }
 
+        let result = candidate::apply_config_set(
+            tasks_dir,
+            &scope,
+            &ConfigSetRequest {
+                entries,
+                force: false,
+                dry_run: false,
+            },
+        )
+        .map_err(|e| LoTaRError::ValidationError(e.to_string()))?;
+
         Ok(ConfigSetOutcome {
-            updated,
-            validation: combined,
+            updated: result.updated,
+            validation: result.validation,
         })
+    }
+
+    /// Whether a project-scope value equals the resolved global value for the
+    /// same canonical field (so storing it would be a redundant duplicate
+    /// override). Callers must have canonicalized and schema-validated the
+    /// raw entry first; this comparison must never be the acceptance path for
+    /// a malformed value.
+    fn value_matches_global(
+        global: &crate::config::types::ResolvedConfig,
+        key: &str,
+        raw_value: &str,
+    ) -> bool {
+        let value = raw_value;
+        let value_trim = value.trim();
+        let csv = |s: &str| -> Vec<String> {
+            s.split(',')
+                .map(|p| p.trim())
+                .filter(|p| !p.is_empty())
+                .map(|p| p.to_string())
+                .collect()
+        };
+        let join = |v: &Vec<String>| -> String { v.join(",") };
+        let parse_bool = |raw: &str| -> Option<bool> {
+            match raw.trim().to_lowercase().as_str() {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            }
+        };
+        let parse_alias_pairs = |raw: &str| -> Option<Vec<(String, String)>> {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() {
+                return Some(Vec::new());
+            }
+            if let Ok(map) =
+                serde_yaml_ng::from_str::<std::collections::HashMap<String, String>>(trimmed)
+            {
+                let mut vec: Vec<(String, String)> = map
+                    .into_iter()
+                    .map(|(k, v)| (k.to_lowercase(), v.trim().to_string()))
+                    .collect();
+                vec.sort();
+                return Some(vec);
+            }
+            let mut vec: Vec<(String, String)> = Vec::new();
+            for entry in trimmed.split([',', ';', '\n']) {
+                let entry = entry.trim();
+                if entry.is_empty() {
+                    continue;
+                }
+                let (alias, target) = entry.split_once('=').or_else(|| entry.split_once(':'))?;
+                vec.push((alias.trim().to_lowercase(), target.trim().to_string()));
+            }
+            vec.sort();
+            Some(vec)
+        };
+
+        match key {
+            // enum list overrides
+            "issue_states" => {
+                let local: Vec<String> = csv(value)
+                    .into_iter()
+                    .filter_map(|s| s.parse::<crate::types::TaskStatus>().ok())
+                    .map(|e| e.to_string())
+                    .collect();
+                let global_values: Vec<String> = global
+                    .issue_states
+                    .values
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect();
+                local == global_values
+            }
+            "issue_types" => {
+                let local: Vec<String> = csv(value)
+                    .into_iter()
+                    .filter_map(|s| s.parse::<crate::types::TaskType>().ok())
+                    .map(|e| e.to_string())
+                    .collect();
+                let global_values: Vec<String> = global
+                    .issue_types
+                    .values
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect();
+                local == global_values
+            }
+            "issue_priorities" => {
+                let local: Vec<String> = csv(value)
+                    .into_iter()
+                    .filter_map(|s| s.parse::<crate::types::Priority>().ok())
+                    .map(|e| e.to_string())
+                    .collect();
+                let global_values: Vec<String> = global
+                    .issue_priorities
+                    .values
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect();
+                local == global_values
+            }
+            "tags" => csv(value) == global.tags.values,
+            "custom_fields" => csv(value) == global.custom_fields.values,
+            // scalar defaults
+            "default_priority" => match value_trim.parse::<crate::types::Priority>() {
+                Ok(p) => global.default_priority.to_string() == p.to_string(),
+                Err(_) => false,
+            },
+            "default_status" => match value_trim.parse::<crate::types::TaskStatus>() {
+                Ok(sv) => {
+                    global
+                        .default_status
+                        .as_ref()
+                        .map(|s| s.to_string())
+                        .as_deref()
+                        == Some(&sv.to_string())
+                }
+                Err(_) => false,
+            },
+            "default_assignee" => {
+                global
+                    .default_assignee
+                    .as_ref()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+                    == value_trim
+            }
+            "default_reporter" => {
+                global
+                    .default_reporter
+                    .as_ref()
+                    .map(|s| s.to_string())
+                    .unwrap_or_default()
+                    == value_trim
+            }
+            "default_tags" => {
+                let global_value: String = join(&global.default_tags);
+                let local = csv(value);
+                join(&local) == global_value
+            }
+            "auto_set_reporter" => parse_bool(value_trim) == Some(global.auto_set_reporter),
+            "auto_assign_on_status" => parse_bool(value_trim) == Some(global.auto_assign_on_status),
+            "scan_signal_words" => csv(value) == global.scan_signal_words,
+            "scan_ticket_patterns" => {
+                let local = csv(value);
+                let global_value = global.scan_ticket_patterns.clone().unwrap_or_default();
+                local == global_value
+            }
+            "scan_enable_ticket_words" => {
+                parse_bool(value_trim) == Some(global.scan_enable_ticket_words)
+            }
+            "scan_enable_mentions" => parse_bool(value_trim) == Some(global.scan_enable_mentions),
+            "scan_strip_attributes" => parse_bool(value_trim) == Some(global.scan_strip_attributes),
+            "branch_type_aliases" => {
+                let local = parse_alias_pairs(value).unwrap_or_default();
+                let mut global_value: Vec<(String, String)> = global
+                    .branch_type_aliases
+                    .iter()
+                    .map(|(k, v)| (k.to_lowercase(), v.to_string()))
+                    .collect();
+                global_value.sort();
+                local == global_value
+            }
+            "branch_status_aliases" => {
+                let local = parse_alias_pairs(value).unwrap_or_default();
+                let mut global_value: Vec<(String, String)> = global
+                    .branch_status_aliases
+                    .iter()
+                    .map(|(k, v)| (k.to_lowercase(), v.to_string()))
+                    .collect();
+                global_value.sort();
+                local == global_value
+            }
+            "branch_priority_aliases" => {
+                let local = parse_alias_pairs(value).unwrap_or_default();
+                let mut global_value: Vec<(String, String)> = global
+                    .branch_priority_aliases
+                    .iter()
+                    .map(|(k, v)| (k.to_lowercase(), v.to_string()))
+                    .collect();
+                global_value.sort();
+                local == global_value
+            }
+            // project_name has no global equivalent
+            _ => false,
+        }
     }
 }
 

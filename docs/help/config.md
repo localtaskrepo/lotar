@@ -66,11 +66,14 @@ lotar config set <KEY> <VALUE> [--global] [--dry-run] [--force]
 ```
 
 Details:
-- Use canonical keys such as `server.port`, `issue.tags`, or `custom_fields`. Arrays/maps accept JSON strings (e.g., `"[\"frontend\",\"backend\"]"`) or comma-separated values (e.g., `frontend,backend`).
+- Use canonical keys such as `server.port`, `issue.tags`, or `custom_fields`, or the shipped flat names (`server_port`, `tags`). Both spellings map to the same field, including the exceptions `default.strict_members` -> `strict_members` and `issue.tags` -> `tags`. Supplying two spellings of one field with different values is rejected; identical values deduplicate. Arrays/maps accept JSON strings (e.g., `"[\"frontend\",\"backend\"]"`) or comma-separated values (e.g., `frontend,backend`).
 - Project scope is chosen via the CLI-wide `--project` flag or the configured `default.project`. Pass `--global` to edit `.tasks/config.yml` instead.
-- `--dry-run` shows the pending change, runs conflict detection, and exits without editing files.
-- `--force` applies the change even when conflict detection finds issues. Validation errors (wrong field name/value) will still abort.
-- Fields that only make sense globally (`server.port`, `default_project`) are automatically treated as global even if `--global` is not passed.
+- `--dry-run` runs the exact validation pipeline of a real write — field/schema checks, resolved-configuration checks, and conflict detection against existing tasks — and exits nonzero without editing files when the change would be rejected. Only the write is skipped; no configuration files are created.
+- `--force` applies the change despite task-compatibility conflicts (an existing task whose status/type/priority would fall outside the new lists). Schema errors (wrong field name/value), malformed configuration or task files, and newly broken resolved-configuration invariants still abort, with or without `--force`.
+- Conflicts reference real task IDs; tasks that were already invalid before the change do not block unrelated updates.
+- An empty value in project scope clears that override precisely (e.g., `lotar config set agent_on_start_status '' --project=ENG` removes only that setting and preserves sibling agent automation).
+- Fields that only make sense globally (`server.port`, `default_project`, sprint defaults) are automatically treated as global even if `--global` is not passed.
+- Writes are lockless and atomic per file: the candidate is validated first and the whole change lands in one atomic file replace. This is not a cross-writer transaction — a concurrent external editor can still race the final replace. Accepted writes rewrite the file in canonical form (comments and unknown keys are dropped); rejected changes leave the bytes untouched.
 
 ### templates
 List available workflow presets and legacy template aliases.
@@ -218,7 +221,7 @@ lotar config init --project=TestProject --dry-run
 ```
 
 ### Validation & Conflict Detection
-`lotar config set --dry-run` runs the same validation pipeline as a real write, including conflict detection against existing tasks. If the preview reports problems you can either fix the underlying data or re-run with `--force` to apply anyway (schema/type validation still runs and may block the change).
+`lotar config set --dry-run` runs the same validation pipeline as a real write, including conflict detection against existing tasks, and exits nonzero when the change would be rejected. If the preview reports task conflicts you can either fix the underlying data or re-run with `--force` to apply anyway (schema/type validation and malformed files still block the change).
 
 `lotar config validate` surfaces the complete error and warning sets for global and project scopes. The `--fix` flag is a placeholder today—the handler prints guidance but no automated rewrite occurs yet.
 
@@ -353,7 +356,7 @@ branch:
 ## Global Options
 
 - `--project <PREFIX_OR_NAME>` - Override auto-detected project for any config subcommand (same resolution rules as `lotar config show --project`).
-- `-C, --config KEY=VALUE` - Inline configuration override for the current invocation. Accepts the same field names as `lotar config set` (e.g., `-C default_status=Done`). Multiple flags can be supplied; later ones win. Existing per-command options remain as shorthands.
+- `--config KEY=VALUE` - Inline configuration override for the current invocation. Accepts the same field names as `lotar config set`, including dotted canonical aliases (e.g., `--config default.strict_members=false`). Multiple flags can be supplied; later ones win, and two spellings of one field with different values are rejected. Existing per-command options remain as shorthands.
 - `--format <FORMAT>` - Output format: text, table, json, markdown
 - `--verbose` - Enable verbose output
 - `--tasks-dir <PATH>` - Custom tasks directory (overrides environment/config)

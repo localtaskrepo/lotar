@@ -10,11 +10,13 @@
 //! - `types`: Core configuration types and structures
 //! - `manager`: Main configuration management coordination
 //! - `operations`: CRUD operations for configuration data
+//! - `candidate`: one validated candidate per config-set operation (DEV-71)
 //! - `persistence`: File I/O operations for configuration files
 //! - `resolution`: Configuration merging and resolution logic
 //! - `validation`: Configuration validation system
 
 pub mod bootstrap;
+pub mod candidate;
 pub mod env_overrides;
 pub mod manager;
 pub mod normalization;

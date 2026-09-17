@@ -14,8 +14,10 @@ describe('UI task panel persistence contract', () => {
     it('creates a task with a custom project status in one atomic request that persists and survives reload', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
-            await workspace.addTask('Seed for project listing', { args: ['--project=PPS'] });
+            // Configure the custom workflow BEFORE seeding: DEV-71 rejects
+            // enum-list changes that would push existing tasks out of the list.
             await workspace.runLotar(['-p', 'PPS', 'config', 'set', 'issue_states', 'Queued,Active,Review,Complete']);
+            await workspace.addTask('Seed for project listing', { args: ['--project=PPS', '--status=Queued'] });
 
             const server = await startLotarServer(workspace);
             try {
@@ -82,9 +84,10 @@ describe('UI task panel persistence contract', () => {
     it('serializes autosaves, coalesces queued null clears and custom fields, and persists them', async () => {
         const workspace = await SmokeWorkspace.create();
         try {
-            await workspace.addTask('Seed for project listing', { args: ['--project=PPS'] });
+            // Configure the custom workflow BEFORE seeding (see DEV-71 note above).
             await workspace.runLotar(['-p', 'PPS', 'config', 'set', 'issue_states', 'Queued,Active,Review,Complete']);
             await workspace.runLotar(['-p', 'PPS', 'config', 'set', 'custom_fields', 'product']);
+            await workspace.addTask('Seed for project listing', { args: ['--project=PPS', '--status=Queued'] });
             const seeded = await workspace.addTask('Panel persistence seed', {
                 args: ['--project=PPS', '--due=2030-01-02', '--effort=3h', '--field=product=Core'],
             });

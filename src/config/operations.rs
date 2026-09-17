@@ -1,5 +1,4 @@
 use crate::config::types::*;
-use crate::config::validation::ConfigValidator;
 use crate::config::validation::errors::ValidationResult;
 use crate::types::{Priority, TaskStatus, TaskType};
 use crate::utils::project::{
@@ -323,97 +322,32 @@ pub fn plan_auto_populated_project_config(
     Ok(Some((project_config, effective)))
 }
 
-/// Update a specific field in global or project configuration
+/// Update a specific field in global or project configuration.
+///
+/// Compatibility wrapper: builds one validated candidate through the shared
+/// DEV-71 pipeline (schema, config, resolved, and real-task validation before
+/// a single atomic write). Dotted canonical field names are accepted. See
+/// [`crate::config::candidate`].
 pub fn update_config_field(
     tasks_dir: &Path,
     field: &str,
     value: &str,
     project_prefix: Option<&str>,
 ) -> Result<ValidationResult, ConfigError> {
-    let validator = ConfigValidator::new(tasks_dir);
-    let format_validation_errors = |result: &ValidationResult| -> String {
-        result
-            .errors
-            .iter()
-            .map(|err| err.to_string())
-            .collect::<Vec<_>>()
-            .join("\n")
+    let scope = match project_prefix {
+        Some(prefix) => crate::config::candidate::ConfigScope::Project(prefix.to_string()),
+        None => crate::config::candidate::ConfigScope::Global,
     };
-
-    if let Some(project) = project_prefix {
-        // Update project config
-        let mut project_config =
-            crate::config::persistence::load_project_config_from_dir(project, tasks_dir)
-                .unwrap_or_else(|_| ProjectConfig::new(project.to_string()));
-
-        apply_field_to_project_config(&mut project_config, field, value)?;
-
-        let validation = validator.validate_project_config(&project_config);
-        if validation.has_errors() {
-            let summary = format_validation_errors(&validation);
-            return Err(ConfigError::ParseError(format!(
-                "Validation failed for project field '{}':\n{}",
-                field, summary
-            )));
-        }
-
-        save_project_config(tasks_dir, project, &project_config)?;
-        let mut combined_validation = validation;
-
-        let resolved_snapshot = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))
-            .map_err(|e| {
-                ConfigError::ParseError(format!(
-                    "Failed to resolve configuration after updating '{}': {}",
-                    field, e
-                ))
-            })?;
-        let project_resolved =
-            crate::config::resolution::get_project_config(&resolved_snapshot, project, tasks_dir)?;
-        let resolved_validation = validator.validate_resolved_config(&project_resolved);
-        if resolved_validation.has_errors() {
-            let summary = format_validation_errors(&resolved_validation);
-            return Err(ConfigError::ParseError(format!(
-                "Resolved configuration invalid after updating project field '{}':\n{}",
-                field, summary
-            )));
-        }
-        combined_validation.merge(resolved_validation);
-        Ok(combined_validation)
-    } else {
-        // Update global config
-        let mut global_config =
-            crate::config::persistence::load_global_config(Some(tasks_dir)).unwrap_or_default();
-        apply_field_to_global_config(&mut global_config, field, value)?;
-
-        let validation = validator.validate_global_config(&global_config);
-        if validation.has_errors() {
-            let summary = format_validation_errors(&validation);
-            return Err(ConfigError::ParseError(format!(
-                "Validation failed for global field '{}':\n{}",
-                field, summary
-            )));
-        }
-
-        save_global_config(tasks_dir, &global_config)?;
-        let mut combined_validation = validation;
-        let resolved_config = crate::config::resolution::load_and_merge_configs(Some(tasks_dir))
-            .map_err(|e| {
-                ConfigError::ParseError(format!(
-                    "Failed to resolve configuration after updating '{}': {}",
-                    field, e
-                ))
-            })?;
-        let resolved_validation = validator.validate_resolved_config(&resolved_config);
-        if resolved_validation.has_errors() {
-            let summary = format_validation_errors(&resolved_validation);
-            return Err(ConfigError::ParseError(format!(
-                "Resolved configuration invalid after updating global field '{}':\n{}",
-                field, summary
-            )));
-        }
-        combined_validation.merge(resolved_validation);
-        Ok(combined_validation)
-    }
+    let result = crate::config::candidate::apply_config_set(
+        tasks_dir,
+        &scope,
+        &crate::config::candidate::ConfigSetRequest {
+            entries: vec![(field.to_string(), value.to_string())],
+            force: false,
+            dry_run: false,
+        },
+    )?;
+    Ok(result.validation)
 }
 
 /// Apply a field update to GlobalConfig
@@ -739,7 +673,7 @@ pub fn apply_field_to_global_config(
 }
 
 /// Apply a field update to ProjectConfig
-fn apply_field_to_project_config(
+pub fn apply_field_to_project_config(
     config: &mut ProjectConfig,
     field: &str,
     value: &str,
@@ -1051,129 +985,137 @@ fn apply_field_to_project_config(
     Ok(())
 }
 
-/// Validate that a field name is valid for the given scope
-pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigError> {
-    let valid_global_fields = vec![
-        "server_port",
-        "default_project",
-        "default_assignee",
-        "default_reporter",
-        "default_tags",
-        "members",
-        "strict_members",
-        "auto_populate_members",
-        "default_priority",
-        "default_status",
-        "tags",
-        "custom_fields",
-        "issue_states",
-        "issue_types",
-        "issue_priorities",
-        "auto_set_reporter",
-        "auto_assign_on_status",
-        "auto_codeowners_assign",
-        "auto_tags_from_path",
-        "auto_branch_infer_type",
-        "auto_branch_infer_status",
-        "auto_branch_infer_priority",
-        "auto_identity",
-        "auto_identity_git",
-        "scan_signal_words",
-        "scan_ticket_patterns",
-        "scan_enable_ticket_words",
-        "scan_enable_mentions",
-        "scan_strip_attributes",
-        "branch_type_aliases",
-        "branch_status_aliases",
-        "branch_priority_aliases",
-        "attachments_dir",
-        "attachments_max_upload_mb",
-        "sync_reports_dir",
-        "sync_write_reports",
-        "agent_context_enabled",
-        "agent_context_extension",
-        "agent_logs_dir",
-        "agent_instructions",
-        "agent_instructions_file",
-        "agent_on_start_status",
-        "agent_on_success_status",
-        "agent_on_failure_status",
-        "agent_on_cancel_status",
-        "agent_on_start_reassign_to",
-        "agent_on_success_reassign_to",
-        "agent_on_failure_reassign_to",
-        "agent_on_cancel_reassign_to",
-        "agent_worktree_enabled",
-        "agent_worktree_dir",
-        "agent_worktree_branch_prefix",
-        "remotes",
-        "sprints_defaults_capacity_points",
-        "sprints_defaults_capacity_hours",
-        "sprints_defaults_length",
-        "sprints_defaults_overdue_after",
-        "sprints_notifications_enabled",
-    ];
-    let valid_project_fields = vec![
-        "project_name",
-        "default_assignee",
-        "default_reporter",
-        "default_tags",
-        "members",
-        "strict_members",
-        "auto_populate_members",
-        "default_priority",
-        "default_status",
-        "issue_states",
-        "issue_types",
-        "issue_priorities",
-        "tags",
-        "custom_fields",
-        "auto_set_reporter",
-        "auto_assign_on_status",
-        "auto_codeowners_assign",
-        "auto_tags_from_path",
-        "auto_branch_infer_type",
-        "auto_branch_infer_status",
-        "auto_branch_infer_priority",
-        "auto_identity",
-        "auto_identity_git",
-        "scan_signal_words",
-        "scan_ticket_patterns",
-        "scan_enable_ticket_words",
-        "scan_enable_mentions",
-        "scan_strip_attributes",
-        "branch_type_aliases",
-        "branch_status_aliases",
-        "branch_priority_aliases",
-        "attachments_dir",
-        "attachments_max_upload_mb",
-        "sync_reports_dir",
-        "sync_write_reports",
-        "agent_context_enabled",
-        "agent_context_extension",
-        "agent_logs_dir",
-        "agent_instructions",
-        "agent_instructions_file",
-        "agent_on_start_status",
-        "agent_on_success_status",
-        "agent_on_failure_status",
-        "agent_on_cancel_status",
-        "agent_on_start_reassign_to",
-        "agent_on_success_reassign_to",
-        "agent_on_failure_reassign_to",
-        "agent_on_cancel_reassign_to",
-        "agent_worktree_enabled",
-        "agent_worktree_dir",
-        "agent_worktree_branch_prefix",
-        "remotes",
-    ];
+/// Fields settable in the global configuration (canonical flat names).
+pub const GLOBAL_CONFIG_FIELDS: &[&str] = &[
+    "server_port",
+    "default_project",
+    "default_assignee",
+    "default_reporter",
+    "default_tags",
+    "members",
+    "strict_members",
+    "auto_populate_members",
+    "default_priority",
+    "default_status",
+    "tags",
+    "custom_fields",
+    "issue_states",
+    "issue_types",
+    "issue_priorities",
+    "auto_set_reporter",
+    "auto_assign_on_status",
+    "auto_codeowners_assign",
+    "auto_tags_from_path",
+    "auto_branch_infer_type",
+    "auto_branch_infer_status",
+    "auto_branch_infer_priority",
+    "auto_identity",
+    "auto_identity_git",
+    "scan_signal_words",
+    "scan_ticket_patterns",
+    "scan_enable_ticket_words",
+    "scan_enable_mentions",
+    "scan_strip_attributes",
+    "branch_type_aliases",
+    "branch_status_aliases",
+    "branch_priority_aliases",
+    "attachments_dir",
+    "attachments_max_upload_mb",
+    "sync_reports_dir",
+    "sync_write_reports",
+    "agent_context_enabled",
+    "agent_context_extension",
+    "agent_logs_dir",
+    "agent_instructions",
+    "agent_instructions_file",
+    "agent_on_start_status",
+    "agent_on_success_status",
+    "agent_on_failure_status",
+    "agent_on_cancel_status",
+    "agent_on_start_reassign_to",
+    "agent_on_success_reassign_to",
+    "agent_on_failure_reassign_to",
+    "agent_on_cancel_reassign_to",
+    "agent_worktree_enabled",
+    "agent_worktree_dir",
+    "agent_worktree_branch_prefix",
+    "remotes",
+    "sprints_defaults_capacity_points",
+    "sprints_defaults_capacity_hours",
+    "sprints_defaults_length",
+    "sprints_defaults_overdue_after",
+    "sprints_notifications_enabled",
+    "web_ui_path",
+];
 
-    let valid_fields = if is_global {
-        &valid_global_fields
+/// Fields settable in a project configuration override (canonical flat names).
+pub const PROJECT_CONFIG_FIELDS: &[&str] = &[
+    "project_name",
+    "default_assignee",
+    "default_reporter",
+    "default_tags",
+    "members",
+    "strict_members",
+    "auto_populate_members",
+    "default_priority",
+    "default_status",
+    "issue_states",
+    "issue_types",
+    "issue_priorities",
+    "tags",
+    "custom_fields",
+    "auto_set_reporter",
+    "auto_assign_on_status",
+    "auto_codeowners_assign",
+    "auto_tags_from_path",
+    "auto_branch_infer_type",
+    "auto_branch_infer_status",
+    "auto_branch_infer_priority",
+    "auto_identity",
+    "auto_identity_git",
+    "scan_signal_words",
+    "scan_ticket_patterns",
+    "scan_enable_ticket_words",
+    "scan_enable_mentions",
+    "scan_strip_attributes",
+    "branch_type_aliases",
+    "branch_status_aliases",
+    "branch_priority_aliases",
+    "attachments_dir",
+    "attachments_max_upload_mb",
+    "sync_reports_dir",
+    "sync_write_reports",
+    "agent_context_enabled",
+    "agent_context_extension",
+    "agent_logs_dir",
+    "agent_instructions",
+    "agent_instructions_file",
+    "agent_on_start_status",
+    "agent_on_success_status",
+    "agent_on_failure_status",
+    "agent_on_cancel_status",
+    "agent_on_start_reassign_to",
+    "agent_on_success_reassign_to",
+    "agent_on_failure_reassign_to",
+    "agent_on_cancel_reassign_to",
+    "agent_worktree_enabled",
+    "agent_worktree_dir",
+    "agent_worktree_branch_prefix",
+    "remotes",
+];
+
+/// Valid canonical field names for the given scope.
+pub fn valid_fields(is_global: bool) -> &'static [&'static str] {
+    if is_global {
+        GLOBAL_CONFIG_FIELDS
     } else {
-        &valid_project_fields
-    };
+        PROJECT_CONFIG_FIELDS
+    }
+}
 
+/// Validate that a (canonical flat) field name is valid for the given scope.
+pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigError> {
+    let valid_fields = valid_fields(is_global);
     if !valid_fields.contains(&field) {
         let scope = if is_global { "global" } else { "project" };
         return Err(ConfigError::ParseError(format!(
@@ -1183,8 +1125,59 @@ pub fn validate_field_name(field: &str, is_global: bool) -> Result<(), ConfigErr
             valid_fields.join(", ")
         )));
     }
-
     Ok(())
+}
+
+/// Canonicalize a config-set field name for the given scope (DEV-71).
+///
+/// Shipped flat names pass through unchanged. Documented dotted canonical
+/// names resolve through the authoritative [`CONFIG_PATHS`] table, including
+/// the exceptions (`default.strict_members` -> `strict_members`,
+/// `issue.tags` -> `tags`). Unknown names and aliases whose target is not
+/// settable in the requested scope are rejected.
+pub fn canonicalize_field_name(field: &str, is_global: bool) -> Result<String, ConfigError> {
+    let trimmed = field.trim();
+    if trimmed.is_empty() {
+        return Err(ConfigError::ParseError(
+            "Config field name cannot be empty".to_string(),
+        ));
+    }
+    let valid_fields = valid_fields(is_global);
+    if valid_fields.contains(&trimmed) {
+        return Ok(trimmed.to_string());
+    }
+    if let Some(&(_, flat)) = crate::config::normalization::CONFIG_PATHS
+        .iter()
+        .find(|&&(dotted, _)| dotted == trimmed)
+    {
+        if valid_fields.contains(&flat) {
+            return Ok(flat.to_string());
+        }
+        let scope = if is_global { "global" } else { "project" };
+        return Err(ConfigError::ParseError(format!(
+            "Canonical field '{}' maps to '{}' which is not settable for {} configurations",
+            trimmed, flat, scope
+        )));
+    }
+    let scope = if is_global { "global" } else { "project" };
+    Err(ConfigError::ParseError(format!(
+        "Invalid {} config field: '{}'. Valid flat fields: {} (dotted canonical aliases such as 'default.priority' or 'issue.states' are also accepted)",
+        scope,
+        trimmed,
+        valid_fields.join(", ")
+    )))
+}
+
+/// If `field` (flat or dotted) canonicalizes to a global-only field, return
+/// its canonical name. Used to auto-promote `config set server.port 9000` and
+/// friends to the global scope without requiring `--global`.
+pub fn is_global_only_field_name(field: &str) -> Option<String> {
+    let canonical = canonicalize_field_name(field, true).ok()?;
+    if PROJECT_CONFIG_FIELDS.contains(&canonical.as_str()) {
+        None
+    } else {
+        Some(canonical)
+    }
 }
 
 /// Validate that a field value is valid for the given field
@@ -1425,61 +1418,94 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
     Ok(())
 }
 
-/// Clear a specific field in a project configuration (remove the override)
-/// This sets the corresponding Option field to None and saves the project config.
-pub fn clear_project_field(
-    tasks_dir: &Path,
-    project_prefix: &str,
+/// Clear a specific field in a project configuration (remove the override).
+///
+/// Field-precise: clearing a nested agent setting (for example
+/// `agent_on_start_status`) clears only that subfield and preserves sibling
+/// settings; emptied sections are pruned instead of leaving empty shells.
+/// Unknown fields are rejected.
+pub fn clear_project_override_field(
+    config: &mut ProjectConfig,
     field: &str,
 ) -> Result<(), ConfigError> {
-    let mut project_config =
-        crate::config::persistence::load_project_config_from_dir(project_prefix, tasks_dir)
-            .unwrap_or_else(|_| ProjectConfig::new(project_prefix.to_string()));
-
     match field {
         // Scalar option fields
-        "default_assignee" => project_config.default_assignee = None,
-        "default_reporter" => project_config.default_reporter = None,
-        "default_priority" => project_config.default_priority = None,
-        "default_status" => project_config.default_status = None,
+        "default_assignee" => config.default_assignee = None,
+        "default_reporter" => config.default_reporter = None,
+        "default_priority" => config.default_priority = None,
+        "default_status" => config.default_status = None,
         // List option fields
-        "default_tags" => project_config.default_tags = None,
-        "members" => project_config.members = None,
-        "strict_members" => project_config.strict_members = None,
+        "default_tags" => config.default_tags = None,
+        "members" => config.members = None,
+        "strict_members" => config.strict_members = None,
         // Enum list overrides
-        "issue_states" => project_config.issue_states = None,
-        "issue_types" => project_config.issue_types = None,
-        "issue_priorities" => project_config.issue_priorities = None,
+        "issue_states" => config.issue_states = None,
+        "issue_types" => config.issue_types = None,
+        "issue_priorities" => config.issue_priorities = None,
         // String-config lists
-        "tags" => project_config.tags = None,
-        "custom_fields" => project_config.custom_fields = None,
-        "auto_set_reporter" => project_config.auto_set_reporter = None,
-        "auto_assign_on_status" => project_config.auto_assign_on_status = None,
-        "scan_signal_words" => project_config.scan_signal_words = None,
-        "scan_ticket_patterns" => project_config.scan_ticket_patterns = None,
-        "scan_enable_ticket_words" => project_config.scan_enable_ticket_words = None,
-        "scan_enable_mentions" => project_config.scan_enable_mentions = None,
-        "scan_strip_attributes" => project_config.scan_strip_attributes = None,
-        "branch_type_aliases" => project_config.branch_type_aliases = None,
-        "branch_status_aliases" => project_config.branch_status_aliases = None,
-        "branch_priority_aliases" => project_config.branch_priority_aliases = None,
-        "agent_context_enabled" => project_config.agent_context_enabled = None,
-        "agent_context_extension" => project_config.agent_context_extension = None,
-        "agent_logs_dir" => project_config.agent_logs_dir = None,
+        "tags" => config.tags = None,
+        "custom_fields" => config.custom_fields = None,
+        "auto_set_reporter" => config.auto_set_reporter = None,
+        "auto_assign_on_status" => config.auto_assign_on_status = None,
+        "auto_populate_members" => config.auto_populate_members = None,
+        "auto_codeowners_assign" => config.auto_codeowners_assign = None,
+        "auto_tags_from_path" => config.auto_tags_from_path = None,
+        "auto_branch_infer_type" => config.auto_branch_infer_type = None,
+        "auto_branch_infer_status" => config.auto_branch_infer_status = None,
+        "auto_branch_infer_priority" => config.auto_branch_infer_priority = None,
+        "auto_identity" => config.auto_identity = None,
+        "auto_identity_git" => config.auto_identity_git = None,
+        "scan_signal_words" => config.scan_signal_words = None,
+        "scan_ticket_patterns" => config.scan_ticket_patterns = None,
+        "scan_enable_ticket_words" => config.scan_enable_ticket_words = None,
+        "scan_enable_mentions" => config.scan_enable_mentions = None,
+        "scan_strip_attributes" => config.scan_strip_attributes = None,
+        "branch_type_aliases" => config.branch_type_aliases = None,
+        "branch_status_aliases" => config.branch_status_aliases = None,
+        "branch_priority_aliases" => config.branch_priority_aliases = None,
+        "agent_context_enabled" => config.agent_context_enabled = None,
+        "agent_context_extension" => config.agent_context_extension = None,
+        "agent_logs_dir" => config.agent_logs_dir = None,
         "agent_instructions" | "agent_instructions_file" => {
-            project_config.agent_instructions = None;
+            config.agent_instructions = None;
         }
-        "agent_on_start_status"
-        | "agent_on_success_status"
-        | "agent_on_failure_status"
-        | "agent_on_cancel_status"
-        | "agent_on_start_reassign_to"
-        | "agent_on_success_reassign_to"
-        | "agent_on_failure_reassign_to"
-        | "agent_on_cancel_reassign_to" => project_config.agent_automation = None,
-        "agent_worktree_enabled" | "agent_worktree_dir" | "agent_worktree_branch_prefix" => {
-            project_config.agent_worktree = None
+        "agent_on_start_status" => {
+            clear_agent_action_field(config, AgentActionField::Start, ActionSubfield::SetStatus)
         }
+        "agent_on_success_status" => {
+            clear_agent_action_field(config, AgentActionField::Success, ActionSubfield::SetStatus)
+        }
+        "agent_on_failure_status" => {
+            clear_agent_action_field(config, AgentActionField::Failure, ActionSubfield::SetStatus)
+        }
+        "agent_on_cancel_status" => {
+            clear_agent_action_field(config, AgentActionField::Cancel, ActionSubfield::SetStatus)
+        }
+        "agent_on_start_reassign_to" => {
+            clear_agent_action_field(config, AgentActionField::Start, ActionSubfield::ReassignTo)
+        }
+        "agent_on_success_reassign_to" => clear_agent_action_field(
+            config,
+            AgentActionField::Success,
+            ActionSubfield::ReassignTo,
+        ),
+        "agent_on_failure_reassign_to" => clear_agent_action_field(
+            config,
+            AgentActionField::Failure,
+            ActionSubfield::ReassignTo,
+        ),
+        "agent_on_cancel_reassign_to" => {
+            clear_agent_action_field(config, AgentActionField::Cancel, ActionSubfield::ReassignTo)
+        }
+        "agent_worktree_enabled" => clear_agent_worktree_field(config, WorktreeSubfield::Enabled),
+        "agent_worktree_dir" => clear_agent_worktree_field(config, WorktreeSubfield::Dir),
+        "agent_worktree_branch_prefix" => {
+            clear_agent_worktree_field(config, WorktreeSubfield::BranchPrefix);
+        }
+        "attachments_dir" => config.attachments_dir = None,
+        "attachments_max_upload_mb" => config.attachments_max_upload_mb = None,
+        "sync_reports_dir" => config.sync_reports_dir = None,
+        "sync_write_reports" => config.sync_write_reports = None,
         // Project name is not optional; do not clear it silently
         "project_name" => { /* no-op: cannot clear non-optional */ }
         other => {
@@ -1489,8 +1515,144 @@ pub fn clear_project_field(
             )));
         }
     }
+    Ok(())
+}
 
-    save_project_config(tasks_dir, project_prefix, &project_config)
+#[derive(Clone, Copy)]
+enum AgentActionField {
+    Start,
+    Success,
+    Failure,
+    Cancel,
+}
+
+#[derive(Clone, Copy)]
+enum ActionSubfield {
+    SetStatus,
+    ReassignTo,
+}
+
+#[derive(Clone, Copy)]
+enum WorktreeSubfield {
+    Enabled,
+    Dir,
+    BranchPrefix,
+}
+
+fn action_override_is_empty(action: &crate::config::types::AgentAutomationActionOverride) -> bool {
+    action.set_status.is_none() && action.reassign_to.is_none()
+}
+
+fn clear_agent_action_field(
+    config: &mut ProjectConfig,
+    action_field: AgentActionField,
+    subfield: ActionSubfield,
+) {
+    let Some(automation) = config.agent_automation.as_mut() else {
+        return;
+    };
+    let action = match action_field {
+        AgentActionField::Start => automation.on_start.as_mut(),
+        AgentActionField::Success => automation.on_success.as_mut(),
+        AgentActionField::Failure => automation.on_failure.as_mut(),
+        AgentActionField::Cancel => automation.on_cancel.as_mut(),
+    };
+    let Some(action) = action else {
+        return;
+    };
+    match subfield {
+        ActionSubfield::SetStatus => action.set_status = None,
+        ActionSubfield::ReassignTo => action.reassign_to = None,
+    }
+    // Prune emptied action overrides and, when every action is gone, the
+    // whole section — sibling settings survive, empty shells do not.
+    let automation = config.agent_automation.as_ref().unwrap();
+    let all_empty = [
+        automation.on_start.as_ref(),
+        automation.on_success.as_ref(),
+        automation.on_failure.as_ref(),
+        automation.on_cancel.as_ref(),
+    ]
+    .iter()
+    .all(|action| action.is_none_or(action_override_is_empty));
+    if all_empty {
+        config.agent_automation = None;
+    } else {
+        let automation = config.agent_automation.as_mut().unwrap();
+        if automation
+            .on_start
+            .as_ref()
+            .is_some_and(action_override_is_empty)
+        {
+            automation.on_start = None;
+        }
+        if automation
+            .on_success
+            .as_ref()
+            .is_some_and(action_override_is_empty)
+        {
+            automation.on_success = None;
+        }
+        if automation
+            .on_failure
+            .as_ref()
+            .is_some_and(action_override_is_empty)
+        {
+            automation.on_failure = None;
+        }
+        if automation
+            .on_cancel
+            .as_ref()
+            .is_some_and(action_override_is_empty)
+        {
+            automation.on_cancel = None;
+        }
+    }
+}
+
+fn clear_agent_worktree_field(config: &mut ProjectConfig, subfield: WorktreeSubfield) {
+    let Some(worktree) = config.agent_worktree.as_mut() else {
+        return;
+    };
+    match subfield {
+        WorktreeSubfield::Enabled => worktree.enabled = None,
+        WorktreeSubfield::Dir => worktree.dir = None,
+        WorktreeSubfield::BranchPrefix => worktree.branch_prefix = None,
+    }
+    let worktree = config.agent_worktree.as_ref().unwrap();
+    let empty = worktree.enabled.is_none()
+        && worktree.dir.is_none()
+        && worktree.branch_prefix.is_none()
+        && worktree.max_parallel_jobs.is_none()
+        && worktree.cleanup_on_done.is_none()
+        && worktree.cleanup_on_failure.is_none()
+        && worktree.cleanup_on_cancel.is_none()
+        && worktree.cleanup_delete_branches.is_none();
+    if empty {
+        config.agent_worktree = None;
+    }
+}
+
+/// Clear a specific override in a project configuration and save it.
+///
+/// Compatibility wrapper routed through the shared DEV-71 candidate pipeline
+/// (validation before a single atomic write).
+pub fn clear_project_field(
+    tasks_dir: &Path,
+    project_prefix: &str,
+    field: &str,
+) -> Result<(), ConfigError> {
+    let scope = crate::config::candidate::ConfigScope::Project(project_prefix.to_string());
+    crate::config::candidate::apply_config_set(
+        tasks_dir,
+        &scope,
+        &crate::config::candidate::ConfigSetRequest {
+            entries: vec![(field.to_string(), String::new())],
+            force: false,
+            dry_run: false,
+        },
+    )?;
+    Ok(())
 }
 
 #[cfg(test)]

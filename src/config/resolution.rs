@@ -1,5 +1,5 @@
 use crate::config::operations::{
-    apply_field_to_global_config, validate_field_name, validate_field_value,
+    apply_field_to_global_config, canonicalize_field_name, validate_field_value,
 };
 use crate::config::types::*;
 use std::collections::{BTreeMap, HashMap};
@@ -141,13 +141,25 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
                 "CLI config override keys cannot be empty".to_string(),
             ));
         }
-        let canonical = key.replace('.', "_");
+        // Shared DEV-71 canonicalization: `-C` accepts the same flat and
+        // dotted field names as `config set` (including exceptions such as
+        // `default.strict_members` and `issue.tags`).
+        let canonical = canonicalize_field_name(key, true)?;
+        if let Some(existing) = normalized.get(&canonical)
+            && existing != raw_value.trim()
+        {
+            return Err(ConfigError::ParseError(format!(
+                "Conflicting values for config override '{}': '{}' vs '{}'",
+                canonical,
+                existing,
+                raw_value.trim()
+            )));
+        }
         normalized.insert(canonical, raw_value.trim().to_string());
     }
 
     let mut overlay = GlobalConfig::default();
     for (key, value) in &normalized {
-        validate_field_name(key, true)?;
         validate_field_value(key, value)?;
         apply_field_to_global_config(&mut overlay, key, value)?;
     }
@@ -170,6 +182,48 @@ pub fn apply_cli_overrides(resolved: &mut ResolvedConfig) {
     if let Some(layer) = active_cli_override_layer() {
         overlay_global_into_resolved(resolved, layer.config);
     }
+}
+
+/// Resolution preview for config-set candidate validation (DEV-71).
+///
+/// Computes the effective configuration exactly like the cached paths, but
+/// from a caller-provided global layer (the candidate instead of the on-disk
+/// file), with the real home and environment snapshots and the active CLI
+/// override layer applied on top. It neither reads nor mutates the config
+/// cache and never touches disk, so dry runs and rejected candidates cannot
+/// poison or bootstrap anything.
+pub fn preview_base_resolved(global_layer: &GlobalConfig) -> ResolvedConfig {
+    let mut config = GlobalConfig::default();
+    merge_global_config(&mut config, global_layer.clone());
+    if let Ok(home_config) = crate::config::persistence::load_home_config() {
+        merge_global_config(&mut config, home_config);
+    }
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    merge_global_config(&mut config, env_snapshot.global);
+    let mut resolved = ResolvedConfig::from_global(config);
+    apply_cli_overrides(&mut resolved);
+    resolved
+}
+
+/// Project-resolution preview for config-set candidate validation (DEV-71):
+/// defaults -> candidate global layer -> home -> env -> candidate project
+/// config -> CLI overrides. Same precedence as [`get_project_config`], pure
+/// with respect to the cache and the filesystem.
+pub fn preview_project_resolved(
+    global_layer: &GlobalConfig,
+    project_config: &ProjectConfig,
+) -> ResolvedConfig {
+    let mut base_global = GlobalConfig::default();
+    merge_global_config(&mut base_global, global_layer.clone());
+    let mut resolved = ResolvedConfig::from_global(base_global);
+    if let Ok(home_config) = crate::config::persistence::load_home_config() {
+        overlay_global_into_resolved(&mut resolved, home_config);
+    }
+    let env_snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    overlay_global_into_resolved(&mut resolved, env_snapshot.global.clone());
+    apply_project_config_overrides(&mut resolved, project_config.clone());
+    apply_cli_overrides(&mut resolved);
+    resolved
 }
 
 /// Load and merge all configurations with proper priority order

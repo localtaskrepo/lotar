@@ -151,7 +151,7 @@ pub fn parse_issue_states_tolerant(
 
 // Aliases are applied from legacy to canonical. Flat fields are the typed
 // schema itself, so newly shipped fields cannot silently disappear here.
-const CONFIG_PATHS: &[(&str, &str)] = &[
+pub(crate) const CONFIG_PATHS: &[(&str, &str)] = &[
     ("config.project_name", "project_name"),
     ("project.id", "project_name"),
     ("project.name", "project_name"),

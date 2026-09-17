@@ -1,11 +1,58 @@
 title: Validate config set candidates before persistence and during dry-run
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.713363+00:00
+modified: 2026-09-16T22:25:20.732652+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-09-16T21:33:39.256725+00:00
+  text: |-
+    Plan (implementation not started; research verified in current checkout):
+
+    SCOPE: One shared config-set candidate path used by CLI set, ConfigService::set (REST/MCP), and the update_config_field/clear_project_field wrappers. Build+validate one candidate against real affected tasks with fresh configs, then a single atomic save; dry-run omits only the write.
+
+    VERIFIED DEFECTS: set.rs dry-run returns before field/value validation and uses fake PROJ-1 conflict logic keyed on 'issue_states.values'; update_config_field (operations.rs:327) swallows malformed configs (unwrap_or_default/new) and saves BEFORE resolved validation; ConfigService::set loops per-field saves (partial state) and ensures config.yml before validation; clear_project_field nukes whole agent_automation/agent_worktree sections; validate_field_name accepts flat only (documented dotted keys rejected); resolution.rs:144 -C override uses naive dot->underscore (breaks default.strict_members, issue.tags).
+
+    DECISIONS: D1 REST/MCP reject task conflicts via existing validation envelope, no new force/dry-run API fields (CLI-only escape). D2 dry-run conflict without force exits nonzero; schema always blocks under force; force escapes only task-enum conflicts (+prefix conflicts), never schema/hard resolved errors. D3 keep lockless writes, one atomic write per operation, no CAS/locks (DEV-55 untouched). D4 field-precise project clears (empty value = clear that override only; preserve sibling agent settings); global empty-value semantics unchanged (empty enum list stays a schema error). Field names canonicalized via CONFIG_PATHS (default.strict_members->strict_members, issue.tags->tags; flat still accepted); canonical-name collisions across multi-field input rejected deterministically. Affected-project resolution respects home/env/CLI precedence with the candidate in memory (reuse pure overlay fns; no cache pollution); masked fields skip task-conflict checks. Task enumeration: primary root only, list_visible_subdirs (excludes @/sprints), fail-closed parse of numeric-stem task yml + project configs; Storage::new forbidden (bootstraps config), use try_open/direct loads. Only newly-introduced violations block (before/after validity per changed constraint). default_status/default_priority not-in-list stay WARNING (no upgrade); hard-error fixtures: alias targets, strict_members w/o members, default_tags subset.
+
+    FILES: new src/config/candidate.rs; operations.rs (wrappers, fail-closed loads, precise clears); normalization.rs (shared field canonicalizer); cli/handlers/config/set.rs rewrite; services/config_service.rs (single-save, ensure moved to save-time, readonly default-project resolution w/ read-only auto_detect_prefix fallback); optional trivial: resolution.rs -C canonicalizer, else explicit follow-up ticket.
+
+    INVARIANTS: rejected change = zero byte changes + no new artifacts beyond pre-existing resolver dir creation (tested at CLI process boundary); accepted = exactly one config file written once; dry-run identical minus write; deterministic alias maps (duplicate rejection, no iteration overwrite); user YAML backwards compatible.
+
+    TESTS: config_validation_test.rs (atomicity, bytes-exact on reject, malformed-config preservation), config_advanced_features_test.rs (dry-run exit codes, force semantics), new candidate integration tests (task conflicts real vs pre-existing-invalid non-blocking, inherited-resolved errors without tasks, warning-not-upgrade, agent-subfield clear, multi-field all-or-nothing, dotted names, no-artifact-on-rejection), REST/MCP conflict rejection envelope. Final gates: npm run lint, npm test, npm run smoke.
+- date: 2026-09-16T22:05:25.291325+00:00
+  text: |-
+    Implementation complete, independent review pending; status stays InProgress.
+
+    OUTCOME: One shared candidate pipeline (src/config/candidate.rs) now backs CLI config set, REST/MCP ConfigService::set, and the update_config_field/clear_project_field wrappers. All entries canonicalize through CONFIG_PATHS (flat + dotted incl. default.strict_members/issue.tags exceptions; ambiguous canonical duplicates rejected deterministically, identical values dedup); schema/config/resolved/real-task validation runs before exactly one atomic write; dry-run runs the identical pipeline minus the write and exits nonzero on would-be rejection (D2); --force escapes only task-compatibility conflicts (D2); REST/MCP keep their request shape and default-reject conflicts (D1); writes stay lockless single-file atomic, no locks/CAS (D3); project empty-value clears are field-precise with sibling-preserving agent/worktree pruning (D4). Affected-project analysis respects per-field project overrides and runtime precedence via new pure resolution::preview_* fns (no cache reads/writes, no storage bootstrap: fail-closed loads, Storage::new avoided). Only NEWLY introduced violations block (before/after comparison at config, resolved, and per-task levels); default_status/default_priority mismatches stay warnings. -C/--config overrides now share the canonicalizer.
+
+    FILES: new src/config/candidate.rs (+5 unit tests); src/config/operations.rs (canonicalize_field_name/is_global_only_field_name, static field lists +web_ui_path gap fix, precise clears, wrappers); src/config/resolution.rs (preview fns, -C canonicalization); src/types.rs (enum_token_eq shared); src/cli/handlers/config/set.rs (rewrite: no ensure before validation, readonly default-project + read-only auto_detect fallback); src/services/config_service.rs (single-save all-or-nothing set, value_matches_global extracted, ConfigSetOutcome shape unchanged + Debug); tests/dev71_config_set_candidate_test.rs (27 tests: real CLI process, direct service, REST route, MCP tool); docs/help/config.md (force/dry-run/lockless-race honesty, dotted names, --config fix: docs claimed -C short flag that was never registered); smoke/tests/ui.panel-persistence reordered to configure custom states BEFORE seeding default-status tasks (new conflict gate is intentional).
+
+    VERIFICATION (nextest --retries 0, no git needed): dev71+config+dry_run+mcp+force+cli_init batch 241 passed; dev67/workspace/storage/api/web/sprints/scan batch 126 passed; cli_/sync_/task_/agent_/sprint_ batch 270 passed (1 pre-existing leaky pass). cargo fmt --all --check clean; clippy --all-targets 0 warnings. Live target/ci/lotar evidence: rejected set leaves fresh tasks dir empty (exit 1); server.port dotted applies canonically with auto-promote; real conflict names ENG-1 with force hint and blocks the write. NOT RUN: full npm test/lint/smoke gates, browser smoke, UI runtime unchanged (deferred to final gates per plan).
+
+    Remaining: independent review; full gates before handoff.
+- date: 2026-09-16T22:20:22.504594+00:00
+  text: |-
+    Review fix applied (validation bypass, classified must-fix): ConfigService::set now canonicalizes and schema-validates ALL raw entries BEFORE the dedup-to-clear conversion (candidate::validate_raw_entries shared with the CLI pipeline), so a malformed CSV like issue_states 'Todo,,Done' can never compare equal-to-global, clear an override, and return 200; REST and MCP inherit the same contract through the service. Empty project values remain accepted only as the documented field-precise clear (validate_raw_entries skips project-scope empties exactly like the candidate); value_matches_global now takes the canonical field and is documented as never the acceptance path for malformed values. Also: clap --force help corrected to 'Apply despite task-compatibility conflicts with existing tasks (schema errors still block)' in src/cli/args/config.rs only (args_config.rs untouched); fail-closed malformed-config errors now name the file/project path.
+
+    New regressions (tests/dev71_config_set_candidate_test.rs, now 35): malformed-CSV rejection for service+CLI+REST(real /api/config/set request, 400, no artifacts on missing dir)+MCP(tool call, error, no artifacts) with bytes-exact preservation and no override clear; project empty enum-clear still works; force cannot bypass resolved alias invariant; malformed project config during global change preserves bytes and names the project; env-mask parity via LOTAR_ISSUE_STATES on an isolated CLI subprocess (masked candidate applies without false task conflicts, no process-global env mutation).
+
+    VERIFICATION post-fix: dev71+config 148/148; combined regression batch (dev71/config/branch/precedence/smart_defaults/normalize/dry_run/mcp/force/cli_init/dev67/workspace/storage/api/web/sprints/scan/cli_/sync_/task_/agent_/sprint_) 562/562 passed, retries 0. cargo fmt --all --check clean; npm run lint:agent clean (vue-tsc + clippy --all-targets --all-features -D warnings + fmt). Live target/ci/lotar: 'Todo,,Done' rejected exit 1 with no override clear; valid set exit 0. Prior full gates (1071 Rust/6 skips, 449 UI, 134 smoke/23 skips) were run BEFORE this fix — full gates must be rerun before final handoff due to the production change. Status stays InProgress pending review confirmation and final gates.
+- date: 2026-09-16T22:25:15.952322+00:00
+  text: |-
+    Closure — independent review signed off (corrected raw-value validation accepted; all 35 integration + 5 unit DEV-71 tests executed, no git cfg needed).
+
+    Outcome: One config-set candidate for every mutation path. Names normalize across flat and dotted canonical aliases (CONFIG_PATHS incl. default.strict_members/issue.tags exceptions, deterministic ambiguity rejection); names and RAW values are validated BEFORE the matches-global clear conversion, so CLI, service, REST, and MCP enforce the same conflict/validation contract against real affected tasks with per-project inheritance overlays and before/after gating (only newly introduced violations block). Dry run runs the full pipeline minus the write with nonzero exits on failure; --force escapes only task-compatibility conflicts, never schema or resolved invariants. Rejections preserve bytes exactly and create no files; malformed existing global/project configs and task files fail closed. Multi-entry batches save once; empty project values clear field-precisely and preserve agent sibling settings. No REST/MCP API shape change; documentation matches actual CLI --config/--force behavior. No CAS added: config writes remain documented lockless single-file atomic (not concurrent-atomic transactions); accepted canonical writes keep the documented comments/unknown-key lossiness.
+
+    Evidence: FINAL post-production-fix gates all exit 0 — npm run lint:agent (vue-tsc view only, clippy --all-targets --all-features -D warnings, fmt); npm run test:agent nextest default concurrency --retries 0: 1079 passed, 1 LEAKY classification, 6 skipped, across 121 binaries (supersedes the earlier 1071-run that predates the final fix); UI 449 tests / 60 files; smoke fresh build (Rust 17.99s): 134 passed, 23 skipped (157 tests / 42 files; subset 37 pass / 5 skip); panel-persistence targeted 2/2 verified in a real browser. DEV-71 = 40 tests (35 integration + 5 unit).
+
+    Remaining: 13 whole + 4 partial test files cfg-excluded (no_git_tests), 6 ignored, and 23 smoke git-gated skips are baseline exclusions, not passes; existing raw smoke TS debt remains outside lint: view; the single nextest LEAKY flag appeared in the final run and was absent in the prior run, test name unidentified — persisted as a verification follow-up on DEV-76 with log /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/kilo/dev71-verify2-20260917-035114-16743/test-agent.log and nested junit target/nextest/default/target/nextest/junit.xml (latter overwritable). No unsupported pre-existing claim; no hidden retries (--retries 0). Done on the basis of all required gates exiting 0 plus review signoff — the leak is not claimed resolved.
+
+    Guidance: no durable instruction finding; the docs change was user-help accuracy, not agent policy.
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: C9.
@@ -16,3 +63,34 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-16T21:28:06.898729+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-16T21:33:39.256725+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T22:05:25.291325+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T22:20:22.504594+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T22:25:15.952322+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-16T22:25:20.732652+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
