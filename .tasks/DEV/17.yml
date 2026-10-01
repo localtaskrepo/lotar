@@ -1,10 +1,11 @@
 title: Refresh README to highlight new and existing features
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.782729+00:00
-modified: 2026-09-06T13:12:54.063794+00:00
+modified: 2026-10-02T18:49:39.675478+00:00
 comments:
 - date: 2026-09-06T11:21:52.740612+00:00
   text: Backlog review retained Todo and clarified README-only ownership; broader help/ADR/tracker corrections are now DEV-83.
@@ -12,6 +13,23 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 18: Update README that highlights the new and old features better, explains what they do and how they work (repo sync, agent orchestration, sync system)
+- date: 2026-10-02T17:58:38.509379+00:00
+  text: |-
+    Plan (2026-10-02): README overhaul per the developer's implementation brief.
+    Scope: rewrite README.md (~150-200 lines: pitch, real badges, hero, what-is, 60s quick start, feature tour w/ docs links, fair comparison vs Backlog.md/GitHub Issues/Jira, how-it-works, docs index, contributing/license). Move removed CLI detail (install variants, env vars, global options, config hierarchy, configurable fields, multi-project, example workflow, dev/test notes) into docs/help (new cli-tour.md + install.md), all linked from the help index.
+    Pipeline: extend scripts/generate-test-tasks.mjs with a realistic demo scenario (one product, 2-3 people + stub agent profile, active sprint w/ backdated burndown history, authored comments, git history); scripts/screenshots.mjs (Playwright, 1440x900@2x, light+dark, optimized output, social preview 1280x640, hero agent-loop recording via stub agent + ffmpeg); npm run screenshots; vhs .tape for terminal recording.
+    Risks: shared checkout with DEV-93 lanes in flight (TaskPanel.vue, smoke, CI, lockfiles) - I touch none of those files and build into isolated output dirs; vhs not installed; competitor cells need live verification.
+    Checks: link check (local + external), rendered-markdown check light/dark, every README claim cross-checked against code, docs consistency; npm run screenshots end-to-end. No commit/push unless authorized.
+- date: 2026-10-02T18:29:29.258872+00:00
+  text: 'Progress (2026-10-02): README rewritten (pitch, real badges, hero, quick start, feature tour, comparison vs Backlog.md/GitHub Issues/Jira, how-it-works, docs index). Removed CLI detail moved to new docs/help/install.md and docs/help/cli-tour.md (linked from help index); examples re-run in scratch repos and corrected where the old README was wrong (--search -> positional query, tasks_dir_name invalid, precedence order, nonexistent .tar.gz.sha256 asset, no cargo install). Pipeline: scripts/demo/workspace.mjs (Atlas demo: 32 tasks, 3 people, stub claude agent, 4 sprints w/ backdated burndown, ~100 authored commits, automation rules, remotes, TODOs) exposed via generate-test-tasks.mjs --demo; scripts/screenshots.mjs + npm run screenshots (11 shots x light/dark WebP @2x, hero agent-loop WebP via ffmpeg+img2webp, vhs terminal.gif, 1280x640 social preview). Found and filed DEV-94 (Sync page errors with no reports) and DEV-95 (task history API fails via symlinked tasks dir). Link check 142 links/14 external: 0 problems; GitHub markdown API render checked in light+dark. Next: clean-clone npm run screenshots + lint/test/smoke in the isolated clone.'
+- date: 2026-10-02T18:34:14.290510+00:00
+  text: |-
+    Outcome: README overhaul done per the brief. New README (pitch, real badges, hero, quick start, feature tour, honest comparison, how-it-works, docs index); removed CLI detail lives in docs/help/install.md + docs/help/cli-tour.md (linked from docs/help/index.md); npm run screenshots regenerates all 26 images + docs/assets/social-preview.png from a seeded Atlas demo (scripts/demo/*, scripts/screenshots.mjs, generate-test-tasks.mjs --demo). Old ui-*.png removed; docs/README.md repointed.
+    Evidence: every README/doc command re-run in scratch workspaces (incl. CLI assignment to @claude running the stub agent in a worktree); competitor cells checked against Backlog.md README and current GitHub/Atlassian sources; link check 142 links/14 external, 0 problems; GitHub markdown API render + local light/dark render, 0 broken images, <picture> dark sources honored. Clean clone (HEAD + only these changes): npm ci + npm run screenshots exit 0 (26 images + social preview); lint:agent pass; test:agent pass (Rust 1196/1196, UI 443/443); test:smoke:agent 188/189 - the one failure is ui.reference-kinds custom attachments store chip timeout, the known HEAD failure DEV-93 item 6 whose fix is uncommitted in the shared checkout (no view/smoke code touched here).
+    Remaining: uncommitted, not integrated (no commit authorized). Repo description/topics and social-preview upload are manual (proposed in the PR description draft). Live GitHub page render can only be confirmed after push. Note: parts of this work (scripts/*, ticket files) were staged by someone else mid-session; staged copies of scripts/demo/terminal.tape and later-edited files are older than the working tree. Follow-ups: DEV-94, DEV-95; docs/help/list.md and main.md still understate query fields/format behavior (DEV-75/DEV-83).
+    Guidance: no durable finding.
+- date: 2026-10-02T18:49:39.675478+00:00
+  text: 'Follow-up (developer review): Homebrew instructions now state LoTaR is a formula in a third-party tap (not Homebrew core, not a cask) and show the explicit ''brew tap localtaskrepo/lotar && brew install lotar'' step in README and docs/help/install.md; one-command form kept as an aside; Linux users pointed to archives/Docker. Link check re-run: 72 links, 0 problems.'
 description: |-
   README feature reconciliation remains open. Agent execution and automation are implemented, but README still labels AI agent integration as planned and says remotes cannot be managed in the UI. Update current feature coverage, SyncHub remote editing versus manual auth profiles, targeted sync discoverability and executable command examples. Related DEV-75 owns CLI list contract decisions; DEV-82 owns REST/OpenAPI contracts; DEV-83 owns the remaining help/developer guides. Preserve those owners rather than duplicating their acceptance criteria here.
 
@@ -38,6 +56,36 @@ history:
       Migrated checklist requirements:
       README should explain both existing and newer functionality, especially repository synchronization and agent orchestration. Preserve README ownership here; DEV-83 owns broader help/developer docs and DEV-82 API contracts.
 - at: 2026-09-06T13:12:54.063794+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T17:58:38.496235+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-02T17:58:38.509379+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T18:29:29.258872+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T18:34:14.290510+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T18:34:14.314759+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
+- at: 2026-10-02T18:49:39.675478+00:00
   actor: mallox
   changes:
   - field: comment_added

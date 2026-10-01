@@ -1,4 +1,7 @@
-profile.default.junit = { path = "target/nextest/junit.xml" }
+# Relative junit paths resolve under the per-profile output directory
+# (target/nextest/<profile>/), so the default profile report lands at
+# target/nextest/default/junit.xml for CI coverage checks and uploads.
+profile.default.junit = { path = "junit.xml" }
 
 # Increase per-binary concurrency; nextest schedules across binaries efficiently.
 profile.default.test-threads = "num-cpus"
@@ -30,3 +33,37 @@ max-threads = 1
 filter = 'binary(agent_automation_integration_test) + binary(agent_safety_test)'
 test-group = 'agent-processes'
 retries = 2
+
+# DEV-78: dedicated profile for wall-clock performance budget runs
+# (`npm run test:rust:perf`, .github/workflows/performance.yml).
+#
+# Controlled execution for absolute budgets: serial test-threads removes the
+# parallel-load noise that makes wall-clock assertions load-dependent under
+# the default profile; retries 0 means a blown budget cannot be retried away
+# (the runner also passes --retries 0 explicitly); fail-fast is off so every
+# budget is still measured and summarized after one exceeds; success-output
+# immediate streams the per-budget [perf-budget] lines that
+# scripts/perf-runner.mjs summarizes. This profile is only selected
+# explicitly - the ordinary correctness suite keeps using profile.default.
+[profile.perf]
+test-threads = 1
+retries = 0
+fail-fast = false
+slow-timeout = "180s"
+success-output = "immediate"
+failure-output = "immediate"
+status-level = "pass"
+# Relative junit paths resolve under the per-profile output dir
+# (target/nextest/perf/), so this lands at target/nextest/perf/perf-junit.xml.
+junit = { path = "perf-junit.xml" }
+
+# DEV-79: runtime Git selection profile. scripts/rust-test-runner.mjs selects
+# this profile when its isolated real-git probe fails; every other setting
+# (concurrency, timeouts, the agent-processes group and its retries) is
+# inherited from profile.default. The default filter excludes exactly the
+# source-local `git_required` test modules, so those tests stay COMPILED and
+# are reported by nextest as skipped via this filter - never as passes.
+# JUnit lands at target/nextest/gitless/junit.xml.
+[profile.gitless]
+default-filter = 'not test(/(^|::)git_required::/)'
+junit = { path = "junit.xml" }

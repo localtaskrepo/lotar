@@ -1,0 +1,7 @@
+title: Task commit history API fails when the tasks dir path goes through a symlink
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-02T18:15:52.399799+00:00
+description: 'Found while capturing README screenshots (DEV-17). With the workspace at /tmp/... on macOS (/tmp -> /private/tmp), GET /api/tasks/history?id=X returns 400 ''Tasks directory not inside repository'' because the tasks dir is compared against the canonical git top-level without canonicalizing first. The CLI ''lotar task history'' works from the same path, so the web UI Commits tab shows ''No commits yet'' while the CLI shows history. Repro: create a git repo under /tmp, commit a task, run lotar serve with LOTAR_TASKS_DIR=/tmp/<repo>/.tasks and query /api/tasks/history. Acceptance: server and CLI resolve the repo-relative task path the same way (canonicalize both sides), with a regression test using a symlinked workspace path.'

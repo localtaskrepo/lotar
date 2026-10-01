@@ -232,43 +232,82 @@ describe('UI DEV-65 query isolation and live convergence', () => {
                         await route.continue();
                     });
 
-                    await page.getByRole('button', { name: 'Refresh tasks' }).click();
-                    await expect.poll(() => held.length, { timeout: 10_000 }).toBeGreaterThan(0);
-                    // Rows from the last completed response stay visible while
-                    // the refresh is merely in flight.
-                    await page.waitForSelector('tbody tr:has-text("Dev65 stale base anchor")');
+                    try {
+                        // Deterministic capture of the deliberate in-flight
+                        // BASE query. The Refresh button is the real-UI
+                        // trigger, but the store's live-convergence machinery
+                        // can independently schedule a refresh of the retained
+                        // BASE query at any moment (SSE reconnect or task event
+                        // -> debounced authoritative refresh). The barrier
+                        // captures that request too, and the button then stays
+                        // disabled until the response is released — so the
+                        // manual click must not be the only path to the
+                        // fixture. Wait for either a captured request or a
+                        // clickable button, click while clickable, and accept
+                        // whichever real BASE request lands first.
+                        const refreshButton = page.getByRole('button', { name: 'Refresh tasks' });
+                        for (let attempt = 0; attempt < 3 && held.length === 0; attempt += 1) {
+                            await expect
+                                .poll(
+                                    async () => held.length > 0 || (await refreshButton.isEnabled()),
+                                    { timeout: 10_000 },
+                                )
+                                .toBe(true);
+                            if (held.length > 0) break;
+                            try {
+                                await refreshButton.click({ timeout: 5_000 });
+                            } catch {
+                                // The click lost a race with a background
+                                // refresh the barrier captured mid-click (the
+                                // button disabled under it); that held request
+                                // is the in-flight query. The poll below still
+                                // requires one to exist.
+                            }
+                        }
+                        await expect.poll(() => held.length, { timeout: 10_000 }).toBeGreaterThan(0);
+                        // Rows from the last completed response stay visible
+                        // while the refresh is merely in flight.
+                        await page.waitForSelector('tbody tr:has-text("Dev65 stale base anchor")');
 
-                    // Switch the filtered view to FRESH while BASE is held.
-                    await openFilterPanel(page);
-                    const projectFilter = page.locator('[data-testid="filter-project"]');
-                    await projectFilter.waitFor({ state: 'visible', timeout: 10_000 });
-                    await expect
-                        .poll(() => projectFilter.locator(`option[value="${freshPrefix}"]`).count())
-                        .toBeGreaterThan(0);
-                    await projectFilter.selectOption(freshPrefix);
-                    // The stale BASE rows must leave the view immediately…
-                    await expect
-                        .poll(() => page.locator('tbody tr', { hasText: 'Dev65 stale base anchor' }).count())
-                        .toBe(0);
+                        // Switch the filtered view to FRESH while BASE is held.
+                        await openFilterPanel(page);
+                        const projectFilter = page.locator('[data-testid="filter-project"]');
+                        await projectFilter.waitFor({ state: 'visible', timeout: 10_000 });
+                        await expect
+                            .poll(() => projectFilter.locator(`option[value="${freshPrefix}"]`).count())
+                            .toBeGreaterThan(0);
+                        await projectFilter.selectOption(freshPrefix);
+                        // The stale BASE rows must leave the view immediately…
+                        await expect
+                            .poll(() => page.locator('tbody tr', { hasText: 'Dev65 stale base anchor' }).count())
+                            .toBe(0);
 
-                    // …and letting the late BASE response finally land must not
-                    // publish its rows over the FRESH view.
-                    await Promise.all(held.map((entry) => entry.route.continue()));
-                    await page.waitForSelector('tbody tr:has-text("Dev65 stale fresh anchor")', {
-                        timeout: 15_000,
-                    });
-                    await lists.settle(lists.urls.length);
-                    await expect
-                        .poll(() => page.locator('tbody tr', { hasText: 'Dev65 stale base anchor' }).count())
-                        .toBe(0);
-                    await expect.poll(() => page.locator('h1').textContent()).toContain('(1)');
+                        // …and letting the late BASE response finally land must not
+                        // publish its rows over the FRESH view.
+                        await Promise.all(held.map((entry) => entry.route.continue()));
+                        await page.waitForSelector('tbody tr:has-text("Dev65 stale fresh anchor")', {
+                            timeout: 15_000,
+                        });
+                        await lists.settle(lists.urls.length);
+                        await expect
+                            .poll(() => page.locator('tbody tr', { hasText: 'Dev65 stale base anchor' }).count())
+                            .toBe(0);
+                        await expect.poll(() => page.locator('h1').textContent()).toContain('(1)');
 
-                    // Exact requests: every held response was BASE-scoped, and
-                    // the view-serving query after the switch was FRESH-scoped.
-                    for (const entry of held) {
-                        expect(new URL(entry.url).searchParams.get('project')).toBe(basePrefix);
+                        // Exact requests: every held response was BASE-scoped, and
+                        // the view-serving query after the switch was FRESH-scoped.
+                        for (const entry of held) {
+                            expect(new URL(entry.url).searchParams.get('project')).toBe(basePrefix);
+                        }
+                        expect(lists.countWith('project', freshPrefix)).toBeGreaterThan(0);
+                    } finally {
+                        // Bounded barrier lifecycle: even when an assertion
+                        // above fails, every owned response is released and
+                        // the route is unarmed — no dangling held requests.
+                        holdBase = false;
+                        await Promise.allSettled(held.map((entry) => entry.route.continue()));
+                        await page.unroute('**/api/tasks/list*').catch(() => undefined);
                     }
-                    expect(lists.countWith('project', freshPrefix)).toBeGreaterThan(0);
                 });
             } finally {
                 await server.stop();

@@ -12,8 +12,12 @@ lotar serve [OPTIONS]
 ## Examples
 
 ```bash
-# Start server on default port (8080)
+# Start server; prefers the built-in default port 8080 and, when nothing
+# configured a port anywhere, moves to an OS-assigned port if 8080 is busy
 lotar serve
+
+# Pin a specific port via the environment (never falls back)
+LOTAR_PORT=3000 lotar serve
 
 # Start on custom port
 lotar serve --port=3000
@@ -40,7 +44,7 @@ lotar serve --web-ui-embedded
 
 ## Options
 
-- `--port <PORT>` - Port to bind server to (default: 8080). The short `-p` flag is reserved for the global `--project` option, so always use the long form when setting the port.
+- `-p <PORT>`, `--port <PORT>` - Port to bind server to. When the flag (or a bare positional port) is omitted, the port is resolved in the documented order: `--config server.port=...`, then `LOTAR_PORT`/`LOTAR_SERVER_PORT`, then the config file's `server.port` (`~/.lotar`, then `.tasks/config.yml`), then the built-in default `8080`; `--port` beats everything. Each layer's request is honored exactly — including a request for `8080` itself — and config-set ports are validated to 1–65535 by the existing `--config` validation, so an OS-assigned port via config uses the file spelling (`server.port: 0`) or `--port 0`. Pass `0` to bind an OS-assigned ephemeral port; the startup banner then reports the actual bound port. `serve` is the deliberate exception where `-p` means the port; for every other command — and before the `serve` subcommand itself (`lotar -p web serve`) — `-p` remains the short form of the global `--project` option.
 - `--host <HOST>` - Host address to bind to (default: localhost)
 - `--open` - Automatically open browser after starting server
 - `--web-ui-path <PATH>` - Path to a directory containing custom web UI assets. When set and the directory exists, files are served from here first, falling back to the bundled UI if not found.
@@ -53,7 +57,16 @@ Assets are served with compression: clients that send `Accept-Encoding: gzip` re
 
 > Tip: `lotar serve` ignores the `--project/-p` global flag on purpose—project defaults are resolved dynamically per request inside the REST handlers—so passing `-p` before the command only changes the CLI project context, not the server port.
 
+### Readiness and bind semantics
+
+The `Host:`/`Port:`/`URL:` banner is printed only after a bind attempt succeeds, and `--port 0` advertisements always show the actual bound port. Automated clients can treat that banner as the readiness signal: when no attempted bind succeeds — a busy port that was explicitly configured (including a request for `8080` itself), or any other bind error such as permissions or an unknown host — the command prints the bind error, exits with a non-zero status, and never prints the banner. The single exception is the implicit default: when nothing configured a port and the built-in `8080` is busy, the server binds an OS-assigned port instead and the banner reports that actual port (see [Default-port fallback](#default-port-fallback) below). This is the contract the smoke harness relies on (see `smoke/helpers/server.ts`).
+
+#### Default-port fallback
+
+Exactly one case does not fail on a busy port: when **no** source configured a port — no `--port`/`-p`/positional, no `--config server.port=...`, no `LOTAR_PORT`/`LOTAR_SERVER_PORT`, and no `server.port` in the config files — the built-in default `8080` is preferred, and if it is already in use on the bind host the server binds an OS-assigned port on the same host instead. The command then prints a warning naming the preferred default and the actual port (`Default port 8080 is already in use on <host>; serving on port <N> instead`), the `Port:`/`URL:` banner reports the actual port, and `--open` uses it. Any explicitly configured port is strict: `--port 8080`, `--config server.port=8080`, `LOTAR_PORT=8080`, or a config file setting `server.port: 8080` all fail fast with the usual bind error instead of moving, because the requester asked for that exact port. Bind failures for other reasons (permissions, unknown host) never trigger the fallback. The `URL:` line always stays plain text for scripts; the `Port:` line is the only banner line that may be styled (bold on an interactive terminal, and bold yellow when the fallback moved the port; `NO_COLOR`, JSON output, and piped streams always stay plain).
+
 ## Environment Variables
+- `LOTAR_PORT`, `LOTAR_SERVER_PORT` - Serve port when `--port` is omitted (`LOTAR_PORT` wins if both are set; `--config server.port` and `--port` outrank them). Locks the server to that exact port: no fallback when it is busy, and an invalid value aborts the command before binding. Resolved through the config precedence chain (see [precedence](precedence.md)).
 - `LOTAR_TASKS_DIR` - Default tasks directory location
 - `LOTAR_WEB_UI_PATH` - Path to custom web UI assets directory (same as `--web-ui-path`)
 - `LOTAR_WEB_UI_EMBEDDED` - When set to `1`, force embedded UI only (same as `--web-ui-embedded`)

@@ -5,6 +5,16 @@
 // targeted allow later.
 #![warn(clippy::needless_pass_by_value)]
 
+// A designated runner (LOTAR_REQUIRE_GIT=1, set by CI) must never end up with
+// git-dependent tests compiled out: build.rs panics under that env when the
+// git capability probe fails. DEV-79 no longer emits `no_git_tests`, so
+// nothing selects tests with that cfg anymore; this guard stays as insurance
+// against an externally forced `no_git_tests` RUSTFLAGS override.
+#[cfg(all(lotar_require_git, no_git_tests))]
+compile_error!(
+    "LOTAR_REQUIRE_GIT=1 and no_git_tests are both active: git-dependent tests would silently compile out on a runner that requires real git coverage"
+);
+
 pub mod api_events;
 pub mod api_server;
 pub mod api_types;
@@ -51,6 +61,7 @@ mod test_environment {
     /// before their destructors run.
     #[ctor::ctor]
     unsafe fn isolate_tmpdir_under_owned_scratch() {
+        scrub_repository_routing_env();
         if OWNED_SCRATCH.get().is_some() {
             return;
         }
@@ -73,6 +84,24 @@ mod test_environment {
             std::env::set_var("TMPDIR", &scratch);
         }
         let _ = OWNED_SCRATCH.set(scratch);
+    }
+
+    /// Remove inherited Git repository-routing variables once per lib-test
+    /// process (same baseline as `tests/common`; see that module for the
+    /// rationale). Shares the routing-key inventory with the production
+    /// `git_command` factory via `is_repository_routing_key`.
+    fn scrub_repository_routing_env() {
+        let offenders: Vec<String> = std::env::vars()
+            .map(|(key, _)| key)
+            .filter(|key| crate::utils::git::is_repository_routing_key(key))
+            .collect();
+        for key in offenders {
+            // Manipulating process-wide env vars requires `unsafe`. Keep
+            // scope tiny; the ctor runs before any test thread exists.
+            unsafe {
+                std::env::remove_var(&key);
+            }
+        }
     }
 
     /// Remove scratch directories whose creating process no longer exists;

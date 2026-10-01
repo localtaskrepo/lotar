@@ -5,6 +5,10 @@ use std::path::{Path, PathBuf};
 fn main() {
     // Declare the custom `no_git_tests` cfg so `check-cfg` doesn't flag it.
     println!("cargo::rustc-check-cfg=cfg(no_git_tests)");
+    println!("cargo::rustc-check-cfg=cfg(lotar_require_git)");
+    // Printed before any conditional return so a warm target directory still
+    // re-evaluates the probe when only this environment variable flips.
+    println!("cargo::rerun-if-env-changed=LOTAR_REQUIRE_GIT");
 
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
     let manifest_dir_path = PathBuf::from(manifest_dir);
@@ -29,9 +33,12 @@ fn main() {
 
     // Some sandboxed runtimes (e.g. certain agent harnesses) forbid creating
     // anything named `.git`, which makes every integration test that runs
-    // `git init` fail with "Operation not permitted". Probe for that here and,
-    // when detected, set `no_git_tests` so the git-dependent tests compile out
-    // instead of surfacing as false negatives. Normal CI leaves the cfg unset.
+    // `git init` fail with "Operation not permitted". Probe for that here so
+    // LOTAR_REQUIRE_GIT=1 can refuse to build on a designated runner that
+    // lost the capability. DEV-79: the historical `no_git_tests` cfg is no
+    // longer emitted - Git-dependent tests always compile and runtime
+    // selection (scripts/rust-test-runner.mjs + the gitless nextest profile)
+    // together with the fail-closed require_git() probe own exclusion.
     //
     // Probe the system temp dir (where tempfile-based tests actually create
     // their repos) in addition to OUT_DIR: some sandboxes allow `.git` inside
@@ -51,8 +58,24 @@ fn main() {
     } else {
         let _ = fs::remove_dir(&temp_probe);
     }
-    if git_denied {
-        println!("cargo:rustc-cfg=no_git_tests");
+    // `LOTAR_REQUIRE_GIT=1` marks a runner as designated to exercise the real
+    // git-dependent tests (CI): refuse to build if the capability probe failed,
+    // instead of silently compiling them out. Any other non-empty value is a
+    // configuration error, mirroring LOTAR_SMOKE_REQUIRE_GIT's strictness.
+    let require_git = match env::var("LOTAR_REQUIRE_GIT") {
+        Ok(value) if value == "1" => true,
+        Ok(value) if value.is_empty() => false,
+        Ok(value) => panic!("LOTAR_REQUIRE_GIT must be set to '1' or left unset; got {value:?}"),
+        Err(env::VarError::NotPresent) => false,
+        Err(err) => panic!("LOTAR_REQUIRE_GIT is not valid unicode: {err}"),
+    };
+    if require_git {
+        println!("cargo::rustc-cfg=lotar_require_git");
+    }
+    if git_denied && require_git {
+        panic!(
+            "LOTAR_REQUIRE_GIT=1 requires real git capability, but creating a '.git' directory is denied in this environment; refusing to build on a designated full-coverage runner"
+        );
     }
 }
 

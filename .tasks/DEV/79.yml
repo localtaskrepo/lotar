@@ -1,10 +1,11 @@
 title: Make Git and platform test coverage explicit and validate safety cases
-status: Todo
+status: Done
 priority: High
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.848688+00:00
-modified: 2026-09-13T17:32:39.632467+00:00
+modified: 2026-10-01T20:23:22.050976+00:00
 relationships:
   related:
   - DEV-46
@@ -27,6 +28,42 @@ comments:
     Final whole-gate evidence for the covered portion: lint:agent clean; test:agent Rust 981+6 skips; UI 352; build-first smoke 109 passed / 23 skips. No git operations.
 - date: 2026-09-13T17:32:39.632467+00:00
   text: 'Coverage correction (DEV-66 finalization evidence; no status change): the earlier 2026-09-11 record''s ''17 additional git-dependent test FILES cfg-compiled-out'' is imprecise. Actual accounting at the current gates: 13 whole Rust test files carry #![cfg(not(no_git_tests))]; 4 further files have only PARTIAL inline cfg exclusion (their non-git portions still compile and run); the six agent_safety cases are the runtime-ignored set when Git is unavailable (the 6 explicit ignores in the 981-passed Rust run). Precise statement: 13 whole-file + portions of 4, not 17 whole files. Environment-coverage requirement for a supported runner is unchanged.'
+- date: 2026-09-17T04:41:21.738266+00:00
+  text: 'Plan (session 2026-09-17, tracking-only record): marked InProgress. (1) Replace build-time-only gating with an ACTUAL runtime capability probe: isolated git init in a test-owned temp workspace determines capability; when a git-dependent test is selected but the capability is unavailable the test FAILS CLOSED (never silently passes), and no early-return path is counted as a passed test. (2) Smoke Git probe reports an honest skip unless designated CI marks it required. (3) CI gains critical-test-name presence guards (fail if a required test name is absent from execution) with NO hardcoded test-count floor. (4) Windows coverage runs as a bounded safety/scan job producing artifacts. Bounded-phase boundary: the existing build-time no_git_tests broad exclusions (13 whole files + portions of 4, per the 2026-09-13 correction) are RETAINED in this phase and explicitly recorded as REMAINING - this ticket is not Done until they are removed or a genuinely supported runner provides execution evidence; local runs cannot claim execution of the Windows cases or the six Git safety cases. Scope note: no repository Git commands are used; tests may exercise the runtime probe code (isolated git init) under the existing authorized scope. Only DEV-78 and DEV-79 mutated this session; all prior history preserved append-only; other workers are still planning - no Done statuses.'
+- date: 2026-09-17T05:00:44.678678+00:00
+  text: 'Progress (session 2026-09-17, tracking-only; final phase, concise): 45 guard conversions across 18 files (incl. 4 async sites) using real isolated git-init + artifact-check probes; 5 Rust + 7 smoke control tests pass. CI: strict YAML validation (a preexisting missing with fixed); Linux job guards a 31-name critical-test manifest plus six-execution requirement; Windows job is bounded to actual read-only/scan artifact checks and was NOT executed in this environment. Boundary unchanged: build-time no_git_tests cfg retained and designated-CI execution remains outstanding - NOT Done. Status stays InProgress pending review + full gates.'
+- date: 2026-09-17T05:22:07.191636+00:00
+  text: 'Correction (session 2026-09-17, tracking-only; additive to the final-phase progress above, prior history preserved unchanged): manifest review counted the Linux critical-test manifest at ACTUAL 30 names, NOT 31 - the 31-name figure in the earlier comment is corrected to 30. Bounded-phase review verdict: zero blockers. However, two NEWLY EXPOSED require-git failures (mixed global options / mcp) are being fixed by splitting Git-only sections into separate tests / an explicit conditional ignore; these are reported honestly as newly exposed and must NOT be described as preexisting passes. Build-time cfg retained and designated-CI execution still outstanding - NOT Done.'
+- date: 2026-09-17T05:53:56.999426+00:00
+  text: 'Plan update (session 2026-09-17, tracking-only; user explicit request - the ci.yml hardcoded test-name inventory is ugly future maintenance). NEW PLAN SUPERSEDES the 30-names/8-execution arrays recorded earlier: (1) CI sets LOTAR_REQUIRE_GIT=1 with build/runtime fail-closed semantics and a cache-invalidating env change; (2) a compile guard forbids no_git_tests on required CI; (3) Windows uses module-based selection with safety+scan auto-added tests; (4) the short workflow delegates to a generic, TESTED structured nextest manifest / JUnit reporter - NO hand-maintained names and NO count floors; (5) meaningful negative controls for missing/skipped/empty manifest. Status: a NEW agent is implementing - not completed, NOT Done. Interim: the prior 2 failures are resolved - 27 pass + 2 explicit skips across the test targets; .git-marker-only cases previously compiled out are now a conditional ignore aligned to the 6 safety cases (NOT a blanket mixed ignore; no false pass). The cache build-probe discovery motivates the new strict contract.'
+- date: 2026-09-17T06:14:14.854822+00:00
+  text: 'Progress (session 2026-09-17, tracking-only): the latest USER-REQUESTED CI refactor is implemented and SUPERSEDES all 30/31-name inventory figures in prior records. Implementation: (1) build.rs enforces LOTAR_REQUIRE_GIT strict value 1 - any other value fails as denied - with rerun env caching; (2) src/lib cfg compile guard forbids no_git_tests + lotar_require_git together; (3) shorter Linux-full / Windows-module policy; (4) dynamic nextest JSON manifest compared against JUnit - no copied name arrays, no count floor. NEW scripts/check-test-coverage.py (production, 253 lines) + scripts/tests/test_check_test_coverage.py (35 generic unit cases); --self-test is a thin wrapper. Checker fail-closes on: unknown filter status, missing/non-boolean ignored, bad package/binary, duplicate JSON keys/derived ids, selected/skipped missing or extra, duplicate/empty reports; future additive fields are accepted. Evidence: 35/35 tests; real 5/5 probe and 19/19 module-execution exact reports; stale full-manifest vs subset fails 1; real full manifest 1095 declared / 1087 selected / 0 ignored-selected (ignored excluded, reported separately). Local negatives: LOTAR_REQUIRE_GIT=1 cargo check panic 101 denied; =yes strict-invalid panic; unset green with same cache 1.8s proving env invalidation; the forced cfg-guard path was NOT executed (denied environment) - static review only. Default JUnit path corrected to target/nextest/default/junit.xml (old nested path obsolete). CI Windows NOT executed; full final gates RUNNING; final review pending - NOT Done.'
+- date: 2026-09-19T18:25:50.160695+00:00
+  text: 'Progress (session 2026-09-19, resumed; tracking-only): review blocker identified but NOT LANDED - ''future''-ignored tests are excluded from the nextest manifest, so the coverage checker cannot see and reject them. Planned minimal implementation: add --run-ignored all to the 2 LIST commands ONLY (to expose ignored entries for checker rejection); the test run itself is unchanged. Full gates repeat after that fix lands. Environment note: prior cache/browser logs under /tmp/kilo were wiped; new persistent locations target/test-fix-handoff (browser/ci-gap/dev55 logs) and target/playwright-browsers restored successfully. Status stays InProgress; no Done, no source edits, no git operations.'
+- date: 2026-09-19T18:40:29.403252+00:00
+  text: 'Progress (session 2026-09-19, resumed; tracking-only): the review blocker is NOW LANDED and verified against REAL nextest. Fix: .github/workflows/ci.yml adds --run-ignored all to BOTH cargo nextest LIST commands (Linux full-suite + Windows module selection) ONLY; run commands unchanged. Gap proven on real nextest 0.9.145 (arm64 slice kept at target/test-fix-handoff/ci-gap/cargo-nextest; user ~/.cargo copy is x86_64, cannot exec in this sandbox): default nextest list reports compile-ignored tests as filter-match=mismatch, invisible to check-test-coverage.py - PRE-FIX pairing demo checker exit=0 FALSE GREEN (36 selected / 36 JUnit) while 8 tests were actually compile-ignored; with --run-ignored all the same rows become matches+ignored=true and the checker REJECTS: exit=1 naming all 8 selected-ignored (44 selected vs 36 JUnit). Checker self-tests 39/39 incl. 4 new generic identity/ignored cases; tests/README.md coverage-enforcement bullet documents manifest-ignored handling. Evidence: target/test-fix-handoff/ci-gap/* (default/run-ignored list JSONs, list-comparison.txt, synthetic JUnit, checker-pairing-demo.log, selftest.log). Caveats unchanged: Windows list command NOT executed locally (no pwsh; flag position mirrors verified Linux command); on CI LOTAR_REQUIRE_GIT=1 the 8 tests compile WITHOUT ignore so the gate stays green there and only fails closed on genuine compile-time ignore; NO actual remote Linux/Windows results yet - ticket REMAINS InProgress/open. No git operations.'
+- date: 2026-09-19T18:52:14.721927+00:00
+  text: 'Correction (session 2026-09-19; tracking-only; additive, prior records preserved): CURRENT exclusion accounting verified against source, superseding the older ''13 whole + portions of 4'' and any ''2 partial'' figures - the old 4th (lib) no longer applies. Exact current state: 13 WHOLE-file #![cfg(not(no_git_tests))] test files + 3 PARTIAL source files carrying inline #[cfg(not(no_git_tests))] sections: tests/agent_automation_integration_test.rs (4 sections), tests/project_monorepo_detection_integration_test.rs (1), src/mcp/server/mcp_server_tests.rs (1); plus 8 conditionally-ignored tests (the ci-gap set). The 3 partial files use #![cfg_attr(no_git_tests, allow(dead_code))] headers, not whole-file gating. Source counts are CURRENT; any docs/comments still saying the old ''4 partial'' figure are superseded. Boundary restated: the local 8 expected skips are NOT proof for remote runners - designated-CI Linux/Windows execution evidence remains outstanding, ticket stays InProgress. Smoke query-isolation fixture fix/integration still pending (tracked on DEV-77; relevant to final gates here too). No source edits, no git operations.'
+- date: 2026-09-19T19:00:33.821345+00:00
+  text: 'Handoff-interim (session 2026-09-19, final; tracking-only). Outcome (done in scope): runtime git fail-closed capability probing, CI LOTAR_REQUIRE_GIT require-guard + compile-guard, dynamic nextest manifest vs JUnit checking with the ignored-listing fix (--run-ignored all on both LIST commands only), and 39 checker regressions incl. 4 new identity/ignored cases - all green locally. Exclusion accounting stated EXPLICITLY (source-verified 2026-09-19, supersedes older figures): 13 whole-file no_git_tests test files + 3 partial files incl. the src MCP test module (tests/agent_automation 4 sections, tests/project_monorepo 1, src/mcp/server/mcp_server_tests.rs 1) + 8 conditionally-ignored tests; the 23 smoke Git skips are recorded as explicit NON-PASSES, not greens. Evidence: ci-gap pairing demo (pre-fix exit 0 false green vs post-fix exit 1 reject); checker selftest 39/39; final shared gates green per DEV-76 closing record; JUnit 103 nonempty executed binaries (not claimed as total compiled bins). Logs: target/test-fix-handoff/ci-gap/ and final-rust-ui/. Remaining: supported-runner Linux/Windows coverage evidence NOT executed locally - designated-CI execution (incl. six Git safety cases, Windows atomic/permission and scan-lock cases, Windows list command) remains outstanding; local expected skips are NOT remote proof. Tooling wording correction per DEV-78 record applies here too (official universal2 nextest 0.9.145, not an arm64-only slice; no remote-CI green claim). Guidance: no durable instruction finding. Status stays InProgress; no git operations.'
+- date: 2026-09-19T19:34:50.329932+00:00
+  text: 'Plan (session 2026-09-19, new user request; tracking-only): design work starting on RUNTIME CAPABILITY SELECTION to replace the broad build-time compile-outs (13 whole-file + 3 partial incl. lib MCP module). Explicitly UNDER DESIGN - do NOT claim or implement a ''simply remove all cfg then accept reds'' approach; selection must keep fail-closed semantics and honest coverage accounting. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T03:41:08.244919+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): implementation UNDERWAY - all code now COMPILES: git_required namespace + runtime capability probe with gitless profile inheriting defaults; NO copied-name inventories. The build-cfg compile-out and conditional-ignore REMOVALS are ACTIVE but NOT done - current counts unknown, honest accounting to follow. Behavior boundary: the native CLI keeps the all-Git-requires-CI capability cap and remains FAIL-CLOSED; direct raw nextest local runs may fail (expected); the wrapper reports HONEST EXCLUSIONS, never passes. Status stays InProgress pending completion + full gates; no source edits or git operations by tracker.'
+- date: 2026-09-20T04:28:52.555774+00:00
+  text: 'Correction (session 2026-09-20; tracking-only; prior history preserved): the previous comment''s phrase ''all code now COMPILES'' is DOWNGRADED - do NOT treat the compile state as verified until this ticket''s own verification actually confirms it; current standing is DESIGN/IMPLEMENTATION PROGRESS ONLY. All other boundaries unchanged: git_required namespace + runtime probe + gitless-profile defaults in progress, no copied-name inventories, compile-out/conditional-ignore removals active with counts unknown, native CLI cap fail-closed, wrapper reports honest exclusions. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T05:19:40.386799+00:00
+  text: 'Progress (session 2026-09-20; tracking-only; runtime owner report): implementation COMPLETE and FINAL GATES RUN - with actual Git AVAILABLE (changed from earlier restricted invocations; earlier initial gate attempts had ENVIRONMENT failures that were corrected - NOT a first-pass claim; all run records incl. both failed attempts at target/test-fix-handoff/completion-final-rust-ui/). Evidence: npm run lint:agent exit 0; npm run test:agent exit 0, DEFAULT profile, retries 0, inherited concurrency - 1190/1190 Rust PASSED, 0 SKIPPED, all 46 git_required tests across 19 binaries EXECUTED; actual JUnit 1190 with zero failures and 0 LEAK flags; UI 443/58; Node wrapper 38/38; Python checker selftests exit 0 (39 expected - verify the report''s actual count rather than assuming). Implementation shape: 38 unit runner + gitless profile; no_git_tests emission REMOVED and all per-case cfg/ignore attrs removed; 46 Git-dependent cases grouped; ONE pure case recovered; the 8 old-ignored are now EXPLICIT FILTER EXCLUSIONS only when unavailable. No early returns or fake passes claimed - PENDING INDEPENDENT REVIEW with actual source checks. ACCOUNTING NOTE: the OLD 13-whole/3-partial/8-ignored cfg-exclusion figures NO LONGER APPLY after this new code - do not cite them. Boundary: NO actual Windows proof yet - only LOCAL Git-capable proof; per corrected record, do NOT claim ''all local Git tests unavailable'' anymore. Real temp-Git fixtures are allowed for automated tests; NO explicit repository Git ops/push. SMOKE FOLLOWUP RUNNING: completion-final-smoke passed 164/23-skip/187, 45 files, fresh Rust 25.79s, vite 425ms, source UI bundle LpHr83za, no leak/unhandled/bind warnings; since Git is now available in Rust, a STRICT Git full smoke is being verified to exercise the 23 earlier skips rather than assume unavailability - results PENDING, do NOT claim 187 pass yet. Status stays InProgress pending runtime independent review + smoke followup; no Done.'
+- date: 2026-10-01T19:02:38.796396+00:00
+  text: 'Progress (session 2026-10-01, tracking-only resume record; no source edits, no git operations, no process actions): Sep-20 smoke followup resolved as NON-PROOF - final smoke 166 passed / 23 Git skips; the strict Git smoke did not execute the 23 skipped cases, and GitSmoke plus Windows designated-runner coverage remain UNCOVERED evidence gaps. Standing pre-followup evidence unchanged: Rust 1190/1190 incl. all 46 git_required executed (default profile, retries 0), UI 443/58 files, Node wrapper 38/38, checker 39. PENDING implementation (runtime owner resumed ses_f44d4f...): sanitize Git dir/context in the shared common + MCP probe constructors; source-local git_required and the runtime Node wrapper are implemented and reviewed. Read-only reconciliation/review proceeds in parallel. The Sep-20 8471 server-PID cleanup item is HISTORICAL - no current PID ownership claimed or probed. Status stays InProgress; Done only after hermetic probes land, gates rerun green, and real GitSmoke/Windows evidence exists - not before.'
+- date: 2026-10-01T19:19:59.324833+00:00
+  text: 'Reconciliation (session 2026-10-01 late, tracking-only; additive, corrects the 19:02 resume record, prior history preserved): (1) Probe/ctor hardening was ALREADY SAVED Sep 20 - independent current review verdict SIGNOFF; the earlier ''PENDING sanitize Git dir/context in common+MCP ctors'' framing is superseded. (2) Classification correction: source now has 45 REAL git_required cases across 19 binaries - the pure changelog-outside-Git case was recovered to a top-level path with NO actual Git command - superseding the 46 figure in classification only. All test bodies compile with NO early returns, ignores, or cfg gates. Dedicated git_capability_test = 10 tests; common not multiplied. Node wrapper source unit count = 41, superseding the earlier 38. (3) Hygiene detail: common + lib cfg(test) baseline ctors scrub repository routes before Guard; scopes live in TestFixtures without env mutation; probes use fresh env, owned home, Windows-safe bootstrap; src utils Git has 17 routing keys with a case-folding matcher and GIT_CONFIG* handling that preserves SSH auth identity. (4) Gate state: the old Sep 20 isolated gate was interrupted by USER SIGTERM at 158/1196 - NOT a pass; only lint exit 0 stands from it. Current NEW gates are IN PROGRESS under target/test-fix-handoff/continuation-oct1 - do NOT claim passed until results exist. (5) Smoke validity: the latest FULL smoke (166 passed / 23 skipped / 189 / 45 files) remains VALID for the current app - production src/utils Git change (22:53) preceded the build (23:04) and only 2 test files changed Oct 1 - so no old-smoke rerun unless the expanded Git coverage probe allows one. GitSmoke capability and Windows remain PENDING true evidence only, no scope waiver. PID 8471 remains historical, not currently known alive. Status stays InProgress pending verification closure; no Done.'
+- date: 2026-10-01T19:28:34.310936+00:00
+  text: 'Handoff-interim (session 2026-10-01, final tracking this wave; CODE COMPLETE + independent SIGNOFF; actual owner board_dd24/04e2 accepted). Outcome: ALL code always compiled - the Git-required source namespace is 45 actual current-group cases, ZERO compile-outs or ignored cases; runtime probe is 5s safe-owned-env; Gitless REPORTS filters when unavailable (no fake passes); LOTAR_REQUIRE_GIT=1 fail-closed; probe/context isolation covers 17 routing keys + config casefold; CTOR scrubbing runs before tests and src LIB is test-only, preserving live Guards; no artifacts outside temp; 10 dedicated controls with genuine negative proof; new Windows boots + Node 41 controls, no leaking raw env. The actual 45 Git Rust PASS means the six agent_safety cases ARE verified locally - not remaining-unexecuted Rust. Evidence (target/test-fix-handoff/continuation-oct1, Oct-1 GREEN): lint:agent exit 0 (vue-tsc + clippy all targets/features -D warnings + fmt); test:agent exit 0 with Node probe = real Git available, DEFAULT profile, retries 0, default concurrency - Rust 1196/1196 PASSED, 0 skipped, 119 binaries, ALL 45 git_required executed + passed, 0 LEAK; relocated pure changelog case now runs OUTSIDE the group; UI 443/58; Node unit 41/41; Python checker 39 prior-unchanged green, NOT rerun Oct 1 - do NOT claim new Python execution. Full-build fresh smoke 166 pass / 23 Git-skip / 189 / 45 files (40 files passed / 5 skipped) VALID for current app via whole-mtime check: prod utils Git 22:53 precedes compiled binary 23:04; Oct 1 changed only 2 test files, not app. Strict Git Smoke: ONE new helper, actual probe, available=false (EPERM .git / mktemp context), no forced cap - the 23 smoke cases remain UNEXECUTED, not passes. Windows: never run; prepared CI 32-case portable-agent lane code-reviewed + Mac mirror 32 - NOT proof. Generic manifest/JUnit pairing: additional owner PENDING - do NOT claim pair-check yet (core gates are actual-complete; append here later if pairing proof lands and is material). Remaining (exact, PLATFORM evidence only - code is NOT unfinished): (1) genuine Git-capable Node full smoke executing the 23 excluded cases; (2) designated Windows storage atomic/read-only + non-Unix scan artifact / CI lane proof; remote CI run NOT authorized, no Git push permission - with no actual supported runner this ticket stays precisely InProgress, not Done. Guidance: none new this pass.'
+- date: 2026-10-01T19:45:45.706716+00:00
+  text: 'Handoff-interim update (session 2026-10-01 final; tracking-only; SUPERSEDES the ''manifest/JUnit pairing additional owner PENDING'' clause in the 19:28:34 record). Outcome: pairing COMPLETE; a NEW real CI checker bug was discovered and FIXED with review SIGNOFF. Final pairing was originally 1196 selected / 1196 executed, but the checker FALSE-FAILED one binary-kind classname because the old package::name derivation lost the bin/ prefix. Fix (production helper, canonical rust binary id): binary-id must be a nonempty string equal to the rust-suites key (the actual JUnit classname); NO hardcoded name/kind inventory, future kinds work; scope = 2 script files + one tests/README sentence only. Evidence: Python selftests 47/47 (39 old + 8 new) ACTUALLY RUN Oct 1 - the earlier ''checker 39 prior-unchanged, not rerun'' record is superseded by this actual 47-pass. OLD checker regenerated FAIL on the real 1196 pair and the new bin fixture; NEW checker ACTUAL exit 0 on the owner-fresh saved full manifest/JUnit: 1196 exactly once, no fail/skip/ignored/missing/extra/duplicates; 45 Git cases, 10 env controls, lib 269, wrapper bin 1; 118 NONEMPTY selected binaries of 119 total artifacts (one empty cli.bin) - counts not contradictory. Negative controls still FAIL correctly (ignored-selected, stale gitless pair). Independent review ses_f070391c... SIGNOFF on code and raw artifact counts, no further blockers. No Rust/app/helper functional edits after the gates (Rust 1196/1196, UI 443/58, Node 41/41, lint 0, smoke 166/23 valid current app). Logs: target/test-fix-handoff/continuation-oct1/coverage-checker-fix and current gate paths. Tool proof note: nextest 0.9.145 observed LOCALLY, not asserted universally - actual CI install may be latest; no repo change needed, factual tracking only. Remaining (unchanged, PLATFORM only): genuine Git-capable Node full smoke executing the 23 excluded cases + designated Windows storage/scan results; DEV-80 remains Windows portable-agents 32-case artifact only. Source git_required = 45 (not the old 46). Done 72/78/81 NOT reopened. Guidance: none new.'
+- date: 2026-10-01T20:23:22.025495+00:00
+  text: 'Outcome: Implementation and local verification are complete. Marked Done before the commit/CI cycle at the developer''s explicit request on 2026-10-01, so the ticket update is included with the implementation rather than requiring a ticket-only amend and CI rerun. Evidence: Rust 1196/1196 passed, including all 45 Git-dependent cases; lint passed; UI 443 passed; runner tests 41 passed; coverage-checker tests 47 passed and the real manifest/JUnit pairing passed. Remaining verification: the 23 Git-dependent smoke cases still require a Git-capable run, and Windows storage/scan execution results remain pending. Accepted completion exception: Done does not assert these checks or CI have passed. CI success must establish the final verified, committed state; any CI failures must be corrected before that state is declared. Guidance: This is a ticket-specific developer-approved completion exception, not a change to repository verification policy. No commit, amend, push, or CI trigger was performed in this tracking step.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T7.
@@ -54,3 +91,89 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-17T04:41:15.523186+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-17T04:41:21.738266+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:00:44.678678+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:22:07.191636+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:53:56.999426+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T06:14:14.854822+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:25:50.160695+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:40:29.403252+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:52:14.721927+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:00:33.821345+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:34:50.329932+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T03:41:08.244919+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T04:28:52.555774+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T05:19:40.386799+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:02:38.796396+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:19:59.324833+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:28:34.310936+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:45:45.706716+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T20:23:22.025495+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T20:23:22.050976+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

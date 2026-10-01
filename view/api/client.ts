@@ -47,7 +47,6 @@ import type {
   ScanResponse,
   SprintAssignmentRequest,
   SprintAssignmentResponse,
-  SprintBacklogResponse,
   SprintBurndownResponse,
   SprintCreateRequest,
   SprintCreateResponse,
@@ -175,7 +174,6 @@ export const api = {
   addTaskReference(payload: GenericReferenceAddRequest): Promise<GenericReferenceAddResponse> { return post('/api/tasks/references/add', payload) },
   removeTaskReference(payload: GenericReferenceRemoveRequest): Promise<GenericReferenceRemoveResponse> { return post('/api/tasks/references/remove', payload) },
   taskHistory(id: string, limit?: number): Promise<Array<{ commit: string; author: string; email: string; date: string; message: string }>> { return get('/api/tasks/history', { id, limit }) },
-  taskCommitDiff(id: string, commit: string): Promise<string> { return get('/api/tasks/commit_diff', { id, commit }) },
   suggestTasks(q: string, project?: string, limit = 20): Promise<Array<{ id: string; title: string }>> { return get('/api/tasks/suggest', { q, project, limit }) },
   suggestReferenceFiles(q: string, limit = 20): Promise<string[]> { return get('/api/references/files', { q, limit }) },
   referenceSnippet(code: string, context?: number | { before?: number; after?: number }): Promise<ReferenceSnippet> {
@@ -249,12 +247,6 @@ export const api = {
   activitySeries(group: 'author' | 'day' | 'week' | 'project', params: { since?: string; until?: string; project?: string } = {}): Promise<Array<{ key: string; count: number; last_date: string }>> {
     return get('/api/activity/series', { group, ...params })
   },
-  activityAuthors(params: { since?: string; until?: string; project?: string } = {}): Promise<Array<{ author: string; email: string; commits: number; last_date: string }>> {
-    return get('/api/activity/authors', params)
-  },
-  activityChangedTasks(params: { since?: string; until?: string; author?: string; project?: string } = {}): Promise<Array<{ id: string; project: string; file: string; last_commit: string; last_author: string; last_date: string; commits: number }>> {
-    return get('/api/activity/changed_tasks', params)
-  },
   activityFeed(params: { since?: string; until?: string; project?: string; limit?: number } = {}): Promise<ActivityFeedItem[]> {
     return get('/api/activity/feed', params)
   },
@@ -289,16 +281,6 @@ export const api = {
   sprintBurndown(sprint: number): Promise<SprintBurndownResponse> { return get('/api/sprints/burndown', { sprint }) },
   sprintVelocity(params: { limit?: number; include_active?: boolean; metric?: 'tasks' | 'points' | 'hours' } = {}): Promise<SprintVelocityResponse> {
     return get('/api/sprints/velocity', params)
-  },
-  sprintBacklog(params: { project?: string; tags?: string[]; status?: string[]; assignee?: string; limit?: number; cleanup_missing?: boolean } = {}): Promise<SprintBacklogResponse> {
-    const query: Record<string, unknown> = {}
-    if (params.project) query.project = params.project
-    if (params.tags?.length) query.tags = params.tags
-    if (params.status?.length) query.status = params.status
-    if (params.assignee) query.assignee = params.assignee
-    if (typeof params.limit === 'number') query.limit = params.limit
-    if (typeof params.cleanup_missing === 'boolean' && params.cleanup_missing) query.cleanup_missing = 'true'
-    return get('/api/sprints/backlog', query)
   },
 }
 

@@ -18,7 +18,7 @@
 //!
 //! No git tooling: repo-anchored fixtures live under CARGO_TARGET_TMPDIR
 //! (ancestry-only `.git` discovery); the Gitless fixture lives under the
-//! plain temp dir outside the checkout. No `no_git_tests` gating.
+//! plain temp dir outside the checkout. No Git gating.
 use lotar::api_events::{self, ApiEvent};
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;

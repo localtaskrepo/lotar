@@ -200,8 +200,41 @@ where
     Ok(out)
 }
 
+/// Explicit server-port intent for a global config save.
+///
+/// The canonical serializer only emits `server.port` when the value differs
+/// from the built-in default, which would silently drop an explicit pin for
+/// the default port on every rewrite. The intent decides whether the key is
+/// kept: pin-preserving by default (unrelated mutations), forced when this
+/// save is itself an explicit port request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServerPortSaveIntent {
+    /// Emit `server.port` iff the existing file on disk already sets it:
+    /// unrelated mutations and round-trips preserve an explicit pin, while
+    /// fresh/implicit configs never gain the key.
+    PreserveExisting,
+    /// This save is an explicit port request (e.g. `config set
+    /// server.port 8080`): always emit the key, even for the default value.
+    ExplicitPin,
+}
+
 /// Save global configuration to tasks_dir/config.yml
 pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(), ConfigError> {
+    save_global_config_with_port(tasks_dir, config, ServerPortSaveIntent::PreserveExisting)
+}
+
+/// Save global configuration with explicit server-port intent.
+///
+/// Callers are expected to have loaded (and, in the candidate pipeline,
+/// validated) the existing configuration before writing: a present but
+/// malformed config file blocks those paths before this save runs, so the
+/// `PreserveExisting` presence read below only ever sees a file that
+/// parse-verified callers already accepted.
+pub fn save_global_config_with_port(
+    tasks_dir: &Path,
+    config: &GlobalConfig,
+    port_intent: ServerPortSaveIntent,
+) -> Result<(), ConfigError> {
     let config_path = crate::utils::paths::global_config_path(tasks_dir);
 
     // Ensure the tasks directory exists
@@ -211,8 +244,23 @@ pub fn save_global_config(tasks_dir: &Path, config: &GlobalConfig) -> Result<(),
         })?;
     }
 
+    let explicit_server_port = match port_intent {
+        ServerPortSaveIntent::ExplicitPin => true,
+        ServerPortSaveIntent::PreserveExisting => {
+            crate::config::persistence::config_file_server_port(&config_path, "global config")
+                .ok()
+                .flatten()
+                .is_some()
+        }
+    };
+
     // Serialize in canonical nested format
-    let config_yaml = crate::config::normalization::to_canonical_global_yaml(config);
+    let config_yaml = crate::config::normalization::to_canonical_global_yaml_with(
+        config,
+        crate::config::normalization::GlobalYamlOptions {
+            explicit_server_port,
+        },
+    );
 
     crate::storage::safety::atomic_write_file(&config_path, &config_yaml)
         .map_err(|e| ConfigError::IoError(format!("Failed to write global config: {}", e)))?;

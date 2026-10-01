@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type Route } from '@playwright/test';
 import fs from 'fs-extra';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +17,11 @@ import { SmokeWorkspace } from '../helpers/workspace.js';
 // - same-basename managed and repository entries stay distinct kinds, a
 //   wrong-kind attachment removal fails closed with 400 leaving the blob
 //   alone, and file references into the managed store are denied,
-// - per-project custom attachment stores resolve downloads for their project.
+// - per-project custom attachment stores resolve downloads for their project,
+//   and an eager drop that lands while the task panel is still initializing
+//   (per-project config held at an ordered route barrier until after the
+//   drop) is buffered for that task and uploaded through that custom store
+//   once it finishes loading.
 //
 // Repository-only endpoints resolve the repo root by walking up from the tasks
 // directory until a `.git` entry exists (backend `find_repo_root`). This suite
@@ -579,6 +583,218 @@ describe('UI reference kinds (DEV-61)', () => {
                     const view = await page.request.get(new URL(href, server.url).toString());
                     expect(view.status()).toBe(200);
                     expect((await view.text()).trim()).toBe('vault store payload');
+
+                    const download = await page.request.get(
+                        `${new URL(href, server.url).toString()}&download=1`,
+                    );
+                    expect(download.status()).toBe(200);
+                    expect(
+                        (download.headers()['content-disposition'] ?? '').startsWith('attachment;'),
+                    ).toBe(true);
+                    expect((await download.text()).trim()).toBe('vault store payload');
+                });
+            } finally {
+                await server.stop();
+            }
+        } finally {
+            await workspace.dispose();
+        }
+    });
+
+    it('holds an eager drop while the task panel loads and routes it through the custom store', async () => {
+        const workspace = await SmokeWorkspace.create({ name: 'lotar-ref-kinds-' });
+        try {
+            await workspace.write('.tasks/STORE/config.yml', 'attachments:\n  dir: "@vault"\n');
+            const task = await workspace.addTask('Held drop custom store task', {
+                args: ['--project=STORE'],
+            });
+
+            const server = await startLotarServer(workspace);
+            try {
+                await withPage(`${server.url}/?project=STORE`, async (page) => {
+                    const apiCalls = trackApiCalls(page);
+                    const storedPathGetter = captureUploadStoredPath(page);
+
+                    // Ordered route barrier over the REAL per-project config
+                    // endpoint. Matching requests pass through untouched
+                    // until the barrier is armed; after arming they are
+                    // captured unanswered. The test dispatches the drop
+                    // first and only then releases every captured route via
+                    // `route.continue()`, so the server always answers with
+                    // genuine responses — no timers, no fulfilled/mocked
+                    // bodies, no busy-timing assumptions.
+                    interface HeldRoute {
+                        route: Route;
+                        at: number;
+                    }
+                    const heldRoutes: HeldRoute[] = [];
+                    let barrierArmed = false;
+                    let barrierReleased = false;
+                    const releaseHeldRoutes = async (): Promise<void> => {
+                        barrierReleased = true;
+                        const pending = heldRoutes.splice(0, heldRoutes.length);
+                        await Promise.all(
+                            pending.map((held) => held.route.continue().catch(() => undefined)),
+                        );
+                    };
+                    const configBarrier = async (route: Route) => {
+                        if (!barrierArmed || barrierReleased) {
+                            await route.continue();
+                            return;
+                        }
+                        heldRoutes.push({ route, at: Date.now() });
+                    };
+                    await page.route('**/api/config/show**', configBarrier);
+
+                    const timed: Array<{
+                        at: number;
+                        kind: 'request' | 'response';
+                        path: string;
+                    }> = [];
+                    page.on('request', (request) => {
+                        const url = new URL(request.url());
+                        if (url.pathname.startsWith('/api/')) {
+                            timed.push({
+                                at: Date.now(),
+                                kind: 'request',
+                                path: `${url.pathname}${url.search}`,
+                            });
+                        }
+                    });
+                    page.on('response', (response) => {
+                        const url = new URL(response.url());
+                        if (url.pathname.startsWith('/api/')) {
+                            timed.push({
+                                at: Date.now(),
+                                kind: 'response',
+                                path: `${url.pathname}${url.search}`,
+                            });
+                        }
+                    });
+
+                    try {
+                        const row = page.locator('tr', { hasText: 'Held drop custom store task' });
+                        await row.waitFor({ timeout: 20_000 });
+                        // Arm only now: every config request so far passed
+                        // through, so the page itself is fully loaded and the
+                        // next config request is the panel's own (fired by
+                        // loadTask after the row click).
+                        barrierArmed = true;
+                        await row.click();
+                        const panel = page.locator('.task-panel');
+                        await panel.waitFor({ state: 'visible', timeout: 15_000 });
+
+                        // loadTask refreshes the per-project config before
+                        // assigning any task field, so a captured config
+                        // request proves the panel is mid-load — and while it
+                        // stays held the task provably cannot finish loading.
+                        await expect
+                            .poll(() => heldRoutes.length, { timeout: 15_000 })
+                            .toBeGreaterThanOrEqual(1);
+                        const capturedAt = Math.max(...heldRoutes.map((held) => held.at));
+
+                        await dropFileOnPanel(page, 'vault-notes.txt', 'vault store payload');
+                        const droppedAt = Date.now();
+                        expect(droppedAt).toBeGreaterThanOrEqual(capturedAt);
+
+                        const releasedAt = Date.now();
+                        await releaseHeldRoutes();
+
+                        // Unless the panel buffers the drop until the task is
+                        // ready, no upload is ever sent and this wait times
+                        // out (the pinned CI failure shape of the per-project
+                        // custom-store case).
+                        const chip = panel.locator(
+                            '.task-panel__attachments .task-panel__attachment-link',
+                        );
+                        await chip.waitFor({ timeout: 15_000 });
+                        const href = (await chip.getAttribute('href')) ?? '';
+                        expect(href).toMatch(
+                            /^\/api\/attachments\/h\/[0-9a-f]{32}\/vault-notes\.txt\?project=STORE$/,
+                        );
+
+                        // Ordering proof from observed events only: the held
+                        // config response landed after the drop and after the
+                        // release, and the upload request landed after that
+                        // response — never before it. If the barrier ever
+                        // degenerates so the drop no longer lands mid-load,
+                        // these fail loudly instead of passing vacuously.
+                        const configResponseAt = Math.max(
+                            0,
+                            ...timed
+                                .filter(
+                                    (event) =>
+                                        event.kind === 'response' &&
+                                        event.path.startsWith('/api/config/show') &&
+                                        event.at >= releasedAt,
+                                )
+                                .map((event) => event.at),
+                        );
+                        expect(configResponseAt).toBeGreaterThan(droppedAt);
+                        const uploadAt =
+                            timed.find(
+                                (event) =>
+                                    event.kind === 'request' &&
+                                    event.path === '/api/tasks/attachments/upload',
+                            )?.at ?? 0;
+                        expect(uploadAt).toBeGreaterThan(0);
+                        expect(uploadAt).toBeGreaterThanOrEqual(configResponseAt);
+
+                        await expect.poll(() => storedPathGetter(), { timeout: 15_000 }).toMatch(
+                            /^vault-notes\.[0-9a-f]{32}\.txt$/,
+                        );
+                        const storedPath = storedPathGetter();
+
+                        const uploadCall = apiCalls.find(
+                            (call) => call.path === '/api/tasks/attachments/upload',
+                        );
+                        expect(uploadCall?.body).toMatchObject({
+                            id: task.id,
+                            filename: 'vault-notes.txt',
+                        });
+
+                        const vaultPath = path.join(workspace.tasksDir, '@vault', storedPath);
+                        await expect
+                            .poll(() => fs.pathExists(vaultPath), { timeout: 15_000 })
+                            .toBe(true);
+                        expect(
+                            await fs.pathExists(
+                                path.join(workspace.tasksDir, '@attachments', storedPath),
+                            ),
+                        ).toBe(false);
+
+                        await expect
+                            .poll(
+                                async () =>
+                                    typedReferences(
+                                        await readParsedTask(workspace, task.id),
+                                    ).some((entry) => entry.attachment === storedPath),
+                                { timeout: 15_000 },
+                            )
+                            .toBe(true);
+
+                        const view = await page.request.get(new URL(href, server.url).toString());
+                        expect(view.status()).toBe(200);
+                        expect((await view.text()).trim()).toBe('vault store payload');
+
+                        const download = await page.request.get(
+                            `${new URL(href, server.url).toString()}&download=1`,
+                        );
+                        expect(download.status()).toBe(200);
+                        expect(
+                            (download.headers()['content-disposition'] ?? '').startsWith(
+                                'attachment;',
+                            ),
+                        ).toBe(true);
+                        expect((await download.text()).trim()).toBe('vault store payload');
+                    } finally {
+                        // Release any still-held routes before unrouting so a
+                        // failed assertion can never leave a deferred fetch
+                        // hanging; post-release requests pass through to the
+                        // real server untouched.
+                        await releaseHeldRoutes().catch(() => undefined);
+                        await page.unroute('**/api/config/show**').catch(() => undefined);
+                    }
                 });
             } finally {
                 await server.stop();

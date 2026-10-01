@@ -140,7 +140,6 @@ vi.mock('../api/client', () => ({
         addComment: vi.fn(),
         updateComment: vi.fn(),
         taskHistory: vi.fn(async () => []),
-        taskCommitDiff: vi.fn(async () => ''),
         suggestTasks: vi.fn(async () => []),
         suggestReferenceFiles: vi.fn(async () => []),
         referenceSnippet: apiFixtures.referenceSnippetMock,

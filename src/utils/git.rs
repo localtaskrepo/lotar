@@ -5,26 +5,27 @@ use std::process::Command;
 /// Anchor Git to the command's working directory, not the invoking process's repo.
 /// Keep SSH/askpass and author/committer identity variables; injected Git config
 /// is removed because it can override core.worktree and repository discovery.
+const REPOSITORY_ROUTING_KEYS: &[&str] = &[
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_NAMESPACE",
+    "GIT_GRAFT_FILE",
+    "GIT_SHALLOW_FILE",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_PREFIX",
+    "GIT_INTERNAL_SUPER_PREFIX",
+    "GIT_SUPER_PREFIX",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_CEILING_DIRECTORIES",
+    "GIT_DISCOVERY_ACROSS_FILESYSTEM",
+];
+
 pub fn clear_repository_env(command: &mut Command) {
-    const LOCAL_KEYS: &[&str] = &[
-        "GIT_DIR",
-        "GIT_WORK_TREE",
-        "GIT_COMMON_DIR",
-        "GIT_INDEX_FILE",
-        "GIT_OBJECT_DIRECTORY",
-        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-        "GIT_NAMESPACE",
-        "GIT_GRAFT_FILE",
-        "GIT_SHALLOW_FILE",
-        "GIT_REPLACE_REF_BASE",
-        "GIT_NO_REPLACE_OBJECTS",
-        "GIT_PREFIX",
-        "GIT_INTERNAL_SUPER_PREFIX",
-        "GIT_SUPER_PREFIX",
-        "GIT_IMPLICIT_WORK_TREE",
-        "GIT_CEILING_DIRECTORIES",
-        "GIT_DISCOVERY_ACROSS_FILESYSTEM",
-    ];
     let config_keys: Vec<_> = std::env::vars_os()
         .map(|(key, _)| key)
         .chain(command.get_envs().map(|(key, _)| key.to_os_string()))
@@ -33,7 +34,7 @@ pub fn clear_repository_env(command: &mut Command) {
                 .is_some_and(|key| key.to_ascii_uppercase().starts_with("GIT_CONFIG"))
         })
         .collect();
-    for key in LOCAL_KEYS {
+    for key in REPOSITORY_ROUTING_KEYS {
         command.env_remove(key);
     }
     for key in config_keys {
@@ -46,6 +47,19 @@ pub fn git_command(root: &Path) -> Command {
     command.current_dir(root);
     clear_repository_env(&mut command);
     command
+}
+
+/// Repository routing keys removed by [`clear_repository_env`]: presence in
+/// an environment can direct Git discovery and writes outside the command's
+/// working directory, and injected `GIT_CONFIG*` keys can override
+/// `core.worktree`. Transport/auth/identity variables (SSH, askpass,
+/// author/committer) are deliberately NOT routing keys. Matching is
+/// case-insensitive so Windows env folds cannot slip a variant through.
+pub fn is_repository_routing_key(key: &str) -> bool {
+    REPOSITORY_ROUTING_KEYS
+        .iter()
+        .any(|routing| routing.eq_ignore_ascii_case(key))
+        || key.to_ascii_uppercase().starts_with("GIT_CONFIG")
 }
 
 /// Verify discovery did not select a parent/foreign checkout and identify its repo.
@@ -123,4 +137,21 @@ pub fn read_remotes(repo_root: &Path) -> Vec<String> {
         }
     }
     remotes
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::is_repository_routing_key;
+
+    /// The lib-test ctor scrubs routing variables once per process; nothing
+    /// that matches the shared inventory may be present afterwards.
+    #[test]
+    fn lib_test_baseline_has_no_repository_routing_env() {
+        for (key, _) in std::env::vars() {
+            assert!(
+                !is_repository_routing_key(&key),
+                "routing variable {key} survived the lib-test baseline"
+            );
+        }
+    }
 }

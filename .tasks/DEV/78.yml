@@ -1,11 +1,11 @@
 title: Separate wall-clock performance budgets from parallel correctness tests
-status: InProgress
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
 assignee: mallox
 created: 2026-09-06T11:10:31.831754+00:00
-modified: 2026-09-11T19:30:41.909404+00:00
+modified: 2026-10-01T19:28:10.470410+00:00
 relationships:
   related:
   - DEV-48
@@ -30,6 +30,34 @@ comments:
     Final gate evidence at current source: lint:agent clean (repeated); test:agent DEFAULT concurrency --retries 0: Rust 981 passed + 6 explicit skips (17 git-dependent test FILES cfg-compiled-out by the sandbox probe, absent from totals — accounting distinction vs the earlier default run of 1000 passing with 6 runtime early-returns; no claim all tests executed); UI 352 final (349 at whole gate + 3 ledger unit tests); build-first smoke 109 passed / 23 skips.
 
     Remaining for this ticket: the broader wall-clock performance budget work (opt-in dedicated benchmark job / controlled execution group with justified thresholds, replacing remaining sleeps/timing assertions with completion signals) is NOT done. No git operations.
+- date: 2026-09-17T04:26:26.266423+00:00
+  text: 'Plan (session 2026-09-17, tracking-only record): new authorized user request - fix the nextest async_run_action_does_not_block push-blocker, then all open test-related tickets. Regression vs the 2026-09-11 gated implementation: intermittent empty-output failure at the post-release assertion tests/agent_automation_integration_test.rs:2011 (final_state.trim() == "done" read after the 10s release poll comes back empty). Plan: (1) investigate and reproduce the intermittent empty marker (gate/release ordering or marker-write race, not a flake to absorb); (2) fix root-cause synchronization in the test gate - explicitly NOT retries and NOT loosened timing; (3) verify with targeted stress runs of this single test; (4) then final full gates at default concurrency with retries 0 (test:agent semantics); (5) independent review before any status move. Status stays InProgress under this existing entry; prior comments preserved append-only; tracking owner performs no git operations and no source edits.'
+- date: 2026-09-17T04:26:32.461650+00:00
+  text: 'Combined scope plan (session 2026-09-17, tracking-only): ordering for the authorized request to fix the push-blocker then all open test-related tickets. (1) DEV-78 async_run_action_does_not_block synchronization fix first (see plan above). (2) DEV-76 (Rust and smoke HTTP server fixture lifecycle and readiness) BEFORE its dependents DEV-77 (replace permissive test assertions, strengthen fixture invariants) and DEV-80 (cross-platform agent test fixtures owning environment and child cleanup). (3) DEV-79 (explicit runtime git/platform test coverage and safety-case validation) is independent of the DEV-76 chain but touches shared test files - serialize its file-writing work against the other tickets rather than parallelizing edits. (4) DEV-81 (remove verified orphan UI, CLI, and test infrastructure after consolidation) LAST, after the others land. No status changes in this record: DEV-78 remains InProgress, DEV-76/77/79/80/81 unchanged, nothing marked Done.'
+- date: 2026-09-17T04:41:11.717251+00:00
+  text: 'Plan/progress (session 2026-09-17, tracking-only): implementation proceeding on the async_run_action_does_not_block synchronization fix and the performance separation. (1) Empty-output regression at tests/agent_automation_integration_test.rs:2011: replace the fixed post-release read with a bounded async content poll (10s) for the marker, plus a deterministic empty-file regression case covering the intermittent empty final_state; still synchronization-based, no retries, no loosened timing. (2) Performance separation: all 13 correctness cases in performance_test.rs are KEPT in the normal gate (none move, none become ignored); wall-clock budgets run in an opt-in serial budget mode exposed as a new command/workflow - no ignored tests, no gate policy change beyond the additive opt-in mode, and no increased thresholds.'
+- date: 2026-09-17T04:48:32.651210+00:00
+  text: 'Progress (session 2026-09-17, tracking-only): async_run_action_does_not_block synchronization fix is PROVISIONAL. Evidence so far: 20 targeted stress runs green; the deterministic regression fails against the OLD implementation (old-code/mutation check fails as expected, proving detection of the prior empty-output bug). Open issue: one prior template flake under load is being investigated - NOT resolved and no resolution is claimed. Status stays InProgress pending that investigation, the default-concurrency retries-0 full gates, and independent review. No status changes to any other ticket in this record.'
+- date: 2026-09-17T05:00:23.102163+00:00
+  text: 'Progress (session 2026-09-17, tracking-only; concise, no log dumps): (1) async_run_action_does_not_block: new test asserts via an empty/partial/full observation handshake - empty and partial marker states are REFUSED, only full done accepted; old-helper mutation check fails fast at 0.019s; whole test binary 34/34 at retries 0; true-blocking fixture negative control CAUGHT at 57.494s with child self-bail restored. Template flake: one failure with truncated log (earlier 5.133s timeout), 1/65 cumulative, NOT root-caused; 30 dedicated runs plus 64 subsequent runs green; no accepted skip - remains an open caveat, no closure claim. (2) Performance separation implemented: 13 canonical functional tests retained in the normal gate (17 total incl. 4 controls); the 13 wall-clock budgets run opt-in via npm run test:rust:perf - cross-platform Node runner, strict complete-budget-list enforcement, cargo profile perf, serial, retries 0, no ignored tests, no changed thresholds. Evidence: e2e 17/17 and 13/13 budgets pass locally (uncontrolled measurement environment); new CI manual workflow parse-validated, NOT run. Status stays InProgress pending independent review + full default-concurrency retries-0 gates.'
+- date: 2026-09-17T06:14:52.782938+00:00
+  text: 'Independent review + integration (session 2026-09-17, tracking-only): SIGNOFF. Performance isolation verified - all 13 functional cases preserved (17 total incl. controls); local 13 budgets e2e green. Status stays InProgress pending full shared gates; reconcile statuses at final - no Done yet.'
+- date: 2026-09-19T18:25:41.767913+00:00
+  text: 'Progress (session 2026-09-19, resumed; tracking-only): session recovered after an interruption. Full-gate attempt at default concurrency: lint PASSED; Rust gate FAILED FAST at 698 cases with exactly 1 failure - dev55_transactional_mutations_test::concurrent_creates_and_assignments_lose_no_memberships (tests/dev55_transactional_mutations_test.rs:341, fn at :286): assign_tasks hits sprint lock busy after 2s under default concurrency. UI and smoke gates NEVER RAN (Rust failed first). Cause assessed as test-only; investigation/fix delegated (evidence logs: target/test-fix-handoff/dev55). Boundary: no product timeout or retry weakening; NOT claimed fixed yet. Status stays InProgress; full gates repeat after the delegated fix lands. No source edits, no git operations.'
+- date: 2026-09-19T18:43:08.653967+00:00
+  text: 'Progress (session 2026-09-19, resumed; tracking-only): dev55 fix COMPLETE at the test-only level, pending final review/gates. Failure mechanics: exact busy timeout 2s hit BEFORE the MultiFileTxn mutation; deterministic lock order; no evidence of a production deadlock. Test-only fix: is_lock_contention_busy classifier requires BOTH still-busy-after-2s AND mutation-was-not-run; bounded retry = 6 retries / 7 attempts; retry applies ONLY to pre-write busy for creators+assigners; all other errors propagate; PRODUCTION TIMEOUT UNCHANGED. Assertions intact: final 18 unique IDs (1..18) and 18 deduped members, every task->sprint-1 assertion unchanged. New coverage: 2 new tests - live-held-lock classifier + 6 negative cases + retry-bounds and non-busy pass-through-at-1-attempt; mutation check: weakened classifier negative FAILS and restored. Reproduction honesty: old failure NOT reproduced in 24 stress + 3 load runs; root mechanism derived from the SAVED JUnit, not a fresh repro. Evidence: new binary 9/9, stress 24/24, related 269/269, scoped clippy clean; logs + original-file prefix at target/test-fix-handoff/dev55/. Tooling note: new NATIVE nextest 0.145 generated locally because existing tooling needed Rosetta (blocked); kept local, NOT a global config change. Gates: full Rust + lint + UI RUNNING now at default concurrency retries 0; NOT Done until they finish plus final review. Existing caveat unchanged: unreproduced template 1/65 flake NOT claimed fixed. No source edits by tracker, no git operations; other ticket statuses unchanged.'
+- date: 2026-09-19T18:52:08.789001+00:00
+  text: 'Progress (session 2026-09-19, resumed; tracking-only): FINAL Rust/UI/lint gates CLEAN - exact evidence. (1) npm run lint:agent: 13s, exit 0 - vue-tsc (view), clippy all targets all features -D warnings, fmt. (2) npm run test:agent: 36s, exit 0, DEFAULT concurrency, --retries 0, --cargo-profile ci. TOOLING CORRECTION superseding the previous comment''s wording: nextest is the DOWNLOADED OFFICIAL 0.9.145 UNIVERSAL2 build running NATIVE on arm - NOT ''locally generated 0.145''. (3) Rust result: 1089 passed / 8 skipped / 0 failed, 29.644 sec, no LEAK flags; captured status pass + FULL log. (4) UI: 449 tests across 60 files, all passed, 5.09s. (5) JUnit contains 103 NONEMPTY EXECUTED binaries - this is NOT the total compiled-binary count; do NOT claim 103 = all bins. (6) Python coverage checker: 39 passed, exit 0. Logs: target/test-fix-handoff/final-rust-ui/{lint-agent.log, test-agent.log, coverage-selftest.log, junit-post-test-agent.xml, env-info.log}. Caveats preserved: the historical template 1/65 flake remains unroot-caused and is NOT magically fixed by this green; no extra CI acceptance assumed beyond the recorded gates. Status STAYS InProgress - NO Done before the final smoke gate (query-isolation smoke fix/integration still pending). No source edits, no git operations.'
+- date: 2026-09-19T19:00:25.945394+00:00
+  text: 'Handoff-interim (session 2026-09-19, final; tracking-only). Outcome: everything in this ticket''s tracked fix scope is GREEN - async marker handshake fix, dev55 busy-timeout test-only fix (classifier + bounded retries, production timeout unchanged, assertions unchanged at 18/18), and the performance separation (opt-in serial budget mode). Evidence: final gates 2026-09-19 - lint clean 13s exit 0; test:agent 36s exit 0 default concurrency --retries 0 --cargo-profile ci: Rust 1089 passed / 8 conditional Git-skips / 0 failed, 29.644s, no LEAK flags; UI 449/60 files 5.09s; checker 39/39; final smoke fixed 34s exit 0 (see DEV-76/77 records); local perf evidence 17/17 e2e + 13/13 budgets passed earlier; manual CI perf workflow parse-validated but NOT executed. Remaining (exact): ONE separate item - historical template_expansion_in_run_action flake, one unroot-caused ~5s timeout, 1/65 cumulative; NOT claimed fixed by any green above. Next step: RETAIN per-attempt diagnostics and investigate the focused template test under load IF it reproduces. Boundary: no user-approval gate invented for the manual CI perf workflow and no claim it is required - the definition of done does not explicitly demand it. TOOLING WORDING CORRECTION (supersedes both earlier notes): the final tool is the ACTUAL NATIVE universal2 nextest 0.9.145, DOWNLOADED OFFICIAL - not ''generated'', not ''0.145'', not a single-arch slice; NO remote-CI green claim is made. Guidance: no durable instruction finding. Status stays InProgress for the historical flake; no git operations.'
+- date: 2026-09-19T19:34:44.373414+00:00
+  text: 'Plan update (session 2026-09-19, new user request; tracking-only): artifact-barrier design for the automation stall. Contract: ACTUAL job status Completed must PRECEDE post-completion automation I/O + dispatch; wait defaults TRUE (blocking, not fire-and-forget). Historical stall assessment: the missing barrier is a PLAUSIBLE cause - the log was lost, so NO exact proof is claimed. Timing rework: ONE absolute deadline of 10s on the ORIGINAL total, measured from BEFORE the trigger - replacing the current two separate 5s gates; artifact completion and the status postcondition are published ATOMICALLY. Diagnostics and new regressions pending; no results claimed yet. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T03:40:57.603990+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): artifact-barrier work verified through source-lifecycle review with INDEPENDENT REVIEW SIGNOFF - single PRE-TRIGGER 10s deadline (replacing the two 5s gates), ATOMIC artifact id+title publish, post-Completed assertion, and diagnostics. Evidence: 30 targeted tests pass; 31/31 current old-cfg; 4 source Git cases. A deterministic injected CLOCK test documents and can falsify the accounting - note the old pattern is NOT a tripwire if the real test is reverted. Historical flake closure position: exact 1/65 cause remains UNPROVEN (log lost); behavior is CONSISTENT with the corrected mechanism; per developer direction, no need to keep this ticket perpetually open once FULL GATES PASS. Full gates still pending - status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T05:20:00.080112+00:00
+  text: 'Status note (session 2026-09-20; tracking-only): ALL scope implemented and independently reviewed; current full gates provided by this wave (lint 0; Rust 1190/1190 at default profile with real Git capability - 0 skipped, 0 LEAK; UI 443/58; smoke 164/23-skip with strict-Git followup pending on DEV-79). Status deliberately held InProgress pending coordinator closure and the latest smoke coverage followup - no Done until then. Historical template 1/65 standing unchanged (unproven, log lost). No source edits or git operations by tracker.'
+- date: 2026-10-01T19:28:07.263975+00:00
+  text: 'Handoff (session 2026-10-01, final; tracking-only; independent SIGNOFF, current Oct-1 gates green). Outcome: async empty-file barrier now waits on CONTENT (real failure fixed + neighbor) with a deterministic partial-write regression; template artifact single pre-trigger 10s replaces the wrong-job Completed+split 5+5 (correct source before hooks); atomic publish id/title post-status assert diagnostics; injected clock documents the failure class and is NOT a tripwire if the real test is reverted; the historical single 1/65 has exact root unproven (log lost) but is consistent with the corrected mechanism - NOT a perpetual remaining-open item. dev55 bounded retry fires ONLY on real busy + mutation-not-run signature; safe pre-write fixed at 6 retries; NO prod 2s timeout / retry-profile weakening; all membership asserts kept. Perf: 13 functional tests keep running; default budget checks are opt-in serial (13 budgets, 17 cases; previous local 17 green); no arbitrary threshold relaxations. Evidence: code/controls reviewed; Oct-1 gates current pass: lint:agent exit 0; Rust 1196/1196, 0 skipped; UI 443/58; Node 41/41; smoke 166 pass / 23 Git-skip valid for current app. Remaining: none mandatory - no CI perf job invented, no human approval required; no staging/commit/push performed (uncommitted state unknown - NO git commands run, not asserting unstaged). Guidance: no durable instruction finding. Marking Done per self-verification lifecycle.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T5.
@@ -65,3 +93,65 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-17T04:26:26.266423+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T04:26:32.461650+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T04:41:11.717251+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T04:48:32.651210+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:00:23.102163+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T06:14:52.782938+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:25:41.767913+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:43:08.653967+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:52:08.789001+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:00:25.945394+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:34:44.373414+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T03:40:57.603990+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T05:20:00.080112+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:28:07.263975+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:28:10.470410+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

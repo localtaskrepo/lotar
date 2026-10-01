@@ -29,7 +29,6 @@ vi.mock('../api/client', () => {
       setStatus: vi.fn(async (_id: string, _s: string) => ({ id: 'PRJ-1', title: 'A', status: _s, priority: 'low', task_type: 'task', created: '', modified: '', tags: [], relationships: {}, comments: [], custom_fields: {} })),
       updateTask: vi.fn(async (_id: string, patch: any) => ({ id: 'PRJ-1', title: 'A', status: 'open', priority: 'low', task_type: 'task', created: '', modified: '', tags: [], relationships: {}, comments: [], custom_fields: {}, ...patch })),
       taskHistory: vi.fn(async () => []),
-      taskCommitDiff: vi.fn(async () => ''),
       addComment: addCommentMock,
       referenceSnippet: vi.fn(async () => ({
         path: 'src/example.rs',

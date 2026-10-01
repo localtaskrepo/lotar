@@ -36,7 +36,7 @@ Each section links to relevant source files and tests. Additions should follow t
 - **Args & handler:** `TaskSearchArgs` + `TaskPostFilters` in `src/cli/args/task.rs`; `SearchHandler` in `src/cli/handlers/task/search.rs`.
 - **Core services:** `storage::manager::Storage` for index reads, `services::task_service::TaskService::search` for per-project merging, post-filter pipeline in `search.rs`.
 - **Features:** alias `ls`, multi-project resolution, additive filters, `--where` custom field lookups, limit/sort combination, text/table/json renderers.
-- **Tests:** `tests/advanced_list_features_test.rs`, `tests/cli_list_alias_test.rs`, `tests/cli_list_effort_filters_and_sort_test.rs`, `tests/comment_command_test.rs` (shared search utilities).
+- **Tests:** `tests/cli_list_alias_test.rs`, `tests/cli_list_effort_filters_and_sort_test.rs`, `tests/comment_command_test.rs` (shared search utilities).
 
 ### lotar status
 
@@ -83,7 +83,7 @@ Each section links to relevant source files and tests. Additions should follow t
 ### lotar task history
 
 - **User help:** [../help/history.md](../help/history.md)
-- **Implementation:** Subcommands wired through `TaskHandler` (`src/cli/handlers/task`) and implemented in `task/history.rs`. Git plumbing lives in `utils::git_helpers`.
+- **Implementation:** Subcommands wired through `TaskHandler` (`src/cli/handlers/task`) and implemented in `task/history.rs`. Git plumbing lives in `utils::git`.
 - **Highlights:** structured JSON diffs, `history-field` alias for targeted property timelines, and the `diff`/`at` helpers exposed under the same namespace.
 - **Tests:** `tests/task_history_git_test.rs`, `tests/task_diff_structured_unit_test.rs`, `tests/task_diff_fields_test.rs`.
 
@@ -96,7 +96,7 @@ Each section links to relevant source files and tests. Additions should follow t
 ### lotar config
 
 - **User help:** [../help/config.md](../help/config.md) & [../help/templates.md](../help/templates.md)
-- **Implementation:** Args in `src/cli/args/config.rs`; handlers under `src/cli/handlers/config/{show,set,init,validate,normalize}.rs` plus the renderer utilities in `render.rs`.
+- **Implementation:** Args in `src/cli/args/config.rs`; handlers under `src/cli/handlers/config/{show,set,validate,normalize}.rs` and in the `config/init/` directory, plus the renderer utilities in `render.rs`.
 - **Services:** `services::config_service` for persistence + schema validation; template sources under `src/config/templates/`.
 - **Tests:** `tests/config_validation_test.rs`, `tests/config_integration_test.rs`, `tests/config_service_branch_alias_test.rs`, `tests/config_set_categories_tags_test.rs`, `tests/config_explain_test.rs`.
 
@@ -107,9 +107,9 @@ Each section links to relevant source files and tests. Additions should follow t
 ### lotar stats
 
 - **User help:** [../help/stats.md](../help/stats.md)
-- **Implementation:** `StatsArgs` in `src/cli/args/stats.rs`; handlers under `src/cli/handlers/stats/{age,burndown,calendar,velocity,effort}`.
+- **Implementation:** `StatsArgs` in `src/cli/args/stats.rs`; handlers under `src/cli/handlers/stats/` (per-metric modules such as `age`, `authors`, `effort`, `status`); burndown, calendar, and velocity views live with sprint reporting in `src/cli/handlers/sprint/reporting/`.
 - **Data flow:** Stats aggregate via `services::sprint_analytics`, `services::sprint_metrics`, and direct reads from `storage::task`.
-- **Tests:** `tests/stats_snapshot_test.rs`, `tests/stats_effort_points_and_auto_and_filters_test.rs`, `tests/stats_git_test.rs`, `tests/cli_sprint_velocity_test.rs` (shared helpers).
+- **Tests:** `tests/stats_snapshot_test.rs`, `tests/stats_git_test.rs`, `tests/cli_sprint_velocity_test.rs` (shared helpers).
 
 ### lotar sprint
 
@@ -123,13 +123,13 @@ Each section links to relevant source files and tests. Additions should follow t
 - **User help:** [../help/scan.md](../help/scan.md)
 - **Implementation:** Args in `src/cli/args/scan.rs`; handler in `src/cli/handlers/scan_handler.rs`; heavy lifting in `src/scanner.rs` (walkdir + attribute parsing).
 - **Features:** include/exclude filters, inline metadata parsing, re-anchoring, dry-run/detailed context.
-- **Tests:** `tests/scanner_integration_test.rs`, `tests/scan_bidir_references_test.rs`, `tests/scan_ignore_and_filters_test.rs`, `tests/scanner_custom_ticket_patterns_test.rs`.
+- **Tests:** `tests/scanner_integration_test.rs`, `tests/scan_bidir_references_test.rs`.
 
 ### lotar serve
 
 - **User help:** [../help/serve.md](../help/serve.md)
 - **Implementation:** Args in `src/cli/args/serve.rs`; handler in `src/cli/handlers/serve_handler.rs` launches `web_server::start_app`.
-- **Server stack:** Axum router in `src/routes.rs`, SSE wiring in `src/web_server.rs`, static assets from `target/web` (Vite build). Watches `.tasks/**` to broadcast `project_changed` events.
+- **Server stack:** Axum router in `src/routes/`, SSE wiring in `src/web_server.rs`, static assets from `target/web` (Vite build). Watches `.tasks/**` to broadcast `project_changed` events.
 - **Tests:** `tests/cli_serve_features_test.rs`, `tests/cli_serve_port_parsing_test.rs`, smoke suites under `smoke/tests/ui.*` and `smoke/tests/api.*`.
 
 ### lotar git

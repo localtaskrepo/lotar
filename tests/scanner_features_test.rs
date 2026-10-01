@@ -88,6 +88,21 @@ mod custom_patterns {
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].uuid, "AUTH-321");
     }
+
+    #[test]
+    fn custom_pattern_does_not_trigger_without_signal_even_when_toggle_on() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        write_file(root, "src/b.rs", "// BLZ_2025-777 implement");
+
+        let patterns = vec![r"\b(BLZ_\d{4}-\d{3})\b".to_string()];
+
+        let mut scanner =
+            Scanner::new(PathBuf::from(root)).with_ticket_detection(Some(&patterns), true);
+        let refs = scanner.scan();
+        // With new semantics, a signal word is required regardless of custom patterns or toggles
+        assert_eq!(refs.len(), 0);
+    }
 }
 
 mod inline_effort {

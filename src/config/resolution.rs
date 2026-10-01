@@ -56,6 +56,10 @@ fn config_fingerprint(tasks_dir: Option<&Path>, project: Option<&str>) -> String
 struct CliOverrideLayer {
     config: GlobalConfig,
     signature: String,
+    /// Explicitly requested server port from the normalized `--config`
+    /// pairs, independent of value: a request for the built-in default
+    /// (8080) is still an explicit request and must outrank lower layers.
+    port_override: Option<u16>,
 }
 
 fn config_cache() -> &'static RwLock<HashMap<String, CachedConfig>> {
@@ -141,9 +145,10 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
                 "CLI config override keys cannot be empty".to_string(),
             ));
         }
-        // Shared DEV-71 canonicalization: `-C` accepts the same flat and
-        // dotted field names as `config set` (including exceptions such as
-        // `default.strict_members` and `issue.tags`).
+        // Shared DEV-71 canonicalization: the long-only `--config` flag
+        // accepts the same flat and dotted field names as `config set`
+        // (including exceptions such as `default.strict_members` and
+        // `issue.tags`).
         let canonical = canonicalize_field_name(key, true)?;
         if let Some(existing) = normalized.get(&canonical)
             && existing != raw_value.trim()
@@ -170,9 +175,18 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
         .collect::<Vec<_>>()
         .join("|");
 
+    // Presence-aware port provenance: the normalized map key is the
+    // authority (already validated by validate_field_value above), so a
+    // `--config server.port=8080` equal to the built-in default stays
+    // distinguishable from "not requested".
+    let port_override = normalized
+        .get("server_port")
+        .and_then(|value| value.parse::<u16>().ok());
+
     set_cli_override_layer(Some(CliOverrideLayer {
         config: overlay,
         signature,
+        port_override,
     }));
 
     Ok(())
@@ -181,6 +195,95 @@ pub fn configure_cli_overrides(pairs: &[(String, String)]) -> Result<(), ConfigE
 pub fn apply_cli_overrides(resolved: &mut ResolvedConfig) {
     if let Some(layer) = active_cli_override_layer() {
         overlay_global_into_resolved(resolved, layer.config);
+        // server_port is applied by presence, not by differs-from-default:
+        // the merge-by-value overlay would silently drop an explicit
+        // `--config server.port=8080` over a lower layer's 9999.
+        if let Some(port) = layer.port_override {
+            resolved.server_port = port;
+        }
+    }
+}
+
+/// The explicitly requested serve port from the active `--config` override
+/// layer, if any. Presence comes from the validated normalized pairs, so it
+/// is reported even when the value equals the built-in default.
+pub(crate) fn active_cli_port_override() -> Option<u16> {
+    active_cli_override_layer().and_then(|layer| layer.port_override)
+}
+
+/// Presence-aware server-port layers for the documented chain (server_port
+/// only; every other field keeps its existing merge semantics).
+///
+/// The generic merge layers apply values only when they differ from the
+/// built-in default, which silently drops an explicit request for `8080`
+/// from a higher layer. Consumers that must honor the documented precedence
+/// for the port — generic resolution, previews, source labels, serve — use
+/// this presence metadata instead of value comparisons.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct ServerPortLayers {
+    pub cli_override: Option<u16>,
+    pub env: Option<u16>,
+    pub home: Option<u16>,
+    pub global: Option<u16>,
+}
+
+impl ServerPortLayers {
+    /// The winning `(port, label)` by documented precedence:
+    /// `--config` > env > home config > global config. `None` when no layer
+    /// configured a port (built-in default territory).
+    pub(crate) fn winner(&self) -> Option<(u16, &'static str)> {
+        if let Some(port) = self.cli_override {
+            return Some((port, "cli"));
+        }
+        if let Some(port) = self.env {
+            return Some((port, "env"));
+        }
+        if let Some(port) = self.home {
+            return Some((port, "home"));
+        }
+        if let Some(port) = self.global {
+            return Some((port, "global"));
+        }
+        None
+    }
+}
+
+/// Collect the presence-aware server-port layers. Tolerant of layer errors
+/// (matching the generic chain's skip-on-error policy); `global_file` is
+/// `None` for previews, whose global tier is the caller-provided candidate
+/// (value overlay) rather than the on-disk file.
+pub(crate) fn server_port_layers(global_file: Option<&Path>) -> ServerPortLayers {
+    let snapshot = crate::config::env_overrides::capture_env_override_snapshot();
+    let env = snapshot
+        .report
+        .applied_keys
+        .contains("server_port")
+        .then_some(snapshot.resolved.server_port);
+    let home = crate::config::persistence::home_config_server_port()
+        .ok()
+        .flatten();
+    let global = global_file.and_then(|path| {
+        crate::config::persistence::config_file_server_port(path, "global config")
+            .ok()
+            .flatten()
+    });
+    ServerPortLayers {
+        cli_override: active_cli_port_override(),
+        env,
+        home,
+        global,
+    }
+}
+
+/// Presence-aware server-port correction for a resolved config (server_port
+/// only). Runs after the value-based merges and the CLI presence apply, and
+/// never overrides an active `--config` port request.
+fn apply_server_port_presence(resolved: &mut ResolvedConfig, global_file: Option<&Path>) {
+    if active_cli_port_override().is_some() {
+        return;
+    }
+    if let Some((port, _label)) = server_port_layers(global_file).winner() {
+        resolved.server_port = port;
     }
 }
 
@@ -202,6 +305,10 @@ pub fn preview_base_resolved(global_layer: &GlobalConfig) -> ResolvedConfig {
     merge_global_config(&mut config, env_snapshot.global);
     let mut resolved = ResolvedConfig::from_global(config);
     apply_cli_overrides(&mut resolved);
+    // Presence-aware port precedence (env > home) without re-reading the
+    // candidate: the global tier here is the passed candidate layer, so a
+    // default-equal candidate port keeps the value-overlay semantics.
+    apply_server_port_presence(&mut resolved, None);
     resolved
 }
 
@@ -223,6 +330,7 @@ pub fn preview_project_resolved(
     overlay_global_into_resolved(&mut resolved, env_snapshot.global.clone());
     apply_project_config_overrides(&mut resolved, project_config.clone());
     apply_cli_overrides(&mut resolved);
+    apply_server_port_presence(&mut resolved, None);
     resolved
 }
 
@@ -282,6 +390,18 @@ fn load_merged_global_chain(tasks_dir: Option<&Path>) -> ResolvedConfig {
 
     let mut resolved = ResolvedConfig::from_global(config);
     apply_cli_overrides(&mut resolved);
+    // server_port honors the documented precedence by layer presence, not
+    // by differs-from-default merging: an explicit env/home request for the
+    // built-in default number must still win over a lower layer's other
+    // value. Every other field keeps the existing merge semantics.
+    let global_file = tasks_dir
+        .map(crate::utils::paths::global_config_path)
+        .unwrap_or_else(|| {
+            crate::utils::paths::global_config_path(&crate::utils::paths::tasks_root_from(
+                Path::new("."),
+            ))
+        });
+    apply_server_port_presence(&mut resolved, Some(&global_file));
     resolved
 }
 

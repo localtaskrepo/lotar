@@ -1,10 +1,11 @@
 title: Replace permissive test assertions and strengthen fixture invariants
-status: Todo
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.815608+00:00
-modified: 2026-09-06T11:29:34.263929+00:00
+modified: 2026-09-19T19:03:47.886868+00:00
 relationships:
   depends_on:
   - DEV-76
@@ -14,6 +15,19 @@ relationships:
   - DEV-28
   - DEV-51
   parent: DEV-53
+comments:
+- date: 2026-09-17T04:51:03.719601+00:00
+  text: 'Plan (session 2026-09-17, tracking-only record): marked InProgress - prerequisite DEV-76 fixture lifecycle implementation is available. Scope per acceptance: (1) exact CLI/config/list/serve assertions with NO swallowed try_success (no accept-either-outcome patterns); (2) same-length deterministic mtime edits for cache tests (isolate mtime instead of changing file length); (3) CLI comment automation asserted EXACTLY ONCE (no duplicate/missing event counting); (4) workspace addTask enforces strict ID/path correspondence (no arbitrary new YAML path acceptance); (5) drag-copy verifies BOTH persisted memberships (DOM plus stored state). Retains the already-repaired SSE filter and automation 400 checks. Verification: targeted rewrites first, then shared final gates and review before Done.'
+- date: 2026-09-17T05:54:15.586776+00:00
+  text: 'Progress (session 2026-09-17, tracking-only): 124 targeted Rust tests pass. New coverage: file-path strict helper tests 3 + CLI tests 5. Browser verification: initial run 5 pass with 2 bad-path ENOENT failures, root-caused to the wrong base path (workspace.root) and corrected to workspace.tasksDir/@sprints - after the fix 7/7 pass in real browser with proper Chromium env. Assertion clauses remain strong as specified and are preserved; NO product bug found (test-side path correction only). Independent review PENDING - not Done.'
+- date: 2026-09-17T06:14:27.407737+00:00
+  text: 'Independent review (session 2026-09-17, tracking-only): SIGNOFF, no blockers. All 124 Rust test counts structurally confirmed; the corrected 7 browser tests passed; no try_success remains anywhere under tests/. Status stays InProgress pending full shared gates and final reconciliation - no Done yet.'
+- date: 2026-09-19T18:40:36.163318+00:00
+  text: 'Progress (session 2026-09-19, resumed; tracking-only): full build-first smoke gate run compliant Sep 19 - exit 1: 163 passed / 23 Git-skips / 1 FAILED: tests/ui.query-isolation.smoke.spec.ts > UI DEV-65 query isolation and live convergence > rejects a late stale project query response after the filter switched (assert sites :235/:215) - observed failure mode as reported: late BASE route response holds background response; Refresh disabled; 30s timeout. Attempt accounting documented honestly: original first attempt ran with INVALID TMPDIR (empty), compliant rerun (TMPDIR=/var/folders/.../T/kilo/final-smoke.*) produced the SAME failure - documented, NOT two greens, no passing claim. Build/preflight evidence: fresh vite build compressed 4 assets; Rust smoke 21.94s; 7 sprints / 17 harness passed. Status of the fix: a new worker is investigating a TEST-ONLY synchronization correction that PRESERVES late-BETA correctness (stale-response rejection behavior must remain); NO fix claimed until results. Root-cause label held back per instruction: do NOT call this second test failure environment-independent or root-cause-proven until the worker confirms. Logs: target/test-fix-handoff/final-smoke/ (run.log, status.txt, env/tmpdir records for both attempts). Status stays InProgress; all six DEV tickets remain InProgress while the dev55 Rust fix and this query-isolation smoke fix are active. No git operations.'
+- date: 2026-09-19T19:00:16.099786+00:00
+  text: 'Handoff-interim (session 2026-09-19, final; tracking-only). Outcome: FULL ticket scope implemented - permissive assertions replaced and fixture invariants strengthened across scope, plus the LAST query-isolation fixture fix: the harness now captures the background OR click-real-BASE-request, requires held>0 BEFORE the FRESH switch, and finally releases/unroutes; stale-response assertions themselves UNCHANGED (late stale rejection semantics preserved). Evidence: targeted query-isolation 5/5 x6 runs green; final full smoke (fixed) compliant run 34s exit 0: 164 passed / 23 Git-skips / 187 tests, 45 files (40 passed / 5 skipped), no leak/unhandled/bind warnings; shared gates green per DEV-76 closing record (lint clean; Rust 1089/8/0 default concurrency retries 0; UI 449/60; checker 39/39). Logs: target/test-fix-handoff/query-isolation/ and final-smoke-fixed/. Remaining: status stays InProgress FOR NOW awaiting ONLY the final independent query-review result (close expected shortly once it lands); gates otherwise green pending that review. Guidance: no durable instruction finding; earlier attempt-accounting correction (invalid-TMPDIR attempt not counted as a green) already recorded 2026-09-19. No source edits by tracker, no git operations.'
+- date: 2026-09-19T19:03:40.660344+00:00
+  text: 'Handoff (session 2026-09-19, FINAL; tracking-only). Outcome: FULL ticket scope complete and INDEPENDENT QUERY REVIEW returned SIGNOFF, no blockers, including an explicit cleanup-race check: handler hold-check + push are synchronous (no await); finally sets hold=false and snapshots synchronously with no append escape; allSettled cleanup absorbs already-handled rejections only and CANNOT mask assertions; the require-held>0 gate is preserved with ALL stale-response assertions intact; no force-clicks, no sleeps, no test retries. Evidence: targeted query-isolation 5/5 x6; FINAL smoke (fixed) single compliant run 34s exit 0 - 164 passed / 23 Git-skips / 187 tests across 45 files (40 passed / 5 skipped), fresh vite assets (4 gzip), Rust smoke 19.89s, ZERO leak/unhandled/bind warnings; shared gates green: lint clean, Rust 1089 passed / 8 skips at default concurrency retries 0 with NO LEAK flag, UI 449 / 60 files, checker 39/39. Evidence paths (valid, no rerun required): target/test-fix-handoff/{query-isolation,final-smoke-fixed,final-rust-ui,ci-gap,dev55,final-smoke,browser}/ with earlier failed-run logs preserved. Remaining: none for this ticket; integration/commit state unchanged (uncommitted per policy). CORRECTIONS captured in this final record for accuracy across the wave: (1) actual gate tooling = OFFICIAL UNIVERSAL2 nextest 0.9.145 running NATIVE arm - no ''.144'' and no ''generated/slice'' wording applies to the current gates; (2) source exclusion accounting = 13 whole + 3 partial files INCLUDING the lib MCP test module (not 2 integration-only) + 8 conditional-ignored + 23 smoke Git skips recorded as honest NON-PASSES; (3) perf evidence 17/17 e2e + 13/13 budgets passed LOCALLY earlier - no invented mandatory CI-perf approval condition; (4) no durable AGENTS instruction finding - the docs/-p fix was consistency, not policy. Guidance: none beyond the above. No new tickets, no broad product work; marking Done per developer instruction with the SIGNOFF above.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T4 T6 T9 T13 T15.
@@ -50,3 +64,41 @@ history:
       Prerequisites/coordination: DEV-76.
       Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
       Acceptance: each rewritten regression fails when its guarded behavior is removed; assert exact exit/status, nonempty expected data and filesystem effects; same-length edits use deterministic mtime changes; CLI IDs match stored paths; drag-copy verifies both memberships; retain the already-repaired SSE and automation checks.
+- at: 2026-09-17T04:50:57.062163+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-17T04:51:03.719601+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:54:15.586776+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T06:14:27.407737+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:40:36.163318+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:00:16.099786+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:03:40.660344+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:03:47.886868+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

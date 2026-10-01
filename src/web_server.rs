@@ -77,6 +77,25 @@ pub fn serve_with_config(
         }
     };
 
+    serve_listener(api_server, &listener, config);
+}
+
+/// Serve on an already-bound listener.
+///
+/// The port used for the test stop registry is taken from the listener's
+/// actual local address, so a listener bound to port 0 (OS-assigned) is
+/// keyed and torn down correctly. Callers should advertise the actual port
+/// from `listener.local_addr()` only after the bind has succeeded.
+pub fn serve_listener(
+    api_server: &api_server::ApiServer,
+    listener: &TcpListener,
+    config: &WebServerConfig,
+) {
+    let port = listener
+        .local_addr()
+        .map(|addr| addr.port())
+        .unwrap_or_default();
+
     // Register this server instance in a global stop registry (used only by tests)
     if let Ok(mut map) = STOP_FLAGS.lock() {
         map.insert(port, false);

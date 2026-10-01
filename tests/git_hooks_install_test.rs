@@ -1,4 +1,3 @@
-#![cfg(not(no_git_tests))]
 mod common;
 
 use predicates::prelude::*;
@@ -28,63 +27,67 @@ fn copy_dir_all(src: &Path, dst: &Path) {
     }
 }
 
-#[test]
-fn installs_git_hooks_and_sets_config() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let temp = TempDir::new().expect("failed to create temp dir");
-    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let hooks_src = repo_root.join(".githooks");
-    let hooks_dest = temp.path().join(".githooks");
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
 
-    copy_dir_all(&hooks_src, &hooks_dest);
+    #[test]
+    fn installs_git_hooks_and_sets_config() {
+        crate::common::require_git();
+        let temp = TempDir::new().expect("failed to create temp dir");
+        let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let hooks_src = repo_root.join(".githooks");
+        let hooks_dest = temp.path().join(".githooks");
 
-    let status = Command::new("git")
-        .current_dir(temp.path())
-        .args(["init", "."])
-        .status()
-        .expect("failed to run git init");
-    assert!(status.success(), "git init failed");
+        copy_dir_all(&hooks_src, &hooks_dest);
 
-    let mut cmd = crate::common::lotar_cmd().expect("binary not built");
-    cmd.current_dir(temp.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(["git", "hooks", "install"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("core.hooksPath"));
+        let status = Command::new("git")
+            .current_dir(temp.path())
+            .args(["init", "."])
+            .status()
+            .expect("failed to run git init");
+        assert!(status.success(), "git init failed");
 
-    let output = Command::new("git")
-        .current_dir(temp.path())
-        .args(["config", "--local", "--get", "core.hooksPath"])
-        .output()
-        .expect("failed to read git config");
-    assert!(output.status.success(), "git config --get failed");
-    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    assert_eq!(value, ".githooks");
+        let mut cmd = crate::common::lotar_cmd().expect("binary not built");
+        cmd.current_dir(temp.path())
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(["git", "hooks", "install"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("core.hooksPath"));
 
-    // Second run should be a no-op and still succeed.
-    let mut second = crate::common::lotar_cmd().expect("binary not built");
-    second
-        .current_dir(temp.path())
-        .env("LOTAR_TEST_SILENT", "1")
-        .args(["git", "hooks", "install"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("already configured"));
+        let output = Command::new("git")
+            .current_dir(temp.path())
+            .args(["config", "--local", "--get", "core.hooksPath"])
+            .output()
+            .expect("failed to read git config");
+        assert!(output.status.success(), "git config --get failed");
+        let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        assert_eq!(value, ".githooks");
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
+        // Second run should be a no-op and still succeed.
+        let mut second = crate::common::lotar_cmd().expect("binary not built");
+        second
+            .current_dir(temp.path())
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(["git", "hooks", "install"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("already configured"));
 
-        let script_path = temp.path().join(".githooks").join("pre-commit");
-        let metadata = fs::metadata(&script_path).expect("missing pre-commit script");
-        assert_ne!(
-            metadata.permissions().mode() & 0o111,
-            0,
-            "script should be executable"
-        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            let script_path = temp.path().join(".githooks").join("pre-commit");
+            let metadata = fs::metadata(&script_path).expect("missing pre-commit script");
+            assert_ne!(
+                metadata.permissions().mode() & 0o111,
+                0,
+                "script should be executable"
+            );
+        }
     }
 }

@@ -52,6 +52,122 @@ fn labeled_sprint(label: &str) -> Sprint {
     }
 }
 
+/// Lock-contention signature from `acquire_storage_lock`
+/// (src/storage/safety.rs): the io `WouldBlock` error raised only after the
+/// bounded 2-second retry loop expires. Both fragments are required: the
+/// open-failure and lock-support-failure messages also promise
+/// "mutation was not run" but are permanent, never retryable.
+fn is_lock_contention_busy(error: &str) -> bool {
+    error.contains("still busy after 2 seconds") && error.contains("mutation was not run")
+}
+
+/// Re-run a whole public mutation, but only when it failed with the lock
+/// contention timeout above. That error is produced strictly before any
+/// write ("mutation was not run"), so a retry re-runs the complete
+/// operation and can neither resume nor duplicate a partial mutation;
+/// every other error is returned unchanged and the bounded attempt count
+/// keeps a genuinely stuck lock failing. Mirrors the DEV78
+/// `begin_retrying_contention` precedent in src/storage/transaction.rs:
+/// under heavy IO/fsync load one worker's multi-fsync commit can
+/// legitimately outlast another worker's contention window — coordination
+/// working as designed, not a lost serialization guarantee.
+fn retry_lock_contention<T, E: std::fmt::Display>(
+    mut operation: impl FnMut() -> Result<T, E>,
+) -> Result<T, E> {
+    let mut busy_retries = 6u32;
+    loop {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(err) if busy_retries > 0 && is_lock_contention_busy(&err.to_string()) => {
+                busy_retries -= 1;
+            }
+            Err(err) => return Err(err),
+        }
+    }
+}
+
+#[test]
+fn lock_contention_retry_classifier_matches_only_the_real_busy_contract() {
+    // Live proof against the production generator: hold the sprints lock in
+    // an isolated workspace, then let acquire_storage_lock exhaust its
+    // 2-second contention window and classify the real error it returns.
+    let (_tmp, tasks_dir) = workspace();
+    let sprints_dir = tasks_dir.join("@sprints");
+    std::fs::create_dir_all(&sprints_dir).unwrap();
+    let held = lotar::storage::safety::acquire_storage_lock(
+        &sprints_dir,
+        lotar::storage::safety::sprint_lock_name(),
+    )
+    .unwrap();
+    let busy = lotar::storage::safety::acquire_storage_lock(
+        &sprints_dir,
+        lotar::storage::safety::sprint_lock_name(),
+    )
+    .unwrap_err();
+    assert_eq!(busy.kind(), std::io::ErrorKind::WouldBlock);
+    let text = busy.to_string();
+    assert!(
+        is_lock_contention_busy(&text),
+        "classifier must accept the live busy contract: {text}"
+    );
+    drop(held);
+
+    // Permanent failures carry the same not-run promise but no busy marker.
+    assert!(!is_lock_contention_busy(
+        "Cannot open storage lock /w/.task.lock: No such file (os error 2); check the directory and permissions; mutation was not run"
+    ));
+    assert!(!is_lock_contention_busy(
+        "Cannot acquire storage lock /w/.task.lock: Operation not supported; check filesystem locking support and permissions; mutation was not run"
+    ));
+    // The busy marker alone, without the nothing-ran guarantee, must not retry.
+    assert!(!is_lock_contention_busy(
+        "Storage lock /w/.sprints.lock is still busy after 2 seconds"
+    ));
+    // Unrelated mutation errors never retry.
+    assert!(!is_lock_contention_busy(
+        "A pending task/sprint transaction journal exists at /w/.txn-pending.json"
+    ));
+    assert!(!is_lock_contention_busy("Sprint not found: 999"));
+    assert!(!is_lock_contention_busy(""));
+}
+
+#[test]
+fn lock_contention_retry_helper_retries_busy_and_passes_through_other_errors() {
+    use std::cell::Cell;
+    let busy_text = "IO error: Storage lock /w/.sprints/.sprints.lock is still busy after 2 seconds; retry after the other writer finishes; mutation was not run";
+
+    // Busy failures are retried until the operation succeeds.
+    let attempts = Cell::new(0u32);
+    let outcome: Result<u32, String> = retry_lock_contention(|| {
+        attempts.set(attempts.get() + 1);
+        if attempts.get() < 3 {
+            Err(busy_text.to_string())
+        } else {
+            Ok(attempts.get())
+        }
+    });
+    assert_eq!(outcome.unwrap(), 3);
+    assert_eq!(attempts.get(), 3);
+
+    // Any other error is returned verbatim after exactly one attempt.
+    let attempts = Cell::new(0u32);
+    let outcome: Result<u32, String> = retry_lock_contention(|| {
+        attempts.set(attempts.get() + 1);
+        Err::<u32, _>("Sprint not found: 999".to_string())
+    });
+    assert_eq!(outcome.unwrap_err(), "Sprint not found: 999");
+    assert_eq!(attempts.get(), 1, "non-busy errors must not be retried");
+
+    // Persistent contention still fails: one attempt plus six retries.
+    let attempts = Cell::new(0u32);
+    let outcome: Result<(), String> = retry_lock_contention(|| {
+        attempts.set(attempts.get() + 1);
+        Err(busy_text.to_string())
+    });
+    assert!(outcome.unwrap_err().contains("still busy after 2 seconds"));
+    assert_eq!(attempts.get(), 7, "retry budget must stay bounded");
+}
+
 #[test]
 fn invalid_sprint_create_leaves_every_file_unchanged() {
     let (_tmp, tasks_dir) = workspace();
@@ -311,16 +427,18 @@ fn concurrent_creates_and_assignments_lose_no_memberships() {
             scope.spawn(move || {
                 let mut storage = Storage::new(&root);
                 for round in 0..4u32 {
-                    TaskService::create(
-                        &mut storage,
-                        TaskCreate {
-                            title: format!("Created {worker}-{round}"),
-                            project: Some("TEST".to_string()),
-                            sprints: vec![1],
-                            ..TaskCreate::default()
-                        },
-                    )
-                    .unwrap();
+                    retry_lock_contention(|| {
+                        TaskService::create(
+                            &mut storage,
+                            TaskCreate {
+                                title: format!("Created {worker}-{round}"),
+                                project: Some("TEST".to_string()),
+                                sprints: vec![1],
+                                ..TaskCreate::default()
+                            },
+                        )
+                    })
+                    .expect("created task under coordinated contention");
                 }
             });
         }
@@ -330,15 +448,17 @@ fn concurrent_creates_and_assignments_lose_no_memberships() {
             scope.spawn(move || {
                 let mut storage = Storage::new(&root);
                 let mut records = SprintService::list(&storage).unwrap();
-                sprint_assignment::assign_tasks(
-                    &mut storage,
-                    &mut records,
-                    &ids,
-                    Some("1"),
-                    false,
-                    false,
-                )
-                .unwrap();
+                retry_lock_contention(|| {
+                    sprint_assignment::assign_tasks(
+                        &mut storage,
+                        &mut records,
+                        &ids,
+                        Some("1"),
+                        false,
+                        false,
+                    )
+                })
+                .expect("assignment under coordinated contention");
             });
         }
     });

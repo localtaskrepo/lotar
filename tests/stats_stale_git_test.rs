@@ -1,4 +1,3 @@
-#![cfg(not(no_git_tests))]
 mod common;
 
 use serde_json::Value;
@@ -54,67 +53,71 @@ fn add_and_commit(
     run_git(repo, &["commit", "-m", msg], &envs);
 }
 
-#[test]
-fn stats_stale_threshold() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn stats_stale_threshold() {
+        crate::common::require_git();
+        let temp = TempDir::new().unwrap();
+        let root = temp.path();
+        init_repo(&temp);
+
+        // Create two tasks: one very old, one recent
+        write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+        write_file(
+            root,
+            ".tasks/TEST/1.yml",
+            "title: Old\nstatus: TODO\nmodified: 2000-01-01T00:00:00Z\n",
+        );
+        add_and_commit(
+            root,
+            ".tasks/TEST/1.yml",
+            ("Old", "old@example.com"),
+            "2000-01-01T00:00:00Z",
+            "old",
+        );
+
+        write_file(
+            root,
+            ".tasks/TEST/2.yml",
+            "title: New\nstatus: TODO\nmodified: 2025-08-18T00:00:00Z\n",
+        );
+        add_and_commit(
+            root,
+            ".tasks/TEST/2.yml",
+            ("New", "new@example.com"),
+            "2025-08-18T00:00:00Z",
+            "new",
+        );
+
+        // Threshold 7000d should include the old task but not the new
+        let out = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .env("LOTAR_IGNORE_ENV_TASKS_DIR", "1")
+            .env("LOTAR_TEST_MODE", "1")
+            .args([
+                "--format",
+                "json",
+                "stats",
+                "stale",
+                "--threshold",
+                "7000d",
+                "--global",
+            ])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(v["status"], "ok");
+        let items = v["items"].as_array().unwrap();
+        // Expect at least one item and that it contains TEST-1 and not TEST-2
+        assert!(items.iter().any(|it| it["id"] == "TEST-1"));
+        assert!(!items.iter().any(|it| it["id"] == "TEST-2"));
     }
-    let temp = TempDir::new().unwrap();
-    let root = temp.path();
-    init_repo(&temp);
-
-    // Create two tasks: one very old, one recent
-    write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
-    write_file(
-        root,
-        ".tasks/TEST/1.yml",
-        "title: Old\nstatus: TODO\nmodified: 2000-01-01T00:00:00Z\n",
-    );
-    add_and_commit(
-        root,
-        ".tasks/TEST/1.yml",
-        ("Old", "old@example.com"),
-        "2000-01-01T00:00:00Z",
-        "old",
-    );
-
-    write_file(
-        root,
-        ".tasks/TEST/2.yml",
-        "title: New\nstatus: TODO\nmodified: 2025-08-18T00:00:00Z\n",
-    );
-    add_and_commit(
-        root,
-        ".tasks/TEST/2.yml",
-        ("New", "new@example.com"),
-        "2025-08-18T00:00:00Z",
-        "new",
-    );
-
-    // Threshold 7000d should include the old task but not the new
-    let out = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
-        .env("LOTAR_IGNORE_ENV_TASKS_DIR", "1")
-        .env("LOTAR_TEST_MODE", "1")
-        .args([
-            "--format",
-            "json",
-            "stats",
-            "stale",
-            "--threshold",
-            "7000d",
-            "--global",
-        ])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(v["status"], "ok");
-    let items = v["items"].as_array().unwrap();
-    // Expect at least one item and that it contains TEST-1 and not TEST-2
-    assert!(items.iter().any(|it| it["id"] == "TEST-1"));
-    assert!(!items.iter().any(|it| it["id"] == "TEST-2"));
 }

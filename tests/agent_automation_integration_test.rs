@@ -1,4 +1,3 @@
-#![cfg_attr(no_git_tests, allow(dead_code))]
 #![cfg(unix)]
 
 mod common;
@@ -185,6 +184,43 @@ fn wait_for_job_status(job_id: &str, status: &str, timeout_ms: u64) -> bool {
         sleep(Duration::from_millis(50));
     }
     false
+}
+
+/// Wait until `path` holds content satisfying `is_complete`, bounded by
+/// `deadline`. Polling for content - not mere file existence - closes the
+/// partial-write window: a shell `echo done > marker` creates the marker
+/// empty before writing, which an exists-only poll can mistake for the
+/// command having finished. On timeout, reports the observed file state so
+/// a wrong or missing terminal value fails diagnosably instead of as an
+/// empty read.
+#[cfg(unix)]
+fn wait_for_file_content(
+    path: &Path,
+    deadline: Instant,
+    awaited: &str,
+    is_complete: impl Fn(&str) -> bool,
+) -> Result<String, String> {
+    let start = Instant::now();
+    loop {
+        if let Ok(content) = fs::read_to_string(path)
+            && is_complete(&content)
+        {
+            return Ok(content);
+        }
+        if Instant::now() >= deadline {
+            let exists = path.exists();
+            let current =
+                fs::read_to_string(path).unwrap_or_else(|err| format!("<unreadable: {err}>"));
+            return Err(format!(
+                "timed out after {:.1}s waiting for {} at {}: file exists: {exists}, content: {:?}",
+                start.elapsed().as_secs_f64(),
+                awaited,
+                path.display(),
+                current
+            ));
+        }
+        sleep(Duration::from_millis(50));
+    }
 }
 
 #[cfg(unix)]
@@ -599,278 +635,6 @@ printf '%s|%s' \"$LOTAR_TICKET_ID\" \"$LOTAR_AGENT_PROFILE\" > \"{}\"\n",
     assert_eq!(refreshed.assignee.as_deref(), Some("sam"));
 }
 
-#[cfg(not(no_git_tests))]
-#[cfg(unix)]
-#[test]
-fn shipped_agent_pipeline_template_runs_end_to_end() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let _guard = lock_agent_tests();
-    enable_server_mode();
-    let fixtures = TestFixtures::new();
-    init_git_repository(fixtures.get_temp_path());
-
-    let run_log = fixtures.get_temp_path().join("template-pipeline-run.log");
-    let agent_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "template-pipeline-agent.sh",
-        &format!(
-            r#"#!/bin/sh
-profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
-printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
-sid="${{profile}}-$$"
-printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
-printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
-exit 0
-"#,
-            run_log.to_string_lossy()
-        ),
-    );
-
-    install_template_workflow(
-        &fixtures,
-        "PIP",
-        "Pipeline Template",
-        AGENT_PIPELINE_TEMPLATE,
-        &[
-            ("implement", agent_script.as_path()),
-            ("test", agent_script.as_path()),
-            ("merge", agent_script.as_path()),
-            ("merge-retry", agent_script.as_path()),
-        ],
-    );
-
-    let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Shipped pipeline template".to_string(),
-            project: Some("PIP".to_string()),
-            status: None,
-            reporter: Some("Agent Tests".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("create task");
-
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@implement".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("assign implementation agent");
-
-    let jobs = wait_for_completed_jobs(&created.id, 3, 6000);
-    assert_eq!(jobs.len(), 3, "expected implement, test, and merge jobs");
-
-    assert!(
-        wait_for_task_status(&storage, &created.id, "Done", 10_000),
-        "task did not reach Done after pipeline completed"
-    );
-
-    let refreshed = TaskService::get(&storage, &created.id, None).expect("get final task");
-    assert_eq!(refreshed.status.as_str(), "Done");
-    assert_eq!(refreshed.assignee.as_deref(), Some("Agent Tests"));
-
-    let run_output = fs::read_to_string(&run_log).expect("read pipeline run log");
-    let phases: Vec<_> = run_output.lines().collect();
-    assert_eq!(phases, vec!["PIP-1|implement", "PIP-1|test", "PIP-1|merge"]);
-}
-
-#[cfg(not(no_git_tests))]
-#[cfg(unix)]
-#[test]
-fn shipped_agent_reviewed_template_handles_failure_review_and_merge() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let _guard = lock_agent_tests();
-    enable_server_mode();
-    let fixtures = TestFixtures::new();
-    init_git_repository(fixtures.get_temp_path());
-
-    let run_log = fixtures.get_temp_path().join("template-reviewed-run.log");
-    let fail_once_marker = fixtures.get_temp_path().join("test-fails-once.marker");
-    fs::write(&fail_once_marker, "fail once\n").expect("write fail-once marker");
-
-    let implement_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "template-reviewed-implement.sh",
-        &format!(
-            r#"#!/bin/sh
-profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
-printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
-sid="${{profile}}-$$"
-printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
-printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
-exit 0
-"#,
-            run_log.to_string_lossy()
-        ),
-    );
-    let test_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "template-reviewed-test.sh",
-        &format!(
-            r#"#!/bin/sh
-profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
-printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
-sid="${{profile}}-$$"
-printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
-if [ -f "{}" ]; then
-  rm "{}"
-  printf '{{"type":"assistant","message":{{"content":[{{"text":"%s failed"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
-  exit 1
-fi
-printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
-exit 0
-"#,
-            run_log.to_string_lossy(),
-            fail_once_marker.to_string_lossy(),
-            fail_once_marker.to_string_lossy()
-        ),
-    );
-    let merge_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "template-reviewed-merge.sh",
-        &format!(
-            r#"#!/bin/sh
-profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
-printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
-sid="${{profile}}-$$"
-printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
-printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
-exit 0
-"#,
-            run_log.to_string_lossy()
-        ),
-    );
-
-    install_template_workflow(
-        &fixtures,
-        "REV",
-        "Reviewed Template",
-        AGENT_REVIEWED_TEMPLATE,
-        &[
-            ("implement", implement_script.as_path()),
-            ("test", test_script.as_path()),
-            ("merge", merge_script.as_path()),
-            ("merge-retry", merge_script.as_path()),
-        ],
-    );
-    lotar::utils::identity::invalidate_identity_cache(Some(fixtures.tasks_root.as_path()));
-
-    let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Shipped reviewed template".to_string(),
-            project: Some("REV".to_string()),
-            status: None,
-            reporter: Some("Agent Tests".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("create task");
-
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@implement".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("assign implementation agent");
-
-    let failed_cycle_jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
-        jobs.len() >= 2
-            && jobs
-                .iter()
-                .any(|job| job.agent.as_deref() == Some("implement") && job.status == "completed")
-            && jobs
-                .iter()
-                .any(|job| job.agent.as_deref() == Some("test") && job.status == "failed")
-    });
-    assert!(
-        failed_cycle_jobs
-            .iter()
-            .any(|job| job.agent.as_deref() == Some("implement") && job.status == "completed"),
-        "expected completed implementation job in failed cycle"
-    );
-    assert!(
-        failed_cycle_jobs
-            .iter()
-            .any(|job| job.agent.as_deref() == Some("test") && job.status == "failed"),
-        "expected failed test job in failed cycle"
-    );
-
-    let review_task =
-        wait_for_task_state(&storage, &created.id, "Review", Some("Agent Tests"), 6000)
-            .expect("task should hand back to reporter for review");
-    assert!(review_task.tags.iter().any(|tag| tag == "ready-for-review"));
-    assert!(review_task.tags.iter().any(|tag| tag == "test-failure"));
-    assert!(review_task.history.iter().any(|entry| {
-        let saw_status_bounce = entry.changes.iter().any(|change| {
-            change.field == "status"
-                && change.old.as_deref() == Some("Testing")
-                && change.new.as_deref() == Some("InProgress")
-        });
-        let saw_reassignment = entry.changes.iter().any(|change| {
-            change.field == "assignee"
-                && change.old.as_deref() == Some("@test")
-                && change.new.as_deref() == Some("@implement")
-        });
-        saw_status_bounce && saw_reassignment
-    }));
-
-    let advanced = TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some("@merge".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("reporter should be allowed to send reviewed task to merge");
-    assert_eq!(advanced.assignee.as_deref(), Some("@merge"));
-
-    let final_task = wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 6000)
-        .expect("task should complete after merge");
-    assert!(!final_task.tags.iter().any(|tag| tag == "ready-for-review"));
-
-    let final_jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
-        jobs.len() >= 5
-            && jobs
-                .iter()
-                .any(|job| job.agent.as_deref() == Some("merge") && job.status == "completed")
-    });
-    assert_eq!(
-        final_jobs.len(),
-        5,
-        "expected implement/test retry plus merge jobs"
-    );
-
-    let run_output = fs::read_to_string(&run_log).expect("read reviewed run log");
-    let phases: Vec<_> = run_output.lines().collect();
-    assert_eq!(
-        phases,
-        vec![
-            "REV-1|implement",
-            "REV-1|test",
-            "REV-1|implement",
-            "REV-1|test",
-            "REV-1|merge",
-        ]
-    );
-}
-
 // ---------- New feature tests ----------
 
 /// Command runner: `runner: command` runs arbitrary scripts with full job lifecycle.
@@ -1019,6 +783,32 @@ fn command_runner_failure_fires_job_failed() {
 }
 
 /// Template expansion in automation `run` commands — `${{ticket.id}}` and `${{ticket.title}}`.
+///
+/// Completion barrier: the run command's artifact, never job status. The
+/// job record flips to `completed` inside `update_job` during
+/// `finalize_job` (agent_job_service.rs), so the status is observable
+/// BEFORE the post-finalization chain runs: the status-log write (fs io),
+/// the registry re-lock, then `apply_job_event` — which resolves config,
+/// reads storage and the task, and only then blocks in the run command's
+/// `/bin/sh` child (`wait` defaults to true in src/automation/types.rs).
+/// A status poll can therefore return while the artifact does not exist,
+/// which is exactly why status is not used as a barrier here.
+///
+/// One absolute deadline, captured BEFORE the triggering assignee update,
+/// bounds the whole pipeline: job queueing, the agent child, the
+/// post-status dispatch chain, and the run command. It is the 10s
+/// combined budget the old split waits already spent (5s status + 5s
+/// artifact); nothing is increased, and no phase can silently reset it.
+/// The artifact predicate requires BOTH expansions — ticket id and the
+/// fully expanded title — so completing the wait proves the subject action
+/// itself finished. The job's `completed` status is asserted afterwards,
+/// from actual state, as an independent post-barrier check.
+///
+/// The run script publishes atomically (temp file + rename), so the poll
+/// can never observe a partial write. The stub agent writes a start
+/// sentinel that is purely diagnostic — it distinguishes "agent child
+/// never started" from "child ran, run action did not finish" in the
+/// timeout message; nothing gates on it and nothing sleeps for it.
 #[cfg(unix)]
 #[test]
 fn template_expansion_in_run_action() {
@@ -1026,14 +816,19 @@ fn template_expansion_in_run_action() {
     enable_server_mode();
     let fixtures = TestFixtures::new();
 
+    let title = "Template expansion test";
+    let started_sentinel = fixtures.get_temp_path().join("tmpl-agent-started.txt");
     let agent_name = "tmpl-agent";
     let script = write_stub_agent_script(
         fixtures.get_temp_path(),
         "stub-tmpl.sh",
-        "#!/bin/sh\n\
-echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"t-1\"}'\n\
-echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"done\"}]},\"session_id\":\"t-1\"}'\n\
-exit 0\n",
+        &format!(
+            "#!/bin/sh\necho started > \"{sentinel}\"\n\
+             echo '{{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"t-1\"}}'\n\
+             echo '{{\"type\":\"assistant\",\"message\":{{\"content\":[{{\"text\":\"done\"}}]}},\"session_id\":\"t-1\"}}'\n\
+             exit 0\n",
+            sentinel = started_sentinel.to_string_lossy()
+        ),
     );
 
     let run_log = fixtures.get_temp_path().join("tmpl-run.log");
@@ -1041,8 +836,8 @@ exit 0\n",
         fixtures.get_temp_path(),
         "tmpl-run.sh",
         &format!(
-            "#!/bin/sh\necho \"$1|$2\" > \"{}\"\n",
-            run_log.to_string_lossy()
+            "#!/bin/sh\nprintf '%s\\n' \"$1|$2\" > \"{log}.part\" && mv \"{log}.part\" \"{log}\"\n",
+            log = run_log.to_string_lossy()
         ),
     );
 
@@ -1063,13 +858,18 @@ exit 0\n",
     let created = TaskService::create(
         &mut storage,
         TaskCreate {
-            title: "Template expansion test".to_string(),
+            title: title.to_string(),
             project: Some("TMPL".to_string()),
             status: None,
             ..Default::default()
         },
     )
     .expect("create task");
+
+    // The shared deadline precedes the trigger: the assignee update below
+    // starts the pipeline, and every wait in this test — job queueing and
+    // the artifact — is bounded by this one instant, 10s out.
+    let deadline = Instant::now() + Duration::from_secs(10);
 
     TaskService::update(
         &mut storage,
@@ -1081,28 +881,68 @@ exit 0\n",
     )
     .expect("update assignee");
 
-    let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "completed", 5000),
-        "job did not complete in time"
-    );
-
-    // Wait for the automation run command to create the log file (async after job completion)
-    let deadline = Instant::now() + Duration::from_millis(5000);
-    while !run_log.exists() && Instant::now() < deadline {
+    // Pre-dispatch phase: the job must appear while the same deadline
+    // still holds. No separate budget, no retries.
+    let job = loop {
+        if let Some(job) = AgentJobService::list_jobs()
+            .into_iter()
+            .find(|job| job.ticket_id == created.id)
+        {
+            break job;
+        }
+        if Instant::now() >= deadline {
+            panic!(
+                "agent job for ticket {} was never queued within the shared budget",
+                created.id
+            );
+        }
         sleep(Duration::from_millis(50));
-    }
+    };
 
-    let run_output = fs::read_to_string(&run_log).expect("read template run log");
+    // The barrier: the artifact holding BOTH expansions. The run command
+    // runs after the job status already reads `completed` (see mechanism
+    // above), so only this wait proves the subject action finished.
+    let run_output = match wait_for_file_content(
+        &run_log,
+        deadline,
+        &format!("run log with ticket id {} and expanded title", created.id),
+        |content| content.contains(&created.id) && content.contains(title),
+    ) {
+        Ok(content) => content,
+        Err(wait_failure) => {
+            let job_state = AgentJobService::get_job(&job.id)
+                .map(|job| job.status)
+                .unwrap_or_else(|| "<job record missing>".to_string());
+            let sentinel_state = match fs::read_to_string(&started_sentinel) {
+                Ok(content) => format!("started ({content:?})"),
+                Err(_) => "absent — the agent child never started".to_string(),
+            };
+            panic!(
+                "template run command did not finish inside the shared budget: {wait_failure}; \
+                 job status at failure: {job_state}; agent child sentinel: {sentinel_state}"
+            );
+        }
+    };
+
     assert!(
         run_output.contains(&created.id),
-        "expected ticket ID in run output, got: {}",
+        "expected ticket id in run output, got: {}",
         run_output
     );
     assert!(
-        run_output.contains("Template expansion test"),
+        run_output.contains(title),
         "expected ticket title in run output, got: {}",
         run_output
+    );
+
+    // Independent actual state, asserted after the barrier rather than
+    // polled as one: the status published before the run command ran, so
+    // it must read `completed` by now.
+    let finalized = AgentJobService::get_job(&job.id)
+        .unwrap_or_else(|| panic!("job record {} disappeared after the artifact", job.id));
+    assert_eq!(
+        finalized.status, "completed",
+        "job must be completed once the run artifact exists"
     );
 }
 
@@ -1383,86 +1223,6 @@ fn command_runner_receives_lotar_env_vars() {
         content.contains("runner=command"),
         "LOTAR_AGENT_RUNNER missing in env output: {}",
         content
-    );
-}
-
-/// Backward compatibility: old YAML keys (job_start, complete, error, cancel) still work.
-#[cfg(not(no_git_tests))]
-#[cfg(unix)]
-#[test]
-fn backward_compat_old_yaml_keys_still_work() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let _guard = lock_agent_tests();
-    enable_server_mode();
-    let fixtures = TestFixtures::new();
-
-    let agent_name = "compat-agent";
-    let script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "compat-agent.sh",
-        "#!/bin/sh\n\
-echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"c-1\"}'\n\
-echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"compat ok\"}]},\"session_id\":\"c-1\"}'\n\
-exit 0\n",
-    );
-
-    fixtures.create_config_in_dir(
-        &fixtures.tasks_root,
-        &format!(
-            "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
-            script.to_string_lossy()
-        ),
-    );
-    // Use OLD YAML key names: job_start, complete (not job_started, job_completed)
-    let automation_yaml = format!(
-        "automation:\n  rules:\n    - name: Backward compat\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_start:\n          set:\n            status: InProgress\n        complete:\n          set:\n            status: Done\n            assignee: \"@reporter\"\n          add:\n            tags: [compat-success]\n"
-    );
-    AutomationService::set(&fixtures.tasks_root, None, &automation_yaml).expect("set automation");
-
-    let mut storage = fixtures.create_storage();
-    let created = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Backward compat test".to_string(),
-            project: Some("COMPAT".to_string()),
-            status: None,
-            reporter: Some("reporter-user".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("create task");
-
-    TaskService::update(
-        &mut storage,
-        &created.id,
-        TaskUpdate {
-            assignee: Some(format!("@{agent_name}")),
-            ..Default::default()
-        },
-    )
-    .expect("update assignee");
-
-    let job = job_for_ticket(&created.id);
-    assert!(
-        wait_for_job_status(&job.id, "completed", 3000),
-        "job did not complete in time (backward compat)"
-    );
-
-    assert!(
-        wait_for_task_status(&storage, &created.id, "Done", 10_000),
-        "task did not reach Done (backward compat)"
-    );
-
-    let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
-    assert_eq!(refreshed.status.as_str(), "Done");
-    assert_eq!(refreshed.assignee.as_deref(), Some("reporter-user"));
-    assert!(
-        refreshed.tags.iter().any(|t| t == "compat-success"),
-        "expected compat-success tag, got tags: {:?}",
-        refreshed.tags
     );
 }
 
@@ -2001,16 +1761,295 @@ fn async_run_action_does_not_block() {
         update_elapsed.as_secs_f64()
     );
 
-    // Open the gate and poll until the script completes (max 10s).
+    // Open the gate and wait until the child records a terminal value
+    // (max 10s). Waiting for terminal content rather than mere file
+    // existence closes the partial-write window: `echo done > M` creates
+    // M empty before writing, which an exists-only poll can mistake for
+    // the child having finished and then read as empty.
     std::fs::write(&release, "release\n").unwrap();
-    let start = std::time::Instant::now();
-    while !marker.exists() && start.elapsed() < std::time::Duration::from_secs(10) {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    let final_state = std::fs::read_to_string(&marker).unwrap_or_default();
+    let final_state = wait_for_file_content(
+        &marker,
+        Instant::now() + Duration::from_secs(10),
+        "the gated child's terminal marker (done or bail)",
+        |content| matches!(content.trim(), "done" | "bail"),
+    )
+    .expect("gated child should record a terminal marker after release");
+    assert!(
+        final_state.trim() != "bail",
+        "gated child bailed: its ~30s bound expired before it saw the release gate (update took {:.1}s)",
+        update_elapsed.as_secs_f64()
+    );
     assert!(
         final_state.trim() == "done",
         "async run command should complete via the gate after release, got {final_state:?}"
+    );
+}
+
+/// Deterministic regression for the marker partial-write window: a shell
+/// `echo done > M` creates M empty before writing, so an exists-only wait
+/// can observe an empty (or partial) file and treat the command as complete
+/// with no content (the empty-read async-gate failure this suite once
+/// showed). The window is forced directly - the marker starts empty and its
+/// content is staged behind channel handshakes - so no sleep-based race is
+/// involved. The wait's own predicate reports every content it evaluates,
+/// which proves the ordering by observation rather than by a timeout:
+///
+/// 1. an exists-only wait, the pre-fix control, accepts the empty file,
+///    which is exactly how the old polling failed;
+/// 2. the content wait evaluates the empty marker, then a partial "do"
+///    fragment, and keeps running - content is never accepted before the
+///    full write, and the predicate never sees "bail" or any other
+///    stand-in value that could satisfy it vacuously;
+/// 3. only after the full "done" write does the wait complete;
+/// 4. a 25ms-bound wait that never completes fails with diagnostics naming
+///    the observed file state, so real-site failures self-diagnose.
+///
+/// Hermetic filesystem/thread test: touches no agent state, so it takes no
+/// agent lock.
+#[cfg(unix)]
+#[test]
+fn wait_for_file_content_rejects_empty_partial_write_window() {
+    let fixtures = TestFixtures::new();
+    let marker = fixtures.get_temp_path().join("partial_write_marker.txt");
+    fs::write(&marker, "").expect("create empty marker (forced partial-write window)");
+
+    // 1. Pre-fix control: the exists-only polling this fix replaces accepts
+    //    the empty file, so the read that follows it observes no content.
+    let legacy_deadline = Instant::now() + Duration::from_secs(2);
+    while !marker.exists() && Instant::now() < legacy_deadline {
+        sleep(Duration::from_millis(50));
+    }
+    let legacy_read = fs::read_to_string(&marker).expect("legacy wait should read the marker");
+    assert!(
+        legacy_read.is_empty(),
+        "control: the exists-only wait must observe the forced empty window, got {legacy_read:?}"
+    );
+
+    // Stage the content behind handshakes: nothing can write the marker
+    // until this test signals, so every refusal below holds by
+    // construction, not timing luck. The predicate reports each content it
+    // evaluates, proving the wait kept refusing up to the real write.
+    let (stage_tx, stage_rx) = std::sync::mpsc::channel::<&'static str>();
+    let (staged_tx, staged_rx) = std::sync::mpsc::channel::<()>();
+    let (observed_tx, observed_rx) = std::sync::mpsc::channel::<String>();
+    let (result_tx, result_rx) = std::sync::mpsc::channel::<Result<String, String>>();
+    let writer_marker = marker.clone();
+    let writer = std::thread::spawn(move || {
+        for stage in stage_rx {
+            fs::write(&writer_marker, stage).expect("write staged marker content");
+            staged_tx.send(()).expect("report staged write");
+        }
+    });
+    let waiter_marker = marker.clone();
+    let waiter = std::thread::spawn(move || {
+        let result = wait_for_file_content(
+            &waiter_marker,
+            Instant::now() + Duration::from_secs(10),
+            "marker content staged behind handshakes",
+            |content| {
+                let _ = observed_tx.send(content.to_string());
+                content.contains("done")
+            },
+        );
+        let _ = result_tx.send(result);
+    });
+
+    // 2. The wait must evaluate the empty marker and refuse it: the first
+    //    observation is the empty window itself, and the wait is still
+    //    running when that observation arrives.
+    let first = observed_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("content wait should evaluate the empty marker");
+    assert_eq!(
+        first, "",
+        "first evaluated content must be the forced empty window"
+    );
+    if let Ok(premature) = result_rx.try_recv() {
+        panic!("content wait completed on empty content, got {premature:?}");
+    }
+
+    // A partial fragment is refused the same way: the wait evaluates "do"
+    // and keeps running until the full content exists.
+    stage_tx.send("do\n").expect("stage partial fragment");
+    staged_rx.recv().expect("partial fragment staged");
+    loop {
+        let observed = observed_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("content wait should evaluate the staged content");
+        assert!(
+            observed.is_empty() || observed == "do\n",
+            "unexpected intermediate content: {observed:?}"
+        );
+        if observed == "do\n" {
+            break;
+        }
+    }
+    if let Ok(premature) = result_rx.try_recv() {
+        panic!("content wait completed on partial content, got {premature:?}");
+    }
+
+    // 3. Only the full write completes the wait; the staged-write handshake
+    //    orders the write before this point.
+    stage_tx.send("done\n").expect("stage full content");
+    staged_rx.recv().expect("full content staged");
+    let completed = result_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("content wait should finish after the full write")
+        .expect("content wait should succeed after the full write");
+    assert_eq!(completed.trim(), "done");
+
+    drop(stage_tx);
+    writer.join().expect("writer thread should finish");
+    waiter.join().expect("waiter thread should finish");
+
+    // 4. Never-completing waits fail with diagnostics naming the observed
+    //    file state, so real-site failures are self-explanatory.
+    let absent = fixtures.get_temp_path().join("never_written_marker.txt");
+    let refusal = wait_for_file_content(
+        &absent,
+        Instant::now() + Duration::from_millis(25),
+        "a marker that is never written",
+        |content| content.contains("done"),
+    )
+    .expect_err("never-written marker must time out");
+    assert!(
+        refusal.contains("file exists: false"),
+        "diagnostics should state that the file is absent, got: {refusal}"
+    );
+    let stale_refusal = wait_for_file_content(
+        &marker,
+        Instant::now() + Duration::from_millis(25),
+        "a marker that never gains the awaited content",
+        |content| content.contains("finished"),
+    )
+    .expect_err("marker without the awaited content must time out");
+    assert!(
+        stale_refusal.contains("file exists: true") && stale_refusal.contains("done"),
+        "diagnostics should state the existing file and its content, got: {stale_refusal}"
+    );
+}
+
+/// Deterministic regression for the split-budget completion flaw the old
+/// template test had. Source-proven ordering (not timing): the job status
+/// publishes inside `update_job` in `finalize_job` BEFORE the status-log
+/// write (fs io), the registry re-lock, and `apply_job_event`'s config +
+/// storage + task reads, and only then does the blocking run command
+/// (`wait` defaults to true) spawn `/bin/sh` and publish its artifact. A
+/// barrier that polls job status returns inside that window, so a fresh
+/// per-phase budget for the artifact wait re-spends the first phase's
+/// budget and can fail while most of the combined budget is still unspent.
+///
+/// This test owns the whole timeline through an injected clock — the same
+/// probe-then-deadline decision order as the real waits, with ticks
+/// standing in for the real 50ms sleeps — so no wall time passes and no
+/// race is involved. Synthetic scale is 1/10 of the real budget: the
+/// status flips at 60ms, the artifact lands at 660ms (a delayed
+/// post-status dispatch standing in for fs contention under a concurrent
+/// build), still inside the combined 1000ms budget. The old pattern fails
+/// that timeline by construction; the shared absolute deadline from the
+/// trigger covers it. The synthetic delay models a plausible window; the
+/// exact cause of the historical one-off 5.133s failure is unproven (its
+/// log is gone) and is not claimed here. Hermetic: touches no agent
+/// state, so it takes no agent lock.
+#[cfg(unix)]
+#[test]
+fn shared_artifact_deadline_covers_delayed_post_status_dispatch() {
+    const TICK: Duration = Duration::from_millis(50);
+    const OLD_PHASE_BUDGET: Duration = Duration::from_millis(500);
+    const SHARED_BUDGET: Duration = Duration::from_millis(1000);
+    const STATUS_FLIP: Duration = Duration::from_millis(60);
+    const ARTIFACT_READY: Duration = Duration::from_millis(660);
+
+    // The synthetic clock only advances in `tick`, mirroring the real
+    // waits' 50ms poll interval; probes are pure functions of it.
+    let clock = std::cell::Cell::new(Instant::now());
+    let start = clock.get();
+    let mut now = || clock.get();
+    let mut tick = || clock.set(clock.get() + TICK);
+    let mut status_probe =
+        || (clock.get().duration_since(start) >= STATUS_FLIP).then_some("completed");
+    let mut artifact_probe = || {
+        (clock.get().duration_since(start) >= ARTIFACT_READY)
+            .then_some("TMPL-1|Template expansion test")
+    };
+
+    // The real waits' decision order: probe first, then deadline, then
+    // wait one interval. The injected clock makes it deterministic.
+    fn synthetic_poll<T>(
+        deadline: Instant,
+        probe: &mut dyn FnMut() -> Option<T>,
+        now: &mut dyn FnMut() -> Instant,
+        tick: &mut dyn FnMut(),
+    ) -> Option<(T, Instant)> {
+        loop {
+            if let Some(value) = probe() {
+                let at = now();
+                return Some((value, at));
+            }
+            if now() >= deadline {
+                return None;
+            }
+            tick();
+        }
+    }
+
+    // Old phase 1 (control): the status barrier succeeds the moment the
+    // status publishes — while the artifact is still absent. That instant
+    // IS the split window: status observable, subject action unfinished.
+    let (status, _seen_at) = synthetic_poll(
+        clock.get() + OLD_PHASE_BUDGET,
+        &mut status_probe,
+        &mut now,
+        &mut tick,
+    )
+    .expect("status barrier observes the synthetic status flip");
+    assert_eq!(status, "completed");
+    assert!(
+        artifact_probe().is_none(),
+        "split window: artifact must be absent when the status barrier returns"
+    );
+
+    // Old phase 2 (control): the artifact wait gets a fresh phase budget
+    // starting at the status flip, so it expires before the artifact even
+    // though the combined budget is far from spent.
+    let old_artifact = synthetic_poll(
+        clock.get() + OLD_PHASE_BUDGET,
+        &mut artifact_probe,
+        &mut now,
+        &mut tick,
+    );
+    assert!(
+        old_artifact.is_none(),
+        "old split budgets must miss the delayed post-status artifact"
+    );
+    let old_failed_after = clock.get().duration_since(start);
+    assert!(
+        old_failed_after < SHARED_BUDGET,
+        "old pattern must fail with combined budget remaining, failed after {old_failed_after:?}"
+    );
+
+    // New pattern: reset to the trigger instant and run the whole
+    // pipeline under ONE shared absolute deadline — no status barrier; the
+    // artifact (both expansions) is the completion predicate.
+    clock.set(start);
+    let (artifact, artifact_at) = synthetic_poll(
+        clock.get() + SHARED_BUDGET,
+        &mut artifact_probe,
+        &mut now,
+        &mut tick,
+    )
+    .expect("shared deadline covers the delayed post-status dispatch");
+    assert_eq!(artifact, "TMPL-1|Template expansion test");
+    assert!(
+        artifact_at.duration_since(start) <= SHARED_BUDGET,
+        "artifact completes within the shared budget"
+    );
+
+    // Post-barrier independent state: the status published earlier and
+    // stays published — read as actual state, never polled as a barrier.
+    assert_eq!(
+        status_probe().expect("status stays published after the artifact"),
+        "completed"
     );
 }
 
@@ -2801,30 +2840,374 @@ exit 0\n",
     );
 }
 
-#[cfg(not(no_git_tests))]
-#[cfg(unix)]
-#[test]
-fn merge_jobs_are_serialized_even_with_parallel_slots() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let _guard = lock_agent_tests();
-    enable_server_mode();
-    let fixtures = TestFixtures::new();
-    init_git_repository(fixtures.get_temp_path());
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
 
-    let merge_script = write_stub_agent_script(
-        fixtures.get_temp_path(),
-        "stub-agent-merge-serial.sh",
-        "#!/bin/sh\n\
+    #[cfg(unix)]
+    #[test]
+    fn shipped_agent_pipeline_template_runs_end_to_end() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+
+        let run_log = fixtures.get_temp_path().join("template-pipeline-run.log");
+        let agent_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "template-pipeline-agent.sh",
+            &format!(
+                r#"#!/bin/sh
+profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
+printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
+sid="${{profile}}-$$"
+printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+exit 0
+"#,
+                run_log.to_string_lossy()
+            ),
+        );
+
+        install_template_workflow(
+            &fixtures,
+            "PIP",
+            "Pipeline Template",
+            AGENT_PIPELINE_TEMPLATE,
+            &[
+                ("implement", agent_script.as_path()),
+                ("test", agent_script.as_path()),
+                ("merge", agent_script.as_path()),
+                ("merge-retry", agent_script.as_path()),
+            ],
+        );
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Shipped pipeline template".to_string(),
+                project: Some("PIP".to_string()),
+                status: None,
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+
+        TaskService::update(
+            &mut storage,
+            &created.id,
+            TaskUpdate {
+                assignee: Some("@implement".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("assign implementation agent");
+
+        let jobs = wait_for_completed_jobs(&created.id, 3, 6000);
+        assert_eq!(jobs.len(), 3, "expected implement, test, and merge jobs");
+
+        assert!(
+            wait_for_task_status(&storage, &created.id, "Done", 10_000),
+            "task did not reach Done after pipeline completed"
+        );
+
+        let refreshed = TaskService::get(&storage, &created.id, None).expect("get final task");
+        assert_eq!(refreshed.status.as_str(), "Done");
+        assert_eq!(refreshed.assignee.as_deref(), Some("Agent Tests"));
+
+        let run_output = fs::read_to_string(&run_log).expect("read pipeline run log");
+        let phases: Vec<_> = run_output.lines().collect();
+        assert_eq!(phases, vec!["PIP-1|implement", "PIP-1|test", "PIP-1|merge"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn shipped_agent_reviewed_template_handles_failure_review_and_merge() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+
+        let run_log = fixtures.get_temp_path().join("template-reviewed-run.log");
+        let fail_once_marker = fixtures.get_temp_path().join("test-fails-once.marker");
+        fs::write(&fail_once_marker, "fail once\n").expect("write fail-once marker");
+
+        let implement_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "template-reviewed-implement.sh",
+            &format!(
+                r#"#!/bin/sh
+profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
+printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
+sid="${{profile}}-$$"
+printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+exit 0
+"#,
+                run_log.to_string_lossy()
+            ),
+        );
+        let test_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "template-reviewed-test.sh",
+            &format!(
+                r#"#!/bin/sh
+profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
+printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
+sid="${{profile}}-$$"
+printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+if [ -f "{}" ]; then
+  rm "{}"
+  printf '{{"type":"assistant","message":{{"content":[{{"text":"%s failed"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+  exit 1
+fi
+printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+exit 0
+"#,
+                run_log.to_string_lossy(),
+                fail_once_marker.to_string_lossy(),
+                fail_once_marker.to_string_lossy()
+            ),
+        );
+        let merge_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "template-reviewed-merge.sh",
+            &format!(
+                r#"#!/bin/sh
+profile="${{LOTAR_AGENT_PROFILE:-unknown}}"
+printf '%s|%s\n' "$LOTAR_TICKET_ID" "$profile" >> "{}"
+sid="${{profile}}-$$"
+printf '{{"type":"system","subtype":"init","session_id":"%s"}}\n' "$sid"
+printf '{{"type":"assistant","message":{{"content":[{{"text":"%s complete"}}]}},"session_id":"%s"}}\n' "$profile" "$sid"
+exit 0
+"#,
+                run_log.to_string_lossy()
+            ),
+        );
+
+        install_template_workflow(
+            &fixtures,
+            "REV",
+            "Reviewed Template",
+            AGENT_REVIEWED_TEMPLATE,
+            &[
+                ("implement", implement_script.as_path()),
+                ("test", test_script.as_path()),
+                ("merge", merge_script.as_path()),
+                ("merge-retry", merge_script.as_path()),
+            ],
+        );
+        lotar::utils::identity::invalidate_identity_cache(Some(fixtures.tasks_root.as_path()));
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Shipped reviewed template".to_string(),
+                project: Some("REV".to_string()),
+                status: None,
+                reporter: Some("Agent Tests".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+
+        TaskService::update(
+            &mut storage,
+            &created.id,
+            TaskUpdate {
+                assignee: Some("@implement".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("assign implementation agent");
+
+        let failed_cycle_jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
+            jobs.len() >= 2
+                && jobs.iter().any(|job| {
+                    job.agent.as_deref() == Some("implement") && job.status == "completed"
+                })
+                && jobs
+                    .iter()
+                    .any(|job| job.agent.as_deref() == Some("test") && job.status == "failed")
+        });
+        assert!(
+            failed_cycle_jobs
+                .iter()
+                .any(|job| job.agent.as_deref() == Some("implement") && job.status == "completed"),
+            "expected completed implementation job in failed cycle"
+        );
+        assert!(
+            failed_cycle_jobs
+                .iter()
+                .any(|job| job.agent.as_deref() == Some("test") && job.status == "failed"),
+            "expected failed test job in failed cycle"
+        );
+
+        let review_task =
+            wait_for_task_state(&storage, &created.id, "Review", Some("Agent Tests"), 6000)
+                .expect("task should hand back to reporter for review");
+        assert!(review_task.tags.iter().any(|tag| tag == "ready-for-review"));
+        assert!(review_task.tags.iter().any(|tag| tag == "test-failure"));
+        assert!(review_task.history.iter().any(|entry| {
+            let saw_status_bounce = entry.changes.iter().any(|change| {
+                change.field == "status"
+                    && change.old.as_deref() == Some("Testing")
+                    && change.new.as_deref() == Some("InProgress")
+            });
+            let saw_reassignment = entry.changes.iter().any(|change| {
+                change.field == "assignee"
+                    && change.old.as_deref() == Some("@test")
+                    && change.new.as_deref() == Some("@implement")
+            });
+            saw_status_bounce && saw_reassignment
+        }));
+
+        let advanced = TaskService::update(
+            &mut storage,
+            &created.id,
+            TaskUpdate {
+                assignee: Some("@merge".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("reporter should be allowed to send reviewed task to merge");
+        assert_eq!(advanced.assignee.as_deref(), Some("@merge"));
+
+        let final_task =
+            wait_for_task_state(&storage, &created.id, "Done", Some("Agent Tests"), 6000)
+                .expect("task should complete after merge");
+        assert!(!final_task.tags.iter().any(|tag| tag == "ready-for-review"));
+
+        let final_jobs = wait_for_ticket_jobs(&created.id, 6000, |jobs| {
+            jobs.len() >= 5
+                && jobs
+                    .iter()
+                    .any(|job| job.agent.as_deref() == Some("merge") && job.status == "completed")
+        });
+        assert_eq!(
+            final_jobs.len(),
+            5,
+            "expected implement/test retry plus merge jobs"
+        );
+
+        let run_output = fs::read_to_string(&run_log).expect("read reviewed run log");
+        let phases: Vec<_> = run_output.lines().collect();
+        assert_eq!(
+            phases,
+            vec![
+                "REV-1|implement",
+                "REV-1|test",
+                "REV-1|implement",
+                "REV-1|test",
+                "REV-1|merge",
+            ]
+        );
+    }
+
+    /// Backward compatibility: old YAML keys (job_start, complete, error, cancel) still work.
+    #[cfg(unix)]
+    #[test]
+    fn backward_compat_old_yaml_keys_still_work() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+
+        let agent_name = "compat-agent";
+        let script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "compat-agent.sh",
+            "#!/bin/sh\n\
+echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"c-1\"}'\n\
+echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"compat ok\"}]},\"session_id\":\"c-1\"}'\n\
+exit 0\n",
+        );
+
+        fixtures.create_config_in_dir(
+            &fixtures.tasks_root,
+            &format!(
+                "agents:\n  {agent_name}:\n    runner: claude\n    command: \"{}\"\n",
+                script.to_string_lossy()
+            ),
+        );
+        // Use OLD YAML key names: job_start, complete (not job_started, job_completed)
+        let automation_yaml = format!(
+            "automation:\n  rules:\n    - name: Backward compat\n      when:\n        assignee: \"@{agent_name}\"\n      on:\n        job_start:\n          set:\n            status: InProgress\n        complete:\n          set:\n            status: Done\n            assignee: \"@reporter\"\n          add:\n            tags: [compat-success]\n"
+        );
+        AutomationService::set(&fixtures.tasks_root, None, &automation_yaml)
+            .expect("set automation");
+
+        let mut storage = fixtures.create_storage();
+        let created = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Backward compat test".to_string(),
+                project: Some("COMPAT".to_string()),
+                status: None,
+                reporter: Some("reporter-user".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create task");
+
+        TaskService::update(
+            &mut storage,
+            &created.id,
+            TaskUpdate {
+                assignee: Some(format!("@{agent_name}")),
+                ..Default::default()
+            },
+        )
+        .expect("update assignee");
+
+        let job = job_for_ticket(&created.id);
+        assert!(
+            wait_for_job_status(&job.id, "completed", 3000),
+            "job did not complete in time (backward compat)"
+        );
+
+        assert!(
+            wait_for_task_status(&storage, &created.id, "Done", 10_000),
+            "task did not reach Done (backward compat)"
+        );
+
+        let refreshed = TaskService::get(&storage, &created.id, None).expect("get task");
+        assert_eq!(refreshed.status.as_str(), "Done");
+        assert_eq!(refreshed.assignee.as_deref(), Some("reporter-user"));
+        assert!(
+            refreshed.tags.iter().any(|t| t == "compat-success"),
+            "expected compat-success tag, got tags: {:?}",
+            refreshed.tags
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn merge_jobs_are_serialized_even_with_parallel_slots() {
+        crate::common::require_git();
+        let _guard = lock_agent_tests();
+        enable_server_mode();
+        let fixtures = TestFixtures::new();
+        init_git_repository(fixtures.get_temp_path());
+
+        let merge_script = write_stub_agent_script(
+            fixtures.get_temp_path(),
+            "stub-agent-merge-serial.sh",
+            "#!/bin/sh\n\
 echo '{\"type\":\"system\",\"subtype\":\"init\",\"session_id\":\"merge-serial\"}'\n\
 sleep 1\n\
 echo '{\"type\":\"assistant\",\"message\":{\"content\":[{\"text\":\"serialized merge done\"}]},\"session_id\":\"merge-serial\"}'\n\
 exit 0\n",
-    );
+        );
 
-    fixtures.create_config_in_dir(
+        fixtures.create_config_in_dir(
         &fixtures.tasks_root,
         &format!(
             "default:\n  project: MRG\nissue:\n  states: [Todo, Merging, Done]\n  priorities: [Low]\n  types: [Feature]\nagent:\n  worktree:\n    enabled: true\n    max_parallel_jobs: 4\n    cleanup_on_done: true\nagents:\n  merge:\n    runner: claude\n    command: \"{}\"\n",
@@ -2832,68 +3215,69 @@ exit 0\n",
         ),
     );
 
-    let mut storage = fixtures.create_storage();
-    let first = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Serialized merge one".to_string(),
-            project: Some("MRG".to_string()),
-            status: None,
-            reporter: Some("sam".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("create first task");
-    let second = TaskService::create(
-        &mut storage,
-        TaskCreate {
-            title: "Serialized merge two".to_string(),
-            project: Some("MRG".to_string()),
-            status: None,
-            reporter: Some("sam".to_string()),
-            ..Default::default()
-        },
-    )
-    .expect("create second task");
-
-    for ticket_id in [&first.id, &second.id] {
-        TaskService::update_with_context(
+        let mut storage = fixtures.create_storage();
+        let first = TaskService::create(
             &mut storage,
-            ticket_id,
-            TaskUpdate {
-                status: Some("Merging".to_string()),
-                assignee: Some("merge".to_string()),
+            TaskCreate {
+                title: "Serialized merge one".to_string(),
+                project: Some("MRG".to_string()),
+                status: None,
+                reporter: Some("sam".to_string()),
                 ..Default::default()
             },
-            TaskUpdateContext::automation_disabled(),
         )
-        .expect("set task to merging");
+        .expect("create first task");
+        let second = TaskService::create(
+            &mut storage,
+            TaskCreate {
+                title: "Serialized merge two".to_string(),
+                project: Some("MRG".to_string()),
+                status: None,
+                reporter: Some("sam".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("create second task");
+
+        for ticket_id in [&first.id, &second.id] {
+            TaskService::update_with_context(
+                &mut storage,
+                ticket_id,
+                TaskUpdate {
+                    status: Some("Merging".to_string()),
+                    assignee: Some("merge".to_string()),
+                    ..Default::default()
+                },
+                TaskUpdateContext::automation_disabled(),
+            )
+            .expect("set task to merging");
+        }
+
+        let first_job = AgentJobService::start_job_with_tasks_dir(
+            AgentJobCreateRequest {
+                ticket_id: first.id.clone(),
+                prompt: "merge first".to_string(),
+                runner: None,
+                agent: Some("merge".to_string()),
+            },
+            fixtures.tasks_root.as_path(),
+        )
+        .expect("start first merge job");
+        let second_job = AgentJobService::start_job_with_tasks_dir(
+            AgentJobCreateRequest {
+                ticket_id: second.id.clone(),
+                prompt: "merge second".to_string(),
+                runner: None,
+                agent: Some("merge".to_string()),
+            },
+            fixtures.tasks_root.as_path(),
+        )
+        .expect("start second merge job");
+
+        assert!(wait_for_job_status(&first_job.id, "running", 1500));
+        assert!(wait_for_job_status(&second_job.id, "queued", 500));
+
+        assert!(wait_for_job_status(&first_job.id, "completed", 4000));
+        assert!(wait_for_job_status(&second_job.id, "completed", 5000));
     }
-
-    let first_job = AgentJobService::start_job_with_tasks_dir(
-        AgentJobCreateRequest {
-            ticket_id: first.id.clone(),
-            prompt: "merge first".to_string(),
-            runner: None,
-            agent: Some("merge".to_string()),
-        },
-        fixtures.tasks_root.as_path(),
-    )
-    .expect("start first merge job");
-    let second_job = AgentJobService::start_job_with_tasks_dir(
-        AgentJobCreateRequest {
-            ticket_id: second.id.clone(),
-            prompt: "merge second".to_string(),
-            runner: None,
-            agent: Some("merge".to_string()),
-        },
-        fixtures.tasks_root.as_path(),
-    )
-    .expect("start second merge job");
-
-    assert!(wait_for_job_status(&first_job.id, "running", 1500));
-    assert!(wait_for_job_status(&second_job.id, "queued", 500));
-
-    assert!(wait_for_job_status(&first_job.id, "completed", 4000));
-    assert!(wait_for_job_status(&second_job.id, "completed", 5000));
 }

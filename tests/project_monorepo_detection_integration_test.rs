@@ -1,4 +1,3 @@
-#![cfg_attr(no_git_tests, allow(dead_code))]
 mod common;
 use std::fs;
 use std::path::PathBuf;
@@ -36,28 +35,28 @@ fn with_cwd(dir: &PathBuf, f: impl FnOnce()) {
     std::env::set_current_dir(old).unwrap();
 }
 
-#[cfg(not(no_git_tests))]
-#[test]
-fn detect_project_name_prefers_nearest_package_json() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn detect_project_name_prefers_nearest_package_json() {
+        crate::common::require_git();
+        let tmp = tempfile::TempDir::new().unwrap();
+        let root = tmp.path().join("repo");
+        fs::create_dir_all(root.join(".git")).unwrap(); // mark as repo root
+        let pkg_root = root.join("package.json");
+        fs::write(&pkg_root, r#"{ "name": "monorepo" }"#).unwrap();
+
+        // packages/api has its own package.json
+        let api_dir = root.join("packages").join("api");
+        fs::create_dir_all(&api_dir).unwrap();
+        fs::write(api_dir.join("package.json"), r#"{ "name": "api" }"#).unwrap();
+
+        with_cwd(&api_dir, || {
+            let name = lotar::project::detect_project_name();
+            assert_eq!(name.as_deref(), Some("api"));
+        });
     }
-    let tmp = tempfile::TempDir::new().unwrap();
-    let root = tmp.path().join("repo");
-    fs::create_dir_all(root.join(".git")).unwrap(); // mark as repo root
-    let pkg_root = root.join("package.json");
-    fs::write(&pkg_root, r#"{ "name": "monorepo" }"#).unwrap();
-
-    // packages/api has its own package.json
-    let api_dir = root.join("packages").join("api");
-    fs::create_dir_all(&api_dir).unwrap();
-    fs::write(api_dir.join("package.json"), r#"{ "name": "api" }"#).unwrap();
-
-    with_cwd(&api_dir, || {
-        let name = lotar::project::detect_project_name();
-        assert_eq!(name.as_deref(), Some("api"));
-    });
 }
 
 #[test]

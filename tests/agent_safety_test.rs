@@ -1,5 +1,4 @@
 #![cfg(unix)]
-#![cfg_attr(no_git_tests, allow(dead_code))]
 
 mod common;
 
@@ -152,24 +151,6 @@ fn worker_process_waits_for_runner_and_finalization() {
 }
 
 #[test]
-#[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
-fn enabled_worktree_failure_never_executes_in_main() {
-    if !common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let (fixture, ticket) = setup("touch executed-in-main", true);
-    fs::write(fixture.get_temp_path().join("worktrees"), "not a directory").unwrap();
-    let job =
-        AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root).unwrap();
-    wait_idle();
-    let job = AgentJobService::get_job(&job.id).unwrap();
-    assert_eq!(job.status, "failed");
-    assert!(job.last_message.unwrap().contains("Worktree setup failed"));
-    assert!(!fixture.get_temp_path().join("executed-in-main").exists());
-}
-
-#[test]
 fn enabled_worktree_without_repository_fails_closed() {
     let (fixture, ticket) = setup("touch \"$LOTAR_TASKS_DIR/../executed-in-main\"", false);
     let path = fixture.tasks_root.join("config.yml");
@@ -284,161 +265,6 @@ fn cleanup_command(fixture: &TestFixtures) -> Command {
 
 fn cleanup(fixture: &TestFixtures) -> std::process::Output {
     cleanup_command(fixture).output().unwrap()
-}
-
-#[test]
-#[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
-fn cli_cleanup_preserves_indeterminate_dirty_and_unmerged_worktrees() {
-    if !common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let (fixture, ticket) = setup("exit 0", true);
-    let root = fixture.get_temp_path();
-    let wt = root.join("worktrees").join(&ticket);
-    let branch = format!("agent/{ticket}");
-    git(
-        root,
-        &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
-    );
-    let task_path = fixture.tasks_root.join("SAFE/1.yml");
-    let original = fs::read_to_string(&task_path).unwrap();
-    fs::remove_file(&task_path).unwrap();
-    assert!(cleanup(&fixture).status.success());
-    assert!(wt.exists(), "missing task must not authorize removal");
-    let all = Command::new(env!("CARGO_BIN_EXE_lotar"))
-        .args([
-            "--tasks-dir",
-            fixture.tasks_root.to_str().unwrap(),
-            "agent",
-            "worktree",
-            "cleanup",
-            "--all",
-            "--delete-branches",
-        ])
-        .env("LOTAR_IGNORE_HOME_CONFIG", "1")
-        .current_dir(root)
-        .output()
-        .unwrap();
-    assert!(all.status.success());
-    assert!(
-        wt.exists(),
-        "--all must not authorize indeterminate cleanup"
-    );
-    for raw in [
-        "broken: [",
-        "title: malformed\nstatus: Done\ncreated: []\n",
-        "title: unknown\nstatus: Unconfigured\ncreated: now\n",
-    ] {
-        fs::write(&task_path, raw).unwrap();
-        assert!(cleanup(&fixture).status.success());
-        assert!(wt.exists(), "indeterminate task must not authorize removal");
-    }
-    fs::remove_file(&task_path).unwrap();
-    fs::create_dir(&task_path).unwrap();
-    assert!(cleanup(&fixture).status.success());
-    assert!(wt.exists(), "unreadable task must not authorize removal");
-    fs::remove_dir(&task_path).unwrap();
-    let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&original).unwrap();
-    task["status"] = "Done".into();
-    fs::write(&task_path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
-    fs::write(wt.join("uncommitted"), "keep me").unwrap();
-    assert!(!cleanup(&fixture).status.success());
-    assert!(wt.join("uncommitted").exists());
-    git(&wt, &["add", "uncommitted"]);
-    git(&wt, &["commit", "-m", "Unmerged work"]);
-    assert!(!cleanup(&fixture).status.success());
-    assert!(wt.exists(), "unmerged worktree must be preserved");
-    git(
-        root,
-        &["show-ref", "--verify", &format!("refs/heads/{branch}")],
-    );
-}
-
-#[test]
-#[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
-fn automatic_cleanup_preserves_missing_malformed_dirty_and_unmerged_worktrees() {
-    if !common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    for body in [
-        "rm \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
-        "printf 'title: malformed\\nstatus: Done\\ncreated: []\\n' > \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
-        "printf 'title: unknown\\nstatus: Unconfigured\\ncreated: now\\n' > \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
-        "rm \"$LOTAR_TASKS_DIR/SAFE/1.yml\"; mkdir \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
-        "touch uncommitted",
-        "touch unmerged; git add unmerged; git commit -m 'Unmerged work'",
-    ] {
-        let (fixture, ticket) = setup(body, true);
-        let path = fixture.tasks_root.join("SAFE/1.yml");
-        let mut task: serde_yaml_ng::Value =
-            serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-        task["status"] = "Done".into();
-        fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
-        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root)
-            .unwrap();
-        wait_idle();
-        let job = AgentJobService::get_job(&job.id).unwrap();
-        assert_eq!(job.status, "completed", "{body}: {:?}", job.last_message);
-        assert!(
-            Path::new(job.worktree_path.as_deref().unwrap()).exists(),
-            "{body}"
-        );
-        git(
-            fixture.get_temp_path(),
-            &[
-                "show-ref",
-                "--verify",
-                &format!("refs/heads/agent/{ticket}"),
-            ],
-        );
-    }
-}
-
-#[test]
-#[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
-fn cli_cleanup_accepts_clean_merged_worktree_with_project_done_status() {
-    if !common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let (fixture, ticket) = setup("exit 0", true);
-    let root = fixture.get_temp_path();
-    let wt = root.join("worktrees").join(&ticket);
-    let branch = format!("agent/{ticket}");
-    git(
-        root,
-        &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
-    );
-    fixture.create_config_in_dir(
-        &fixture.tasks_root.join("SAFE"),
-        "project:\n  name: SAFE\nissue:\n  states: [Todo, Shipped]\n",
-    );
-    let path = fixture.tasks_root.join("SAFE/1.yml");
-    let mut task: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-    task["status"] = "Shipped".into();
-    fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
-    let output = cleanup(&fixture);
-    assert!(
-        output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(
-        !wt.exists(),
-        "configured done state should allow clean merged cleanup"
-    );
-    assert!(
-        !Command::new("git")
-            .args(["show-ref", "--verify", &format!("refs/heads/{branch}")])
-            .current_dir(root)
-            .output()
-            .unwrap()
-            .status
-            .success()
-    );
 }
 
 #[test]
@@ -633,82 +459,6 @@ fn dispatched_cancellation_hands_off_once_after_teardown() {
 }
 
 #[test]
-#[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
-fn inherited_and_profile_git_overrides_cannot_redirect_setup_or_runner() {
-    if !common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let (fixture, ticket) = setup(
-        "git rev-parse --show-toplevel > \"$LOTAR_TASKS_DIR/../runner-top\"\ngit rev-parse --path-format=absolute --git-common-dir > \"$LOTAR_TASKS_DIR/../runner-common\"",
-        true,
-    );
-    let (other, _) = setup("exit 0", true);
-    let other_root = other.get_temp_path();
-    let overrides = [
-        (
-            "GIT_DIR",
-            other_root.join(".git").to_string_lossy().to_string(),
-        ),
-        ("GIT_WORK_TREE", other_root.to_string_lossy().to_string()),
-        (
-            "GIT_COMMON_DIR",
-            other_root.join(".git").to_string_lossy().to_string(),
-        ),
-        (
-            "GIT_INDEX_FILE",
-            other_root.join(".git/index").to_string_lossy().to_string(),
-        ),
-        ("GIT_CONFIG_COUNT", "1".into()),
-        ("GIT_CONFIG_KEY_0", "core.worktree".into()),
-        (
-            "GIT_CONFIG_VALUE_0",
-            other_root.to_string_lossy().to_string(),
-        ),
-    ];
-    let path = fixture.tasks_root.join("config.yml");
-    let mut config: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-    config["agents"]["safety"]["env"] = serde_yaml_ng::to_value(
-        overrides
-            .iter()
-            .cloned()
-            .collect::<std::collections::BTreeMap<_, _>>(),
-    )
-    .unwrap();
-    fs::write(path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
-    wait_worker(
-        worker_command(&fixture, &ticket)
-            .envs(overrides)
-            .spawn()
-            .unwrap(),
-    );
-    let top = fs::read_to_string(fixture.get_temp_path().join("runner-top")).unwrap();
-    let common = fs::read_to_string(fixture.get_temp_path().join("runner-common")).unwrap();
-    assert_eq!(
-        fs::canonicalize(top.trim()).unwrap(),
-        fs::canonicalize(fixture.get_temp_path().join("worktrees").join(&ticket)).unwrap()
-    );
-    assert_eq!(
-        fs::canonicalize(common.trim()).unwrap(),
-        fs::canonicalize(fixture.get_temp_path().join(".git")).unwrap()
-    );
-    assert!(
-        !Command::new("git")
-            .args([
-                "show-ref",
-                "--verify",
-                &format!("refs/heads/agent/{ticket}")
-            ])
-            .current_dir(other_root)
-            .output()
-            .unwrap()
-            .status
-            .success()
-    );
-}
-
-#[test]
 fn cancelled_dispatch_waits_for_inflight_start_before_handoff() {
     AgentJobService::set_orchestrator_mode(
         lotar::services::agent_job_service::AgentOrchestratorMode::Server,
@@ -799,47 +549,280 @@ automation:
     );
 }
 
-#[test]
-#[cfg_attr(no_git_tests, ignore = "Git repository creation unavailable")]
-fn inherited_git_dir_cannot_make_unmerged_cleanup_compare_branch_to_itself() {
-    if !common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn enabled_worktree_failure_never_executes_in_main() {
+        common::require_git();
+        let (fixture, ticket) = setup("touch executed-in-main", true);
+        fs::write(fixture.get_temp_path().join("worktrees"), "not a directory").unwrap();
+        let job = AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root)
+            .unwrap();
+        wait_idle();
+        let job = AgentJobService::get_job(&job.id).unwrap();
+        assert_eq!(job.status, "failed");
+        assert!(job.last_message.unwrap().contains("Worktree setup failed"));
+        assert!(!fixture.get_temp_path().join("executed-in-main").exists());
     }
-    let (fixture, ticket) = setup("exit 0", true);
-    let root = fixture.get_temp_path();
-    let wt = root.join("worktrees").join(&ticket);
-    let branch = format!("agent/{ticket}");
-    git(
-        root,
-        &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
-    );
-    fs::write(wt.join("unmerged"), "must survive").unwrap();
-    git(&wt, &["add", "unmerged"]);
-    git(&wt, &["commit", "-m", "Unmerged test work"]);
-    let path = fixture.tasks_root.join("SAFE/1.yml");
-    let mut task: serde_yaml_ng::Value =
-        serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-    task["status"] = "Done".into();
-    fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
-    let gitdir = Command::new("git")
-        .args(["rev-parse", "--absolute-git-dir"])
-        .current_dir(&wt)
-        .output()
+
+    #[test]
+    fn cli_cleanup_preserves_indeterminate_dirty_and_unmerged_worktrees() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let wt = root.join("worktrees").join(&ticket);
+        let branch = format!("agent/{ticket}");
+        git(
+            root,
+            &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
+        );
+        let task_path = fixture.tasks_root.join("SAFE/1.yml");
+        let original = fs::read_to_string(&task_path).unwrap();
+        fs::remove_file(&task_path).unwrap();
+        assert!(cleanup(&fixture).status.success());
+        assert!(wt.exists(), "missing task must not authorize removal");
+        let all = Command::new(env!("CARGO_BIN_EXE_lotar"))
+            .args([
+                "--tasks-dir",
+                fixture.tasks_root.to_str().unwrap(),
+                "agent",
+                "worktree",
+                "cleanup",
+                "--all",
+                "--delete-branches",
+            ])
+            .env("LOTAR_IGNORE_HOME_CONFIG", "1")
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(all.status.success());
+        assert!(
+            wt.exists(),
+            "--all must not authorize indeterminate cleanup"
+        );
+        for raw in [
+            "broken: [",
+            "title: malformed\nstatus: Done\ncreated: []\n",
+            "title: unknown\nstatus: Unconfigured\ncreated: now\n",
+        ] {
+            fs::write(&task_path, raw).unwrap();
+            assert!(cleanup(&fixture).status.success());
+            assert!(wt.exists(), "indeterminate task must not authorize removal");
+        }
+        fs::remove_file(&task_path).unwrap();
+        fs::create_dir(&task_path).unwrap();
+        assert!(cleanup(&fixture).status.success());
+        assert!(wt.exists(), "unreadable task must not authorize removal");
+        fs::remove_dir(&task_path).unwrap();
+        let mut task: serde_yaml_ng::Value = serde_yaml_ng::from_str(&original).unwrap();
+        task["status"] = "Done".into();
+        fs::write(&task_path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        fs::write(wt.join("uncommitted"), "keep me").unwrap();
+        assert!(!cleanup(&fixture).status.success());
+        assert!(wt.join("uncommitted").exists());
+        git(&wt, &["add", "uncommitted"]);
+        git(&wt, &["commit", "-m", "Unmerged work"]);
+        assert!(!cleanup(&fixture).status.success());
+        assert!(wt.exists(), "unmerged worktree must be preserved");
+        git(
+            root,
+            &["show-ref", "--verify", &format!("refs/heads/{branch}")],
+        );
+    }
+
+    #[test]
+    fn automatic_cleanup_preserves_missing_malformed_dirty_and_unmerged_worktrees() {
+        common::require_git();
+        for body in [
+            "rm \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
+            "printf 'title: malformed\\nstatus: Done\\ncreated: []\\n' > \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
+            "printf 'title: unknown\\nstatus: Unconfigured\\ncreated: now\\n' > \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
+            "rm \"$LOTAR_TASKS_DIR/SAFE/1.yml\"; mkdir \"$LOTAR_TASKS_DIR/SAFE/1.yml\"",
+            "touch uncommitted",
+            "touch unmerged; git add unmerged; git commit -m 'Unmerged work'",
+        ] {
+            let (fixture, ticket) = setup(body, true);
+            let path = fixture.tasks_root.join("SAFE/1.yml");
+            let mut task: serde_yaml_ng::Value =
+                serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+            task["status"] = "Done".into();
+            fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+            let job =
+                AgentJobService::start_job_with_tasks_dir(request(&ticket), &fixture.tasks_root)
+                    .unwrap();
+            wait_idle();
+            let job = AgentJobService::get_job(&job.id).unwrap();
+            assert_eq!(job.status, "completed", "{body}: {:?}", job.last_message);
+            assert!(
+                Path::new(job.worktree_path.as_deref().unwrap()).exists(),
+                "{body}"
+            );
+            git(
+                fixture.get_temp_path(),
+                &[
+                    "show-ref",
+                    "--verify",
+                    &format!("refs/heads/agent/{ticket}"),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn cli_cleanup_accepts_clean_merged_worktree_with_project_done_status() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let wt = root.join("worktrees").join(&ticket);
+        let branch = format!("agent/{ticket}");
+        git(
+            root,
+            &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
+        );
+        fixture.create_config_in_dir(
+            &fixture.tasks_root.join("SAFE"),
+            "project:\n  name: SAFE\nissue:\n  states: [Todo, Shipped]\n",
+        );
+        let path = fixture.tasks_root.join("SAFE/1.yml");
+        let mut task: serde_yaml_ng::Value =
+            serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        task["status"] = "Shipped".into();
+        fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        let output = cleanup(&fixture);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            !wt.exists(),
+            "configured done state should allow clean merged cleanup"
+        );
+        assert!(
+            !Command::new("git")
+                .args(["show-ref", "--verify", &format!("refs/heads/{branch}")])
+                .current_dir(root)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+    }
+
+    #[test]
+    fn inherited_and_profile_git_overrides_cannot_redirect_setup_or_runner() {
+        common::require_git();
+        let (fixture, ticket) = setup(
+            "git rev-parse --show-toplevel > \"$LOTAR_TASKS_DIR/../runner-top\"\ngit rev-parse --path-format=absolute --git-common-dir > \"$LOTAR_TASKS_DIR/../runner-common\"",
+            true,
+        );
+        let (other, _) = setup("exit 0", true);
+        let other_root = other.get_temp_path();
+        let overrides = [
+            (
+                "GIT_DIR",
+                other_root.join(".git").to_string_lossy().to_string(),
+            ),
+            ("GIT_WORK_TREE", other_root.to_string_lossy().to_string()),
+            (
+                "GIT_COMMON_DIR",
+                other_root.join(".git").to_string_lossy().to_string(),
+            ),
+            (
+                "GIT_INDEX_FILE",
+                other_root.join(".git/index").to_string_lossy().to_string(),
+            ),
+            ("GIT_CONFIG_COUNT", "1".into()),
+            ("GIT_CONFIG_KEY_0", "core.worktree".into()),
+            (
+                "GIT_CONFIG_VALUE_0",
+                other_root.to_string_lossy().to_string(),
+            ),
+        ];
+        let path = fixture.tasks_root.join("config.yml");
+        let mut config: serde_yaml_ng::Value =
+            serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        config["agents"]["safety"]["env"] = serde_yaml_ng::to_value(
+            overrides
+                .iter()
+                .cloned()
+                .collect::<std::collections::BTreeMap<_, _>>(),
+        )
         .unwrap();
-    assert!(gitdir.status.success());
-    let gitdir = String::from_utf8(gitdir.stdout).unwrap();
-    let result = cleanup_command(&fixture)
-        .env("GIT_DIR", gitdir.trim())
-        .env("GIT_WORK_TREE", &wt)
-        .env("GIT_COMMON_DIR", root.join(".git"))
-        .env("GIT_INDEX_FILE", Path::new(gitdir.trim()).join("index"))
-        .output()
-        .unwrap();
-    assert!(!result.status.success());
-    assert!(wt.join("unmerged").exists());
-    git(
-        root,
-        &["show-ref", "--verify", &format!("refs/heads/{branch}")],
-    );
+        fs::write(path, serde_yaml_ng::to_string(&config).unwrap()).unwrap();
+        wait_worker(
+            worker_command(&fixture, &ticket)
+                .envs(overrides)
+                .spawn()
+                .unwrap(),
+        );
+        let top = fs::read_to_string(fixture.get_temp_path().join("runner-top")).unwrap();
+        let common = fs::read_to_string(fixture.get_temp_path().join("runner-common")).unwrap();
+        assert_eq!(
+            fs::canonicalize(top.trim()).unwrap(),
+            fs::canonicalize(fixture.get_temp_path().join("worktrees").join(&ticket)).unwrap()
+        );
+        assert_eq!(
+            fs::canonicalize(common.trim()).unwrap(),
+            fs::canonicalize(fixture.get_temp_path().join(".git")).unwrap()
+        );
+        assert!(
+            !Command::new("git")
+                .args([
+                    "show-ref",
+                    "--verify",
+                    &format!("refs/heads/agent/{ticket}")
+                ])
+                .current_dir(other_root)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+    }
+
+    #[test]
+    fn inherited_git_dir_cannot_make_unmerged_cleanup_compare_branch_to_itself() {
+        common::require_git();
+        let (fixture, ticket) = setup("exit 0", true);
+        let root = fixture.get_temp_path();
+        let wt = root.join("worktrees").join(&ticket);
+        let branch = format!("agent/{ticket}");
+        git(
+            root,
+            &["worktree", "add", "-b", &branch, wt.to_str().unwrap()],
+        );
+        fs::write(wt.join("unmerged"), "must survive").unwrap();
+        git(&wt, &["add", "unmerged"]);
+        git(&wt, &["commit", "-m", "Unmerged test work"]);
+        let path = fixture.tasks_root.join("SAFE/1.yml");
+        let mut task: serde_yaml_ng::Value =
+            serde_yaml_ng::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        task["status"] = "Done".into();
+        fs::write(path, serde_yaml_ng::to_string(&task).unwrap()).unwrap();
+        let gitdir = Command::new("git")
+            .args(["rev-parse", "--absolute-git-dir"])
+            .current_dir(&wt)
+            .output()
+            .unwrap();
+        assert!(gitdir.status.success());
+        let gitdir = String::from_utf8(gitdir.stdout).unwrap();
+        let result = cleanup_command(&fixture)
+            .env("GIT_DIR", gitdir.trim())
+            .env("GIT_WORK_TREE", &wt)
+            .env("GIT_COMMON_DIR", root.join(".git"))
+            .env("GIT_INDEX_FILE", Path::new(gitdir.trim()).join("index"))
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(wt.join("unmerged").exists());
+        git(
+            root,
+            &["show-ref", "--verify", &format!("refs/heads/{branch}")],
+        );
+    }
 }

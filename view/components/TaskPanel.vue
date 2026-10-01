@@ -708,6 +708,18 @@ const attachmentsDragActive = ref(false)
 const attachmentsDragDepth = ref(0)
 const attachmentsUploading = ref(false)
 const removingAttachmentPath = ref<string | null>(null)
+// Drops that arrived while an edit-mode panel was still loading the task
+// (before `task.id` exists); flushed as soon as that task is ready. The
+// buffer is bound to the task target that was loading when the drop landed.
+const pendingDropFiles = ref<File[]>([])
+const pendingDropUrls = ref<string[]>([])
+let pendingDropTaskId: string | null = null
+
+function clearPendingDrops() {
+  pendingDropFiles.value = []
+  pendingDropUrls.value = []
+  pendingDropTaskId = null
+}
 
 const showAttachmentsPreference = ref(readTaskPanelShowAttachmentsPreference())
 const showLinksInAttachmentsPreference = ref(readTaskPanelShowLinksInAttachmentsPreference())
@@ -726,6 +738,7 @@ onMounted(() => {
 onUnmounted(() => {
   unsubscribePreferencesChanged?.()
   unsubscribePreferencesChanged = null
+  clearPendingDrops()
 })
 
 async function loadSyncConfig(prefix: string | null) {
@@ -1114,6 +1127,91 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
+async function uploadDroppedFiles(files: File[]): Promise<void> {
+  attachmentsUploading.value = true
+  try {
+    let added = 0
+    let skipped = 0
+    let failed = 0
+
+    for (const file of files) {
+      try {
+        const base64 = await fileToBase64(file)
+        const response = await api.uploadTaskAttachment({
+          id: task.id,
+          filename: file.name,
+          content_base64: base64,
+        })
+
+        if (response.attached) {
+          added += 1
+        } else {
+          skipped += 1
+        }
+
+        Object.assign(task, response.task)
+        applyReferencesFromTaskResponse(response.task)
+        emit('updated', response.task)
+      } catch (error: any) {
+        failed += 1
+        console.warn('Failed to upload attachment', { file: file.name, error })
+      }
+    }
+
+    if (files.length === 1 && added === 0 && skipped === 1 && failed === 0) {
+      showToast('Attachment already attached')
+      return
+    }
+
+    if (added > 0 && skipped === 0 && failed === 0) {
+      showToast(added === 1 ? 'Attachment added' : 'Attachments added')
+    } else {
+      const parts = []
+      if (added > 0) parts.push(`${added} added`)
+      if (skipped > 0) parts.push(`${skipped} already attached`)
+      if (failed > 0) parts.push(`${failed} failed`)
+      showToast(parts.length ? `Attachments: ${parts.join(', ')}` : 'No attachments uploaded')
+    }
+  } finally {
+    attachmentsUploading.value = false
+    resetAttachmentsDragState()
+  }
+}
+
+async function addDroppedUrls(urls: string[]): Promise<void> {
+  addingLinkReferences.value = true
+  try {
+    let added = 0
+    let skipped = 0
+    let failed = 0
+
+    for (const url of urls) {
+      const outcome = await addLinkReference(url)
+      if (outcome === 'added') added += 1
+      else if (outcome === 'skipped') skipped += 1
+      else failed += 1
+    }
+
+    if (urls.length === 1 && added === 0 && skipped === 1 && failed === 0) {
+      showToast('Link already attached')
+      return
+    }
+
+    if (added > 0 && skipped === 0 && failed === 0) {
+      showToast(added === 1 ? 'Link added' : 'Links added')
+    } else {
+      const parts = []
+      if (added > 0) parts.push(`${added} added`)
+      if (skipped > 0) parts.push(`${skipped} already attached`)
+      if (failed > 0) parts.push(`${failed} failed`)
+      showToast(parts.length ? `Links: ${parts.join(', ')}` : 'No links added')
+    }
+  } finally {
+    addingLinkReferences.value = false
+    resetAttachmentsDragState()
+  }
+}
+
 async function onAttachmentsDrop(event: DragEvent) {
   if (attachmentsUploading.value || addingLinkReferences.value) return
 
@@ -1124,100 +1222,88 @@ async function onAttachmentsDrop(event: DragEvent) {
   event.preventDefault()
   resetAttachmentsDragState()
 
-  if (mode.value !== 'edit' || !task.id) {
+  if (mode.value !== 'edit') {
     showToast(hasFiles ? 'Save the task before attaching files' : 'Save the task before attaching links')
+    return
+  }
+
+  if (!task.id) {
+    // The panel is still initializing this task: `task.id` is assigned only
+    // after the per-project config loads, so an eager drop would otherwise
+    // be discarded with a misleading "save the task" toast. Buffer the
+    // payload for the task target that is loading and flush it once that
+    // task is ready. A files-bearing event ignores link payloads, matching
+    // the direct drop path where files take priority.
+    if (hasFiles) {
+      const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
+      if (!files.length) return
+      pendingDropFiles.value = [...pendingDropFiles.value, ...files]
+      pendingDropTaskId = props.taskId ?? null
+      showToast('Task is still loading — attachments will upload when it is ready')
+      return
+    }
+    if (urls.length) {
+      pendingDropUrls.value = [...pendingDropUrls.value, ...urls]
+      pendingDropTaskId = props.taskId ?? null
+      showToast('Task is still loading — attachments will upload when it is ready')
+      return
+    }
     return
   }
 
   if (hasFiles) {
     const files = Array.from(event.dataTransfer?.files ?? []).filter((file) => file && file.size >= 0)
     if (!files.length) return
-
-    attachmentsUploading.value = true
-    try {
-      let added = 0
-      let skipped = 0
-      let failed = 0
-
-      for (const file of files) {
-        try {
-          const base64 = await fileToBase64(file)
-          const response = await api.uploadTaskAttachment({
-            id: task.id,
-            filename: file.name,
-            content_base64: base64,
-          })
-
-          if (response.attached) {
-            added += 1
-          } else {
-            skipped += 1
-          }
-
-          Object.assign(task, response.task)
-          applyReferencesFromTaskResponse(response.task)
-          emit('updated', response.task)
-        } catch (error: any) {
-          failed += 1
-          console.warn('Failed to upload attachment', { file: file.name, error })
-        }
-      }
-
-      if (files.length === 1 && added === 0 && skipped === 1 && failed === 0) {
-        showToast('Attachment already attached')
-        return
-      }
-
-      if (added > 0 && skipped === 0 && failed === 0) {
-        showToast(added === 1 ? 'Attachment added' : 'Attachments added')
-      } else {
-        const parts = []
-        if (added > 0) parts.push(`${added} added`)
-        if (skipped > 0) parts.push(`${skipped} already attached`)
-        if (failed > 0) parts.push(`${failed} failed`)
-        showToast(parts.length ? `Attachments: ${parts.join(', ')}` : 'No attachments uploaded')
-      }
-    } finally {
-      attachmentsUploading.value = false
-      resetAttachmentsDragState()
-    }
+    await uploadDroppedFiles(files)
     return
   }
 
   if (urls.length) {
-    addingLinkReferences.value = true
-    try {
-      let added = 0
-      let skipped = 0
-      let failed = 0
-
-      for (const url of urls) {
-        const outcome = await addLinkReference(url)
-        if (outcome === 'added') added += 1
-        else if (outcome === 'skipped') skipped += 1
-        else failed += 1
-      }
-
-      if (urls.length === 1 && added === 0 && skipped === 1 && failed === 0) {
-        showToast('Link already attached')
-        return
-      }
-
-      if (added > 0 && skipped === 0 && failed === 0) {
-        showToast(added === 1 ? 'Link added' : 'Links added')
-      } else {
-        const parts = []
-        if (added > 0) parts.push(`${added} added`)
-        if (skipped > 0) parts.push(`${skipped} already attached`)
-        if (failed > 0) parts.push(`${failed} failed`)
-        showToast(parts.length ? `Links: ${parts.join(', ')}` : 'No links added')
-      }
-    } finally {
-      addingLinkReferences.value = false
-      resetAttachmentsDragState()
-    }
+    await addDroppedUrls(urls)
   }
 }
+
+// Flush drops buffered while the panel was still loading the task. `taskId`
+// becomes non-empty exactly when the loaded task fields are applied, and the
+// buffer only uploads when the panel still shows that same task target in
+// edit mode — a swap to another task, create mode, or a closed panel
+// invalidates the buffer instead of uploading into the wrong task.
+watch(taskId, (id) => {
+  if (!id) return
+  const files = pendingDropFiles.value
+  const urls = pendingDropUrls.value
+  if (!files.length && !urls.length) return
+  const belongsToLoadedTask =
+    props.open && mode.value === 'edit' && props.taskId === id && pendingDropTaskId === id
+  clearPendingDrops()
+  if (!belongsToLoadedTask) return
+  if (files.length) {
+    void uploadDroppedFiles(files)
+  } else {
+    void addDroppedUrls(urls)
+  }
+})
+
+// A task-target swap (the controller opens task B while task A is still
+// loading, or reopens the panel in create mode) invalidates drops buffered
+// for the previous target. Sync flush clears the buffer at the prop change,
+// before the new target's load can complete and arm the flush watcher.
+watch(
+  () => props.taskId,
+  () => {
+    clearPendingDrops()
+  },
+  { flush: 'sync' },
+)
+
+watch(
+  () => props.open,
+  (open) => {
+    if (!open) {
+      clearPendingDrops()
+    }
+  },
+)
 
 async function detectAndAttachLinksFromTaskText() {
   if (!autoDetectLinksPreference.value) return

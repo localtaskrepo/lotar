@@ -1,4 +1,3 @@
-#![cfg(not(no_git_tests))]
 use tempfile::TempDir;
 
 mod common;
@@ -29,113 +28,111 @@ fn init_fake_git(repo_root: &std::path::Path, branch: &str) {
     std::fs::write(&branch_path, "").unwrap();
 }
 
-#[test]
-fn infers_feature_on_feat_branch() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn infers_feature_on_feat_branch() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        write_global(&tasks);
+        init_fake_git(root, "feat/api-endpoint");
+
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(out.contains("\"type\":\"Feature\""), "Output: {out}");
     }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    write_global(&tasks);
-    init_fake_git(root, "feat/api-endpoint");
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"type\":\"Feature\""), "Output: {out}");
-}
+    #[test]
+    fn infers_bug_on_fix_branch() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        write_global(&tasks);
+        init_fake_git(root, "fix/login-crash");
 
-#[test]
-fn infers_bug_on_fix_branch() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(out.contains("\"type\":\"Bug\""), "Output: {out}");
     }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    write_global(&tasks);
-    init_fake_git(root, "fix/login-crash");
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"type\":\"Bug\""), "Output: {out}");
-}
-
-#[test]
-fn falls_back_when_type_not_allowed() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    // Only Feature allowed to force fallback
-    let content = r#"default.project: TEST
+    #[test]
+    fn falls_back_when_type_not_allowed() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        // Only Feature allowed to force fallback
+        let content = r#"default.project: TEST
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature]
 issue.priorities: [Low, Medium, High]
 issue.tags: [*]
 "#;
-    std::fs::write(tasks.join("config.yml"), content).unwrap();
-    init_fake_git(root, "fix/should-fallback");
+        std::fs::write(tasks.join("config.yml"), content).unwrap();
+        init_fake_git(root, "fix/should-fallback");
 
-    // Also add a project-specific config to be explicit about allowed types
-    let proj_dir = tasks.join("TEST");
-    std::fs::create_dir_all(&proj_dir).unwrap();
-    let proj_cfg = r#"project.name: TEST
+        // Also add a project-specific config to be explicit about allowed types
+        let proj_dir = tasks.join("TEST");
+        std::fs::create_dir_all(&proj_dir).unwrap();
+        let proj_cfg = r#"project.name: TEST
 issue.types: [Feature]
 "#;
-    std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();
+        std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"type\":\"Feature\""), "Output: {out}");
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(out.contains("\"type\":\"Feature\""), "Output: {out}");
+    }
 }

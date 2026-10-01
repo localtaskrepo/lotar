@@ -23,10 +23,11 @@ description: Choose meaningful behavior checks and run targeted Rust, UI, or smo
 
 ## Rust (nextest)
 
-- Full (CI-like profile): `npm run test:rust`
+- Full (CI-like profile): `npm run test:rust` (runtime Git probe: default profile when Git works, else the `gitless` profile with reported `git_required` exclusions — see [tests README](../../../tests/README.md))
 - Filter by substring: `npm run test:rust -- <substring>`
 - List exact test names: `cargo nextest list --cargo-profile ci`
 - Pass-through test-binary args (e.g. `--nocapture`): `cargo nextest run --cargo-profile ci <filter> -- --nocapture`
+- Raw nextest (no npm runner) still selects `git_required` tests; they fail closed via `require_git()` when Git is unavailable — never a silent pass.
 - Fast clippy-only loop (lib+bins, no `--all-targets`/`--all-features`): `npm run lint:backend:fast`
 - Fresh worktree: run `npm run build:web` before compiling Rust; `include_dir!` requires the generated `target/web-embed` directory.
 

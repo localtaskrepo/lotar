@@ -647,24 +647,6 @@ export interface SprintVelocityResponse {
   entries: SprintVelocityEntryPayload[]
 }
 
-export interface SprintBacklogTask {
-  id: string
-  title: string
-  status: string
-  priority: string
-  assignee?: string | null
-  due_date?: string | null
-  tags: string[]
-}
-
-export interface SprintBacklogResponse {
-  status: string
-  count: number
-  truncated: boolean
-  tasks: SprintBacklogTask[]
-  missing_sprints: number[]
-  integrity?: SprintIntegrityDiagnostics
-}
 
 export interface ProjectDTO { name: string; prefix: string }
 export interface ProjectCreateRequest {

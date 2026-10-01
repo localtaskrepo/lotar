@@ -26,7 +26,7 @@ All rows below are defined in `src/config/env_overrides.rs`. Each variable maps 
 
 | Config key | Env var(s) | Accepted values | Purpose |
 | --- | --- | --- | --- |
-| `server_port` | `LOTAR_PORT`, `LOTAR_SERVER_PORT` | Integer | Forces the HTTP/SSE server to a specific port (`src/web_server.rs`). |
+| `server_port` | `LOTAR_PORT`, `LOTAR_SERVER_PORT` | Integer | Locks the HTTP/SSE server to a specific port when `serve` runs without `--port` (`--config server.port` and `--port` win). A busy configured port fails rather than moving; only the untouched built-in default (8080) falls back to an OS-assigned port (`src/cli/handlers/serve_handler.rs`). |
 | `default_project` | `LOTAR_PROJECT`, `LOTAR_DEFAULT_PROJECT` | Project prefix/slug | Sets the fallback project for CLI commands that omit `-p/--project`. |
 | `default_assignee` | `LOTAR_DEFAULT_ASSIGNEE` | username / `@me` | Auto-populates the assignee on new tasks. |
 | `default_reporter` | `LOTAR_DEFAULT_REPORTER` | username / email | Sets the reporter used when resolving `@me` (`src/utils/identity.rs`). |

@@ -7,16 +7,22 @@
 //   node scripts/generate-test-tasks.mjs --count 120           # more tasks
 //   node scripts/generate-test-tasks.mjs --dir .tasks-demo     # use a specific dir
 //   node scripts/generate-test-tasks.mjs --serve               # also launch `lotar serve` against it
+//   node scripts/generate-test-tasks.mjs --demo --dir /tmp/atlas  # realistic README/screenshot scenario
 //
 // The script writes a project config with a broad vocabulary, then seeds tasks with a
 // realistic spread of status/priority/type/assignee/tags/effort/due-date/custom-fields.
 // It uses the built `lotar` binary (LOTAR_BINARY_PATH/LOTAR_BIN, else target/{smoke,release}).
+//
+// `--demo` instead seeds the curated "Atlas" scenario from scripts/demo/workspace.mjs: a git
+// repository with backdated history, three people, a stub agent profile, sprints with burndown,
+// automation rules, sync remotes, and TODOs for the scanner. `npm run screenshots` uses it.
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { seedDemoWorkspace } from './demo/workspace.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -35,7 +41,7 @@ function resolveBinary() {
 }
 
 function parseArgs(argv) {
-    const opts = { count: 40, project: 'DEMO', dir: null, serve: false, keep: true };
+    const opts = { count: 40, project: 'DEMO', dir: null, serve: false, keep: true, demo: false };
     for (let i = 0; i < argv.length; i += 1) {
         const a = argv[i];
         if (a === '--count') opts.count = Number(argv[++i]);
@@ -43,6 +49,7 @@ function parseArgs(argv) {
         else if (a === '--dir') opts.dir = argv[++i];
         else if (a === '--serve') opts.serve = true;
         else if (a === '--rm') opts.keep = false;
+        else if (a === '--demo') opts.demo = true;
         else if (a === '-h' || a === '--help') {
             printHelp();
             process.exit(0);
@@ -60,6 +67,8 @@ Options:
   --dir <path>     target directory (default: a fresh temp dir)
   --serve          after seeding, run \`lotar serve\` against the dir (Ctrl-C to stop)
   --rm             remove the target dir first if it exists
+  --demo           seed the curated Atlas demo scenario (git repo, sprints, agent stub);
+                   replaces the target dir; --count/--project do not apply
   -h, --help       show this help`);
 }
 
@@ -120,6 +129,16 @@ function main() {
     }
 
     const dir = opts.dir || path.join(os.tmpdir(), `lotar-demo-${process.pid}`);
+    if (opts.demo) {
+        const demo = seedDemoWorkspace({ dir: path.resolve(dir), bin });
+        console.log(`\nSeeded the Atlas demo (${Object.keys(demo.ids).length} tasks, git history, 4 sprints) into: ${demo.dir}`);
+        console.log(`  cd "${demo.dir}" && lotar list --format table`);
+        console.log(`  cd "${demo.dir}" && lotar serve --open   # assign a task to @claude to run the stub agent`);
+        if (opts.serve) {
+            spawnSync(bin, ['serve', '--port', '8080'], { cwd: demo.dir, env: { ...process.env, LOTAR_IGNORE_HOME_CONFIG: '1' }, stdio: 'inherit' });
+        }
+        return;
+    }
     if (opts.dir && !opts.keep && existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     mkdirSync(path.join(dir, '.tasks'), { recursive: true });
     writeFileSync(path.join(dir, '.tasks', 'config.yml'), CONFIG_YAML.replace('project: DEMO', `project: ${opts.project}`));

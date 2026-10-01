@@ -1,11 +1,24 @@
 title: Honor resolved server port configuration and environment precedence
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.729489+00:00
+modified: 2026-10-01T19:27:58.787241+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-09-19T19:34:37.134552+00:00
+  text: 'Plan (session 2026-09-19, new user request; tracking-only): marked InProgress. Scope: reuse this ticket''s existing serve-port-precedence bug (audit C12) AND record the user''s feature extension with the CHOSEN CONTRACT explicitly: (1) CLI port becomes Option - distinguish None vs Some(8080); resolved config/env precedence applied ONCE. (2) CLI/env/config/--config specified ports stay FIXED per existing force/lock docs - no fallback for them. (3) ONLY the implicit built-in 8080 falls back on AddrInUse to a SAME-HOST OS-assigned port 0. (4) NO other error fallback. (5) Actual port is reported POST-BIND in bold yellow text when interactive (NO_COLOR respected; plain for pipes/machine consumers); the URL stays plain always. (6) --port 0 / -p PORT / positional explicit forms remain supported; the browser opens/stops at the ACTUAL bound port. (7) New tests use owned ports only, no foreign-server cleanup. Guidance finding: the local serve skill''s -p guidance is proven wrong - to be corrected via instruction-maintenance; no quality/policy change. Boundary: Done DEV-76/77 are NOT reopened. Environment ready: native universal2 nextest 0.9.145 and persistent browser assets unchanged. Plans recorded meaningfully, no autoclose; no source edits or git operations by tracker.'
+- date: 2026-09-20T03:40:47.204267+00:00
+  text: 'Progress (session 2026-09-20; tracking-only; NOT complete, full gates pending). Rounds 1-3 done: initial source + bold bugs corrected (round 2); independent PTY check 3/3 with EXACT 1;33 (bold yellow); fallback verified on actual ports with owned children, exit 0, HTTP stop; NO_COLOR/JSON stay plain. Round 3: var_os non-Unicode guard + generic env/home 8080-over-9999 case; value/source fixes 75/75 + compat 187/187, clippy clean; IPv6 URL bracket formatter added. ROUND 4 IN PROGRESS - IMPORTANT OPEN BUG: serializer normalization currently OMITS the default port, so an explicit raw 8080 pin can be LOST via an unrelated config mutation, and ''config set 8080'' does not persist. Owner is designing preservation of explicit-default intent WITHOUT emitting a port for every default config; the global-file 8080 source label is also being fixed. Do NOT claim DEV-72 entirely complete. Guidance: the proven-wrong serve -p SKILL guidance has been corrected minimally via instruction-maintenance; no quality policy change. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T04:28:34.062133+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): ROUND 4 COMPLETED - bug PROVEN and fixed; evidence target/test-fix-handoff/serve-fallback/round4/ (repros logged: an UNRELATED config set erased a raw explicit 8080, and an explicit ''config set 8080'' persisted NOTHING). Fix shape: additive GlobalYamlOptions + ServerPortSaveIntent with PreserveExisting/ExplicitPin - NO GlobalConfig public-struct/wire-field change; existing raw port key PRESERVED on all normal global saves; explicit canonical server_port mutation FORCES the key; fresh implicit config adds no port; candidate validation/single-write/dry-run bytes UNCHANGED. Global default pin now labeled ''global'' via with_port builders in Config show + ConfigService both scopes; absence = Default. Coverage: 7 new cli_serve_port_pin intent tests; 266/266 target + 85 final; scoped clippy/fmt clean. Unsupported clear/empty still rejected by existing validation. NOT Done: full independent review IN PROGRESS and the full smoke gate is RUNNING. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T05:19:48.481108+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): FINAL INDEPENDENT REVIEW SIGNOFF - all prior blockers closed. Round 4 persistence metadata with NO GlobalConfig shape change (7 tests); final home-fixture fix sets HOME + USERPROFILE with proper child isolation - 29/29 + clippy/fmt clean, PRODUCTION UNCHANGED, followed by the green full smoke. Additional actual-PTY verification: NO_COLOR + INVALID BYTES 10/10 across whole-CLI checks - no panic, ZERO ANSI output, owned child exit 0. Guidance: user-p corrected against the existing counterexample; no quality policy change. Scope complete and reviewed; status intentionally held InProgress pending coordinator closure (runtime independent review + latest smoke coverage followup outstanding on the wave) - NOT Done yet. No source edits or git operations by tracker.'
+- date: 2026-10-01T19:27:53.046098+00:00
+  text: 'Handoff (session 2026-10-01, final; tracking-only; current code independent SIGNOFF, current Oct-1 gates green, actual owner board_dd24/04e2 accepted + source independent review). Outcome: implicit 8080 is ONLY a fallback on AddrInUse (same host); OS bind-0 reports the ACTUAL port post-bind, bold yellow (1;33) on TTY, plain URL under NO_COLOR incl non-UTF8 and JSON pipe; explicit -p/--port and env/home/global/--config are strict incl 8080 with presence precedence; config show labels consistent; explicit pin preserved across config save / explicit set 8080 with no accidental fresh default key; --port 0 actually supported; IPv6 brackets; NO wire API / GlobalConfig public field change. Deliberate Rust source API change: ServeArgs.port u16 -> Option<u16> (with Index pub-type cleanup under the existing pre-adoption review); no actual CLI break - serve -p kept. Evidence: TTY proof positive 3 + non-Unicode 10 checks; child HTTP servers stopped/reaped; no foreign servers killed; Oct-1 gates: lint:agent exit 0 (vue-tsc + clippy all targets/features -D warnings + fmt); Rust 1196/1196, 0 skipped; UI 443/58; Node 41/41; smoke 166 pass / 23 Git-skip valid for current app. Remaining: none in scope; no staging/commit/push performed (uncommitted state unknown - NO git commands run, not asserting unstaged). Guidance: wrong serve -p example minimally corrected in local-serve SKILL, links checked; no further durable finding. Marking Done per self-verification lifecycle.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: C12.
@@ -16,3 +29,38 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-19T19:34:29.858139+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-19T19:34:37.134552+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T03:40:47.204267+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T04:28:34.062133+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T05:19:48.481108+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:27:53.046098+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:27:58.787241+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

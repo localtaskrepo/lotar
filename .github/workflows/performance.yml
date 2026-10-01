@@ -1,0 +1,113 @@
+name: Performance Budgets
+
+# DEV-78: optional, manually dispatched wall-clock budget measurement.
+#
+# This workflow is deliberately NOT part of the regular CI lane (ci.yml is
+# untouched and stays authoritative): ordinary correctness gates must not
+# fail due solely to host load. It runs the dedicated perf runner
+# (`npm run test:rust:perf`) with budgets explicitly enabled via
+# LOTAR_TEST_PERF_BUDGETS, under the serial nextest `perf` profile with
+# --retries 0, and uploads the junit report and run log as baseline
+# artifacts. Thresholds are the pre-existing suite values - treat the
+# uploaded measurements as baselines and do NOT raise budgets to make a run
+# pass; justify any threshold change in DEV-78 first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline_label:
+        description: 'Baseline label recorded in the artifact name and run summary'
+        required: false
+        default: 'baseline'
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: 1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Explicit opt-in required by scripts/perf-runner.mjs (no silent fallback).
+  LOTAR_TEST_PERF_BUDGETS: '1'
+
+jobs:
+  perf_budgets:
+    name: Wall-clock budgets (serial, retries 0)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RUSTC_WRAPPER: sccache
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        # No explicit toolchain input: the action installs the toolchain pinned
+        # in rust-toolchain.toml so CI and local development stay identical.
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: perf-${{ runner.os }}
+          save-if: true
+
+      - name: Install sccache
+        uses: taiki-e/install-action@v2
+        with:
+          tool: sccache
+
+      - name: Cache sccache
+        uses: actions/cache@v5
+        with:
+          path: .sccache
+          key: sccache-perf-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            sccache-perf-${{ runner.os }}-
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Determine Node version
+        id: node_version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').engines.node")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ steps.node_version.outputs.version }}
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build web assets (include_dir build script requires them)
+        run: npm run build:web
+
+      - name: Verify web assets exist
+        run: test -f target/web/index.html
+
+      - name: Record baseline label
+        run: 'echo "Performance baseline label: ${{ inputs.baseline_label }} (measurements are baseline wall-clock values on a GitHub-hosted runner)"'
+
+      - name: Run performance budgets
+        run: npm run test:rust:perf
+
+      - name: Upload performance artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: perf-budget-${{ inputs.baseline_label }}-${{ github.run_id }}
+          path: |
+            target/nextest/perf/perf-junit.xml
+            target/nextest/perf-run.log
+          if-no-files-found: warn
+          retention-days: 30

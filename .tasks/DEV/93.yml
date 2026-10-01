@@ -1,0 +1,103 @@
+title: Repair cold-run CI builds and smoke regressions
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-02T17:14:04.623830+00:00
+modified: 2026-10-02T18:37:44.429150+00:00
+comments:
+- date: 2026-10-02T17:14:21.190232+00:00
+  text: |-
+    Plan (tracking owner, 2026-10-02): four coordinated lanes in the current shared checkout, isolated build targets, no repo Git operations, no commits or pushes. Existing changes from other workers are preserved; no foreign cleanup.
+
+    Lanes:
+    - Assets/CI worker: .github/workflows/ci.yml cold-run embed inputs for the Rust Quality Checks job (build/fetch target/web-embed before cargo) + scripts/compress-web.mjs Windows path portability (replace URL.pathname drive-form handling) + unit coverage for the path conversion.
+    - Fixture worker: smoke/helpers/git.ts and the affected api spec stop assuming a freshly initialized repository starts on branch main; same worker owns the agent queued-state snapshot race fix.
+    - Custom-store worker: attachment chip 15s timeout after removal - diagnosis test first, minimal runtime change only if the root cause requires it.
+    - Parent: Cargo.lock rustls bump to >= 0.45 for RUSTSEC-2026-0285 and dependency-tree verification.
+
+    Final gates once lanes are stable: npm run lint; agent Rust/UI tests with default retries 0; build-first smoke with an actual Git probe when the invocation context permits, otherwise the Git-gated subset is explicitly excluded and reported; cargo audit + npm audit within the declared scope above (no blind npm audit fix); independent review before closure.
+
+    Closure rule: this ticket stays InProgress until the parent records the final result and gates. True Windows CI evidence requires a push that is not authorized, so it remains an explicit developer-accepted exception and remote green is not claimed.
+- date: 2026-10-02T17:28:08.290780+00:00
+  text: |-
+    Progress (tracking owner, 2026-10-02, appended from lane reports; tracker performed no git operations and no source edits):
+
+    1. Cold Linux assets (assets/CI worker, released): Node/npm and npm run build:web generated the embed inputs, verified present before clippy runs. scripts/compress-web.mjs now uses fileURLToPath; both dist and embed import paths safe; 6 portable unit tests including an actual legacy double-D (/D:/) control; real build:web gz roundtrip verified; ci.yml YAML 18 structural checks pass; existing 41 runner self-tests unchanged.
+
+    2. Git fixtures (fixture worker, released): initial branch main is now an explicit local init option with no global Git config writes; targeted harness probe 9/9 pass; agent 2 cases x6 plus fixture 6 passing; 2 new git-init regressions cover host-default-branch isolation; they skip in this sandbox on actual EPERM and are NOT claimed as passes (designated CI-with-git remains the executor).
+
+    3. Agent queued snapshot race (fixture worker, released): agent creation asserts queued OR running via the correct API after spawn; gated real mid-RUNNING state, then release to Completed with log final-status content awaited; cleanup drained.
+
+    4. Custom-store attachment chip timeout (custom-store worker, released): root cause PROVEN in the actual UI - the eager drop panel becomes visible before the task id resolves during config load; old code issued no POST and no FS writes because the guard discarded them. TaskPanel now queues early files/URLs and flushes after task load; 5th held-real-config regression added plus view/download byte assertions; FS vault wrong-store case absent; 5/5 browser, 49 unit, frontend types pass; rollback negative control fails on old code. Independent review in progress and a possible lifecycle safety fix is pending - NOT claimed done yet.
+
+    5. Parent Cargo.lock audit lane: rustls 0.23.43 -> 0.23.45 lock-only (checksum-only crate change); current RustSec advisory snapshot 117edb3bed98e9be112f277b7615eea3252e7c43 fetched as a GitHub archive with NO git clone commands; official aarch64 cargo-audit 0.22.2, digest-verified, local tool; cargo-audit audit --no-fetch --stale --db target/.../advisory-db --file Cargo.lock --color never loaded 1280 advisories, scanned 221 crates, exit 0, zero vulnerable crates; NOTE the global crates-index lock could not be opened, producing a YANKED-lookup warning only - vulnerability findings were not suppressed and no --ignore/--deny weakening was used. npm audit found 10 propagated vulnerabilities; 3 semver-compatible lock-only leaf bumps applied: dompurify 3.4.14 -> 3.4.16, brace-exp 5.0.9 -> 5.0.12, undici 8.10.1 -> 8.10.2; after npm update --package-lock-only and a fresh npm ci (local cache/target) the audit reports the parent-quoted figure 2350 remaining vulnerabilities (severity breakdown lives in parent evidence; outside the declared lock-only scope). npm ci warns 2 fsevents install-script allowlist entries are not approved (not a policy change, no build impact); the earlier build:web needs one fresh final verification.
+
+    Coordination state: all source workers released; 2 independent reviewers active. No commit or push requested; no remote-CI green claim until a publish rerun. Full gates NOT started yet - current phase is source inspection and test scope. Ticket stays InProgress; DEV-79/80 Done CI-completion exceptions preserved unchanged; next step: reviews finish, then final gate set per the plan (lint, agent tests retries 0, build-first smoke with honest Git-probe handling, scoped audits, independent review signoff) before any closure.
+- date: 2026-10-02T17:28:26.521702+00:00
+  text: 'Correction to progress comment #2 (audit lane): the patched package is brace-expansion 5.0.9 -> 5.0.12 (parent board record board_b6fa5e6c); dompurify 3.4.16 and undici 8.10.2 unchanged as recorded. No other lane facts affected.'
+- date: 2026-10-02T18:37:44.405488+00:00
+  text: |-
+    Outcome: All reported CI failure causes have been repaired and independently reviewed. Rust quality checks now build and verify fresh embedded web assets before compilation; compression uses fileURLToPath on both paths, with six portable path/script regressions. Smoke repositories explicitly initialize on main without changing global Git configuration. The agent test uses a real release gate and waits for completed log content rather than assuming the creation-response snapshot is queued. TaskPanel retains eager drops until project configuration/task loading finishes, scopes buffers to the requested task, cancels them on target changes/close/unmount, and preserves typed attachment storage semantics. Five lifecycle unit tests and an ordered, real-network custom-store smoke regression cover the fix; negative controls failed on both the old discard behavior and the intermediate wrong-task flush. No REST shape changed.
+
+    Evidence: Required local lint passed, including Clippy with all targets/features and formatting. Rust tests: 1,151 passed, 45 explicitly excluded by the gitless profile, 1,196 total, zero retries and no leak warnings. Final frontend typechecking passed. Final UI tests: 448 passed in 59 files. Fresh build-first smoke: 167 passed and 25 Git-dependent skips, 192 total in 46 files; no unhandled rejections, leak warnings, or bind errors. Node runner/compression checks: 47 passed; Python coverage-checker checks: 47 passed. CI/assets/fixtures and final attachment lifecycle reviews signed off without blockers. Evidence is under target/ci-repair-20261002/final-rust-ui, final-ui-smoke, assets, fixtures, and custom-store/lifecycle.
+
+    Audit corrections and results: The prior progress comment's '2350 remaining vulnerabilities' was a transcription error: npm audited 235 packages and reported ZERO vulnerabilities. Actual resolved npm versions are dompurify 3.4.16, brace-expansion 5.0.12, and undici 8.11.2, within unchanged manifest ranges. rustls is 0.23.45. The native cargo-audit 0.22.2 scan of 221 crates against the current 1,280-advisory RustSec snapshot 117edb3bed98e9be112f277b7615eea3252e7c43 exited successfully with zero vulnerable crates. The snapshot was downloaded without Git commands; an index-cache permission warning prevented yanked-crate lookup but did not suppress vulnerability findings. No advisories were ignored and no forced major npm upgrade was used.
+
+    Remaining: This sandbox's real Git probe returns Operation not permitted, so the 45 Rust Git cases and 25 smoke Git cases are exclusions, not passes; they must execute in the mandatory Git-capable CI lanes. Genuine Windows execution and a new remote CI run are not claimed. The auxiliary exact-CI follow-up supplied no completed test-run/report-pair artifacts and is not counted as verification. The latest remote QA run is still the failed run on 0f8d8da; these changes have not been published by this session. Done records completed implementation and verified local checks under the developer-approved pre-commit CI workflow, avoiding a later status-only amend. Successful CI must establish the final verified committed state; any further failures must be repaired before declaring it verified.
+
+    Guidance: No quality gate, audit policy, or repository safety rule was weakened. No durable agent-policy correction was necessary; the failures were workflow setup, fixture assumptions, and a genuine UI initialization race. Existing changes were preserved. No Git commands, staging, commit, push, remote CI trigger, or foreign server termination was performed.
+description: 'Repair the failures in Quality Assurance run 37036203848 on commit 0f8d8da. Scope: generate frontend/embed assets before Rust quality checks on cold runners; resolve compression paths with fileURLToPath on Windows; patch rustls 0.23.43 to 0.23.45 and the affected compatible npm dependencies; make the initial branch of smoke repositories explicitly main; synchronize the agent creation-response test with the worker instead of assuming its snapshot is always queued; retain eager attachment drops during task-panel initialization and prevent retained drops from being applied to another task. The custom-store failure was after an eager upload drop, not after removal. The agent race was in the HTTP creation response, not a UI rendering assertion. Acceptance: implementation and independent review complete; required local lint, Rust/UI tests, fresh build-first smoke, helper regression tests, and dependency audits pass without weakening checks. Git-dependent exclusions and genuine Windows execution remain explicitly recorded rather than counted as passes. Remote CI must establish the final verified committed state after publication, consistent with the developer-approved pre-commit ticket completion workflow. No commit, push, or remote CI trigger is authorized by this ticket. Preserve unrelated changes and never terminate foreign servers.'
+history:
+- at: 2026-10-02T17:14:12.695322+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-02T17:14:21.190232+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T17:28:08.290780+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T17:28:26.521702+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T18:36:42.156519+00:00
+  actor: mallox
+  changes:
+  - field: description
+    old: |-
+      Trigger: Quality Assurance CI run 37036203848 failed on current main 0f8d8da (2026-10-02). User-directed independent repair scope; historical Done tickets (DEV-72/76/77/78/79/80/81 and the CI-completion exception accepted by the developer) stay closed and are not reopened for this work.
+
+      Enumerated failures to fix:
+      1. Cold-run Rust Quality Checks cannot compile: the job neither builds nor downloads the frontend assets embedded by include_dir! from target/web-embed (src/web_server.rs:15), so Rust tests and coverage were skipped. CI must produce the embed inputs on a cold runner before cargo builds.
+      2. Windows asset compression path bug: scripts/compress-web.mjs derives paths via URL.pathname, which on Windows yields a leading-slash drive form (/D:/...), producing malformed double-drive output paths after successful frontend compilation. Use portable fileURLToPath-equivalent conversion with unit coverage.
+      3. Cargo.lock pins rustls 0.23.43, covered by advisory RUSTSEC-2026-0285 which requires >= 0.45. Bump the lockfile and verify the dependency tree still builds and tests green.
+      4. Two smoke fixtures assume the initial branch of a freshly initialized repository is main; runners with a different default branch name break them. Make branch expectations explicit and portable (smoke git fixture helper and the affected api spec).
+      5. Agent jobs queued-state snapshot race in the UI (queued job rendering versus snapshot updates).
+      6. Custom-store attachment UI chip times out (15s) after removal; root cause pending. Diagnosis test first, minimal runtime fix only if the root cause requires it.
+
+      Acceptance: all applicable targeted and full gates pass locally with no weakened checks: npm run lint; agent Rust/UI tests with default retries 0; build-first smoke with an actual Git probe when the invocation context permits, otherwise the Git-gated subset is explicitly excluded and reported, never claimed as covered; cargo audit and npm audit run with declared scope, addressing only warnings related to the change diff where feasible and never running a blind npm audit fix. True Windows CI evidence is unavailable without push and must remain an explicit developer-accepted exception; remote green is not claimed. No commits or pushes are authorized for this ticket.
+
+      Constraints: all lanes work in the current shared checkout with isolated build targets; preserve existing changes from other workers; no repository Git operations; no foreign cleanup.
+
+      Definition of done: coordinated lanes land, independent review passes, final gate evidence is recorded in this ticket, and remaining platform/CI evidence limits are documented explicitly.
+    new: 'Repair the failures in Quality Assurance run 37036203848 on commit 0f8d8da. Scope: generate frontend/embed assets before Rust quality checks on cold runners; resolve compression paths with fileURLToPath on Windows; patch rustls 0.23.43 to 0.23.45 and the affected compatible npm dependencies; make the initial branch of smoke repositories explicitly main; synchronize the agent creation-response test with the worker instead of assuming its snapshot is always queued; retain eager attachment drops during task-panel initialization and prevent retained drops from being applied to another task. The custom-store failure was after an eager upload drop, not after removal. The agent race was in the HTTP creation response, not a UI rendering assertion. Acceptance: implementation and independent review complete; required local lint, Rust/UI tests, fresh build-first smoke, helper regression tests, and dependency audits pass without weakening checks. Git-dependent exclusions and genuine Windows execution remain explicitly recorded rather than counted as passes. Remote CI must establish the final verified committed state after publication, consistent with the developer-approved pre-commit ticket completion workflow. No commit, push, or remote CI trigger is authorized by this ticket. Preserve unrelated changes and never terminate foreign servers.'
+- at: 2026-10-02T18:37:44.405488+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T18:37:44.429150+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

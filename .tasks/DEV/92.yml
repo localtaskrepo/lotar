@@ -1,0 +1,7 @@
+title: Support/Verify soft delete
+status: Todo
+priority: High
+type: Feature
+reporter: mallox
+created: 2026-09-20T05:36:29.977698+00:00
+description: Issues can be deleted. By default they should be soft deleted so that the client doesn't show them anymore (except maybe via a filter/flag). The system should however still support hard deletes, e.g. when a developer just deletes a task file, without breaking. It's their responsibility to handle this and there is always the git history that users can rely on. This also means that missing ticket IDs should not cause any problems. ID counters can be based on highest ID+1 so that we reuse ticket ID numbers if they're not in the system, which allows gaps, but doesn't increase count if the tickets are not stored. Yes, this can mean that the git history may have a different ticket with the same ID, if I delete the newest one and add a different one, but I think this okay, as the issues will be raised through the git diff, which will still allow a user to increment the ID number manually, which they are probably comfortable with if they already mess with the files directly. Instead of delete flag we can use a deletedAt timestamp, which is more flexible and allows for future features like "undelete" or "restore". The system should also support a way to list all deleted issues, maybe with a filter or a separate command. This will allow users to see what has been deleted and potentially restore them if needed.

@@ -8,11 +8,11 @@ pub use args::{
     AddArgs, AgentAction, AgentArgs, AgentCheckArgs, AgentRunArgs, AgentWorkerArgs,
     AutomationAction, AutomationArgs, AutomationSimulateArgs, CompletionShell, CompletionsAction,
     CompletionsArgs, ConfigAction, ConfigInitArgs, ConfigNormalizeArgs, ConfigSetArgs,
-    ConfigShowArgs, ConfigValidateArgs, GitAction, GitHooksAction, GitHooksInstallArgs,
-    IndexAction, IndexArgs, ScanArgs, ServeArgs, SortField, SprintAction, SprintArgs,
-    SprintCreateArgs, SprintListArgs, SprintShowArgs, StatsArgs, SyncArgs, SyncCheckArgs,
-    SyncCommandAction, SyncCommandArgs, TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs,
-    TaskSearchArgs, TaskStatusArgs, parse_key_value,
+    ConfigShowArgs, ConfigValidateArgs, GitAction, GitHooksAction, GitHooksInstallArgs, ScanArgs,
+    ServeArgs, SortField, SprintAction, SprintArgs, SprintCreateArgs, SprintListArgs,
+    SprintShowArgs, StatsArgs, SyncArgs, SyncCheckArgs, SyncCommandAction, SyncCommandArgs,
+    TaskAction, TaskAddArgs, TaskDeleteArgs, TaskEditArgs, TaskSearchArgs, TaskStatusArgs,
+    parse_key_value,
 };
 pub mod preprocess;
 
@@ -222,14 +222,6 @@ pub enum Commands {
     /// Shell completions support
     Completions(CompletionsArgs),
 }
-
-// AddArgs moved to args_task
-
-// Task-related arg structs and enums are re-exported from args_task
-
-// ScanArgs, ServeArgs, IndexArgs and IndexAction moved to args_* modules
-
-// parse_key_value moved to args_common
 
 pub mod handlers;
 pub mod project;

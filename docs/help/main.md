@@ -44,7 +44,7 @@ See [Agent Jobs](./agent.md) for the full CLI workflow and wrapper requirements.
 | --- | --- |
 | `--format text|table|json|markdown` | Pick an output style once and reuse it everywhere. |
 | `--log-level <level>` / `--verbose` | Control how chatty the command should be. |
-| `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. Note: `lotar serve` ignores the project flag on purpose; use `--port` to change the server port. |
+| `--project, -p <PREFIX>` | Force a project context when auto-detection isn’t enough. Note: `lotar serve` ignores the project flag on purpose; use `--port`/`-p <PORT>` (after `serve`) to change the server port. |
 | `--tasks-dir <PATH>` | Point at a completely different workspace; the folder is created automatically when missing. |
 
 These flags stack with command-specific options. Example:
@@ -60,7 +60,7 @@ lotar --format json list --project AUTH --status todo --limit 50
 | `LOTAR_TASKS_DIR` | Keep your workspace alongside the repo, or point CI at a shared cache. |
 | `LOTAR_PROJECT` | Default prefix when you rarely switch projects. |
 | `LOTAR_DEFAULT_ASSIGNEE` / `LOTAR_DEFAULT_REPORTER` | Seed new tasks with the right people. |
-| `LOTAR_PORT` | Lock the web UI to a known port for tunnels or shared dev boxes. |
+| `LOTAR_PORT` | Lock the web UI to a known port for tunnels or shared dev boxes. Applies when `serve` runs without `--port` (and loses to it); a busy locked port fails instead of moving. `LOTAR_SERVER_PORT` is an alias. |
 | `LOTAR_AUTO_IDENTITY` / `LOTAR_AUTO_IDENTITY_GIT` | Enable or disable `@me` lookups based on local policy. |
 
 See [Environment Variables](./environment.md) for automation toggles, sprint defaults, diagnostics, and more.

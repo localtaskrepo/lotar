@@ -1,7 +1,9 @@
 use super::ConfigHandler;
 use super::render::{YamlRenderOptions, emit_config_yaml};
 use crate::config::ConfigManager;
-use crate::config::source_labels::{build_global_source_labels, build_project_source_labels};
+use crate::config::source_labels::{
+    build_global_source_labels_with_port, build_project_source_labels,
+};
 use crate::output::OutputRenderer;
 use crate::services::attachment_service::AttachmentService;
 use crate::workspace::TasksDirectoryResolver;
@@ -144,9 +146,16 @@ impl ConfigHandler {
             let global_cfg =
                 crate::config::persistence::load_global_config(Some(&effective_read_root)).ok();
             let home_cfg = crate::config::persistence::load_home_config().ok();
-            let sources = build_global_source_labels(resolved_config, &global_cfg, &home_cfg);
+            let global_port_explicit =
+                crate::config::persistence::global_config_sets_server_port(&effective_read_root);
+            let sources = build_global_source_labels_with_port(
+                resolved_config,
+                &global_cfg,
+                &home_cfg,
+                global_port_explicit,
+            );
 
-            const GLOBAL_SOURCES: &[&str] = &["env", "home", "global"];
+            const GLOBAL_SOURCES: &[&str] = &["env", "home", "global", "cli"];
             let options = YamlRenderOptions {
                 include_defaults: full,
                 include_comments: explain,

@@ -16,7 +16,9 @@
 //! These tests use no git tooling: `.git` is never created or invoked,
 //! and repo-root discovery happens by ancestry from a workspace placed
 //! under CARGO_TARGET_TMPDIR inside the real checkout. The suite must
-//! stay compiled (and executing) even under the `no_git_tests` cfg.
+//! stay compiled (and executing) in every environment, including
+//! Git-denied sandboxes (only source-local `git_required` modules are ever
+//! excluded, and never by compilation).
 use lotar::api_server::{ApiServer, HttpRequest};
 use lotar::routes;
 use serde_json::{Value, json};

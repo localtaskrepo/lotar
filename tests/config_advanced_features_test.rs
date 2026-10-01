@@ -1,333 +1,155 @@
-#![allow(clippy::redundant_pattern_matching)]
-
 mod common;
 
 use crate::common::cargo_bin_silent;
 use common::TestFixtures;
 use std::fs;
 
-/// Phase 2.3 - Config Command Advanced Features Testing
-/// Tests advanced config functionality including dry-run mode, validation,
-/// and advanced operations like --force and --copy-from.
+/// Config command advanced features: dry-run previews, force, copy-from,
+/// template validation, and config show output. Every test asserts the exact
+/// exit status plus the observable file effects of the documented behavior.
 
 #[test]
-fn test_config_init_dry_run_mode() {
+fn config_init_dry_run_previews_without_writing() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    let mut cmd = cargo_bin_silent();
-    let result = cmd
+    cargo_bin_silent()
         .current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--dry-run")
-        .assert();
-
-    match result.try_success() {
-        Ok(assert_result) => {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-            assert!(
-                output.contains("Would create")
-                    || output.contains("Preview")
-                    || output.contains("dry"),
-                "Dry-run should show preview output"
-            );
-
-            // Verify no files were actually created
-            let config_path = temp_dir.join(".tasks").join("config.yml");
-            assert!(!config_path.exists(), "Dry-run should not create files");
-        }
-        Err(_) => {
-            // Dry-run may not be implemented yet
-        }
-    }
-
-    // Test dry-run with template option
-    let mut cmd = cargo_bin_silent();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--dry-run")
-        .arg("--template=agile")
-        .assert();
-
-    if let Ok(assert_result) = result.try_success() {
-        let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-        assert!(
-            output.contains("agile"),
-            "Dry-run should work with templates"
-        );
-    }
-}
-
-#[test]
-fn test_config_set_dry_run_mode() {
-    let fixtures = TestFixtures::new();
-    let temp_dir = fixtures.temp_dir.path();
-
-    // First create a proper config to test dry-run modifications on
-    let mut cmd = cargo_bin_silent();
-    cmd.current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=default")
+        .args(["config", "init", "--dry-run"])
         .assert()
-        .success();
+        .success()
+        .stdout(predicates::str::contains("DRY RUN"))
+        .stdout(predicates::str::contains("workflow 'default'"));
 
-    let mut cmd = cargo_bin_silent();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("project_name")
-        .arg("test-project-dry-run")
-        .arg("--dry-run")
-        .assert();
-
-    if let Ok(assert_result) = result.try_success() {
-        let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-        assert!(
-            output.contains("Would set") || output.contains("Preview") || output.contains("dry"),
-            "Config set dry-run should show preview"
-        );
-
-        // Verify config wasn't actually changed
-        let config_path = temp_dir.join(".tasks").join("config.yml");
-        if config_path.exists() {
-            let config_content = fs::read_to_string(&config_path).unwrap_or_default();
-            assert!(
-                !config_content.contains("test-project-dry-run"),
-                "Dry-run should not modify config"
-            );
-        }
-    }
-}
-
-#[test]
-fn test_config_force_flag() {
-    let fixtures = TestFixtures::new();
-    let temp_dir = fixtures.temp_dir.path();
-
-    // Create initial config
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=default")
-        .assert()
-        .success();
-
-    // Test --force flag with potentially conflicting operation
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--force")
-        .arg("--template=agile")
-        .assert();
-
-    if let Ok(_) = result.try_success() {
-        // New behavior: template state/content lives in the project config, not global.
-        // Just assert that the project config exists and the global config was created.
-        let tasks_dir = temp_dir.join(".tasks");
-        assert!(
-            tasks_dir.join("config.yml").exists(),
-            "Force flag should leave/create the global config"
-        );
-        let mut found_project_config_with_agile_shape = false;
-        if let Ok(rd) = fs::read_dir(&tasks_dir) {
-            for entry in rd.flatten() {
-                let p = entry.path();
-                if p.is_dir() {
-                    let cfg = p.join("config.yml");
-                    if cfg.exists() {
-                        let content = fs::read_to_string(&cfg).unwrap_or_default();
-                        if content.contains("Verify") || content.contains("InProgress") {
-                            found_project_config_with_agile_shape = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        assert!(
-            found_project_config_with_agile_shape,
-            "Force flag should overwrite project config with agile workflow"
-        );
-    }
-
-    // Test force flag with invalid values
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("invalid_field")
-        .arg("invalid_value")
-        .arg("--force")
-        .assert();
-
-    // Force flag should still validate config fields
+    let tasks_dir = temp_dir.join(".tasks");
     assert!(
-        result.try_success().is_err(),
-        "Force flag should still validate config fields"
+        !tasks_dir.join("config.yml").exists(),
+        "dry-run init must not create the global config"
+    );
+    assert!(
+        fs::read_dir(&tasks_dir).unwrap().count() == 0,
+        "dry-run init must not create any project files"
+    );
+
+    cargo_bin_silent()
+        .current_dir(temp_dir)
+        .args(["config", "init", "--dry-run", "--template=agile"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("DRY RUN"))
+        .stdout(predicates::str::contains("workflow 'agile'"));
+
+    assert!(
+        !tasks_dir.join("config.yml").exists(),
+        "dry-run init with a template must not create the global config"
+    );
+    assert!(
+        fs::read_dir(&tasks_dir).unwrap().count() == 0,
+        "dry-run init with a template must not create any project files"
     );
 }
 
 #[test]
-fn test_config_copy_from_functionality() {
+fn config_set_dry_run_previews_without_modifying_config() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    // Create source project with custom configuration
-    let source_dir = temp_dir.join("source_project");
-    fs::create_dir_all(&source_dir).unwrap();
-
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(&source_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=agile")
+    cargo_bin_silent()
+        .current_dir(temp_dir)
+        .args(["config", "init", "--template=default"])
         .assert()
         .success();
 
-    // Set default project to a valid prefix so project-scoped set works
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(&source_dir)
-        .args(["config", "set", "default_project", "DEMO", "--global"])
+    cargo_bin_silent()
+        .current_dir(temp_dir)
+        .args([
+            "config",
+            "set",
+            "project_name",
+            "test-project-dry-run",
+            "--dry-run",
+        ])
         .assert()
-        .success();
+        .success()
+        .stdout(predicates::str::contains(
+            "DRY RUN: Would set project_name = test-project-dry-run",
+        ));
 
-    // Now project-scoped set should create DEMO project config and succeed
-    crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(&source_dir)
-        .args(["config", "set", "project_name", "source-project"])
-        .assert()
-        .success();
-
-    // Create target project directory
-    let target_dir = temp_dir.join("target_project");
-    fs::create_dir_all(&target_dir).unwrap();
-
-    // Test copy-from functionality
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
-        .current_dir(&target_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--copy-from")
-        .arg(source_dir.to_str().unwrap())
-        .assert();
-
-    if let Ok(_) = result.try_success() {
-        // Verify target config was created with source settings
-        let target_config = target_dir.join(".tasks").join("config.yml");
-        assert!(
-            target_config.exists(),
-            "Copy-from should create target config"
-        );
-
-        let config_content = fs::read_to_string(&target_config).unwrap_or_default();
-        assert!(
-            config_content.contains("source-project") || config_content.contains("agile"),
-            "Copy-from should copy settings from source"
-        );
-    }
+    let config_path = temp_dir.join(".tasks").join("config.yml");
+    assert!(config_path.exists(), "init should have created the config");
+    let content = fs::read_to_string(&config_path).unwrap();
+    assert!(
+        !content.contains("test-project-dry-run"),
+        "dry-run set must not modify the config: {content}"
+    );
 }
 
 #[test]
-fn test_config_validation_and_conflicts() {
+fn config_force_overwrites_project_config_with_agile_workflow() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    // Create initial config
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=default")
-        .assert()
-        .success();
-
-    // Test invalid config values
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("issue_prefix")
-        .arg("invalid-prefix-with-dashes") // Should be uppercase letters only
-        .assert();
-
-    // May accept or reject based on validation implementation
-    let _validation_result = result.try_success().is_ok();
-
-    // Test unknown fields
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("unknown_field")
-        .arg("some_value")
-        .assert();
-
-    // May accept or reject based on validation implementation
-    let _unknown_field_result = result.try_success().is_ok();
-
-    // Test project name vs prefix conflict detection
-    // Ensure default project is set so project-scoped set works
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
-        .args(["config", "set", "default_project", "DEMO", "--global"])
+        .args(["config", "init", "--template=default"])
         .assert()
         .success();
 
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("project_name")
-        .arg("different-project")
-        .assert()
-        .success();
-
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
+    crate::common::lotar_cmd()
+        .unwrap()
         .current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("issue_prefix")
-        .arg("CONFLICT") // Different from project name abbreviation
-        .assert();
+        .args(["config", "init", "--force", "--template=agile"])
+        .assert()
+        .success();
 
-    if let Ok(assert_result) = result.try_success() {
-        let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-        // Check if conflict warning exists (optional feature)
-        let _has_conflict_warning = output.contains("warning") || output.contains("conflict");
-    }
+    let tasks_dir = temp_dir.join(".tasks");
+    assert!(
+        tasks_dir.join("config.yml").exists(),
+        "force init must leave the global config in place"
+    );
+    let project_configs: Vec<String> = fs::read_dir(&tasks_dir)
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.path().join("config.yml"))
+        .filter(|path| path.exists())
+        .map(|path| fs::read_to_string(&path).unwrap_or_default())
+        .collect();
+    assert!(
+        project_configs
+            .iter()
+            .any(|content| content.contains("Verify") || content.contains("InProgress")),
+        "force init must overwrite the project config with the agile workflow: {project_configs:?}"
+    );
 }
 
 #[test]
-fn test_config_global_vs_project_precedence() {
+fn config_force_does_not_bypass_field_validation() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    // Create project config
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=default")
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "invalid_field", "invalid_value", "--force"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("Invalid project config field"));
+}
+
+#[test]
+fn config_copy_from_merges_source_project_settings() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "init", "--template=agile"])
         .assert()
         .success();
 
-    // Set project-specific value - first set default project to a valid prefix
     crate::common::lotar_cmd()
         .unwrap()
         .current_dir(temp_dir)
@@ -335,131 +157,225 @@ fn test_config_global_vs_project_precedence() {
         .assert()
         .success();
 
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("config")
-        .arg("set")
-        .arg("project_name")
-        .arg("project-specific")
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "default_priority", "High"])
         .assert()
         .success();
 
-    // Test config show displays project values
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
+    crate::common::lotar_cmd()
+        .unwrap()
         .current_dir(temp_dir)
-        .arg("config")
-        .arg("show")
-        .arg("--format=json")
-        .assert();
+        .args(["config", "init", "--project=frontend", "--copy-from=DEMO"])
+        .assert()
+        .success();
 
-    if let Ok(assert_result) = result.try_success() {
-        let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-        // Try to parse as JSON to validate structure
-        match serde_json::from_str::<serde_json::Value>(&output) {
-            Ok(json) => {
-                // Check if project config precedence is working
-                if let Some(project_name) = json.get("project_name") {
-                    // Config show command works and returns project data
-                    let _has_project_name = project_name.as_str().is_some();
-                }
-            }
-            Err(_) => {
-                // Fall back to string search if JSON parsing fails
-                // Config show may not return JSON or project values may not be set
-                let _has_project_values = output.contains("project-specific");
-            }
-        }
-    }
-
-    // Test global config doesn't override project config
-    let home_dir = temp_dir.join("fake_home");
-    fs::create_dir_all(&home_dir).unwrap();
-
-    // Note: Testing global config requires proper home directory setup
-    // This is a simplified test for the precedence concept
-    assert!(home_dir.exists(), "Test home directory created");
+    let copied: Vec<String> = fs::read_dir(temp_dir.join(".tasks"))
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.path().join("config.yml"))
+        .filter(|path| path.exists())
+        .map(|path| fs::read_to_string(&path).unwrap_or_default())
+        .filter(|content| content.contains("name: frontend"))
+        .collect();
+    assert_eq!(
+        copied.len(),
+        1,
+        "exactly one frontend project config must exist: {copied:?}"
+    );
+    assert!(
+        copied[0].contains("priority: High"),
+        "copy-from must merge non-identity settings from the source project: {}",
+        copied[0]
+    );
 }
 
 #[test]
-fn test_config_template_validation() {
+fn config_set_rejects_invalid_and_unknown_fields() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    // Test valid templates
-    let valid_templates = vec![
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "init", "--template=default"])
+        .assert()
+        .success();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args([
+            "config",
+            "set",
+            "issue_prefix",
+            "invalid-prefix-with-dashes",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains(
+            "Invalid project config field: 'issue_prefix'",
+        ));
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "unknown_field", "some_value"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains(
+            "Invalid project config field: 'unknown_field'",
+        ));
+}
+
+#[test]
+fn config_set_persists_project_name_in_project_config() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "init", "--template=default"])
+        .assert()
+        .success();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "default_project", "DEMO", "--global"])
+        .assert()
+        .success();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "project_name", "project-specific"])
+        .assert()
+        .success();
+
+    let project_config =
+        fs::read_to_string(temp_dir.join(".tasks").join("DEMO").join("config.yml"))
+            .expect("project config must exist after set");
+    assert!(
+        project_config.contains("name: project-specific"),
+        "project_name must be persisted in the project config: {project_config}"
+    );
+}
+
+#[test]
+fn config_show_json_reports_resolved_defaults_and_sources() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "init", "--template=default"])
+        .assert()
+        .success();
+
+    crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "set", "default_project", "DEMO", "--global"])
+        .assert()
+        .success();
+
+    let output = crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["config", "show", "--format=json"])
+        .output()
+        .expect("run config show");
+    assert!(
+        output.status.success(),
+        "config show failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let payload: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
+        panic!(
+            "config show --format=json must emit valid JSON: {e}: {}",
+            String::from_utf8_lossy(&output.stdout)
+        )
+    });
+    assert_eq!(
+        payload["config"]["default_project"], "DEMO",
+        "resolved config must report the global default project: {payload}"
+    );
+    assert_eq!(
+        payload["sources"]["default.project"], "global",
+        "the default project must be attributed to the global source: {payload}"
+    );
+}
+
+#[test]
+fn config_init_accepts_documented_templates() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+
+    for template in [
         "default",
         "agile",
         "kanban",
         "jira",
         "github",
         "jira-github",
-    ];
-
-    for template in valid_templates {
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
+    ] {
+        crate::common::lotar_cmd()
+            .unwrap()
             .current_dir(temp_dir)
-            .arg("config")
-            .arg("init")
-            .arg(format!("--template={template}"))
-            .arg("--force") // Force to overwrite previous configs
-            .assert();
-
-        // Template should be accepted (tests may pass or fail based on implementation)
-        let _template_works = result.try_success().is_ok();
+            .args([
+                "config",
+                "init",
+                format!("--template={template}").as_str(),
+                "--force",
+            ])
+            .assert()
+            .success();
     }
 
-    // Test invalid template
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
-        .current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=nonexistent")
-        .assert();
-
-    // Invalid template should be rejected
     assert!(
-        result.try_success().is_err(),
-        "Invalid template should be rejected"
+        temp_dir.join(".tasks").join("config.yml").exists(),
+        "template init must leave the global config in place"
     );
 }
 
 #[test]
-fn test_config_advanced_features_summary() {
+fn config_init_rejects_unknown_template() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    // Test basic config functionality as baseline
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd
+    crate::common::lotar_cmd()
+        .unwrap()
         .current_dir(temp_dir)
-        .arg("config")
-        .arg("init")
-        .arg("--template=default")
-        .assert();
+        .args(["config", "init", "--template=nonexistent"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("Unknown workflow/template"));
+}
 
-    // Config init may or may not succeed depending on implementation
-    let _config_init_works = result.try_success().is_ok();
+#[test]
+fn config_help_documents_advanced_options() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
 
-    // Test config help
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    let result = cmd.current_dir(temp_dir).arg("help").arg("config").assert();
+    let output = crate::common::lotar_cmd()
+        .unwrap()
+        .current_dir(temp_dir)
+        .args(["help", "config"])
+        .output()
+        .expect("run help config");
+    assert!(output.status.success());
 
-    if let Ok(assert_result) = result.try_success() {
-        let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-        // Verify help documentation contains expected options
-        let has_dry_run = output.contains("--dry-run");
-        let has_force = output.contains("--force");
-        let has_copy_from = output.contains("--copy-from");
-
-        // At least one advanced option should be documented
-        assert!(
-            has_dry_run || has_force || has_copy_from,
-            "Config help should document advanced options"
-        );
-    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--dry-run"), "help must document --dry-run");
+    assert!(stdout.contains("--force"), "help must document --force");
+    assert!(
+        stdout.contains("--copy-from"),
+        "help must document --copy-from"
+    );
 }

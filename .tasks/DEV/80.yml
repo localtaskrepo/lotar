@@ -1,12 +1,36 @@
 title: Make agent test fixtures cross-platform and own environment and child cleanup
-status: Todo
-relationships:
-  parent: DEV-53
-  depends_on: [DEV-76]
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.865336+00:00
+modified: 2026-10-01T20:23:40.201424+00:00
+relationships:
+  depends_on:
+  - DEV-76
+  parent: DEV-53
+comments:
+- date: 2026-09-17T04:51:16.527414+00:00
+  text: 'Plan (session 2026-09-17, tracking-only record): marked InProgress - prerequisite DEV-76 fixture lifecycle implementation is available. Wave 1 (Node/smoke side): Node-portable mock agents replacing bash/date/sleep dependencies; async gate owns child cleanup with deterministic termination/drain; the completed-filter assertion portion is CREDITED TO DEV-77 (tracked there, not double-counted here). Wave 2 (separate, AFTER DEV-79 common work is released): Rust fixture environment ownership (child-scoped env, fixture-owned guards instead of process-global mutation outside the shared guard). Boundary: full Windows verification is PENDING - do NOT claim cross-platform execution until a supported Windows runner provides evidence. Verification: targeted tests per wave, then shared final gates and review before Done.'
+- date: 2026-09-17T05:22:11.991426+00:00
+  text: 'Progress (session 2026-09-17, tracking-only): Wave 1 complete - smoke now uses Node-portable launchers, and the async gate owns child release/drain: 30 pass, 1 honest Git skip. Rust env-fixture work landed with NO env reset inside guards: new tests 8/8; suite totals 135 pass; the 2 require-git failures are KNOWN and are handled under DEV-79 newly-exposed rules (no silent pass, not counted as preexisting green). Independent review PENDING; Windows execution NOT performed - no cross-platform claim. Full gates + review before any Done; status stays InProgress.'
+- date: 2026-09-17T06:14:38.097492+00:00
+  text: 'Independent review (session 2026-09-17, tracking-only): SIGNOFF, no blockers. Local evidence supports the behavior: 8 new env-fixture tests plus 30 smoke tests. Windows remains UNEXECUTED - the supported-runner requirement is still pending and no cross-platform claim is made. Status stays InProgress pending full shared gates and final reconciliation - no Done yet.'
+- date: 2026-09-19T19:00:44.500654+00:00
+  text: 'Handoff-interim (session 2026-09-19, final; tracking-only). Outcome (local portion done): agent test fixtures made cross-platform with child-scoped environment and fixture-owned guards/cleanup - local fixtures/env coverage is 8 test + 30 smoke cases; review PASSED; final full shared gates green per DEV-76 closing record (lint clean; Rust 1089/8/0 default concurrency retries 0 no LEAK flags; UI 449/60; checker 39/39; final smoke fixed 34s exit 0, no leak/unhandled/bind warnings). Remaining (exact, keeps this ticket open): Windows PORTABLE-AGENT SMOKE proof is still REQUIRED - the existing Windows CI job''s storage/scan artifact checks ALONE do NOT satisfy agent smoke verification. Cancellation/worker-finalization regressions were not weakened. Evidence: gate logs at target/test-fix-handoff/final-rust-ui/ and final-smoke-fixed/. Guidance: no durable instruction finding. Status stays InProgress; no source edits by tracker, no git operations.'
+- date: 2026-09-19T19:34:56.004874+00:00
+  text: 'Plan (session 2026-09-19, new user request; tracking-only): design a WINDOWS BROWSER-FREE portable-agent SMOKE CI job - the existing Windows lib job (storage/scan artifact checks) is INSUFFICIENT for agent smoke verification, as previously recorded. Runner boundary, stated honestly: the user dismissed the Windows-runner question - NO new git/push permission granted; there is NO verified Windows runtime available (UTM reports 0 VMs; local Docker is Linux-only). Plan is to prepare code/jobs/local proof, but GENUINE platform evidence CANNOT be claimed until a runner is actually available; ticket stays honestly open unless/until verified execution happens. Environment unchanged: native universal2 nextest 0.9.145, persistent browser assets ready. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T03:41:16.759407+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): Windows CI browser-free portable-agent SMOKE job specs added - 4 specs covering 32 cases, with a Darwin mirror run GREEN 32/32; JUnit artifact made MANDATORY, plus Node wrapper unit gates on Linux UI + Windows; cold-Windows path gained the required build:web step. ACTUAL WINDOWS EXECUTION: NOT run - the user dismissed the runner question and granted NO git/push permission; Docker CLI daemon is not running and NO fallback runner was started. Platform-evidence boundary unchanged: prepare code/jobs/local proof only; genuine Windows proof cannot be claimed until a real runner executes the job. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T04:28:45.231855+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): docs made ENVIRONMENT-NEUTRAL - not macOS-specific policy, no blanket remote-CI ban: an authorized CI or user Windows host is equally valid. The Windows repro now includes npm ci / build:web / cargo build in the correct COLD order; session-specific ports are NOT enshrined in docs. CODE independent review: SIGNOFF. Platform execution still PENDING: only the four browser-free cases'' 32 Mac-mirror passes exist; the runner''s Node unit gates are still pending (79-file integration outstanding); NO green-CI claim is made. Boundary unchanged: no runner available, no git/push permission, user question dismissed. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T05:20:23.685237+00:00
+  text: 'Status note (session 2026-09-20; tracking-only): code + docs complete with independent review SIGNOFF (4 browser-free specs, Darwin mirror 32/32, mandatory JUnit + Node wrapper gates, cold-order build:web); the sole remaining item is ACTUAL WINDOWS PROOF - still pending because the user dismissed the runner/permission options (no git/push permission, no runner started; Docker daemon not running). With local Git capability now proven (DEV-79), the Mac-side gate evidence is current; no green-CI or Windows claim made. Status stays InProgress pending coordinator closure; no source edits or git operations by tracker.'
+- date: 2026-10-01T19:28:42.451190+00:00
+  text: 'Handoff-interim (session 2026-10-01, final tracking this wave; Rust-side env hardening COMPLETE per the DEV-79 Oct-1 record - ctor baseline scrub before Guard, TestFixtures own scopes without env mutation, fresh-env owned-home probes, Windows-safe bootstrap, Node 41 controls with no leaking raw env; do NOT repeat finished Rust env hardening as unfinished). Evidence: Oct-1 gates green - lint:agent exit 0; Rust 1196/1196, 0 skipped, all 45 git_required executed + passed, 0 LEAK; UI 443/58; Node 41/41; smoke 166 pass / 23 Git-skip valid for current app. Remaining (exact, PLATFORM only): actual Windows portable launcher / cmd quoting / lifecycle 32-case lane artifact; the old template flake is NOT a required new followup; root probe-env-capture.txt - the cleanup owner will delete only a verified owned artifact, NOT ticket-blocking unless user work cannot touch it. Status stays InProgress pending Windows evidence only; no Done claimed. Guidance: none new this pass.'
+- date: 2026-10-01T20:23:40.180991+00:00
+  text: 'Outcome: Cross-platform fixture implementation, cleanup/environment isolation, and the Windows portable-agent CI lane are complete. Marked Done before the commit/CI cycle at the developer''s explicit request on 2026-10-01, so the ticket update is committed with the implementation and does not require a ticket-only amend and CI rerun. Evidence: Independent review signed off; local fixture checks and the 32-case portable-agent selection passed on macOS; integrated Rust/UI/lint gates passed. Remaining verification: genuine Windows execution of the portable-agent lane, including launcher/cmd quoting and lifecycle behavior, is still pending. Accepted completion exception: Done records implementation completion under the developer-approved CI workflow; it does not claim Windows checks or CI have passed. Successful CI must establish the final verified, committed state, and any failures must be corrected before that state is declared. Guidance: This is a ticket-specific developer-approved completion exception, not a change to repository verification policy. No commit, amend, push, or CI trigger was performed in this tracking step.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T10 T12.
@@ -18,3 +42,58 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-17T04:51:07.090207+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-17T04:51:16.527414+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:22:11.991426+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T06:14:38.097492+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:00:44.500654+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:34:56.004874+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T03:41:16.759407+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T04:28:45.231855+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T05:20:23.685237+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:28:42.451190+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T20:23:40.180991+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T20:23:40.201424+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

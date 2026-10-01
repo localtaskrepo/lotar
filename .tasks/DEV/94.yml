@@ -1,0 +1,7 @@
+title: Sync page errors when a scope has no sync reports
+status: Todo
+priority: Medium
+type: Bug
+reporter: mallox
+created: 2026-10-02T18:15:52.389031+00:00
+description: 'Found while capturing README screenshots (DEV-17). GET /api/sync/reports/list omits the reports field when the list is empty (src/api_types.rs SyncReportListResponse has skip_serializing_if = Vec::is_empty), but view/api/types.ts declares reports: SyncReportMeta[] as required and view/pages/SyncHub.vue loadReports() calls payload.reports.map(...). Result: a fresh workspace with remotes but no reports shows ''Cannot read properties of undefined (reading map)'' in the Sync reports card. Repro: node scripts/generate-test-tasks.mjs --demo, lotar serve, open /sync. Acceptance: decide the contract (always serialize an empty array, or make it optional in TS/OpenAPI and default in the UI), keep src/api_types.rs, view/api/types.ts and docs/openapi.json in agreement, add a regression test; the empty state renders ''No reports yet.'' without an error.'

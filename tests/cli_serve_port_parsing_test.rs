@@ -13,7 +13,7 @@ fn serve_accepts_long_port_flag() {
     let cli = parse_cli(&["lotar", "serve", "--port", "4242"]);
     match cli.command {
         Commands::Serve(serve_args) => {
-            assert_eq!(serve_args.port, 4242);
+            assert_eq!(serve_args.port, Some(4242));
             assert_eq!(serve_args.host, "localhost");
             assert!(!serve_args.open);
         }
@@ -26,7 +26,7 @@ fn serve_short_p_alias_maps_to_port() {
     let cli = parse_cli(&["lotar", "serve", "-p", "5050"]);
     match cli.command {
         Commands::Serve(serve_args) => {
-            assert_eq!(serve_args.port, 5050);
+            assert_eq!(serve_args.port, Some(5050));
         }
         _ => panic!("expected serve command"),
     }
@@ -36,7 +36,7 @@ fn serve_short_p_alias_maps_to_port() {
 fn serve_legacy_positional_port_is_supported() {
     let cli = parse_cli(&["lotar", "serve", "7000"]);
     match cli.command {
-        Commands::Serve(serve_args) => assert_eq!(serve_args.port, 7000),
+        Commands::Serve(serve_args) => assert_eq!(serve_args.port, Some(7000)),
         _ => panic!("expected serve command"),
     }
 }
@@ -46,7 +46,31 @@ fn global_project_short_remains_available_before_serve() {
     let cli = parse_cli(&["lotar", "-p", "web", "serve", "-p", "8081"]);
     assert_eq!(cli.project.as_deref(), Some("web"));
     match cli.command {
-        Commands::Serve(serve_args) => assert_eq!(serve_args.port, 8081),
+        Commands::Serve(serve_args) => assert_eq!(serve_args.port, Some(8081)),
+        _ => panic!("expected serve command"),
+    }
+}
+
+#[test]
+fn serve_without_port_flag_parses_as_unset() {
+    // No `--port`/`-p`/positional: the flag carries no value so the handler
+    // resolves env/config, and only the untouched built-in default may fall
+    // back to an OS-assigned port.
+    let cli = parse_cli(&["lotar", "serve"]);
+    match cli.command {
+        Commands::Serve(serve_args) => assert_eq!(serve_args.port, None),
+        _ => panic!("expected serve command"),
+    }
+}
+
+#[test]
+fn serve_with_host_only_still_parses_port_as_unset() {
+    let cli = parse_cli(&["lotar", "serve", "--host", "0.0.0.0"]);
+    match cli.command {
+        Commands::Serve(serve_args) => {
+            assert_eq!(serve_args.port, None);
+            assert_eq!(serve_args.host, "0.0.0.0");
+        }
         _ => panic!("expected serve command"),
     }
 }

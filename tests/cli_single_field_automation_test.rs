@@ -17,6 +17,7 @@ const MARKER_EFFORT_SET: &str = "effort-set";
 const MARKER_EFFORT_CLEARED: &str = "effort-cleared";
 const MARKER_STATUS_DONE: &str = "status-done";
 const MARKER_ASSIGNEE_ALICE: &str = "assignee-alice";
+const MARKER_COMMENT_ADDED: &str = "comment-added";
 
 struct AutomationCliEnv {
     fixtures: TestFixtures,
@@ -79,7 +80,11 @@ impl AutomationCliEnv {
              \x20           to: alice\n\
              \x20     on:\n\
              \x20       updated:\n\
-             \x20         run: \"echo {MARKER_ASSIGNEE_ALICE} >> {log}\"\n",
+             \x20         run: \"echo {MARKER_ASSIGNEE_ALICE} >> {log}\"\n\
+             \x20   - name: comment added\n\
+             \x20     on:\n\
+             \x20       commented:\n\
+             \x20         run: \"echo {MARKER_COMMENT_ADDED} >> {log}\"\n",
             log = log_path.to_string_lossy(),
         );
         std::fs::write(fixtures.tasks_root.join("automation.yml"), automation_yaml)
@@ -332,4 +337,81 @@ fn nested_task_subcommands_delegate_to_automated_update_path() {
         effort_get.contains("effort: -"),
         "getter must show no effort after nested clear: {effort_get}"
     );
+}
+
+#[test]
+fn cli_comment_fires_commented_automation_exactly_once_and_persists() {
+    let env = AutomationCliEnv::new();
+    let task_id = env.add_task("Comment automation target");
+
+    env.run_ok(&["comment", &task_id, "first body"]);
+
+    assert_eq!(
+        env.marker_count(MARKER_COMMENT_ADDED),
+        1,
+        "a single comment must fire on.commented exactly once"
+    );
+    let yaml = env.task_yaml(&task_id);
+    assert!(
+        yaml.contains("text: first body"),
+        "comment must be persisted in the task file: {yaml}"
+    );
+
+    env.run_ok(&["comment", &task_id, "second body"]);
+
+    assert_eq!(
+        env.marker_count(MARKER_COMMENT_ADDED),
+        2,
+        "each additional comment must fire on.commented exactly once more"
+    );
+    let yaml = env.task_yaml(&task_id);
+    assert_eq!(
+        yaml.matches("text: first body").count(),
+        1,
+        "first comment must remain persisted exactly once: {yaml}"
+    );
+    assert_eq!(
+        yaml.matches("text: second body").count(),
+        1,
+        "second comment must be persisted exactly once: {yaml}"
+    );
+}
+
+#[test]
+fn cli_comment_list_does_not_fire_commented_automation() {
+    let env = AutomationCliEnv::new();
+    let task_id = env.add_task("Comment list automation target");
+
+    env.run_ok(&["comment", &task_id, "only body"]);
+    assert_eq!(env.marker_count(MARKER_COMMENT_ADDED), 1);
+
+    let listing = env.stdout_of(&["comment", &task_id]);
+    assert!(
+        listing.contains("only body"),
+        "comment list must show the persisted comment: {listing}"
+    );
+    assert_eq!(
+        env.marker_count(MARKER_COMMENT_ADDED),
+        1,
+        "listing comments must not fire on.commented"
+    );
+}
+
+#[test]
+fn cli_comment_json_reports_action_and_exact_count() {
+    let env = AutomationCliEnv::new();
+    let task_id = env.add_task("Comment JSON automation target");
+
+    let stdout = env.stdout_of(&["-f", "json", "comment", &task_id, "json body"]);
+    let payload: serde_json::Value = serde_json::from_str(&stdout)
+        .unwrap_or_else(|e| panic!("comment must emit one JSON object: {e}\n{stdout}"));
+    assert_eq!(payload["status"], "success");
+    assert_eq!(payload["action"], "task.comment");
+    assert_eq!(payload["task_id"], task_id);
+    assert_eq!(payload["comments"], 1);
+    assert_eq!(
+        payload["added_comment"]["text"], "json body",
+        "added_comment must echo the persisted text: {payload}"
+    );
+    assert_eq!(env.marker_count(MARKER_COMMENT_ADDED), 1);
 }

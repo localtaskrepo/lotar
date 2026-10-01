@@ -37,41 +37,66 @@ fn mk_req(method: &str, path: &str, query: &[(&str, &str)], body: Value) -> Http
     }
 }
 
-// Helpers merged from sse_events_test.rs
-fn find_free_port() -> u16 {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-    drop(listener);
-    port
+// Test server fixture owning its listener for the whole lifecycle.
+//
+// The listener is bound BEFORE the server thread is spawned, so the port is
+// genuinely owned: there is no probe-then-bind race, readiness cannot be
+// mistaken (TCP connect succeeds against the bound socket via the backlog),
+// and a bind failure is reported synchronously without leaking a thread.
+#[derive(Debug)]
+struct TestServer {
+    port: u16,
+    handle: Option<thread::JoinHandle<()>>,
+    done: std::sync::mpsc::Receiver<()>,
 }
 
-fn start_server_on(port: u16) {
-    thread::spawn(move || {
-        // Enable fast IO/heartbeat paths inside the server during tests
-        unsafe {
-            std::env::set_var("LOTAR_TEST_FAST_IO", "1");
-        }
-        unsafe {
-            std::env::set_var("LOTAR_ALLOW_TEST_STOP", "1");
-        }
-        let mut api = ApiServer::new();
-        routes::initialize(&mut api);
-        lotar::web_server::serve(&api, port);
-    });
-    // Also enable faster client-side network timeouts for this process
+fn start_server() -> TestServer {
+    start_server_on(0).expect("test server should bind an ephemeral port")
+}
+
+fn start_server_on(port: u16) -> Result<TestServer, String> {
+    let listener = TcpListener::bind(("127.0.0.1", port))
+        .map_err(|e| format!("bind 127.0.0.1:{port} failed: {e}"))?;
+    let port = listener.local_addr().unwrap().port();
+
+    // Enable fast IO/heartbeat paths inside the server during tests, plus
+    // faster client-side network timeouts for this process.
     unsafe {
+        std::env::set_var("LOTAR_TEST_FAST_IO", "1");
+        std::env::set_var("LOTAR_ALLOW_TEST_STOP", "1");
         std::env::set_var("LOTAR_TEST_FAST_NET", "1");
     }
-    // Wait until a TCP connection to the server port succeeds.
-    // This avoids panicking while the listener is still starting up.
+
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let handle = thread::spawn(move || {
+        let mut api = ApiServer::new();
+        routes::initialize(&mut api);
+        lotar::web_server::serve_listener(
+            &api,
+            &listener,
+            &lotar::web_server::WebServerConfig::default(),
+        );
+        let _ = done_tx.send(());
+    });
+
+    wait_for_server_ready(port, Duration::from_millis(750))?;
+    Ok(TestServer {
+        port,
+        handle: Some(handle),
+        done: done_rx,
+    })
+}
+
+fn wait_for_server_ready(port: u16, max_wait: Duration) -> Result<(), String> {
     let start = Instant::now();
-    let max_wait = Duration::from_millis(750);
     loop {
         match TcpStream::connect(("127.0.0.1", port)) {
-            Ok(_) => break,
-            Err(_) => {
+            Ok(_) => return Ok(()),
+            Err(e) => {
                 if start.elapsed() > max_wait {
-                    break; // give up after max_wait; tests will still proceed
+                    return Err(format!(
+                        "server on port {port} never became reachable within {max_wait:?}: {e}"
+                    ));
                 }
                 std::thread::sleep(Duration::from_millis(5));
             }
@@ -79,7 +104,40 @@ fn start_server_on(port: u16) {
     }
 }
 
-fn stop_server_on(port: u16) {
+impl TestServer {
+    fn port(&self) -> u16 {
+        self.port
+    }
+
+    fn stop(&mut self) {
+        request_stop(self.port);
+        // Join the accept-loop thread with a bound so a broken teardown fails
+        // the test deterministically instead of leaking the thread.
+        if self.done.recv_timeout(Duration::from_secs(5)).is_err() {
+            panic!(
+                "server thread on port {} did not exit after stop request",
+                self.port
+            );
+        }
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for TestServer {
+    fn drop(&mut self) {
+        // Safety net for tests that forget to call stop(): best-effort
+        // shutdown without panicking inside drop.
+        if self.handle.is_some() {
+            request_stop(self.port);
+            let _ = self.done.recv_timeout(Duration::from_secs(5));
+            let _ = self.handle.take().map(|handle| handle.join());
+        }
+    }
+}
+
+fn request_stop(port: u16) {
     if let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)) {
         let _ = stream.set_read_timeout(Some(Duration::from_millis(250)));
         let req = "GET /__test/stop HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n";
@@ -88,8 +146,10 @@ fn stop_server_on(port: u16) {
         let mut tmp = [0u8; 256];
         let _ = stream.read(&mut tmp);
     }
-    // Allow the server a brief moment to shut down sockets
-    std::thread::sleep(Duration::from_millis(5));
+    // Wake the accept loop: the stop flag is checked at the top of the loop
+    // body, so one extra connection after the stop request lets the server
+    // thread observe the flag, drop the listener, and exit.
+    let _ = TcpStream::connect(("127.0.0.1", port));
 }
 
 fn http_post_json(port: u16, path_and_query: &str, body: &str) -> (u16, Vec<u8>) {
@@ -242,8 +302,8 @@ fn rest_create_and_update_supports_me_alias() {
     )
     .unwrap();
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     // Create task with @me as assignee
     let create_body = json!({
@@ -273,7 +333,7 @@ fn rest_create_and_update_supports_me_alias() {
     let data = env.get("data").cloned().unwrap_or(json!({}));
     assert_eq!(data.get("reporter").and_then(|v| v.as_str()), Some("erin"));
 
-    stop_server_on(port);
+    server.stop();
 
     // Env restored by guards
 }
@@ -623,8 +683,8 @@ fn task_creation_waits_for_fragmented_body_with_case_insensitive_content_length(
     let tasks_dir = tmp.path().join(".tasks");
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     for header in ["Content-Length", "content-length", "cOnTeNt-LeNgTh"] {
         let body = json!({
@@ -660,7 +720,7 @@ fn task_creation_waits_for_fragmented_body_with_case_insensitive_content_length(
         assert_eq!(created["data"]["description"], "details ".repeat(512));
     }
 
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -849,8 +909,8 @@ fn api_config_show_set() {
 
 #[test]
 fn api_options_preflight_returns_204_and_cors_headers() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     let (status, headers) = http_options(port, "/api/tasks/list");
     assert_eq!(status, 204);
     assert_eq!(
@@ -870,13 +930,13 @@ fn api_options_preflight_returns_204_and_cors_headers() {
         .cloned()
         .unwrap_or_default();
     assert!(allow_headers.to_ascii_lowercase().contains("content-type"));
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
 fn mutating_requests_with_foreign_origin_are_rejected() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     let (status, _body) = http_post_json_with_origin(
         port,
         "/api/tasks/add?project=DEMO",
@@ -884,13 +944,13 @@ fn mutating_requests_with_foreign_origin_are_rejected() {
         Some("https://evil.example"),
     );
     assert_eq!(status, 403, "cross-origin mutation must be rejected");
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
 fn shutdown_endpoint_is_not_exposed() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     {
         let _guard = EnvVarGuard::clear("LOTAR_ALLOW_TEST_STOP");
         for path in ["/shutdown", "/__test/stop"] {
@@ -915,13 +975,13 @@ fn shutdown_endpoint_is_not_exposed() {
             );
         }
     }
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
 fn sse_initial_retry_hint_is_sent() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     let (mut stream, mut leftover) = open_sse(port, "");
     if leftover.is_empty() {
         // Read a bit more to capture any small write coalescing differences
@@ -934,13 +994,13 @@ fn sse_initial_retry_hint_is_sent() {
         text.contains("retry: 1000"),
         "leftover did not contain retry hint: {text}"
     );
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
 fn static_files_reject_dot_segment_traversal() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     for path in [
         "/../../Cargo.toml",
         "/assets/../../../../Cargo.toml",
@@ -951,13 +1011,13 @@ fn static_files_reject_dot_segment_traversal() {
         assert_eq!(status, 404, "dot-segment path {path} must not resolve");
         assert!(!text.contains("[package]"), "{path} leaked repo file");
     }
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
 fn sse_headers_do_not_allow_cross_origin() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     let (_stream, leftover) = open_sse(port, "");
     let text = String::from_utf8_lossy(&leftover);
     assert!(
@@ -966,7 +1026,7 @@ fn sse_headers_do_not_allow_cross_origin() {
             .contains("access-control-allow-origin"),
         "SSE response advertises wildcard CORS: {text}"
     );
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -992,14 +1052,14 @@ fn commit_diff_rejects_option_style_commit() {
         "git wrote attacker-controlled output file"
     );
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     let path = format!(
         "/api/tasks/commit_diff?id=DEV-1&commit={}",
         url_encode(&commit_arg)
     );
     let (status, _headers, body) = http_get_bytes(port, &path);
-    stop_server_on(port);
+    server.stop();
 
     let text = String::from_utf8_lossy(&body);
     assert_ne!(status, 200, "route must not serve option-style commits");
@@ -1036,8 +1096,8 @@ fn audit_service_rejects_unsafe_git_revs() {
 
 #[test]
 fn openapi_spec_served() {
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
     let (status, headers, body) = http_get_bytes(port, "/api/openapi.json");
     assert_eq!(status, 200);
     assert_eq!(
@@ -1048,7 +1108,7 @@ fn openapi_spec_served() {
     // Check that a couple of known paths are present
     assert!(resp_body.contains("\"/api/tasks/add\""));
     assert!(resp_body.contains("\"/api/events\""));
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -1249,8 +1309,8 @@ fn sse_events_with_kinds_and_project_filter() {
     // Enable explicit ready event for faster startup sync
     let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     let (mut sse, leftover) = open_sse(
         port,
@@ -1288,7 +1348,7 @@ fn sse_events_with_kinds_and_project_filter() {
     assert_eq!(event["id"], expected_id);
 
     // Restored by guard
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -1301,8 +1361,8 @@ fn sse_debounce_emits_all_events() {
     // Enable explicit ready event to avoid startup sleeps
     let _guard_ready = EnvVarGuard::set("LOTAR_SSE_READY", "1");
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     let (mut sse, leftover) = open_sse(
         port,
@@ -1326,7 +1386,7 @@ fn sse_debounce_emits_all_events() {
     );
 
     // Restored by guard
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -1343,8 +1403,8 @@ fn sse_includes_triggered_by_identity() {
     std::fs::write(tasks_dir.join("config.yml"), b"default.reporter: alice\n").unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     let (mut sse, mut leftover) = open_sse(
         port,
@@ -1399,7 +1459,7 @@ fn sse_includes_triggered_by_identity() {
     assert!(found, "did not find a TEST-* task_created event");
 
     // Restored by guards
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -1491,8 +1551,8 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
     std::fs::create_dir_all(&tasks_dir).unwrap();
     let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", &tasks_dir.to_string_lossy());
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     // invalid kind should filter out events; debounce 0 should flush immediately
     let (mut sse, leftover) = open_sse(port, "debounce_ms=0&kinds=invalid_kind");
@@ -1529,7 +1589,7 @@ fn sse_debounce_zero_and_invalid_kind_handling() {
     assert!(events.is_empty(), "invalid kind should filter all events");
 
     // Restored by guard
-    stop_server_on(port);
+    server.stop();
 }
 
 #[test]
@@ -1550,8 +1610,8 @@ fn sse_project_changed_emitted_on_fs_change() {
     let prev_cwd = std::env::current_dir().unwrap();
     std::env::set_current_dir(&root).unwrap();
 
-    let port = find_free_port();
-    start_server_on(port);
+    let mut server = start_server();
+    let port = server.port();
 
     // Open SSE stream with project filter and kinds=project_changed
     let (mut sse, leftover) = open_sse(
@@ -1582,7 +1642,68 @@ fn sse_project_changed_emitted_on_fs_change() {
     assert_eq!(v.get("name").and_then(|s| s.as_str()), Some("DEMO"));
 
     // Cleanup and restore CWD
-    stop_server_on(port);
+    server.stop();
     std::env::set_current_dir(prev_cwd).unwrap();
     // Restored by guards
+}
+
+// --- DEV-76: fixture lifecycle and readiness acceptance ---
+
+#[test]
+fn server_fixture_fails_deterministically_on_occupied_port() {
+    // Hold a listener so the port is definitively occupied.
+    let holder = TcpListener::bind("127.0.0.1:0").unwrap();
+    let held_port = holder.local_addr().unwrap().port();
+
+    let err = start_server_on(held_port).expect_err("binding a held port must fail");
+    assert!(
+        err.contains(&held_port.to_string()),
+        "error should name the occupied port: {err}"
+    );
+
+    // The failed start must not poison the process: a healthy server still
+    // starts (bind happens before any thread is spawned, so the failure path
+    // never created one) and tears down cleanly.
+    let mut server = start_server();
+    server.stop();
+}
+
+#[test]
+fn server_fixture_stop_joins_thread_and_releases_port() {
+    let mut server = start_server();
+    let port = server.port();
+    // stop() joins the accept-loop thread; after it returns the listener is
+    // dropped and the port must no longer accept connections.
+    server.stop();
+
+    let start = Instant::now();
+    while TcpStream::connect(("127.0.0.1", port)).is_ok() {
+        if start.elapsed() > Duration::from_millis(750) {
+            panic!("port {port} still accepts connections after stop");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
+fn server_fixture_readiness_fails_promptly_when_nothing_listens() {
+    // Reserve then release an ephemeral port so nothing listens on it.
+    let probe = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = probe.local_addr().unwrap().port();
+    drop(probe);
+
+    let start = Instant::now();
+    let err = wait_for_server_ready(port, Duration::from_millis(300))
+        .expect_err("readiness wait must fail when nothing listens");
+    let elapsed = start.elapsed();
+    assert!(
+        err.contains(&port.to_string()),
+        "error should name the port: {err}"
+    );
+    // Bounded wait: fails within the bound (plus scheduling slack), not by
+    // hanging until the test timeout.
+    assert!(
+        elapsed < Duration::from_secs(3),
+        "readiness failure took too long: {elapsed:?}"
+    );
 }

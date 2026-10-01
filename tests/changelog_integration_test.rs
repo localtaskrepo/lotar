@@ -1,4 +1,3 @@
-#![cfg(not(no_git_tests))]
 use assert_cmd::prelude::*;
 use std::fs;
 use std::path::Path;
@@ -39,13 +38,12 @@ fn init_repo(root: &Path) {
         .success();
 }
 
+/// The outside-git contract needs no repository at all: the changelog
+/// command must succeed (not crash) in a plain directory. Pure case - kept
+/// OUTSIDE `git_required` so Git-denied environments still cover it.
 mod smoke {
     #[test]
     fn changelog_outside_git_no_crash() {
-        if !crate::common::git_available() {
-            eprintln!("skipping: git unavailable in this sandbox");
-            return;
-        }
         let temp = crate::common::temp_dir();
         // No git repo here; command should not crash
         crate::common::lotar_cmd()
@@ -57,230 +55,225 @@ mod smoke {
     }
 }
 
-mod range {
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
     use super::*;
 
-    #[test]
-    fn changelog_with_ref_range_runs() {
-        if !crate::common::git_available() {
-            eprintln!("skipping: git unavailable in this sandbox");
-            return;
+    mod range {
+        use super::*;
+
+        #[test]
+        fn changelog_with_ref_range_runs() {
+            crate::common::require_git();
+            let temp = crate::common::temp_dir();
+            let root = temp.path();
+
+            init_repo(root);
+
+            // initial commit
+            write_task(root, "TEST", "1", "first");
+            Command::new("git")
+                .current_dir(root)
+                .args(["add", "."])
+                .assert()
+                .success();
+            Command::new("git")
+                .current_dir(root)
+                .args(["commit", "-m", "init"])
+                .assert()
+                .success();
+
+            // second change
+            write_task(root, "TEST", "1", "second");
+            Command::new("git")
+                .current_dir(root)
+                .args(["add", "."])
+                .assert()
+                .success();
+            Command::new("git")
+                .current_dir(root)
+                .args(["commit", "-m", "second"])
+                .assert()
+                .success();
+
+            // run changelog for HEAD~1..HEAD (implicitly via since ref)
+            crate::common::lotar_cmd()
+                .unwrap()
+                .current_dir(root)
+                .args(["changelog", "HEAD~1", "--global"])
+                .assert()
+                .success();
         }
-        let temp = crate::common::temp_dir();
-        let root = temp.path();
-
-        init_repo(root);
-
-        // initial commit
-        write_task(root, "TEST", "1", "first");
-        Command::new("git")
-            .current_dir(root)
-            .args(["add", "."])
-            .assert()
-            .success();
-        Command::new("git")
-            .current_dir(root)
-            .args(["commit", "-m", "init"])
-            .assert()
-            .success();
-
-        // second change
-        write_task(root, "TEST", "1", "second");
-        Command::new("git")
-            .current_dir(root)
-            .args(["add", "."])
-            .assert()
-            .success();
-        Command::new("git")
-            .current_dir(root)
-            .args(["commit", "-m", "second"])
-            .assert()
-            .success();
-
-        // run changelog for HEAD~1..HEAD (implicitly via since ref)
-        crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["changelog", "HEAD~1", "--global"])
-            .assert()
-            .success();
     }
-}
 
-mod range_json {
-    use super::*;
+    mod range_json {
+        use super::*;
 
-    #[test]
-    fn changelog_range_mode_json() {
-        if !crate::common::git_available() {
-            eprintln!("skipping: git unavailable in this sandbox");
-            return;
+        #[test]
+        fn changelog_range_mode_json() {
+            crate::common::require_git();
+            let temp = crate::common::temp_dir();
+            let root = temp.path();
+
+            init_repo(root);
+
+            write_task(root, "PRJ", "1", "v1");
+            Command::new("git")
+                .current_dir(root)
+                .args(["add", "."])
+                .assert()
+                .success();
+            Command::new("git")
+                .current_dir(root)
+                .args(["commit", "-m", "init"])
+                .assert()
+                .success();
+
+            write_task(root, "PRJ", "1", "v2");
+            Command::new("git")
+                .current_dir(root)
+                .args(["add", "."])
+                .assert()
+                .success();
+            Command::new("git")
+                .current_dir(root)
+                .args(["commit", "-m", "second"])
+                .assert()
+                .success();
+
+            let out = crate::common::lotar_cmd()
+                .unwrap()
+                .current_dir(root)
+                .args(["--format", "json", "changelog", "HEAD~1", "--global"])
+                .assert()
+                .success()
+                .get_output()
+                .stdout
+                .clone();
+
+            let text = String::from_utf8_lossy(&out);
+            let json: serde_json::Value = serde_json::from_str(&text).expect("valid json");
+            assert_eq!(json["status"], "ok");
+            assert_eq!(json["action"], "changelog");
+            assert_eq!(json["mode"], "range");
+            let items = json["items"].as_array().unwrap();
+            assert!(items.iter().any(|it| it["id"] == "PRJ-1"));
         }
-        let temp = crate::common::temp_dir();
-        let root = temp.path();
-
-        init_repo(root);
-
-        write_task(root, "PRJ", "1", "v1");
-        Command::new("git")
-            .current_dir(root)
-            .args(["add", "."])
-            .assert()
-            .success();
-        Command::new("git")
-            .current_dir(root)
-            .args(["commit", "-m", "init"])
-            .assert()
-            .success();
-
-        write_task(root, "PRJ", "1", "v2");
-        Command::new("git")
-            .current_dir(root)
-            .args(["add", "."])
-            .assert()
-            .success();
-        Command::new("git")
-            .current_dir(root)
-            .args(["commit", "-m", "second"])
-            .assert()
-            .success();
-
-        let out = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "changelog", "HEAD~1", "--global"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
-
-        let text = String::from_utf8_lossy(&out);
-        let json: serde_json::Value = serde_json::from_str(&text).expect("valid json");
-        assert_eq!(json["status"], "ok");
-        assert_eq!(json["action"], "changelog");
-        assert_eq!(json["mode"], "range");
-        let items = json["items"].as_array().unwrap();
-        assert!(items.iter().any(|it| it["id"] == "PRJ-1"));
     }
-}
 
-mod working_tree {
-    use super::*;
+    mod working_tree {
+        use super::*;
 
-    #[test]
-    fn changelog_working_tree_modified_json() {
-        if !crate::common::git_available() {
-            eprintln!("skipping: git unavailable in this sandbox");
-            return;
-        }
-        let temp = crate::common::temp_dir();
-        let root = temp.path();
-        init_repo(root);
+        #[test]
+        fn changelog_working_tree_modified_json() {
+            crate::common::require_git();
+            let temp = crate::common::temp_dir();
+            let root = temp.path();
+            init_repo(root);
 
-        // commit initial task
-        write_task(root, "TEST", "1", "first");
-        Command::new("git")
-            .current_dir(root)
-            .args(["add", "."])
-            .assert()
-            .success();
-        Command::new("git")
-            .current_dir(root)
-            .args(["commit", "-m", "init"])
-            .assert()
-            .success();
+            // commit initial task
+            write_task(root, "TEST", "1", "first");
+            Command::new("git")
+                .current_dir(root)
+                .args(["add", "."])
+                .assert()
+                .success();
+            Command::new("git")
+                .current_dir(root)
+                .args(["commit", "-m", "init"])
+                .assert()
+                .success();
 
-        // modify working tree (not committed)
-        write_task(root, "TEST", "1", "changed");
+            // modify working tree (not committed)
+            write_task(root, "TEST", "1", "changed");
 
-        // run changelog default (working)
-        let output = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "changelog", "--global"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
-        let text = String::from_utf8_lossy(&output);
-        let json: serde_json::Value = serde_json::from_str(&text).expect("valid json");
-        assert_eq!(json["status"], "ok");
-        assert_eq!(json["action"], "changelog");
-        assert_eq!(json["mode"], "working");
+            // run changelog default (working)
+            let output = crate::common::lotar_cmd()
+                .unwrap()
+                .current_dir(root)
+                .args(["--format", "json", "changelog", "--global"])
+                .assert()
+                .success()
+                .get_output()
+                .stdout
+                .clone();
+            let text = String::from_utf8_lossy(&output);
+            let json: serde_json::Value = serde_json::from_str(&text).expect("valid json");
+            assert_eq!(json["status"], "ok");
+            assert_eq!(json["action"], "changelog");
+            assert_eq!(json["mode"], "working");
 
-        // find TEST-1
-        let items = json["items"].as_array().unwrap();
-        let found = items
-            .iter()
-            .find(|it| it["id"] == "TEST-1")
-            .expect("TEST-1 present");
-        let changes = found["changes"].as_array().unwrap();
-        // expect a title change old:first -> new:changed
-        assert!(
-            changes
+            // find TEST-1
+            let items = json["items"].as_array().unwrap();
+            let found = items
                 .iter()
-                .any(|c| c["field"] == "title" && c["old"] == "first" && c["new"] == "changed")
-        );
-    }
-
-    #[test]
-    fn changelog_working_tree_created_and_deleted() {
-        if !crate::common::git_available() {
-            eprintln!("skipping: git unavailable in this sandbox");
-            return;
+                .find(|it| it["id"] == "TEST-1")
+                .expect("TEST-1 present");
+            let changes = found["changes"].as_array().unwrap();
+            // expect a title change old:first -> new:changed
+            assert!(
+                changes
+                    .iter()
+                    .any(|c| c["field"] == "title" && c["old"] == "first" && c["new"] == "changed")
+            );
         }
-        let temp = crate::common::temp_dir();
-        let root = temp.path();
-        init_repo(root);
 
-        // commit initial task 1
-        write_task(root, "TEST", "1", "first");
-        Command::new("git")
-            .current_dir(root)
-            .args(["add", "."])
-            .assert()
-            .success();
-        Command::new("git")
-            .current_dir(root)
-            .args(["commit", "-m", "init"])
-            .assert()
-            .success();
+        #[test]
+        fn changelog_working_tree_created_and_deleted() {
+            crate::common::require_git();
+            let temp = crate::common::temp_dir();
+            let root = temp.path();
+            init_repo(root);
 
-        // create new task 2 (uncommitted) and delete 1 from working tree
-        write_task(root, "TEST", "2", "new");
-        let path1 = root.join(".tasks/TEST/1.yml");
-        fs::remove_file(&path1).unwrap();
+            // commit initial task 1
+            write_task(root, "TEST", "1", "first");
+            Command::new("git")
+                .current_dir(root)
+                .args(["add", "."])
+                .assert()
+                .success();
+            Command::new("git")
+                .current_dir(root)
+                .args(["commit", "-m", "init"])
+                .assert()
+                .success();
 
-        let output = crate::common::lotar_cmd()
-            .unwrap()
-            .current_dir(root)
-            .args(["--format", "json", "changelog", "--global"])
-            .assert()
-            .success()
-            .get_output()
-            .stdout
-            .clone();
-        let text = String::from_utf8_lossy(&output);
-        let json: serde_json::Value = serde_json::from_str(&text).expect("valid json");
+            // create new task 2 (uncommitted) and delete 1 from working tree
+            write_task(root, "TEST", "2", "new");
+            let path1 = root.join(".tasks/TEST/1.yml");
+            fs::remove_file(&path1).unwrap();
 
-        let items = json["items"].as_array().unwrap();
+            let output = crate::common::lotar_cmd()
+                .unwrap()
+                .current_dir(root)
+                .args(["--format", "json", "changelog", "--global"])
+                .assert()
+                .success()
+                .get_output()
+                .stdout
+                .clone();
+            let text = String::from_utf8_lossy(&output);
+            let json: serde_json::Value = serde_json::from_str(&text).expect("valid json");
 
-        // TEST-2 should have a "created" change
-        let item2 = items
-            .iter()
-            .find(|it| it["id"] == "TEST-2")
-            .expect("TEST-2 present");
-        let changes2 = item2["changes"].as_array().unwrap();
-        assert!(changes2.iter().any(|c| c["field"] == "created"));
+            let items = json["items"].as_array().unwrap();
 
-        // TEST-1 should have a "deleted" change
-        let item1 = items
-            .iter()
-            .find(|it| it["id"] == "TEST-1")
-            .expect("TEST-1 present");
-        let changes1 = item1["changes"].as_array().unwrap();
-        assert!(changes1.iter().any(|c| c["field"] == "deleted"));
+            // TEST-2 should have a "created" change
+            let item2 = items
+                .iter()
+                .find(|it| it["id"] == "TEST-2")
+                .expect("TEST-2 present");
+            let changes2 = item2["changes"].as_array().unwrap();
+            assert!(changes2.iter().any(|c| c["field"] == "created"));
+
+            // TEST-1 should have a "deleted" change
+            let item1 = items
+                .iter()
+                .find(|it| it["id"] == "TEST-1")
+                .expect("TEST-1 present");
+            let changes1 = item1["changes"].as_array().unwrap();
+            assert!(changes1.iter().any(|c| c["field"] == "deleted"));
+        }
     }
 }

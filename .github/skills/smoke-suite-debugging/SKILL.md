@@ -25,8 +25,9 @@ description: Use this when smoke tests fail (binary/web assets, Playwright setup
   - Fix: run `npm run build:smoke`, or set `LOTAR_BINARY_PATH` (or `LOTAR_BIN`) to a freshly built custom binary.
 
 - “Port already in use”
-  - The harness normally auto-picks a free port; failures may indicate a stuck server.
-  - Re-run with `--maxWorkers=1 --maxConcurrency=1 --no-file-parallelism` so it is easier to isolate lifecycle issues. Vitest does not support `--runInBand`.
+  - By default the harness passes `--port 0`: the OS assigns the port at bind time (no probe-then-bind race) and the actual port is read back from the post-bind readiness banner, so default runs do not collide.
+  - A pinned explicit port that is busy fails strictly by design. That may point to a server-lifecycle issue, but never kill or reconfigure a server this run did not spawn — ownership of a foreign listener cannot be inferred from the port alone.
+  - To isolate lifecycle issues, re-run with `--maxWorkers=1 --maxConcurrency=1 --no-file-parallelism`. Vitest does not support `--runInBand`.
 
 - “SSE readiness / flaky waits”
   - Smoke uses `LOTAR_SSE_READY` hooks and server heartbeats; see `docs/help/serve.md` for the testing aids.
@@ -35,7 +36,11 @@ description: Use this when smoke tests fail (binary/web assets, Playwright setup
 
 Some agent harnesses run the shell in a sandbox that blocks certain OS operations. LoTaR's tests are already hardened for this, so you usually don't need to act — just recognize the signatures:
 
-- **`.git: Operation not permitted`** — the sandbox forbids creating anything named `.git`, so every test that runs `git init` would fail. This is auto-handled: `build.rs` probes for it and sets the `no_git_tests` cfg, which compiles those Rust tests out; smoke git tests skip via `gitAvailable()` (`describe.concurrent.skipIf`). If you see git tests failing, the auto-detection may have missed one — add the same gate. In normal CI these all run.
+- **`.git: Operation not permitted`** — the sandbox forbids creating anything named `.git`, so tests that run a real `git init` cannot use Git. Whether Git works is decided per invocation by an isolated probe, not per host: the Rust runner's probe can pass while the Node smoke probe fails in the same environment (or vice versa), so never generalize one probe's result. Nothing is compiled out:
+  - `npm run test:rust`/`test:rust:agent` probe at run time and, when Git is unavailable, select the `gitless` nextest profile whose default filter excludes exactly the source-local `git_required` modules — all code still compiles, and exclusions are reported as skipped, never as passes.
+  - Raw `cargo nextest` (no npm runner) still selects `git_required` tests; they fail closed via `require_git()` instead of passing silently.
+  - Smoke git tests skip honestly via `describe.concurrent.skipIf(!gitAvailable())`.
+  - Designated full-coverage runners set `LOTAR_REQUIRE_GIT=1` (build refuses) and `LOTAR_SMOKE_REQUIRE_GIT=1` (smoke probe fatal): missing Git must FAIL — no gitless fallback, compile-outs, or early-return passes. Do not add new gates or compile-out cfgs; see the [tests README](../../../tests/README.md), [testing-strategy](../testing-strategy/SKILL.md), and [platform guide](../../../docs/developers/platform-test-verification.md).
 - **Chromium won't launch (`MachPortRendezvous … Permission denied`, then `Target page … closed`)** — the sandbox denies the browser's multi-process bootstrap. Set `LOTAR_SMOKE_CHROMIUM_ARGS="--no-sandbox,--no-zygote,--single-process"` (the smoke `withBrowser` helper reads this; empty by default so CI is unaffected).
 - **`mcp.protocol` framed-transport test waits for a `tools/listChanged` notification** after a config write — this depends on file-change detection. The MCP config watcher now polls as a fallback (alongside the kernel watcher), so it fires reliably even when kernel file-watching is blocked; the binary itself answers framed MCP fine.
 

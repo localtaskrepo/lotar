@@ -1,4 +1,3 @@
-#![cfg_attr(no_git_tests, allow(dead_code))]
 use super::*;
 // Minimal per-variable lock for this test to avoid env races
 use std::collections::HashMap;
@@ -22,17 +21,51 @@ fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
     mtx.lock().unwrap()
 }
 
-fn git_available_for_test() -> bool {
-    static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *AVAILABLE.get_or_init(|| {
+fn require_git_for_test() {
+    static CAPABILITY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let available = *CAPABILITY.get_or_init(|| {
         let Ok(tmp) = tempfile::tempdir() else {
             return false;
         };
-        match std::fs::create_dir(tmp.path().join(".git")) {
-            Ok(()) => true,
-            Err(_) => false,
+        let repo = tmp.path().join("repo");
+        let gitconfig = tmp.path().join("gitconfig");
+        if std::fs::create_dir(&repo).is_err() || std::fs::write(&gitconfig, "").is_err() {
+            return false;
         }
-    })
+        // Fresh child environment (DEV-79 review): an inherited absolute
+        // GIT_DIR/GIT_WORK_TREE could direct `git init` outside this owned
+        // probe directory before the artifact check runs. Only PATH and
+        // owned HOME/config variables survive; Windows adds its bootstrap
+        // variables.
+        let mut command = std::process::Command::new("git");
+        command
+            .arg("init")
+            .arg("--quiet")
+            .arg(&repo)
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("HOME", tmp.path())
+            .env("USERPROFILE", tmp.path())
+            .env("XDG_CONFIG_HOME", tmp.path().join(".config"))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", &gitconfig)
+            .current_dir(tmp.path())
+            .stdin(std::process::Stdio::null());
+        #[cfg(windows)]
+        for key in ["SystemRoot", "windir", "TEMP", "TMP", "COMSPEC"] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
+        command
+            .output()
+            .map(|output| output.status.success() && repo.join(".git").exists())
+            .unwrap_or(false)
+    });
+    assert!(
+        available,
+        "this test requires Git, but the runtime `git init` probe failed; failing closed instead of passing silently (DEV-79)"
+    );
 }
 
 fn seed_single_project_config(tasks_dir: &Path) {
@@ -135,153 +168,153 @@ fn parse_tool_payload(resp: &JsonRpcResponse) -> serde_json::Value {
     serde_json::from_str(first_tool_text(resp)).expect("tool payload should be valid json")
 }
 
-#[cfg(not(no_git_tests))]
-#[test]
-fn tools_call_reference_add_and_remove() {
-    let _lock = lock_var("LOTAR_TASKS_DIR");
-    // Sandboxes that forbid creating `.git` cannot run this test; the
-    // build-time cfg normally compiles it out, but cargo's TMPDIR redirect
-    // can fool that probe, so double-check at runtime.
-    if !git_available_for_test() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn tools_call_reference_add_and_remove() {
+        let _lock = lock_var("LOTAR_TASKS_DIR");
+        // Sandboxes that forbid creating `.git` cannot run this test; the
+        // build-time cfg normally compiles it out, but cargo's TMPDIR redirect
+        // can fool that probe, so require the real capability and fail closed.
+        require_git_for_test();
+        let tmp = tempfile::tempdir().unwrap();
+        let tasks_dir = tmp.path().join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        seed_single_project_config(&tasks_dir);
+
+        // Make repo root discoverable for file/code references.
+        std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("src")).unwrap();
+        std::fs::write(tmp.path().join("src/example.rs"), "fn main() {}\n").unwrap();
+
+        set_tasks_dir_env(&tasks_dir);
+
+        // Create a task
+        let create_args = json!({
+            "name": "task_create",
+            "arguments": { "title": "MCP References", "project": "MCP" }
+        });
+        let create_req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(30)),
+            method: "tools/call".into(),
+            params: create_args,
+        };
+        let create_resp = dispatch(create_req);
+        assert!(create_resp.error.is_none(), "task_create failed");
+        let task_json = parse_tool_payload(&create_resp);
+        let id = task_json
+            .get("task")
+            .and_then(|task| task.get("id"))
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string();
+
+        // Add link reference
+        let add_link_args = json!({
+            "name": "task_reference_add",
+            "arguments": { "id": id, "kind": "link", "value": "https://example.com" }
+        });
+        let add_link_req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(31)),
+            method: "tools/call".into(),
+            params: add_link_args,
+        };
+        let add_link_resp = dispatch(add_link_req);
+        assert!(
+            add_link_resp.error.is_none(),
+            "task_reference_add link failed"
+        );
+        let payload = parse_tool_payload(&add_link_resp);
+        assert!(payload.get("changed").and_then(|v| v.as_bool()).unwrap());
+
+        // Add file reference
+        let add_file_args = json!({
+            "name": "task_reference_add",
+            "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "file", "value": "src/example.rs" }
+        });
+        let add_file_req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(32)),
+            method: "tools/call".into(),
+            params: add_file_args,
+        };
+        let add_file_resp = dispatch(add_file_req);
+        assert!(
+            add_file_resp.error.is_none(),
+            "task_reference_add file failed"
+        );
+
+        // Add code reference
+        let add_code_args = json!({
+            "name": "task_reference_add",
+            "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
+        });
+        let add_code_req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(33)),
+            method: "tools/call".into(),
+            params: add_code_args,
+        };
+        let add_code_resp = dispatch(add_code_req);
+        assert!(
+            add_code_resp.error.is_none(),
+            "task_reference_add code failed"
+        );
+        let payload = parse_tool_payload(&add_code_resp);
+        let refs = payload
+            .get("task")
+            .and_then(|t| t.get("references"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        assert!(refs.iter().any(|r| {
+            r.get("link")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == "https://example.com")
+        }));
+        assert!(refs.iter().any(|r| {
+            r.get("file")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == "src/example.rs")
+        }));
+        assert!(refs.iter().any(|r| {
+            r.get("code")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == "src/example.rs#1")
+        }));
+
+        // Remove code reference
+        let remove_code_args = json!({
+            "name": "task_reference_remove",
+            "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
+        });
+        let remove_code_req = JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(34)),
+            method: "tools/call".into(),
+            params: remove_code_args,
+        };
+        let remove_code_resp = dispatch(remove_code_req);
+        assert!(
+            remove_code_resp.error.is_none(),
+            "task_reference_remove code failed"
+        );
+        let payload = parse_tool_payload(&remove_code_resp);
+        let refs = payload
+            .get("task")
+            .and_then(|t| t.get("references"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        assert!(!refs.iter().any(|r| {
+            r.get("code")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == "src/example.rs#1")
+        }));
     }
-    let tmp = tempfile::tempdir().unwrap();
-    let tasks_dir = tmp.path().join(".tasks");
-    std::fs::create_dir_all(&tasks_dir).unwrap();
-    seed_single_project_config(&tasks_dir);
-
-    // Make repo root discoverable for file/code references.
-    std::fs::create_dir_all(tmp.path().join(".git")).unwrap();
-    std::fs::create_dir_all(tmp.path().join("src")).unwrap();
-    std::fs::write(tmp.path().join("src/example.rs"), "fn main() {}\n").unwrap();
-
-    set_tasks_dir_env(&tasks_dir);
-
-    // Create a task
-    let create_args = json!({
-        "name": "task_create",
-        "arguments": { "title": "MCP References", "project": "MCP" }
-    });
-    let create_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(30)),
-        method: "tools/call".into(),
-        params: create_args,
-    };
-    let create_resp = dispatch(create_req);
-    assert!(create_resp.error.is_none(), "task_create failed");
-    let task_json = parse_tool_payload(&create_resp);
-    let id = task_json
-        .get("task")
-        .and_then(|task| task.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap()
-        .to_string();
-
-    // Add link reference
-    let add_link_args = json!({
-        "name": "task_reference_add",
-        "arguments": { "id": id, "kind": "link", "value": "https://example.com" }
-    });
-    let add_link_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(31)),
-        method: "tools/call".into(),
-        params: add_link_args,
-    };
-    let add_link_resp = dispatch(add_link_req);
-    assert!(
-        add_link_resp.error.is_none(),
-        "task_reference_add link failed"
-    );
-    let payload = parse_tool_payload(&add_link_resp);
-    assert!(payload.get("changed").and_then(|v| v.as_bool()).unwrap());
-
-    // Add file reference
-    let add_file_args = json!({
-        "name": "task_reference_add",
-        "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "file", "value": "src/example.rs" }
-    });
-    let add_file_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(32)),
-        method: "tools/call".into(),
-        params: add_file_args,
-    };
-    let add_file_resp = dispatch(add_file_req);
-    assert!(
-        add_file_resp.error.is_none(),
-        "task_reference_add file failed"
-    );
-
-    // Add code reference
-    let add_code_args = json!({
-        "name": "task_reference_add",
-        "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
-    });
-    let add_code_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(33)),
-        method: "tools/call".into(),
-        params: add_code_args,
-    };
-    let add_code_resp = dispatch(add_code_req);
-    assert!(
-        add_code_resp.error.is_none(),
-        "task_reference_add code failed"
-    );
-    let payload = parse_tool_payload(&add_code_resp);
-    let refs = payload
-        .get("task")
-        .and_then(|t| t.get("references"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert!(refs.iter().any(|r| {
-        r.get("link")
-            .and_then(|v| v.as_str())
-            .is_some_and(|s| s == "https://example.com")
-    }));
-    assert!(refs.iter().any(|r| {
-        r.get("file")
-            .and_then(|v| v.as_str())
-            .is_some_and(|s| s == "src/example.rs")
-    }));
-    assert!(refs.iter().any(|r| {
-        r.get("code")
-            .and_then(|v| v.as_str())
-            .is_some_and(|s| s == "src/example.rs#1")
-    }));
-
-    // Remove code reference
-    let remove_code_args = json!({
-        "name": "task_reference_remove",
-        "arguments": { "id": payload.get("id").and_then(|v| v.as_str()).unwrap(), "kind": "code", "value": "src/example.rs#1" }
-    });
-    let remove_code_req = JsonRpcRequest {
-        jsonrpc: "2.0".into(),
-        id: Some(json!(34)),
-        method: "tools/call".into(),
-        params: remove_code_args,
-    };
-    let remove_code_resp = dispatch(remove_code_req);
-    assert!(
-        remove_code_resp.error.is_none(),
-        "task_reference_remove code failed"
-    );
-    let payload = parse_tool_payload(&remove_code_resp);
-    let refs = payload
-        .get("task")
-        .and_then(|t| t.get("references"))
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
-    assert!(!refs.iter().any(|r| {
-        r.get("code")
-            .and_then(|v| v.as_str())
-            .is_some_and(|s| s == "src/example.rs#1")
-    }));
 }
 
 #[test]

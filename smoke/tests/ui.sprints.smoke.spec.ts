@@ -1,9 +1,42 @@
-import { readFile } from 'node:fs/promises';
+import fs from 'fs-extra';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { startLotarServer } from '../helpers/server.js';
 import { html5DragAndDrop, withPage } from '../helpers/ui.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
+
+async function readSprintMembership(workspace: SmokeWorkspace, sprintId: string): Promise<string[]> {
+    const sprintFile = path.join(workspace.tasksDir, '@sprints', `${sprintId}.yml`);
+    let raw: string;
+    try {
+        raw = await fs.readFile(sprintFile, 'utf8');
+    } catch (error) {
+        throw new Error(
+            `sprint file ${sprintFile} must exist while polling membership (sprints are created before the server starts): ${(error as Error).message}`,
+        );
+    }
+    const sprint = parse(raw) as { tasks?: string[] };
+    return sprint.tasks ?? [];
+}
+
+async function pollUntil<T>(
+    probe: () => Promise<T>,
+    done: (value: T) => boolean,
+    timeoutMs = 10_000,
+    intervalMs = 100,
+): Promise<T> {
+    const deadline = Date.now() + timeoutMs;
+    let last = await probe();
+    while (!done(last)) {
+        if (Date.now() >= deadline) {
+            return last;
+        }
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        last = await probe();
+    }
+    return last;
+}
 
 describe.concurrent('UI sprints smoke scenarios', () => {
     it('renders sprint groups when stored sprints exist', async () => {
@@ -72,7 +105,14 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                         timeout: 10_000,
                     });
 
-                    await page.waitForTimeout(250);
+                    const targetMembership = await pollUntil(
+                        () => readSprintMembership(workspace, '2'),
+                        (members) => members.includes(task.id),
+                    );
+                    expect(targetMembership).toEqual([task.id]);
+                    const sourceMembership = await readSprintMembership(workspace, '1');
+                    expect(sourceMembership).not.toContain(task.id);
+
                     const remaining = await page.$(
                         '[data-sprint-id="1"] tr.task-row[data-task-id="' + task.id + '"]',
                     );
@@ -124,8 +164,10 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                         '[data-sprint-id="1"] th[data-column="status"] button.header-button',
                     );
 
-                    await page.waitForTimeout(150);
-                    const after = await headerOrder();
+                    const after = await pollUntil(
+                        headerOrder,
+                        (order) => order.indexOf('priority') < order.indexOf('status'),
+                    );
                     expect(after.indexOf('priority')).toBeLessThan(after.indexOf('status'));
                 });
             } finally {
@@ -176,12 +218,27 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                         timeout: 10_000,
                     });
 
-                    await page.waitForTimeout(300);
+                    const memberships = await pollUntil(
+                        async () => {
+                            const [source, target] = await Promise.all([
+                                readSprintMembership(workspace, '1'),
+                                readSprintMembership(workspace, '2'),
+                            ]);
+                            return { source, target };
+                        },
+                        ({ source, target }) => source.includes(task.id) && target.includes(task.id),
+                    );
+                    expect(memberships.source).toEqual([task.id]);
+                    expect(memberships.target).toEqual([task.id]);
 
                     const sourceStillExists = await page.$(
                         '[data-sprint-id="1"] tr.task-row[data-task-id="' + task.id + '"]',
                     );
                     expect(sourceStillExists).not.toBeNull();
+                    const targetStillExists = await page.$(
+                        '[data-sprint-id="2"] tr.task-row[data-task-id="' + task.id + '"]',
+                    );
+                    expect(targetStillExists).not.toBeNull();
                 });
             } finally {
                 await server.stop();
@@ -287,9 +344,11 @@ describe.concurrent('UI sprints smoke scenarios', () => {
                 await server.stop();
             }
 
-            const taskYaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
-            const membership = Array.isArray(taskYaml.sprints) ? taskYaml.sprints : [];
-            expect(membership).not.toContain(1);
+            const sprintFileGone = await pollUntil(
+                async () => !(await fs.pathExists(path.join(workspace.tasksDir, '@sprints', '1.yml'))),
+                (gone) => gone,
+            );
+            expect(sprintFileGone).toBe(true);
         } finally {
             await workspace.dispose();
         }
@@ -357,7 +416,7 @@ describe.concurrent('UI sprints smoke scenarios', () => {
             const newFiles = filesAfter.filter((file) => !filesBefore.includes(file));
             expect(newFiles).toHaveLength(1);
 
-            const taskYaml = parse(await readFile(newFiles[0]!, 'utf8')) as Record<string, any>;
+            const taskYaml = parse(await fs.readFile(newFiles[0]!, 'utf8')) as Record<string, any>;
             expect(taskYaml.title).toBe(taskTitle);
             expect(Buffer.byteLength(String(taskYaml.description ?? ''), 'utf8')).toBeGreaterThan(1024);
         } finally {

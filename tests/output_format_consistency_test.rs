@@ -1,738 +1,237 @@
 mod common;
 
 use common::TestFixtures;
+use predicates::prelude::*;
+use std::process::Output;
 
-/// Phase 1.2 - Output Format Consistency Testing
-/// Tests that all commands properly support their advertised format options
-/// and produce consistent, valid output across all supported formats.
+// Output format consistency: every documented format for list, add,
+// status, config show, and scan is asserted with its exact observable
+// contract, and an unknown format value fails with an argument error.
+
+fn run(temp_dir: &std::path::Path, args: &[&str]) -> Output {
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    let output = cmd
+        .current_dir(temp_dir)
+        .env("LOTAR_TEST_SILENT", "1")
+        .args(args)
+        .output()
+        .expect("run lotar");
+    assert!(
+        output.status.success(),
+        "lotar {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    output
+}
+
+fn stdout_of(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stdout).to_string()
+}
 
 #[test]
-fn test_list_command_all_formats() {
+fn list_formats_report_the_same_tasks() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+    run(
+        temp_dir,
+        &["add", "Format task 1", "--type=feature", "--priority=high"],
+    );
+    run(temp_dir, &["add", "Format task 2", "--type=bug"]);
+
+    let json = stdout_of(&run(temp_dir, &["list", "--format=json"]));
+    let payload: serde_json::Value =
+        serde_json::from_str(&json).unwrap_or_else(|e| panic!("invalid JSON: {e}: {json}"));
+    let mut titles: Vec<String> = payload["tasks"]
+        .as_array()
+        .expect("tasks array")
+        .iter()
+        .map(|task| task["title"].as_str().expect("title").to_string())
+        .collect();
+    titles.sort();
+    assert_eq!(titles, vec!["Format task 1", "Format task 2"]);
+
+    for format in ["text", "table", "markdown"] {
+        let output = stdout_of(&run(temp_dir, &["list", &format!("--format={format}")]));
+        assert!(
+            output.contains("Found 2 task(s)"),
+            "{format} output must report the task count: {output}"
+        );
+        assert!(
+            output.contains("Format task 1") && output.contains("Format task 2"),
+            "{format} output must list every task title: {output}"
+        );
+    }
+}
+
+#[test]
+fn add_formats_report_the_created_task() {
     let fixtures = TestFixtures::new();
     let temp_dir = fixtures.temp_dir.path();
 
-    // Setup test data - create a few tasks to list
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("add")
-        .arg("Test task 1")
-        .arg("--type=feature")
-        .arg("--priority=high")
-        .assert()
-        .success();
-
-    let mut cmd = crate::common::lotar_cmd().unwrap();
-    cmd.current_dir(temp_dir)
-        .arg("add")
-        .arg("Test task 2")
-        .arg("--type=bug")
-        .arg("--priority=medium")
-        .assert()
-        .success();
-
-    // Test each format option for list command
-    let formats = ["text", "table", "json", "markdown"];
-
-    for format in &formats {
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let assert_result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg(format!("--format={format}"))
-            .assert()
-            .success();
-
-        let output = assert_result.get_output();
-        let output_str = String::from_utf8_lossy(&output.stdout);
-
+    for format in ["text", "table", "markdown"] {
+        let output = stdout_of(&run(
+            temp_dir,
+            &[
+                "add",
+                &format!("Add {format} task"),
+                &format!("--format={format}"),
+            ],
+        ));
         assert!(
-            !output_str.is_empty(),
-            "Output should not be empty for format: {format}"
+            output.contains("Created task:"),
+            "{format} output must announce the created task: {output}"
         );
+        assert!(
+            output.contains(&format!("Add {format} task")),
+            "{format} output must echo the title: {output}"
+        );
+    }
 
-        // Format-specific validation
-        match *format {
-            "json" => {
-                // JSON output should be valid JSON
-                serde_json::from_str::<serde_json::Value>(&output_str).unwrap_or_else(|_| {
-                    panic!("Invalid JSON output for list --format={format}: {output_str}")
-                });
-            }
-            "table" => {
-                // List command table format might not use traditional pipe separators
-                // Check for structured output that indicates table formatting
-                assert!(
-                    !output_str.trim().is_empty(),
-                    "Table format should not be empty"
-                );
-                assert!(
-                    output_str.contains("Found")
-                        || output_str.contains("task")
-                        || output_str.contains("-"),
-                    "Table format should contain task listing: {output_str}"
-                );
-            }
-            "markdown" => {
-                // List command markdown might not use traditional table syntax
-                // Check for markdown-like formatting
-                assert!(
-                    !output_str.trim().is_empty(),
-                    "Markdown format should not be empty"
-                );
-                assert!(
-                    output_str.contains("Found")
-                        || output_str.contains("task")
-                        || output_str.contains("-"),
-                    "Markdown format should contain task information: {output_str}"
-                );
-            }
-            "text" => {
-                // Text format should be human-readable (could contain emojis)
-                assert!(
-                    !output_str.trim().is_empty(),
-                    "Text format should not be empty: {output_str}"
-                );
-            }
-            _ => panic!("Unknown format: {format}"),
-        }
+    let json = stdout_of(&run(temp_dir, &["add", "Add json task", "--format=json"]));
+    let payload: serde_json::Value =
+        serde_json::from_str(&json).unwrap_or_else(|e| panic!("invalid JSON: {e}: {json}"));
+    assert_eq!(payload["status"], "success");
+    assert_eq!(payload["task"]["title"], "Add json task");
+    let id = payload["task"]["id"].as_str().expect("task id").to_string();
+    assert!(
+        !id.is_empty(),
+        "created task JSON must carry the canonical id: {payload}"
+    );
+}
+
+#[test]
+fn status_formats_report_the_exact_transition() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+    run(temp_dir, &["add", "Status format task"]);
+
+    let listing = stdout_of(&run(temp_dir, &["list", "--format=json"]));
+    let payload: serde_json::Value = serde_json::from_str(&listing).expect("valid list JSON");
+    let id = payload["tasks"][0]["id"].as_str().expect("id").to_string();
+
+    for (format, target, expected) in [
+        ("text", "in_progress", "from Todo to InProgress"),
+        ("table", "todo", "from InProgress to Todo"),
+        ("markdown", "in_progress", "from Todo to InProgress"),
+    ] {
+        let output = stdout_of(&run(
+            temp_dir,
+            &["status", &id, target, &format!("--format={format}")],
+        ));
+        assert!(
+            output.contains(&format!("Task {id} status changed {expected}")),
+            "{format} output must state the exact transition: {output}"
+        );
+    }
+
+    let json = stdout_of(&run(temp_dir, &["status", &id, "done", "--format=json"]));
+    let payload: serde_json::Value =
+        serde_json::from_str(&json).unwrap_or_else(|e| panic!("invalid JSON: {e}: {json}"));
+    assert_eq!(payload["status"], "success");
+    assert_eq!(payload["task_id"], id);
+    assert_eq!(payload["old_status"], "InProgress");
+    assert_eq!(payload["new_status"], "Done");
+}
+
+#[test]
+fn config_show_formats_expose_resolved_configuration() {
+    let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+    run(temp_dir, &["config", "init", "--template=default"]);
+    run(
+        temp_dir,
+        &["config", "set", "default_project", "DEMO", "--global"],
+    );
+
+    let json = stdout_of(&run(temp_dir, &["config", "show", "--format=json"]));
+    let payload: serde_json::Value =
+        serde_json::from_str(&json).unwrap_or_else(|e| panic!("invalid JSON: {e}: {json}"));
+    assert_eq!(payload["config"]["default_project"], "DEMO", "{payload}");
+
+    for format in ["text", "table", "markdown"] {
+        let output = stdout_of(&run(
+            temp_dir,
+            &["config", "show", &format!("--format={format}")],
+        ));
+        assert!(
+            output.contains("Tasks directory"),
+            "{format} output must show the resolved tasks directory: {output}"
+        );
+        assert!(
+            output.contains("DEMO"),
+            "{format} output must show the resolved default project: {output}"
+        );
     }
 }
 
 #[test]
-fn test_add_command_all_formats() {
+fn scan_formats_report_discovered_todo_comments() {
     let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+    std::fs::write(
+        temp_dir.join("sample.rs"),
+        "// TODO: format probe marker\nfn main() {}\n",
+    )
+    .expect("write sample source");
 
-    let formats = ["text", "table", "json", "markdown"];
+    let output = stdout_of(&run(temp_dir, &["scan", ".", "--format=text"]));
+    assert!(
+        output.contains("Found 1 TODO comment(s)"),
+        "text scan output must report the finding count: {output}"
+    );
+    assert!(
+        output.contains("sample.rs:1"),
+        "text scan output must name the file and line: {output}"
+    );
 
-    for (i, format) in formats.iter().enumerate() {
-        let task_title = format!("Format test task {}", i + 1);
-        let result = fixtures.run_command(&[
-            "add",
-            &task_title,
-            "--type=feature",
-            &format!("--format={format}"),
-        ]);
-
-        match result {
-            Ok(output) => {
-                assert!(
-                    !output.is_empty(),
-                    "Output should not be empty for format: {format}"
-                );
-
-                // Format-specific validation
-                match *format {
-                    "json" => {
-                        // JSON output should be valid JSON
-                        let json: serde_json::Value =
-                            serde_json::from_str(&output).unwrap_or_else(|_| {
-                                panic!("Invalid JSON output for add --format={format}: {output}")
-                            });
-
-                        // Should contain task information
-                        assert!(json.is_object(), "JSON should be an object");
-
-                        // Check for expected fields (depending on implementation)
-                        let obj = json.as_object().unwrap();
-                        assert!(
-                            obj.contains_key("task_id")
-                                || obj.contains_key("id")
-                                || obj.contains_key("status"),
-                            "JSON should contain task information: {output}"
-                        );
-                    }
-                    "table" => {
-                        // Add command table format may not use pipe separators
-                        // Just check that it's properly formatted (not empty and structured)
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Table format should not be empty: {output}"
-                        );
-                        assert!(
-                            output.contains("Created task")
-                                || output.contains("Task")
-                                || output.contains("Title"),
-                            "Table format should contain task information: {output}"
-                        );
-                    }
-                    "markdown" => {
-                        // Markdown might be a table or just formatted text
-                        // Accept either format
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Markdown format should not be empty: {output}"
-                        );
-                    }
-                    "text" => {
-                        // Text format should mention the task creation
-                        assert!(
-                            output.to_lowercase().contains("created")
-                                || output.to_lowercase().contains("task")
-                                || output.contains("📋"),
-                            "Text format should indicate task creation: {output}"
-                        );
-                    }
-                    _ => panic!("Unknown format: {format}"),
-                }
-            }
-            Err(e) => {
-                panic!("Add command failed with format {format}: {e}");
-            }
-        }
-    }
+    let json = stdout_of(&run(temp_dir, &["scan", ".", "--format=json"]));
+    let findings: Vec<serde_json::Value> =
+        serde_json::from_str(&json).unwrap_or_else(|e| panic!("invalid JSON: {e}: {json}"));
+    assert_eq!(findings.len(), 1, "json scan must list the finding: {json}");
+    assert_eq!(findings[0]["file"], "./sample.rs");
+    assert_eq!(findings[0]["line"], 1);
+    assert_eq!(findings[0]["title"], "format probe marker");
 }
 
 #[test]
-fn test_status_command_all_formats() {
+fn format_flag_is_equivalent_globally_and_per_command() {
     let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
+    run(temp_dir, &["add", "Flag placement task"]);
 
-    // Create a test task first
-    let add_result = fixtures
-        .run_command(&["add", "Status format test task", "--type=feature"])
-        .expect("Failed to create test task");
+    let global = stdout_of(&run(temp_dir, &["--format=json", "list"]));
+    let per_command = stdout_of(&run(temp_dir, &["list", "--format=json"]));
 
-    // Extract task ID from output (assuming it follows the pattern)
-    let task_id = if add_result.contains("Created task") {
-        // Parse from text like "Created task PROJECT-001"
-        add_result
-            .split_whitespace()
-            .find(|&s| s.contains("-") && s.len() > 3)
-            .unwrap_or("1") // Fallback to numeric ID
-            .replace(":", "")
-    } else {
-        "1".to_string() // Use numeric ID as fallback
-    };
-    let formats = ["text", "table", "json", "markdown"];
-
-    for format in &formats {
-        let result = fixtures.run_command(&[
-            "status",
-            &task_id,
-            "in_progress",
-            &format!("--format={format}"),
-        ]);
-
-        match result {
-            Ok(output) => {
-                assert!(
-                    !output.is_empty(),
-                    "Output should not be empty for format: {format}"
-                );
-
-                // Format-specific validation
-                match *format {
-                    "json" => {
-                        // JSON output should be valid JSON
-                        let json: serde_json::Value =
-                            serde_json::from_str(&output).unwrap_or_else(|_| {
-                                panic!("Invalid JSON output for status --format={format}: {output}")
-                            });
-
-                        // Should contain status change information
-                        assert!(json.is_object(), "JSON should be an object");
-
-                        let obj = json.as_object().unwrap();
-                        assert!(
-                            obj.contains_key("task_id")
-                                || obj.contains_key("id")
-                                || obj.contains_key("old_status")
-                                || obj.contains_key("new_status")
-                                || obj.contains_key("status"),
-                            "JSON should contain status change information: {output}"
-                        );
-                    }
-                    "table" => {
-                        // Status command table format might not use traditional pipe separators
-                        // Check for status change information
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Table format should not be empty"
-                        );
-                        assert!(
-                            output.contains("Task")
-                                || output.contains("status")
-                                || output.contains("already has"),
-                            "Table format should contain status information: {output}"
-                        );
-                    }
-                    "markdown" => {
-                        // Markdown format should not be empty
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Markdown format should not be empty: {output}"
-                        );
-                    }
-                    "text" => {
-                        // Text format should indicate status change
-                        assert!(
-                            output.to_lowercase().contains("status")
-                                || output.contains("✅")
-                                || output.contains("🚧"),
-                            "Text format should indicate status change: {output}"
-                        );
-                    }
-                    _ => panic!("Unknown format: {format}"),
-                }
-            }
-            Err(e) => {
-                panic!("Status command failed with format {format}: {e}");
-            }
-        }
-    }
+    let global_json: serde_json::Value = serde_json::from_str(&global)
+        .unwrap_or_else(|e| panic!("global --format=json must emit valid JSON: {e}: {global}"));
+    let per_command_json: serde_json::Value =
+        serde_json::from_str(&per_command).unwrap_or_else(|e| {
+            panic!("command --format=json must emit valid JSON: {e}: {per_command}")
+        });
+    assert_eq!(
+        global_json["tasks"].as_array().map(Vec::len),
+        per_command_json["tasks"].as_array().map(Vec::len),
+        "both placements must return the same task count: {global_json} vs {per_command_json}"
+    );
+    assert!(
+        global_json["tasks"].as_array().is_some_and(|tasks| tasks
+            .iter()
+            .any(|task| task["title"] == "Flag placement task")),
+        "global placement must include the seeded task: {global_json}"
+    );
 }
 
 #[test]
-fn test_config_show_all_formats() {
+fn unknown_format_value_fails_with_argument_error() {
     let fixtures = TestFixtures::new();
+    let temp_dir = fixtures.temp_dir.path();
 
-    let formats = ["text", "table", "json", "markdown"];
-
-    for format in &formats {
-        let result = fixtures.run_command(&["config", "show", &format!("--format={format}")]);
-
-        match result {
-            Ok(output) => {
-                assert!(
-                    !output.is_empty(),
-                    "Output should not be empty for format: {format}"
-                );
-
-                // Format-specific validation
-                match *format {
-                    "json" => {
-                        // JSON output should be valid JSON if the command supports it
-                        // Some commands might not implement JSON format properly yet
-                        if output.trim().starts_with("{") || output.trim().starts_with("[") {
-                            serde_json::from_str::<serde_json::Value>(&output).unwrap_or_else(|_| panic!("Invalid JSON output for config show --format={format}: {output}"));
-                        } else {
-                            // Command might not support JSON format yet - just check it's not empty
-                            assert!(
-                                !output.trim().is_empty(),
-                                "Output should not be empty even if JSON not supported: {output}"
-                            );
-                        }
-                    }
-                    "table" => {
-                        // Config show table format might not use traditional pipe separators
-                        // Check for configuration information
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Table format should not be empty"
-                        );
-                        let lower = output.to_ascii_lowercase();
-                        assert!(
-                            lower.contains("configuration")
-                                || lower.contains("settings")
-                                || lower.contains("project"),
-                            "Table format should contain configuration information: {output}"
-                        );
-                    }
-                    "markdown" => {
-                        // Markdown format should not be empty
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Markdown format should not be empty: {output}"
-                        );
-                    }
-                    "text" => {
-                        // Text format should show configuration
-                        assert!(
-                            !output.trim().is_empty(),
-                            "Text format should not be empty: {output}"
-                        );
-                    }
-                    _ => panic!("Unknown format: {format}"),
-                }
-            }
-            Err(e) => {
-                panic!("Config show command failed with format {format}: {e}");
-            }
-        }
-    }
-}
-
-#[test]
-fn test_scan_command_all_formats() {
-    let fixtures = TestFixtures::new();
-
-    // Create a test file with TODO comments
-    let test_file_content = r#"
-// TODO: This is a test todo comment
-fn main() {
-    // FIXME: This needs to be fixed
-    println!("Hello world");
-    // HACK: Temporary solution
-}
-"#;
-
-    std::fs::write(fixtures.temp_dir.path().join("test.rs"), test_file_content)
-        .expect("Failed to create test file");
-
-    let formats = ["text", "table", "json", "markdown"];
-
-    for format in &formats {
-        let result = fixtures.run_command(&[
-            "scan",
-            fixtures.temp_dir.path().to_str().unwrap(),
-            &format!("--format={format}"),
-        ]);
-
-        match result {
-            Ok(output) => {
-                // Scan might not find anything, which is OK, but output should be valid
-                // Format-specific validation
-                match *format {
-                    "json" => {
-                        if !output.trim().is_empty() {
-                            // JSON output should be valid JSON if the command supports it
-                            if output.trim().starts_with("{") || output.trim().starts_with("[") {
-                                serde_json::from_str::<serde_json::Value>(&output).unwrap_or_else(|_| panic!("Invalid JSON output for scan --format={format}: {output}"));
-                            } else {
-                                // Command might not support JSON format yet - just check it's not empty
-                                assert!(
-                                    !output.trim().is_empty(),
-                                    "Output should not be empty even if JSON not supported: {output}"
-                                );
-                            }
-                        }
-                    }
-                    "table" => {
-                        // Scan command table format might not use traditional pipe separators
-                        // Accept any valid scan output format
-                        if output.trim().is_empty()
-                            || output.contains("Found")
-                            || output.contains("Scanning")
-                            || output.contains("TODO")
-                        {
-                            // Valid - empty, scanning message, or TODO items found
-                        } else {
-                            panic!(
-                                "Table format should be empty or contain scan results: {output}"
-                            );
-                        }
-                    }
-                    "markdown" => {
-                        // Markdown format is acceptable if empty or formatted
-                        // This is valid regardless of content
-                    }
-                    "text" => {
-                        // Text format is acceptable if empty or formatted
-                        // This is valid regardless of content
-                    }
-                    _ => panic!("Unknown format: {format}"),
-                }
-            }
-            Err(_e) => {
-                // Scan command might not be fully implemented, so we allow this
-            }
-        }
-    }
-}
-
-#[test]
-fn test_format_option_error_handling() {
-    let fixtures = TestFixtures::new();
-
-    // Test invalid format option
-    let result = fixtures.run_command(&["list", "--format=invalid_format"]);
-
-    match result {
-        Ok(_) => {
-            // If it succeeds, the system might be accepting unknown formats
-            println!(
-                "⚠️  System accepts unknown format 'invalid_format' - this might be intentional"
-            );
-        }
-        Err(e) => {
-            // Should provide helpful error message
-            let error_msg = e.to_string().to_lowercase();
-            assert!(
-                error_msg.contains("format")
-                    || error_msg.contains("invalid")
-                    || error_msg.contains("unknown")
-                    || error_msg.contains("supported"),
-                "Error message should mention format issue: {e}"
-            );
-        }
-    }
-}
-
-#[test]
-fn test_json_format_structure_consistency() {
-    let fixtures = TestFixtures::new();
-
-    // Create test data
-    fixtures
-        .run_command(&[
-            "add",
-            "JSON consistency test",
-            "--type=feature",
-            "--priority=high",
-        ])
-        .expect("Failed to create test task");
-
-    // Test that JSON output from different commands has consistent structure
-    let list_result = fixtures
-        .run_command(&["list", "--format=json"])
-        .expect("List command should work");
-
-    if !list_result.trim().is_empty() {
-        let list_json: serde_json::Value =
-            serde_json::from_str(&list_result).expect("List JSON should be valid");
-
-        // Verify list returns an array
-        if list_json.is_array() {
-            // Check structure of individual task objects
-            if let Some(first_task) = list_json.as_array().unwrap().first() {
-                assert!(first_task.is_object(), "Each task should be a JSON object");
-
-                let task_obj = first_task.as_object().unwrap();
-                assert!(
-                    task_obj.contains_key("id") || task_obj.contains_key("task_id"),
-                    "Task should have an ID field"
-                );
-            }
-        } else if list_json.is_object() {
-            // Alternative: single object with tasks array or metadata
-        } else {
-            panic!("List JSON should be array or object, got: {list_json}");
-        }
-    }
-}
-
-#[test]
-fn test_format_option_across_global_and_command_specific() {
-    let fixtures = TestFixtures::new();
-
-    // Test that format can be specified globally vs command-specifically
-    // Global format option should work
-    let result1 = fixtures.run_command(&["--format=json", "list"]);
-
-    // Command-specific format option should work
-    let result2 = fixtures.run_command(&["list", "--format=json"]);
-
-    match (result1, result2) {
-        (Ok(output1), Ok(output2)) => {
-            // Both should produce valid JSON
-            if !output1.trim().is_empty() {
-                serde_json::from_str::<serde_json::Value>(&output1)
-                    .expect("Global --format=json should produce valid JSON");
-            }
-
-            if !output2.trim().is_empty() {
-                serde_json::from_str::<serde_json::Value>(&output2)
-                    .expect("Command-specific --format=json should produce valid JSON");
-            }
-        }
-        (Err(_e1), Ok(_)) => {
-            // Global format option not supported
-        }
-        (Ok(_), Err(_e2)) => {
-            // Command-specific format option not supported
-        }
-        (Err(_e1), Err(_e2)) => {
-            // Neither format option works
-        }
-    }
-}
-
-// =============================================================================
-// Simple sanity checks for format support (consolidated)
-// =============================================================================
-
-mod simple {
-    use crate::common::TestFixtures;
-    use crate::common::cargo_bin_silent;
-
-    /// Minimal format support surface checks
-    #[test]
-    fn list_command_format_support() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create test tasks
-        let mut cmd = cargo_bin_silent();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Format test task 1")
-            .arg("--type=feature")
-            .assert()
-            .success();
-
-        // Test each format
-        let formats = ["text", "table", "json", "markdown"];
-
-        for format in &formats {
-            let mut cmd = cargo_bin_silent();
-            let assert_result = cmd
-                .current_dir(temp_dir)
-                .arg("list")
-                .arg(format!("--format={format}"))
-                .assert()
-                .success();
-
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            match *format {
-                "json" => {
-                    if !output.trim().is_empty() {
-                        serde_json::from_str::<serde_json::Value>(&output).unwrap_or_else(|_| {
-                            panic!("Invalid JSON for list --format={format}: {output}")
-                        });
-                    }
-                }
-                "table" | "markdown" | "text" => {
-                    if output.contains("Found")
-                        || output.contains("No tasks")
-                        || output.trim().is_empty()
-                    {
-                    } else {
-                        panic!("Unexpected format output for {format}: {output}");
-                    }
-                }
-                _ => panic!("Unknown format: {format}"),
-            }
-        }
-    }
-
-    #[test]
-    fn add_command_format_support() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        let formats = ["text", "table", "json", "markdown"];
-
-        for (i, format) in formats.iter().enumerate() {
-            let task_title = format!("Add format test {}", i + 1);
-            let mut cmd = cargo_bin_silent();
-            let assert_result = cmd
-                .current_dir(temp_dir)
-                .arg("add")
-                .arg(&task_title)
-                .arg("--type=feature")
-                .arg(format!("--format={format}"))
-                .assert()
-                .success();
-
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            match *format {
-                "json" => {
-                    if !output.trim().is_empty() {
-                        serde_json::from_str::<serde_json::Value>(&output).unwrap_or_else(|_| {
-                            panic!("Invalid JSON for add --format={format}: {output}")
-                        });
-                    }
-                }
-                "table" | "markdown" | "text" => {
-                    // accept current styles
-                }
-                _ => panic!("Unknown format: {format}"),
-            }
-        }
-    }
-
-    #[test]
-    fn status_command_format_support() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create a test task first
-        let mut cmd = cargo_bin_silent();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Status format test task")
-            .arg("--type=feature")
-            .assert()
-            .success();
-
-        let formats = ["text", "table", "json", "markdown"];
-
-        for format in &formats {
-            let mut cmd = cargo_bin_silent();
-            let assert_result = cmd
-                .current_dir(temp_dir)
-                .arg("status")
-                .arg("1")
-                .arg("in_progress")
-                .arg(format!("--format={format}"))
-                .assert()
-                .success();
-
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            match *format {
-                "json" => {
-                    if !output.trim().is_empty() {
-                        serde_json::from_str::<serde_json::Value>(&output).unwrap_or_else(|_| {
-                            panic!("Invalid JSON for status --format={format}: {output}")
-                        });
-                    }
-                }
-                "table" | "markdown" | "text" => {
-                    // accept current styles
-                }
-                _ => panic!("Unknown format: {format}"),
-            }
-        }
-    }
-
-    #[test]
-    fn config_show_format_support() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        let formats = ["text", "table", "json", "markdown"];
-
-        for format in &formats {
-            let mut cmd = cargo_bin_silent();
-            let assert_result = cmd
-                .current_dir(temp_dir)
-                .arg("config")
-                .arg("show")
-                .arg(format!("--format={format}"))
-                .assert()
-                .success();
-
-            let _output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-            match *format {
-                "json" => {
-                    // config show may not support json; tolerate
-                }
-                "table" | "markdown" | "text" => {}
-                _ => panic!("Unknown format: {format}"),
-            }
-        }
-    }
-
-    #[test]
-    fn scan_command_format_support() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        std::fs::write(
-            temp_dir.join("test.rs"),
-            "// TODO: This is a test todo comment\nfn main() {}",
-        )
-        .expect("Failed to create test file");
-
-        let formats = ["text", "table", "json", "markdown"];
-
-        for format in &formats {
-            let mut cmd = cargo_bin_silent();
-            let result = cmd
-                .current_dir(temp_dir)
-                .arg("scan")
-                .arg(".")
-                .arg(format!("--format={format}"))
-                .assert();
-
-            if let Ok(assert_result) = result.try_success() {
-                let _output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-                if *format == "json" {
-                    // tolerate
-                }
-            }
-        }
-    }
+    let mut cmd = crate::common::lotar_cmd().unwrap();
+    cmd.current_dir(temp_dir)
+        .env("LOTAR_TEST_SILENT", "1")
+        .args(["list", "--format=invalid_format"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("error"));
 }

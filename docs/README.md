@@ -142,8 +142,8 @@ cutting a new version or when exercising the Scoop/Homebrew verification workflo
 
 | Tasks | Boards |
 | --- | --- |
-| ![Tasks list](assets/screenshots/ui-tasks.png) | ![Boards](assets/screenshots/ui-boards.png) |
-| ![Sprints](assets/screenshots/ui-sprints.png) | ![Insights](assets/screenshots/ui-insights.png) |
+| ![Tasks list](assets/screenshots/tasks-light.webp) | ![Boards](assets/screenshots/board-light.webp) |
+| ![Sprints](assets/screenshots/sprints-light.webp) | ![Insights](assets/screenshots/insights-light.webp) |
 
 ### Server flags and endpoints
 
@@ -268,4 +268,4 @@ run Rust doctests; a passing nextest suite does not establish doctest coverage.
 
 | Calendar | Configuration |
 | --- | --- |
-| ![Sprint calendar](assets/screenshots/ui-calendar.png) | ![Configuration](assets/screenshots/ui-config.png) |
+| ![Sprint calendar](assets/screenshots/calendar-light.webp) | ![Configuration](assets/screenshots/config-light.webp) |

@@ -14,10 +14,11 @@ description: Use this to run and debug the UI + server locally (Vite dev server,
   - `cargo run -- serve --port 8080`
 
 Notes:
-- `lotar serve` port must be set with `--port` (the short `-p` is reserved for the global `--project` flag).
-  - Correct: `lotar serve --port 9000`
+- `lotar serve` port flags: `-p <PORT>` and `--port <PORT>` both set the port. `serve` is the deliberate exception where `-p` means the port.
+  - Correct: `lotar serve -p 9000` or `lotar serve --port 9000`
   - Also accepted: `lotar serve 9000` (positional port; kept for backward compatibility)
-  - Incorrect (sets project, not port): `lotar serve -p 9000`
+  - `serve --project X` is accepted and ignored; `-p` before the subcommand (e.g. `lotar -p web serve`) still selects the global project.
+  - Running `serve` with no port configured anywhere prefers 8080 and moves to an OS-assigned port (with a warning) when it is busy; explicitly configured ports never move.
   - See: `docs/help/serve.md`
 
 ### Production-like UI (embedded/static bundle)

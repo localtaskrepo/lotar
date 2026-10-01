@@ -21,6 +21,9 @@ jobs:
     name: Build Frontend & Release Binary
     runs-on: ubuntu-latest
     env:
+      # Designated git-capable runner: build.rs refuses to compile git
+      # behavior out (panics if creating .git is denied).
+      LOTAR_REQUIRE_GIT: '1'
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
@@ -107,6 +110,10 @@ jobs:
     env:
       USER: mallox
       USERNAME: mallox
+      # Git capability is a build-time contract here: build.rs panics rather
+      # than setting no_git_tests, runtime require_git() probes fail closed,
+      # and the manifest gate below asserts every selected test executed.
+      LOTAR_REQUIRE_GIT: '1'
       RUSTC_WRAPPER: sccache
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
@@ -115,7 +122,8 @@ jobs:
       
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
-      # Toolchain comes from rust-toolchain.toml.
+      with:
+        # Toolchain comes from rust-toolchain.toml.
         components: rustfmt, clippy
         
     - name: Rust Cache
@@ -142,9 +150,37 @@ jobs:
       uses: taiki-e/install-action@v2
       with:
         tool: nextest
-        
+
+    # include_dir! embeds target/web-embed (src/web_server.rs), so every
+    # Rust compile step on this cold runner needs freshly generated web
+    # assets first; same Node engine/setup pattern as build_artifacts and
+    # windows_checks (docs/developers/testing.md). No cache reliance: the
+    # gzip tree is rebuilt in-job before fmt/clippy/tests.
+    - name: Determine Node version
+      id: node_version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').engines.node")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ steps.node_version.outputs.version }}
+        cache: npm
+
+    - name: Install npm dependencies
+      run: npm ci --prefer-offline
+
+    - name: Build web assets
+      run: npm run build:web
+
+    - name: Verify embed assets exist
+      run: test -f target/web-embed/index.html.gz
+
     - name: Check code formatting
       run: cargo fmt --all --check
+
         
     - name: Run clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
@@ -158,12 +194,28 @@ jobs:
           --retries 0 \
           --lib --bins --tests
 
+    - name: Enforce full-suite coverage (manifest vs JUnit)
+      run: |
+        set -euo pipefail
+        python3 scripts/check-test-coverage.py --self-test
+        mkdir -p target/nextest
+        # The list intentionally includes ignored tests (--run-ignored all):
+        # the default list reports them as filter mismatches, which would let
+        # a selected-but-ignored test slip past the gate unseen.
+        cargo nextest list --cargo-profile ci --all-features --lib --bins --tests --run-ignored all --message-format json > target/nextest/manifest.json
+        python3 scripts/check-test-coverage.py \
+          --label 'linux full suite' \
+          --manifest target/nextest/manifest.json \
+          --junit target/nextest/default/junit.xml
+
     - name: Upload nextest report
       if: always()
       uses: actions/upload-artifact@v5
       with:
         name: nextest-report
-        path: target/nextest/junit.xml
+        path: |
+          target/nextest/default/junit.xml
+          target/nextest/manifest.json
         if-no-files-found: ignore
         retention-days: 7
 
@@ -192,6 +244,17 @@ jobs:
 
     - name: Run Vitest suite
       run: npm run test:ui
+
+    # Unit gate for the runtime Git test-selection runner (DEV-79); see the
+    # matching step in windows_checks.
+    - name: Run rust-test-runner unit tests
+      run: node --test scripts/tests/rust-test-runner.test.mjs
+
+    # Path-portability regression gate for the web asset compression script
+    # (Windows drives, spaces, Unicode, POSIX, gz-only embed tree); see the
+    # matching step in windows_checks.
+    - name: Run compress-web unit tests
+      run: node --test scripts/tests/compress-web.test.mjs
 
   smoke_tests:
     name: Smoke Tests
@@ -243,22 +306,24 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install --with-deps chromium
 
-    - name: Configure git default branch
-      run: git config --global init.defaultBranch main
-
     - name: Run smoke suite
       env:
         LOTAR_BINARY_PATH: ${{ github.workspace }}/target/release/lotar
         # Force embedded UI to ensure we test the bundled assets, not stale filesystem copies
         LOTAR_WEB_UI_EMBEDDED: '1'
+        # Designated CI runner: the smoke helper's real git-init probe is
+        # fatal here instead of producing skipped git-dependent specs; the
+        # workflow itself runs no git commands (DEV-79).
+        LOTAR_SMOKE_REQUIRE_GIT: '1'
       run: npm run test:smoke:quick
 
   windows_checks:
-    name: Windows Binary Sanity
+    name: Windows Binary Sanity and Portable Smoke
     runs-on: windows-latest
     env:
       USER: mallox
       USERNAME: mallox
+      LOTAR_REQUIRE_GIT: '1'
       SCCACHE_DIR: ${{ github.workspace }}/.sccache
       RUSTC_WRAPPER: sccache
     steps:
@@ -288,6 +353,30 @@ jobs:
         cache-on-failure: true
         shared-key: ci-${{ runner.os }}
         save-if: true
+
+    # Node is required before the first Rust build: the binary embeds the
+    # generated target/web-embed directory via include_dir!, so a cold
+    # runner must build the web assets first (docs/developers/testing.md).
+    # The same Node install runs the browser-free portable agent smoke
+    # selection and the rust-test-runner unit gate below.
+    - name: Determine Node version
+      id: node_version
+      shell: bash
+      run: |
+        version=$(node -p "require('./package.json').engines.node")
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ steps.node_version.outputs.version }}
+        cache: npm
+
+    - name: Install npm dependencies
+      run: npm ci --prefer-offline
+
+    - name: Build web assets
+      run: npm run build:web
 
     - name: Build binary (ci profile)
       shell: pwsh
@@ -328,6 +417,99 @@ jobs:
         & $bin add "Windows CI task" --format=json | Out-Host
         & $bin list --format=json | Out-Host
         Pop-Location
+
+    - name: Install cargo-nextest
+      uses: taiki-e/install-action@v2
+      with:
+        tool: nextest
+
+    # Module selection, not a name list: every test under the storage
+    # safety and scan modules runs here, so platform-specific cases (the
+    # Windows atomic-readonly one included) and future additions are
+    # covered without maintaining witness names.
+    - name: Run storage safety and scan selection (nextest)
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        cargo nextest run --cargo-profile ci --all-features --retries 0 --failure-output=immediate-final --lib --bins --tests -E 'test(storage::safety::) | test(utils::scan::)'
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Enforce selection coverage (manifest vs JUnit)
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        New-Item -ItemType Directory -Force -Path target/nextest | Out-Null
+        # --run-ignored all keeps ignored tests visible as selected-but-ignored
+        # so the checker rejects them instead of silently filtering them out.
+        cargo nextest list --cargo-profile ci --all-features --lib --bins --tests --run-ignored all --message-format json -E 'test(storage::safety::) | test(utils::scan::)' | Out-File -Encoding utf8 target/nextest/windows-manifest.json
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        python scripts/check-test-coverage.py --label 'windows storage::safety + utils::scan' --manifest target/nextest/windows-manifest.json --junit target/nextest/default/junit.xml
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    - name: Upload Windows nextest report
+      if: always()
+      uses: actions/upload-artifact@v5
+      with:
+        name: windows-nextest-report
+        path: |
+          target/nextest/default/junit.xml
+          target/nextest/windows-manifest.json
+        if-no-files-found: warn
+        retention-days: 7
+
+    # Browser-free portable agent + automation smoke selection (DEV-80).
+    # These specs need no Playwright browser: fixture launchers, the agent
+    # job REST lifecycle, CLI automation, and REST automation endpoints all
+    # exercise the real binary via helpers only. LOTAR_BINARY_PATH points
+    # at the ci-profile binary built above; ensureBinaryExists fails loudly
+    # instead of building. LOTAR_SMOKE_REQUIRE_GIT marks this designated
+    # runner: the helper's real-git probe is fatal rather than producing
+    # silently skipped git-dependent specs. Vitest exits non-zero on any
+    # failure and when a filter selects no test files, so an empty or
+    # failing selection is red by construction (no pass-count floor).
+    - name: Run portable agent + automation smoke selection (browser-free)
+      shell: pwsh
+      env:
+        LOTAR_BINARY_PATH: ${{ github.workspace }}/target/ci/lotar.exe
+        LOTAR_SMOKE_REQUIRE_GIT: '1'
+      run: |
+        $ErrorActionPreference = 'Stop'
+        New-Item -ItemType Directory -Force -Path target/smoke-report | Out-Null
+        npm run test:smoke:quick -- `
+          smoke/tests/fixtures.agent.smoke.spec.ts `
+          smoke/tests/api.agent-jobs.smoke.spec.ts `
+          smoke/tests/cli.automation.smoke.spec.ts `
+          smoke/tests/api.automation.smoke.spec.ts `
+          --reporter=default `
+          --reporter=junit `
+          "--outputFile.junit=$env:GITHUB_WORKSPACE/target/smoke-report/portable-agent-smoke.junit.xml"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    # Real Windows results are recorded as JUnit and uploaded unconditionally
+    # (if: always), so a red run still leaves evidence. if-no-files-found:
+    # error turns a missing report (startup crash before the reporter wrote)
+    # into a failure instead of a silent empty upload; on such runs the smoke
+    # step itself already failed, so the erroring upload cannot mask a green.
+    - name: Upload Windows portable smoke report
+      if: always()
+      uses: actions/upload-artifact@v5
+      with:
+        name: windows-portable-smoke-report
+        path: target/smoke-report/
+        if-no-files-found: error
+        retention-days: 7
+
+    # Unit gate for the runtime Git test-selection runner (DEV-79). The
+    # runner wraps cargo nextest for cross-platform use, so its own tests
+    # run on both Node-enabled lanes.
+    - name: Run rust-test-runner unit tests
+      run: node --test scripts/tests/rust-test-runner.test.mjs
+
+    # Path-portability regression gate for the web asset compression script,
+    # run on Windows itself: the same windows:true unit proofs plus a child
+    # fixture run through this lane's real drive-letter script URL.
+    - name: Run compress-web unit tests
+      run: node --test scripts/tests/compress-web.test.mjs
 
   # Security audit (optimized with caching, runs in parallel)
   security:

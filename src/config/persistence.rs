@@ -35,19 +35,26 @@ pub fn load_global_config(tasks_dir: Option<&Path>) -> Result<GlobalConfig, Conf
     load_config_file(&path)
 }
 
-/// Load home configuration from ~/.lotar
-pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
-    // In test environments, ignore the user's home config to keep behavior deterministic
-    // Heuristics: RUST_TEST_THREADS is set by cargo test; LOTAR_TEST_MODE/LOTAR_IGNORE_HOME_CONFIG
-    // can be used to force-disable reading home config.
-    if std::env::var("RUST_TEST_THREADS").is_ok()
+/// Whether the home config layer is honored right now.
+///
+/// In test environments the user's home config is ignored to keep behavior
+/// deterministic: `RUST_TEST_THREADS` is set by cargo test, and
+/// `LOTAR_TEST_MODE`/`LOTAR_IGNORE_HOME_CONFIG` can force-disable reading
+/// the home config. Shared by the loaders below and by callers that need
+/// source presence (not just a load result) for the home layer.
+pub fn home_config_honored() -> bool {
+    !(std::env::var("RUST_TEST_THREADS").is_ok()
         || std::env::var("LOTAR_TEST_MODE")
             .map(|v| v == "1")
             .unwrap_or(false)
         || std::env::var("LOTAR_IGNORE_HOME_CONFIG")
             .map(|v| v == "1")
-            .unwrap_or(false)
-    {
+            .unwrap_or(false))
+}
+
+/// Load home configuration from ~/.lotar
+pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
+    if !home_config_honored() {
         return Err(ConfigError::FileNotFound(
             "Home config ignored in test mode".to_string(),
         ));
@@ -63,15 +70,7 @@ pub fn load_home_config() -> Result<GlobalConfig, ConfigError> {
 pub fn load_home_config_with_override(
     home_config_path: Option<&Path>,
 ) -> Result<GlobalConfig, ConfigError> {
-    // In test environments, ignore the user's home config to keep behavior deterministic
-    if std::env::var("RUST_TEST_THREADS").is_ok()
-        || std::env::var("LOTAR_TEST_MODE")
-            .map(|v| v == "1")
-            .unwrap_or(false)
-        || std::env::var("LOTAR_IGNORE_HOME_CONFIG")
-            .map(|v| v == "1")
-            .unwrap_or(false)
-    {
+    if !home_config_honored() {
         return Err(ConfigError::FileNotFound(
             "Home config ignored in test mode".to_string(),
         ));
@@ -86,6 +85,86 @@ pub fn load_home_config_with_override(
     };
     warn_insecure_home_config_permissions(&path);
     load_config_file(&path)
+}
+
+/// Whether config content sets the server port under any accepted spelling
+/// (`server_port`, `server.port`, nested `server: {port: ...}`). Key
+/// presence is the authority — never the parsed value — so an explicit
+/// `8080` stays distinguishable from "not configured" for every consumer
+/// (serve port selection, generic resolution, source labels).
+pub(crate) fn config_sets_server_port(content: &str) -> bool {
+    use serde_yaml_ng::Value;
+    let Ok(Value::Mapping(mapping)) = serde_yaml_ng::from_str::<Value>(content) else {
+        return false;
+    };
+    if mapping.contains_key(Value::String("server_port".to_string())) {
+        return true;
+    }
+    if mapping.contains_key(Value::String("server.port".to_string())) {
+        return true;
+    }
+    match mapping.get(Value::String("server".to_string())) {
+        Some(Value::Mapping(nested)) => nested.contains_key(Value::String("port".to_string())),
+        _ => false,
+    }
+}
+
+/// Pure form of [`config_file_server_port`] on raw file content.
+pub(crate) fn config_content_server_port(content: &str) -> Result<Option<u16>, String> {
+    let parsed = crate::config::normalization::parse_global_from_yaml_str(content)
+        .map_err(|err| format!("{}", err))?;
+    if config_sets_server_port(content) {
+        Ok(Some(parsed.server_port))
+    } else {
+        Ok(None)
+    }
+}
+
+/// A config file layer's explicit server port: `Ok(Some(port))` when the
+/// file sets the server port, `Ok(None)` when the file is absent or sets no
+/// port, and `Err` when the file exists but cannot be parsed (its intended
+/// port is unknowable, so callers must not guess).
+pub(crate) fn config_file_server_port(path: &Path, what: &str) -> Result<Option<u16>, String> {
+    let content = match fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(err) => {
+            return Err(format!(
+                "Failed to read {} at {}: {}",
+                what,
+                path.display(),
+                err
+            ));
+        }
+    };
+    config_content_server_port(&content)
+        .map_err(|err| format!("Invalid {} at {}: {}", what, path.display(), err))
+}
+
+/// Whether the global config FILE under a tasks root explicitly sets the
+/// server port (any accepted spelling). Presence-only: false for missing or
+/// unparseable files.
+pub(crate) fn global_config_sets_server_port(tasks_root: &Path) -> bool {
+    config_file_server_port(
+        &crate::utils::paths::global_config_path(tasks_root),
+        "global config",
+    )
+    .ok()
+    .flatten()
+    .is_some()
+}
+
+/// The home config layer's explicit server port, honoring the shared ignore
+/// gates: an ignored or missing home layer contributes nothing; a present
+/// but unparseable one is an error so no caller silently guesses.
+pub(crate) fn home_config_server_port() -> Result<Option<u16>, String> {
+    if !home_config_honored() {
+        return Ok(None);
+    }
+    let Some(home_dir) = dirs::home_dir() else {
+        return Ok(None);
+    };
+    config_file_server_port(&home_dir.join(".lotar"), "home config")
 }
 
 /// Load project configuration from .tasks/{project}/config.yml
@@ -245,5 +324,58 @@ fn warn_insecure_home_config_permissions(path: &Path) {
                 let _ = WARNED.set(());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod server_port_tests {
+    use super::{config_content_server_port, config_sets_server_port};
+
+    #[test]
+    fn detects_every_accepted_port_spelling() {
+        for content in [
+            "server:\n  port: 9000\n",
+            "server.port: 9100\n",
+            "server_port: 9200\n",
+            "default:\n  project: A\nserver:\n  port: 8080\n",
+            "server_port: 8080\n",
+            "server:\n  port: 0\n",
+        ] {
+            assert!(
+                config_sets_server_port(content),
+                "must detect port key in: {content}"
+            );
+        }
+    }
+
+    #[test]
+    fn content_without_port_key_is_not_detected() {
+        for content in [
+            "",
+            "default:\n  project: A\n",
+            "issue:\n  states: [Todo, Done]\n",
+        ] {
+            assert!(
+                !config_sets_server_port(content),
+                "must not detect port key in: {content}"
+            );
+        }
+    }
+
+    #[test]
+    fn extracts_values_and_fails_closed() {
+        assert_eq!(
+            config_content_server_port("server:\n  port: 9000\n").unwrap(),
+            Some(9000)
+        );
+        assert_eq!(
+            config_content_server_port("server_port: 8080\n").unwrap(),
+            Some(8080)
+        );
+        assert_eq!(
+            config_content_server_port("default:\n  project: A\n").unwrap(),
+            None
+        );
+        assert!(config_content_server_port("server:\n  port: [not, a, number]\n").is_err());
     }
 }

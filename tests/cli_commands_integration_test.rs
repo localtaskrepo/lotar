@@ -1260,255 +1260,32 @@ mod dry_run {
 // =============================================================================
 
 mod serve {
-    use super::common::cargo_bin_silent;
     use super::*;
-    use std::time::Duration;
 
     #[test]
-    fn test_serve_command_basic_functionality() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create a test task first to have some data to serve
-        let mut cmd = cargo_bin_silent();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task for web server")
-            .arg("--type=feature")
-            .assert()
-            .success();
-
-        // Test serve command help
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
+    fn serve_help_documents_bind_options() {
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(TestFixtures::new().temp_dir.path())
             .arg("serve")
             .arg("--help")
-            .assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-            let _ = output.contains("port") || output.contains("host");
-        }
-
-        // Test serve command with default options (background mode for testing)
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .timeout(Duration::from_millis(200)) // Very quick timeout - just test if command exists
-            .assert();
-
-        // Expected to timeout or fail - we just want to see if command is recognized
-        let _serve_command_exists = result.try_success().is_ok();
-    }
-
-    #[test]
-    fn test_serve_command_port_options() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Test custom port option
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--port=8080")
-            .timeout(Duration::from_millis(200))
-            .assert();
-
-        // Port option may or may not be implemented
-        let _custom_port_works = result.try_success().is_ok();
-
-        // Test alternative port option
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("-p")
-            .arg("9090")
-            .timeout(Duration::from_millis(200))
-            .assert();
-
-        // Alternative port syntax may or may not be implemented
-        let _alt_port_works = result.try_success().is_ok();
-
-        // Test invalid port option
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--port=99999") // Invalid port
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
-    }
-
-    #[test]
-    fn test_serve_command_host_options() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Test localhost host
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--host=localhost")
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
-
-        // Test bind to all interfaces
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--host=0.0.0.0")
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
-
-        // Test custom IP
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--host=127.0.0.1")
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
-    }
-
-    #[test]
-    fn test_serve_command_combined_options() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Test port and host together
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--port=8080")
-            .arg("--host=localhost")
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
-
-        // Test with verbose output
-        let mut cmd = cargo_bin_silent();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--verbose")
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
-    }
-
-    #[test]
-    fn test_serve_command_with_project_data() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-        let _guard = super::common::env_mutex::EnvVarGuard::set(
-            "LOTAR_TASKS_DIR",
-            &fixtures.tasks_root.to_string_lossy(),
-        );
-
-        // Create diverse test data
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("Web UI Test Task")
-            .arg("--project=test-project")
-            .arg("--type=feature")
-            .arg("--priority=high")
-            .arg("--assignee=test@example.com")
             .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("task")
-            .arg("add")
-            .arg("API Test Task")
-            .arg("--project=test-project")
-            .arg("--type=bug")
-            .arg("--priority=high")
-            .assert()
-            .success();
-
-        // Change one task status
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("2")
-            .arg("in_progress")
-            .arg("--project=test-project")
-            .assert()
-            .success();
-
-        // Test serve with actual project data
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .timeout(Duration::from_millis(150))
-            .assert();
-
-        let _ = result.try_success();
-
-        // Test serve with specific project
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("serve")
-            .arg("--project=test-project")
-            .timeout(Duration::from_millis(100))
-            .assert();
-
-        let _ = result.try_success();
+            .success()
+            .stdout(predicate::str::contains("--port"))
+            .stdout(predicate::str::contains("--host"))
+            .stdout(predicate::str::contains("8080"));
     }
 
     #[test]
-    fn test_serve_implementation_summary() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create test task
+    fn help_subcommand_documents_serve_usage() {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Summary test task")
+        cmd.current_dir(TestFixtures::new().temp_dir.path())
+            .arg("help")
+            .arg("serve")
             .assert()
-            .success();
-
-        // Test basic serve existence
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd.current_dir(temp_dir).arg("help").assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-            let _ = output.contains("serve");
-        }
-
-        // Test serve help specifically
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd.current_dir(temp_dir).arg("help").arg("serve").assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-            let _ = output.contains("port");
-            let _ = output.contains("host");
-        }
+            .success()
+            .stdout(predicate::str::contains("lotar serve"))
+            .stdout(predicate::str::contains("--port"))
+            .stdout(predicate::str::contains("--host"));
     }
 }
 
@@ -1931,629 +1708,354 @@ mod comments {
 // =============================================================================
 
 mod list_features {
-    #![allow(clippy::redundant_pattern_matching)]
     use super::*;
+    use serde_json::Value;
 
-    /// Phase 2.1 - Advanced List Command Features Testing
-    /// Tests complex filtering, sorting, and grouping functionality
-    /// including custom properties, multiple filters, and date operations.
-    ///
-    /// Phase 2.1 - Advanced List Command Features Testing
-    /// Tests current filtering capabilities and documents gaps between
-    /// help documentation and actual implementation.
-    ///
-    /// KEY FINDINGS:
-    /// - Single filters work (status, type, priority)
-    /// - Multiple values for same filter NOT implemented yet
-    /// - Help documentation promises features not in CLI args
-    /// - CLI args use Option<String> instead of Vec<String>
-    ///
-    #[test]
-    fn test_current_filtering_capabilities() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create diverse test tasks
+    fn list_json(temp_dir: &std::path::Path, args: &[&str]) -> Value {
         let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Bug task")
-            .arg("--type=bug")
-            .arg("--priority=high")
-            .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Feature task")
-            .arg("--type=feature")
-            .arg("--priority=low")
-            .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Chore task")
-            .arg("--type=chore")
-            .arg("--priority=medium")
-            .assert()
-            .success();
-
-        // Change one task status
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("status")
-            .arg("2")
-            .arg("in_progress")
-            .assert()
-            .success();
-
-        // Test single status filter (WORKS)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
+        let output = cmd
             .current_dir(temp_dir)
-            .arg("list")
-            .arg("--status=todo")
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(args)
             .arg("--format=json")
-            .assert()
-            .success();
-
-        let output = String::from_utf8_lossy(&result.get_output().stdout);
-        if !output.trim().is_empty() {
-            let json: serde_json::Value =
-                serde_json::from_str(&output).expect("Should return valid JSON");
-
-            if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
-                for task in tasks {
-                    if let Some(status) = task.get("status").and_then(|s| s.as_str()) {
-                        assert_eq!(
-                            status.to_ascii_lowercase(),
-                            "todo",
-                            "Status filter should work"
-                        );
-                    }
-                }
-                assert!(!tasks.is_empty(), "Should find some TODO tasks");
-            }
-        }
-
-        // Test single priority filter (UNCLEAR - needs verification)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--priority=high")
-            .arg("--format=json")
-            .assert();
-
-        // Priority filter may or may not be implemented
-        let _priority_result = result.try_success().is_ok();
-
-        // Test high priority flag (DOCUMENTED but may not work)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--high")
-            .arg("--format=json")
-            .assert();
-
-        // High priority flag may or may not be implemented
-        let _high_priority_result = result.try_success().is_ok();
+            .output()
+            .expect("run list");
+        assert!(
+            output.status.success(),
+            "list {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        serde_json::from_slice(&output.stdout).unwrap_or_else(|e| {
+            panic!(
+                "list must emit valid JSON: {e}: {}",
+                String::from_utf8_lossy(&output.stdout)
+            )
+        })
     }
 
-    #[test]
-    fn test_documentation_vs_implementation_gaps() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create a test task
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Test task")
-            .assert()
-            .success();
-
-        // Test 1: Multiple status filters (DOCUMENTED but fails)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--status=todo")
-            .arg("--status=in_progress")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(_) = result.try_success() {}
-
-        // Test 2: Type filtering
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--type=feature")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(_) = result.try_success() {}
-
-        // Test 3: --bugs shortcut (DOCUMENTED)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--bugs")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(_) = result.try_success() {}
-
-        // Test 4: --assignee filter (DOCUMENTED)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--assignee=test@example.com")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(_) = result.try_success() {}
-
-        // Test 5: Sorting (DOCUMENTED)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--sort-by=priority")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(_) = result.try_success() {}
-
-        // Test 6: Grouping (DOCUMENTED)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--group-by=status")
-            .assert();
-
-        if let Ok(_) = result.try_success() {}
+    fn titles(payload: &Value) -> Vec<String> {
+        let mut titles: Vec<String> = payload["tasks"]
+            .as_array()
+            .expect("tasks array")
+            .iter()
+            .map(|task| task["title"].as_str().expect("title").to_string())
+            .collect();
+        titles.sort();
+        titles
     }
 
-    #[test]
-    fn test_single_type_filtering() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create tasks with different types
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Feature task")
-            .arg("--type=feature")
-            .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Bug task")
-            .arg("--type=bug")
-            .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Chore task")
-            .arg("--type=chore")
-            .assert()
-            .success();
-
-        // Test single type filter for bugs
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--type=bug")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            if !output.trim().is_empty() {
-                let json: serde_json::Value =
-                    serde_json::from_str(&output).expect("Should return valid JSON");
-
-                if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
-                    // Should only include bug tasks
-                    for task in tasks {
-                        if let Some(task_type) = task.get("task_type").and_then(|t| t.as_str()) {
-                            assert_eq!(
-                                task_type.to_ascii_lowercase(),
-                                "bug",
-                                "Type filter should only return bug tasks"
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_multiple_type_filters_architecture() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create tasks with different types
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Feature task")
-            .arg("--type=feature")
-            .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Bug task")
-            .arg("--type=bug")
-            .assert()
-            .success();
-
-        // Test multiple type filters (may not be implemented)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--type=bug")
-            .arg("--type=feature")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            if !output.trim().is_empty() {
-                let json: serde_json::Value =
-                    serde_json::from_str(&output).expect("Should return valid JSON");
-
-                if let Some(_tasks) = json.get("tasks").and_then(|t| t.as_array()) {}
-            }
-        }
-    }
-
-    #[test]
-    fn test_search_command_vs_list_command() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create tasks for comparison
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Search test task")
-            .arg("--type=feature")
-            .arg("--priority=high")
-            .assert()
-            .success();
-
-        // Test list command with filters
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let list_result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(assert_result) = list_result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-            if !output.trim().is_empty() {}
-        }
-
-        // Test task search command (full interface)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let search_result = cmd
-            .current_dir(temp_dir)
-            .arg("task")
-            .arg("search")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(_) = search_result.try_success() {}
-    }
-
-    #[test]
-    fn test_advanced_filter_combinations() {
-        let fixtures = TestFixtures::new();
-        let temp_dir = fixtures.temp_dir.path();
-
-        // Create diverse tasks
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("High priority bug")
-            .arg("--type=bug")
-            .arg("--priority=high")
-            .arg("--assignee=alice@company.com")
-            .assert()
-            .success();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Medium priority feature")
-            .arg("--type=feature")
-            .arg("--priority=medium")
-            .arg("--assignee=bob@company.com")
-            .assert()
-            .success();
-
-        // Test what combinations might work (based on CLI args available)
-        let test_cases = vec![
-            // Basic single filters that should work based on CLI struct
-            ("--status=todo", "single status filter"),
-            ("--priority=high", "single priority filter"),
-            ("--assignee=alice@company.com", "assignee filter"),
-            ("--mine", "mine filter"),
-            ("--high", "high priority flag"),
-            ("--critical", "critical priority flag"),
-        ];
-
-        for (filter_arg, _description) in test_cases {
+    fn seed_filter_tasks(temp_dir: &std::path::Path) {
+        for (title, extra) in [
+            (
+                "Bug task",
+                vec![
+                    "--type=bug",
+                    "--priority=high",
+                    "--assignee=alice@company.com",
+                ],
+            ),
+            (
+                "Feature task",
+                vec![
+                    "--type=feature",
+                    "--priority=medium",
+                    "--assignee=bob@company.com",
+                ],
+            ),
+            ("Chore task", vec!["--type=chore", "--priority=medium"]),
+        ] {
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            let args: Vec<&str> = filter_arg.split_whitespace().collect();
-            let mut cmd_with_args = cmd.current_dir(temp_dir).arg("list");
+            let output = cmd
+                .current_dir(temp_dir)
+                .env("LOTAR_TEST_SILENT", "1")
+                .arg("add")
+                .arg(title)
+                .args(&extra)
+                .output()
+                .expect("seed task");
+            assert!(
+                output.status.success(),
+                "seed {} failed: {}",
+                title,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let output = cmd
+            .current_dir(temp_dir)
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(["status", "2", "in_progress"])
+            .output()
+            .expect("set status");
+        assert!(
+            output.status.success(),
+            "status update failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 
-            for arg in args {
-                cmd_with_args = cmd_with_args.arg(arg);
-            }
+    #[test]
+    fn single_filters_return_exact_task_sets() {
+        let fixtures = TestFixtures::new();
+        let temp_dir = fixtures.temp_dir.path();
+        seed_filter_tasks(temp_dir);
 
-            let result = cmd_with_args.arg("--format=json").assert();
+        assert_eq!(
+            titles(&list_json(temp_dir, &["list", "--status=todo"])),
+            vec!["Bug task", "Chore task"],
+            "status filter must return exactly the Todo tasks"
+        );
+        assert_eq!(
+            titles(&list_json(temp_dir, &["list", "--priority=high"])),
+            vec!["Bug task"],
+            "priority filter must return exactly the High task"
+        );
+        assert_eq!(
+            titles(&list_json(temp_dir, &["list", "--high"])),
+            vec!["Bug task"],
+            "--high shortcut must match the high-priority filter"
+        );
+        assert_eq!(
+            titles(&list_json(temp_dir, &["list", "--critical"])),
+            Vec::<String>::new(),
+            "--critical must return no tasks when none are critical"
+        );
+        assert_eq!(
+            titles(&list_json(
+                temp_dir,
+                &["list", "--assignee=alice@company.com"]
+            )),
+            vec!["Bug task"],
+            "assignee filter must return exactly the assigned task"
+        );
+    }
 
-            if let Ok(_) = result.try_success() {}
+    #[test]
+    fn repeated_filter_flags_combine_with_or_semantics() {
+        let fixtures = TestFixtures::new();
+        let temp_dir = fixtures.temp_dir.path();
+        seed_filter_tasks(temp_dir);
+
+        assert_eq!(
+            titles(&list_json(
+                temp_dir,
+                &["list", "--status=todo", "--status=in_progress"]
+            )),
+            vec!["Bug task", "Chore task", "Feature task"],
+            "repeated --status flags must combine with OR"
+        );
+        assert_eq!(
+            titles(&list_json(
+                temp_dir,
+                &["list", "--type=bug", "--type=feature"]
+            )),
+            vec!["Bug task", "Feature task"],
+            "repeated --type flags must combine with OR"
+        );
+    }
+
+    #[test]
+    fn undocumented_grouping_and_type_shortcuts_are_rejected() {
+        let fixtures = TestFixtures::new();
+        let temp_dir = fixtures.temp_dir.path();
+
+        for flag in ["--group-by=status", "--bugs"] {
+            let mut cmd = crate::common::lotar_cmd().unwrap();
+            cmd.current_dir(temp_dir)
+                .env("LOTAR_TEST_SILENT", "1")
+                .args(["list"])
+                .arg(flag)
+                .assert()
+                .failure()
+                .stderr(predicate::str::contains("unexpected argument"));
         }
     }
 
     #[test]
-    fn test_search_performance_and_limits() {
+    fn sort_by_priority_orders_severity_with_id_tiebreak() {
         let fixtures = TestFixtures::new();
         let temp_dir = fixtures.temp_dir.path();
+        seed_filter_tasks(temp_dir);
 
-        // Ensure no other tests are concurrently setting LOTAR_TASKS_DIR.
-        let _tasks_guard = super::common::env_mutex::EnvVarGuard::clear("LOTAR_TASKS_DIR");
+        let payload = list_json(temp_dir, &["list", "--sort-by=priority"]);
+        let ordered: Vec<String> = payload["tasks"]
+            .as_array()
+            .expect("tasks array")
+            .iter()
+            .map(|task| task["title"].as_str().expect("title").to_string())
+            .collect();
+        assert_eq!(
+            ordered,
+            vec!["Bug task", "Feature task", "Chore task"],
+            "priority sort must be High first with ascending-ID tiebreak for equal priorities"
+        );
+    }
 
-        // Create multiple tasks to test performance and limits
+    #[test]
+    fn positional_search_text_filters_titles() {
+        let fixtures = TestFixtures::new();
+        let temp_dir = fixtures.temp_dir.path();
+        seed_filter_tasks(temp_dir);
+
+        assert_eq!(
+            titles(&list_json(temp_dir, &["list", "Bug"])),
+            vec!["Bug task"],
+            "positional search must filter by title text"
+        );
+        let payload = list_json(temp_dir, &["list", "zzz-no-match"]);
+        assert_eq!(
+            titles(&payload),
+            Vec::<String>::new(),
+            "non-matching search text must return an empty result: {payload}"
+        );
+    }
+
+    #[test]
+    fn limit_caps_results_and_default_returns_all() {
+        let fixtures = TestFixtures::new();
+        let temp_dir = fixtures.temp_dir.path();
 
         for i in 1..=5 {
             let mut cmd = crate::common::lotar_cmd().unwrap();
-            cmd.current_dir(temp_dir)
+            let output = cmd
+                .current_dir(temp_dir)
+                .env("LOTAR_TEST_SILENT", "1")
                 .arg("add")
                 .arg(format!("Performance test task {i}"))
                 .arg("--type=feature")
-                .assert()
-                .success();
+                .output()
+                .expect("seed task");
+            assert!(
+                output.status.success(),
+                "seed task {i} failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
 
-        // Test limit parameter
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--limit=3") // This should be supported based on CLI args
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            if !output.trim().is_empty() {
-                let json: serde_json::Value =
-                    serde_json::from_str(&output).expect("Should return valid JSON");
-
-                if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
-                    assert!(
-                        tasks.len() <= 3,
-                        "list --limit=3 should cap results to three tasks"
-                    );
-                }
-            }
-        }
-
-        // Test with no limit (default)
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let result = cmd
-            .current_dir(temp_dir)
-            .arg("list")
-            .arg("--format=json")
-            .assert();
-
-        if let Ok(assert_result) = result.try_success() {
-            let output = String::from_utf8_lossy(&assert_result.get_output().stdout);
-
-            if !output.trim().is_empty() {
-                let json: serde_json::Value =
-                    serde_json::from_str(&output).expect("Should return valid JSON");
-
-                if let Some(tasks) = json.get("tasks").and_then(|t| t.as_array()) {
-                    assert_eq!(
-                        tasks.len(),
-                        5,
-                        "list without --limit should return all created tasks"
-                    );
-                }
-            }
-        }
-
-        // Test offset/page pagination helpers
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let first_page = cmd
-            .current_dir(temp_dir)
-            .args(["list", "--page-size=2", "--sort-by=id", "--format=json"])
-            .assert()
-            .success();
-        let first_out = String::from_utf8_lossy(&first_page.get_output().stdout);
-        let first_json: serde_json::Value =
-            serde_json::from_str(&first_out).expect("Should return valid JSON");
-        let first_ids: Vec<String> = first_json
-            .get("tasks")
-            .and_then(|t| t.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|t| {
-                        t.get("id")
-                            .and_then(|id| id.as_str())
-                            .map(|s| s.to_string())
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let second_page_by_offset = cmd
-            .current_dir(temp_dir)
-            .args([
-                "list",
-                "--page-size=2",
-                "--offset=2",
-                "--sort-by=id",
-                "--format=json",
-            ])
-            .assert()
-            .success();
-        let second_out = String::from_utf8_lossy(&second_page_by_offset.get_output().stdout);
-        let second_json: serde_json::Value =
-            serde_json::from_str(&second_out).expect("Should return valid JSON");
-        let second_ids: Vec<String> = second_json
-            .get("tasks")
-            .and_then(|t| t.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|t| {
-                        t.get("id")
-                            .and_then(|id| id.as_str())
-                            .map(|s| s.to_string())
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
-        assert!(first_ids.len() <= 2);
-        assert!(second_ids.len() <= 2);
-        assert!(
-            first_ids.iter().all(|id| !second_ids.contains(id)),
-            "second page (by offset) should not repeat first page"
+        let limited = list_json(temp_dir, &["list", "--limit=3", "--sort-by=id"]);
+        assert_eq!(
+            titles(&limited),
+            vec![
+                "Performance test task 1",
+                "Performance test task 2",
+                "Performance test task 3"
+            ],
+            "--limit=3 must cap results to the first three tasks"
         );
 
-        let mut cmd = crate::common::lotar_cmd().unwrap();
-        let second_page_by_page = cmd
-            .current_dir(temp_dir)
-            .args([
-                "list",
-                "--page-size=2",
-                "--page=2",
-                "--sort-by=id",
-                "--format=json",
-            ])
-            .assert()
-            .success();
-        let second_page_out = String::from_utf8_lossy(&second_page_by_page.get_output().stdout);
-        let second_page_json: serde_json::Value =
-            serde_json::from_str(&second_page_out).expect("Should return valid JSON");
-        let second_page_ids: Vec<String> = second_page_json
-            .get("tasks")
-            .and_then(|t| t.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|t| {
-                        t.get("id")
-                            .and_then(|id| id.as_str())
-                            .map(|s| s.to_string())
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
-
+        let all = list_json(temp_dir, &["list", "--sort-by=id", "--page-size=20"]);
         assert_eq!(
-            second_ids, second_page_ids,
+            titles(&all).len(),
+            5,
+            "listing without --limit must return all five tasks"
+        );
+    }
+
+    #[test]
+    fn page_and_offset_pagination_are_consistent() {
+        let fixtures = TestFixtures::new();
+        let temp_dir = fixtures.temp_dir.path();
+
+        for i in 1..=5 {
+            let mut cmd = crate::common::lotar_cmd().unwrap();
+            let output = cmd
+                .current_dir(temp_dir)
+                .env("LOTAR_TEST_SILENT", "1")
+                .arg("add")
+                .arg(format!("Pagination task {i}"))
+                .output()
+                .expect("seed task");
+            assert!(
+                output.status.success(),
+                "seed task {i} failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+
+        let ids = |payload: &Value| -> Vec<String> {
+            payload["tasks"]
+                .as_array()
+                .expect("tasks array")
+                .iter()
+                .map(|task| task["id"].as_str().expect("id").to_string())
+                .collect()
+        };
+
+        let first = list_json(temp_dir, &["list", "--page-size=2", "--sort-by=id"]);
+        let by_offset = list_json(
+            temp_dir,
+            &["list", "--page-size=2", "--offset=2", "--sort-by=id"],
+        );
+        let by_page = list_json(
+            temp_dir,
+            &["list", "--page-size=2", "--page=2", "--sort-by=id"],
+        );
+
+        assert_eq!(ids(&first).len(), 2, "first page must have two tasks");
+        assert_eq!(ids(&by_offset).len(), 2, "offset page must have two tasks");
+        assert!(
+            ids(&first).iter().all(|id| !ids(&by_offset).contains(id)),
+            "second page (by offset) should not repeat first page"
+        );
+        assert_eq!(
+            ids(&by_offset),
+            ids(&by_page),
             "--page=2 should match --offset=2 when page-size=2"
         );
     }
 
     #[test]
-    fn test_implementation_status_summary() {
+    fn core_list_surface_returns_valid_json_and_rejects_bad_format() {
         let fixtures = TestFixtures::new();
         let temp_dir = fixtures.temp_dir.path();
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        let output = cmd
+            .current_dir(temp_dir)
+            .env("LOTAR_TEST_SILENT", "1")
+            .args([
+                "add",
+                "Summary test task",
+                "--type=feature",
+                "--priority=high",
+            ])
+            .output()
+            .expect("seed task");
+        assert!(
+            output.status.success(),
+            "seed failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
 
-        // Create a test task
+        for args in [
+            vec!["list"],
+            vec!["list", "--status=todo"],
+            vec!["list", "--limit=5"],
+        ] {
+            let payload = list_json(temp_dir, &args);
+            assert_eq!(
+                titles(&payload),
+                vec!["Summary test task"],
+                "list {:?} must return the seeded task",
+                args
+            );
+        }
+
         let mut cmd = crate::common::lotar_cmd().unwrap();
         cmd.current_dir(temp_dir)
-            .arg("add")
-            .arg("Summary test task")
-            .arg("--type=feature")
-            .arg("--priority=high")
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(["list", "--format=text"])
             .assert()
-            .success();
+            .success()
+            .stdout(predicate::str::contains("Summary test task"));
 
-        // Core features that should work
-        let core_features = vec![
-            ("Basic list", "list", vec!["--format=json"]),
-            (
-                "Status filter",
-                "list",
-                vec!["--status=todo", "--format=json"],
-            ),
-            ("JSON format", "list", vec!["--format=json"]),
-            ("Text format", "list", vec!["--format=text"]),
-            ("Limit param", "list", vec!["--limit=5", "--format=json"]),
-        ];
-
-        for (_name, cmd_name, args) in core_features {
-            let mut cmd = crate::common::lotar_cmd().unwrap();
-            let mut cmd_with_args = cmd.current_dir(temp_dir).arg(cmd_name);
-
-            for arg in args {
-                cmd_with_args = cmd_with_args.arg(arg);
-            }
-
-            let _result = cmd_with_args.assert().try_success().is_ok();
-        }
-
-        // Features documented but not implemented
-        let missing_features = vec![
-            (
-                "Multiple status filters",
-                "list",
-                vec!["--status=todo", "--status=in_progress"],
-            ),
-            (
-                "Multiple type filters",
-                "list",
-                vec!["--type=bug", "--type=feature"],
-            ),
-            ("Sorting", "list", vec!["--sort-by=priority"]),
-            ("Grouping", "list", vec!["--group-by=status"]),
-            ("High priority flag", "list", vec!["--high-priority"]),
-            ("Type shortcuts", "list", vec!["--bugs"]),
-        ];
-
-        for (_name, cmd_name, args) in missing_features {
-            let mut cmd = crate::common::lotar_cmd().unwrap();
-            let mut cmd_with_args = cmd.current_dir(temp_dir).arg(cmd_name);
-
-            for arg in args {
-                cmd_with_args = cmd_with_args.arg(arg);
-            }
-
-            let _result = cmd_with_args.assert().try_success().is_ok();
-        }
+        let mut cmd = crate::common::lotar_cmd().unwrap();
+        cmd.current_dir(temp_dir)
+            .env("LOTAR_TEST_SILENT", "1")
+            .args(["list", "--format=invalid_format"])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("error"));
     }
 
     // Merged from tag_filtering_comprehensive_test.rs

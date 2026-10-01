@@ -1,4 +1,3 @@
-#![cfg(not(no_git_tests))]
 use serde_json::Value;
 use std::process::Command as ProcCommand;
 use tempfile::TempDir;
@@ -54,76 +53,80 @@ fn add_and_commit(
     run_git(repo, &["commit", "-m", msg], &envs);
 }
 
-#[test]
-fn task_history_diff_at() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn task_history_diff_at() {
+        crate::common::require_git();
+        let temp = crate::common::temp_dir();
+        let root = temp.path();
+        init_repo(&temp);
+
+        write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
+        write_file(
+            root,
+            ".tasks/TEST/1.yml",
+            "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n",
+        );
+        add_and_commit(
+            root,
+            ".tasks/TEST/1.yml",
+            ("A", "a@example.com"),
+            "2025-08-01T10:00:00Z",
+            "add 1",
+        );
+        write_file(
+            root,
+            ".tasks/TEST/1.yml",
+            "title: One2\nstatus: IN_PROGRESS\nmodified: 2025-08-02T09:00:00Z\n",
+        );
+        add_and_commit(
+            root,
+            ".tasks/TEST/1.yml",
+            ("B", "b@example.com"),
+            "2025-08-02T09:00:00Z",
+            "edit 1",
+        );
+
+        // History JSON
+        let out = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .args(["--format", "json", "task", "history", "TEST-1", "-L", "5"])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(v["status"], "ok");
+        let items = v["items"].as_array().unwrap();
+        assert!(items.len() >= 2);
+
+        // Diff JSON (latest)
+        let out = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .args(["--format", "json", "task", "diff", "TEST-1"])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert!(v["patch"].as_str().unwrap().contains("diff"));
+
+        // At JSON (first commit)
+        // Extract last item commit (oldest) from history
+        let first_commit = items.last().unwrap()["commit"].as_str().unwrap();
+        let out = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .args(["--format", "json", "task", "at", "TEST-1", first_commit])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let v: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert!(v["content"].as_str().unwrap().contains("title: One"));
     }
-    let temp = crate::common::temp_dir();
-    let root = temp.path();
-    init_repo(&temp);
-
-    write_file(root, ".tasks/TEST/config.yml", "project_name: TEST\n");
-    write_file(
-        root,
-        ".tasks/TEST/1.yml",
-        "title: One\nstatus: TODO\nmodified: 2025-08-01T10:00:00Z\n",
-    );
-    add_and_commit(
-        root,
-        ".tasks/TEST/1.yml",
-        ("A", "a@example.com"),
-        "2025-08-01T10:00:00Z",
-        "add 1",
-    );
-    write_file(
-        root,
-        ".tasks/TEST/1.yml",
-        "title: One2\nstatus: IN_PROGRESS\nmodified: 2025-08-02T09:00:00Z\n",
-    );
-    add_and_commit(
-        root,
-        ".tasks/TEST/1.yml",
-        ("B", "b@example.com"),
-        "2025-08-02T09:00:00Z",
-        "edit 1",
-    );
-
-    // History JSON
-    let out = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["--format", "json", "task", "history", "TEST-1", "-L", "5"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(v["status"], "ok");
-    let items = v["items"].as_array().unwrap();
-    assert!(items.len() >= 2);
-
-    // Diff JSON (latest)
-    let out = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["--format", "json", "task", "diff", "TEST-1"])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert!(v["patch"].as_str().unwrap().contains("diff"));
-
-    // At JSON (first commit)
-    // Extract last item commit (oldest) from history
-    let first_commit = items.last().unwrap()["commit"].as_str().unwrap();
-    let out = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .args(["--format", "json", "task", "at", "TEST-1", first_commit])
-        .output()
-        .unwrap();
-    assert!(out.status.success());
-    let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert!(v["content"].as_str().unwrap().contains("title: One"));
 }

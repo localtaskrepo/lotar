@@ -1,4 +1,3 @@
-#![cfg_attr(no_git_tests, allow(dead_code))]
 use std::env;
 use std::fs;
 
@@ -6,8 +5,10 @@ mod common;
 use crate::common::TestFixtures;
 use crate::common::env_mutex::{EnvVarGuard, lock_var};
 
-// Global mutex to ensure environment variable tests don't run in parallel
-// Use shared ENV_MUTEX from tests/common/env_mutex.rs for any env mutations
+// Environment discipline (DEV-80): every env scope in this file is owned by an
+// EnvVarGuard that holds the per-variable mutex and restores the previous value
+// on drop. Fixtures never mutate the process environment, so scenarios that
+// need a variable absent hold an EnvVarGuard::clear for the whole scenario.
 
 /// Tests for Phase 3.1.2: Global Options Consistency
 ///
@@ -178,18 +179,19 @@ mod tasks_dir_consistency {
 mod environment_variable_consistency {
     use super::*;
 
-    fn reset_env(var: &str) {
-        let _g = lock_var(var);
-        unsafe { env::remove_var(var) }
-        // guard drops here, releasing the per-var lock
+    /// Hold a variable absent for a scenario scope (DEV-80). The returned
+    /// guard keeps the per-variable mutex for its lifetime and restores the
+    /// previous value on drop, so concurrent guards cannot clobber the
+    /// absence and nothing leaks past the scenario.
+    fn env_absent(var: &str) -> EnvVarGuard {
+        EnvVarGuard::clear(var)
     }
 
     /// Combined test for environment variable scenarios to avoid parallel execution conflicts
     #[test]
     fn test_environment_variable_scenarios_combined() {
-        // Ensure a clean environment before starting (scoped resets under lock)
-        reset_env("LOTAR_TASKS_DIR");
-        reset_env("LOTAR_DEFAULT_ASSIGNEE");
+        // Baseline cleanliness is owned by the process constructor; every
+        // scenario below owns its variables through held guards.
 
         // === SCENARIO 1: LOTAR_TASKS_DIR environment variable ===
         {
@@ -240,9 +242,9 @@ mod environment_variable_consistency {
 
         // === SCENARIO 2: Fallback behavior without environment variables ===
         {
-            // Ensure no environment variables are set
-            reset_env("LOTAR_TASKS_DIR");
-            reset_env("LOTAR_DEFAULT_ASSIGNEE");
+            // Hold both variables absent for the whole scenario (restored on drop)
+            let _tasks_absent = env_absent("LOTAR_TASKS_DIR");
+            let _assignee_absent = env_absent("LOTAR_DEFAULT_ASSIGNEE");
 
             let fixtures = TestFixtures::new();
 
@@ -292,10 +294,6 @@ mod environment_variable_consistency {
 
         // === SCENARIO 3: Precedence order testing ===
         {
-            // Ensure clean state
-            reset_env("LOTAR_TASKS_DIR");
-            reset_env("LOTAR_DEFAULT_ASSIGNEE");
-
             let fixtures = TestFixtures::new();
 
             let cli_dir = fixtures.temp_dir.path().join("cli_specified");
@@ -341,10 +339,6 @@ mod environment_variable_consistency {
 
         // === SCENARIO 4: CLI override behavior ===
         {
-            // Ensure clean state
-            reset_env("LOTAR_TASKS_DIR");
-            reset_env("LOTAR_DEFAULT_ASSIGNEE");
-
             let fixtures = TestFixtures::new();
 
             let env_tasks_dir = fixtures.temp_dir.path().join("env_tasks");
@@ -479,10 +473,6 @@ mod environment_variable_consistency {
 
             // Guard drops here
         }
-
-        // Final cleanup
-        reset_env("LOTAR_TASKS_DIR");
-        reset_env("LOTAR_DEFAULT_ASSIGNEE");
     }
 }
 
@@ -540,43 +530,43 @@ mod parent_directory_resolution {
         );
     }
 
-    #[cfg(not(no_git_tests))]
-    #[test]
-    fn test_project_detection_stops_at_git_boundary() {
-        if !crate::common::git_available() {
-            eprintln!("skipping: git unavailable in this sandbox");
-            return;
+    mod git_required {
+        use super::*;
+
+        #[test]
+        fn test_project_detection_stops_at_git_boundary() {
+            crate::common::require_git();
+            let fixtures = TestFixtures::new();
+
+            // Create nested project structure
+            let outer_project = fixtures.temp_dir.path().join("outer");
+            let inner_project = outer_project.join("subproject");
+            let inner_tasks = inner_project.join("tasks");
+            let work_dir = inner_project.join("work");
+
+            fs::create_dir_all(&inner_tasks).unwrap();
+            fs::create_dir_all(&work_dir).unwrap();
+
+            // Create .git directory in inner project to simulate git boundary
+            fs::create_dir_all(inner_project.join(".git")).unwrap();
+
+            // Test with explicit tasks directory pointing to inner project
+            let output = fixtures.run_command(&[
+                "config",
+                "show",
+                "--tasks-dir",
+                inner_tasks.to_str().unwrap(),
+            ]);
+            assert!(
+                output.is_ok(),
+                "Config show should work with explicit tasks dir"
+            );
+            let output_str = output.unwrap();
+            assert!(
+                output_str.contains(&*inner_tasks.to_string_lossy()),
+                "Should show specified tasks directory in config output"
+            );
         }
-        let fixtures = TestFixtures::new();
-
-        // Create nested project structure
-        let outer_project = fixtures.temp_dir.path().join("outer");
-        let inner_project = outer_project.join("subproject");
-        let inner_tasks = inner_project.join("tasks");
-        let work_dir = inner_project.join("work");
-
-        fs::create_dir_all(&inner_tasks).unwrap();
-        fs::create_dir_all(&work_dir).unwrap();
-
-        // Create .git directory in inner project to simulate git boundary
-        fs::create_dir_all(inner_project.join(".git")).unwrap();
-
-        // Test with explicit tasks directory pointing to inner project
-        let output = fixtures.run_command(&[
-            "config",
-            "show",
-            "--tasks-dir",
-            inner_tasks.to_str().unwrap(),
-        ]);
-        assert!(
-            output.is_ok(),
-            "Config show should work with explicit tasks dir"
-        );
-        let output_str = output.unwrap();
-        assert!(
-            output_str.contains(&*inner_tasks.to_string_lossy()),
-            "Should show specified tasks directory in config output"
-        );
     }
 }
 
@@ -729,9 +719,7 @@ mod global_options_integration {
             assert!(task_content.contains("assignee: env-assignee")); // Environment variable was used
         }
 
-        // Clean up environment variables
-        unsafe {
-            env::remove_var("LOTAR_DEFAULT_ASSIGNEE");
-        }
+        // No manual cleanup: _assignee_guard drops here and restores the
+        // previous value while still holding the per-variable mutex.
     }
 }

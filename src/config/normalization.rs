@@ -308,14 +308,31 @@ pub fn parse_project_from_yaml_str(
     )
 }
 
+/// Options for canonical global YAML rendering (server-port intent only;
+/// every other field keeps its differs-from-default emission rule).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GlobalYamlOptions {
+    /// Emit `server.port` even when the value equals the built-in default,
+    /// preserving an explicit default-port pin through mutations. Without
+    /// this flag a default-valued port stays implicit so fresh configs keep
+    /// the user's fallback eligibility.
+    pub explicit_server_port: bool,
+}
+
 /// Render GlobalConfig into canonical nested YAML form
 pub fn to_canonical_global_yaml(cfg: &GlobalConfig) -> String {
+    to_canonical_global_yaml_with(cfg, GlobalYamlOptions::default())
+}
+
+/// Render GlobalConfig into canonical nested YAML form with explicit
+/// server-port intent.
+pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOptions) -> String {
     use serde_yaml_ng::Value as Y;
     let defaults = GlobalConfig::default();
     let mut root = serde_yaml_ng::Mapping::new();
 
     // server
-    if cfg.server_port != defaults.server_port {
+    if options.explicit_server_port || cfg.server_port != defaults.server_port {
         let mut server = serde_yaml_ng::Mapping::new();
         server.insert(Y::String("port".into()), Y::Number(cfg.server_port.into()));
         root.insert(Y::String("server".into()), Y::Mapping(server));

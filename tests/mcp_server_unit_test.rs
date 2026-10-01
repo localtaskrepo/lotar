@@ -1,4 +1,3 @@
-#![cfg_attr(no_git_tests, allow(dead_code))]
 mod common;
 use crate::common::env_mutex::EnvVarGuard;
 use std::collections::HashMap;
@@ -1145,65 +1144,66 @@ fn mcp_task_create_honors_default_assignee() {
     assert_eq!(stored.assignee.as_deref(), Some("default-user@example.com"));
 }
 
-#[cfg(not(no_git_tests))]
-#[test]
-fn mcp_task_create_infers_branch_defaults() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let tmp = tempfile::tempdir().unwrap();
-    let repo_root = tmp.path();
-    let tasks_dir = repo_root.join(".tasks");
-    std::fs::create_dir_all(&tasks_dir).unwrap();
-    let git_dir = repo_root.join(".git");
-    std::fs::create_dir_all(&git_dir).unwrap();
-    std::fs::write(git_dir.join("HEAD"), "ref: refs/heads/feat/new-ui\n").unwrap();
-    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+mod git_required {
+    use super::*;
 
-    std::fs::write(
-        tasks_dir.join("config.yml"),
-        "default.project: MCP\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\nauto.branch_infer_priority: true\nauto.branch_infer_status: true\nauto.branch_infer_type: true\nbranch.priority_aliases:\n  feat: High\nbranch.status_aliases:\n  feat: InProgress\n",
-    )
-    .unwrap();
+    #[test]
+    fn mcp_task_create_infers_branch_defaults() {
+        crate::common::require_git();
+        let tmp = tempfile::tempdir().unwrap();
+        let repo_root = tmp.path();
+        let tasks_dir = repo_root.join(".tasks");
+        std::fs::create_dir_all(&tasks_dir).unwrap();
+        let git_dir = repo_root.join(".git");
+        std::fs::create_dir_all(&git_dir).unwrap();
+        std::fs::write(git_dir.join("HEAD"), "ref: refs/heads/feat/new-ui\n").unwrap();
+        let _guard_tasks =
+            EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
 
-    let _cwd = CwdGuard::enter(repo_root).unwrap();
+        std::fs::write(
+            tasks_dir.join("config.yml"),
+            "default.project: MCP\nissue.states: [Todo, InProgress, Done]\nissue.types: [Feature, Bug, Chore]\nissue.priorities: [Low, Medium, High]\nauto.branch_infer_priority: true\nauto.branch_infer_status: true\nauto.branch_infer_type: true\nbranch.priority_aliases:\n  feat: High\nbranch.status_aliases:\n  feat: InProgress\n",
+        )
+        .unwrap();
 
-    let create_req = serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": 30,
-        "method": "tools/call",
-        "params": {
-            "name": "task_create",
-            "arguments": {
-                "title": "Branch inferred",
-                "project": "MCP"
+        let _cwd = CwdGuard::enter(repo_root).unwrap();
+
+        let create_req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 30,
+            "method": "tools/call",
+            "params": {
+                "name": "task_create",
+                "arguments": {
+                    "title": "Branch inferred",
+                    "project": "MCP"
+                }
             }
-        }
-    });
-    let create_line = serde_json::to_string(&create_req).unwrap();
-    let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
-    let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
-    assert!(
-        create_resp.get("error").is_none(),
-        "task_create failed: {create_resp}"
-    );
-    let content = tool_content(&create_resp);
-    assert!(!content.is_empty());
-    let text = first_tool_text(&create_resp).unwrap_or_default();
-    let task_json = task_from_text(&text);
-    assert_eq!(
-        task_json.get("priority").and_then(|v| v.as_str()),
-        Some("High")
-    );
-    assert_eq!(
-        task_json.get("status").and_then(|v| v.as_str()),
-        Some("InProgress")
-    );
-    assert_eq!(
-        task_json.get("task_type").and_then(|v| v.as_str()),
-        Some("Feature")
-    );
+        });
+        let create_line = serde_json::to_string(&create_req).unwrap();
+        let create_resp_line = lotar::mcp::server::handle_json_line(&create_line);
+        let create_resp: serde_json::Value = serde_json::from_str(&create_resp_line).unwrap();
+        assert!(
+            create_resp.get("error").is_none(),
+            "task_create failed: {create_resp}"
+        );
+        let content = tool_content(&create_resp);
+        assert!(!content.is_empty());
+        let text = first_tool_text(&create_resp).unwrap_or_default();
+        let task_json = task_from_text(&text);
+        assert_eq!(
+            task_json.get("priority").and_then(|v| v.as_str()),
+            Some("High")
+        );
+        assert_eq!(
+            task_json.get("status").and_then(|v| v.as_str()),
+            Some("InProgress")
+        );
+        assert_eq!(
+            task_json.get("task_type").and_then(|v| v.as_str()),
+            Some("Feature")
+        );
+    }
 }
 
 // Merged from mcp_smoke_test.rs: basic storage smoke via MCP-shaped flow

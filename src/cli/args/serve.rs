@@ -2,9 +2,27 @@ use clap::Args;
 
 #[derive(Args)]
 pub struct ServeArgs {
-    /// Port to serve on (use `--port` or `-p`)
-    #[arg(long = "port", value_name = "PORT", default_value_t = 8080)]
-    pub port: u16,
+    /// Port to serve on (`--port`, `-p`, or a bare positional). When omitted,
+    /// the port comes from the resolved config (`LOTAR_PORT` /
+    /// `LOTAR_SERVER_PORT`, then the config file's `server.port`); with
+    /// nothing configured anywhere, the built-in default 8080 is preferred
+    /// and an OS-assigned port is used instead when it is already taken.
+    /// Any explicitly requested port — including `8080` or `0` — is honored
+    /// exactly: `0` binds an OS-assigned ephemeral port and a busy port
+    /// fails instead of moving.
+    #[arg(short = 'p', long = "port", value_name = "PORT")]
+    pub port: Option<u16>,
+
+    /// Accept-and-ignore shadow of the global `--project` option.
+    ///
+    /// `serve` is the deliberate exception where `-p` selects the port, so
+    /// the global project argument (whose own `-p` short would otherwise be
+    /// propagated into this subcommand and clash with the port short) is
+    /// scoped out here by declaring an argument with the same id. The long
+    /// form stays accepted for compatibility and, like the global form
+    /// before it, has no effect on the server.
+    #[arg(long = "project", hide = true)]
+    pub project: Option<String>,
 
     /// Host to bind to
     #[arg(long, default_value = "localhost")]

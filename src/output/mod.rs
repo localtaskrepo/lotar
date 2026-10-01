@@ -3,7 +3,7 @@ use crate::types::{Priority, TaskStatus, TaskType};
 use clap::ValueEnum;
 use serde::Serialize;
 use std::fmt::{self, Write as FmtWrite};
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 
 mod json;
 mod text;
@@ -377,4 +377,114 @@ impl OutputRenderer {
     }
 }
 
-// Styling removed to keep output plain and test-friendly
+/// Wrap `text` in ANSI bold (unconditional wrapper for call sites that have
+/// already decided styling is appropriate).
+pub(crate) fn ansi_bold(text: &str) -> String {
+    format!("\x1b[1m{}\x1b[0m", text)
+}
+
+/// Wrap `text` in ANSI bold plus a yellow foreground highlight. Used for the
+/// serve fallback port: bold AND highlighted, so the moved port stands out
+/// from the rest of the banner (which stays plain or plain-bold).
+pub(crate) fn ansi_bold_highlight(text: &str) -> String {
+    format!("\x1b[1;33m{}\x1b[0m", text)
+}
+
+/// Pure decision for whether stdout output may carry ANSI styling: only the
+/// text format on an interactive terminal with `NO_COLOR` unset (the same
+/// policy as help rendering and `config show`).
+/// Pure presence decision for `NO_COLOR`: any value — including empty or
+/// non-UTF-8 bytes — disables styling. `var().is_ok()` would wrongly re-
+/// enable styling when the variable holds non-Unicode bytes.
+pub(crate) fn no_color_disables(no_color: Option<&std::ffi::OsStr>) -> bool {
+    no_color.is_some()
+}
+
+pub(crate) fn styling_allowed(
+    format_is_text: bool,
+    no_color_set: bool,
+    stdout_is_tty: bool,
+) -> bool {
+    format_is_text && !no_color_set && stdout_is_tty
+}
+
+/// Whether stdout styling is appropriate for this renderer right now.
+/// Machine formats (JSON) and piped/plain streams never receive ANSI.
+pub(crate) fn stdout_styling_enabled(format: &OutputFormat) -> bool {
+    styling_allowed(
+        matches!(format, OutputFormat::Text),
+        no_color_disables(std::env::var_os("NO_COLOR").as_deref()),
+        std::io::stdout().is_terminal(),
+    )
+}
+
+#[cfg(test)]
+mod styling_tests {
+    use super::*;
+
+    #[test]
+    fn ansi_bold_wraps_with_bold_escape_pair() {
+        assert_eq!(ansi_bold("Port: 8080"), "\x1b[1mPort: 8080\x1b[0m");
+    }
+
+    #[test]
+    fn styling_requires_text_format() {
+        assert!(styling_allowed(true, false, true));
+        assert!(!styling_allowed(false, false, true), "JSON must stay plain");
+    }
+
+    #[test]
+    fn styling_respects_no_color() {
+        assert!(!styling_allowed(true, true, true));
+    }
+
+    #[test]
+    fn no_color_presence_disables_even_for_empty_or_non_utf8_values() {
+        assert!(!no_color_disables(None), "unset NO_COLOR keeps styling");
+        assert!(no_color_disables(Some(std::ffi::OsStr::new(""))));
+        assert!(no_color_disables(Some(std::ffi::OsStr::new("1"))));
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            // Non-UTF-8 bytes: var() would report NotUnicode; presence must
+            // still disable styling.
+            let raw = std::ffi::OsStr::from_bytes(b"\xff\xfe");
+            assert!(no_color_disables(Some(raw)));
+        }
+    }
+
+    #[test]
+    fn styling_requires_terminal() {
+        assert!(
+            !styling_allowed(true, false, false),
+            "piped output stays plain"
+        );
+    }
+
+    #[test]
+    fn bold_wrapper_preserves_content() {
+        let plain = "Port: 1234";
+        let bold = ansi_bold(plain);
+        assert!(bold.starts_with("\x1b[1mPort: 1234"));
+        assert!(bold.ends_with("Port: 1234\x1b[0m"));
+        assert_eq!(bold.len(), plain.len() + "\x1b[1m".len() + "\x1b[0m".len());
+    }
+
+    #[test]
+    fn bold_highlight_is_bold_and_yellow_in_one_sequence() {
+        assert_eq!(
+            ansi_bold_highlight("Port: 777"),
+            "\x1b[1;33mPort: 777\x1b[0m",
+            "fallback port uses one exact bold+yellow sequence"
+        );
+        let styled = ansi_bold_highlight("Port: 777");
+        assert!(styled.starts_with("\x1b[1;33m"));
+        assert!(styled.ends_with("\x1b[0m"));
+        assert_eq!(
+            styled.len(),
+            "Port: 777".len() + "\x1b[1;33m".len() + "\x1b[0m".len()
+        );
+        // Distinct from plain bold so callers cannot silently downgrade.
+        assert_ne!(styled, ansi_bold("Port: 777"));
+    }
+}

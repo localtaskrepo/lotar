@@ -199,6 +199,16 @@ pub fn apply_config_set(
                 }
             }
 
+            // An explicit server.port request in this mutation pins the
+            // port even when the value equals the built-in default, so the
+            // canonical serializer must emit the key; unrelated mutations
+            // preserve any existing pin via the save adapter's default.
+            let port_intent = if canonical.iter().any(|(field, _)| field == "server_port") {
+                crate::config::operations::ServerPortSaveIntent::ExplicitPin
+            } else {
+                crate::config::operations::ServerPortSaveIntent::PreserveExisting
+            };
+
             finish(
                 tasks_dir,
                 scope,
@@ -206,7 +216,7 @@ pub fn apply_config_set(
                 canonical,
                 validation,
                 &conflicts,
-                || save_global(tasks_dir, &candidate),
+                || save_global(tasks_dir, &candidate, port_intent),
             )
         }
         ConfigScope::Project(prefix) => {
@@ -306,8 +316,12 @@ fn finish(
     })
 }
 
-fn save_global(tasks_dir: &Path, candidate: &GlobalConfig) -> Result<(), ConfigError> {
-    crate::config::operations::save_global_config(tasks_dir, candidate)
+fn save_global(
+    tasks_dir: &Path,
+    candidate: &GlobalConfig,
+    port_intent: crate::config::operations::ServerPortSaveIntent,
+) -> Result<(), ConfigError> {
+    crate::config::operations::save_global_config_with_port(tasks_dir, candidate, port_intent)
 }
 
 fn save_project(

@@ -235,6 +235,7 @@ struct GlobalScopeContext<'a> {
     home_cfg: &'a Option<GlobalConfig>,
     env_resolved: &'a ResolvedConfig,
     env_applied: &'a HashSet<&'static str>,
+    global_port_explicit: bool,
 }
 
 impl<'a> GlobalScopeContext<'a> {
@@ -244,6 +245,7 @@ impl<'a> GlobalScopeContext<'a> {
         home_cfg: &'a Option<GlobalConfig>,
         env_resolved: &'a ResolvedConfig,
         env_applied: &'a HashSet<&'static str>,
+        global_port_explicit: bool,
     ) -> Self {
         Self {
             base_config,
@@ -251,6 +253,7 @@ impl<'a> GlobalScopeContext<'a> {
             home_cfg,
             env_resolved,
             env_applied,
+            global_port_explicit,
         }
     }
 
@@ -261,6 +264,7 @@ impl<'a> GlobalScopeContext<'a> {
             self.home_cfg,
             self.env_resolved,
             self.env_applied,
+            self.global_port_explicit,
             key,
         )
     }
@@ -284,14 +288,34 @@ pub fn build_global_source_labels(
     global_cfg: &Option<GlobalConfig>,
     home_cfg: &Option<GlobalConfig>,
 ) -> HashMap<String, String> {
+    build_global_source_labels_with_port(resolved, global_cfg, home_cfg, false)
+}
+
+/// Like [`build_global_source_labels`], with the global config FILE's
+/// explicit `server.port` presence supplied by the caller so an explicit
+/// request for the built-in default port is credited to `global` instead of
+/// being mislabeled `default` (which would contradict fallback eligibility).
+pub fn build_global_source_labels_with_port(
+    resolved: &ResolvedConfig,
+    global_cfg: &Option<GlobalConfig>,
+    home_cfg: &Option<GlobalConfig>,
+    global_port_explicit: bool,
+) -> HashMap<String, String> {
     let snapshot = capture_env_override_snapshot();
     let env_resolved = &snapshot.resolved;
     let env_applied = snapshot.applied_keys();
     let mut labels = HashMap::new();
     populate_source_labels(&mut labels, |entry| {
-        GlobalScopeContext::new(resolved, global_cfg, home_cfg, env_resolved, env_applied)
-            .global_label(entry.label_key)
-            .to_string()
+        GlobalScopeContext::new(
+            resolved,
+            global_cfg,
+            home_cfg,
+            env_resolved,
+            env_applied,
+            global_port_explicit,
+        )
+        .global_label(entry.label_key)
+        .to_string()
     });
     labels
 }
@@ -304,11 +328,38 @@ pub fn build_project_source_labels(
     global_cfg: &Option<GlobalConfig>,
     home_cfg: &Option<GlobalConfig>,
 ) -> HashMap<String, String> {
+    build_project_source_labels_with_port(
+        resolved_project,
+        base_config,
+        project_cfg,
+        global_cfg,
+        home_cfg,
+        false,
+    )
+}
+
+/// Like [`build_project_source_labels`], with global-file `server.port`
+/// presence supplied by the caller (see
+/// [`build_global_source_labels_with_port`]).
+pub fn build_project_source_labels_with_port(
+    resolved_project: &ResolvedConfig,
+    base_config: &ResolvedConfig,
+    project_cfg: Option<&ProjectConfig>,
+    global_cfg: &Option<GlobalConfig>,
+    home_cfg: &Option<GlobalConfig>,
+    global_port_explicit: bool,
+) -> HashMap<String, String> {
     let snapshot = capture_env_override_snapshot();
     let env_resolved = &snapshot.resolved;
     let env_applied = snapshot.applied_keys();
-    let context =
-        GlobalScopeContext::new(base_config, global_cfg, home_cfg, env_resolved, env_applied);
+    let context = GlobalScopeContext::new(
+        base_config,
+        global_cfg,
+        home_cfg,
+        env_resolved,
+        env_applied,
+        global_port_explicit,
+    );
     let mut labels = HashMap::new();
     populate_source_labels(&mut labels, |entry| {
         source_label_for_project(entry.label_key, resolved_project, project_cfg, &context)
@@ -319,7 +370,7 @@ pub fn build_project_source_labels(
 pub fn collapse_label_to_scope(label: &str) -> &'static str {
     match label {
         "project" => "project",
-        "global" | "home" | "env" => "global",
+        "global" | "home" | "env" | "cli" => "global",
         _ => "built_in",
     }
 }
@@ -330,8 +381,20 @@ fn source_label_for_global(
     home_cfg: &Option<GlobalConfig>,
     env_resolved: &ResolvedConfig,
     env_applied: &HashSet<&'static str>,
+    global_port_explicit: bool,
     key: &str,
 ) -> &'static str {
+    // server_port: the winning layer gets the credit. The `--config`
+    // override layer outranks env, so it is attributed before the env check;
+    // the lower tiers keep the standard value matching, which attributes
+    // correctly now that the resolved value itself honors layer presence.
+    if key == "server_port"
+        && let Some(port) = crate::config::resolution::active_cli_port_override()
+        && port == resolved.server_port
+    {
+        return "cli";
+    }
+
     let env_matches_key = env_applied.iter().any(|candidate| *candidate == key);
     if env_matches_key && env_value_matches(resolved, env_resolved, key) {
         return "env";
@@ -361,7 +424,33 @@ fn source_label_for_global(
     }
 
     match key {
-        "server_port" => scope_field!(server_port),
+        // server_port attributes by layer presence, never by value: an
+        // explicit request for the built-in default number must credit the
+        // requesting layer, and a default-valued parsed field from a file
+        // that does not set the key must not steal credit.
+        "server_port" => {
+            if let Some(home_port) = crate::config::persistence::home_config_server_port()
+                .ok()
+                .flatten()
+                && home_port == resolved.server_port
+            {
+                return "home";
+            }
+            if global_port_explicit {
+                return "global";
+            }
+            if home.is_some_and(|cfg| cfg.server_port == resolved.server_port)
+                && resolved.server_port != defaults.server_port
+            {
+                return "home";
+            }
+            if global.is_some_and(|cfg| cfg.server_port == resolved.server_port)
+                && resolved.server_port != defaults.server_port
+            {
+                return "global";
+            }
+            "default"
+        }
         "default_project" => scope_field!(default_project),
         "default_assignee" => scope_field!(default_assignee),
         "default_reporter" => scope_field!(default_reporter),
@@ -676,6 +765,7 @@ fn source_label_for_project(
             home_cfg,
             env_resolved,
             env_applied,
+            context.global_port_explicit,
             key,
         )
         .to_string(),
@@ -749,6 +839,7 @@ fn source_label_for_project(
             home_cfg,
             env_resolved,
             env_applied,
+            context.global_port_explicit,
             key,
         )
         .to_string(),
@@ -758,6 +849,7 @@ fn source_label_for_project(
             home_cfg,
             env_resolved,
             env_applied,
+            context.global_port_explicit,
             key,
         )
         .to_string(),
@@ -795,6 +887,7 @@ mod tests {
         assert_eq!(collapse_label_to_scope("global"), "global");
         assert_eq!(collapse_label_to_scope("home"), "global");
         assert_eq!(collapse_label_to_scope("env"), "global");
+        assert_eq!(collapse_label_to_scope("cli"), "global");
         assert_eq!(collapse_label_to_scope("default"), "built_in");
         assert_eq!(collapse_label_to_scope("anything_else"), "built_in");
     }

@@ -1,12 +1,34 @@
 title: Remove verified orphan UI CLI and test infrastructure after consolidation
-status: Todo
-relationships:
-  parent: DEV-53
-  related: [DEV-52]
+status: Done
 priority: Medium
 type: Chore
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.881622+00:00
+modified: 2026-10-01T19:28:23.712780+00:00
+relationships:
+  related:
+  - DEV-52
+  parent: DEV-53
+comments:
+- date: 2026-09-17T04:48:28.138424+00:00
+  text: 'Progress (session 2026-09-17, tracking-only record): marked InProgress on a TEST-ONLY scope slice; the ticket acceptance is preserved and the broader UI/product orphan surfaces (SprintBacklog/TaskRow/QuickHelp/ConfigSync/AuthProfiles, unused API/TaskTable contracts, shadow CLI args) are UNTOUCHED by this slice. Completed by the implementer: (1) removed the hard-coded-pass framework tests/test_framework.rs - zero external callers; it contained 3 self-tests plus an internal list of 10 fake pass entries, so the actual tests removed are 3, NOT 10 (no 10 additional nextest tests existed; the 10 were fake framework entries, not real tests). (2) Removed 11 duplicate test cases: 3 stats, 5 scan-filters, 2 custom-pattern, 1 bidirectional. Preserved the unique custom_pattern_does_not_trigger_without_signal_even_when_toggle_on by moving it into scanner_features. (3) Files: 6 removed (tests/test_framework.rs, stats_effort_unit_option, stats_effort_points_and_auto_and_filters, stats_effort_comments_custom, scan_ignore_and_filters, scanner_custom_ticket_patterns) and 4 updated (scanner_features, scanner_integration, docs/developers/cli). Verification: canonical targeted 62/62 plus the preserved unique test 1/1 and cargo fmt pass; command of record (implementer-reported): cargo nextest run --all-features --test canonical, 4 runs, no --cargo-profile ci - recorded as TARGETED evidence, NOT the canonical final gate. No unique behavior lost. Remaining in this ticket: advanced_list duplicate waits for DEV-77; canonical rewrite/common helpers after DEV-79; broader production/UI orphans are outside this test-focused slice - NOT Done.'
+- date: 2026-09-17T05:00:50.839917+00:00
+  text: 'Disclosure record (session 2026-09-17, tracking-only): a reviewer violated the read-only Git restriction by running Git status/diff against DEV-81 work despite explicit instruction not to use Git. The violation was disclosed to the user; NO Git writes were reported (read-only inspection only). Recorded here for audit honesty; no tracker policy change beyond this disclosure, and all work continues under the existing no-Git/no-source-edit tracking constraint.'
+- date: 2026-09-17T05:54:26.951739+00:00
+  text: 'Progress (session 2026-09-17, tracking-only): second removal wave - advanced_list: 11 real duplicate cases removed from 1 binary. Canonical cli_commands 80/80 pass, run STANDALONE under the DEFAULT Cargo profile - NOT the final gate; the implementation initially confused --cargo-profile with the nextest profile, command clarified, and the final gate must next run with the ci profile. Cumulative across waves: 22 real duplicate cases removed plus the 3 artificial framework self-tests; 7 test files (binaries) removed; the internal 10 fake-pass entries were not actual tests (accounting per the earlier record). Six dead common helpers removed, 80 zero-callers. Broader UI/product orphans remain OUT OF SCOPE of this test-focused work - ticket stays open. Docs validated: cli references plus testing README command/policy clarifications.'
+- date: 2026-09-19T19:00:55.795757+00:00
+  text: 'Handoff-interim (session 2026-09-19, final; tracking-only). Outcome: the TEST-INFRA slice of this ticket is COMPLETE - 22 duplicate tests + 3 fake hard-coded-pass framework selftests removed across 7 files, 6 dead helpers deleted, unique canonical implementations preserved; targeted runs plus full shared gates green per DEV-76 closing record (lint clean; Rust 1089/8/0; UI 449/60; checker 39/39; final smoke fixed 164 passed / 23 Git-skips, exit 0). Review: an earlier independent review of the removals delivered SIGNOFF - it exists on the board/code record even though it was never written into this ticket; it is RECORDED here now for continuity. Remaining (exact): the NON-TEST orphan surfaces - UI (SprintBacklog/TaskRow/QuickHelp/ConfigSync/AuthProfiles), API/TaskTable contracts, shadow CLI args/index/sort exports - remain UNTOUCHED, were NOT in this pass, and no de-scope is claimed: they stay within this ticket''s open scope pending compatibility review. Guidance: no durable instruction finding; no new tickets opened, no product cleanup started. Status stays InProgress; no git operations.'
+- date: 2026-09-19T19:35:01.424653+00:00
+  text: 'Progress + scope extension (session 2026-09-19, new user request; tracking-only): user NOW AUTHORIZES FULL remaining orphan cleanup (supersedes the earlier test-infra-only slice boundary; prior records preserved). Rust progress: 9 dead files removed, ENV_MUTEX/static-export cleanup done; target run 133 passed / 1 skip. Compatibility position is CORRECT as implemented: the auto-lib exists; removed IndexArgs was a public Rust symbol that is undocumented, inert, and wired to no CLI command - removal is deliberate PRE-ADOPTION cleanup, not bin-only. Independent review PENDING for these removals; the other 8 candidates are uncompiled with no API surface. UI owner is ACTIVE: verify-then-delete unrouted components + internal client methods; NO REST shape change. Status stays InProgress pending review + full gates; no source edits or git operations by tracker.'
+- date: 2026-09-20T03:48:18.158117+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): FULL orphan UI/Rust cleanup has INDEPENDENT REVIEW SIGNOFF. UI: 442 tests / 57 files (vs prior 449/60) - removed 7 dead component tests with NO unique live behavior lost; deletions: 5 components, 3 specs, 4 internal client methods, 2 types; endpoints/redirects remain live. Rust: 9 files removed (8 uncompiled + the compiled Index-struct file); 2 public Rust types removed - actual source-API break for UNKNOWN external imports, accepted as DELIBERATE pre-adoption removal after review; there was never a CLI Index command - the removal is NOT bin-only. ENV_MUTEX was unused and is removed; the GUARD is KEPT. Retained as live/not-orphan (no invented closure block): SortField, TaskTable, serve pub wrappers. ENVIRONMENT CLEANUP (exact remaining item, already disclosed to user): a worker-owned temporary serve process at 127.0.0.1:8471 - last verified PID 79264 STILL ALIVE (re-verified this session via ps/lsof; kill returns EPERM; the process lacks the LOTAR_ALLOW_TEST_STOP launch flag since it was started by a probe SPA, not a stop-capable wrapper); its unique temp-workspace source has been identified. Policy: do NOT kill foreign processes or bypass - no new permissions. Fresh UI browser proof: on-disk asset SHA EQUAL, backend old; final embedded rebuild PENDING. Evidence: target/test-fix-handoff/orphan-ui/evidence.md. Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T04:28:39.362912+00:00
+  text: 'Progress (session 2026-09-20; tracking-only): history_client.test.ts was formerly UNCOLLECTED - now activated as history_client.spec.ts with 1 test asserting the exact taskHistory URL params, default GET, Accept header, and envelope. Current UI: 443 tests / 58 files (+1 from 442/57; -6 from the original 449). Independent orphan-review SIGNOFF stands as recorded: 8 uncompiled files + the one compiled public Index file; source-API removal deliberate pre-adoption; no CLI/wire removals. Manual 8471 cleanup: STILL BLOCKED - last-known PID recorded (79264), NOT re-probed this session; status remains pending (no kill, no bypass, no new permissions). Status stays InProgress; no source edits or git operations by tracker.'
+- date: 2026-09-20T05:20:07.309448+00:00
+  text: 'Status note (session 2026-09-20; tracking-only): ALL scope implemented and independently reviewed (UI orphan removals + Rust 9-file cleanup, signoffs recorded earlier); current full gates provided by this wave (lint 0; Rust 1190/1190 default profile real-Git 0-skip 0-LEAK; UI 443/58 incl. the activated history_client.spec.ts; smoke 164/23-skip with strict-Git followup pending on DEV-79). Remaining environment item unchanged: manual 8471 cleanup blocked (last-known PID record; no re-probe, no bypass). Status deliberately held InProgress pending coordinator closure and the latest smoke coverage followup - no Done yet. No source edits or git operations by tracker.'
+- date: 2026-10-01T19:28:16.116311+00:00
+  text: 'Handoff (session 2026-10-01, final; tracking-only; independent SIGNOFF, current Oct-1 gates green). Outcome: all AUTHORIZED orphan UI/Rust test-infra removals landed with actual contract reviews - endpoints CLI/MCP active, redirect kept; TaskTable/SyncHub live; UI current 443/58; 7 dead component tests removed, 1 history case activated (.spec); Rust 9 removed = 8 uncompiled + 1 compiled (public IndexArgs/IndexAction source-API real break ACCEPTED under pre-adoption review; no CLI Index command, no other wire support removed); unused ENV_MUTEX removed with per-var Guard kept; corrected accounting: 7 duplicate Rust test files / 25 real cases (22 duplicate + 3 fake-framework selftests), NOT 10 fake - internal records now cite actual tests and preserve uniques. Foreign/live pub serve wrappers / SortField / TaskTable intentionally KEPT - not unfinished cleanup. Historical: temp server 8471 (Sep 20, PID 79264) cleanup was EPERM and recorded old - NOT currently alive (verified; no signal/poke of old PID); environmental note, not a code bug - not ticket-blocking. Evidence: contract reviews + Oct-1 gates current: lint:agent exit 0; Rust 1196/1196, 0 skipped; UI 443/58; Node 41/41; smoke 166 pass / 23 Git-skip valid for current app. Remaining: none in scope; no staging/commit/push performed (uncommitted state unknown - NO git commands run, not asserting unstaged). Guidance: stale compile-out SKILL wording fixed minimally (runtime: all code compiles + Gitless reported / strict CI); docs consistency proof done. Marking Done per self-verification lifecycle.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: C15 U15 T14.
@@ -17,3 +39,54 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-09-17T04:48:22.105664+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-17T04:48:28.138424+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:00:50.839917+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:54:26.951739+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:00:55.795757+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:35:01.424653+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T03:48:18.158117+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T04:28:39.362912+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-20T05:20:07.309448+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:28:16.116311+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-01T19:28:23.712780+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

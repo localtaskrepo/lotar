@@ -1,4 +1,3 @@
-#![cfg(not(no_git_tests))]
 mod common;
 
 use tempfile::TempDir;
@@ -19,17 +18,20 @@ fn init_fake_git(repo_root: &std::path::Path, branch: &str) {
     std::fs::write(&branch_path, "").unwrap();
 }
 
-#[test]
-fn infers_status_from_branch_alias() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
-    }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    let cfg = r#"default.project: TEST
+/// Tests that need a real Git repository (see `common::require_git`).
+/// The `git_required` module path is what the gitless nextest profile
+/// excludes when the runtime Git capability probe fails (DEV-79).
+mod git_required {
+    use super::*;
+
+    #[test]
+    fn infers_status_from_branch_alias() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        let cfg = r#"default.project: TEST
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature, Bug, Chore]
 issue.priorities: [Low, Medium, High]
@@ -38,42 +40,39 @@ branch:
   status_aliases:
     wip: InProgress
 "#;
-    write_global_with_aliases(&tasks, cfg);
-    init_fake_git(root, "wip/doing-work");
+        write_global_with_aliases(&tasks, cfg);
+        init_fake_git(root, "wip/doing-work");
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(
-        out.contains("\"status_value\":\"InProgress\""),
-        "Output: {out}"
-    );
-}
-
-#[test]
-fn infers_priority_from_branch_alias() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(
+            out.contains("\"status_value\":\"InProgress\""),
+            "Output: {out}"
+        );
     }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    let cfg = r#"default.project: TEST
+
+    #[test]
+    fn infers_priority_from_branch_alias() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        let cfg = r#"default.project: TEST
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature, Bug, Chore]
 issue.priorities: [Low, Medium, High, Critical]
@@ -82,39 +81,36 @@ branch:
   priority_aliases:
     hotfix: Critical
 "#;
-    write_global_with_aliases(&tasks, cfg);
-    init_fake_git(root, "hotfix/urgent-fix");
+        write_global_with_aliases(&tasks, cfg);
+        init_fake_git(root, "hotfix/urgent-fix");
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"priority\":\"Critical\""), "Output: {out}");
-}
-
-#[test]
-fn toggles_disable_inference() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(out.contains("\"priority\":\"Critical\""), "Output: {out}");
     }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    let cfg = r#"default.project: TEST
+
+    #[test]
+    fn toggles_disable_inference() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        let cfg = r#"default.project: TEST
 default.priority: Medium
 default.status: Todo
 issue.states: [Todo, InProgress, Done]
@@ -127,41 +123,38 @@ branch:
   status_aliases: { wip: InProgress }
   priority_aliases: { hotfix: High }
 "#;
-    write_global_with_aliases(&tasks, cfg);
-    init_fake_git(root, "wip/something");
+        write_global_with_aliases(&tasks, cfg);
+        init_fake_git(root, "wip/something");
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"status_value\":\"Todo\""), "Output: {out}");
-    assert!(out.contains("\"priority\":\"Medium\""), "Output: {out}");
-}
-
-#[test]
-fn project_alias_overrides_global() {
-    if !crate::common::git_available() {
-        eprintln!("skipping: git unavailable in this sandbox");
-        return;
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(out.contains("\"status_value\":\"Todo\""), "Output: {out}");
+        assert!(out.contains("\"priority\":\"Medium\""), "Output: {out}");
     }
-    let tmp = TempDir::new().unwrap();
-    let root = tmp.path();
-    let tasks = root.join(".tasks");
-    std::fs::create_dir_all(&tasks).unwrap();
-    // Global says feat -> High, project overrides to Low
-    let cfg = r#"default.project: TEST
+
+    #[test]
+    fn project_alias_overrides_global() {
+        crate::common::require_git();
+        let tmp = TempDir::new().unwrap();
+        let root = tmp.path();
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        // Global says feat -> High, project overrides to Low
+        let cfg = r#"default.project: TEST
 issue.states: [Todo, InProgress, Done]
 issue.types: [Feature, Bug]
 issue.priorities: [Low, Medium, High]
@@ -169,31 +162,32 @@ issue.tags: ['*']
 branch:
   priority_aliases: { feat: High }
 "#;
-    write_global_with_aliases(&tasks, cfg);
-    let proj_dir = tasks.join("TEST");
-    std::fs::create_dir_all(&proj_dir).unwrap();
-    let proj_cfg = r#"project.name: TEST
+        write_global_with_aliases(&tasks, cfg);
+        let proj_dir = tasks.join("TEST");
+        std::fs::create_dir_all(&proj_dir).unwrap();
+        let proj_cfg = r#"project.name: TEST
 branch:
   priority_aliases: { feat: Low }
 "#;
-    std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();
-    init_fake_git(root, "feat/new");
+        std::fs::write(proj_dir.join("config.yml"), proj_cfg).unwrap();
+        init_fake_git(root, "feat/new");
 
-    let assert = crate::common::lotar_cmd()
-        .unwrap()
-        .current_dir(root)
-        .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
-        .env("LOTAR_TEST_SILENT", "1")
-        .env("HOME", root.to_string_lossy().to_string())
-        .args([
-            "add",
-            "Test",
-            "--project=TEST",
-            "--dry-run",
-            "--format=json",
-        ])
-        .assert()
-        .success();
-    let out = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(out.contains("\"priority\":\"Low\""), "Output: {out}");
+        let assert = crate::common::lotar_cmd()
+            .unwrap()
+            .current_dir(root)
+            .env("LOTAR_TASKS_DIR", tasks.to_string_lossy().to_string())
+            .env("LOTAR_TEST_SILENT", "1")
+            .env("HOME", root.to_string_lossy().to_string())
+            .args([
+                "add",
+                "Test",
+                "--project=TEST",
+                "--dry-run",
+                "--format=json",
+            ])
+            .assert()
+            .success();
+        let out = String::from_utf8_lossy(&assert.get_output().stdout);
+        assert!(out.contains("\"priority\":\"Low\""), "Output: {out}");
+    }
 }

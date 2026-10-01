@@ -17,11 +17,12 @@
     "build:rust": "cargo build --release",
     "build:smoke": "npm run build:web && cargo build --profile smoke",
     "test": "npm run test:rust && npm run test:ui",
-    "test:rust": "cargo nextest run --cargo-profile ci",
+    "test:rust": "node scripts/rust-test-runner.mjs --cargo-profile ci",
     "test:ui": "vitest run --config view/vitest.config.ts",
     "test:ui:only": "npm run test:ui",
     "test:agent": "bash -lc 'set -euo pipefail; npm run test:rust:agent; npm run test:ui:agent'",
-    "test:rust:agent": "bash -lc 'set -euo pipefail; export NO_COLOR=1 FORCE_COLOR=0 CARGO_TERM_COLOR=never; cargo nextest run --cargo-profile ci --color never --failure-output immediate-final --retries 0 \"$@\"' --",
+    "test:rust:agent": "node scripts/rust-test-runner.mjs --agent",
+    "test:rust:perf": "node scripts/perf-runner.mjs",
     "test:ui:agent": "bash -lc 'set -euo pipefail; export NO_COLOR=1 FORCE_COLOR=0; vitest run --config view/vitest.config.ts --reporter dot --no-color \"$@\"' --",
     "test:smoke": "npm run build:smoke && vitest run --config smoke/vitest.config.ts",
     "test:smoke:quick": "vitest run --config smoke/vitest.config.ts",
@@ -31,6 +32,7 @@
     "smoke:ui": "npm run build:web && bash -lc 'set -euo pipefail; LOTAR_WEB_UI_EMBEDDED=0 LOTAR_WEB_UI_PATH=\"$PWD/target/web\" npm run test:smoke:quick'",
     "playwright:install": "npx playwright install --with-deps chromium",
     "seed:test-tasks": "node scripts/generate-test-tasks.mjs",
+    "screenshots": "npm run build:smoke && node scripts/screenshots.mjs",
     "clean": "cargo clean && rm -rf node_modules"
   },
   "keywords": [

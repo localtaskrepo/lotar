@@ -1,5 +1,10 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import {
+    createGateFixture,
+    indentBlock,
+    nodeRunActionYaml,
+} from '../helpers/agent-fixtures.js';
 import { parse } from 'yaml';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
@@ -396,24 +401,29 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         }
     });
 
-    it('run action executes a shell command', async () => {
+    it('run action executes a shell command synchronously', async () => {
         const workspace = await SmokeWorkspace.create();
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
-            // Shell form (plain string) runs synchronously with wait:true by default
+            // Shell form (plain string) runs synchronously with wait:true by
+            // default; `echo ... >>` is understood by both sh and cmd so the
+            // payload stays portable without Unix-only binaries.
             await writeAutomation(workspace, `automation:
   rules:
     - name: Run on create
       on:
         created:
-          run: "touch run-fired.txt"
+          run: "echo shell-run-fired >> run-fired.txt"
 `);
 
             await workspace.addTask('Run action test');
-            // Shell variant waits by default; sentinel should exist in workspace root
+            // Shell variant waits by default; the sentinel must already exist
+            // in the workspace root with the emitted content.
             const sentinel = `${workspace.root}/run-fired.txt`;
             expect(existsSync(sentinel)).toBe(true);
+            const sentinelContent = readFileSync(sentinel, 'utf8').replace(/\r/g, '');
+            expect(sentinelContent).toContain('shell-run-fired');
         } finally {
             await workspace.dispose();
         }
@@ -470,28 +480,48 @@ describe.concurrent('CLI automation smoke scenarios', () => {
         }
     });
 
-    it('async run action does not block task update', async () => {
+    it('async run action does not block the task update and completes after release', async () => {
+        const gate = await createGateFixture('lotar-smoke-async-run-');
         const workspace = await SmokeWorkspace.create();
+        let drainIncomplete: readonly string[] = [];
 
         try {
             await workspace.write('.tasks/config.yml', AUTOMATION_CONFIG);
+            // Structured run form executes the Node runtime directly
+            // (Command + args, no sh/cmd) with wait:false, so the command is
+            // cross-platform without shell quoting games.
             await writeAutomation(workspace, `automation:
   rules:
-    - name: Slow async run
+    - name: Gated async run
       on:
         created:
-          run: "sleep 30"
+${indentBlock(nodeRunActionYaml([gate.script, ...gate.agentArgs({ mode: 'plain', label: 'automation', holdMs: 20_000 })], { wait: false }), 10)}
           add:
             tags: [async-verified]
 `);
 
-            // If the run were blocking, this would take 30s and likely time out.
-            // The tag should be added regardless since run is async by default.
-            const task = await workspace.addTask('Async run test');
+            // The CLI must return while the gated child is still running: the
+            // created rule already applied the tag and the child is provably
+            // started but cannot be completed (the release file does not
+            // exist yet). A blocking run would keep addTask from returning
+            // until the child finished.
+            const task = await workspace.addTask('Async gate test');
+            await gate.waitForStarted('automation', 10_000);
+            expect(gate.completedExists('automation')).toBe(false);
+
             const yaml = parse(await workspace.readTaskYaml(task.id)) as Record<string, any>;
             expect(yaml.tags).toContain('async-verified');
+
+            // Release and await real completion so no child outlives the test.
+            await gate.release();
+            await gate.waitForCompleted('automation', 10_000);
         } finally {
+            drainIncomplete = await gate.drain(10_000);
             await workspace.dispose();
+            await gate.dispose();
+        }
+        if (drainIncomplete.length > 0) {
+            throw new Error(`gated automation children did not finish after release: ${drainIncomplete.join(', ')}`);
         }
     });
 });

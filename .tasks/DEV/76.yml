@@ -1,10 +1,11 @@
 title: Harden Rust and smoke HTTP server fixture lifecycle and readiness
-status: Todo
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.799720+00:00
-modified: 2026-09-16T22:25:33.518539+00:00
+modified: 2026-09-19T19:00:03.911556+00:00
 relationships:
   blocks:
   - DEV-77
@@ -15,6 +16,16 @@ comments:
   text: 'Context from DEV-60 final smoke verification (comment only; no status/scope change): the user-authorized narrow fix in smoke/helpers/server.ts (getPort({ host }) host-matching probe instead of 127.0.0.1-only) landed with 3 new harness tests and eliminated bind/port-collision errors (final full smoke: zero bind errors, exit 0). Remaining hardening that fits this ticket scope: (1) the host probe still has a close->bind TOCTOU window (port can be taken between probe and bind); (2) the readiness banner is emitted before the actual bind, so a failed bind can follow a "ready" line; (3) orphaned server processes from earlier failed runs were NOT all verified - approximately 103 smoke-workspace listeners were verified; the earlier all-153-orphan claim was not substantiated, a cleanup attempt was denied, and no existing servers were stopped. Suggested shape already in scope here: owned listener/actual port (bind first, then advertise), bounded readiness, lifecycle-owner teardown joining children.'
 - date: 2026-09-16T22:25:33.518539+00:00
   text: 'Verification follow-up from DEV-71 final gates (comment only; no status/scope/acceptance change, no autostart): the final npm run test:agent run (nextest, default concurrency, --retries 0) reported 1079 passed / 6 skipped / 121 binaries with exactly 1 LEAKY classification; the immediately prior run of the same suites showed no leaky flag. The leaky test name was not identified in the low-noise output. Evidence retained: /var/folders/sd/8vwyr5jx7p9_0mknmb7rrsbw0000gn/T/kilo/dev71-verify2-20260917-035114-16743/test-agent.log and nested junit at target/nextest/default/target/nextest/junit.xml (junit file is overwritable by later runs). No root cause assumed; DEV-71 closed on gates-exit-0 plus review signoff and does not claim the leak resolved.'
+- date: 2026-09-17T04:28:26.151290+00:00
+  text: 'Plan (session 2026-09-17, tracking-only record): marked InProgress. User authorized work on the open test tickets; an independent implementation has already started and owns these files: tests/web_api_integration_test.rs, smoke/helpers/server.ts, smoke/tests/harness.server.smoke.spec.ts, and the minimal serve_handler/web_server surface required for readiness. Requirements: (1) readiness is confirmed POST-BIND only (no ready banner before the listener is bound - closes the gap noted in the 2026-09-16 context comment); (2) occupied-port handling keeps split marker, early-EOF, and timeout signals distinct so each failure mode is deterministic and diagnosable; (3) startup-failure paths own cleanup with joined threads/processes - no leaked children, teardown joins; (4) preserve host-matched explicit-port semantics from the DEV-60 getPort({ host }) probe - do not regress to 127.0.0.1-only; (5) no cleanup of foreign servers the fixture did not start; (6) no silent retries. Verification: targeted tests for the owned files first, then shared final gates (lint/test/smoke) and review BEFORE any Done. Dependencies: DEV-77 and DEV-80 remain Todo pending this lifecycle work; DEV-79 is planning-only, no status change yet. Prior comments preserved append-only; tracking owner performs no git operations and no source edits.'
+- date: 2026-09-17T04:50:46.462625+00:00
+  text: 'Progress (session 2026-09-17, tracking-only): implementation completed across 6 files. (1) Server listener binds FIRST and advertises post-bind readiness using the ACTUAL port (port 0 - owned listener, real assigned port, no pre-bind banner, no TOCTOU probe); startup failures exit nonzero. (2) Rust integration fixture is owned end-to-end with bounded-join teardown (joined threads/processes on all exit paths). (3) Smoke harness handles split/partial marker, EOF, and timeout with owned cleanup; host-matched explicit-port semantics preserved; no foreign-server cleanup; no silent retries. Verification (targeted): 28/28 Rust fixture tests, 17/17 harness tests run x2, apiAutomation 8, UI basic 1. PENDING: independent review + full shared gates (lint/test/smoke) before any Done - NOT Done. Dependency note: DEV-76 implementation is now AVAILABLE, unblocking dependents DEV-77 and DEV-80 (marked InProgress with plans this session). All other statuses unchanged.'
+- date: 2026-09-17T05:21:42.508358+00:00
+  text: 'Progress/correction (session 2026-09-17, tracking-only): USER EXPLICIT CORRECTION - the intended serve -p PORT exception is RETAINED and the docs are now accurate. Evidence: the earlier misleading reserved-project sentence is preexisting history (Jan 7); preprocessor behavior handled -p and it was never removed recently. Current semantics: in real Clap the short -p is hidden and long-only --project shadows the scope-global short; global -p elsewhere/before the command is preserved; the serve docs exception is corrected. Verification: 11 new flag-isolation tests + 4 parse + 16 preprocess tests green (dev profile, debug); 92 existing DEV-77-scope tests + 17 harness tests green. Independent review of DEV-76 and the flag follow-up: SIGNOFF, no blockers. Full gates PENDING - NOT Done.'
+- date: 2026-09-17T05:54:33.941147+00:00
+  text: 'Correction (session 2026-09-17, tracking-only; additive, prior history preserved): the previous comment phrase hidden short -p is INCORRECT. Accurate semantics: port IS the real short -p; project is the hidden long-only shadow; the arrangement is additive. No Done until full gates.'
+- date: 2026-09-19T18:59:56.724069+00:00
+  text: 'Handoff (session 2026-09-19, final; tracking-only). Outcome: FULL ticket scope complete - server fixture readiness/ownership hardening (bind-first owned listener advertising the ACTUAL port post-bind, no pre-bind banner/TOCTOU probe; bounded-join teardown owning children/threads on all exit paths; split-marker/early-EOF/timeout signals distinct and deterministic; host-matched explicit-port semantics from DEV-60 preserved; no foreign-server cleanup; no silent retries; startup failures exit nonzero) PLUS the serve -p PORT exception retained with accurate docs. Independent review: SIGNOFF prior (2026-09-17), including the subsequent short-p/-long-only-shadow correction signoff (port IS the real short -p; project is the hidden long-only shadow; additive arrangement). Evidence: targeted 28/28 Rust fixture + 17/17 harness x2 + 11 flag-isolation + 4 parse + 16 preprocess tests; FINAL shared gates all green 2026-09-19 - lint clean; Rust 1089 passed / 8 conditional Git-skips / 0 failed (default concurrency, --retries 0, no LEAK flags); UI 449 tests / 60 files; coverage checker 39/39; final smoke (fixed) single compliant run 34s exit 0: 164 passed / 23 Git-skips / 187 tests across 45 files (40 passed / 5 skipped), fresh vite 515ms with 4 gzip assets, Rust smoke 19.89s, zero leak/unhandled/bind warnings; other gates remain valid since only the smoke test was edited after them. Logs: target/test-fix-handoff/final-rust-ui/ and final-smoke-fixed/ (earlier failed-run logs preserved). Remaining: none for this ticket; integration/commit state unchanged (uncommitted per policy). Guidance: no durable AGENTS.md finding - the serve docs/-p correction was an actual-command/help consistency fix, not policy. Session governance note: the one earlier READ-ONLY git violation disclosed 2026-09-17 stands preserved in the existing record (commands not repeated); this final wave ran NO git commands. Marking Done per developer instruction with prior independent review + correction signoff.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: T3 T8.
@@ -34,3 +45,37 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-09-17T04:28:19.319963+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-09-17T04:28:26.151290+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T04:50:46.462625+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:21:42.508358+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-17T05:54:33.941147+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T18:59:56.724069+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-09-19T19:00:03.911556+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

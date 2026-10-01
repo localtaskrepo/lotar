@@ -1,12 +1,9 @@
 use assert_cmd::Command;
 use assert_cmd::cargo::{CargoError, cargo_bin_cmd};
 use ctor::{ctor, dtor};
-use lotar::types::Priority;
-use lotar::{Storage, Task};
+use lotar::Storage;
 use serde_json::Value;
 use std::fs;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -24,6 +21,11 @@ pub struct TestFixtures {
     pub tasks_root: PathBuf,
 }
 
+/// Build a `lotar` CLI child command with the test defaults applied
+/// child-scoped (DEV-80): the child always runs with
+/// `LOTAR_IGNORE_HOME_CONFIG=1` and without `RUST_TEST_THREADS`, independent
+/// of the test process environment, which stays owned by guards and the
+/// process constructor baseline.
 #[allow(dead_code)]
 pub fn lotar_cmd() -> Result<Command, CargoError> {
     let mut cmd = cargo_bin_cmd!("lotar");
@@ -35,7 +37,36 @@ pub fn lotar_cmd() -> Result<Command, CargoError> {
 #[ctor]
 unsafe fn init_lotar_test_environment() {
     reset_lotar_test_environment();
+    scrub_repository_routing_env();
     isolate_tmpdir_under_owned_scratch();
+}
+
+/// Remove inherited Git repository-routing variables once per test process.
+///
+/// Raw fixture helpers that shell out to `Command::new("git")` inherit the
+/// launching environment; an absolute `GIT_DIR`/`GIT_WORK_TREE`/injected
+/// `GIT_CONFIG*` inherited from a wrapper process could direct fixture git
+/// operations outside the test's owned temporary root before any assertion
+/// runs. The ctor scrub gives every test process (npm runner and raw nextest
+/// alike) a routing-clean baseline while preserving transport auth, SSH,
+/// identity, and `PATH`. The key inventory is
+/// [`lotar::utils::git::is_repository_routing_key`] — the same policy the
+/// production `git_command` factory enforces per child. Case-supplied
+/// `EnvVarGuard` scopes in negative tests still run AFTER this scrub and
+/// keep working exactly as before.
+pub fn scrub_repository_routing_env() {
+    let offenders: Vec<String> = std::env::vars()
+        .map(|(key, _)| key)
+        .filter(|key| lotar::utils::git::is_repository_routing_key(key))
+        .collect();
+    for key in offenders {
+        let _guard = env_mutex::lock_var(&key);
+        // Manipulating process-wide env vars requires `unsafe`. Keep scope
+        // tiny; the ctor runs before any test thread exists.
+        unsafe {
+            std::env::remove_var(&key);
+        }
+    }
 }
 
 /// Process-owned scratch directory that TMPDIR is redirected to (DEV-90).
@@ -136,28 +167,54 @@ unsafe fn cleanup_owned_scratch() {
 }
 
 /// Remove shared LOTAR environment variables and ignore home config for deterministic tests.
+///
+/// DEV-80 ownership contract:
+/// - The process constructor calls this once before any test thread exists;
+///   it is the only environment writer besides `EnvVarGuard` scopes.
+/// - Test fixtures (`TestFixtures::new`, [`temp_dir`]) never mutate the
+///   process environment; mid-test scopes must use `EnvVarGuard` so previous
+///   values are restored.
+/// - Each variable's mutex is held only around the mutation itself: a
+///   concurrent guard holder is serialized with this reset, never silently
+///   clobbered by it. The per-variable mutexes are not reentrant, so callers
+///   must not already hold an `EnvVarGuard`/`lock_var` for any listed
+///   variable.
 pub fn reset_lotar_test_environment() {
-    // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny.
+    for var in [
+        "LOTAR_TASKS_DIR",
+        "LOTAR_HOME",
+        "LOTAR_TEST_SILENT",
+        "LOTAR_IGNORE_ENV_TASKS_DIR",
+    ] {
+        let _guard = env_mutex::lock_var(var);
+        // Manipulating process-wide env vars requires `unsafe`. Keep scope tiny.
+        unsafe {
+            std::env::remove_var(var);
+        }
+    }
+    let _guard = env_mutex::lock_var("LOTAR_IGNORE_HOME_CONFIG");
     unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_HOME");
-        std::env::remove_var("LOTAR_TEST_SILENT");
-        std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
         std::env::set_var("LOTAR_IGNORE_HOME_CONFIG", "1");
     }
 }
 
+/// Create an isolated temp directory without mutating the process
+/// environment (DEV-80): live `EnvVarGuard` values survive this call.
 #[allow(dead_code)]
 pub fn temp_dir() -> TempDir {
-    reset_lotar_test_environment();
     TempDir::new().expect("Failed to create temp directory")
 }
 
 impl TestFixtures {
+    /// Create isolated workspace fixtures.
+    ///
+    /// DEV-80: fixture construction owns no environment state. Values owned
+    /// by live `EnvVarGuard`s survive fixture creation, and the deterministic
+    /// baseline (cleared LOTAR vars, `LOTAR_IGNORE_HOME_CONFIG=1`) is owned
+    /// by the process constructor plus the child-scoped defaults in
+    /// [`lotar_cmd`].
     #[allow(dead_code)]
     pub fn new() -> Self {
-        reset_lotar_test_environment();
-
         let temp_dir = TempDir::new().expect("Failed to create temp directory");
         let tasks_root = temp_dir.path().join(".tasks");
         fs::create_dir_all(&tasks_root).expect("Failed to create tasks directory");
@@ -166,12 +223,6 @@ impl TestFixtures {
             temp_dir,
             tasks_root,
         }
-    }
-
-    // Clean up after test
-    #[allow(dead_code)]
-    pub fn cleanup(&self) {
-        // Temporary directory is automatically cleaned up when TestFixtures is dropped
     }
 
     #[allow(dead_code)] // Used across multiple test modules
@@ -220,49 +271,6 @@ impl TestFixtures {
             )
             .into())
         }
-    }
-
-    /// Create test files with TODO comments for scanner testing
-    #[allow(dead_code)] // Used by scanner tests
-    pub fn create_test_source_files(&self) -> Vec<String> {
-        let mut files = Vec::new();
-
-        // Create Rust file with TODO containing UUID
-        let rust_file_path = self.temp_dir.path().join("test.rs");
-        let mut rust_file = File::create(&rust_file_path).unwrap();
-        writeln!(rust_file, "fn main() {{").unwrap();
-        writeln!(rust_file, "    // TODO (uuid-1234): Test Rust with UUID").unwrap();
-        writeln!(rust_file, "    // TODO: Implement main functionality").unwrap();
-        writeln!(rust_file, "}}").unwrap();
-        files.push(rust_file_path.to_string_lossy().to_string());
-
-        // Create JavaScript file with TODO
-        let js_file_path = self.temp_dir.path().join("test.js");
-        let mut js_file = File::create(&js_file_path).unwrap();
-        writeln!(js_file, "function test() {{").unwrap();
-        writeln!(js_file, "    // TODO: Test JavaScript").unwrap();
-        writeln!(js_file, "}}").unwrap();
-        files.push(js_file_path.to_string_lossy().to_string());
-
-        // Create Python file with TODO
-        let py_file_path = self.temp_dir.path().join("test.py");
-        let mut py_file = File::create(&py_file_path).unwrap();
-        writeln!(py_file, "def test():").unwrap();
-        writeln!(py_file, "    # TODO: Test Python").unwrap();
-        writeln!(py_file, "    pass").unwrap();
-        files.push(py_file_path.to_string_lossy().to_string());
-
-        files
-    }
-
-    /// Create a sample task for testing
-    #[allow(dead_code)]
-    pub fn create_sample_task(&self, _project: &str) -> Task {
-        Task::new(
-            self.tasks_root.clone(),
-            "Sample Test Task".to_string(),
-            Priority::from("Medium"),
-        )
     }
 
     /// Create a config file in the specified directory
@@ -314,15 +322,6 @@ pub fn extract_task_id_from_bytes(output: &[u8]) -> Option<String> {
     extract_task_id_from_output(&text)
 }
 
-/// Test utility functions
-pub mod utils {
-    /// Extract project prefix from task ID (e.g., "PROJ-123" -> "PROJ")
-    #[allow(dead_code)] // Used across multiple test modules
-    pub fn get_project_for_task(task_id: &str) -> Option<String> {
-        task_id.split('-').next().map(|s| s.to_string())
-    }
-}
-
 /// Command helpers shared across CLI tests
 #[allow(dead_code)]
 pub fn cargo_bin_silent() -> Command {
@@ -340,111 +339,172 @@ pub fn cargo_bin_in(fixtures: &TestFixtures) -> Command {
     cmd
 }
 
-/// Assertion helpers for testing
-pub mod assertions {
-    use std::path::Path;
-
-    #[allow(dead_code)] // Used in storage_crud_test.rs
-    pub fn assert_task_exists(tasks_root: &Path, project: &str, _task_id: &str) {
-        // Look for .yml files since we changed the extension
-        let task_files = std::fs::read_dir(tasks_root.join(project))
-            .expect("Project directory should exist")
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "yml"))
-            .collect::<Vec<_>>();
-
-        assert!(
-            !task_files.is_empty(),
-            "Should have at least one task file in project {project}"
-        );
-    }
-
-    #[allow(dead_code)] // Used in storage_crud_test.rs
-    pub fn assert_metadata_updated(
-        tasks_root: &Path,
-        project: &str,
-        task_count: u64,
-        current_id: u64,
-    ) {
-        // Removed metadata file existence check since we've eliminated metadata.yml files
-        // With the new filesystem-based approach, we verify the data by counting files and finding max ID
-        let project_path = tasks_root.join(project);
-
-        // Count actual task files in the directory (exclude config.yml)
-        let actual_task_count = if let Ok(entries) = std::fs::read_dir(&project_path) {
-            entries
-                .filter_map(|entry| entry.ok())
-                .filter(|entry| {
-                    let path = entry.path();
-                    let file_name = path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("");
-                    path.is_file()
-                        && path.extension().is_some_and(|ext| ext == "yml")
-                        && file_name != "config.yml" // Exclude config files from task count
-                })
-                .count() as u64
-        } else {
-            0
-        };
-
-        // Find the highest numbered file to verify current_id
-        let actual_current_id = if let Ok(entries) = std::fs::read_dir(&project_path) {
-            entries
-                .filter_map(|entry| entry.ok())
-                .filter_map(|entry| {
-                    let file_name = entry.file_name();
-                    let name_str = file_name.to_string_lossy();
-                    if name_str.ends_with(".yml") {
-                        name_str.strip_suffix(".yml")?.parse::<u64>().ok()
-                    } else {
-                        None
-                    }
-                })
-                .max()
-                .unwrap_or(0)
-        } else {
-            0
-        };
-
-        assert_eq!(
-            actual_task_count, task_count,
-            "Task count mismatch for project {project}"
-        );
-        assert_eq!(
-            actual_current_id, current_id,
-            "Current ID mismatch for project {project}"
-        );
-    }
-}
-
 // Note: Test functions for common utilities have been removed to prevent duplication
 // across all test files that import this module. Each test file should test its own functionality.
 
+/// Result of the runtime Git capability probe.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitProbe {
+    pub available: bool,
+    pub reason: String,
+}
+
 /// Whether git-dependent tests can run in this environment.
 ///
-/// Some sandboxed runtimes forbid creating anything named `.git` anywhere
-/// except the workspace, which makes every test that runs `git init` fail
-/// with "Operation not permitted". The build-time `no_git_tests` cfg compiles
-/// those tests out when detected at build time, but cargo redirects `TMPDIR`
-/// for build scripts, which can fool that probe. This runtime probe checks
-/// what the tests actually do — creating a `.git` directory inside a real
-/// tempfile — and lets each gated test skip instead of failing.
+/// Some sandboxed runtimes forbid creating anything named `.git` outside the
+/// workspace, which makes every test that runs `git init` fail with
+/// "Operation not permitted". Git-dependent tests are always compiled
+/// (DEV-79); they live in source-local `git_required` modules that the
+/// gitless nextest profile excludes when this probe fails, and guarded tests
+/// call `require_git()` to fail closed if selected anyway. This runtime probe
+/// performs what the tests actually need — a real `git init` inside an
+/// isolated temporary directory — and verifies the `.git` artifact exists
+/// afterwards.
+///
+/// Environment-variable overrides are deliberately not provided; the
+/// designated-runner environment contract is tracked separately (DEV-80).
 #[allow(dead_code)]
 pub fn git_available() -> bool {
-    static AVAILABLE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *AVAILABLE.get_or_init(|| {
-        let Ok(tmp) = tempfile::tempdir() else {
-            return false;
-        };
-        let probe = tmp.path().join(".git");
-        match fs::create_dir(&probe) {
-            Ok(()) => {
-                let _ = fs::remove_dir(&probe);
-                true
-            }
-            Err(_) => false,
+    git_capability().available
+}
+
+/// Cached outcome of the runtime Git capability probe.
+#[allow(dead_code)]
+pub fn git_capability() -> &'static GitProbe {
+    static CAPABILITY: std::sync::OnceLock<GitProbe> = std::sync::OnceLock::new();
+    CAPABILITY.get_or_init(|| probe_git_with_binary(None))
+}
+
+/// Fail closed for tests that require Git.
+///
+/// Guarded tests call this instead of returning silently when Git is
+/// unavailable: a selected test that cannot exercise its Git-dependent path
+/// must fail with a diagnostic rather than report a pass (DEV-79).
+#[allow(dead_code)]
+#[track_caller]
+pub fn require_git() {
+    let probe = git_capability();
+    let reason = if probe.reason.is_empty() {
+        "unknown reason"
+    } else {
+        &probe.reason
+    };
+    assert!(
+        probe.available,
+        "this test requires Git, but the runtime capability probe failed: {reason}. Failing closed instead of passing silently (DEV-79)"
+    );
+}
+
+/// Probe Git with the environment-resolved `git` binary in a fresh temp dir.
+#[allow(dead_code)]
+pub fn probe_git_with_binary(git_binary: Option<&std::path::Path>) -> GitProbe {
+    match tempfile::tempdir() {
+        Ok(tmp) => probe_git_in(tmp.path(), git_binary),
+        Err(err) => GitProbe {
+            available: false,
+            reason: format!("cannot create probe directory: {err}"),
+        },
+    }
+}
+
+/// Pass through the Windows bootstrap variables a child process requires
+/// (`SystemRoot` et al.) without leaking any parent Git configuration. HOME
+/// bases (`HOME`/`USERPROFILE`/`XDG_CONFIG_HOME`) are always overridden with
+/// the owned root by the caller.
+#[cfg(windows)]
+fn apply_windows_bootstrap_env(command: &mut std::process::Command, owned_root: &std::path::Path) {
+    const BOOTSTRAP_KEYS: &[&str] = &["SystemRoot", "windir", "TEMP", "TMP", "COMSPEC"];
+    for key in BOOTSTRAP_KEYS {
+        if let Some(value) = std::env::var_os(key) {
+            command.env(key, value);
         }
-    })
+    }
+    command.env("USERPROFILE", owned_root);
+}
+
+#[cfg(not(windows))]
+fn apply_windows_bootstrap_env(
+    _command: &mut std::process::Command,
+    _owned_root: &std::path::Path,
+) {
+}
+
+/// Run the real Git capability probe inside `probe_root`.
+///
+/// `git_binary` is `None` to resolve `git` from the environment (what the
+/// cached capability uses) or a path to a controlled executable, which lets
+/// the probe's own tests drive failure and missing-binary outcomes
+/// deterministically on any platform.
+#[allow(dead_code)]
+pub fn probe_git_in(
+    probe_root: &std::path::Path,
+    git_binary: Option<&std::path::Path>,
+) -> GitProbe {
+    let repo = probe_root.join("repo");
+    if let Err(err) = fs::create_dir(&repo) {
+        return GitProbe {
+            available: false,
+            reason: format!("cannot prepare probe repository directory: {err}"),
+        };
+    }
+    let gitconfig = probe_root.join("gitconfig");
+    if let Err(err) = fs::write(&gitconfig, "") {
+        return GitProbe {
+            available: false,
+            reason: format!("cannot prepare probe gitconfig: {err}"),
+        };
+    }
+    let program = git_binary.unwrap_or_else(|| std::path::Path::new("git"));
+    let mut command = std::process::Command::new(program);
+    command
+        .arg("init")
+        .arg("--quiet")
+        .arg(&repo)
+        // Fresh child environment (DEV-79 review): an inherited absolute
+        // GIT_DIR/GIT_WORK_TREE could direct `git init` outside this owned
+        // probe root BEFORE the artifact check runs. Only PATH (to resolve
+        // the binary) and owned HOME/config variables survive; Windows adds
+        // the process bootstrap variables it requires.
+        .env_clear()
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env("HOME", probe_root)
+        .env("USERPROFILE", probe_root)
+        .env("XDG_CONFIG_HOME", probe_root.join(".config"))
+        .env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", &gitconfig)
+        .current_dir(probe_root)
+        .stdin(std::process::Stdio::null());
+    apply_windows_bootstrap_env(&mut command, probe_root);
+    let output = command.output();
+    match output {
+        Ok(output) if output.status.success() => {
+            if repo.join(".git").exists() {
+                GitProbe {
+                    available: true,
+                    reason: String::new(),
+                }
+            } else {
+                GitProbe {
+                    available: false,
+                    reason: format!(
+                        "`git init` exited successfully but left no .git artifact in {}",
+                        repo.display()
+                    ),
+                }
+            }
+        }
+        Ok(output) => GitProbe {
+            available: false,
+            reason: format!(
+                "`git init` failed with status {}: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ),
+        },
+        Err(err) => GitProbe {
+            available: false,
+            reason: format!("cannot run git: {err}"),
+        },
+    }
 }

@@ -1,477 +1,213 @@
-# LoTaR - Local Task Repository
+<h1 align="center">LoTaR</h1>
 
-> A git-integrated task management system that lives in your repository.
+<p align="center"><b>A git-native issue tracker that lives in your repo, and can run your coding agents for you.</b></p>
 
-[![Production Ready](https://img.shields.io/badge/status-production%20ready-brightgreen)](docs/README.md)
-[![Tests](https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml/badge.svg)](https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml)
-[![Rust](https://img.shields.io/badge/rust-stable-orange)](https://www.rust-lang.org/)
+<p align="center">
+  <a href="https://github.com/localtaskrepo/lotar/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/localtaskrepo/lotar"></a>
+  <a href="https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/localtaskrepo/lotar/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/localtaskrepo/lotar"></a>
+  <a href="https://github.com/localtaskrepo/homebrew-lotar"><img alt="Homebrew tap" src="https://img.shields.io/badge/homebrew-localtaskrepo%2Flotar-orange"></a>
+  <a href="https://hub.docker.com/r/mallox/lotar"><img alt="Docker pulls" src="https://img.shields.io/docker/pulls/mallox/lotar"></a>
+</p>
 
-## 🚀 Quick Start
+<p align="center">
+  <img src="docs/assets/screenshots/hero-agent-loop.webp" width="900"
+       alt="Assigning a task to the claude agent profile in the web UI: the job starts in its own git worktree, its log streams live, and automation moves the task to NeedsReview with every change in the task history">
+</p>
 
-LoTaR ships as both a signed Homebrew formula and a ready-to-run Docker image, so you can get moving without installing Rust or managing binaries manually. Pick the installer that matches your setup, then run the same commands everywhere.
+LoTaR keeps tasks as plain YAML files in `.tasks/`, versioned and branched with your code. The CLI, the built-in web UI, the REST API, and the MCP server all read and write those same files, so there is no database and no hosted service. Assign a task to an agent profile and LoTaR runs your coding agent CLI on it in an isolated git worktree, streams the log, and hands the task back for review.
 
-### 1. Install LoTaR
+## Quick start
 
-**macOS ([Homebrew](https://brew.sh/))**
-```bash
-brew tap localtaskrepo/lotar
-brew install lotar
-lotar --version
-```
-This adds the CLI to your PATH and keeps it updated with `brew upgrade lotar`.
+| Platform | Install |
+| --- | --- |
+| macOS | `brew tap localtaskrepo/lotar && brew install lotar` |
+| Windows | `scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar; scoop install lotar` |
+| Linux, macOS, Windows | Signed binaries on [GitHub Releases](https://github.com/localtaskrepo/lotar/releases/latest) |
+| Any OS with Docker | `docker run --rm -v "$PWD":/workspace -v "$PWD/.tasks":/tasks -w /workspace mallox/lotar list` |
 
-**Windows ([Scoop](https://scoop.sh/))**
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-iwr -useb get.scoop.sh | iex
-scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar
-scoop install lotar
-lotar --version
-```
-This installs LoTaR via the community bucket we publish during every release. Pass
-`--version` to `scoop install` if you need to pin to a specific release.
+LoTaR is not published on crates.io; to build it yourself, see [Installation](docs/help/install.md#build-from-source).
 
-**GitHub Releases (macOS • Linux • Windows)**
-```bash
-# Pick the asset for your platform from the releases page
-curl -LO https://github.com/localtaskrepo/lotar/releases/latest/download/lotar-vX.Y.Z-linux-x64.tar.gz
-tar -xzf lotar-vX.Y.Z-linux-x64.tar.gz
-sudo mv lotar /usr/local/bin/
-lotar --version
-```
-Verify signatures/checksums from the same release before moving the binary into your PATH if you need extra assurance.
-
-**Any OS ([Docker Hub](https://hub.docker.com/r/mallox/lotar))**
-```bash
-docker pull mallox/lotar
-docker run --rm mallox/lotar --version
-```
-The image entrypoint is `lotar`, so pass subcommands directly (for example, `mallox/lotar list`).
-See [docs/docker.md](docs/docker.md) for Docker Compose and long-running server examples.
-The Docker image bundles the latest signed musl build, so Linux, macOS, and Windows users can all run the same artifact.
-
-**Rust developers (from source)**
-```bash
-git clone https://github.com/localtaskrepo/lotar
-cd lotar
-cargo build --release
-export PATH="$PATH:$(pwd)/target/release"
-```
-Use this option if you want to contribute or hack on LoTaR itself.
-
-### 2. Point LoTaR at your repository
-
-- **Homebrew/source install**: `cd /path/to/your/repo` and run LoTaR commands directly.
-- **Docker**: mount your repo at `/workspace` and your `.tasks` directory at `/tasks`.
+Then, inside any repository:
 
 ```bash
-docker run --rm \
-    -v "$PWD":/workspace \
-    -v "$PWD/.tasks":/tasks \
-    -w /workspace \
-    mallox/lotar list
-```
-
-### 3. Track work
-
-```bash
-# Create your first task (auto-initializes defaults)
-lotar add "Plan product launch" --priority=high
-
-# List everything in a friendly table (auto-detects single project)
-lotar list --format table
-
-# Update status or assignee (numeric IDs work when LoTaR auto-detects the project or you set a default)
-lotar status 1 in_progress
-lotar assignee 1 alex@example.com
-
-# Open the web UI if you prefer a browser
+lotar add "Fix the login redirect loop" --type bug --priority high
+lotar list
 lotar serve --open
 ```
 
-> LoTaR automatically scopes to your single project (or `default_project` setting), which is why the commands above can reference tasks with just the numeric portion. When you manage multiple projects or overlapping prefixes, use the fully-qualified IDs (`AUTH-12`) or attach `--project`. See [🗂️ Multi-Project Workflows (Advanced)](#%F0%9F%97%82%EF%B8%8F-multi-project-workflows-advanced) for details.
+The first command creates `.tasks/` with sensible defaults. Commit it along with your code.
 
-## ✨ What is LoTaR?
+<p align="center"><img src="docs/assets/screenshots/terminal.gif" width="900" alt="Terminal session: lotar add creates a task, lotar list filters by status, lotar scan previews TODO comments it would turn into tasks, and lotar stats lists authors from git history"></p>
 
-LoTaR is a **production-ready task management system** designed for developers who want their task tracking to live alongside their code. Instead of external tools that get out of sync, LoTaR stores tasks as human-readable YAML files in your repository.
+## Feature tour
 
-Think of it as a local-first, git-native issue tracker (and task tracker) built for developer workflows.
+### Agents and automation
 
-### Key Benefits
-- 🔒 **Git-native**: Tasks are version-controlled with your code
-- 📝 **Human-readable**: YAML files you can edit manually
-- 🚀 **Fast**: Sub-100ms operations with direct file operations
-- 🔍 **Integrated**: Scan source code for TODO comments
-- 🌐 **Complete**: CLI, web interface, and REST API
-- 🛡️ **Secure**: Project isolation and input validation
-- ⚡ **Zero-config**: Auto-initializes projects with sensible defaults
-- 🧠 **Smart**: Intelligent project resolution and auto-detection
+Configure an agent profile once, then assign a task to it like you would to a teammate. LoTaR queues a job, runs the agent CLI (Claude Code, Codex, Copilot CLI, or Gemini CLI) in a dedicated worktree on its own branch, and streams the output to the CLI and the web UI. Automation rules in YAML decide what happens on start, success, and failure, and also react to ordinary task changes. See [Agent jobs](docs/help/agent.md) and [Automation rules](docs/help/automation.md).
 
-## 🗂️ Multi-Project Workflows (Advanced)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/agents-dark.webp">
+  <img src="docs/assets/screenshots/agents-light.webp" alt="Agent jobs page with a running claude job, its worktree branch, and the live log">
+</picture>
 
-Most users never need to think about project prefixes—LoTaR automatically scopes to whichever project you’re working in. If you maintain multiple concurrent projects (monorepos, shared storage, cross-repo worktrees), use the fully-qualified IDs and project-specific commands below.
-
-```bash
-# Explicit project specification
-lotar add "Setup API auth" --project=backend --priority=high
-lotar add "Design login UI" --project=frontend --priority=medium
-
-# List tasks by project (supports full names or auto-generated prefixes)
-lotar list --project=backend      # Full name
-lotar list --project=BACK         # Auto-generated prefix
-
-# Search across projects with context
-lotar list --search="auth" --project=backend
-# → [BACK-001] Setup API auth - BACKEND (Priority: HIGH)
-
-# Custom tasks directory for different environments
-export LOTAR_TASKS_DIR=/shared/project-tasks
-lotar add "Integration test" --project=testing
-# OR use command-line override
-lotar add "Deploy script" --tasks-dir=/ops/tasks --project=deployment
-
-# Advanced configuration per project
-lotar init --template=agile --project=backend    # shortcut for `lotar config init`
-lotar config set issue_states TODO,IN_PROGRESS,REVIEW,DONE --project=backend
-```
-> **[📖 Smart Project Management Guide](docs/smart-project-management.md)** - Detailed documentation on intelligent project resolution, auto-detection, and flexible naming
-
-## 🎯 Core Features
-
-### Task Management
-```bash
-# Full CRUD operations with formatted IDs
-lotar add "OAuth Implementation" --type=feature --priority=high
-lotar status 2 in_progress
-lotar assignee 2 john.doe@company.com
-lotar list --priority=high
+```yaml
+# .tasks/automation.yml
+automation:
+  rules:
+    - name: Agent lifecycle
+      when: { assignee: "@agent" }
+      on:
+        job_started:   { set: { status: InProgress } }
+        job_completed: { set: { status: NeedsReview, assignee: "@reporter" } }
+        job_failed:    { set: { status: Blocked } }
 ```
 
-### Environment Variables & Global Options
-```bash
-# Environment variable support (applies to all commands)
-export LOTAR_TASKS_DIR=/project/tasks
-export LOTAR_DEFAULT_ASSIGNEE=john.doe@company.com
-lotar add "Environment-configured task"  # Uses environment settings
+### Web UI: board, sprints, calendar, insights
 
-# Global options work with ALL commands
-lotar add "Task" --tasks-dir=/custom/path
-lotar list --tasks-dir=/custom/path
-lotar config show --tasks-dir=/custom/path
+`lotar serve` starts a local web app on the same files: a filterable task list, a board with WIP limits, sprints with burndown and velocity, a calendar of due dates and sprint windows, and project insights. Changes made in the CLI or by agents show up live. See [Serve](docs/help/serve.md) and [Sprints](docs/help/sprints.md).
 
-# Output format control
-lotar list --format=table     # Terminal table
-lotar list --format=json      # JSON for scripting  
-lotar list --format=markdown  # Markdown output
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/board-dark.webp">
+  <img src="docs/assets/screenshots/board-light.webp" alt="Board view with Todo, InProgress, NeedsReview, Blocked, and Done columns">
+</picture>
+
+<table>
+  <tr>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/sprints-dark.webp"><img src="docs/assets/screenshots/sprints-light.webp" alt="Sprint burndown chart for the active sprint"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/calendar-dark.webp"><img src="docs/assets/screenshots/calendar-light.webp" alt="Calendar with task due dates"></picture></td>
+    <td><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/insights-dark.webp"><img src="docs/assets/screenshots/insights-light.webp" alt="Project insights with status, priority, and assignee breakdowns"></picture></td>
+  </tr>
+</table>
+
+### MCP server for coding agents
+
+`lotar mcp` speaks the Model Context Protocol over stdio, so agents in your editor or terminal can list, create, and update tasks, manage sprints, and read config without scraping CLI output. See [MCP server](docs/help/mcp.md) and the [LoTaR agent skill](docs/help/agent-skills.md).
+
+```json
+{ "mcpServers": { "lotar": { "command": "lotar", "args": ["mcp"] } } }
 ```
 
-### Source Code Integration
-```bash
-# Scan for TODOs in 25+ programming languages
-lotar scan ./src
-```
+### TODO scanner
 
-### Sync Integrations (manual config)
-LoTaR sync is manual-only: configure remotes in your project config and auth profiles in your home config. The UI and CLI do not create or edit connections for you.
+`lotar scan` turns `TODO`, `FIXME`, and similar comments into tasks, writes the new task ID back into the comment, and keeps a code reference on the task that follows the line when code moves. Preview first with `--dry-run`, or pick findings individually on the Scan page. See [Scan](docs/help/scan.md).
 
-Sync integrations are still in beta. Use least-privilege credentials and double-check the repositories or projects you target before running pull/push, since LoTaR can create and update issues.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/scan-dark.webp">
+  <img src="docs/assets/screenshots/scan-light.webp" alt="Scan page listing TODO and FIXME comments with the edits a scan would make">
+</picture>
+
+### Jira and GitHub sync (beta)
+
+Pull issues from Jira or GitHub into local tasks, or push local changes back, with field and value mappings per remote. Sync runs only when you ask: from the CLI, the Sync page, or MCP. Credentials stay in your home config or environment, never in the repo. See the [sync guide](docs/developers/sync.md).
 
 ```yaml
 # .tasks/<PROJECT>/config.yml
 remotes:
-    jira-home:
-        provider: jira
-        project: ENG
-        auth_profile: jira.default
-```
-
-```yaml
-# ~/.lotar
-auth_profiles:
-    jira.default:
-        method: basic
-        email_env: LOTAR_JIRA_EMAIL
-        token_env: LOTAR_JIRA_TOKEN
+  github:
+    provider: github
+    repo: your-org/your-repo
+    auth_profile: github.default
 ```
 
 ```bash
-# Run sync manually
-lotar pull jira-home
-lotar push jira-home
+lotar pull github --dry-run
+lotar push github
 ```
 
-See [docs/developers/sync.md](docs/developers/sync.md) and [docs/help/config-reference.md](docs/help/config-reference.md) for full configuration details.
+### Git history and stats
 
-### Git-derived Stats (read-only)
+Because tasks are files in git, every change has an author and a commit. LoTaR reads that history to show per-task commits and diffs, and to report churn, activity, and authors; these commands only read the repository. See [History](docs/help/history.md) and [Stats](docs/help/stats.md).
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/task-commits-dark.webp">
+  <img src="docs/assets/screenshots/task-commits-light.webp" alt="Task panel showing the git commits that touched the task file">
+</picture>
+
 ```bash
-# Tickets changed in the last 14 days (project by default)
-lotar stats changed --since 14d
-
-# Highest churn (commits per ticket) across all projects in the last 30 days
-lotar stats churn --since 30d --global
-
-# Top authors touching tasks in the last 90 days
-lotar stats authors --since 90d --global
-
-# Activity grouped by day (or author|week|project) in the last 60 days
-lotar stats activity --since 60d --group-by day
-
-# JSON output for scripting
-lotar --format json stats changed --since 7d
+lotar task history ATLS-26           # commits that touched the task
+lotar stats churn --since 30d        # most-changed tasks
+lotar stats authors --since 90d      # who changed tasks
 ```
 
-### Web Interface
+### Custom fields and templates
+
+Define your own states, types, priorities, tags, and custom fields per project, or start from the `default`, `agile`, or `kanban` template. Every surface validates against the same config. See [Configuration](docs/help/config.md) and [Templates](docs/help/templates.md).
+
 ```bash
-# Built-in web server with Vue frontend
-lotar serve --host 127.0.0.1 --port 8080
+lotar init --template=agile --project=mobile
+lotar config set custom_fields component,team --project=mobile
+lotar add "Offline mode for the editor" --project=mobile --field component=editor
+lotar list --where component=editor
 ```
 
-### Screenshots
+## How LoTaR compares
 
-A quick peek at the built-in web UI:
+An honest snapshot as of October 2026. Rows marked **◀** are where LoTaR is behind at least one alternative.
 
-| Tasks | Boards |
-| --- | --- |
-| ![Tasks list](docs/assets/screenshots/ui-tasks.png) | ![Boards](docs/assets/screenshots/ui-boards.png) |
-| ![Sprints](docs/assets/screenshots/ui-sprints.png) | ![Insights](docs/assets/screenshots/ui-insights.png) |
+| | LoTaR | [Backlog.md](https://github.com/MrLesk/Backlog.md) | GitHub Issues | Jira |
+| --- | --- | --- | --- | --- |
+| Tasks live in your repo | ✅ YAML | ✅ Markdown | ❌ hosted | ❌ hosted |
+| Works offline | ✅ | ✅ | ❌ | ❌ |
+| Web UI | ✅ local | ✅ local | ✅ | ✅ |
+| MCP server | ✅ | ✅ | ✅ official server | ✅ official server (Cloud) |
+| Runs coding agents on tasks | ✅ local agent CLIs in worktrees | ❌ | ✅ Copilot coding agent (paid) | ✅ Rovo and third-party agents (Cloud, paid) |
+| Automation rules | ✅ | ❌ | ⚠️ via Actions and Projects workflows | ✅ |
+| Sprints and burndown | ✅ | ⚠️ milestones, no burndown | ⚠️ iterations, no burndown chart | ✅ |
+| Sync with other trackers | ⚠️ Jira and GitHub (beta) | ❌ | n/a | n/a |
+| TODO comment scanning | ✅ | ❌ | ❌ | ❌ |
+| **◀** Typo-tolerant search | ❌ case- and separator-insensitive only | ✅ fuzzy search | ❌ | ❌ |
+| **◀** Docs and decision records | ❌ | ✅ | ⚠️ wiki | ⚠️ via Confluence |
 
-### Task History (read-only, from git)
-```bash
-# Show commit history for a task
-lotar task history PROJ-123
+Pick GitHub Issues or Jira when you need a hosted tracker for non-developers, permissions, and integrations. Pick LoTaR when you want tasks reviewed in the same pull request as the code, and agents working those tasks on your own machine.
 
-# Show raw diff for the latest commit touching the task (or specify --commit)
-lotar task diff PROJ-123
-lotar task diff PROJ-123 --commit abcdef1
+## How it works
 
-# Show the task file snapshot at a specific commit
-lotar task at PROJ-123 abcdef1
-```
-
-## 📁 How It Works
-
-LoTaR creates a `.tasks/` directory in your repository:
-
-```
-```
+```text
 .tasks/
-├── config.yml               # Global configuration
-├── BACKEND/                 # Project folders
-│   ├── config.yml          # Project-specific configuration (optional)
-│   ├── 001.yml             # Individual task files
-│   └── 002.yml
-└── FRONTEND/
-    └── 001.yml
-```
+├── config.yml          # workspace defaults: states, types, members, agent profiles
+├── automation.yml      # optional automation rules
+├── @sprints/1.yml      # sprint plans and actual start/close times
+└── ATLS/               # one folder per project
+    ├── config.yml      # optional project overrides and sync remotes
+    ├── 26.yml          # one file per task
+    └── 27.yml
 ```
 
-Each task is stored as a readable YAML file with structured data:
 ```yaml
-title: "Implement OAuth Authentication"
-status: "IN_PROGRESS"
-priority: "HIGH"
-task_type: "feature"
-assignee: "john.doe@company.com"
-created: "2025-07-30T10:00:00Z"
+# .tasks/ATLS/26.yml
+title: Offline edits are lost when reconnecting mid-sync
+status: Done
+priority: Critical
+type: Bug
+reporter: priya
+assignee: marco
+due_date: 2026-09-29
+effort: 3pt
+tags: [sync, customer]
+references:
+  - link: https://github.com/atlas-notes/atlas/pull/412
+  - code: web/src/sync/queue.ts#20-33
+history:
+  - at: 2026-09-28T15:12:00Z
+    actor: priya
+    changes: [{ field: status, old: NeedsReview, new: Done }]
 ```
 
-## ⚙️ Configuration
+## Documentation
 
-### Zero-Configuration Start
-For most users, **no configuration is needed**! LoTaR automatically initializes projects with sensible defaults:
+- [Installation](docs/help/install.md): every install method, Docker usage, building from source
+- [CLI tour](docs/help/cli-tour.md): example workflow, multi-project setups, global options, configuration basics
+- [Help index](docs/help/index.md): every command and reference page
+- [Configuration reference](docs/help/config-reference.md), [precedence](docs/help/precedence.md), and [environment variables](docs/help/environment.md)
+- [Agent jobs](docs/help/agent.md), [automation rules](docs/help/automation.md), and the [LoTaR agent skill](docs/help/agent-skills.md)
+- [REST API quick reference](docs/help/api-quick-reference.md) and [OpenAPI spec](docs/openapi.json)
+- [Architecture decisions](docs/architecture-decisions.md) and [developer docs](docs/developers/README.md)
 
-```bash
-# This automatically creates default configuration
-lotar add "First task" --project=myproject
-```
+## Contributing
 
-### Configuration Commands
-```bash
-# View current configuration
-lotar config show
+Bug reports and pull requests are welcome in [issues](https://github.com/localtaskrepo/lotar/issues); report security problems through a [private advisory](https://github.com/localtaskrepo/lotar/security/advisories/new). Development setup, test commands, and conventions are in [AGENTS.md](AGENTS.md) and [docs/developers/](docs/developers/README.md). After UI changes, `npm run screenshots` regenerates every image in this README.
 
-# Manual initialization (only for custom templates)
-lotar init --template=agile --project=myapp
+## License
 
-# Set global/project settings
-lotar config set server_port 9000
-lotar config set issue_states TODO,WORKING,REVIEW,DONE --project=myapp
-
-# List available templates (default, agile, kanban)
-lotar config templates
-# See also: docs/help/templates.md for details
-```
-
-> Tip: `lotar init` is a shorthand for `lotar config init` and accepts the same flags.
-
-### Configuration Hierarchy
-1. Built-in defaults
-2. Global config (`.tasks/config.yml`)
-3. Home config (`~/.lotar`) 
-4. Project config (`.tasks/{project}/config.yml`)
-5. Environment variables (`LOTAR_TASKS_DIR`, `LOTAR_DEFAULT_ASSIGNEE`)
-6. Command-line flags (highest priority)
-
-<details>
-<summary>📋 Complete Configuration Reference</summary>
-
-### Environment Variables
-- `LOTAR_TASKS_DIR`: Override tasks directory (absolute: `/project/tasks` or relative: `.issues`)
-- `LOTAR_DEFAULT_ASSIGNEE`: Set default assignee for all tasks
-
-### Available Templates
-- **default**: Basic workflow using global defaults (Todo/InProgress/Done, Feature/Bug/Chore, Low/Medium/High, wildcard tags, and categories)
-- **agile**: Full agile workflow with epics, spikes, sprints, and rich vocabularies
-- **kanban**: Continuous flow with verify gate, feature/bug/epic/chore types, and category custom field
-
-### Configurable Fields
-**Global Settings:**
-- `server_port`: Web interface port (default: 8080)
-- `default_project`: Default project name
-- `tasks_dir_name`: Task storage directory name
-
-**Project Settings:**
-- `issue_states`: Valid task statuses (TODO, IN_PROGRESS, DONE, etc.)
-- `issue_types`: Task types (feature, bug, chore, epic, etc.)
-- `issue_priorities`: Priority levels (LOW, MEDIUM, HIGH, etc.)
-- `custom_fields`: Additional fields like `product`, `sprint`, etc. (wildcard or curated lists)
-- `tags`: Task tags (wildcard by default)
-- `default_assignee`: Default task assignee
-- `default_priority`: Default priority level
-
-</details>
-
-## 🧪 Production Ready
-
-- ✅ **Comprehensive test suite** with continuous integration
-- ✅ **Memory safe** with Rust's ownership system
-- ✅ **Performance optimized** for large task sets
-- ✅ **Security validated** with project isolation
-
-## 🤝 Use Cases
-
-- **Development Teams**: Track features, bugs, and technical debt alongside code
-- **Solo Developers**: Keep tasks organized without external dependencies
-- **Code Reviews**: See task context in git history and diffs
-- **Compliance**: Immutable audit trail of decisions and changes
-- **Documentation**: Requirements that evolve with your codebase
-
-## 📖 Documentation
-
-**Getting Started:**
-- [📚 Complete Documentation](docs/README.md) - Features, commands, and usage
-- [📇 Help Index](docs/help/index.md) - Central links to command help and references
-- [⚖️ Resolution & Precedence](docs/help/precedence.md) - Config/identity/path source order
-- [🧠 Smart Project Management](docs/smart-project-management.md) - Intelligent project resolution and auto-detection
-- [🕓 Git-based History & Stats](docs/mcp-web-foundation-plan.md) - Read-only history design and analytics overview
-- [🏗️ Architecture & Technical Reference](docs/architecture-decisions.md) - System design and file formats
-
-**Advanced:**
-- [🔮 Future Features](docs/mcp-integration-specification.md) - Planned AI agent integration
-
-## 🆘 Support & Bug Reports
-
-- Support & bug reports: https://github.com/localtaskrepo/lotar/issues
-- Security issues: https://github.com/localtaskrepo/lotar/security/advisories/new
-
-## 📝 Example Workflow
-
-```bash
-# Start a new feature (auto-initializes with defaults)
-lotar add "Add user authentication" --type=feature --priority=high --project=auth
-
-# Scan for TODOs in your code
-lotar scan ./src
-
-# Update status as you progress
-lotar status AUTH-001 in_progress
-
-# Add related tasks (smart project resolution)
-lotar add "Add password reset" --project=auth
-lotar add "Add 2FA support" --project=authentication  # Full name also works
-
-# Filter and search
-lotar list --search="auth" --status=todo
-
-# Complete and track in git
-lotar status AUTH-001 done
-git add .tasks/ && git commit -m "Complete user authentication feature"
-```
-
-## 🛠️ Installation
-
-Pick the delivery path that matches your environment; every artifact is produced by the same release workflow, so features and signatures stay consistent.
-
-### macOS ([Homebrew](https://brew.sh/))
-```bash
-brew tap localtaskrepo/lotar
-brew install lotar
-lotar --version
-```
-The tap hosts universal binaries, so both Apple Silicon and Intel machines are supported. Upgrade any time with `brew upgrade lotar`.
-
-### Windows ([Scoop](https://scoop.sh/))
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-iwr -useb get.scoop.sh | iex
-scoop bucket add lotar https://github.com/localtaskrepo/scoop-lotar
-scoop install lotar
-lotar --version
-```
-Use `scoop install lotar --version vX.Y.Z` when validating a specific release manifest from the bucket.
-
-### Docker (macOS • Linux • Windows)
-```bash
-docker pull mallox/lotar
-docker run --rm mallox/lotar --version
-
-# Operate on your current repository
-docker run --rm \
-    -v "$PWD":/workspace \
-    -v "$PWD/.tasks":/tasks \
-    -w /workspace \
-    mallox/lotar list
-```
-The image is a minimal `scratch` container that already contains the signed musl binary. See [`docs/docker.md`](docs/docker.md) or the [Docker Hub page](https://hub.docker.com/r/mallox/lotar) for more scenarios (shared tasks directories, environment variables, etc.).
-
-### Build from Source (Rust)
-```bash
-git clone https://github.com/mallox/lotar
-cd lotar
-cargo build --release
-
-# Optional: Add to PATH
-export PATH="$PATH:$(pwd)/target/release"
-```
-You’ll need the stable Rust toolchain plus Node/npm (for the web assets) if you intend to run tests or `npm run build` locally.
-
-### Development
-```bash
-npm run test            # Preferred full test run (uses nextest)
-cargo nextest run --all-features  # Direct harness access
-cargo build             # Development build
-cargo clippy            # Code quality
-```
-
-### Additional testing notes
-- Nextest uses a more efficient harness and parallelism; see `.config/nextest.toml` for defaults.
-- Doc tests remain available via `cargo test --doc --all-features`.
-- The legacy `cargo test` command intentionally errors and instructs you to use nextest.
-
-### Releases
-- Follow the automated release pipeline and post-release verification steps in
-    [`docs/release-guide.md`](docs/release-guide.md).
-- Manual verification workflows (`Verify Scoop Install` and `Verify Homebrew Install`)
-    live under **Actions** for quick smoke-tests of installer paths.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🌟 Why LoTaR?
-
-Unlike external task trackers that become outdated and disconnected from your code, LoTaR keeps your task management **in sync with your development workflow**. Every requirement change, status update, and decision is version-controlled alongside the code it affects.
-
-With **zero-configuration setup** and **intelligent project management**, you can start tracking tasks immediately without any upfront configuration. LoTaR automatically creates sensible defaults and intelligently resolves project names, but still gives you full control to customize your workflow when needed.
-
-Perfect for teams who want the benefits of structured task management without losing the simplicity and reliability of git-based workflows.
+[MIT](LICENSE)

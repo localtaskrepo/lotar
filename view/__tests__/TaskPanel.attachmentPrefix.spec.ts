@@ -84,7 +84,6 @@ vi.mock('../api/client', () => ({
         addTask: vi.fn(),
         addComment: vi.fn(),
         taskHistory: vi.fn(async () => []),
-        taskCommitDiff: vi.fn(async () => ''),
         suggestTasks: vi.fn(async () => []),
         referenceSnippet: vi.fn(async () => null),
         listTasks: vi.fn(async () => []),

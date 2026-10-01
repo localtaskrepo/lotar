@@ -153,39 +153,33 @@ export class SmokeWorkspace {
         const { project, sequence } = SmokeWorkspace.splitTaskId(id);
         const candidatePath = path.join(this.tasksDir, project, `${sequence}.yml`);
 
-        let filePath: string | null = null;
-        const attempts = 20;
-        for (let i = 0; i < attempts; i += 1) {
-            if (await fs.pathExists(candidatePath)) {
-                filePath = candidatePath;
-                break;
-            }
-
+        // Strict ID/path correspondence: only the file derived from the
+        // reported task ID is accepted. Any other new task file appearing
+        // while the expected path is missing is a mismatch and fails fast
+        // instead of being adopted.
+        const deadline = Date.now() + 5_000;
+        let unexpectedFiles: string[] = [];
+        while (!(await fs.pathExists(candidatePath))) {
             const nextFiles = await this.listTaskFiles();
-            const newFiles = nextFiles.filter((file) => !existingFiles.has(file));
-            if (process.env.SMOKE_DEBUG === '1') {
-                console.debug('[smoke] addTask poll', {
-                    attempt: i,
-                    candidatePath,
-                    nextFiles,
-                    newFiles,
-                });
+            unexpectedFiles = nextFiles.filter((file) => !existingFiles.has(file));
+            if (unexpectedFiles.length > 0) {
+                throw new Error(
+                    `lotar reported task ${id} (expected ${candidatePath}) but only unexpected task file(s) appeared: ${unexpectedFiles.join(', ')}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+                );
             }
-            if (newFiles.length) {
-                filePath = newFiles[0];
-                break;
+            if (Date.now() >= deadline) {
+                throw new Error(
+                    `Expected task file ${candidatePath} for reported task ${id} was not created within 5s\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+                );
             }
-
             await new Promise((resolve) => setTimeout(resolve, 50));
         }
 
-        if (!filePath) {
-            throw new Error(
-                `Expected task file to be created for ${id}, but none was found.\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
-            );
+        if (process.env.SMOKE_DEBUG === '1') {
+            console.debug('[smoke] addTask resolved', { id, candidatePath });
         }
 
-        return { id, project, sequence, filePath, result };
+        return { id, project, sequence, filePath: candidatePath, result };
     }
 
     async readTaskYaml(taskId: string): Promise<string> {

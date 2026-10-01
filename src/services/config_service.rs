@@ -1,8 +1,8 @@
 use crate::api_types::ProjectDTO;
 use crate::config::manager::ConfigManager;
 use crate::config::source_labels::{
-    CONFIG_SOURCE_ENTRIES, build_global_source_labels, build_project_source_labels,
-    collapse_label_to_scope,
+    CONFIG_SOURCE_ENTRIES, build_global_source_labels_with_port,
+    build_project_source_labels_with_port, collapse_label_to_scope,
 };
 use crate::config::validation::errors::ValidationResult;
 use crate::errors::{LoTaRError, LoTaRResult};
@@ -60,6 +60,7 @@ impl ConfigService {
 
         let global_path = paths::global_config_path(&resolver.path);
         let has_global_file = global_path.exists();
+        let global_port_explicit = persistence::global_config_sets_server_port(&resolver.path);
         let global_cfg = persistence::load_global_config(Some(&resolver.path)).ok();
         let home_cfg = persistence::load_home_config().ok();
         let global_raw: GlobalConfig = global_cfg.clone().unwrap_or_default();
@@ -84,19 +85,25 @@ impl ConfigService {
                 project_raw_val = serde_json::to_value(cfg).unwrap_or(serde_json::json!({}));
             }
 
-            let sources = build_project_source_labels(
+            let sources = build_project_source_labels_with_port(
                 &resolved_project,
                 &resolved_global,
                 project_cfg.as_ref(),
                 &global_cfg,
                 &home_cfg,
+                global_port_explicit,
             );
 
             (effective_val, sources)
         } else {
             let effective_val = serde_json::to_value(&resolved_global)
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
-            let sources = build_global_source_labels(&resolved_global, &global_cfg, &home_cfg);
+            let sources = build_global_source_labels_with_port(
+                &resolved_global,
+                &global_cfg,
+                &home_cfg,
+                global_port_explicit,
+            );
             (effective_val, sources)
         };
 
