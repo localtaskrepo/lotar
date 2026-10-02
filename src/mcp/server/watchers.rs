@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
 use super::hints::{EnumHints, gather_enum_hints};
-use super::{session_initialized, write_json_message};
+use super::session::McpSession;
+use super::write_json_message;
 
 #[derive(Debug)]
 pub(super) enum ServerEvent {
@@ -17,17 +18,23 @@ pub(super) enum ServerEvent {
 pub(super) fn spawn_event_dispatcher(
     receiver: mpsc::Receiver<ServerEvent>,
     stdout: Arc<Mutex<io::Stdout>>,
+    session: Option<Arc<McpSession>>,
 ) {
     std::thread::spawn(move || {
         while let Ok(event) = receiver.recv() {
             match event {
                 ServerEvent::ToolsChanged { hint_categories } => {
-                    if !session_initialized() {
-                        continue;
-                    }
                     let notification = build_tools_changed_notification(&hint_categories);
-                    if let Ok(line) = serde_json::to_string(&notification) {
-                        write_json_message(&stdout, &line);
+                    let Ok(line) = serde_json::to_string(&notification) else {
+                        continue;
+                    };
+                    match &session {
+                        // Before the session is Ready the change is deferred
+                        // and coalesced into the session's pending flag; the
+                        // wire loop emits exactly one notification right
+                        // after the ready transition instead of dropping it.
+                        Some(session) if session.defer_list_changed_if_not_ready() => {}
+                        _ => write_json_message(&stdout, &line),
                     }
                 }
             }
@@ -55,8 +62,9 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
 
         // Best-effort kernel watcher for instant updates. Some runtimes (e.g.
         // sandboxed agent shells) forbid the underlying file-watch syscalls, so
-        // this may be `None`; the periodic poll below still detects config/
-        // tooling changes so `tools/listChanged` fires reliably everywhere.
+        // this may be `None`; the intentional periodic poll below still detects
+        // config/tooling changes so `notifications/tools/list_changed` fires
+        // reliably everywhere.
         let _watcher = (|| {
             let mut watcher = recommended_watcher({
                 let tx = tx.clone();
@@ -102,8 +110,8 @@ fn spawn_tools_dir_watcher(tasks_dir: PathBuf, sender: mpsc::Sender<ServerEvent>
     });
 }
 
-/// Re-gather enum hints and emit a `tools/listChanged` notification when they
-/// differ from the last snapshot, debounced to coalesce event bursts.
+/// Re-gather enum hints and emit a tools-list change when they differ from
+/// the last snapshot, debounced to coalesce event bursts.
 fn emit_tools_change_if_changed(
     sender: &mpsc::Sender<ServerEvent>,
     previous_hints: &mut Option<EnumHints>,
@@ -152,10 +160,13 @@ pub(crate) fn event_affects_tooling(paths: &[PathBuf], tasks_dir: &Path) -> bool
     })
 }
 
+/// Build the outgoing `notifications/tools/list_changed` JSON-RPC
+/// notification. The method name follows the MCP notification namespace; the
+/// advertised capability key stays the camelCase `tools.listChanged`.
 pub(super) fn build_tools_changed_notification(hint_categories: &[String]) -> Value {
     json!({
         "jsonrpc": "2.0",
-        "method": "tools/listChanged",
+        "method": "notifications/tools/list_changed",
         "params": {
             "hintCategories": hint_categories
         }
@@ -283,7 +294,7 @@ mod tests {
         let notification = build_tools_changed_notification(&categories);
         assert_eq!(
             notification.get("method").and_then(|v| v.as_str()),
-            Some("tools/listChanged")
+            Some("notifications/tools/list_changed")
         );
         let params = notification
             .get("params")

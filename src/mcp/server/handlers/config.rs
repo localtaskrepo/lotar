@@ -60,7 +60,10 @@ pub(crate) fn handle_config_set(req: JsonRpcRequest) -> JsonRpcResponse {
         .unwrap_or_default();
     let mut map = BTreeMap::new();
     for (k, v) in values.iter() {
-        map.insert(k.clone(), v.as_str().unwrap_or(&v.to_string()).to_string());
+        let Some(text) = v.as_str() else {
+            return err(req.id, -32602, "Config values must be strings", None);
+        };
+        map.insert(k.clone(), text.to_string());
     }
     let global = req
         .params

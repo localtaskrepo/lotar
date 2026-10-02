@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::super::{JsonRpcRequest, JsonRpcResponse, err, ok};
+use super::super::{JsonRpcRequest, JsonRpcResponse, domain_service_error, err, ok};
 use crate::api_types::AgentJobCreateRequest;
 use crate::services::agent_job_service::AgentJobService;
 use crate::workspace::TasksDirectoryResolver;
@@ -59,7 +59,9 @@ pub(crate) fn handle_agent_run(req: JsonRpcRequest) -> JsonRpcResponse {
                 }),
             )
         }
-        Err(e) => err(req.id, -32603, &e.to_string(), None),
+        // Bad ticket/runner/profile and job-registry rejections are expected
+        // domain failures -> isError tool results; internal faults stay -32603.
+        Err(e) => domain_service_error(req.id, "Agent job failed", &e),
     }
 }
 
@@ -79,7 +81,7 @@ pub(crate) fn handle_agent_status(req: JsonRpcRequest) -> JsonRpcResponse {
                 }),
             )
         }
-        None => err(req.id, -32602, "Job not found", None),
+        None => err(req.id, -32000, "Job not found", None),
     }
 }
 
@@ -116,8 +118,8 @@ pub(crate) fn handle_agent_cancel(req: JsonRpcRequest) -> JsonRpcResponse {
                 }),
             )
         }
-        Ok(None) => err(req.id, -32602, "Job not found", None),
-        Err(e) => err(req.id, -32603, &e.to_string(), None),
+        Ok(None) => err(req.id, -32000, "Job not found", None),
+        Err(e) => domain_service_error(req.id, "Agent cancel failed", &e),
     }
 }
 
@@ -141,6 +143,6 @@ pub(crate) fn handle_agent_send_message(req: JsonRpcRequest) -> JsonRpcResponse 
                 }),
             )
         }
-        Err(e) => err(req.id, -32603, &e.to_string(), None),
+        Err(e) => domain_service_error(req.id, "Agent send message failed", &e),
     }
 }

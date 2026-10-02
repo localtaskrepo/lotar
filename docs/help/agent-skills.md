@@ -94,7 +94,7 @@ your workflow values to work around it; recheck this limitation after upgrading.
   between workers. Compaction can lose cache reuse yet reduce total cost. Do not
   preserve irrelevant context, send warm-up requests, or weaken permissions for it.
 - LoTaR MCP updates tool metadata when enum hints change. Hosts must process
-  `tools/listChanged` for correctness; do not suppress necessary schema updates
+  `notifications/tools/list_changed` for correctness; do not suppress necessary schema updates
   to preserve a cache. Prefer focused task queries and filtered `schema_discover`
   over repeatedly requesting the whole catalog.
 

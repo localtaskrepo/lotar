@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { callTool, extractToolPayload, initializeFramedMcp, withFramedMcpClient } from '../helpers/mcp-harness.js';
+import { callTool, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
-const BASIC_CONFIG = `default:\n  project: CLI\n  reporter: me@example.com\nissue:\n  states: [Todo, Done]\n  priorities: [Low]\n  types: [Feature]\n`;
+const BASIC_CONFIG = `\ndefault:\n  project: CLI\n  reporter: me@example.com\nissue:\n  states: [Todo, Done]\n  priorities: [Low]\n  types: [Feature]\n`;
 
 async function withSeededWorkspace<T>(
     seedFiles: Record<string, string>,
@@ -20,12 +20,9 @@ async function withSeededWorkspace<T>(
 describe.concurrent('MCP high-value tools', () => {
     it('resolves whoami with explain', async () => {
         await withSeededWorkspace({ '.tasks/config.yml': BASIC_CONFIG }, async (workspace) => {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const frame = await callTool(client, 2, 'whoami', { explain: true });
-                expect(frame.message?.error).toBeUndefined();
+                expect(frame.error).toBeUndefined();
                 const payload = extractToolPayload(frame) as any;
                 expect(payload.status).toBe('ok');
                 expect(payload.user).toBe('me@example.com');
@@ -37,22 +34,19 @@ describe.concurrent('MCP high-value tools', () => {
     it('adds and updates task comments via MCP', async () => {
         await withSeededWorkspace({ '.tasks/config.yml': BASIC_CONFIG }, async (workspace) => {
             const created = await workspace.addTask('MCP comment task');
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const added = await callTool(client, 2, 'task_comment_add', {
                     id: created.id,
                     text: 'First comment',
                 });
-                expect(added.message?.error).toBeUndefined();
+                expect(added.error).toBeUndefined();
 
                 const updated = await callTool(client, 3, 'task_comment_update', {
                     id: created.id,
                     index: 0,
                     text: 'Updated comment',
                 });
-                expect(updated.message?.error).toBeUndefined();
+                expect(updated.error).toBeUndefined();
 
                 const yaml = parse(await workspace.readTaskYaml(created.id)) as Record<string, any>;
                 const comments = Array.isArray(yaml.comments) ? yaml.comments : [];
@@ -68,15 +62,12 @@ describe.concurrent('MCP high-value tools', () => {
             await workspace.addTask('MCP list A');
             await workspace.addTask('MCP list B');
 
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const page1 = await callTool(client, 2, 'task_list', {
                     limit: 1,
                     cursor: 0,
                 });
-                expect(page1.message?.error).toBeUndefined();
+                expect(page1.error).toBeUndefined();
                 const payload1 = extractToolPayload(page1) as any;
 
                 expect(payload1.status).toBe('ok');
@@ -89,7 +80,7 @@ describe.concurrent('MCP high-value tools', () => {
                     limit: 1,
                     cursor: payload1.nextCursor,
                 });
-                expect(page2.message?.error).toBeUndefined();
+                expect(page2.error).toBeUndefined();
                 const payload2 = extractToolPayload(page2) as any;
                 expect(payload2.status).toBe('ok');
                 expect(payload2.count).toBe(1);
@@ -102,16 +93,13 @@ describe.concurrent('MCP high-value tools', () => {
             const first = await workspace.addTask('MCP sprint task A');
             const second = await workspace.addTask('MCP sprint task B');
 
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const created = await callTool(client, 2, 'sprint_create', {
                     label: 'MCP Sprint',
                     starts_at: '2025-01-01T00:00:00Z',
                     ends_at: '2025-01-08T00:00:00Z',
                 });
-                expect(created.message?.error).toBeUndefined();
+                expect(created.error).toBeUndefined();
                 const createPayload = extractToolPayload(created) as any;
                 expect(createPayload.status).toBe('ok');
 
@@ -122,7 +110,7 @@ describe.concurrent('MCP high-value tools', () => {
                     sprint_id: sprintId,
                     label: 'MCP Sprint Updated',
                 });
-                expect(updated.message?.error).toBeUndefined();
+                expect(updated.error).toBeUndefined();
                 const updatePayload = extractToolPayload(updated) as any;
                 expect(updatePayload.status).toBe('ok');
                 expect(updatePayload.sprint?.label).toBe('MCP Sprint Updated');
@@ -131,7 +119,7 @@ describe.concurrent('MCP high-value tools', () => {
                     limit: 1,
                     cursor: 0,
                 });
-                expect(list.message?.error).toBeUndefined();
+                expect(list.error).toBeUndefined();
                 const listPayload = extractToolPayload(list) as any;
                 expect(listPayload.status).toBe('ok');
                 expect(listPayload.count).toBe(1);
@@ -141,25 +129,25 @@ describe.concurrent('MCP high-value tools', () => {
                     tasks: [first.id, second.id],
                     sprint_id: sprintId,
                 });
-                expect(added.message?.error).toBeUndefined();
+                expect(added.error).toBeUndefined();
 
                 const bulkUpdated = await callTool(client, 6, 'task_bulk_update', {
                     ids: [first.id],
                     patch: { status: 'Done' },
                 });
-                expect(bulkUpdated.message?.error).toBeUndefined();
+                expect(bulkUpdated.error).toBeUndefined();
 
                 const summary = await callTool(client, 7, 'sprint_summary', {
                     sprint_id: sprintId,
                 });
-                expect(summary.message?.error).toBeUndefined();
+                expect(summary.error).toBeUndefined();
                 const summaryPayload = extractToolPayload(summary) as any;
                 expect(summaryPayload.status).toBe('ok');
 
                 const burndown = await callTool(client, 8, 'sprint_burndown', {
                     sprint_id: sprintId,
                 });
-                expect(burndown.message?.error).toBeUndefined();
+                expect(burndown.error).toBeUndefined();
                 const burndownPayload = extractToolPayload(burndown) as any;
                 expect(burndownPayload.status).toBe('ok');
                 expect(Array.isArray(burndownPayload.series)).toBe(true);
@@ -168,7 +156,7 @@ describe.concurrent('MCP high-value tools', () => {
                     include_active: true,
                     metric: 'tasks',
                 });
-                expect(velocity.message?.error).toBeUndefined();
+                expect(velocity.error).toBeUndefined();
                 const velocityPayload = extractToolPayload(velocity) as any;
                 expect(velocityPayload.status).toBe('ok');
                 expect(Array.isArray(velocityPayload.entries)).toBe(true);

@@ -127,7 +127,11 @@ fn mcp_initialize_advertises_list_changed_capability() {
         "jsonrpc": "2.0",
         "id": 42,
         "method": "initialize",
-        "params": {}
+        "params": {
+            "protocolVersion": "2025-06-18",
+            "capabilities": {},
+            "clientInfo": {"name": "lotar-test", "version": "1.0.0"}
+        }
     });
     let line = serde_json::to_string(&req).unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
@@ -799,7 +803,9 @@ fn mcp_sprint_tools_assign_and_backlog() {
         "params": {
             "name": "sprint_add",
             "arguments": {
-                "sprint": sprint_id,
+                // Advertised schema for sprint_add.sprint is string|null:
+                // use the documented "#<id>" reference form.
+                "sprint": format!("#{sprint_id}"),
                 "tasks": [task_a.id, task_b.id]
             }
         }
@@ -862,7 +868,7 @@ fn mcp_sprint_tools_assign_and_backlog() {
         "params": {
             "name": "sprint_remove",
             "arguments": {
-                "sprint": sprint_id,
+                "sprint": format!("#{sprint_id}"),
                 "tasks": [task_a.id]
             }
         }
@@ -1230,7 +1236,7 @@ fn mcp_task_create_and_get() {
 }
 
 #[test]
-fn mcp_tools_call_with_invalid_tool_name_returns_method_not_found() {
+fn mcp_tools_call_with_invalid_tool_name_returns_invalid_params() {
     let req = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 99,
@@ -1241,7 +1247,66 @@ fn mcp_tools_call_with_invalid_tool_name_returns_method_not_found() {
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     let err = resp.get("error").cloned().unwrap_or(serde_json::json!({}));
-    assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32601));
+    // Unknown tools under tools/call use invalid params per MCP guidance,
+    // not method-not-found (that code is reserved for unknown wire methods).
+    assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
+    assert_eq!(
+        err.get("message").and_then(|v| v.as_str()),
+        Some("Unknown tool: does_not_exist")
+    );
+}
+
+#[test]
+fn mcp_tools_call_never_dispatches_control_plane_methods() {
+    for name in [
+        "initialize",
+        "ping",
+        "tools/list",
+        "tools_list",
+        "tools/call",
+        "tools_call",
+        "logging/setLevel",
+        "logging_setLevel",
+    ] {
+        let req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 77,
+            "method": "tools/call",
+            "params": {"name": name, "arguments": {}}
+        });
+        let line = serde_json::to_string(&req).unwrap();
+        let resp_line = lotar::mcp::server::handle_json_line(&line);
+        let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+        let err = resp
+            .get("error")
+            .cloned()
+            .unwrap_or_else(|| panic!("tools/call {name} must not dispatch"));
+        assert_eq!(
+            err.get("code").and_then(|v| v.as_i64()),
+            Some(-32602),
+            "tools/call {name}"
+        );
+        assert_eq!(
+            err.get("message").and_then(|v| v.as_str()),
+            Some(format!("Unknown tool: {name}").as_str())
+        );
+    }
+
+    // schema_discover remains a callable advertised tool through tools/call.
+    let req = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 78,
+        "method": "tools/call",
+        "params": {"name": "schema_discover", "arguments": {}}
+    });
+    let line = serde_json::to_string(&req).unwrap();
+    let resp_line = lotar::mcp::server::handle_json_line(&line);
+    let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+    assert!(
+        resp.get("error").is_none(),
+        "schema_discover must stay callable: {resp}"
+    );
+    assert_eq!(function_response_name(&resp), Some("schema_discover"));
 }
 
 #[test]
@@ -1262,12 +1327,138 @@ fn mcp_task_create_missing_title_returns_invalid_params() {
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
     let err = resp.get("error").cloned().unwrap();
     assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
-    let msg = err
-        .get("message")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_lowercase();
-    assert!(msg.contains("missing") && msg.contains("title"));
+    // Schema-layer rejections carry structured issues naming the violation.
+    let issues = err
+        .get("data")
+        .and_then(|data| data.get("issues"))
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        issues.iter().any(|issue| {
+            let text = issue.as_str().unwrap_or("");
+            text.contains("title") && text.contains("required")
+        }),
+        "issues must name the missing required title: {issues:?}"
+    );
+
+    // guard drops here
+}
+
+#[test]
+fn mcp_strict_input_pins_reject_on_the_tools_call_surface() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    let cases = [
+        // sprint_delete "force" was advertised-but-ignored; intentionally
+        // rejected now on the tools/call surface as well.
+        (
+            "sprint_delete",
+            serde_json::json!({"sprint": "#1", "force": true}),
+            "force",
+        ),
+        // sync task_id was undocumented and unadvertised.
+        (
+            "sync_pull",
+            serde_json::json!({"remote": "origin", "task_id": "MCP-1"}),
+            "task_id",
+        ),
+        // config_set values must be strings (no silent coercion).
+        (
+            "config_set",
+            serde_json::json!({"values": {"default.project": 42}}),
+            "default.project",
+        ),
+    ];
+    for (tool, arguments, field) in cases {
+        let req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 500,
+            "method": "tools/call",
+            "params": {"name": tool, "arguments": arguments}
+        });
+        let line = serde_json::to_string(&req).unwrap();
+        let resp_line = lotar::mcp::server::handle_json_line(&line);
+        let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
+        let err = resp
+            .get("error")
+            .cloned()
+            .unwrap_or_else(|| panic!("tools/call {tool} with {field} must be rejected: {resp}"));
+        assert_eq!(err.get("code").and_then(|v| v.as_i64()), Some(-32602));
+        let issues = err
+            .get("data")
+            .and_then(|data| data.get("issues"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        assert!(
+            issues
+                .iter()
+                .any(|issue| { issue.as_str().unwrap_or("").contains(field) }),
+            "{tool} issues must name {field}: {issues:?}"
+        );
+    }
+    // Side-effect safety: nothing was created in the workspace.
+    let entries: Vec<_> = std::fs::read_dir(&tasks_dir)
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .collect();
+    assert!(
+        entries.is_empty(),
+        "rejected pins must not write: {entries:?}"
+    );
+
+    // guard drops here
+}
+
+#[test]
+fn mcp_long_multibyte_enum_rejection_reports_error_instead_of_panicking() {
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    let _guard_tasks = EnvVarGuard::set("LOTAR_TASKS_DIR", tasks_dir.to_string_lossy().as_ref());
+
+    let send_due = |due: String, note: &str| {
+        let req = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 600,
+            "method": "tools/call",
+            "params": {"name": "task_list", "arguments": {"due": due}}
+        });
+        let line = serde_json::to_string(&req).unwrap();
+        let resp_line = lotar::mcp::server::handle_json_line(&line);
+        let resp: serde_json::Value = serde_json::from_str(&resp_line)
+            .unwrap_or_else(|error| panic!("{note}: non-JSON response {resp_line:?}: {error}"));
+        let err = resp
+            .get("error")
+            .cloned()
+            .unwrap_or_else(|| panic!("{note}: expected error, got {resp}"));
+        assert_eq!(
+            err.get("code").and_then(|v| v.as_i64()),
+            Some(-32602),
+            "{note}"
+        );
+        let issues = err
+            .get("data")
+            .and_then(|data| data.get("issues"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        assert!(!issues.is_empty(), "{note}: issues required");
+    };
+
+    // Reviewer repro: 81 bytes with byte 80 mid-character (27 x 3-byte char).
+    send_due("研".repeat(27), "multibyte 81 bytes");
+    // Exact 80-byte boundary and long ASCII values.
+    send_due("a".repeat(80), "exact 80 ascii");
+    send_due("a".repeat(300), "long ascii");
+    // Mixed multibyte at several cut offsets.
+    send_due(format!("{}{}", "b".repeat(77), "✓✓✓"), "mixed boundary");
+    send_due("日".repeat(26 + 2), "multibyte 84 bytes");
 
     // guard drops here
 }

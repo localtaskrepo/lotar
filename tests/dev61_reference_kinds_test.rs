@@ -212,6 +212,14 @@ fn mcall(name: &str, args: Value) -> Value {
     serde_json::from_str(&resp_line).unwrap()
 }
 
+/// True when the tool call failed: JSON-RPC protocol error or recoverable
+/// domain failure surfaced as result.isError (DEV-63).
+fn mcp_failed(resp: &Value) -> bool {
+    resp.get("error").is_some()
+        || resp.get("result").and_then(|result| result.get("isError"))
+            == Some(&serde_json::json!(true))
+}
+
 fn task_yaml_has_reference_key(tasks_dir: &Path, project: &str, number: &str, key: &str) -> bool {
     let yaml =
         std::fs::read_to_string(tasks_dir.join(project).join(format!("{number}.yml"))).unwrap();
@@ -695,7 +703,7 @@ fn mcp_file_and_attachment_kinds_follow_the_contract() {
             json!({"id": "TP-2", "kind": "file", "value": value}),
         );
         assert!(
-            resp.get("error").is_some(),
+            mcp_failed(&resp),
             "MCP file add must reject store paths: {resp}"
         );
     }
@@ -724,7 +732,7 @@ fn mcp_file_and_attachment_kinds_follow_the_contract() {
             json!({"id": "TP-2", "kind": "attachment", "value": bad}),
         );
         assert!(
-            resp.get("error").is_some(),
+            mcp_failed(&resp),
             "MCP attachment add must reject {bad}: {resp}"
         );
     }
@@ -1141,10 +1149,7 @@ fn code_references_reject_store_paths_and_stale_detach_still_works() {
         "task_reference_add",
         json!({"id": "TP-1", "kind": "code", "value": store_rel_anchored}),
     );
-    assert!(
-        resp.get("error").is_some(),
-        "MCP code add must reject store path"
-    );
+    assert!(mcp_failed(&resp), "MCP code add must reject store path");
 
     // Snippet preview route rejects store targets as well.
     let resp = api.handle_request(&mk_req_query(
@@ -1264,10 +1269,7 @@ fn store_guard_fails_closed_on_invalid_configuration() {
             "task_reference_add",
             json!({"id": "TP-1", "kind": "file", "value": example}),
         );
-        assert!(
-            resp.get("error").is_some(),
-            "{context}: MCP file add denied: {resp}"
-        );
+        assert!(mcp_failed(&resp), "{context}: MCP file add denied: {resp}");
 
         // User-owned data is preserved: no reference was created.
         assert_eq!(storage_task_refcount(&fx, "TP-1"), 0, "{context}: no refs");

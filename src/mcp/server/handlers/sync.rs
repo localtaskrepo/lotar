@@ -18,7 +18,8 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
         _ => return err(req.id, -32602, "Missing remote", None),
     };
     let project = req.params.get("project").and_then(|v| v.as_str());
-    let task_id = req.params.get("task_id").and_then(|v| v.as_str());
+    // task_id is intentionally not advertised: the schema layer rejects it as
+    // an unknown property before this handler runs.
     let auth_profile = req.params.get("auth_profile").and_then(|v| v.as_str());
     let dry_run = req
         .params
@@ -52,7 +53,7 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
             project,
             dry_run,
             auth_profile,
-            task_id,
+            None,
             write_report,
             include_report,
             client_run_id,
@@ -63,7 +64,7 @@ fn handle_sync(req: JsonRpcRequest, direction: SyncDirection) -> JsonRpcResponse
             project,
             dry_run,
             auth_profile,
-            task_id,
+            None,
             write_report,
             include_report,
             client_run_id,

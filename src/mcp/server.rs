@@ -1,35 +1,35 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock, mpsc};
 use std::time::Duration;
 
 mod handlers;
 mod hints;
+mod registry;
+mod schema;
+mod session;
 mod tools;
+mod transport;
 mod watchers;
 
 #[cfg(test)]
 mod mcp_server_tests;
 
-use handlers::{
-    handle_agent_cancel, handle_agent_list_jobs, handle_agent_run, handle_agent_send_message,
-    handle_agent_status, handle_config_set, handle_config_show, handle_project_list,
-    handle_project_stats, handle_sprint_add, handle_sprint_backlog, handle_sprint_burndown,
-    handle_sprint_create, handle_sprint_delete, handle_sprint_get, handle_sprint_list,
-    handle_sprint_remove, handle_sprint_summary, handle_sprint_update, handle_sprint_velocity,
-    handle_sync_pull, handle_sync_push, handle_task_bulk_comment_add,
-    handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
-    handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete,
-    handle_task_get, handle_task_list, handle_task_reference_add, handle_task_reference_remove,
-    handle_task_update, handle_whoami,
-};
 use hints::gather_enum_hints;
+use session::McpSession;
 use tools::build_tool_definitions;
 #[cfg(test)]
 pub(crate) use watchers::event_affects_tooling;
 use watchers::{ServerEvent, spawn_event_dispatcher, start_tools_change_notifier};
+
+/// MCP protocol revision this server implements and always negotiates to.
+const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
+
+/// JSON-RPC error code rejecting operational requests that arrive before the
+/// session finished the initialize lifecycle.
+const MCP_NOT_INITIALIZED: i64 = -32002;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct JsonRpcRequest {
@@ -65,7 +65,7 @@ const MAX_MCP_FRAME_BYTES: usize = 10 * 1024 * 1024;
 
 /// Discard an oversized framed body byte-by-byte so the stream stays in sync
 /// without ever allocating the announced size.
-fn drain_framed_body<R: Read>(reader: &mut R, mut remaining: usize) {
+fn drain_framed_body<R: Read + ?Sized>(reader: &mut R, mut remaining: usize) {
     let mut sink = [0u8; 8192];
     while remaining > 0 {
         let want = remaining.min(sink.len());
@@ -106,6 +106,9 @@ fn err(id: Option<Value>, code: i64, message: &str, data: Option<Value>) -> Json
     }
 }
 
+/// Map a raw method spelling to its canonical wire method: snake_case tool
+/// names (`task_create`) normalize to their direct slash form
+/// (`task/create`); methods already containing `/` pass through unchanged.
 fn normalize_method(name: &str) -> String {
     if name.contains('/') {
         name.to_string()
@@ -119,7 +122,7 @@ fn normalize_method(name: &str) -> String {
 
 static LOG_LEVEL: OnceLock<RwLock<String>> = OnceLock::new();
 static USE_FRAMED_OUTPUT: AtomicBool = AtomicBool::new(false);
-static SESSION_INITIALIZED: AtomicBool = AtomicBool::new(false);
+
 fn set_log_level(level: &str) {
     let lvl = level.to_ascii_lowercase();
     let valid = matches!(
@@ -130,6 +133,38 @@ fn set_log_level(level: &str) {
     let cell = LOG_LEVEL.get_or_init(|| RwLock::new("info".to_string()));
     if let Ok(mut guard) = cell.write() {
         *guard = final_level;
+    }
+}
+
+/// Classify a domain-service error for MCP tool responses: expected domain
+/// failures (validation, not-found, invalid references) use the custom
+/// -32000 code the registry converts into `isError` tool results, while
+/// genuine internal failures (I/O, serialization) keep the reserved
+/// -32603 protocol error.
+fn domain_service_error(
+    id: Option<Value>,
+    envelope: &str,
+    error: &crate::errors::LoTaRError,
+) -> JsonRpcResponse {
+    use crate::errors::LoTaRError;
+    match error {
+        LoTaRError::ValidationError(_)
+        | LoTaRError::TaskNotFound(_)
+        | LoTaRError::SprintNotFound(_)
+        | LoTaRError::InvalidTaskId(_)
+        | LoTaRError::ProjectNotFound(_)
+        | LoTaRError::IndexError(_) => err(
+            id,
+            -32000,
+            envelope,
+            Some(json!({ "message": error.to_string() })),
+        ),
+        _ => err(
+            id,
+            -32603,
+            envelope,
+            Some(json!({ "message": error.to_string() })),
+        ),
     }
 }
 
@@ -218,23 +253,379 @@ fn write_json_message(stdout: &Arc<Mutex<io::Stdout>>, payload: &str) {
 }
 
 fn respond_parse_error(stdout: &Arc<Mutex<io::Stdout>>, details: &str) {
-    let response = err(
-        Some(Value::Null),
-        -32700,
-        "Parse error",
-        Some(json!({"details": details})),
-    );
+    let response = parse_error_response(details);
     if let Ok(encoded) = serde_json::to_string(&response) {
         write_json_message(stdout, &encoded);
     }
 }
 
-fn mark_session_initialized() {
-    SESSION_INITIALIZED.store(true, Ordering::Relaxed);
+fn parse_error_response(details: &str) -> JsonRpcResponse {
+    err(
+        Some(Value::Null),
+        -32700,
+        "Parse error",
+        Some(json!({ "details": details })),
+    )
 }
 
-fn session_initialized() -> bool {
-    SESSION_INITIALIZED.load(Ordering::Relaxed)
+fn invalid_request_response(id: Value, message: &str) -> JsonRpcResponse {
+    err(Some(id), -32600, message, None)
+}
+
+fn write_serialized_response(stdout: &Arc<Mutex<io::Stdout>>, response: &JsonRpcResponse) {
+    match serde_json::to_string(response) {
+        Ok(payload) => write_json_message(stdout, &payload),
+        Err(error) => {
+            let fallback = json!({
+                "jsonrpc": "2.0",
+                "error": {
+                    "code": -32603,
+                    "message": format!("Serialization error: {error}")
+                },
+                "id": Value::Null
+            })
+            .to_string();
+            write_json_message(stdout, &fallback);
+        }
+    }
+}
+
+/// What the wire loop should do after routing one incoming message.
+enum WireOutcome {
+    /// Respond to a request.
+    Respond(JsonRpcResponse),
+    /// A lifecycle transition happened; emit the coalesced deferred
+    /// tools-list change if one is pending.
+    FlushDeferred,
+    /// Notification or ignored message: no response is ever written.
+    Silent,
+}
+
+/// A syntactically valid JSON-RPC message with a validated envelope.
+enum Incoming {
+    Request {
+        id: Value,
+        method: String,
+        params: Value,
+    },
+    Notification {
+        method: String,
+    },
+}
+
+/// Parse and validate one raw message (NDJSON line or framed body).
+///
+/// Error classification:
+/// - syntactically malformed JSON -> -32700 Parse error (id null);
+/// - structurally invalid envelopes (non-object payload, wrong `jsonrpc`,
+///   non-string `method`, non-string/number `id`, non-object `params` on a
+///   request) -> -32600 Invalid Request (request id echoed when valid).
+fn parse_incoming(raw: &str) -> Result<Incoming, JsonRpcResponse> {
+    let value: Value = match serde_json::from_str(raw) {
+        Ok(value) => value,
+        Err(error) => return Err(parse_error_response(&error.to_string())),
+    };
+
+    let object = match value {
+        Value::Object(object) => object,
+        _ => {
+            return Err(invalid_request_response(
+                Value::Null,
+                "request must be a JSON object",
+            ));
+        }
+    };
+
+    match object.get("jsonrpc") {
+        Some(Value::String(version)) if version == "2.0" => {}
+        _ => {
+            return Err(invalid_request_response(
+                Value::Null,
+                "jsonrpc must be exactly \"2.0\"",
+            ));
+        }
+    }
+
+    let method = match object.get("method") {
+        Some(Value::String(method)) => method.clone(),
+        _ => {
+            return Err(invalid_request_response(
+                Value::Null,
+                "method must be a string",
+            ));
+        }
+    };
+
+    let id = match object.get("id") {
+        None => None,
+        Some(id) if is_valid_request_id(id) => Some(id.clone()),
+        Some(_) => {
+            return Err(invalid_request_response(
+                Value::Null,
+                "id must be a string or a number",
+            ));
+        }
+    };
+
+    let params = match object.get("params") {
+        None | Some(Value::Null) => Value::Object(serde_json::Map::new()),
+        Some(params @ Value::Object(_)) => params.clone(),
+        Some(_) => match id {
+            Some(id) => {
+                return Err(invalid_request_response(id, "params must be an object"));
+            }
+            // Malformed notifications are dropped without a response, per
+            // JSON-RPC: servers never reply to a message carrying no id.
+            None => Value::Object(serde_json::Map::new()),
+        },
+    };
+
+    match id {
+        Some(id) => Ok(Incoming::Request { id, method, params }),
+        None => Ok(Incoming::Notification { method }),
+    }
+}
+
+fn is_valid_request_id(id: &Value) -> bool {
+    match id {
+        Value::String(_) => true,
+        Value::Number(number) => number.is_u64() || number.is_i64(),
+        _ => false,
+    }
+}
+
+/// Route one parsed message. `session` is `None` for the stateless
+/// in-process dispatch surface (treated as fully initialized); the wire
+/// server always passes its own cold session.
+fn route_message(session: Option<&McpSession>, message: Incoming) -> WireOutcome {
+    match message {
+        Incoming::Notification { method } => {
+            // Notifications never receive responses and never execute tools.
+            if normalize_method(&method) == "notifications/initialized"
+                && let Some(session) = session
+                && session.complete_initialize()
+            {
+                return WireOutcome::FlushDeferred;
+            }
+            WireOutcome::Silent
+        }
+        Incoming::Request { id, method, params } => {
+            WireOutcome::Respond(route_request(session, id, &method, params))
+        }
+    }
+}
+
+fn route_request(
+    session: Option<&McpSession>,
+    id: Value,
+    method: &str,
+    params: Value,
+) -> JsonRpcResponse {
+    let method_key = normalize_method(method);
+
+    // Lifecycle-exempt methods: initialize and ping answer in every state.
+    match method_key.as_str() {
+        "initialize" => {
+            if let Err(issues) = validate_initialize_params(&params) {
+                return err(
+                    Some(id),
+                    -32602,
+                    "Invalid params",
+                    Some(json!({ "tool": "initialize", "issues": issues })),
+                );
+            }
+            if let Some(session) = session {
+                // A second initialize never resets a live session.
+                session.begin_initialize();
+            }
+            return initialize_response(id);
+        }
+        "ping" => return ok(Some(id), json!({})),
+        _ => {}
+    }
+
+    // Everything else requires a Ready session on the wire; the stateless
+    // surface (session == None) is dispatched as initialized by contract.
+    if let Some(session) = session
+        && !session.is_ready()
+    {
+        return err(
+            Some(id),
+            MCP_NOT_INITIALIZED,
+            "Server not initialized",
+            None,
+        );
+    }
+
+    match method_key.as_str() {
+        // tools/list -> return available tool definitions with input schemas
+        "tools/list" => {
+            let enum_hints = gather_enum_hints();
+            ok(
+                Some(id),
+                json!({
+                    "tools": build_tool_definitions(enum_hints.as_ref())
+                }),
+            )
+        }
+        // tools/call -> resolve the tool in the registry, validate arguments
+        // against the advertised schema, then invoke its handler.
+        "tools/call" => handle_tools_call(id, &params),
+        // logging/setLevel -> accept the requested level and ack
+        "logging/setLevel" => {
+            let level = params
+                .get("level")
+                .and_then(|v| v.as_str())
+                .unwrap_or("info");
+            set_log_level(level);
+            ok(Some(id), json!({}))
+        }
+        "schema/discover" => handle_schema_discover(id, &params),
+        _ => match registry::find_tool_by_method(&method_key) {
+            Some(spec) => {
+                let (response, _domain_error) = registry::invoke_tool(spec, Some(id), params);
+                response
+            }
+            None => err(Some(id), -32601, "Method not found", None),
+        },
+    }
+}
+
+/// Validate `initialize` params against the MCP 2025-06-18 request shape:
+/// `protocolVersion` string, `capabilities` object, and `clientInfo` with
+/// `name`/`version` strings. Unsupported version strings still negotiate to
+/// the supported revision; a missing or malformed shape is invalid params.
+fn validate_initialize_params(params: &Value) -> Result<(), Vec<String>> {
+    let mut issues = Vec::new();
+    match params.get("protocolVersion") {
+        Some(Value::String(_)) => {}
+        _ => issues.push("protocolVersion must be a string".to_string()),
+    }
+    match params.get("capabilities") {
+        Some(Value::Object(_)) => {}
+        _ => issues.push("capabilities must be an object".to_string()),
+    }
+    match params.get("clientInfo") {
+        Some(Value::Object(client_info)) => {
+            if !matches!(client_info.get("name"), Some(Value::String(_))) {
+                issues.push("clientInfo.name must be a string".to_string());
+            }
+            if !matches!(client_info.get("version"), Some(Value::String(_))) {
+                issues.push("clientInfo.version must be a string".to_string());
+            }
+        }
+        _ => issues.push("clientInfo must be an object with name and version strings".to_string()),
+    }
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(issues)
+    }
+}
+
+fn initialize_response(id: Value) -> JsonRpcResponse {
+    ok(
+        Some(id),
+        json!({
+            // Whatever version the client offered, the server responds with
+            // the revision it supports per the MCP negotiation rules.
+            "protocolVersion": MCP_PROTOCOL_VERSION,
+            "capabilities": {
+                // Tools with listChanged notifications when config/project
+                // metadata updates.
+                "tools": { "listChanged": true },
+                // Logging support so hosts can subscribe if desired.
+                "logging": {}
+            },
+            "serverInfo": {
+                "name": "lotar-mcp",
+                "version": env!("CARGO_PKG_VERSION")
+            },
+            "instructions": "Lotar MCP server exposes task, project, config, and agent tools."
+        }),
+    )
+}
+
+fn handle_tools_call(id: Value, params: &Value) -> JsonRpcResponse {
+    let Some(name) = params.get("name").and_then(|v| v.as_str()) else {
+        return err(
+            Some(id),
+            -32602,
+            "Invalid params",
+            Some(json!({ "tool": null, "issues": ["params.name must be a string"] })),
+        );
+    };
+    let spec = match registry::find_tool_for_call(name) {
+        Ok(spec) => spec,
+        Err(message) => return err(Some(id), -32602, &message, None),
+    };
+    let arguments = match params.get("arguments") {
+        None | Some(Value::Null) => json!({}),
+        Some(value @ Value::Object(_)) => value.clone(),
+        Some(_) => {
+            return err(
+                Some(id),
+                -32602,
+                "Invalid params",
+                Some(json!({
+                    "tool": spec.name,
+                    "issues": ["params.arguments must be an object"]
+                })),
+            );
+        }
+    };
+    let (response, domain_error) = registry::invoke_tool(spec, Some(id), arguments);
+    registry::wrap_for_tools_call(response, domain_error, spec.name)
+}
+
+fn handle_schema_discover(id: Value, params: &Value) -> JsonRpcResponse {
+    let enum_hints = gather_enum_hints();
+    let mut tools = build_tool_definitions(enum_hints.as_ref());
+    if let Some(filter) = params
+        .get("tool")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_ascii_lowercase())
+    {
+        tools.retain(|tool| {
+            tool.get("name")
+                .and_then(|v| v.as_str())
+                .map(|name| name.to_ascii_lowercase() == filter)
+                .unwrap_or(false)
+        });
+    }
+
+    let payload = json!({
+        "status": "ok",
+        "toolCount": tools.len(),
+        "tools": tools,
+    });
+
+    ok(
+        Some(id),
+        json!({
+            "content": [
+                {
+                    "type": "text",
+                    "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into())
+                }
+            ]
+        }),
+    )
+}
+
+/// Registry handler adapter: `schema_discover` is an advertised tool and this
+/// exposes the control implementation under the tool-handler signature.
+fn handle_schema_discover_request(req: JsonRpcRequest) -> JsonRpcResponse {
+    handle_schema_discover(req.id.unwrap_or(Value::Null), &req.params)
+}
+
+/// Stateless single-request dispatch for the in-source test suite: identical
+/// to [`handle_json_line`] after envelope parsing, routing through the
+/// initialized (session-less) surface.
+#[cfg(test)]
+fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
+    let id = req.id.unwrap_or(Value::Null);
+    route_request(None, id, &req.method, req.params)
 }
 
 pub fn run_stdio_server() {
@@ -262,21 +653,24 @@ pub fn run_stdio_server() {
 
     let stdin = io::stdin();
     let stdout = Arc::new(Mutex::new(io::stdout()));
+    let session = Arc::new(McpSession::new());
     let (event_tx, event_rx) = mpsc::channel::<ServerEvent>();
     start_tools_change_notifier(event_tx);
-    spawn_event_dispatcher(event_rx, stdout.clone());
+    spawn_event_dispatcher(event_rx, stdout.clone(), Some(session.clone()));
     let mut reader = io::BufReader::new(stdin.lock());
 
     loop {
-        let mut first_line = String::new();
-        if reader
-            .read_line(&mut first_line)
-            .ok()
-            .filter(|&n| n > 0)
-            .is_none()
-        {
-            break;
-        }
+        // NDJSON reads are bounded to the same 10 MiB ceiling as framed
+        // bodies; an overlong line is answered with a parse error and the
+        // stream resynchronizes at the next line.
+        let first_line = match transport::read_ndjson_line(&mut reader) {
+            transport::NdjsonLineOutcome::Line(line) => line,
+            transport::NdjsonLineOutcome::Overlong => {
+                respond_parse_error(&stdout, "line exceeds maximum line size");
+                continue;
+            }
+            transport::NdjsonLineOutcome::Eof | transport::NdjsonLineOutcome::InvalidUtf8 => break,
+        };
         let trimmed = first_line.trim_end_matches(['\r', '\n']);
         if trimmed.is_empty() {
             continue;
@@ -284,326 +678,42 @@ pub fn run_stdio_server() {
 
         if trimmed.to_ascii_lowercase().starts_with("content-length:") {
             enable_framed_output();
-            let mut content_length: Option<usize> = None;
-            if let Some(v) = trimmed.split(':').nth(1) {
-                content_length = v.trim().parse::<usize>().ok();
-            }
-            loop {
-                let mut line = String::new();
-                if reader
-                    .read_line(&mut line)
-                    .ok()
-                    .filter(|&n| n > 0)
-                    .is_none()
-                {
-                    break;
+            match transport::read_framed_message(&mut reader, trimmed) {
+                transport::FramedReadOutcome::Body(body) => {
+                    let outcome = process_wire_text(&session, &body);
+                    write_wire_outcome(&stdout, &session, outcome);
                 }
-                let l = line.trim_end_matches(['\r', '\n']);
-                if l.is_empty() {
-                    break;
-                }
-                if l.to_ascii_lowercase().starts_with("content-length:")
-                    && let Some(v) = l.split(':').nth(1)
-                {
-                    content_length = v.trim().parse::<usize>().ok();
+                transport::FramedReadOutcome::Malformed(details) => {
+                    respond_parse_error(&stdout, &details);
                 }
             }
-            if let Some(len) = content_length {
-                if len > MAX_MCP_FRAME_BYTES {
-                    drain_framed_body(&mut reader, len);
-                    respond_parse_error(&stdout, "Content-Length exceeds maximum frame size");
-                    continue;
-                }
-                let mut buf = vec![0u8; len];
-                if let Err(e) = reader.read_exact(&mut buf) {
-                    let detail = format!("body read failed: {}", e);
-                    respond_parse_error(&stdout, &detail);
-                    continue;
-                }
-                let body = match String::from_utf8(buf) {
-                    Ok(s) => s,
-                    Err(e) => {
-                        let detail = format!("utf8 error: {}", e);
-                        respond_parse_error(&stdout, &detail);
-                        continue;
-                    }
-                };
-                let req: Result<JsonRpcRequest, _> = serde_json::from_str(&body);
-                match req {
-                    Ok(r) => {
-                        let should_respond = r.id.is_some();
-                        let response = dispatch(r);
-                        if should_respond {
-                            let payload = match serde_json::to_string(&response) {
-                                Ok(s) => s,
-                                Err(e) => format!(
-                                    "{{\"jsonrpc\":\"2.0\",\"error\":{{\"code\":-32603,\"message\":\"Serialization error: {}\"}},\"id\":null}}",
-                                    e
-                                ),
-                            };
-                            write_framed_json(&stdout, &payload);
-                        }
-                    }
-                    Err(e) => {
-                        respond_parse_error(&stdout, &e.to_string());
-                    }
-                }
-                continue;
-            } else {
-                respond_parse_error(&stdout, "missing Content-Length");
-                continue;
-            }
+            continue;
         }
 
-        let req: Result<JsonRpcRequest, _> = serde_json::from_str(trimmed);
-        match req {
-            Ok(r) => {
-                let should_respond = r.id.is_some();
-                let response = dispatch(r);
-                if should_respond {
-                    match serde_json::to_string(&response) {
-                        Ok(s) => write_json_message(&stdout, &s),
-                        Err(e) => {
-                            let fallback = json!({
-                                "jsonrpc": "2.0",
-                                "error": {
-                                    "code": -32603,
-                                    "message": format!("Serialization error: {}", e)
-                                },
-                                "id": Value::Null
-                            })
-                            .to_string();
-                            write_json_message(&stdout, &fallback);
-                        }
-                    }
-                }
-            }
-            Err(e) => respond_parse_error(&stdout, &e.to_string()),
-        }
+        let outcome = process_wire_text(&session, trimmed);
+        write_wire_outcome(&stdout, &session, outcome);
     }
 }
 
-fn dispatch(req: JsonRpcRequest) -> JsonRpcResponse {
-    let method = normalize_method(req.method.as_str());
-    match method.as_str() {
-        // Minimal MCP handshake
-        // initialize -> return protocol and capabilities
-        "initialize" => {
-            // Negotiate protocol version per MCP 2025-06-18
-            let client_version = req
-                .params
-                .get("protocolVersion")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            // We support only the latest spec we target
-            let server_version = "2025-06-18";
-            let negotiated = if client_version.is_empty() {
-                server_version
-            } else {
-                // If client asks for something else, respond with our supported version per spec
-                server_version
-            };
+fn process_wire_text(session: &McpSession, raw: &str) -> WireOutcome {
+    match parse_incoming(raw) {
+        Ok(message) => route_message(Some(session), message),
+        Err(error_response) => WireOutcome::Respond(error_response),
+    }
+}
 
-            mark_session_initialized();
-            ok(
-                req.id,
-                json!({
-                    "protocolVersion": negotiated,
-                    "capabilities": {
-                        // We expose tools and emit listChanged notifications when config/project metadata updates
-                        "tools": { "listChanged": true },
-                        // Optionally declare logging support so hosts can subscribe if desired
-                        "logging": {}
-                    },
-                    "serverInfo": {
-                        "name": "lotar-mcp",
-                        "version": env!("CARGO_PKG_VERSION")
-                    },
-                    "instructions": "Lotar MCP server exposes task, project, config, and agent tools."
-                }),
-            )
-        }
-        // logging/setLevel -> accept the requested level and ack
-        "logging/setLevel" => {
-            let level = req
-                .params
-                .get("level")
-                .and_then(|v| v.as_str())
-                .unwrap_or("info");
-            set_log_level(level);
-            ok(req.id, json!({}))
-        }
-        // tools/list -> return available tool definitions with input schemas
-        "tools/list" => {
-            let enum_hints = gather_enum_hints();
-            ok(
-                req.id,
-                json!({
-                    "tools": build_tool_definitions(enum_hints.as_ref())
-                }),
-            )
-        }
-        "schema/discover" => {
-            let enum_hints = gather_enum_hints();
-            let mut tools = build_tool_definitions(enum_hints.as_ref());
-            if let Some(filter) = req
-                .params
-                .get("tool")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_ascii_lowercase())
+fn write_wire_outcome(stdout: &Arc<Mutex<io::Stdout>>, session: &McpSession, outcome: WireOutcome) {
+    match outcome {
+        WireOutcome::Respond(response) => write_serialized_response(stdout, &response),
+        WireOutcome::FlushDeferred => {
+            if session.take_deferred_list_changed()
+                && let Ok(payload) =
+                    serde_json::to_string(&watchers::build_tools_changed_notification(&[]))
             {
-                tools.retain(|tool| {
-                    tool.get("name")
-                        .and_then(|v| v.as_str())
-                        .map(|name| name.to_ascii_lowercase() == filter)
-                        .unwrap_or(false)
-                });
+                write_json_message(stdout, &payload);
             }
-
-            let payload = json!({
-                "status": "ok",
-                "toolCount": tools.len(),
-                "tools": tools,
-            });
-
-            ok(
-                req.id,
-                json!({
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into())
-                        }
-                    ]
-                }),
-            )
         }
-        // tools/call -> forward to specific method name in params.name
-        "tools/call" => {
-            let tool_name = match req.params.get("name").and_then(|v| v.as_str()) {
-                Some(name) => name.to_string(),
-                None => return err(req.id, -32602, "Missing tool name", None),
-            };
-            let arguments = req.params.get("arguments").cloned().unwrap_or(json!({}));
-            let inner_req = JsonRpcRequest {
-                jsonrpc: "2.0".into(),
-                id: req.id.clone(),
-                method: tool_name.clone(),
-                params: arguments,
-            };
-            let mut response = dispatch(inner_req);
-            if response.error.is_none() {
-                let already_wrapped = response
-                    .result
-                    .as_ref()
-                    .and_then(|value| value.get("functionResponse"))
-                    .is_some();
-                if !already_wrapped {
-                    // VS Code MCP expects tool responses to expose `result.content` as an array.
-                    // Gemini CLI expects `result.functionResponse.response` to contain the tool payload.
-                    // Provide both shapes to maximize compatibility.
-                    let inner_result = response.result.take().unwrap_or_else(|| json!({}));
-                    match inner_result {
-                        Value::Object(mut obj) => {
-                            let cloned = Value::Object(obj.clone());
-                            obj.insert(
-                                "functionResponse".to_string(),
-                                json!({
-                                    "name": tool_name,
-                                    "response": cloned,
-                                }),
-                            );
-                            response.result = Some(Value::Object(obj));
-                        }
-                        other => {
-                            response.result = Some(json!({
-                                "content": [
-                                    {
-                                        "type": "text",
-                                        "text": other.to_string()
-                                    }
-                                ],
-                                "functionResponse": {
-                                    "name": tool_name,
-                                    "response": other
-                                }
-                            }));
-                        }
-                    }
-                }
-            }
-            response
-        }
-        // task/create(params: TaskCreate) -> { task }
-        "task/create" => handle_task_create(req),
-        // task/get({ id, project? }) -> { task }
-        "task/get" => handle_task_get(req),
-        // config/show({ global?, project? }) -> { config }
-        "config/show" => handle_config_show(req),
-        // config/set({ global?, project?, values }) -> { updated }
-        "config/set" => handle_config_set(req),
-        // sync/pull({ remote, project?, auth_profile?, dry_run? }) -> { summary }
-        "sync/pull" => handle_sync_pull(req),
-        // sync/push({ remote, project?, auth_profile?, dry_run? }) -> { summary }
-        "sync/push" => handle_sync_push(req),
-        // task/update({ id, patch }) -> { task }
-        "task/update" => handle_task_update(req),
-        // task/reference_add({ id, project?, kind, value }) -> { task, changed }
-        "task/reference_add" => handle_task_reference_add(req),
-        // task/reference_remove({ id, project?, kind, value }) -> { task, changed }
-        "task/reference_remove" => handle_task_reference_remove(req),
-        // task/delete({ id, project? }) -> { deleted }
-        "task/delete" => handle_task_delete(req),
-        // task/list(params: TaskListFilter) -> { tasks }
-        "task/list" => handle_task_list(req),
-        // whoami({ explain? }) -> { user }
-        "whoami" => handle_whoami(req),
-        // task/comment_add({ id, project?, body, actor?, at? }) -> { task }
-        "task/comment_add" => handle_task_comment_add(req),
-        // task/comment_update({ id, project?, index, body, actor?, at? }) -> { task }
-        "task/comment_update" => handle_task_comment_update(req),
-        // task/bulk_update({ ids, patch, stop_on_error? }) -> { updated, failed }
-        "task/bulk_update" => handle_task_bulk_update(req),
-        // task/bulk_comment_add({ ids, body, actor?, at?, stop_on_error? }) -> { updated, failed }
-        "task/bulk_comment_add" => handle_task_bulk_comment_add(req),
-        // task/bulk_reference_add({ ids, kind, value, stop_on_error? }) -> { updated, failed }
-        "task/bulk_reference_add" => handle_task_bulk_reference_add(req),
-        // task/bulk_reference_remove({ ids, kind, value, stop_on_error? }) -> { updated, failed }
-        "task/bulk_reference_remove" => handle_task_bulk_reference_remove(req),
-
-        // sprint/list({ cursor?, offset?, limit?, include_integrity? }) -> { sprints }
-        "sprint/list" => handle_sprint_list(req),
-        // sprint/get({ sprint_id? sprint }) -> { sprint }
-        "sprint/get" => handle_sprint_get(req),
-        // sprint/create(params: SprintCreateRequest) -> { sprint }
-        "sprint/create" => handle_sprint_create(req),
-        // sprint/update(params: SprintUpdateRequest) -> { sprint }
-        "sprint/update" => handle_sprint_update(req),
-        // sprint/summary({ sprint_id? sprint }) -> SprintSummaryReportResponse
-        "sprint/summary" => handle_sprint_summary(req),
-        // sprint/burndown({ sprint_id? sprint }) -> SprintBurndownResponse
-        "sprint/burndown" => handle_sprint_burndown(req),
-        // sprint/velocity({ limit?, include_active?, metric? }) -> SprintVelocityResponse
-        "sprint/velocity" => handle_sprint_velocity(req),
-        "sprint/add" => handle_sprint_add(req),
-        "sprint/remove" => handle_sprint_remove(req),
-        "sprint/delete" => handle_sprint_delete(req),
-        "sprint/backlog" => handle_sprint_backlog(req),
-        // project/list({}) -> { projects }
-        "project/list" => handle_project_list(req),
-        // project/stats({ name }) -> { stats }
-        "project/stats" => handle_project_stats(req),
-        // agent/run({ ticket_id, prompt, runner?, agent? }) -> { job }
-        "agent/run" => handle_agent_run(req),
-        // agent/status({ id }) -> { job }
-        "agent/status" => handle_agent_status(req),
-        // agent/list_jobs({}) -> { jobs, queue_stats }
-        "agent/list_jobs" => handle_agent_list_jobs(req),
-        // agent/cancel({ id }) -> { cancelled, job }
-        "agent/cancel" => handle_agent_cancel(req),
-        // agent/send_message({ id, message }) -> { job }
-        "agent/send_message" => handle_agent_send_message(req),
-        _ => err(req.id, -32601, "Method not found", None),
+        WireOutcome::Silent => {}
     }
 }
 
@@ -650,23 +760,95 @@ fn write_framed_json(stdout: &Arc<Mutex<io::Stdout>>, payload: &str) {
     }
 }
 
-// inline tests moved to tests/mcp_server_unit_test.rs
-
-// Helper for tests and simple harnesses: process one line and return response line
+/// Stateless in-process dispatch helper for tests and simple harnesses.
+///
+/// This function parses ONE newline-delimited JSON-RPC message and dispatches
+/// it as if the session were already fully initialized. It applies the same
+/// envelope validation (JSON-RPC version, id type, params shape), tool-input
+/// schema enforcement, and domain-error -> `isError` conversion as the wire
+/// server, but it deliberately owns NO wire lifecycle:
+///
+/// - `initialize` returns the standard result without creating readiness;
+/// - `notifications/initialized` (or any notification) is ignored and
+///   produces no output line;
+/// - no readiness state exists to leak: the wire server uses its own
+///   [`McpSession`] exclusively, and pre-initialize rejection, notification
+///   suppression, and deferred list-changed emission live only there.
+///
+/// Returns the serialized response line, or an empty string for
+/// notifications and other messages that never receive responses.
 pub fn handle_json_line(line: &str) -> String {
-    let req: Result<JsonRpcRequest, _> = serde_json::from_str(line);
-    let response = match req {
-        Ok(r) => dispatch(r),
-        Err(e) => err(
-            Some(Value::Null),
-            -32700,
-            "Parse error",
-            Some(json!({"details": e.to_string()})),
-        ),
-    };
-    serde_json::to_string(&response).unwrap_or_else(|_| {
-        // Fall back to a minimal, valid JSON-RPC error line
-        "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}"
-            .to_string()
-    })
+    match parse_incoming(line) {
+        Err(error_response) => serde_json::to_string(&error_response).unwrap_or_else(|_| {
+            // Fall back to a minimal, valid JSON-RPC error line
+            "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}"
+                .to_string()
+        }),
+        Ok(message) => match route_message(None, message) {
+            WireOutcome::Respond(response) => serde_json::to_string(&response).unwrap_or_else(
+                |_| {
+                    "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32603,\"message\":\"Serialization error\"},\"id\":null}"
+                        .to_string()
+                },
+            ),
+            WireOutcome::FlushDeferred | WireOutcome::Silent => String::new(),
+        },
+    }
+}
+
+/// Shared test-only environment helpers for the MCP in-source suites, so the
+/// per-variable mutex discipline is identical across modules.
+#[cfg(test)]
+pub(crate) mod test_env {
+    use std::collections::HashMap;
+    use std::path::Path;
+    use std::sync::{LazyLock, Mutex, MutexGuard};
+
+    static ENV_LOCKS: LazyLock<Mutex<HashMap<&'static str, &'static Mutex<()>>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+
+    pub(crate) fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
+        let lock: &'static Mutex<()> = {
+            let mut map = ENV_LOCKS.lock().unwrap();
+            if let Some(existing) = map.get(var) {
+                existing
+            } else {
+                let leaked: &'static Mutex<()> = Box::leak(Box::new(Mutex::new(())));
+                map.insert(var, leaked);
+                leaked
+            }
+        };
+        lock.lock().unwrap()
+    }
+
+    /// Guard that clears the LOTAR_TASKS_DIR test variables when dropped.
+    pub(crate) struct TasksDirEnvGuard(MutexGuard<'static, ()>);
+
+    impl Drop for TasksDirEnvGuard {
+        fn drop(&mut self) {
+            clear_tasks_dir();
+            // Hold the per-variable lock until the environment is cleared.
+            let _ = &self.0;
+        }
+    }
+
+    pub(crate) fn lock_tasks_dir() -> TasksDirEnvGuard {
+        TasksDirEnvGuard(lock_var("LOTAR_TASKS_DIR"))
+    }
+
+    pub(crate) fn set_tasks_dir(tasks_dir: &Path) {
+        unsafe {
+            std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
+            std::env::remove_var("LOTAR_TEST_MODE");
+            std::env::set_var("LOTAR_TASKS_DIR", tasks_dir);
+        }
+    }
+
+    pub(crate) fn clear_tasks_dir() {
+        unsafe {
+            std::env::remove_var("LOTAR_TASKS_DIR");
+            std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
+            std::env::remove_var("LOTAR_TEST_MODE");
+        }
+    }
 }

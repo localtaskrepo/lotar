@@ -1,12 +1,56 @@
 title: Align MCP lifecycle notifications and smoke transport with the advertised protocol
-status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-63]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.562818+00:00
+modified: 2026-10-02T22:49:41.863021+00:00
+relationships:
+  blocks:
+  - DEV-63
+  parent: DEV-53
+comments:
+- date: 2026-10-02T20:14:13.194428+00:00
+  text: |-
+    Plan (tracking agent; source changes owned by implementation agents). Scope: align MCP lifecycle notifications and smoke transport with the advertised protocol (audit M1 M2 T1).
+
+    1. Standards-compliant initialize: negotiate protocolVersion, advertise capabilities, and handle/echo clientInfo per spec.
+    2. Reach Ready only after the client sends notifications/initialized; before that, reject premature requests BEFORE any side effects (no dispatch, no mutation, consistent error).
+    3. Support ping requests per spec once initialized.
+    4. Emit tool-change notifications with the correct method notifications/tools/list_changed (replacing tools/listChanged).
+    5. Retain the intentional 2-second polling fallback alongside list-changed notifications.
+    6. Smoke transport: make the NDJSON client the primary smoke path with complete initialize parameters plus notifications/initialized; keep framed transport only as explicit compatibility coverage.
+
+    Verification: targeted regressions for handshake sequence, ping, premature-request rejection ordering, list_changed method name, polling fallback, and both smoke client transports; then final npm run lint, npm test, npm run smoke, and independent review before Done.
+
+    Status: no implementation or test results claimed yet; this comment records the plan only. Umbrella: DEV-53.
+- date: 2026-10-02T21:01:16.239936+00:00
+  text: |-
+    Stage release (tracking agent; remains InProgress until full gates + independent review; NOT Done).
+
+    Outcome: Core lifecycle/transport stage released. Standards-compliant initialize (protocolVersion negotiation to 2025-06-18, capabilities, clientInfo validation), Ready granted only after notifications/initialized (out-of-order/repeat never grants; second initialize answers without reset), ping answered pre/post-ready, premature operational requests rejected -32002 'Server not initialized' with zero side effects, notifications never replied and tool-shaped notifications never executed, method corrected to notifications/tools/list_changed (capability key tools.listChanged unchanged), pre-ready list changes deferred+coalesced, intentional 2-second polling fallback retained, NDJSON primary with framed compatibility retained.
+
+    Evidence: 294 lib + 173 affected nextest passed (retries 0, gitless profile); targeted clippy -D warnings and fmt clean; logs in target/mcp-repair-20261002/core.
+
+    Remaining: full npm run lint/test/smoke gates; independent core and client real-wire review; do not close yet.
+
+    Guidance: factual notification/NDJSON corrections are already in docs (help/mcp.md, developers/mcp.md, smoke-suite-debugging SKILL.md) and will get final validation with the full gates; no full completion claimed. Umbrella: DEV-53.
+- date: 2026-10-02T21:10:41.916849+00:00
+  text: |-
+    Pre-review milestone (tracking; stays InProgress, NOT Done).
+
+    Outcome: Full PRE-review gates green on the current tree: lint exit 0; Rust 1187 passed / 45 gitless exclusions (nextest); UI 448 tests / 59 files; build-first smoke 197 passed / 25 Git skips / 49 files with no leak, bind, or unhandled-rejection errors. Independent core review then assigned new findings to the core owner within this ticket's scope: reachable UTF-8 byte-truncation panic on enum mismatches, and unbounded NDJSON input. The green gates are evidence for the PRE-FIX tree only and are NOT final proof after the upcoming edits.
+
+    Evidence: gate logs in target/mcp-repair-20261002/final-rust-ui and target/mcp-repair-20261002/final-smoke; independent core review report.
+
+    Remaining: core owner fixes the transport findings with targeted tests; follow-up independent review; rerun affected full gates on final source. Genuine Git-gated and Windows/remote execution remain unproven.
+
+    Guidance: factual notification/NDJSON corrections are already validated in docs; no policy change. Scope record: no REST/DEV-58 expansion; no commit/push/remote CI. Umbrella: DEV-53.
+- date: 2026-10-02T21:34:17.330099+00:00
+  text: 'Outcome: Parent recovered and preserved the interrupted review fixes after the Rust worker hit its 5-hour usage limit. UTF-8-safe rejected-value previews now handle quoted JSON lengths correctly; real stdio regression rejects multibyte enum values and still answers ping. NDJSON uses a bounded 10 MiB payload ceiling, supports LF/CRLF at the exact limit, drains oversize lines and recovers the next message. Evidence: final-source npm run lint:agent exit 0; test:agent 1203 Rust passed / 45 Gitless exclusions and 448 UI passed / 59 files; fresh build-first test:smoke:agent 197 passed / 25 Git-gated skips / 49 files. Logs: target/mcp-repair-20261002/core/review-fix/{parent-mcp,final-assets,final-lint,final-test,final-smoke}.log. No leaks, unhandled rejections or bind failures observed; no retries or altered concurrency. Remaining: follow-up independent core reviewer also hit the reported usage limit; scheduled goal continuation at 2026-10-03T06:15:00Z after reported 06:10:04 reset (timezone not supplied by error). Keep InProgress until review resolved, then exact-read completion state. Genuine Git, Windows and unpublished remote CI remain unproven. No Git commands, index writes, commits or pushes. Guidance: factual smoke debugging correction uses notifications/tools/list_changed and standard NDJSON; polling fallback remains intentional; no policy change.'
+- date: 2026-10-02T22:49:41.836738+00:00
+  text: 'Outcome: Completed MCP lifecycle and transport repair. Each real stdio session remains cold until full initialize plus notifications/initialized; ping works in every state, premature operations are rejected before writes, and notifications never reply or execute tools. Standard notifications/tools/list_changed is deferred/coalesced before readiness with the intentional 2-second polling fallback retained. NDJSON is primary and bounded to 10 MiB with LF/CRLF, oversize drain/resynchronization and EOF handling; framed sticky compatibility is retained. Review-found multibyte error-preview crash is fixed and pinned through public and real-wire regressions. Evidence: final-source lint:agent passed; test:agent 1203 Rust passed, 45 Gitless exclusions, 448 UI passed in 59 files; fresh build-first smoke 197 passed, 25 Git-gated skips in 49 files. Zero Rust retries/default concurrency; no leak/bind/unhandled-rejection failures. Logs target/mcp-repair-20261002/core/review-fix/. Client independent review signed off; core independent follow-up SIGNOFF/no actionable findings on board_fad5b4f3-a9c6-4dc8-b187-2af64d83e063 after successful requested quota retry. Reviewer inspected source/tests, not rerunning gates. Remaining: none for this scoped fix; genuine Git-required cases, Windows and unpublished remote CI remain unproven, under the accepted pre-commit CI handoff exception. No Git/index/commit/push/worktree operations. Guidance: factual smoke-debugging correction names standard notification and NDJSON while retaining polling; final one-line agent_run summary now agrees with service and detailed docs that runner or profile is required.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: M1 M2 T1.
@@ -17,3 +61,38 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-02T20:14:04.207188+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-02T20:14:13.194428+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T21:01:16.239936+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T21:10:41.916849+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T21:34:17.330099+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T22:49:41.836738+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T22:49:41.863021+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

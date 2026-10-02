@@ -1,13 +1,17 @@
 # MCP Tools Reference
 
-Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools/call` using its snake_case name (`task_list`). This guide summarizes the parameters, validation rules, and response payloads implemented by the server.
+Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools/call` using its snake_case name (`task_list`). Control-plane methods (`initialize`, `tools/list`, `notifications/*`, …) are not tools and are rejected under `tools/call` as unknown names. This guide summarizes the parameters, validation rules, and response payloads implemented by the server.
 
 
 ## Conventions
 
 - All parameters use `snake_case` and mirror the CLI/REST field names.
 - Responses follow the MCP `content` convention: `result.content[*].text` contains pretty-printed JSON (or multi-line text). Parse that string if you need structured data.
-- Enum values (`status`, `priority`, etc.) are validated with the same `CliValidator` as the CLI; errors include `error.data.details` when enum hints are available.
+- Tool arguments are validated against each tool's advertised `inputSchema` before the handler runs. Missing required arguments, unknown fields, and type violations return JSON-RPC error `-32602` with `error.data.tool` (the tool name) and `error.data.issues` (what failed). This is a strictness change: previously undocumented extra fields were never supported aliases — they are now rejected instead of being silently ignored. For example, `sync_pull`/`sync_push` reject an unknown `dryrun` field instead of treating it as `dry_run`, so a misspelled dry-run request can no longer trigger a live sync.
+- Enum values (`status`, `priority`, etc.) are validated with the same `CliValidator` as the CLI; errors include `error.data.suggestions`/`error.data.details` when enum hints are available.
+- Unknown or control-plane tool names under `tools/call` return `-32602` with an `Unknown tool: <name>` message and are never dispatched. Unknown direct methods return `-32601` Method not found.
+- Semantic/domain failures (unknown task ids, membership failures, sync failures, …) are tool-execution failures, not protocol errors: the response carries `result.isError: true` with no JSON-RPC `error` object, and the existing explanation/data envelope lives in the `content[0].text` payload. Bulk tools keep partial outcomes in `updated[]`/`failed[]` instead of failing the whole call.
+- `tools/call` results additionally embed a `functionResponse` compatibility wrapper (successes and `isError` conversions alike); direct method calls omit it.
 - `@me` is accepted anywhere a reporter/assignee is expected and resolves using the same identity chain as the CLI.
 - Many responses include `enumHints` so hosts can surface the project’s allowed values.
 
@@ -19,7 +23,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `status`, `user`, and optional `explain` metadata.
 
 ### `task_create`
-- **Params:** `title` (required), optional `description`, `project`, `priority`, `type`, `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, and `sprints[]` (numeric IDs).
+- **Params:** `title` (required), optional `description`, `project`, `priority`, `type` (alias `task_type`), `status`, `reporter`, `assignee`, `due_date`, `effort`, `tags[]`, `acceptance_criteria[]`, `relationships`, `custom_fields` map, and `sprints[]` (positive integers).
 - **Behavior:** validates `status`/`priority`/`type` against the target project's configuration (project-only enum values are accepted; failures carry `error.data.suggestions` from that project); an explicit `status` is persisted atomically with creation; auto-fills missing defaults (priority/type/status/reporter/assignee/tags) per project config; `@me` supported for people fields.
 - **Response:** JSON blob containing the saved `task` plus `metadata.appliedDefaults` (fields the server filled) and `metadata.enumHints` when available.
 
@@ -28,8 +32,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Pretty-printed `TaskDTO` for the requested record.
 
 ### `task_update`
-- **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields plus `acceptance_criteria` and `sprints`.
-- **Behavior:** tri-state semantics per key: omitted = no-op, `null` = clear, value = set. Empty string clears reporter/assignee/due_date/effort/description; empty array/object clears tags/acceptance_criteria/relationships/custom_fields/sprints. `title`/`status`/`priority`/`type` treat `null` as omitted and blank titles are rejected. Enum strings are validated against the task's project configuration (failures return `-32602` with `error.data.suggestions`); list and map patches replace the whole value; `sprints` must be an array of positive integers (invalid entries are rejected, not dropped); membership failures keep the `Task update failed` envelope with `data.message`.
+- **Params:** `id` (required) and `patch` object. Patch keys mirror `task_create` fields (including the `task_type` alias for `type`) plus `acceptance_criteria` and `sprints`.
+- **Behavior:** tri-state semantics per key: omitted = no-op, `null` = clear, value = set. Empty string clears reporter/assignee/due_date/effort/description; empty array/object clears tags/acceptance_criteria/relationships/custom_fields/sprints. `title`/`status`/`priority`/`type` treat `null` as omitted and blank titles are rejected. Enum strings are validated against the task's project configuration (failures return `-32602` with `error.data.suggestions`); list and map patches replace the whole value; `sprints` must be an array of positive integers (invalid entries are rejected, not dropped); membership failures keep the `Task update failed` envelope with `data.message` (a tool-execution `isError` result).
 - **Response:** Updated `TaskDTO` serialized to JSON.
 
 ### `task_comment_add`
@@ -42,8 +46,18 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Behavior:** updates the comment at the specified index and records a history entry.
 - **Response:** Updated `TaskDTO`.
 
+### `task_reference_add`
+- **Params:** `id` (required), optional `project`, `kind` (required: `link|file|code|jira|github|attachment`), `value` (required).
+- **Behavior:** attaches one reference to a task with the same semantics as the bulk variant: `file` values are repository-relative paths (attachments-store paths are rejected), `attachment` values are stored blob names and fail closed when the blob is missing, and `code`/`file` adds require a repository root.
+- **Response:** JSON with the updated `task` and a `changed` flag.
+
+### `task_reference_remove`
+- **Params:** `id` (required), optional `project`, `kind` (required: `link|file|code|jira|github|attachment`), `value` (required).
+- **Behavior:** detaches one reference with the same semantics as the bulk variant: `attachment` detach is reference-only and never deletes blobs, `code` removal works outside a Git repository, and `file` removal requires a repository root.
+- **Response:** JSON with the updated `task` and a `changed` flag.
+
 ### `task_bulk_update`
-- **Params:** `ids[]` (required), `patch` (required), optional `stop_on_error`.
+- **Params:** `ids[]` (required), `patch` (required, same keys as `task_update` including the `task_type` alias), optional `stop_on_error`.
 - **Behavior:** applies the same patch to multiple tasks using the `task_update` tri-state semantics. Enum validation runs per task against its own project configuration, so a value valid in one project can fail in another (reported per id in `failed[]`). When `stop_on_error=true`, aborts after the first failure.
 - **Response:** JSON with `updated[]` and `failed[]` per task id.
 
@@ -67,8 +81,8 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Text payload like `deleted=true` or `deleted=false`.
 
 ### `task_list`
-- **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `sprints`, `custom_fields`, smart filters `due` (`today|soon|later|overdue`), `recent` (`7d`), `needs` (CSV or array of `effort`,`due`), ordering `sort_by` (builtins `priority`,`status`,`effort`,`due-date`,`created`,`modified`,`assignee`,`reporter`,`title`,`type`,`project`,`id`,`tags`,`sprints` or `custom:<name>`/`field:<name>`; tags compare lexicographically and sprints numerically, empty first ascending) and `order` (`asc|desc`), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings.
-- **Errors:** `assignee: "@me"` that cannot be resolved returns JSON-RPC error `-32002` (fail closed — never returns the unfiltered list). Invalid explicit `status`/`priority`/`type` values (with enum hints), invalid `sprints` entries, and invalid `order`/`sort_by`/`due`/`recent`/`needs` values return `-32602` instead of being silently dropped, as do explicitly blank `due`/`recent`/`needs` strings. Enum filters validate against the explicit `project`'s resolved configuration when one is requested.
+- **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `sprints`, `custom_fields`, smart filters `due` (`today|soon|later|overdue`), `recent` (`7d`), `needs` (CSV or array of `effort`,`due`), ordering `sort_by` (builtins `priority`,`status`,`effort`,`due-date`,`created`,`modified`,`assignee`,`reporter`,`title`,`type`,`project`,`id`,`tags`,`sprints` or `custom:<name>`/`field:<name>`; tags compare lexicographically and sprints numerically, empty first ascending) and `order` (`asc|desc`), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings; multi-value filters (`status`, `priority`, `tags`) also accept `null` to clear the filter.
+- **Errors:** `assignee: "@me"` that cannot be resolved fails closed as a tool-execution `isError` result (never returns the unfiltered list). Invalid explicit `status`/`priority`/`type` values (with enum hints), invalid `sprints` entries, and invalid `order`/`sort_by`/`due`/`recent`/`needs` values return `-32602` instead of being silently dropped, as do explicitly blank `due`/`recent`/`needs` strings. Enum filters validate against the explicit `project`'s resolved configuration when one is requested.
 - **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page. Pages iterate a deterministic global order (default `modified` desc, canonical-ID ascending tiebreak) identical to REST `/api/tasks/list` and `/api/tasks/export`.
 
 ## Sprint Tools
@@ -78,7 +92,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `sprints[]`, and optional `missing_sprints`/`integrity`.
 
 ### `sprint_get`
-- **Params:** `sprint` or `sprint_id`.
+- **Params:** `sprint` (reference like `#1`, keyword, or numeric id) or `sprint_id` (numeric; preferred).
 - **Response:** JSON with `status` and a single `sprint` entry.
 
 ### `sprint_create`
@@ -102,26 +116,29 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Same payload as the CLI sprint velocity report.
 
 ### `sprint_add`
-- **Params:** `tasks` (string or array, required), optional `sprint` (reference like `#1` or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (force reassignments), and `cleanup_missing` (remove dangling references first).
+- **Params:** `tasks` (string or array, required), optional `sprint` (reference like `#1`, numeric id, or keyword), optional `sprint_id` (numeric id), `allow_closed` (default `false`), `force_single`/`force` (advertised aliases — force reassignments), and `cleanup_missing` (remove dangling references first).
 - **Response:** JSON with `status`, `action` (`created|updated|moved`), `sprint_id`, `sprint_label`, lists of `modified`, `unchanged`, `replaced`, `missing_sprints`, and optional `integrity` metrics. If reassignments occur, an additional text content item lists the human-readable warnings.
 
 ### `sprint_remove`
-- **Params:** Same as `sprint_add` (`tasks`, optional `sprint`, optional `sprint_id`, optional `cleanup_missing`).
+- **Params:** Same forms as `sprint_add` (`tasks` scalar or array, optional `sprint` reference/numeric id, optional `sprint_id`, optional `cleanup_missing`).
 - **Response:** Mirrors `sprint_add` but describes removal results rather than assignments.
 
 ### `sprint_delete`
 - **Params:** `sprint` (reference like `#1`) or `sprint_id` (numeric id), plus optional `cleanup_missing` to scrub dangling references.
+- **Behavior:** `force` is not a parameter of this tool — it was previously advertised but ignored, and the schema now rejects it as an unknown property (`-32602`).
 - **Response:** Two content items: a summary sentence and a JSON object containing `deleted`, `sprint_id`, `sprint_label`, `removed_references`, `updated_tasks`, and optional `integrity` data.
 
 ### `sprint_backlog`
 - **Params:** `project`, `status` list (defaults come from config), `tag` filter, `assignee`, `limit` (default 20, max 100), `cursor` (<= 5000), and `cleanup_missing`.
+- **Validation:** `sort_by`, `order`, `due`, `recent`, and `needs` are not supported here. They were previously advertised but ignored; they now return `-32602` rather than silently returning an unfiltered backlog. Use `task_list` for those filters.
 - **Response:** Paginated backlog with `status`, `count`, `total`, `cursor`, `nextCursor` (number or null), `tasks[]`, `missing_sprints`, `enumHints`, and a `truncated`/`hasMore` flag.
 
 ## Project Tools
 
 ### `project_list`
-- **Params:** none.
-- **Response:** Array of project metadata.
+- **Params:** `limit` (default 50, max 200), `cursor` (string/number, 0-based, <= 5000), and `offset` (cursor alias).
+- **Validation:** `sort_by`, `order`, `due`, `recent`, and `needs` are rejected with `-32602`; the handler never implemented these previously advertised parameters.
+- **Response:** Paginated project metadata in `projects[]`, with `count`, `total`, `cursor`, `limit`, `hasMore`, and `nextCursor` (string or null). Projects are ordered by prefix.
 
 ### `project_stats`
 - **Params:** `name` (project key).
@@ -134,18 +151,44 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** Pretty-printed YAML-equivalent JSON representing the resolved config at the requested scope.
 
 ### `config_set`
-- **Params:** `values` map of key→string plus optional `global`/`project` selectors.
+- **Params:** `values` map of key→string plus optional `global`/`project` selectors. Values must be strings — non-string values are rejected by the schema (silent coercion was removed).
 - **Response:** Text summary indicating success along with any validation warnings/info from the config service.
 
 ## Sync Tools
 
 ### `sync_pull`
 - **Params:** `remote` (required), optional `project`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
+- **Behavior:** `task_id` is not an accepted parameter (it was never advertised) and is rejected as an unknown property — scope runs with `project` instead.
 - **Response:** JSON summary plus report metadata; `include_report` returns per-item entries.
 
 ### `sync_push`
 - **Params:** `remote` (required), optional `project`, `auth_profile`, `dry_run`, `include_report`, `write_report`, `client_run_id`.
+- **Behavior:** `task_id` is rejected as an unknown property, exactly as with `sync_pull`.
 - **Response:** JSON summary plus report metadata; `include_report` returns per-item entries.
+
+## Agent Tools
+
+### `agent_run`
+- **Params:** `ticket_id` (required, e.g. `PROJ-1`), `prompt` (required), optional `runner` (`copilot|claude|codex|gemini|command`) and `agent` (profile name from config).
+- **Validation:** Supply either `runner` or `agent`. Unknown tickets, unsupported runners, and unknown profiles return explanatory tool-execution `isError` results; malformed argument types still return `-32602`.
+- **Response:** Job details including the job ID used for status tracking.
+
+### `agent_status`
+- **Params:** `id` (job ID, required).
+- **Response:** Job details including status, exit code, last message, and timing. Unknown job ids are tool-execution `isError` results.
+
+### `agent_list_jobs`
+- **Params:** none.
+- **Response:** All agent jobs (running, queued, completed, failed, cancelled; newest first) plus queue statistics.
+
+### `agent_cancel`
+- **Params:** `id` (job ID, required).
+- **Response:** Whether the job was cancelled, plus job details.
+
+### `agent_send_message`
+- **Params:** `id` (running job ID, required), `message` (required).
+- **Behavior:** Only supported for runners that accept stdin input (Claude, Copilot).
+- **Response:** Updated job details.
 
 ## Schema Tool
 

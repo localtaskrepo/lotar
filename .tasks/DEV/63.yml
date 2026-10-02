@@ -1,13 +1,66 @@
 title: Restrict MCP tool dispatch and enforce schemas and error classification
-status: Todo
-relationships:
-  parent: DEV-53
-  blocks: [DEV-64]
-  depends_on: [DEV-58, DEV-62]
+status: Done
 priority: High
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.579951+00:00
+modified: 2026-10-02T22:49:41.912633+00:00
+relationships:
+  depends_on:
+  - DEV-58
+  - DEV-62
+  blocks:
+  - DEV-64
+  parent: DEV-53
+comments:
+- date: 2026-10-02T20:14:20.911697+00:00
+  text: |-
+    Research/coordination note (status stays Todo; no implementation started).
+
+    Goals for the eventual fix (audit M3 M4 M5):
+    - Safe tool registry: initialize/tools/list and other control-plane methods must not be reachable through recursive tools/call dispatch; one registry governs all dispatch.
+    - Enforce advertised schemas on every direct/standard call argument object before side effects; unknown fields such as dryrun must never trigger a live sync.
+    - Error classification: separate malformed envelopes/unknown tools (protocol errors) from isError tool-execution failures so recoverable domain failures return the correct MCP shape; preserve shipped aliases or document compatibility decisions.
+
+    Dependency assessment:
+    - DEV-62 (lifecycle, High) is now InProgress and is being implemented first; DEV-63 follows and is not started.
+    - DEV-58 (REST domain-error to HTTP mapping, Medium, Todo) is being assessed as a genuine dependency for shared error classification; it is NOT automatically started and NOT declared done by this note.
+    - Existing dependency links (Prerequisites/coordination: DEV-58, DEV-62) remain in place and were not removed.
+
+    No source changes, no test results claimed. Umbrella: DEV-53.
+- date: 2026-10-02T20:44:47.097728+00:00
+  text: 'Dependency assessment: DEV-58 is a separate REST-only HTTP error-mapping task. MCP handlers call the services directly and do not use src/routes; the MCP registry, input-schema validation, and protocol-versus-tool-error classification can be implemented independently using the existing domain errors. DEV-58 remains Todo and is not started or declared complete by this work. Its existing relationship is retained as a coordination note. DEV-62 remains the actual lifecycle prerequisite; both MCP fixes are owned by one Rust writer to avoid conflicting dispatch refactors, with a separate NDJSON/compatibility smoke-client lane. Structural schema violations and unknown tools remain protocol errors; recoverable tool failures use result.isError with the existing explanation/data. Current implementation and client-only checks are in progress; no Rust-wire or full-gate pass is claimed yet.'
+- date: 2026-10-02T21:01:26.812212+00:00
+  text: |-
+    Shared registry/schema/error milestone (status promoted Todo -> InProgress now the DEV-62 lifecycle targeted prerequisite is verified; NOT Done, do not close).
+
+    Outcome: Single authoritative registry binds all 37 advertised tools (snake_case + slash aliases, registry == tools/list enforced by test); tools/call can never reach control-plane methods (no recursive dispatch; unknown/control-plane names -32602 'Unknown tool'). Every direct and tools/call argument object is validated fail-closed against the advertised inputSchema before handlers run. Domain failures (-32000..-32006) return result.isError=true with message + data (functionResponse wrapper under tools/call); protocol errors (-32700..-32600, -32002) stay root errors; bulk partial outcomes preserved.
+
+    Intentional schema rejections recorded: dead sprint_delete.force (was advertised-but-ignored, now rejected as unknown property), undocumented sync.task_id (rejected as unknown), config_set non-string values (silent coercion removed). All other schema-aligned aliases preserved by advertising: task_create task_type/sprints, task_update/bulk task_type, nullable multi-value filter oneOf, sprint add/remove scalar|array tasks and string|number sprint, sprint_add force_single/force, sprint_get numeric sprint.
+
+    DEV-58: separate REST-only domain-error -> HTTP mapping task; MCP handlers call services directly and never touch routes/*, so DEV-58 does not technically block this work. Original relationship links preserved, DEV-58 untouched (Todo, Medium).
+
+    Evidence: 294 lib + 173 affected nextest passed; targeted clippy/fmt clean; logs target/mcp-repair-20261002/core.
+
+    Remaining: full lint/test/smoke gates and independent core/client review before Done.
+
+    Guidance: factual notification/NDJSON docs corrections already landed and will get final validation; no full completion claimed. Umbrella: DEV-53.
+- date: 2026-10-02T21:10:47.521853+00:00
+  text: |-
+    Pre-review milestone (tracking; stays InProgress, NOT Done).
+
+    Outcome: Shared pre-review evidence: full gates green (lint exit 0; Rust 1187 passed / 45 gitless exclusions; UI 448 / 59 files; build-first smoke 197 passed / 25 Git skips / 49 files, no leak/bind/unhandled) — evidence for the PRE-FIX tree, NOT final proof after upcoming edits. Independent core review findings assigned to the core owner in this ticket's scope: advertised project_list/sprint_backlog filters are ignored; some agent/sprint domain errors use reserved -32603; reachable UTF-8 byte-truncation panic on enum mismatches; unbounded NDJSON input. Named strictness regressions were confirmed absent. Additional planned invariants: hinted/hintless schema parity, and removal of schema-dead sync.task_id/config coercion paths.
+
+    Evidence: gate logs target/mcp-repair-20261002/final-rust-ui and final-smoke; independent core review report.
+
+    Remaining: fix findings with targeted tests; follow-up independent review; rerun affected full gates on final source; genuine Git + Windows/remote execution unproven.
+
+    Guidance: factual notification/NDJSON correction already validated in docs; no policy change. Scope record: no REST/DEV-58 expansion (DEV-58 untouched); no commit/push/remote CI. Umbrella: DEV-53.
+- date: 2026-10-02T21:34:17.348302+00:00
+  text: 'Outcome: Review corrections recovered by parent after worker quota interruption. Removed five advertised-but-ignored filters from project_list/sprint_backlog with explicit -32602 rejection/docs; expected agent/sprint service failures use domain isError with preserved explanations and functionResponse, genuine I/O/serialization faults retain -32603. Named sprint_delete.force, sync_pull/push.task_id and config_set non-string rejections are pinned through BOTH public direct and tools/call paths with unchanged configuration/no writes. Removed dead sync task parsing and config coercion; hinted and hintless schemas remain identical across 37 tools. New tests distinguish real missing-ticket, invalid-runner, unknown-profile, missing-job/sprint explanations and all eight LoTaRError classifications. Evidence: final-source lint:agent exit 0; test:agent 1203 Rust passed / 45 Gitless exclusions, UI 448 passed / 59 files; fresh build-first smoke 197 passed / 25 Git skips / 49 files. Logs target/mcp-repair-20261002/core/review-fix/. Independent client review signs off. Remaining: follow-up independent core review was stopped by the same 5-hour quota, goal resumes 2026-10-03T06:15:00Z after reported reset (timezone absent); keep InProgress and reconcile Done only after findings resolved. DEV-58 remains separate REST-only coordination, original relationships preserved; DEV-64 remains unstarted. Genuine Git/Windows/unpublished CI not claimed. No Git/index/commit/push operations. Guidance: no additional durable finding beyond factual notification/NDJSON skill correction, validated against passing wire tests.'
+- date: 2026-10-02T22:49:41.895004+00:00
+  text: 'Outcome: Completed authoritative 37-tool MCP registry, direct/standard alias binding, pre-handler advertised-schema validation and protocol-versus-domain error split. tools/call cannot recurse into control methods; dryrun typos and unknown/types/required/nested enum violations fail before side effects. Expected domain failures preserve explanations/data as isError and tools/call functionResponse; genuine I/O/serialization retain reserved protocol errors. Project-aware enums and partial bulk updated/failed results remain intact. Hint-bearing and canonical schemas have parity. Removed previously ignored project/backlog filters and dead sprint_delete.force; undocumented sync.task_id and non-string config values are rejected and pinned on BOTH public paths with unchanged config/no writes. Supported task_type/sprint/null/force aliases remain advertised. Evidence: final lint passed; Rust 1203 passed/45 Gitless excluded, UI 448/59 files, fresh build-first smoke 197 passed/25 Git skips/49 files; logs target/mcp-repair-20261002/core/review-fix/. Independent client and final core reviews sign off, latest board_fad5b4f3-a9c6-4dc8-b187-2af64d83e063; all actionable findings resolved without weakened assertions. Remaining: no scoped blockers. Non-blocking legacy logging leniency, hintCategories extension, integral-float ID rejection and internal domain-code reuse were reviewed and remain outside this task. DEV-58 REST mapping is not technically coupled (MCP uses services directly), original links preserved; DEV-64 remains unstarted. Genuine Git/Windows/unpublished CI not claimed; accepted pre-commit CI handoff exception retained. No Git/index/commit/push/worktree operations. Guidance: only factual notification/NDJSON skill correction; final docs match all 37 tools, strictness decisions and runner/profile requirement; no policy changes.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: M3 M4 M5.
@@ -19,3 +72,42 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-02T20:14:20.911697+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T20:44:47.097728+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T21:01:20.002974+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-02T21:01:26.812212+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T21:10:47.521853+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T21:34:17.348302+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T22:49:41.895004+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T22:49:41.912633+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

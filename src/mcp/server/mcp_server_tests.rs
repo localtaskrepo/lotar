@@ -1,24 +1,8 @@
 use super::*;
-// Minimal per-variable lock for this test to avoid env races
-use std::collections::HashMap;
 use std::path::Path;
-use std::sync::LazyLock;
-use std::sync::{Mutex, MutexGuard};
-static ENV_LOCKS: LazyLock<Mutex<HashMap<&'static str, &'static Mutex<()>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+use std::sync::MutexGuard;
 fn lock_var(var: &'static str) -> MutexGuard<'static, ()> {
-    let mtx: &'static Mutex<()> = {
-        let mut map = ENV_LOCKS.lock().unwrap();
-        if let Some(m) = map.get(var) {
-            m
-        } else {
-            let boxed: Box<Mutex<()>> = Box::new(Mutex::new(()));
-            let leaked: &'static Mutex<()> = Box::leak(boxed);
-            map.insert(var, leaked);
-            leaked
-        }
-    };
-    mtx.lock().unwrap()
+    test_env::lock_var(var)
 }
 
 fn require_git_for_test() {
@@ -125,19 +109,11 @@ fn tool_description(tool: &Value) -> &str {
 }
 
 fn set_tasks_dir_env(tasks_dir: &Path) {
-    unsafe {
-        std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_MODE");
-        std::env::set_var("LOTAR_TASKS_DIR", tasks_dir);
-    }
+    test_env::set_tasks_dir(tasks_dir);
 }
 
 fn clear_tasks_dir_env() {
-    unsafe {
-        std::env::remove_var("LOTAR_TASKS_DIR");
-        std::env::remove_var("LOTAR_IGNORE_ENV_TASKS_DIR");
-        std::env::remove_var("LOTAR_TEST_MODE");
-    }
+    test_env::clear_tasks_dir();
 }
 
 fn tool_response_payload(resp: &JsonRpcResponse) -> &Value {
@@ -349,10 +325,11 @@ fn tools_call_update_delete_list_and_invalid_enum() {
         .unwrap()
         .to_string();
 
-    // Update the task
+    // Update the task. `project` is not an advertised task_update argument
+    // (the project is derived from the task id); the schema layer rejects it.
     let update_args = json!({
         "name": "task_update",
-        "arguments": { "id": id, "project": "MCP", "patch": { "title": "Updated Title" } }
+        "arguments": { "id": id, "patch": { "title": "Updated Title" } }
     });
     let update_req = JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -1578,21 +1555,48 @@ fn tools_call_task_create_membership_error_keeps_operation_envelope() {
             }
         }),
     });
-    let error = resp
-        .error
-        .as_ref()
-        .expect("strict member violation must fail");
-    assert_eq!(error.code, -32000, "operation envelope code");
-    assert_eq!(error.message.as_str(), "Task create failed");
-    let message = error
-        .data
-        .as_ref()
-        .and_then(|data| data.get("message"))
-        .and_then(|v| v.as_str())
-        .expect("data.message detail");
+    // Recoverable tool/domain failures are successful JSON-RPC responses with
+    // result.isError = true; the strict-member violation must not surface as
+    // a bare protocol error.
     assert!(
-        message.contains("Assignee 'intruder' is not in configured members"),
-        "unexpected detail: {message}"
+        resp.error.is_none(),
+        "domain failure must convert to isError: {:?}",
+        resp.error
+    );
+    let result = resp.result.as_ref().expect("isError result present");
+    assert_eq!(result.get("isError"), Some(&json!(true)));
+    let text = result
+        .get("content")
+        .and_then(|content| content.get(0))
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .expect("isError content text");
+    assert!(
+        text.contains("Assignee 'intruder' is not in configured members"),
+        "unexpected detail: {text}"
+    );
+    let function_response = result
+        .get("functionResponse")
+        .and_then(|fr| fr.get("response"))
+        .expect("structured functionResponse for isError");
+    assert_eq!(
+        function_response.get("isError"),
+        Some(&json!(true)),
+        "functionResponse carries the error flag"
+    );
+    assert_eq!(
+        function_response.get("message").and_then(|v| v.as_str()),
+        Some("Task create failed"),
+        "structured message keeps the operation envelope"
+    );
+    assert!(
+        function_response
+            .get("data")
+            .and_then(|data| data.get("message"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .contains("Assignee 'intruder' is not in configured members"),
+        "structured data must carry the domain detail"
     );
 
     // Enum failures keep the invalid-params code with suggestions.

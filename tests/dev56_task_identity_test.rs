@@ -147,6 +147,42 @@ fn mcall(name: &str, args: Value) -> Value {
     serde_json::from_str(&resp_line).unwrap()
 }
 
+/// True when the tool call failed: either a JSON-RPC protocol error or a
+/// recoverable domain failure surfaced as result.isError (DEV-63).
+fn mcp_failed(resp: &Value) -> bool {
+    resp.get("error").is_some()
+        || resp.get("result").and_then(|result| result.get("isError"))
+            == Some(&serde_json::json!(true))
+}
+
+/// Explanatory text of a failed tool call across both error shapes.
+fn mcp_failure_text(resp: &Value) -> String {
+    if let Some(result) = resp.get("result") {
+        let structured = result
+            .get("functionResponse")
+            .and_then(|fr| fr.get("response"));
+        if let Some(message) = structured
+            .and_then(|r| r.get("data"))
+            .and_then(|data| data.get("message"))
+            .and_then(|m| m.as_str())
+        {
+            return message.to_string();
+        }
+        return result
+            .get("content")
+            .and_then(|content| content.get(0))
+            .and_then(|entry| entry.get("text"))
+            .and_then(|t| t.as_str())
+            .unwrap_or_default()
+            .to_string();
+    }
+    resp["error"]["data"]["message"]
+        .as_str()
+        .or_else(|| resp["error"]["message"].as_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
 fn mcp_text(resp: &Value) -> Option<String> {
     resp.get("result")
         .and_then(|r| r.get("content"))
@@ -591,13 +627,11 @@ fn delete_project_mismatch_refused_and_bytes_unchanged() {
         "REST bytes unchanged"
     );
 
-    // MCP boundary behaves the same.
+    // MCP boundary behaves the same (recoverable failure -> isError result).
     let resp = mcall("task_delete", json!({"id": "DEV-5", "project": "TP"}));
-    assert!(resp.get("error").is_some(), "MCP mismatch refused: {resp}");
+    assert!(mcp_failed(&resp), "MCP mismatch refused: {resp}");
     assert!(
-        resp["error"]["data"]["message"]
-            .as_str()
-            .is_some_and(|m| m.contains("refusing to cross projects")),
+        mcp_failure_text(&resp).contains("refusing to cross projects"),
         "{resp}"
     );
     assert!(tp_five.exists() && dev_five.exists(), "MCP bytes unchanged");
@@ -919,7 +953,7 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
             json!({"id": "TP-2", "kind": "file", "value": "@attachments/whatever.txt"}),
         );
         assert!(
-            resp.get("error").is_some(),
+            mcp_failed(&resp),
             "file reference without a repo root must fail closed: {resp}"
         );
         let storage = Storage::try_open(&fx.tasks_dir).unwrap();
@@ -954,15 +988,8 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
         "task_reference_add",
         json!({"id": "TP-2", "kind": "attachment", "value": filename}),
     );
-    assert!(
-        resp.get("error").is_some(),
-        "locked store must refuse: {resp}"
-    );
-    let message = resp["error"]["data"]["message"]
-        .as_str()
-        .or_else(|| resp["error"]["message"].as_str())
-        .unwrap_or_default()
-        .to_string();
+    assert!(mcp_failed(&resp), "locked store must refuse: {resp}");
+    let message = mcp_failure_text(&resp);
     assert!(
         message.contains("attachments-store") || message.contains("busy"),
         "fail-closed lock diagnostics: {message}"
@@ -1007,7 +1034,7 @@ fn mcp_single_file_reference_blocks_on_held_store_lock() {
             json!({"id": "TP-2", "kind": "file", "value": value}),
         );
         assert!(
-            resp.get("error").is_some(),
+            mcp_failed(&resp),
             "store paths must not be attachable as file references: {resp}"
         );
     }

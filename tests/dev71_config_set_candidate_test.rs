@@ -808,13 +808,31 @@ fn dev71_mcp_config_set_conflict_rejects() {
     .unwrap();
     let resp_line = lotar::mcp::server::handle_json_line(&line);
     let resp: serde_json::Value = serde_json::from_str(&resp_line).unwrap();
-    let error = resp
-        .get("error")
-        .expect("MCP task conflicts must reject without force");
+    // Config-set conflicts are recoverable tool failures: result.isError with
+    // the conflict detail (DEV-63), never a bare protocol error.
+    assert!(
+        resp.get("error").is_none(),
+        "conflict must convert to isError: {resp}"
+    );
+    let result = resp.get("result").cloned().unwrap_or_default();
+    assert_eq!(result.get("isError"), Some(&serde_json::json!(true)));
+    let structured = result
+        .get("functionResponse")
+        .and_then(|fr| fr.get("response"))
+        .cloned()
+        .unwrap_or_default();
     assert_eq!(
-        error.get("code").and_then(|c| c.as_i64()),
-        Some(-32002),
-        "config set error code: {resp}"
+        structured.get("message").and_then(|m| m.as_str()),
+        Some("Config set failed")
+    );
+    let detail = structured
+        .get("data")
+        .and_then(|data| data.get("message"))
+        .and_then(|m| m.as_str())
+        .unwrap_or_default();
+    assert!(
+        detail.contains("conflict") || detail.contains("in progress"),
+        "conflict detail must explain the rejection: {detail}"
     );
     assert!(
         !tasks_dir.join("config.yml").exists(),
@@ -951,9 +969,23 @@ fn dev71_mcp_rejects_malformed_csv() {
     .unwrap();
     let resp: serde_json::Value =
         serde_json::from_str(&lotar::mcp::server::handle_json_line(&line)).unwrap();
+    // Recoverable tool/domain failures surface as result.isError=true with
+    // explanatory content (DEV-63); the config tree must stay untouched.
     assert!(
-        resp.get("error").is_some(),
-        "MCP must reject malformed values: {resp}"
+        resp.get("error").is_none(),
+        "domain failures must convert to isError: {resp}"
+    );
+    let result = resp.get("result").cloned().unwrap_or_default();
+    assert_eq!(result.get("isError"), Some(&serde_json::json!(true)));
+    let text = result
+        .get("content")
+        .and_then(|content| content.get(0))
+        .and_then(|entry| entry.get("text"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    assert!(
+        text.contains("issue_states") && text.contains("cannot be empty"),
+        "MCP must explain the malformed values: {text}"
     );
     assert!(
         !tasks_dir.join("config.yml").exists(),

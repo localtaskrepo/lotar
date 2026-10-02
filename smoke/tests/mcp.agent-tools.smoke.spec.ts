@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { callTool, extractToolPayload, initializeFramedMcp, withFramedMcpClient } from '../helpers/mcp-harness.js';
+import { callTool, expectProtocolError, expectToolFailure, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 const CONFIG_WITH_AGENT = `default:
   project: MCP
   reporter: tester@example.com
-statuses: [Todo, InProgress, Done]
-priorities: [Low, Medium, High]
-types: [Feature, Bug]
+  statuses: [Todo, InProgress, Done]
+  priorities: [Low, Medium, High]
+  types: [Feature, Bug]
 
 agent:
   logs_dir: .logs
@@ -28,12 +28,9 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const frame = await callTool(client, 2, 'agent_list_jobs', {});
-                expect(frame.message?.error).toBeUndefined();
+                expect(frame.error).toBeUndefined();
 
                 const payload = extractToolPayload(frame) as Record<string, any>;
                 expect(payload.jobs).toBeDefined();
@@ -53,51 +50,39 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const frame = await callTool(client, 2, 'agent_status', {});
-                expect(frame.message?.error).toBeDefined();
-                expect(frame.message?.error?.message).toContain('Missing required parameter');
+                expectProtocolError(frame, -32602, 'Invalid params');
             });
         } finally {
             await workspace.dispose();
         }
     });
 
-    it('returns error for agent/status with non-existent job', async () => {
+    it('reports a tool failure for agent/status with non-existent job', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: { '.tasks/config.yml': CONFIG_WITH_AGENT },
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const frame = await callTool(client, 2, 'agent_status', { id: 'nonexistent-job-id' });
-                expect(frame.message?.error).toBeDefined();
-                expect(frame.message?.error?.message).toContain('Job not found');
+                expectToolFailure(frame, 'Job not found');
             });
         } finally {
             await workspace.dispose();
         }
     });
 
-    it('returns error for agent/cancel with non-existent job', async () => {
+    it('reports a tool failure for agent/cancel with non-existent job', async () => {
         const workspace = await SmokeWorkspace.create({
             seedFiles: { '.tasks/config.yml': CONFIG_WITH_AGENT },
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const frame = await callTool(client, 2, 'agent_cancel', { id: 'nonexistent-job-id' });
-                expect(frame.message?.error).toBeDefined();
-                expect(frame.message?.error?.message).toContain('Job not found');
+                expectToolFailure(frame, 'Job not found');
             });
         } finally {
             await workspace.dispose();
@@ -110,19 +95,14 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 // Missing both ticket_id and prompt
                 const frame1 = await callTool(client, 2, 'agent_run', {});
-                expect(frame1.message?.error).toBeDefined();
-                expect(frame1.message?.error?.message).toContain('Missing required parameter');
+                expectProtocolError(frame1, -32602, 'Invalid params');
 
                 // Missing prompt
                 const frame2 = await callTool(client, 3, 'agent_run', { ticket_id: 'MCP-1' });
-                expect(frame2.message?.error).toBeDefined();
-                expect(frame2.message?.error?.message).toContain('Missing required parameter');
+                expectProtocolError(frame2, -32602, 'Invalid params');
             });
         } finally {
             await workspace.dispose();
@@ -135,19 +115,14 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 // Missing both id and message
                 const frame1 = await callTool(client, 2, 'agent_send_message', {});
-                expect(frame1.message?.error).toBeDefined();
-                expect(frame1.message?.error?.message).toContain('Missing required parameter');
+                expectProtocolError(frame1, -32602, 'Invalid params');
 
                 // Missing message
                 const frame2 = await callTool(client, 3, 'agent_send_message', { id: 'some-id' });
-                expect(frame2.message?.error).toBeDefined();
-                expect(frame2.message?.error?.message).toContain('Missing required parameter');
+                expectProtocolError(frame2, -32602, 'Invalid params');
             });
         } finally {
             await workspace.dispose();
@@ -160,18 +135,15 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 await client.send({
                     jsonrpc: '2.0',
                     id: 2,
                     method: 'tools/list',
                 });
-                const list = await client.readUntil((frame) => frame.message?.id === 2);
+                const list = await client.awaitResponse(2);
 
-                const tools = list.message?.result?.tools as Array<{ name: string }>;
+                const tools = list.result?.tools as Array<{ name: string }>;
                 expect(tools).toBeDefined();
                 const toolNames = tools.map((t) => t.name);
 
@@ -194,16 +166,13 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         try {
             const task = await workspace.addTask('MCP agent run test');
 
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const frame = await callTool(client, 2, 'agent_run', {
                     ticket_id: task.id,
                     prompt: 'Do something',
                     agent: 'test-agent',
                 });
-                expect(frame.message?.error).toBeUndefined();
+                expect(frame.error).toBeUndefined();
 
                 const payload = extractToolPayload(frame) as Record<string, any>;
                 expect(payload.id).toBeTruthy();
@@ -224,10 +193,7 @@ describe.concurrent('MCP agent tools smoke tests', () => {
         try {
             const task = await workspace.addTask('MCP status test');
 
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 // Create a job first
                 const runFrame = await callTool(client, 2, 'agent_run', {
                     ticket_id: task.id,
@@ -243,7 +209,7 @@ describe.concurrent('MCP agent tools smoke tests', () => {
 
                 // Query status
                 const statusFrame = await callTool(client, 3, 'agent_status', { id: jobId });
-                expect(statusFrame.message?.error).toBeUndefined();
+                expect(statusFrame.error).toBeUndefined();
 
                 const statusPayload = extractToolPayload(statusFrame) as Record<string, any>;
                 expect(statusPayload.id).toBe(jobId);

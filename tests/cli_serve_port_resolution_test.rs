@@ -10,7 +10,7 @@
 mod common;
 
 use common::TestFixtures;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Read};
 use std::net::TcpListener;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -29,13 +29,19 @@ enum Start {
     },
 }
 
+enum OutputLine {
+    Stdout(String),
+    Stderr(String),
+}
+
 struct ServeChild {
     child: Option<Child>,
     host: String,
     port: u16,
-    lines: mpsc::Receiver<String>,
+    lines: mpsc::Receiver<OutputLine>,
     stdout_dump: std::sync::Arc<std::sync::Mutex<String>>,
     stderr_dump: std::sync::Arc<std::sync::Mutex<String>>,
+    readers: Vec<thread::JoinHandle<()>>,
 }
 
 fn prepare_command(cwd: &std::path::Path, args: &[&str]) -> Command {
@@ -58,54 +64,7 @@ fn try_spawn_serve_env(cwd: &std::path::Path, args: &[&str], env_sets: &[(&str, 
         cmd.env(key, value);
     }
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
-    let mut child = cmd.spawn().expect("spawn lotar serve");
-
-    let stdout = child.stdout.take().expect("piped stdout");
-    let stderr = child.stderr.take().expect("piped stderr");
-    let (tx, rx) = mpsc::channel::<String>();
-    let stdout_dump = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-    let stdout_sink = std::sync::Arc::clone(&stdout_dump);
-    thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
-            match line {
-                Ok(line) => {
-                    if let Ok(mut sink) = stdout_sink.lock() {
-                        sink.push_str(&line);
-                        sink.push('\n');
-                    }
-                    if tx.send(line).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-    let stderr_dump = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-    let stderr_sink = std::sync::Arc::clone(&stderr_dump);
-    thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            match line {
-                Ok(line) => {
-                    if let Ok(mut sink) = stderr_sink.lock() {
-                        sink.push_str(&line);
-                        sink.push('\n');
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    let mut serve = ServeChild {
-        child: Some(child),
-        host: String::new(),
-        port: 0,
-        lines: rx,
-        stdout_dump,
-        stderr_dump,
-    };
+    let mut serve = capture_serve_child(cmd.spawn().expect("spawn lotar serve"));
     if serve.wait_for_banner().is_ok() {
         Start::Ready(serve)
     } else if let Some(mut child) = serve.child.take() {
@@ -116,6 +75,48 @@ fn try_spawn_serve_env(cwd: &std::path::Path, args: &[&str], env_sets: &[(&str, 
         }
     } else {
         panic!("serve child ownership lost");
+    }
+}
+
+fn capture_stream(
+    stream: impl Read + Send + 'static,
+    dump: std::sync::Arc<std::sync::Mutex<String>>,
+    tx: mpsc::Sender<OutputLine>,
+    event: fn(String) -> OutputLine,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        for line in BufReader::new(stream).lines() {
+            let Ok(line) = line else { break };
+            if let Ok(mut sink) = dump.lock() {
+                sink.push_str(&line);
+                sink.push('\n');
+            }
+            // The snapshot is updated before its stream's readiness event.
+            if tx.send(event(line)).is_err() {
+                break;
+            }
+        }
+    })
+}
+
+fn capture_serve_child(mut child: Child) -> ServeChild {
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+    let (tx, rx) = mpsc::channel();
+    let stdout_dump = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let stderr_dump = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+    let readers = vec![
+        capture_stream(stdout, stdout_dump.clone(), tx.clone(), OutputLine::Stdout),
+        capture_stream(stderr, stderr_dump.clone(), tx, OutputLine::Stderr),
+    ];
+    ServeChild {
+        child: Some(child),
+        host: String::new(),
+        port: 0,
+        lines: rx,
+        stdout_dump,
+        stderr_dump,
+        readers,
     }
 }
 
@@ -154,6 +155,8 @@ impl ServeChild {
     fn wait_for_banner(&mut self) -> Result<(), ()> {
         let deadline = Instant::now() + READY_TIMEOUT;
         let mut seen = String::new();
+        let mut stdout_ready = false;
+        let mut stderr_ready = false;
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
@@ -163,7 +166,7 @@ impl ServeChild {
                 );
             }
             match self.lines.recv_timeout(remaining) {
-                Ok(line) => {
+                Ok(OutputLine::Stdout(line)) => {
                     seen.push_str(&line);
                     seen.push('\n');
                     if let Some(rest) = line.strip_prefix("   URL: http://") {
@@ -175,7 +178,15 @@ impl ServeChild {
                         });
                         self.host = host.to_string();
                         self.port = port;
-                        return Ok(());
+                        stdout_ready = true;
+                    }
+                }
+                Ok(OutputLine::Stderr(line)) => {
+                    // This final stderr startup line follows the fallback
+                    // warning in the same pipe. The URL alone cannot prove
+                    // that the independent stderr reader has caught up.
+                    if line.contains("Press Ctrl+C to stop the server") {
+                        stderr_ready = true;
                     }
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
@@ -185,6 +196,9 @@ impl ServeChild {
                     );
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => return Err(()),
+            }
+            if stdout_ready && stderr_ready {
+                return Ok(());
             }
         }
     }
@@ -208,15 +222,23 @@ impl ServeChild {
         let _ = std::net::TcpStream::connect((self.host.as_str(), self.port));
         let child = self.child.as_mut().expect("serve child ownership");
         let deadline = Instant::now() + STOP_TIMEOUT;
-        loop {
+        let status = loop {
             match child.try_wait().expect("poll serve child") {
-                Some(status) => return status,
+                Some(status) => break status,
                 None if Instant::now() >= deadline => {
                     child.kill().expect("kill serve child after stop timeout");
-                    return child.wait().expect("reap killed serve child");
+                    break child.wait().expect("reap killed serve child");
                 }
                 None => thread::sleep(Duration::from_millis(25)),
             }
+        };
+        self.join_readers();
+        status
+    }
+
+    fn join_readers(&mut self) {
+        for reader in self.readers.drain(..) {
+            let _ = reader.join();
         }
     }
 
@@ -240,6 +262,7 @@ impl Drop for ServeChild {
             let _ = child.kill();
             let _ = child.wait();
         }
+        self.join_readers();
     }
 }
 
@@ -248,6 +271,82 @@ fn reserve_ephemeral_port() -> u16 {
     let port = listener.local_addr().unwrap().port();
     drop(listener);
     port
+}
+
+#[test]
+fn stdout_banner_alone_is_not_complete_startup_output() {
+    let (tx, rx) = mpsc::channel();
+    tx.send(OutputLine::Stdout(
+        "   URL: http://127.0.0.1:12345".to_string(),
+    ))
+    .unwrap();
+    drop(tx);
+    let mut serve = ServeChild {
+        child: None,
+        host: String::new(),
+        port: 0,
+        lines: rx,
+        stdout_dump: Default::default(),
+        stderr_dump: Default::default(),
+        readers: Vec::new(),
+    };
+    assert!(
+        serve.wait_for_banner().is_err(),
+        "stdout readiness must not expose an unread stderr snapshot"
+    );
+}
+
+#[test]
+fn startup_capture_accepts_either_stream_order() {
+    for stderr_first in [false, true] {
+        let (tx, rx) = mpsc::channel();
+        let stdout = OutputLine::Stdout("   URL: http://127.0.0.1:12345".to_string());
+        let stderr = OutputLine::Stderr("Press Ctrl+C to stop the server".to_string());
+        let events = if stderr_first {
+            [stderr, stdout]
+        } else {
+            [stdout, stderr]
+        };
+        for event in events {
+            tx.send(event).unwrap();
+        }
+        drop(tx);
+        let mut serve = ServeChild {
+            child: None,
+            host: String::new(),
+            port: 0,
+            lines: rx,
+            stdout_dump: Default::default(),
+            stderr_dump: Default::default(),
+            readers: Vec::new(),
+        };
+        assert!(serve.wait_for_banner().is_ok());
+        assert_eq!(serve.host, "127.0.0.1");
+        assert_eq!(serve.port, 12345);
+    }
+}
+
+#[test]
+fn stderr_startup_marker_alone_is_not_complete_startup_output() {
+    let (tx, rx) = mpsc::channel();
+    tx.send(OutputLine::Stderr(
+        "Press Ctrl+C to stop the server".to_string(),
+    ))
+    .unwrap();
+    drop(tx);
+    let mut serve = ServeChild {
+        child: None,
+        host: String::new(),
+        port: 0,
+        lines: rx,
+        stdout_dump: Default::default(),
+        stderr_dump: Default::default(),
+        readers: Vec::new(),
+    };
+    assert!(
+        serve.wait_for_banner().is_err(),
+        "stderr startup must not substitute for a bound URL"
+    );
 }
 
 fn write_global_config(fixtures: &TestFixtures, content: &str) {
@@ -523,52 +622,7 @@ fn spawn_serve_home_args(
 }
 
 fn spawn_from_command(mut cmd: Command) -> ServeChild {
-    let mut child = cmd.spawn().expect("spawn lotar serve");
-    let stdout = child.stdout.take().expect("piped stdout");
-    let stderr = child.stderr.take().expect("piped stderr");
-    let (tx, rx) = mpsc::channel::<String>();
-    let stdout_dump = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-    let stdout_sink = std::sync::Arc::clone(&stdout_dump);
-    thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
-            match line {
-                Ok(line) => {
-                    if let Ok(mut sink) = stdout_sink.lock() {
-                        sink.push_str(&line);
-                        sink.push('\n');
-                    }
-                    if tx.send(line).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-    let stderr_dump = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
-    let stderr_sink = std::sync::Arc::clone(&stderr_dump);
-    thread::spawn(move || {
-        let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            match line {
-                Ok(line) => {
-                    if let Ok(mut sink) = stderr_sink.lock() {
-                        sink.push_str(&line);
-                        sink.push('\n');
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-    let mut serve = ServeChild {
-        child: Some(child),
-        host: String::new(),
-        port: 0,
-        lines: rx,
-        stdout_dump,
-        stderr_dump,
-    };
+    let mut serve = capture_serve_child(cmd.spawn().expect("spawn lotar serve"));
     if serve.wait_for_banner().is_err() {
         if let Some(mut child) = serve.child.take() {
             let _ = child.kill();

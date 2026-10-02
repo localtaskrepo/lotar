@@ -1,0 +1,43 @@
+title: Synchronize serve test readiness across stdout and stderr
+status: Done
+priority: Medium
+type: Bug
+reporter: mallox
+assignee: mallox
+created: 2026-10-02T22:57:02.545297+00:00
+modified: 2026-10-02T23:13:08.000555+00:00
+comments:
+- date: 2026-10-02T22:58:24.627651+00:00
+  text: 'Plan: reproduce stdout-only premature readiness with a deterministic channel control, then require the fixture to capture both URL and the final stderr startup marker before exposing snapshots. Preserve warning/port/JSON/no-ANSI assertions and production serve behavior; add both stream-order and early-EOF controls. Verify owned cleanup and run targeted nextest, independent review, final lint/Rust/UI/build-first smoke. User failure c7e04a46-f49b-43c1-ba2d-82b07f4f58cd returned an empty stderr snapshot after a fallback URL. No Git/push operations authorized; keep historical Done tickets unchanged.'
+- date: 2026-10-02T23:08:10.196857+00:00
+  text: 'Outcome: Deterministic stdout-only/EOF control reproduced old premature readiness (red.log). Fixture now captures both streams on one typed event channel, updates snapshots before events, and requires URL plus final stderr startup marker in either order before exposing output. This marker follows the fallback warning in the same stderr pipe, removing the cross-reader race without sleeps or changed assertions. Duplicate spawn capture paths consolidated; owned reader threads joined after child exit/drop. Evidence: 25/25 serve-port cases passed with profile default/retries 0; original JSON fallback case stress-run 50 times without retry recovery. Final-source lint/Rust/UI/build-first smoke completed, exact counts being reconciled from target/serve-output-repair-20261002/. Remaining: independent review and final closure; no production serve changes, no Git/push operations, original Done tickets preserved. Guidance: no durable instruction correction identified; existing bounded fixture lifecycle guidance applies.'
+- date: 2026-10-02T23:13:07.979689+00:00
+  text: 'Outcome: Fixed the test-only stdout/stderr capture race behind the reported JSON fallback failure. Readiness now requires the bound URL and final stderr startup marker, in either order; same-pipe FIFO proves fallback diagnostics are already captured. Both spawn paths share capture logic and own/join reader threads after owned child exit/drop. Production serve/output code and all existing warning/port/JSON/no-ANSI assertions are unchanged; no sleeps, timeout increases, concurrency changes or retry masking added. Evidence: deterministic new control FAILED old URL-only helper (red.log); exact binary targeted-binary.log has 25/25 passing cases with profile default/retries 0; stress-json.log contains 50/50 successful original-case runs, with 24 other cases filtered each time. targeted.log accidentally selected zero tests and is explicitly NOT passing evidence. Final gates passed: lint/Clippy/fmt; Rust 1206 passed, 45 Gitless exclusions; UI 448 passed in 59 files; fresh build-first smoke 197 passed, 25 Git-gated skips in 49 files. Logs target/serve-output-repair-20261002/. Independent source review SIGNOFF/no blockers: board_ee716eae-d56c-497e-992b-b1362eeefbf0; reviewer observed the stress file before completion, parent subsequently verified all 50 summary rows. Remaining: none for this scoped defect. Genuine Git-required tests, Windows and remote CI remain unproven in this sandbox; accepted pre-commit handoff exception retained. No Git commands, index writes, commits or pushes; push not retried. Informational pre-existing ephemeral-port TOCTOU and hypothetical closed-stdio/non-exiting-child wait risk remain outside scope. Guidance: no durable instruction correction found; existing bounded fixture lifecycle and strict assertion guidance applied.'
+description: Fix the push-gate failure in json_format_keeps_fallback_notice_plain_and_machine_readable. The serve fixture returns on the stdout URL while its independent stderr reader may not yet have captured the fallback warning. Preserve exact JSON/no-ANSI/port assertions and production serve behavior. Add deterministic stdout-before-stderr and EOF readiness controls, retain bounded cleanup and owned processes, run targeted zero-retry nextest plus required lint/Rust/UI/build-first smoke gates, and record honest Git/platform exclusions. Do not run Git commands, commits or pushes, and do not reopen completed DEV-72/76/MCP tasks.
+history:
+- at: 2026-10-02T22:58:24.593884+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-02T22:58:24.627651+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T23:08:10.196857+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T23:13:07.979689+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-02T23:13:08.000555+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

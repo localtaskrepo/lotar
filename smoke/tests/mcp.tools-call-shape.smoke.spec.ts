@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { callTool, initializeFramedMcp, withFramedMcpClient } from '../helpers/mcp-harness.js';
+import { callTool, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 describe.concurrent('MCP tools/call result shape', () => {
@@ -12,31 +12,28 @@ describe.concurrent('MCP tools/call result shape', () => {
         });
 
         try {
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const config = await callTool(client, 2, 'config_show', {});
-                expect(config.message?.error).toBeUndefined();
+                expect(config.error).toBeUndefined();
 
-                const configContent = config.message?.result?.content;
+                const configContent = config.result?.content;
                 expect(Array.isArray(configContent)).toBe(true);
                 expect(configContent.length).toBeGreaterThan(0);
                 expect(configContent[0]?.type).toBe('text');
 
-                const configWrapped = config.message?.result?.functionResponse?.response?.content;
+                const configWrapped = config.result?.functionResponse?.response?.content;
                 expect(Array.isArray(configWrapped)).toBe(true);
                 expect(configWrapped.length).toBeGreaterThan(0);
 
                 const projects = await callTool(client, 3, 'project_list', {});
-                expect(projects.message?.error).toBeUndefined();
+                expect(projects.error).toBeUndefined();
 
-                const projectsContent = projects.message?.result?.content;
+                const projectsContent = projects.result?.content;
                 expect(Array.isArray(projectsContent)).toBe(true);
                 expect(projectsContent.length).toBeGreaterThan(0);
                 expect(projectsContent[0]?.type).toBe('text');
 
-                const projectsWrapped = projects.message?.result?.functionResponse?.response?.content;
+                const projectsWrapped = projects.result?.functionResponse?.response?.content;
                 expect(Array.isArray(projectsWrapped)).toBe(true);
                 expect(projectsWrapped.length).toBeGreaterThan(0);
             });

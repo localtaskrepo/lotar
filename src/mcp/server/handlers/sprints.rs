@@ -4,7 +4,7 @@ use std::fmt::Write as _;
 use super::super::hints::{EnumHints, enum_hints_to_value};
 use super::super::{
     JsonRpcRequest, JsonRpcResponse, MCP_DEFAULT_BACKLOG_LIMIT, MCP_DEFAULT_SPRINT_LIST_LIMIT,
-    MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, err,
+    MCP_MAX_BACKLOG_LIMIT, MCP_MAX_CURSOR, MCP_MAX_SPRINT_LIST_LIMIT, domain_service_error, err,
     make_mcp_integrity_payload, ok, parse_cursor_value, parse_limit_value,
 };
 use crate::api_types::{
@@ -520,12 +520,7 @@ pub(crate) fn handle_sprint_create(req: JsonRpcRequest) -> JsonRpcResponse {
     let outcome = match SprintService::create(&mut storage, sprint, defaults) {
         Ok(outcome) => outcome,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Failed to create sprint",
-                Some(json!({"message": error.to_string()})),
-            );
+            return domain_service_error(req.id, "Failed to create sprint", &error);
         }
     };
 
@@ -602,12 +597,7 @@ pub(crate) fn handle_sprint_update(req: JsonRpcRequest) -> JsonRpcResponse {
     let outcome = match SprintService::update(&mut storage, sprint_id, sprint) {
         Ok(outcome) => outcome,
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Failed to update sprint",
-                Some(json!({"message": error.to_string()})),
-            );
+            return domain_service_error(req.id, "Failed to update sprint", &error);
         }
     };
 
@@ -1328,12 +1318,7 @@ pub(crate) fn handle_sprint_delete(req: JsonRpcRequest) -> JsonRpcResponse {
             );
         }
         Err(error) => {
-            return err(
-                req.id,
-                -32603,
-                "Failed to delete sprint",
-                Some(json!({"message": error.to_string()})),
-            );
+            return domain_service_error(req.id, "Failed to delete sprint", &error);
         }
     }
 

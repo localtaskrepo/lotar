@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { callTool, extractToolPayload, initializeFramedMcp, withFramedMcpClient } from '../helpers/mcp-harness.js';
+import { callTool, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 describe.concurrent('MCP sprint_add identifiers', () => {
@@ -12,17 +12,14 @@ describe.concurrent('MCP sprint_add identifiers', () => {
 
             await workspace.runLotar(['sprint', 'create', '--label', 'MCP Sprint Add Smoke']);
 
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const addViaRef = await callTool(client, 2, 'sprint_add', {
                     sprint: '#1',
                     tasks: [first.id],
                 });
-                expect(addViaRef.message?.error).toBeUndefined();
+                expect(addViaRef.error).toBeUndefined();
 
-                const addViaRefContent = addViaRef.message?.result?.content;
+                const addViaRefContent = addViaRef.result?.content;
                 expect(Array.isArray(addViaRefContent)).toBe(true);
                 expect(addViaRefContent.length).toBeGreaterThan(0);
 
@@ -36,9 +33,9 @@ describe.concurrent('MCP sprint_add identifiers', () => {
                     sprint_id: 1,
                     tasks: [second.id],
                 });
-                expect(addViaId.message?.error).toBeUndefined();
+                expect(addViaId.error).toBeUndefined();
 
-                const addViaIdContent = addViaId.message?.result?.content;
+                const addViaIdContent = addViaId.result?.content;
                 expect(Array.isArray(addViaIdContent)).toBe(true);
                 expect(addViaIdContent.length).toBeGreaterThan(0);
 

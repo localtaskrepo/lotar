@@ -177,6 +177,42 @@ fn mcall(name: &str, args: Value) -> Value {
     serde_json::from_str(text).unwrap_or(json!({}))
 }
 
+/// True when the tool call failed: JSON-RPC protocol error or recoverable
+/// domain failure surfaced as result.isError (DEV-63).
+fn mcp_failed(resp: &Value) -> bool {
+    resp.get("error").is_some()
+        || resp.get("result").and_then(|result| result.get("isError"))
+            == Some(&serde_json::json!(true))
+}
+
+/// Explanatory text of a failed tool call across both error shapes.
+fn mcp_failure_text(resp: &Value) -> String {
+    if let Some(result) = resp.get("result") {
+        let structured = result
+            .get("functionResponse")
+            .and_then(|fr| fr.get("response"));
+        if let Some(message) = structured
+            .and_then(|r| r.get("data"))
+            .and_then(|data| data.get("message"))
+            .and_then(|m| m.as_str())
+        {
+            return message.to_string();
+        }
+        return result
+            .get("content")
+            .and_then(|content| content.get(0))
+            .and_then(|entry| entry.get("text"))
+            .and_then(|t| t.as_str())
+            .unwrap_or_default()
+            .to_string();
+    }
+    resp["error"]["data"]["message"]
+        .as_str()
+        .or_else(|| resp["error"]["message"].as_str())
+        .unwrap_or_default()
+        .to_string()
+}
+
 fn task_file(tasks_dir: &Path, id: &str) -> PathBuf {
     let (project, number) = id.rsplit_once('-').expect("full task id");
     tasks_dir.join(project).join(format!("{number}.yml"))
@@ -921,9 +957,8 @@ fn mcp_single_attachment_add_checks_blob_under_the_store_lock() {
     });
     let line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&req).unwrap());
     let resp: Value = serde_json::from_str(&line).unwrap();
-    let message = resp["error"]["data"]["message"]
-        .as_str()
-        .unwrap_or_default();
+    assert!(mcp_failed(&resp), "locked store must refuse: {resp}");
+    let message = mcp_failure_text(&resp);
     assert!(
         message.contains("attachments-store") && message.contains("busy"),
         "lock must be acquired before the blob check: {message}"
@@ -934,9 +969,8 @@ fn mcp_single_attachment_add_checks_blob_under_the_store_lock() {
     drop(guard);
     let line = lotar::mcp::server::handle_json_line(&serde_json::to_string(&req).unwrap());
     let resp: Value = serde_json::from_str(&line).unwrap();
-    let message = resp["error"]["data"]["message"]
-        .as_str()
-        .unwrap_or_default();
+    assert!(mcp_failed(&resp), "missing blob must refuse: {resp}");
+    let message = mcp_failure_text(&resp);
     assert!(
         message.to_lowercase().contains("not found"),
         "fail-closed missing-blob check still applies: {message}"

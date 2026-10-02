@@ -159,6 +159,13 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
     );
     properties.insert("priority".into(), json!({"type": ["string", "null"]}));
     properties.insert("type".into(), json!({"type": ["string", "null"]}));
+    properties.insert(
+        "task_type".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Alias for 'type'."
+        }),
+    );
     properties.insert("reporter".into(), json!({"type": ["string", "null"]}));
     properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
     properties.insert("due_date".into(), json!({"type": ["string", "null"]}));
@@ -181,6 +188,14 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
         json!({
             "type": "object",
             "description": "Assign custom_fields key/value pairs defined in config."
+        }),
+    );
+    properties.insert(
+        "sprints".into(),
+        json!({
+            "type": ["array", "null"],
+            "items": {"type": "number"},
+            "description": "Initial sprint memberships; entries must be positive integers."
         }),
     );
 
@@ -321,6 +336,13 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
     patch_properties.insert(
         "type".into(),
         json!({"type": ["string", "null"], "description": "null is treated as omitted."}),
+    );
+    patch_properties.insert(
+        "task_type".into(),
+        json!({
+            "type": ["string", "null"],
+            "description": "Alias for 'type'; null is treated as omitted."
+        }),
     );
     patch_properties.insert(
         "reporter".into(),
@@ -763,6 +785,10 @@ fn make_task_bulk_update_tool(enum_hints: Option<&EnumHints>) -> Value {
         "sprints".into(),
         json!({"type": ["array", "null"], "items": {"type": "number"}}),
     );
+    patch_properties.insert(
+        "task_type".into(),
+        json!({"type": ["string", "null"], "description": "Alias for 'type'."}),
+    );
 
     let mut tool = json!({
         "name": "task_bulk_update",
@@ -932,7 +958,7 @@ fn make_sprint_get_tool() -> Value {
         "inputSchema": {
             "type": "object",
             "properties": {
-                "sprint": {"type": ["string", "null"], "description": "Sprint reference like '#1'."},
+                "sprint": {"type": ["string", "number", "null"], "description": "Sprint reference like '#1' or a numeric id."},
                 "sprint_id": {"type": ["number", "null"], "description": "Numeric sprint identifier."}
             },
             "additionalProperties": false
@@ -1043,16 +1069,29 @@ fn make_sprint_add_tool() -> Value {
             "type": "object",
             "properties": {
                 "sprint": {
-                    "type": ["string", "null"],
-                    "description": "Sprint reference like '#1' or keyword (next/previous/active)."
+                    "type": ["string", "number", "null"],
+                    "description": "Sprint reference like '#1', a numeric id, or keyword (next/previous/active)."
                 },
                 "sprint_id": {
                     "type": ["number", "null"],
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
-                "tasks": {"type": "array", "items": {"type": "string"}},
+                "tasks": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}}
+                    ]
+                },
                 "allow_closed": {"type": ["boolean", "null"]},
-                "cleanup_missing": {"type": ["boolean", "null"]}
+                "cleanup_missing": {"type": ["boolean", "null"]},
+                "force_single": {
+                    "type": ["boolean", "null"],
+                    "description": "Replace existing sprint memberships instead of adding."
+                },
+                "force": {
+                    "type": ["boolean", "null"],
+                    "description": "Alias for force_single."
+                }
             },
             "required": ["tasks"],
             "additionalProperties": false
@@ -1068,14 +1107,19 @@ fn make_sprint_remove_tool() -> Value {
             "type": "object",
             "properties": {
                 "sprint": {
-                    "type": ["string", "null"],
-                    "description": "Sprint reference like '#1' or keyword (next/previous/active)."
+                    "type": ["string", "number", "null"],
+                    "description": "Sprint reference like '#1', a numeric id, or keyword (next/previous/active)."
                 },
                 "sprint_id": {
                     "type": ["number", "null"],
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
-                "tasks": {"type": "array", "items": {"type": "string"}},
+                "tasks": {
+                    "oneOf": [
+                        {"type": "string"},
+                        {"type": "array", "items": {"type": "string"}}
+                    ]
+                },
                 "cleanup_missing": {"type": ["boolean", "null"]}
             },
             "required": ["tasks"],
@@ -1099,8 +1143,7 @@ fn make_sprint_delete_tool() -> Value {
                     "type": ["number", "null"],
                     "description": "Numeric sprint identifier. Prefer this over 'sprint' when your host struggles with union schemas."
                 },
-                "cleanup_missing": {"type": ["boolean", "null"]},
-                "force": {"type": ["boolean", "null"]}
+                "cleanup_missing": {"type": ["boolean", "null"]}
             },
             "additionalProperties": false
         }
@@ -1132,45 +1175,6 @@ fn make_sprint_backlog_tool(enum_hints: Option<&EnumHints>) -> Value {
         json!({
             "type": ["number", "null"],
             "description": "Alias for cursor (0-based)."
-        }),
-    );
-    properties.insert(
-        "sort_by".into(),
-        json!({
-            "type": ["string", "null"],
-            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending)."
-        }),
-    );
-    properties.insert(
-        "order".into(),
-        json!({
-            "type": ["string", "null"],
-            "enum": ["asc", "desc", null],
-            "description": "Sort direction. Defaults to desc. Ties always break by canonical task ID ascending."
-        }),
-    );
-    properties.insert(
-        "due".into(),
-        json!({
-            "type": ["string", "null"],
-            "enum": ["today", "soon", "later", "overdue", null],
-            "description": "Smart filter on the due date: today, soon (next 7 days excluding today), later (beyond 7 days), or overdue (before today)."
-        }),
-    );
-    properties.insert(
-        "recent".into(),
-        json!({
-            "type": ["string", "null"],
-            "enum": ["7d", null],
-            "description": "Smart filter: only tasks modified in the last 7 days."
-        }),
-    );
-    properties.insert(
-        "needs".into(),
-        json!({
-            "type": ["string", "array", "null"],
-            "items": {"type": "string", "enum": ["effort", "due"]},
-            "description": "Smart filter: keep only tasks missing these fields. Accepts CSV string or array; strict vocabulary: effort, due. Blank explicit values are errors."
         }),
     );
 
@@ -1247,45 +1251,6 @@ fn make_project_list_tool(enum_hints: Option<&EnumHints>) -> Value {
         json!({
             "type": ["number", "null"],
             "description": "Alias for cursor (0-based)."
-        }),
-    );
-    properties.insert(
-        "sort_by".into(),
-        json!({
-            "type": ["string", "null"],
-            "description": "Global sort key: one of priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints, or custom:<name> (alias field:<name>). Defaults to modified. tags compares the array of strings lexicographically (empty first ascending); sprints compares the ascending sprint-id list numerically (empty first ascending)."
-        }),
-    );
-    properties.insert(
-        "order".into(),
-        json!({
-            "type": ["string", "null"],
-            "enum": ["asc", "desc", null],
-            "description": "Sort direction. Defaults to desc. Ties always break by canonical task ID ascending."
-        }),
-    );
-    properties.insert(
-        "due".into(),
-        json!({
-            "type": ["string", "null"],
-            "enum": ["today", "soon", "later", "overdue", null],
-            "description": "Smart filter on the due date: today, soon (next 7 days excluding today), later (beyond 7 days), or overdue (before today)."
-        }),
-    );
-    properties.insert(
-        "recent".into(),
-        json!({
-            "type": ["string", "null"],
-            "enum": ["7d", null],
-            "description": "Smart filter: only tasks modified in the last 7 days."
-        }),
-    );
-    properties.insert(
-        "needs".into(),
-        json!({
-            "type": ["string", "array", "null"],
-            "items": {"type": "string", "enum": ["effort", "due"]},
-            "description": "Smart filter: keep only tasks missing these fields. Accepts CSV string or array; strict vocabulary: effort, due. Blank explicit values are errors."
         }),
     );
 
@@ -1479,7 +1444,8 @@ fn multi_value_string_schema() -> Value {
     json!({
         "oneOf": [
             {"type": "string"},
-            {"type": "array", "items": {"type": "string"}}
+            {"type": "array", "items": {"type": "string"}},
+            {"type": "null"}
         ]
     })
 }

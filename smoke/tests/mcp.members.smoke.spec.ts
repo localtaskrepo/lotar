@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
-import { callTool, extractToolPayload, initializeFramedMcp, withFramedMcpClient } from '../helpers/mcp-harness.js';
+import { callTool, expectToolFailure, extractToolPayload, withMcpClient } from '../helpers/mcp-harness.js';
 import { SmokeWorkspace } from '../helpers/workspace.js';
 
 const STRICT_MEMBERS_CONFIG = `default:
@@ -27,19 +27,17 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
         try {
             await workspace.write('.tasks/config.yml', STRICT_MEMBERS_CONFIG);
 
-            await withFramedMcpClient(workspace, async (client) => {
-                const init = await initializeFramedMcp(client);
-                expect(init.message?.error).toBeUndefined();
-
+            await withMcpClient(workspace, async (client) => {
                 const invalid = await callTool(client, 2, 'task/create', {
                     title: 'MCP strict members invalid assignee',
                     project: 'CLI',
                     reporter: 'allowed@example.com',
                     assignee: 'intruder@example.com',
                 });
-                expect(invalid.message?.error?.message).toBe('Task create failed');
-                const errorMessage = invalid.message?.error?.data?.message ?? '';
-                expect(errorMessage).toContain("Assignee 'intruder@example.com' is not in configured members");
+                expectToolFailure(
+                    invalid,
+                    "Assignee 'intruder@example.com' is not in configured members",
+                );
 
                 const success = await callTool(client, 3, 'task/create', {
                     title: 'MCP strict members allowed assignee',
@@ -47,7 +45,7 @@ describe.concurrent('MCP strict member smoke scenarios', () => {
                     reporter: 'allowed@example.com',
                     assignee: 'allowed@example.com',
                 });
-                expect(success.message?.error).toBeUndefined();
+                expect(success.error).toBeUndefined();
 
                 const payload = extractToolPayload(success) as Record<string, any>;
                 const dto: Record<string, any> = payload.task ?? payload;

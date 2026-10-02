@@ -42,7 +42,7 @@ Some agent harnesses run the shell in a sandbox that blocks certain OS operation
   - Smoke git tests skip honestly via `describe.concurrent.skipIf(!gitAvailable())`.
   - Designated full-coverage runners set `LOTAR_REQUIRE_GIT=1` (build refuses) and `LOTAR_SMOKE_REQUIRE_GIT=1` (smoke probe fatal): missing Git must FAIL — no gitless fallback, compile-outs, or early-return passes. Do not add new gates or compile-out cfgs; see the [tests README](../../../tests/README.md), [testing-strategy](../testing-strategy/SKILL.md), and [platform guide](../../../docs/developers/platform-test-verification.md).
 - **Chromium won't launch (`MachPortRendezvous … Permission denied`, then `Target page … closed`)** — the sandbox denies the browser's multi-process bootstrap. Set `LOTAR_SMOKE_CHROMIUM_ARGS="--no-sandbox,--no-zygote,--single-process"` (the smoke `withBrowser` helper reads this; empty by default so CI is unaffected).
-- **`mcp.protocol` framed-transport test waits for a `tools/listChanged` notification** after a config write — this depends on file-change detection. The MCP config watcher now polls as a fallback (alongside the kernel watcher), so it fires reliably even when kernel file-watching is blocked; the binary itself answers framed MCP fine.
+- **`mcp.protocol` framed-compatibility test waits for a `notifications/tools/list_changed` notification** after a config write — this depends on file-change detection. The MCP config watcher polls as a fallback (alongside the kernel watcher), so it fires reliably even when kernel file-watching is blocked. Primary smoke MCP clients use newline-delimited JSON (NDJSON); the framed client is explicit compatibility coverage.
 
 ## Useful env vars
 
