@@ -98,9 +98,12 @@ vi.mock('vue-router', () => ({
     useRouter: () => ({ push: routerPushMock }),
 }))
 
+const showConfigMock = vi.fn(async (_project?: string) => ({}))
+
 vi.mock('../api/client', () => ({
     api: {
         setStatus: vi.fn(async () => { }),
+        showConfig: (project?: string) => showConfigMock(project),
     },
 }))
 
@@ -190,6 +193,17 @@ vi.mock('../composables/useTaskPanelController', () => ({
 }))
 
 import Board from '../pages/Board.vue'
+import { invalidateCompletionPolicies } from '../composables/useCompletionPolicy'
+
+function policyConfig(overrides: Record<string, unknown> = {}) {
+    return {
+        issue_states: ['Todo', 'Doing', 'Done'],
+        effective_done_states: ['Done'],
+        done_states_mode: 'inferred',
+        task_calendar_day: '2026-01-05',
+        ...overrides,
+    }
+}
 
 function baseTask(overrides: Partial<TaskDTO>): TaskDTO {
     return {
@@ -799,8 +813,12 @@ describe('Board overdue suppression for done tasks', () => {
         tasksStore.hydrateAll.mockClear()
         tasksStore.getQuery.mockClear()
         boardQueryHandle.refresh.mockClear()
-        // Configured statuses: Todo, Doing, Done — "Done" is the final/done status
+        // Configured statuses: Todo, Doing, Done — server-resolved terminal
+        // policy: Done (inferred legacy default).
         configStore.statuses.value = ['Todo', 'Doing', 'Done']
+        showConfigMock.mockReset()
+        showConfigMock.mockImplementation(async () => policyConfig())
+        invalidateCompletionPolicies()
         if (typeof localStorage !== 'undefined' && localStorage.clear) {
             localStorage.clear()
         }
@@ -831,6 +849,109 @@ describe('Board overdue suppression for done tasks', () => {
         expect(card.text()).toContain('Due')
         expect(card.text()).not.toContain('Overdue')
     })
+
+    it('suppresses overdue for a custom terminal status in the middle of the list', async () => {
+        // Explicit policy: Done + Closed are terminal (Closed sits mid-list).
+        configStore.statuses.value = ['Todo', 'Closed', 'Doing', 'Done']
+        showConfigMock.mockImplementation(async () => policyConfig({
+            issue_states: ['Todo', 'Closed', 'Doing', 'Done'],
+            effective_done_states: ['Done', 'Closed'],
+            done_states_mode: 'explicit',
+        }))
+
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Closed', due_date: '2025-12-01' }),
+            baseTask({ id: 'ACME-2', status: 'Doing', due_date: '2025-12-01' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const cards = wrapper.findAll('article.card.task')
+        const closed = cards.find(c => c.text().includes('ACME-1'))!
+        const doing = cards.find(c => c.text().includes('ACME-2'))!
+        expect(closed.text()).not.toContain('Overdue')
+        expect(doing.text()).toContain('Overdue')
+        wrapper.unmount()
+    })
+
+    it('marks Done overdue again when the explicit policy excludes it', async () => {
+        // Explicit policy names only Shipped: Done is no longer terminal.
+        configStore.statuses.value = ['Todo', 'Doing', 'Done', 'Shipped']
+        showConfigMock.mockImplementation(async () => policyConfig({
+            issue_states: ['Todo', 'Doing', 'Done', 'Shipped'],
+            effective_done_states: ['Shipped'],
+            done_states_mode: 'explicit',
+        }))
+
+        const tasks = [
+            baseTask({ id: 'ACME-1', status: 'Done', due_date: '2025-12-01' }),
+            baseTask({ id: 'ACME-2', status: 'Shipped', due_date: '2025-12-01' }),
+        ]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const cards = wrapper.findAll('article.card.task')
+        const done = cards.find(c => c.text().includes('ACME-1'))!
+        const shipped = cards.find(c => c.text().includes('ACME-2'))!
+        expect(done.text()).toContain('Overdue')
+        expect(shipped.text()).not.toContain('Overdue')
+        wrapper.unmount()
+    })
+
+    it('does not treat a stale is_done flag as done after an optimistic status change', async () => {
+        // Reopened: status Doing, but the cached server metadata still says done.
+        const tasks = [baseTask({
+            id: 'ACME-1',
+            status: 'Doing',
+            due_date: '2025-12-01',
+            task_state: { is_done: true, due_bucket: null, calendar_day: '2026-01-05' },
+        })]
+        taskMap.value = new Map(tasks.map(t => [t.id, t]))
+        taskVersion.value++
+
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const card = wrapper.find('article.card.task')
+        expect(card.text()).toContain('Overdue')
+        wrapper.unmount()
+    })
+
+    it('seeds the done-column statuses from the effective policy but keeps stored preferences', async () => {
+        // No stored preference: seeded with the effective terminal labels.
+        const wrapper = mount(Board)
+        await flushPromises()
+        wrapper.unmount()
+
+        const stored = JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')
+        expect(stored).toBeNull() // seeding must not freeze a preference
+
+        // Explicitly toggling a non-terminal column persists the seeded
+        // terminal labels plus the user's choice.
+        const wrapper2 = mount(Board)
+        await flushPromises()
+        const doingToggle = wrapper2.findAll('.done-filter input[type="checkbox"]')
+            .find((input) => input.element.closest('label')?.textContent?.includes('Doing'))
+        expect(doingToggle).toBeTruthy()
+        await doingToggle!.setValue(true)
+        expect(JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')?.statuses).toEqual(['Done', 'Doing'])
+        wrapper2.unmount()
+
+        // A stored preference survives a remount even when the policy changes.
+        showConfigMock.mockImplementation(async () => policyConfig({ effective_done_states: ['Done', 'Closed'] }))
+        invalidateCompletionPolicies()
+        const wrapper3 = mount(Board)
+        await flushPromises()
+        expect(JSON.parse(window.localStorage.getItem('lotar.doneFilters::ACME') || 'null')?.statuses).toEqual(['Done', 'Doing'])
+        wrapper3.unmount()
+    })
+
     it('shows a retry banner while retaining cards when a refresh fails with data', async () => {
         const tasks = [baseTask({ id: 'ACME-1', title: 'Alpha' })]
         taskMap.value = new Map(tasks.map(t => [t.id, t]))

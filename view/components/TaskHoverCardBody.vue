@@ -1,14 +1,27 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { customFieldEntriesFromTask } from '../composables/useColumns'
+import { ensureCompletionPolicy, useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { formatRelativeTime, parseTaskDate, startOfLocalDay } from '../utils/date'
 import { formatMember } from '../utils/member'
+import { projectOf } from '../utils/text'
 
 const props = defineProps<{
     task: TaskDTO
     fields?: Partial<Record<string, boolean>>
 }>()
+
+const completion = useCompletionPolicy()
+
+watch(
+    () => props.task?.id,
+    (id) => {
+        const prefix = projectOf(id ?? '')
+        if (prefix) void ensureCompletionPolicy(prefix)
+    },
+    { immediate: true },
+)
 
 type FieldKey =
     | 'id'
@@ -82,7 +95,8 @@ const dueInfo = computed(() => {
     let tone: 'overdue' | 'due-today' | 'soon' | null = null
     if (diffDays < 0) {
         context = `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} ago`
-        tone = 'overdue'
+        // Terminal tasks are never shown as overdue (DEV-21 shared policy).
+        tone = completion.isTaskOverdue(props.task) ? 'overdue' : null
     } else if (diffDays === 0) {
         context = 'Today'
         tone = 'due-today'

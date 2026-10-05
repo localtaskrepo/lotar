@@ -17,6 +17,12 @@
             <div class="task-panel__title">
               <span v-if="mode === 'edit'" class="task-panel__id">{{ form.id }}</span>
               <h2>{{ mode === 'create' ? 'Create task' : form.title || 'Task details' }}</h2>
+              <span
+                v-if="form.status"
+                class="badge task-panel__status-badge"
+                :class="statusBadgeClass"
+                data-testid="task-panel-status-badge"
+              >{{ form.status }}</span>
             </div>
             <div class="task-panel__header-actions">
               <UiButton
@@ -576,6 +582,7 @@ const {
   canCreate,
   task,
   form,
+  statusBadgeClass,
   hoveredReferenceCode,
   hoveredReferenceStyle,
   hoveredReferenceLoading,
@@ -1744,6 +1751,11 @@ async function removeSprintChip(sprintId: number) {
   border-radius: var(--radius-pill);
   font-size: var(--text-xs, 0.75rem);
   letter-spacing: 0.02em;
+}
+
+.task-panel__status-badge {
+  align-self: center;
+  white-space: nowrap;
 }
 
 .badge--success {

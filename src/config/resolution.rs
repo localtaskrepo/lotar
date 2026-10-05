@@ -335,6 +335,44 @@ pub fn preview_project_resolved(
 }
 
 /// Load and merge all configurations with proper priority order
+/// Fail-closed validation of an effective explicit completion policy
+/// (DEV-21). An explicit `issue.done_states` that is empty or references
+/// statuses outside the effective `issue_states` is invalid on READ, not
+/// only on mutation: runtime classification must never silently fall back
+/// to the inferred policy (which would mark nothing terminal) or to a
+/// global policy. Returns Ok for the inferred mode (`None`).
+pub fn validate_effective_done_policy(config: &ResolvedConfig) -> Result<(), ConfigError> {
+    use crate::config::types::ConfigError;
+    let Some(done) = &config.issue_done_states else {
+        return Ok(());
+    };
+    if done.values.is_empty() {
+        return Err(ConfigError::PolicyError(
+            "issue.done_states cannot be empty; remove the issue.done_states key to use the inferred completion policy, or list at least one terminal status"
+                .to_string(),
+        ));
+    }
+    let invalid: Vec<String> = done
+        .values
+        .iter()
+        .filter(|value| {
+            !config
+                .issue_states
+                .values
+                .iter()
+                .any(|state| state.eq_ignore_case(value.as_str()))
+        })
+        .map(|value| value.as_str().to_string())
+        .collect();
+    if !invalid.is_empty() {
+        return Err(ConfigError::PolicyError(format!(
+            "issue.done_states contains values not present in issue_states: {}; add them to issue.states or remove them from issue.done_states",
+            invalid.join(", ")
+        )));
+    }
+    Ok(())
+}
+
 pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig, ConfigError> {
     // Fast path: return from cache if the config files are unchanged
     let key = cache_key_for(tasks_dir);
@@ -343,11 +381,20 @@ pub fn load_and_merge_configs(tasks_dir: Option<&Path>) -> Result<ResolvedConfig
         && let Some(cached) = guard.get(&key)
         && cached.fingerprint == fingerprint
     {
+        // Cached entries were validated when inserted; re-validate anyway
+        // because the environment layer is not part of the file fingerprint.
+        validate_effective_done_policy(&cached.resolved)?;
         return Ok(cached.resolved.clone());
     }
 
     let resolved = load_merged_global_chain(tasks_dir);
 
+    // DEV-21 read-time enforcement: a hand-edited explicit done policy that
+    // is empty or references unknown statuses fails closed here (show,
+    // inspect, and every runtime classification) instead of silently
+    // classifying nothing as terminal. Repair flows through the full
+    // candidate pipeline, which loads raw configs and revalidates.
+    validate_effective_done_policy(&resolved)?;
     if let Ok(mut guard) = config_cache().write() {
         guard.insert(
             key,
@@ -418,7 +465,15 @@ pub fn config_for_project(
     let Some(prefix) = project.map(str::trim).filter(|p| !p.is_empty()) else {
         return Ok(base);
     };
-    Ok(get_project_config(&base, prefix, tasks_dir).unwrap_or(base))
+    match get_project_config(&base, prefix, tasks_dir) {
+        Ok(resolved) => Ok(resolved),
+        // An invalid explicit completion policy must fail closed: never
+        // silently fall back to the base policy for this error class.
+        Err(err @ crate::config::types::ConfigError::PolicyError(_)) => Err(err),
+        // Legacy behavior: an unloadable project config keeps the merged
+        // base policy.
+        Err(_) => Ok(base),
+    }
 }
 
 /// Improved merging that only overrides non-default values
@@ -436,6 +491,11 @@ pub fn merge_global_config(base: &mut GlobalConfig, override_config: GlobalConfi
     // For configurable fields, we do full replacement if they differ
     if override_config.issue_states.values != defaults.issue_states.values {
         base.issue_states = override_config.issue_states;
+    }
+    // issue.done_states is presence-based: an explicit override wins even
+    // when it equals the base value, and absence keeps the base setting.
+    if override_config.issue_done_states.is_some() {
+        base.issue_done_states = override_config.issue_done_states;
     }
     if override_config.issue_types.values != defaults.issue_types.values {
         base.issue_types = override_config.issue_types;
@@ -587,6 +647,10 @@ pub fn overlay_global_into_resolved(resolved: &mut ResolvedConfig, override_conf
 
     if override_config.issue_states.values != defaults.issue_states.values {
         resolved.issue_states = override_config.issue_states;
+    }
+    // Presence-based optional override (see merge_global_config).
+    if override_config.issue_done_states.is_some() {
+        resolved.issue_done_states = override_config.issue_done_states;
     }
     if override_config.issue_types.values != defaults.issue_types.values {
         resolved.issue_types = override_config.issue_types;
@@ -744,6 +808,9 @@ pub fn get_project_config(
         && let Some(cached) = guard.get(&cache_key)
         && cached.fingerprint == fingerprint
     {
+        // Cached entries were validated when inserted; re-validate anyway
+        // because the environment layer is not part of the file fingerprint.
+        validate_effective_done_policy(&cached.resolved)?;
         return Ok(cached.resolved.clone());
     }
 
@@ -775,6 +842,11 @@ pub fn get_project_config(
     apply_project_config_overrides(&mut resolved, project_config);
     apply_cli_overrides(&mut resolved);
 
+    // DEV-21 read-time enforcement for the project-resolved chain (show/
+    // inspect effective views use this path directly). Invalid explicit
+    // policies fail closed instead of caching an unclassifiable policy.
+    validate_effective_done_policy(&resolved)?;
+
     if let Ok(mut guard) = config_cache().write() {
         // Hard cap: bounded memory even if many legitimate projects are queried.
         if guard.len() >= 256 {
@@ -794,6 +866,12 @@ pub fn get_project_config(
 fn apply_project_config_overrides(resolved: &mut ResolvedConfig, project_config: ProjectConfig) {
     if let Some(states) = project_config.issue_states {
         resolved.issue_states = states;
+    }
+    // An omitted project issue.done_states inherits the effective explicit
+    // global list; Some(...) overrides it, including an explicit pin that
+    // happens to equal the global value.
+    if let Some(done_states) = project_config.issue_done_states {
+        resolved.issue_done_states = Some(done_states);
     }
     if let Some(types) = project_config.issue_types {
         resolved.issue_types = types;
@@ -1022,6 +1100,7 @@ impl ResolvedConfig {
             server_port: global.server_port,
             default_project: global.default_project,
             issue_states: global.issue_states,
+            issue_done_states: global.issue_done_states,
             issue_types: global.issue_types,
             issue_priorities: global.issue_priorities,
             tags: global.tags,

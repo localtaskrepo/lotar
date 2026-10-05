@@ -910,7 +910,7 @@ fn wait_for_job_completion(
             return Err(format!("Job '{}' not found", job_id));
         };
 
-        if is_terminal_status(job.status.as_str()) {
+        if job_is_terminal(job.status.as_str()) {
             if job.status.eq_ignore_ascii_case("completed") {
                 renderer.emit_success(format!("Job {} completed", job.id));
             } else {
@@ -938,7 +938,10 @@ fn wait_for_job_completion(
     }
 }
 
-fn is_terminal_status(status: &str) -> bool {
+/// Whether an agent JOB (not a task) reached a terminal state. Renamed in
+/// DEV-21 to avoid conflation with the task completion policy's terminal
+/// statuses; sprint lifecycle states are a third, separate notion.
+fn job_is_terminal(status: &str) -> bool {
     status.eq_ignore_ascii_case("completed")
         || status.eq_ignore_ascii_case("failed")
         || status.eq_ignore_ascii_case("cancelled")

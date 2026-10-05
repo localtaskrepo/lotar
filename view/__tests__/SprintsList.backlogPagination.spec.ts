@@ -15,6 +15,7 @@ vi.mock('vue-router', () => ({
 vi.mock('../api/client', () => ({
     api: {
         listTasks: vi.fn(),
+        showConfig: vi.fn(async () => ({})),
     },
 }))
 

@@ -65,10 +65,44 @@
       />
       <p v-if="issuePrioritiesError" class="field-error">{{ issuePrioritiesError }}</p>
     </div>
+
+    <div class="field">
+      <label class="field-label">
+        <span>Done states</span>
+        <span
+          v-if="issueDoneStatesSource"
+          :class="['provenance', provenanceClass(issueDoneStatesSource)]"
+        >
+          {{ provenanceLabel(issueDoneStatesSource) }}
+        </span>
+      </label>
+      <select
+        class="done-states-mode"
+        :value="doneStatesMode"
+        aria-label="Done states mode"
+        @change="onDoneStatesModeChange(($event.target as HTMLSelectElement).value)"
+      >
+        <option value="automatic">{{ automaticLabel }}</option>
+        <option value="explicit">Explicit statuses</option>
+      </select>
+      <ChipListField
+        v-if="doneStatesMode === 'explicit'"
+        v-model="doneStatesChips"
+        :suggestions="statusSuggestions"
+        placeholder="Add done state"
+        add-label="Add done state"
+        composer-label="Done state"
+        empty-label="No done states defined"
+        @update:modelValue="handleUpdate('issue_done_states')"
+      />
+      <p v-if="effectiveSummary" class="field-hint">{{ effectiveSummary }}</p>
+      <p v-if="issueDoneStatesError" class="field-error">{{ issueDoneStatesError }}</p>
+    </div>
   </ConfigGroup>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ConfigSource } from '../api/types'
 import ChipListField from './ChipListField.vue'
 import ConfigGroup from './ConfigGroup.vue'
@@ -76,6 +110,9 @@ import ConfigGroup from './ConfigGroup.vue'
 const issueStates = defineModel<string[]>('issueStates', { required: true })
 const issueTypes = defineModel<string[]>('issueTypes', { required: true })
 const issuePriorities = defineModel<string[]>('issuePriorities', { required: true })
+// null = automatic/inherit; an explicit list is one-or-more (empty flips back
+// to automatic/inherit instead of saving an invalid explicit-empty value).
+const issueDoneStates = defineModel<string[] | null>('issueDoneStates', { required: true })
 
 const {
   description,
@@ -85,9 +122,14 @@ const {
   issueStatesError = null,
   issueTypesError = null,
   issuePrioritiesError = null,
+  issueDoneStatesError = null,
   issueStatesSource,
   issueTypesSource,
   issuePrioritiesSource,
+  issueDoneStatesSource,
+  automaticLabel = 'Automatic',
+  effectiveSummary = '',
+  effectiveDoneLabels = [],
   provenanceLabel,
   provenanceClass,
 } = defineProps<{
@@ -98,18 +140,47 @@ const {
   issueStatesError?: string | null
   issueTypesError?: string | null
   issuePrioritiesError?: string | null
+  issueDoneStatesError?: string | null
   issueStatesSource?: ConfigSource
   issueTypesSource?: ConfigSource
   issuePrioritiesSource?: ConfigSource
+  issueDoneStatesSource?: ConfigSource
+  /** Label for the automatic/inherit option (shows the current effective list). */
+  automaticLabel?: string
+  /** Effective done states summary shown under the control. */
+  effectiveSummary?: string
+  /** Effective labels used to seed the list when switching to explicit. */
+  effectiveDoneLabels?: string[]
   provenanceLabel: (source: ConfigSource | undefined) => string
   provenanceClass: (source: ConfigSource | undefined) => string
 }>()
 
 const emit = defineEmits<{
-  (e: 'validate', field: 'issue_states' | 'issue_types' | 'issue_priorities'): void
+  (e: 'validate', field: 'issue_states' | 'issue_types' | 'issue_priorities' | 'issue_done_states'): void
 }>()
 
-function handleUpdate(field: 'issue_states' | 'issue_types' | 'issue_priorities') {
+const doneStatesMode = computed<'automatic' | 'explicit'>(() => (issueDoneStates.value === null ? 'automatic' : 'explicit'))
+
+const doneStatesChips = computed<string[]>({
+  get: () => issueDoneStates.value ?? [],
+  set: (value) => {
+    // Clearing every chip resets to automatic/inherit, never explicit-empty.
+    issueDoneStates.value = value.length ? value : null
+  },
+})
+
+function onDoneStatesModeChange(mode: string) {
+  if (mode === 'explicit') {
+    issueDoneStates.value = effectiveDoneLabels.length ? [...effectiveDoneLabels] : []
+    if (!effectiveDoneLabels.length) {
+      emit('validate', 'issue_done_states')
+    }
+    return
+  }
+  issueDoneStates.value = null
+}
+
+function handleUpdate(field: 'issue_states' | 'issue_types' | 'issue_priorities' | 'issue_done_states') {
   emit('validate', field)
 }
 </script>
@@ -131,6 +202,16 @@ function handleUpdate(field: 'issue_states' | 'issue_types' | 'issue_priorities'
 .field-error {
   color: var(--color-danger);
   font-size: 12px;
+}
+
+.field-hint {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.done-states-mode {
+  width: fit-content;
+  min-height: 34px;
 }
 
 </style>

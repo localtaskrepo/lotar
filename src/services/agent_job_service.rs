@@ -1096,10 +1096,21 @@ pub(crate) fn ticket_done_state(tasks_dir: &std::path::Path, ticket_id: &str) ->
     {
         return None;
     }
-    let config = crate::config::resolution::config_for_project(tasks_dir, Some(prefix)).ok()?;
+    // DEV-21 review F1: classify against the policy of the tasks root that
+    // ACTUALLY holds the ticket, not the issuing workspace — homonymous
+    // prefixes across sibling roots carry different completion policies.
+    // A missing or ambiguous identity stays indeterminate (None), which
+    // conservatively skips cleanup; every destructive guard is unchanged.
+    let storage = crate::storage::manager::Storage::new(tasks_dir);
+    let root = match storage.resolve_task_location(ticket_id) {
+        Ok(location) => location.root,
+        Err(_) => return None,
+    };
+    let config =
+        crate::config::resolution::config_for_project(root.as_path(), Some(prefix)).ok()?;
     // Cleanup must not use the tolerant task parser: damaged files are indeterminate.
     let path = crate::storage::operations::StorageOperations::get_file_path_for_id(
-        &tasks_dir.join(prefix),
+        &root.join(prefix),
         ticket_id,
     )?;
     let raw = fs::read_to_string(path).ok()?;
@@ -2131,6 +2142,7 @@ mod tests {
 
     fn sample_task() -> crate::api_types::TaskDTO {
         crate::api_types::TaskDTO {
+            task_state: None,
             id: "TEST-1".to_string(),
             title: "Test task".to_string(),
             status: crate::types::TaskStatus::from("Todo"),
@@ -2383,5 +2395,66 @@ mod tests {
         };
         let profile = resolve_profile(&config, &req).unwrap();
         assert_eq!(profile.runner, "codex");
+    }
+}
+
+#[cfg(test)]
+mod dev21_ticket_done_state_tests {
+    use super::ticket_done_state;
+
+    fn write_task(root: &std::path::Path, prefix: &str, num: u32, status: &str) {
+        let dir = root.join(".tasks").join(prefix);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(format!("{num}.yml")),
+            format!(
+                "title: t{num}\nstatus: {status}\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    fn write_config(root: &std::path::Path, done: &str) {
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        std::fs::write(
+            tasks.join("config.yml"),
+            format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n"),
+        )
+        .unwrap();
+    }
+
+    /// DEV-21 review F1: cleanup eligibility classifies against the ticket's
+    /// ACTUAL root policy, not the issuing workspace's policy. Destructive
+    // guards are elsewhere and unchanged; this covers classification only.
+    #[test]
+    fn ticket_done_state_uses_actual_ticket_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Nested-workspace layout (the locator's monorepo discovery): B is a
+        // separate tasks root discovered from A.
+        let root_a = tmp.path().join("wsa");
+        let root_b = tmp.path().join("wsa").join("wsb");
+        write_config(&root_a, "Shipped");
+        write_config(&root_b, "Done");
+        write_task(&root_a, "PX", 1, "Done");
+        write_task(&root_b, "PX", 2, "Done");
+
+        let tasks_a = root_a.join(".tasks");
+        let tasks_b = root_b.join(".tasks");
+
+        // Issued from A: PX-1 (in A, Done non-terminal) is open; PX-2 (in
+        // sibling B, Done terminal under B's policy) is done.
+        assert_eq!(ticket_done_state(&tasks_a, "PX-1"), Some(false));
+        assert_eq!(ticket_done_state(&tasks_a, "PX-2"), Some(true));
+
+        // Issued from B: the local ticket still classifies under B's
+        // policy. The PARENT workspace A is not discoverable from the
+        // nested root (locator discovers downward only), so PX-1 stays
+        // indeterminate from B — conservatively no cleanup.
+        assert_eq!(ticket_done_state(&tasks_b, "PX-1"), None);
+        assert_eq!(ticket_done_state(&tasks_b, "PX-2"), Some(true));
+
+        // Unknown identity stays indeterminate (conservatively no cleanup).
+        assert_eq!(ticket_done_state(&tasks_a, "PX-99"), None);
     }
 }

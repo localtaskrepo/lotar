@@ -10,6 +10,9 @@ excludeAgent: ["code-review"]
 - End-to-end flows across the built Rust binary + embedded web assets.
 - Specs live under `smoke/tests/`, run via the Vitest config at `smoke/vitest.config.ts`.
 - Tests use isolated temp workspaces (`smoke/helpers/workspace.ts`) — they never touch the repo `.tasks/`.
+- In concurrent Vitest cases, use test-scoped `expect` (`async ({ expect }) =>`)
+  for polling and capture or pass that instance through asynchronous helpers;
+  imported global `expect.poll` can lose its test context during parallel waits.
 
 ## Commands
 

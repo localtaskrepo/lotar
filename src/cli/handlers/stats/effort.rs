@@ -294,6 +294,7 @@ pub(crate) fn run(
                             .map(|orders| orders.keys().copied().collect::<Vec<u32>>())
                             .unwrap_or_default();
                         let dto = crate::api_types::TaskDTO {
+                            task_state: None,
                             id: id.clone(),
                             title: task.title,
                             status: task.status,

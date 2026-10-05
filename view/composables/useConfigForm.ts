@@ -23,6 +23,12 @@ export interface ConfigFormState {
     issueStates: string[]
     issueTypes: string[]
     issuePriorities: string[]
+    /**
+     * Explicit done states for the edited scope. null = unset: automatic
+     * legacy inference (global) / inherit the global setting (project). An
+     * explicit empty array is invalid (one-or-more rule).
+     */
+    issueDoneStates: string[] | null
     tags: string[]
     customFields: string[]
     autoSetReporter: ToggleValue
@@ -90,6 +96,10 @@ type UseConfigFormReturn = {
     statusSuggestions: ComputedRef<string[]>
     prioritySuggestions: ComputedRef<string[]>
     typeSuggestions: ComputedRef<string[]>
+    effectiveDoneLabels: ComputedRef<string[]>
+    doneStatesMode: ComputedRef<'explicit' | 'inferred' | null>
+    doneStatesAutomaticLabel: ComputedRef<string>
+    doneStatesEffectiveSummary: ComputedRef<string>
     peopleDescription: ComputedRef<string>
     workflowDescription: ComputedRef<string>
     taxonomyDescription: ComputedRef<string>
@@ -135,6 +145,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         issueStates: [],
         issueTypes: [],
         issuePriorities: [],
+        issueDoneStates: null,
         tags: [],
         customFields: [],
         autoSetReporter: 'inherit',
@@ -304,6 +315,36 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
     const prioritySuggestions = computed(() => priorityOptions.value)
     const typeSuggestions = computed(() => typeOptions.value)
 
+    // ---- Done states (DEV-21) ----------------------------------------------
+    // Effective values come from the server-resolved config; the form edits
+    // the raw override only.
+    const effectiveDoneLabels = computed(() => {
+        const labels = inspectData.value?.effective?.effective_done_states
+        return Array.isArray(labels) ? labels.map((value) => String(value)).filter((value) => value.trim().length > 0) : []
+    })
+
+    const doneStatesMode = computed(() => {
+        const mode = inspectData.value?.effective?.done_states_mode
+        return mode === 'explicit' || mode === 'inferred' ? mode : null
+    })
+
+    const doneStatesAutomaticLabel = computed(() => {
+        const effective = effectiveDoneLabels.value
+        const summary = effective.length ? effective.join(', ') : 'inferred automatically'
+        if (isGlobal.value) {
+            return `Automatic (last status + conventional names — currently ${summary})`
+        }
+        return `Inherit global (Currently ${summary})`
+    })
+
+    const doneStatesEffectiveSummary = computed(() => {
+        const effective = effectiveDoneLabels.value
+        if (!effective.length) return ''
+        const mode = doneStatesMode.value
+        const modeLabel = mode === 'explicit' ? 'explicit' : mode === 'inferred' ? 'inferred' : ''
+        return `Effective now: ${effective.join(', ')}${modeLabel ? ` (${modeLabel})` : ''}`
+    })
+
     watch(
         [isGlobal, statusOptions],
         ([global, options]) => {
@@ -377,6 +418,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             issueStates: [...form.issueStates],
             issueTypes: [...form.issueTypes],
             issuePriorities: [...form.issuePriorities],
+            issueDoneStates: form.issueDoneStates === null ? null : [...form.issueDoneStates],
             tags: [...form.tags],
             customFields: [...form.customFields],
             autoSetReporter: form.autoSetReporter,
@@ -413,6 +455,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.issueStates = [...snapshot.issueStates]
         form.issueTypes = [...snapshot.issueTypes]
         form.issuePriorities = [...snapshot.issuePriorities]
+        form.issueDoneStates = snapshot.issueDoneStates === null ? null : [...snapshot.issueDoneStates]
         form.tags = [...snapshot.tags]
         form.customFields = [...snapshot.customFields]
         form.autoSetReporter = snapshot.autoSetReporter
@@ -769,6 +812,35 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
                 validateField('default_priority')
                 break
             }
+            case 'issue_done_states': {
+                const values = form.issueDoneStates
+                if (values === null || values === undefined) {
+                    errors.issue_done_states = null
+                    return
+                }
+                const trimmed = values.map((val) => val.trim()).filter((val) => val.length > 0)
+                if (!trimmed.length) {
+                    errors.issue_done_states = 'Choose at least one done state, or switch back to automatic/inherit.'
+                    return
+                }
+                const duplicate = findDuplicateValue(trimmed)
+                if (duplicate) {
+                    errors.issue_done_states = `"${duplicate}" appears more than once.`
+                    return
+                }
+                const options = statusOptions.value
+                if (!options.length) {
+                    errors.issue_done_states = 'Define statuses before choosing done states.'
+                    return
+                }
+                const invalid = trimmed.find((val) => !options.some((opt) => opt.toLowerCase() === val.toLowerCase()))
+                if (invalid) {
+                    errors.issue_done_states = `"${invalid}" is not a configured status.`
+                    return
+                }
+                errors.issue_done_states = null
+                break
+            }
             case 'branch_type_aliases': {
                 errors.branch_type_aliases = validateAliasEntries(form.branchTypeAliases, 'branch type')
                 break
@@ -798,6 +870,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             'issue_states',
             'issue_types',
             'issue_priorities',
+            'issue_done_states',
             'tags',
             'custom_fields',
             'scan_signal_words',
@@ -815,6 +888,11 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         return !hasErrors.value
     }
 
+    function normalizeDoneStatesRaw(value: unknown): string[] | null {
+        if (!Array.isArray(value)) return null
+        return value.map((entry) => String(entry)).filter((entry) => entry.trim().length > 0)
+    }
+
     function populateForm(data: ConfigInspectResult) {
         const effective = data.effective
         form.serverPort = effective.server_port?.toString() ?? ''
@@ -830,6 +908,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         form.issueStates = [...effective.issue_states]
         form.issueTypes = [...effective.issue_types]
         form.issuePriorities = [...effective.issue_priorities]
+        form.issueDoneStates = null
         form.tags = (effective.tags ?? []).filter((value) => value !== '*')
         form.customFields = (effective.custom_fields ?? []).filter((value) => value !== '*')
         form.autoCodeownersAssign = toToggle(!!effective.auto_codeowners_assign)
@@ -850,6 +929,9 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         if (!isGlobal.value) {
             const raw = ((data.project_raw as any) || {}) as Record<string, any>
             form.projectName = raw.project_name || currentProject.value?.name || ''
+            // Explicit project override (kept even when equal to the global
+            // list — intent is preserved, never erased to inherit).
+            form.issueDoneStates = normalizeDoneStatesRaw(raw.issue_done_states)
             if (raw.attachments_dir !== undefined) {
                 form.attachmentsDir = typeof raw.attachments_dir === 'string' ? raw.attachments_dir : ''
             }
@@ -878,6 +960,7 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
             }
         } else {
             form.projectName = ''
+            form.issueDoneStates = normalizeDoneStatesRaw((data.global_raw as any)?.issue_done_states)
             form.autoSetReporter = toToggle(!!effective.auto_set_reporter)
             form.autoAssignOnStatus = toToggle(!!effective.auto_assign_on_status)
             form.scanEnableTicketWords = toToggle(!!effective.scan_enable_ticket_words)
@@ -966,6 +1049,21 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         addArray('issueStates', 'issue_states')
         addArray('issueTypes', 'issue_types')
         addArray('issuePriorities', 'issue_priorities')
+
+        // Done states are tri-state: null (auto/inherit) vs explicit list.
+        // Clearing an explicit list sends an empty CSV so the backend resets
+        // the project override (or the global automatic inference); an
+        // untouched equal-to-global project list stays an explicit override.
+        {
+            const currentDone = current.issueDoneStates ?? null
+            const baseDone = base.issueDoneStates ?? null
+            const samePresence = (currentDone === null) === (baseDone === null)
+            const sameList = arraysEqual(currentDone ?? [], baseDone ?? [])
+            if (!samePresence || !sameList) {
+                payload.issue_done_states = currentDone === null ? '' : normalizeCsv(currentDone)
+            }
+        }
+
         addArray('tags', 'tags')
         addArray('customFields', 'custom_fields')
         addArray('scanSignalWords', 'scan_signal_words')
@@ -1010,6 +1108,10 @@ export function useConfigForm({ project, projects, inspectData, saving }: UseCon
         statusSuggestions,
         prioritySuggestions,
         typeSuggestions,
+        effectiveDoneLabels,
+        doneStatesMode,
+        doneStatesAutomaticLabel,
+        doneStatesEffectiveSummary,
         peopleDescription,
         workflowDescription,
         taxonomyDescription,

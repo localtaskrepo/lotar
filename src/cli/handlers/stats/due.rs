@@ -41,7 +41,12 @@ pub(crate) fn run(
         );
     }
 
-    let now = chrono::Utc::now().date_naive();
+    // DEV-21: shared due parser + local calendar day (injectable-clock
+    // semantics), replacing the date-only/UTC island: RFC3339 due values
+    // bucket on the local date they fall on, matching the REST/CLI
+    // executor.
+    let now = chrono::Utc::now();
+    let today = crate::services::task_query::today_local(now);
     // Parse threshold for overdue mode (Nd or Nw)
     let overdue_cutoff_days: i64 = if overdue {
         let t = threshold.trim().to_lowercase();
@@ -70,12 +75,19 @@ pub(crate) fn run(
     }
 
     for (_id, t) in tasks.into_iter() {
-        if let Some(due) = t.due_date
-            && let Ok(date) = chrono::NaiveDate::parse_from_str(&due, "%Y-%m-%d")
+        if let Some(due_raw) = t.due_date.as_deref()
+            && let Some(due) = crate::services::task_query::parse_stored_due(due_raw)
         {
-            let diff = (date - now).num_days();
+            let date = due.local_date();
+            let diff = (date - today).num_days();
+            // Terminal tasks are never overdue (DEV-21); the classification
+            // comes from the task's own project policy via task_state.
+            let is_done = t.task_state.as_ref().is_some_and(|state| state.is_done);
             // Classify
             if diff < 0 && enabled.contains("overdue") {
+                if is_done {
+                    continue;
+                }
                 // In overdue-only mode, filter by threshold age
                 if overdue {
                     let age_days = -diff; // how many days overdue

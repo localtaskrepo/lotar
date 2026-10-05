@@ -3,6 +3,31 @@ export type TaskStatus = string
 export type Priority = string
 export type TaskType = string
 
+export type TaskDueBucket = 'today' | 'soon' | 'later' | 'overdue'
+
+/**
+ * Server-computed runtime completion/due metadata (DEV-21). Populated by all
+ * actual get/list/mutation/SSE task payloads using the actual root/project
+ * policy and the server's local calendar day; never persisted in task YAML.
+ * `due_bucket` is null for tasks without a due date and for terminal tasks
+ * that are past due (only Overdue excludes done; a done task due today can
+ * still be 'today').
+ *
+ * `done_states` embeds the ORDERED actual-root terminal policy that produced
+ * `is_done`/`due_bucket`. Real payloads always include all four fields; the
+ * field stays optional only so legacy test fixtures may omit metadata.
+ * Homonymous project prefixes across storage roots can resolve DIFFERENT
+ * policies, so the embedded set — not a config/show lookup by id prefix — is
+ * authoritative for classifying THIS task.
+ */
+export interface TaskRuntimeState {
+  done_states?: string[]
+  is_done: boolean
+  due_bucket: TaskDueBucket | null
+  /** Server-local calendar day (YYYY-MM-DD) this state was computed for. */
+  calendar_day: string
+}
+
 export interface TaskDTO {
   id: string
   title: string
@@ -13,6 +38,8 @@ export interface TaskDTO {
   assignee?: string | null
   created: string
   modified: string
+  /** Optional runtime completion metadata; may be omitted in test fixtures. */
+  task_state?: TaskRuntimeState
   due_date?: string | null
   effort?: string | null
   subtitle?: string | null
@@ -666,6 +693,8 @@ export interface ApiEnvelope<T> { data: T; meta?: any; error?: { code: string; m
 
 export type ConfigSource = 'project' | 'global' | 'built_in'
 
+export type DoneStatesMode = 'explicit' | 'inferred'
+
 export type SyncProvider = 'jira' | 'github'
 export type SyncWhenEmpty = 'skip' | 'clear'
 
@@ -714,6 +743,14 @@ export interface ResolvedConfigDTO {
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]
+  /** Raw inherited explicit done-state list; null/absent when unset. */
+  issue_done_states?: string[] | null
+  /** Server-resolved terminal statuses; always present. */
+  effective_done_states: string[]
+  /** Whether the effective list came from an explicit setting or inference. */
+  done_states_mode: DoneStatesMode
+  /** Server-local calendar day (YYYY-MM-DD) at resolution time. */
+  task_calendar_day: string
   tags: string[]
   custom_fields: string[]
   auto_set_reporter: boolean
@@ -746,6 +783,8 @@ export interface GlobalConfigRaw {
   issue_states: string[]
   issue_types: string[]
   issue_priorities: string[]
+  /** Explicit done states; null/absent = automatic legacy inference. */
+  issue_done_states?: string[] | null
   tags: string[]
   default_assignee?: string | null
   default_reporter?: string | null
@@ -783,6 +822,8 @@ export interface ProjectConfigRaw {
   issue_states?: string[]
   issue_types?: string[]
   issue_priorities?: string[]
+  /** Explicit done states; null/absent = inherit the global setting. */
+  issue_done_states?: string[] | null
   tags?: string[]
   default_assignee?: string | null
   default_reporter?: string | null

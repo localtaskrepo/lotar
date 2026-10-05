@@ -198,6 +198,18 @@ fn render_resolved_config_yaml(
         sources.get("issue.states"),
         options,
     );
+    // Presence-based explicit terminal states (DEV-21); inferred policies
+    // render nothing here — config show reports them as computed fields.
+    if let Some(done) = &resolved.issue_done_states {
+        issue_written |= write_sequence(
+            &mut issue_body,
+            2,
+            "done-states",
+            &done.values,
+            sources.get("issue.done_states"),
+            options,
+        );
+    }
     issue_written |= write_sequence(
         &mut issue_body,
         2,

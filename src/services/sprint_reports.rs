@@ -11,15 +11,12 @@ use crate::services::sprint_analytics::{
     SprintDetail, SprintReviewLifecyclePayload, SprintStatusWarningPayload, SprintSummary,
     to_status_warning_payloads,
 };
-use crate::services::sprint_metrics::{
-    determine_blocked_statuses_from_config, determine_done_statuses_from_config, ratio, ratio_usize,
-};
+use crate::services::sprint_metrics::{determine_blocked_statuses_from_config, ratio, ratio_usize};
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleState, SprintLifecycleStatus};
 use crate::services::sprint_timing::{
-    SprintDurations, compute_sprint_durations, duration_to_days, find_done_timestamp,
-    format_calendar_relative, format_calendar_window, resolve_burndown_window,
-    resolve_calendar_end, resolve_calendar_start,
+    SprintDurations, compute_sprint_durations, duration_to_days, format_calendar_relative,
+    format_calendar_window, resolve_burndown_window, resolve_calendar_end, resolve_calendar_start,
 };
 use crate::storage::manager::Storage;
 use crate::storage::task::Task as StoredTask;
@@ -351,7 +348,6 @@ pub struct SprintBurndownPoint {
 }
 
 struct SprintBurndownItem {
-    done_at: Option<DateTime<Utc>>,
     points: f64,
     hours: f64,
 }
@@ -359,7 +355,12 @@ struct SprintBurndownItem {
 struct StatusAggregate {
     label: String,
     count: usize,
-    done: bool,
+    /// How many tasks under this status label classified as terminal.
+    /// DEV-21 review F2: the same status string can be terminal in one
+    /// project and not another, so the aggregate counts per task instead
+    /// of freezing the first task's flag; the reported `done` boolean is
+    /// unanimous (true only when EVERY task under the label is terminal).
+    done_count: usize,
 }
 
 pub fn compute_sprint_review(
@@ -374,9 +375,12 @@ pub fn compute_sprint_review(
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_statuses = determine_done_statuses_from_config(config);
+    let done_sets = crate::services::completion::resolve_task_done_sets(
+        storage,
+        tasks.iter().map(|(id, _)| id),
+    );
     let blocked_statuses = determine_blocked_statuses_from_config(config);
-    let metrics = summarize_sprint_tasks(&tasks, &done_statuses, &blocked_statuses);
+    let metrics = summarize_sprint_tasks(&tasks, &done_sets, &blocked_statuses);
 
     let payload = SprintReviewResponse {
         status: "ok",
@@ -411,9 +415,12 @@ pub fn compute_sprint_stats(
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_statuses = determine_done_statuses_from_config(config);
+    let done_sets = crate::services::completion::resolve_task_done_sets(
+        storage,
+        tasks.iter().map(|(id, _)| id),
+    );
     let blocked_statuses = determine_blocked_statuses_from_config(config);
-    let metrics = summarize_sprint_tasks(&tasks, &done_statuses, &blocked_statuses);
+    let metrics = summarize_sprint_tasks(&tasks, &done_sets, &blocked_statuses);
 
     let capacity_points = record
         .sprint
@@ -533,9 +540,12 @@ pub fn compute_sprint_summary(
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_statuses = determine_done_statuses_from_config(config);
+    let done_sets = crate::services::completion::resolve_task_done_sets(
+        storage,
+        tasks.iter().map(|(id, _)| id),
+    );
     let blocked_statuses = determine_blocked_statuses_from_config(config);
-    let metrics = summarize_sprint_tasks(&tasks, &done_statuses, &blocked_statuses);
+    let metrics = summarize_sprint_tasks(&tasks, &done_sets, &blocked_statuses);
 
     let capacity_points = record
         .sprint
@@ -647,7 +657,7 @@ pub fn compute_sprint_summary(
 pub fn compute_sprint_burndown(
     storage: &Storage,
     record: &SprintRecord,
-    config: &ResolvedConfig,
+    _config: &ResolvedConfig,
     now: DateTime<Utc>,
 ) -> Result<SprintBurndownContext, String> {
     let lifecycle = sprint_status::derive_status(&record.sprint, now);
@@ -656,8 +666,11 @@ pub fn compute_sprint_burndown(
 
     let tasks = SprintService::load_tasks_for_record(storage, record);
 
-    let done_statuses = determine_done_statuses_from_config(config);
-    let computation = generate_burndown_series(record, &lifecycle, &tasks, &done_statuses)?;
+    let done_sets = crate::services::completion::resolve_task_done_sets(
+        storage,
+        tasks.iter().map(|(id, _)| id),
+    );
+    let computation = generate_burndown_series(record, &lifecycle, &tasks, &done_sets)?;
 
     let payload = SprintBurndownResponse {
         status: "ok",
@@ -785,7 +798,7 @@ pub fn compute_sprint_calendar(
 
 pub fn summarize_sprint_tasks(
     tasks: &[(String, StoredTask)],
-    done_statuses: &HashSet<String>,
+    done_sets: &crate::services::completion::TaskDoneSets,
     blocked_statuses: &HashSet<String>,
 ) -> SprintTaskMetrics {
     let mut status_counts: BTreeMap<String, StatusAggregate> = BTreeMap::new();
@@ -804,7 +817,7 @@ pub fn summarize_sprint_tasks(
             task.status.as_str().to_string()
         };
         let key = label.to_ascii_lowercase();
-        let is_done = done_statuses.contains(&key);
+        let is_done = done_sets.is_done(id, &task.status);
         let is_blocked =
             blocked_statuses.contains(&key) || label.to_ascii_lowercase().contains("block");
         let entry = status_counts
@@ -812,10 +825,11 @@ pub fn summarize_sprint_tasks(
             .or_insert_with(|| StatusAggregate {
                 label: label.clone(),
                 count: 0,
-                done: is_done,
+                done_count: 0,
             });
         entry.count += 1;
-        if entry.done {
+        if is_done {
+            entry.done_count += 1;
             done_tasks += 1;
         } else {
             remaining_tasks.push(SprintReviewTask {
@@ -868,7 +882,7 @@ pub fn summarize_sprint_tasks(
         .map(|aggregate| SprintReviewStatusMetric {
             status: aggregate.label,
             count: aggregate.count,
-            done: aggregate.done,
+            done: aggregate.done_count == aggregate.count,
         })
         .collect();
 
@@ -889,9 +903,9 @@ pub fn generate_burndown_series(
     record: &SprintRecord,
     lifecycle: &SprintLifecycleStatus,
     tasks: &[(String, StoredTask)],
-    done_statuses: &HashSet<String>,
+    done_sets: &crate::services::completion::TaskDoneSets,
 ) -> Result<SprintBurndownComputation, String> {
-    let (start, end) = resolve_burndown_window(record, lifecycle, tasks, done_statuses)?;
+    let (start, end) = resolve_burndown_window(record, lifecycle, tasks, done_sets)?;
 
     let start_day = start.date_naive();
     let end_day = end.date_naive();
@@ -903,15 +917,10 @@ pub fn generate_burndown_series(
     let mut total_hours = 0.0f64;
 
     for (_, task) in tasks {
-        let done_at = find_done_timestamp(task, done_statuses);
         let (points, hours) = parse_effort_values(task);
         total_points += points;
         total_hours += hours;
-        items.push(SprintBurndownItem {
-            done_at,
-            points,
-            hours,
-        });
+        items.push(SprintBurndownItem { points, hours });
     }
 
     let total_tasks = items.len();
@@ -938,9 +947,15 @@ pub fn generate_burndown_series(
         let mut completed_tasks = 0usize;
         let mut completed_points = 0.0f64;
         let mut completed_hours = 0.0f64;
-        for item in &items {
-            if let Some(done_at) = item.done_at
-                && done_at < day_end
+        // DEV-21: replay each task's status history per calendar cut so a
+        // reopened task counts as done before its reopen and open after it
+        // until it re-completes, and a terminal -> terminal move never
+        // restarts the clock (previously the earliest-ever done timestamp
+        // froze a task as done for the whole series).
+        for ((task_id, task), item) in tasks.iter().zip(&items) {
+            let done = done_sets.done_set(task_id);
+            if let Some(done) = done
+                && crate::services::completion::task_done_at_cut(task, done, day_end)
             {
                 completed_tasks += 1;
                 completed_points += item.points;

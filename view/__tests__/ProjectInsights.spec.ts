@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { defineComponent, h, reactive, ref } from 'vue'
 import type { ProjectStatsDTO, TaskDTO } from '../api/types'
 import { _resetActivityStore } from '../composables/useActivity'
+import { invalidateCompletionPolicies } from '../composables/useCompletionPolicy'
 import { _resetTaskStore } from '../composables/useTaskStore'
 
 const api = vi.hoisted(() => ({
     listTasks: vi.fn(),
     projectStats: vi.fn(),
     activityFeed: vi.fn(),
+    showConfig: vi.fn(),
 }))
 vi.mock('../api/client', () => ({ api }))
 
@@ -122,6 +124,7 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
     let listTasksMock: Mock
     let projectStatsMock: Mock
     let activityFeedMock: Mock
+    let showConfigMock: Mock
 
     function retryButton() {
         const button = wrapper.findAll('button').find(b => b.text().includes('Retry'))
@@ -165,9 +168,17 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         listTasksMock = client.api.listTasks as unknown as Mock
         projectStatsMock = client.api.projectStats as unknown as Mock
         activityFeedMock = client.api.activityFeed as unknown as Mock
+        showConfigMock = client.api.showConfig as unknown as Mock
         listTasksMock.mockResolvedValue({ total: 0, tasks: [] })
         projectStatsMock.mockResolvedValue(stats(0))
         activityFeedMock.mockResolvedValue([])
+        showConfigMock.mockImplementation(async (project?: string) => ({
+            issue_states: ['Todo', 'Doing', 'Done', 'Closed'],
+            effective_done_states: project === 'B' ? ['Closed'] : ['Done'],
+            done_states_mode: 'explicit',
+            task_calendar_day: '2026-01-05',
+        }))
+        invalidateCompletionPolicies()
     })
 
     afterEach(() => {
@@ -454,6 +465,97 @@ describe('ProjectInsights query scoping (DEV-66)', () => {
         expect(showToast).not.toHaveBeenCalled()
         const { useTaskStore } = await import('../composables/useTaskStore')
         expect(useTaskStore().getQuery({ project: 'A' }).ids.value).toEqual([])
+    })
+
+    it('overdue tile excludes terminal tasks and due-today; tile and breakdown agree', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        try {
+            const tasks = [
+                makeTask('A-1', { status: 'Done', due_date: '2025-12-01' }), // terminal past due: not overdue
+                makeTask('A-2', { status: 'Todo', due_date: '2025-12-01' }), // overdue
+                makeTask('A-3', { status: 'Todo', due_date: '2026-01-05' }), // due today, not overdue
+                makeTask('A-4', { status: 'Done', due_date: '2026-01-05' }), // terminal due today: still due today
+                makeTask('A-5', { status: 'Todo' }),                          // no due date
+            ]
+            listTasksMock.mockResolvedValue({ total: tasks.length, tasks })
+
+            await mountInsights()
+
+            expect(tile('Overdue')).toBe('1')
+            const rows = wrapper.findAll('table.distribution tbody tr')
+            const dueRow = (label: string) => rows.find(r => r.text().includes(label))
+            expect(dueRow('Overdue')?.text()).toContain('1')
+            expect(dueRow('Due today')?.text()).toContain('2')
+
+            // F4: the terminal past-due class is VISIBLE (no silent percent
+            // leak) and explains the whole denominator...
+            const finished = dueRow('Finished (past due)')
+            expect(finished).toBeTruthy()
+            expect(finished!.text()).toContain('1')
+            expect(finished!.text()).toContain('20%')
+            // ...percentages now account for every task (1+1+2+1 of 5 = 100%).
+            const percentOf = (label: string) => {
+                const cells = dueRow(label)!.findAll('td')
+                return Number(cells[cells.length - 1]!.text().replace('%', ''))
+            }
+            const percents = ['Overdue', 'Finished (past due)', 'Due today', 'No due date'].map(percentOf)
+            expect(percents).toEqual([20, 20, 40, 20])
+            expect(percents.reduce((a, b) => a + b, 0)).toBe(100)
+            // ...but the row is NOT clickable: no invented due-filter value.
+            expect(finished!.classes()).not.toContain('clickable')
+            routerPush.mockClear()
+            await finished!.trigger('click')
+            expect(routerPush).not.toHaveBeenCalled()
+            // The Overdue row itself remains the authoritative drill-down.
+            expect(dueRow('Overdue')!.classes()).toContain('clickable')
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('drills the overdue row into the TasksList due=overdue filter', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        try {
+            const tasks = [makeTask('A-2', { status: 'Todo', due_date: '2025-12-01' })]
+            listTasksMock.mockResolvedValue({ total: tasks.length, tasks })
+            await mountInsights()
+
+            const rows = wrapper.findAll('table.distribution tbody tr')
+            const overdueRow = rows.find(r => r.text().includes('Overdue'))
+            expect(overdueRow).toBeTruthy()
+            await overdueRow!.trigger('click')
+
+            expect(routerPush).toHaveBeenCalledWith(expect.objectContaining({
+                path: '/',
+                query: expect.objectContaining({ due: 'overdue' }),
+            }))
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('uses each project policy in all-projects scope (custom terminal, not a Done guess)', async () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+        try {
+            // B's policy names only Closed; a Done task stays overdue there.
+            const tasks = [
+                makeTask('A-1', { status: 'Done', due_date: '2025-12-01' }),
+                makeTask('B-1', { status: 'Done', due_date: '2025-12-01' }),
+                makeTask('B-2', { status: 'Closed', due_date: '2025-12-01' }),
+            ]
+            listTasksMock.mockResolvedValue({ total: tasks.length, tasks })
+
+            await mountInsights()
+
+            expect(showConfigMock).toHaveBeenCalledWith('A')
+            expect(showConfigMock).toHaveBeenCalledWith('B')
+            expect(tile('Overdue')).toBe('1')
+        } finally {
+            vi.useRealTimers()
+        }
     })
 })
 

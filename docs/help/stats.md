@@ -1,6 +1,6 @@
 # lotar stats
 
-Read-only analytics derived from git history (no git writes).
+Read-only task analytics. History-window commands derive data from git history; snapshot commands inspect current tasks (no git writes).
 
 
 Project scope defaults to the current project; use `--global` to span all projects.
@@ -139,6 +139,8 @@ Example JSON output:
 
 ### due
 Summarize tasks into due-date buckets (snapshot), or show only overdue items with an age threshold.
+
+Overdue excludes tasks finished under their own project's [Done States](./config.md#done-states). A due date on today is not overdue. Date-only values and timestamp due values use the same server-local calendar interpretation as task queries; completed tasks can remain in non-overdue date buckets. This is independent of the task's status label being literally `Done`.
 
 ```bash
 lotar stats due [--buckets overdue,today,week,month,later] [--global]

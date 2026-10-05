@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import { showToast } from '../components/toast'
@@ -12,6 +12,7 @@ import { useTaskPanelSprints } from './task-panel/useTaskPanelSprints'
 import { useTaskPanelTags } from './task-panel/useTaskPanelTags'
 import { useTaskPanelWatchers } from './task-panel/useTaskPanelWatchers'
 import { useConfig } from './useConfig'
+import { completionStatusKey, embeddedDoneStatesOf, ensureCompletionPolicy, useCompletionPolicy } from './useCompletionPolicy'
 import { useProjects } from './useProjects'
 import { useReferencePreview } from './useReferencePreview'
 import { useSprints } from './useSprints'
@@ -292,9 +293,35 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
     ]
     const activityTab = ref<ActivityTab>('comments')
 
+    // DEV-21: terminal statuses resolved per project; custom terminal names
+    // (e.g. "Shipped") render with the success badge instead of a name guess.
+    // Policy fetches follow the panel's confirmed config scope (never a
+    // stale initial project while a task fetch is still pending).
+    const completion = useCompletionPolicy()
+    watch(
+        loadedConfigScope,
+        (scope) => {
+            const prefix = (scope || '').trim()
+            if (prefix && prefix === form.project) void ensureCompletionPolicy(prefix)
+        },
+        { immediate: true },
+    )
+
     const statusBadgeClass = computed(() => {
         const status = (form.status || '').toLowerCase()
-        if (status.includes('done')) return 'badge--success'
+        // DEV-21 precedence: the loaded task's EMBEDDED actual-root done
+        // states decide terminality first (homonymous prefixes across roots
+        // can differ; no green "Done" substring guess once embedded states
+        // are provided); then the scoped cached policy. Missing policy keeps
+        // the badge neutral rather than guessing completion from its name.
+        const embedded = embeddedDoneStatesOf(task)
+        if (embedded) {
+            if (embedded.has(completionStatusKey(form.status))) return 'badge--success'
+            if (status.includes('progress')) return 'badge--info'
+            if (status.includes('block')) return 'badge--danger'
+            return 'badge--muted'
+        }
+        if (completion.isDoneStatus(form.project, form.status)) return 'badge--success'
         if (status.includes('progress')) return 'badge--info'
         if (status.includes('block')) return 'badge--danger'
         return 'badge--muted'

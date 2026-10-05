@@ -40,8 +40,12 @@ Field | Type | Notes
 `sprint_order` | `BTreeMap<u32, u32>?` | Optional manual ordering for this task (sprint id → order index).
 `history` | `TaskChangeLogEntry[]?` | Chronological change log entries (field deltas, actor, timestamp); omitted when empty.
 `custom_fields` | `CustomFields` | Map of configured custom-field keys → YAML/JSON values. Skipped when empty.
+`task_state` | `TaskStateDTO?` | Computed completion and due-bucket snapshot from the task's actual storage root, project configuration, and server-local calendar day. Never persisted in task YAML.
 
 ### Relationships & related structs
+
+- `TaskStateDTO` contains `done_states` (the effective policy for the task's actual storage root and project), `is_done`, `due_bucket` (`today`, `soon`, `later`, `overdue`, or null), and `calendar_day` (`YYYY-MM-DD`). A finished task cannot have the `overdue` bucket. Due-today remains a calendar bucket even for a finished task. Clients use the embedded policy for optimistic status changes rather than borrowing configuration for a homonymous project in another root. These values describe evaluation time; clients refresh after configuration changes and server calendar rollover rather than treating them as stored task fields.
+- Invalid explicit done-state configuration is rejected on configuration reads. Legacy task-read paths that cannot return that configuration error project an empty embedded policy and `is_done: false` conservatively, rather than silently substituting the built-in `Done` policy. An empty runtime policy is not a valid writable `issue.done_states` setting.
 
 - `TaskRelationships` exposes dedicated arrays for `depends_on`, `blocks`, `related`, `children`, `fixes`, plus single-value `parent` and `duplicate_of`. All properties are optional; empty collections are dropped on serialization.
 - `TaskComment` holds `{ date: RFC3339, text: string }`. Comments do not store authorship today.
@@ -69,6 +73,7 @@ These extensions are separate from `custom_fields` and are not added to REST/MCP
 	- `issue_priorities`: e.g., `Low`, `Medium`, `High`, `Critical`, `Blocker`.
 	- `issue_types`: e.g., `feature`, `bug`, `epic`, `spike`, `chore`.
 - Because these values are data-driven, client code should not assume a fixed enum list; always render the exact casing stored on the task.
+- Finished status is defined by the task's resolved project policy (`issue.done_states`), not by a client-side comparison with literal `Done`. See [Done States](./config.md#done-states).
 
 ## Create/update payloads
 

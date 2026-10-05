@@ -246,6 +246,31 @@ lotar config init --project=new-service --copy-from=existing-service
 
 ```
 
+## Done States
+
+`issue.done_states` defines which task statuses count as finished. It is independent of sprint lifecycle states and agent-job states. The dotted spelling, nested YAML spelling, and flat `issue_done_states` alias address the same field.
+
+```yaml
+issue:
+  states: [Todo, InProgress, Review, Closed, Shipped]
+  done_states: [Closed, Shipped]
+```
+
+An explicit list is authoritative: the final workflow status or a status named `Done` is not also finished unless listed. Values must belong to the resolved project's `issue.states`; empty lists and invalid values are rejected. Changing status vocabulary and done states together validates one complete candidate before writing. Global changes also validate affected project overrides, and `--force` cannot bypass an invalid resolved policy.
+
+When no explicit list exists, automatic inference preserves the legacy rule: the final configured status, configured names `Done`, `Completed`, or `Closed` (case-insensitive), and the `done` branch-alias target. This rule is applied after resolving each project's workflow, not once against the global status list. Omitted project settings inherit an explicit global list; otherwise they use the resolved-project automatic rule.
+
+```bash
+lotar config set issue.done_states 'Closed,Shipped' --project=ENG
+lotar config set issue.done_states '' --project=ENG
+```
+
+The second command clears the project override rather than defining a workflow with no finished states. An explicit project choice remains an override even when it currently matches the inherited list. In the WebUI, **Done States** shows the effective values and whether they are automatic, inherited, or explicitly selected.
+
+Completion affects project and sprint metrics, cross-project dependency checks, workload counts, and worktree cleanup eligibility. Existing cleanup safeguards still apply. Overdue means a non-finished task with a due calendar date strictly before today; due-today tasks and finished tasks are not overdue. All listed states count as finished work; distinguishing canceled work from successfully delivered work is not a separate policy in this version.
+
+Resolved configuration responses expose `effective_done_states`, `done_states_mode` (`explicit` or `inferred`), and the live server-local `task_calendar_day`. These are computed metadata, not writable configuration keys. Changing completion policy reclassifies existing tasks and reports; it does not rewrite task YAML or snapshot the old policy for historical reports.
+
 ## Configuration Keys
 
 > Legacy note: older configurations may still carry `issue.categories`. The value is normalized for backwards compatibility, but the runtime no longer uses it—model the same information with `custom_fields` instead (the older `custom.fields` alias remains accepted for compatibility).
@@ -253,6 +278,7 @@ lotar config init --project=new-service --copy-from=existing-service
 ### Project-Level
 - `project.name` - Optional human-readable project name; folder name remains the canonical identifier
 - `issue.states` - Available task statuses
+- `issue.done_states` - Explicit finished task statuses; a nonempty subset of the effective `issue.states`. Omit or clear the override to inherit.
 - `issue.types` - Available task types  
 - `issue.priorities` - Available priorities
 - `issue.tags` - Available tags
@@ -283,6 +309,7 @@ Automation (defaults inherited from global):
 - `server.port` - Web server port
 - `default.project` - Default project prefix
 - `issue.states` - Default task statuses for all projects
+- `issue.done_states` - Optional default finished task statuses. When unset throughout the precedence chain, use automatic inference for each resolved project workflow.
 - `issue.types` - Default task types for all projects
 - `issue.priorities` - Default priorities for all projects
 - `issue.tags` - Default tags for all projects
@@ -366,6 +393,7 @@ branch:
 - `LOTAR_TASKS_DIR` - Default tasks directory location (overrides discovery)
 - `LOTAR_PORT` - Web server port override
 - `LOTAR_PROJECT` - Default project name; mapped to a prefix and applied as `default.project`
+- `LOTAR_ISSUE_DONE_STATES` - Comma-separated explicit default done-state list. Project and CLI overrides retain their higher precedence; the final list must belong to the effective workflow.
 - `LOTAR_DEFAULT_ASSIGNEE` - Default assignee for all new tasks
 - `LOTAR_DEFAULT_REPORTER` - Default reporter identity used for auto reporter/assign
 

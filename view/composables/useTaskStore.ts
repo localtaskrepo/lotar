@@ -37,6 +37,7 @@ import { computed, shallowRef, triggerRef, type ComputedRef, type ShallowRef } f
 import type { ApiClient } from '../api/client'
 import { api } from '../api/client'
 import type { TaskCreate, TaskDTO, TaskListFilter, TaskUpdate } from '../api/types'
+import { registerTaskQueryInvalidator } from './useCompletionPolicy'
 import { useSse } from './useSse'
 
 // ---------------------------------------------------------------------------
@@ -137,6 +138,12 @@ export interface TaskStoreState {
   readonly fetchOneError: ShallowRef<string | null>
   /** Force a full reload (clears entities first). */
   forceRefresh(filter?: TaskListFilter): Promise<void>
+  /**
+   * DEV-21: schedule a debounced authoritative refresh of every RETAINED
+   * query (same primitive task SSE events use). Used when the server
+   * calendar day rolls so embedded task_state metadata is refetched.
+   */
+  invalidateQueries(): void
   /** Returns true if the active query has data (regardless of freshness). */
   readonly hasData: ComputedRef<boolean>
 
@@ -754,6 +761,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     hydratePage,
     fetchOne,
     forceRefresh,
+    invalidateQueries: invalidateRetainedQueries,
     add,
     update,
     remove,
@@ -775,6 +783,10 @@ let _instance: TaskStoreState | null = null
 export function useTaskStore(): TaskStoreState {
   if (!_instance) {
     _instance = createTaskStore(api)
+    // DEV-21: the shared completion policy refreshes retained task queries
+    // when the server calendar day rolls (stale task_state metadata).
+    const store = _instance
+    registerTaskQueryInvalidator(() => store.invalidateQueries())
   }
   return _instance
 }

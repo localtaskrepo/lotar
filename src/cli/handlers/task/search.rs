@@ -456,18 +456,27 @@ impl<'a> TaskPostFilters<'a> {
     /// `--due-soon[=days]` matches today through today+days inclusive, so a
     /// task due later today is "today" work, never overdue, and stored
     /// date-only values never depend on local-midnight resolution.
+    /// DEV-21: `--overdue` also excludes terminal tasks, each classified
+    /// under its own project's completion policy (completed work is not
+    /// overdue work).
     fn apply_due_filters(&self, tasks: &mut Vec<(String, Task)>) {
         if !self.args.overdue && self.args.due_soon.is_none() {
             return;
         }
         let today = crate::services::task_query::today_local(chrono::Utc::now());
         if self.args.overdue {
-            tasks.retain(|(_, task)| {
-                crate::services::task_query::due_raw_matches_bucket(
-                    task.due_date.as_deref(),
-                    crate::services::task_query::DueFilter::Overdue,
-                    today,
-                )
+            let storage = crate::storage::manager::Storage::new(&self.resolver.path);
+            let done_sets = crate::services::completion::resolve_task_done_sets(
+                &storage,
+                tasks.iter().map(|(id, _)| id),
+            );
+            tasks.retain(|(id, task)| {
+                !done_sets.is_done(id, &task.status)
+                    && crate::services::task_query::due_raw_matches_bucket(
+                        task.due_date.as_deref(),
+                        crate::services::task_query::DueFilter::Overdue,
+                        today,
+                    )
             });
         }
 

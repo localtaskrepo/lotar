@@ -905,7 +905,9 @@ fn cli_shares_default_order_strict_sort_and_due_buckets() {
     let fx = Fixture::new("PM");
     std::fs::write(
         fx.tasks_dir.join("config.yml"),
-        "issue.states: [Todo]\nissue.types: [Task]\ncustom_fields: [size]\n",
+        // DEV-21: `--overdue` excludes terminal tasks, so Todo must not be
+        // the (last = inferred-terminal) state list's final entry.
+        "issue.states: [Todo, Done]\nissue.types: [Task]\ncustom_fields: [size]\n",
     )
     .unwrap();
 

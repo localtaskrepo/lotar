@@ -246,6 +246,16 @@ test('inventory args: safe selector and build flags are mirrored exactly', () =>
   ]);
 });
 
+test('inventory args: agent mode uses the same Cargo profile as the run', () => {
+  const parsed = parseWrapperArgs(['--agent']);
+  const plan = resolvePlan({ probe: UNAVAILABLE, requireGit: 'off', explicitProfile: null, parsed });
+  const run = buildRunArgs(parsed, plan);
+  const inventory = buildInventoryArgs(parsed);
+  assert.deepEqual(inventory.slice(2, 4), ['--cargo-profile', 'ci']);
+  assert.equal(inventory[3], run[run.indexOf('--cargo-profile') + 1]);
+  assert.equal(buildInventoryArgs(parseWrapperArgs([])).includes('--cargo-profile'), false);
+});
+
 test('inventory args: unknown or run-only flags disable the mirror', () => {
   assert.equal(buildInventoryArgs(parseWrapperArgs(['--retries', '0'])), null);
   assert.equal(buildInventoryArgs(parseWrapperArgs(['--color', 'never'])), null);

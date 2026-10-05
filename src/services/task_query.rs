@@ -450,6 +450,13 @@ fn due_bucket_matches(due_local: NaiveDate, today: NaiveDate, filter: DueFilter)
 }
 
 fn task_matches_due(task: &TaskDTO, filter: DueFilter, today: NaiveDate) -> bool {
+    // DEV-21: only the Overdue bucket excludes terminal tasks ("completed
+    // work is not overdue work"). Today/Soon/Later keep matching done
+    // tasks. The bucket itself is recomputed here from the raw due value
+    // and the injected clock, never trusted from a TaskDTO snapshot.
+    if filter == DueFilter::Overdue && task.task_state.as_ref().is_some_and(|state| state.is_done) {
+        return false;
+    }
     due_raw_matches_bucket(task.due_date.as_deref(), filter, today)
 }
 
@@ -751,6 +758,7 @@ mod tests {
 
     fn dto(id: &str, modified: &str) -> crate::api_types::TaskDTO {
         crate::api_types::TaskDTO {
+            task_state: None,
             id: id.to_string(),
             title: format!("task {id}"),
             status: crate::types::TaskStatus::from("Todo"),

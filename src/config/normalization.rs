@@ -168,6 +168,7 @@ pub(crate) const CONFIG_PATHS: &[(&str, &str)] = &[
     ("taxonomy.tags", "tags"),
     ("issue.tags", "tags"),
     ("issue.states", "issue_states"),
+    ("issue.done_states", "issue_done_states"),
     ("issue.types", "issue_types"),
     ("issue.priorities", "issue_priorities"),
     ("custom.fields", "custom_fields"),
@@ -393,6 +394,14 @@ pub fn to_canonical_global_yaml_with(cfg: &GlobalConfig, options: GlobalYamlOpti
         issue.insert(
             Y::String("states".into()),
             serde_yaml_ng::to_value(&cfg.issue_states.values).unwrap_or(Y::Null),
+        );
+    }
+    // Presence-based: only an explicit global issue.done_states is written;
+    // absence keeps the legacy inferred completion policy.
+    if let Some(done) = &cfg.issue_done_states {
+        issue.insert(
+            Y::String("done_states".into()),
+            serde_yaml_ng::to_value(&done.values).unwrap_or(Y::Null),
         );
     }
     if cfg.issue_types.values != defaults.issue_types.values {
@@ -799,6 +808,14 @@ pub fn to_canonical_project_yaml(cfg: &ProjectConfig) -> String {
             .map(|s| Y::String(s.as_str().to_string()))
             .collect();
         issue.insert(Y::String("states".into()), Y::Sequence(vals));
+    }
+    if let Some(v) = &cfg.issue_done_states {
+        let vals: Vec<Y> = v
+            .values
+            .iter()
+            .map(|s| Y::String(s.as_str().to_string()))
+            .collect();
+        issue.insert(Y::String("done_states".into()), Y::Sequence(vals));
     }
     if let Some(v) = &cfg.issue_types {
         let vals: Vec<Y> = v

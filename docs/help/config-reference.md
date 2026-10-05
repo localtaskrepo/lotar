@@ -16,6 +16,7 @@ CLI > project > env > home > global > defaults (commands without a project skip 
 - default.strict_members: boolean (default false)
 - members: string[]
 - issue.states: string[] (e.g., [Todo, InProgress, NeedsReview, Done])
+- issue.done_states: optional nonempty string[] of finished task statuses, all drawn from the effective `issue.states`. An explicit list replaces inference; omitted project values inherit, and without any explicit list LoTaR infers completion after resolving the project's workflow. See [Done States](./config.md#done-states).
 - issue.types: string[] (feature, bug, epic, spike, chore)
 - issue.priorities: string[] (Low, Medium, High, Critical)
 - issue.tags: string[]

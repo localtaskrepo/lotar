@@ -34,11 +34,20 @@ impl ConfigService {
             })?;
             let mut value = serde_json::to_value(project_cfg)
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            // Computed completion-policy fields (DEV-21) alongside the raw
+            // override: the effective done set for THIS project and the
+            // live server-local calendar day.
+            if let Ok(resolved) =
+                crate::config::resolution::config_for_project(resolver.path.as_path(), Some(prefix))
+            {
+                insert_computed_completion_fields(&mut value, &resolved);
+            }
             redact_config(&mut value);
             Ok(value)
         } else {
             let mut value = serde_json::to_value(mgr.get_resolved_config())
                 .map_err(|e| LoTaRError::SerializationError(e.to_string()))?;
+            insert_computed_completion_fields(&mut value, mgr.get_resolved_config());
             redact_config(&mut value);
             Ok(value)
         }
@@ -136,6 +145,13 @@ impl ConfigService {
         let mut global_effective_val =
             serde_json::to_value(&resolved_global).unwrap_or(serde_json::json!({}));
         let mut global_raw_val = serde_json::to_value(&global_raw).unwrap_or(serde_json::json!({}));
+        // Computed completion-policy fields (DEV-21) on the effective and
+        // global-effective views; raw views stay raw.
+        insert_computed_completion_fields(
+            &mut effective_val,
+            &resolved_for_computed(project_prefix, &resolved_global, &mgr),
+        );
+        insert_computed_completion_fields(&mut global_effective_val, &resolved_global);
         for value in [
             &mut effective_val,
             &mut global_effective_val,
@@ -319,14 +335,20 @@ impl ConfigService {
         let mut entries: Vec<(String, String)> = Vec::with_capacity(canonical_entries.len());
         if let ConfigScope::Project(_) = &scope {
             // When setting project fields, avoid storing duplicates of global
-            // values: an empty entry clears the override instead.
+            // values: an empty entry clears the override instead. The dedup
+            // load is deliberately tolerant (DEV-21): when the existing
+            // config already carries an invalid read-time value (e.g. a
+            // hand-edited explicit done policy), repair through this same
+            // pipeline must stay possible, so the dedup pass is skipped and
+            // the candidate pipeline performs the full validation.
             let resolved_global = ConfigManager::new_manager_with_tasks_dir_readonly(tasks_dir)
-                .map_err(|e| LoTaRError::ValidationError(format!("Failed to load config: {}", e)))?
-                .get_resolved_config()
-                .clone();
+                .ok()
+                .map(|mgr| mgr.get_resolved_config().clone());
             for (field, value) in &canonical_entries {
                 if value.trim().is_empty()
-                    || Self::value_matches_global(&resolved_global, field, value)
+                    || resolved_global
+                        .as_ref()
+                        .is_some_and(|global| Self::value_matches_global(global, field, value))
                 {
                     entries.push((field.clone(), String::new()));
                 } else {
@@ -410,6 +432,11 @@ impl ConfigService {
         };
 
         match key {
+            // An explicit project issue.done_states pin is preserved even
+            // when it equals the global list: the pin expresses intent and
+            // must survive unrelated global changes (DEV-21), so it is
+            // never deduplicated into a clear.
+            "issue_done_states" => false,
             // enum list overrides
             "issue_states" => {
                 let local: Vec<String> = csv(value)
@@ -573,5 +600,48 @@ fn redact_config(value: &mut serde_json::Value) {
                 profile_map.remove("env");
             }
         }
+    }
+}
+
+/// Computed completion-policy fields shared by `config show` and
+/// `config inspect` (DEV-21): the effective done set (ordered), whether it
+/// is explicit or inferred, and the live server-local calendar day. The
+/// calendar day is evaluated at response time, never cached in a resolved
+/// snapshot.
+fn insert_computed_completion_fields(
+    value: &mut serde_json::Value,
+    resolved: &crate::config::types::ResolvedConfig,
+) {
+    use crate::services::completion;
+    let Some(map) = value.as_object_mut() else {
+        return;
+    };
+    map.insert(
+        "effective_done_states".to_string(),
+        serde_json::json!(completion::effective_done_status_values(resolved)),
+    );
+    map.insert(
+        "done_states_mode".to_string(),
+        serde_json::json!(completion::done_states_mode(resolved).as_str()),
+    );
+    map.insert(
+        "task_calendar_day".to_string(),
+        serde_json::json!(completion::local_calendar_day(chrono::Utc::now())),
+    );
+}
+
+/// The resolved configuration whose completion policy the inspect
+/// `effective` view describes: the project-resolved config for a project
+/// scope, the resolved global otherwise.
+fn resolved_for_computed(
+    project_prefix: Option<&str>,
+    resolved_global: &crate::config::types::ResolvedConfig,
+    mgr: &ConfigManager,
+) -> crate::config::types::ResolvedConfig {
+    match project_prefix {
+        Some(prefix) => mgr
+            .get_project_config(prefix)
+            .unwrap_or_else(|_| resolved_global.clone()),
+        None => resolved_global.clone(),
     }
 }

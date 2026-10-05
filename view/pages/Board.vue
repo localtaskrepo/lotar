@@ -331,6 +331,7 @@ import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
+import { useCompletionPolicy, ensureCompletionPolicy, normalizeStatusKey } from '../composables/useCompletionPolicy'
 import { useConfig } from '../composables/useConfig'
 import { buildServerFilter, useCustomFilterPresets, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { MS_PER_DAY } from '../utils/date'
@@ -367,6 +368,9 @@ function adoptQuery(handle: TaskQueryHandle) {
 const loadingTasks = computed(() => boardQuery.value?.status.value === 'loading')
 const loadError = computed(() => boardQuery.value?.error.value ?? null)
 const items = computed(() => boardQuery.value?.tasks.value ?? [])
+// DEV-21: shared per-project completion policy (terminal statuses, due
+// buckets) resolved from server config; never re-inferred client-side.
+const completion = useCompletionPolicy({ tasks: () => items.value })
 const { openTaskPanel } = useTaskPanelController()
 
 const project = ref<string>(route.query.project ? String(route.query.project) : '')
@@ -474,11 +478,6 @@ function priorityClass(value: string | undefined): string {
   return ''
 }
 
-const doneStatus = computed(() => {
-  const s = statuses.value
-  return s.length ? normalizeStatusKey(s[s.length - 1]) : ''
-})
-
 function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   const raw = (task.due_date || '').trim()
   if (!raw) return { label: '', overdue: false }
@@ -491,9 +490,11 @@ function taskDueInfo(task: TaskDTO): { label: string; overdue: boolean } {
   const sameYear = parsed.getFullYear() === today.getFullYear()
   const dateLabel = parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: sameYear ? undefined : 'numeric' })
   if (diffDays < 0) {
-    // Tasks in the final (done) status are not overdue
-    const isDone = doneStatus.value && normalizeStatusKey(task.status) === doneStatus.value
-    return { label: isDone ? `Due ${dateLabel}` : `Overdue ${dateLabel}`, overdue: !isDone }
+    // Shared server-basis predicate (terminal tasks are never overdue;
+    // stale authoritative buckets follow the server day, not this local
+    // diffDays) — keeps the card label consistent with hover/table/sprints.
+    const overdue = completion.isTaskOverdue(task)
+    return { label: overdue ? `Overdue ${dateLabel}` : `Due ${dateLabel}`, overdue }
   }
   return { label: `Due ${dateLabel}`, overdue: false }
 }
@@ -532,7 +533,10 @@ function hasTaskIdentity(task: TaskDTO): boolean {
 
 const hasDoneFilters = computed(() => {
   const d = doneFilters.value
-  return d.statuses.length > 0 || (typeof d.maxAgeDays === 'number' && d.maxAgeDays > 0) || (typeof d.maxVisible === 'number' && d.maxVisible > 0)
+  const hasLimits = (typeof d.maxAgeDays === 'number' && d.maxAgeDays > 0) || (typeof d.maxVisible === 'number' && d.maxVisible > 0)
+  // Seeded statuses alone don't filter anything (they only pre-check which
+  // columns the age/visible limits would apply to).
+  return d.statuses.length > 0 && hasLimits
 })
 const hasAnyFilters = computed(() => hasFilters.value || groupBy.value !== 'none' || hasDoneFilters.value)
 
@@ -554,12 +558,6 @@ async function refreshBoardTasks(snapshot?: Record<string, string>) {
   // Refresh failures surface through the query's error state (loadError);
   // previously they were swallowed by the shared status with stale rows left behind.
   await activeQueryHandle!.refresh()
-}
-
-function normalizeStatusKey(value: string | null | undefined) {
-  return typeof value === 'string'
-    ? value.trim().toLowerCase().replace(/[\s_-]+/g, '')
-    : ''
 }
 
 const statusSource = computed(() => {
@@ -747,10 +745,21 @@ const doneFilters = ref<DoneFilterSettings>({ statuses: [], maxAgeDays: null, ma
 
 function doneFilterKey(){ return project.value ? `lotar.doneFilters::${project.value}` : 'lotar.doneFilters' }
 
-function loadDoneFilters(){
+// Browser-local done-column defaults: seed the checked statuses from the
+// project's effective terminal policy (presentation only — semantics stay
+// server-owned). Stored preferences always win and are never overwritten by
+// reseeding.
+function defaultDoneFilterSettings(): DoneFilterSettings {
+  return { statuses: [...completion.doneLabelsFor(project.value)], maxAgeDays: null, maxVisible: null }
+}
+
+async function loadDoneFilters(){
   const parsed = storageGetJson<{ statuses?: unknown; maxAgeDays?: unknown; maxVisible?: unknown }>(doneFilterKey())
   if (!parsed) {
-    doneFilters.value = { statuses: [], maxAgeDays: null, maxVisible: null }
+    // Wait for the project's resolved policy so the seed matches the
+    // effective terminal statuses.
+    await ensureCompletionPolicy(project.value)
+    doneFilters.value = defaultDoneFilterSettings()
     return
   }
   const statuses = Array.isArray(parsed?.statuses) ? parsed.statuses.filter((label: unknown) => typeof label === 'string') : []
@@ -776,6 +785,7 @@ function toggleDoneStatus(label: string){
   const set = new Set(doneFilters.value.statuses)
   if (set.has(label)) set.delete(label); else set.add(label)
   doneFilters.value = { ...doneFilters.value, statuses: Array.from(set) }
+  saveDoneFilters()
 }
 
 function onDoneMaxAgeInput(ev: Event){
@@ -784,6 +794,7 @@ function onDoneMaxAgeInput(ev: Event){
     ...doneFilters.value,
     maxAgeDays: Number.isFinite(value) && value > 0 ? value : null,
   }
+  saveDoneFilters()
 }
 
 function onDoneMaxVisibleInput(ev: Event){
@@ -792,15 +803,13 @@ function onDoneMaxVisibleInput(ev: Event){
     ...doneFilters.value,
     maxVisible: Number.isFinite(value) && value > 0 ? Math.floor(value) : null,
   }
+  saveDoneFilters()
 }
 
 function resetDoneFilters(){
-  doneFilters.value = { statuses: [], maxAgeDays: null, maxVisible: null }
-}
-
-watch(doneFilters, () => {
+  doneFilters.value = defaultDoneFilterSettings()
   saveDoneFilters()
-}, { deep: true })
+}
 
 watch(groupBy, () => { saveGroupBy() })
 
@@ -920,7 +929,7 @@ onMounted(async () => {
   await refreshConfig(project.value)
   await refreshBoardTasks()
   loadWip()
-  loadDoneFilters()
+  await loadDoneFilters()
 })
 
 watch(() => route.query, async (q) => {
@@ -928,7 +937,7 @@ watch(() => route.query, async (q) => {
   await refreshConfig(project.value)
   await refreshBoardTasks()
   loadWip()
-  loadDoneFilters()
+  await loadDoneFilters()
   groupBy.value = loadGroupBy()
   collapsedGroups.value = new Set()
   resetExpansion()

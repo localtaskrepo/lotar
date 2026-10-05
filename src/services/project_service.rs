@@ -2,7 +2,7 @@ use crate::api_types::{ProjectDTO, ProjectStatsDTO};
 use crate::storage::manager::Storage;
 use crate::types::TaskChangeLogEntry;
 use chrono::{DateTime, Utc};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub struct ProjectService;
 
@@ -42,11 +42,17 @@ impl ProjectService {
             ..Default::default()
         };
         let tasks = storage.search(&filter);
-        let done_statuses = determine_done_statuses(storage);
+        // DEV-21: project stats classify with THIS project's effective
+        // completion policy (explicit issue.done_states or the legacy
+        // inference over its resolved issue_states), not the global set.
+        let done_sets = crate::services::completion::resolve_task_done_sets(
+            storage,
+            tasks.iter().map(|(id, _)| id),
+        );
         let (open, done) = tasks
             .iter()
-            .fold((0_u64, 0_u64), |(open_acc, done_acc), (_, task)| {
-                if is_done_status(&task.status, &done_statuses) {
+            .fold((0_u64, 0_u64), |(open_acc, done_acc), (id, task)| {
+                if done_sets.is_done(id, &task.status) {
                     (open_acc, done_acc + 1)
                 } else {
                     (open_acc + 1, done_acc)
@@ -100,29 +106,4 @@ fn update_latest(target: &mut Option<DateTime<Utc>>, value: &str) {
 
 fn update_history_entry(target: &mut Option<DateTime<Utc>>, entry: &TaskChangeLogEntry) {
     update_latest(target, &entry.at);
-}
-
-fn determine_done_statuses(storage: &Storage) -> HashSet<String> {
-    let mut done = HashSet::new();
-    if let Ok(config) = crate::config::resolution::load_and_merge_configs(Some(&storage.root_path))
-    {
-        if let Some(last) = config.issue_states.values.last() {
-            done.insert(last.as_str().to_lowercase());
-        }
-        for (alias, status) in &config.branch_status_aliases {
-            if alias.eq_ignore_ascii_case("done") {
-                done.insert(status.as_str().to_lowercase());
-            }
-        }
-    }
-    if done.is_empty() {
-        done.insert("done".to_string());
-        done.insert("completed".to_string());
-        done.insert("closed".to_string());
-    }
-    done
-}
-
-fn is_done_status(status: &crate::types::TaskStatus, done: &HashSet<String>) -> bool {
-    done.contains(&status.as_str().to_lowercase())
 }

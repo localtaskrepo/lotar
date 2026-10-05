@@ -32,6 +32,11 @@ pub const CONFIG_SOURCE_ENTRIES: &[ConfigSourceEntry] = &[
     entry("default.priority", "default_priority", "default_priority"),
     entry("default.status", "default_status", "default_status"),
     entry("issue.states", "issue_states", "issue_states"),
+    entry(
+        "issue.done_states",
+        "issue_done_states",
+        "issue_done_states",
+    ),
     entry("issue.types", "issue_types", "issue_types"),
     entry("issue.priorities", "issue_priorities", "issue_priorities"),
     entry("issue.tags", "issue_tags", "tags"),
@@ -461,6 +466,7 @@ fn source_label_for_global(
         "default_priority" => scope_field!(default_priority),
         "default_status" => scope_field!(default_status),
         "issue_states" => scope_field!(issue_states.values),
+        "issue_done_states" => scope_field!(issue_done_states),
         "issue_types" => scope_field!(issue_types.values),
         "issue_priorities" => scope_field!(issue_priorities.values),
         "issue_tags" => scope_field!(tags.values),
@@ -549,6 +555,7 @@ fn env_value_matches(resolved: &ResolvedConfig, env_resolved: &ResolvedConfig, k
         "default_priority" => env_equal!(default_priority),
         "default_status" => env_equal!(default_status),
         "issue_states" => env_equal!(issue_states.values),
+        "issue_done_states" => env_equal!(issue_done_states),
         "issue_types" => env_equal!(issue_types.values),
         "issue_priorities" => env_equal!(issue_priorities.values),
         "issue_tags" => env_equal!(tags.values),
@@ -680,6 +687,13 @@ fn source_label_for_project(
                 .is_some();
             let diff = resolved_project.issue_states.values != base_config.issue_states.values;
             project_scope!("issue_states", has_override, diff)
+        }
+        "issue_done_states" => {
+            let has_override = project_cfg
+                .and_then(|pc| pc.issue_done_states.as_ref())
+                .is_some();
+            let diff = resolved_project.issue_done_states != base_config.issue_done_states;
+            project_scope!("issue_done_states", has_override, diff)
         }
         "issue_types" => {
             let has_override = project_cfg.and_then(|pc| pc.issue_types.as_ref()).is_some();

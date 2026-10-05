@@ -320,7 +320,7 @@ impl SyncConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConfigurableField<T> {
     pub values: Vec<T>,
 }
@@ -408,6 +408,13 @@ pub struct ProjectConfig {
     pub project_name: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub issue_states: Option<ConfigurableField<TaskStatus>>,
+    /// Explicit terminal states for this project. `None` inherits the
+    /// effective global `issue.done_states`; when every layer is unset the
+    /// completion policy infers done states from `issue_states` after
+    /// project resolution. An explicit list is authoritative and must be a
+    /// non-empty subset of the effective `issue_states`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub issue_done_states: Option<ConfigurableField<TaskStatus>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub issue_types: Option<ConfigurableField<TaskType>>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -510,6 +517,7 @@ impl ProjectConfig {
         Self {
             project_name,
             issue_states: None,
+            issue_done_states: None,
             issue_types: None,
             issue_priorities: None,
             tags: None,
@@ -567,6 +575,12 @@ pub struct GlobalConfig {
     // Default configurations for all projects
     #[serde(default = "default_issue_states")]
     pub issue_states: ConfigurableField<TaskStatus>,
+    /// Explicit global terminal states. `None` (key absent or null) keeps
+    /// the legacy inferred completion policy; an explicit list is
+    /// authoritative for every project that does not override it and must
+    /// be a non-empty subset of `issue_states`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub issue_done_states: Option<ConfigurableField<TaskStatus>>,
     #[serde(default = "default_issue_types")]
     pub issue_types: ConfigurableField<TaskType>,
     #[serde(default = "default_issue_priorities")]
@@ -690,6 +704,10 @@ pub struct ResolvedConfig {
     pub server_port: u16,
     pub default_project: String,
     pub issue_states: ConfigurableField<TaskStatus>,
+    /// Effective explicit terminal states (project override > env > home >
+    /// global). `None` means no layer set them and the completion policy
+    /// infers done states from `issue_states` after project resolution.
+    pub issue_done_states: Option<ConfigurableField<TaskStatus>>,
     pub issue_types: ConfigurableField<TaskType>,
     pub issue_priorities: ConfigurableField<Priority>,
     pub tags: StringConfigField,
@@ -798,6 +816,10 @@ pub enum ConfigError {
     IoError(String),
     ParseError(String),
     FileNotFound(String),
+    /// An effective configuration value is invalid at read time (DEV-21:
+    /// hand-edited explicit completion policy). Fail-closed signal: callers
+    /// must not silently fall back to another policy for these errors.
+    PolicyError(String),
 }
 
 impl std::fmt::Display for ConfigError {
@@ -806,6 +828,7 @@ impl std::fmt::Display for ConfigError {
             ConfigError::IoError(msg) => write!(f, "IO Error: {}", msg),
             ConfigError::ParseError(msg) => write!(f, "Parse Error: {}", msg),
             ConfigError::FileNotFound(msg) => write!(f, "Config file not found: {}", msg),
+            ConfigError::PolicyError(msg) => write!(f, "Invalid configuration policy: {}", msg),
         }
     }
 }
@@ -914,6 +937,7 @@ impl Default for GlobalConfig {
             server_port: default_port(),
             default_project: default_project_name(),
             issue_states: default_issue_states(),
+            issue_done_states: None,
             issue_types: default_issue_types(),
             issue_priorities: default_issue_priorities(),
             tags: default_tags(),

@@ -19,6 +19,7 @@ fn make_cfg(
         server_port: 8080,
         default_project: "TEST".to_string(),
         issue_states: ConfigurableField { values: statuses },
+        issue_done_states: None,
         issue_types: ConfigurableField {
             values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         },

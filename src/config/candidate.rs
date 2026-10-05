@@ -61,6 +61,7 @@ const TASK_CONFLICT_FIELDS: &[&str] = &["issue_states", "issue_types", "issue_pr
 /// conflicts, so project enumeration is skipped for them.
 const RESOLVED_RELEVANT_FIELDS: &[&str] = &[
     "issue_states",
+    "issue_done_states",
     "issue_types",
     "issue_priorities",
     "tags",
@@ -419,6 +420,7 @@ fn block_newly_introduced_errors(
 fn project_overrides_field(cfg: &ProjectConfig, field: &str) -> bool {
     match field {
         "issue_states" => cfg.issue_states.is_some(),
+        "issue_done_states" => cfg.issue_done_states.is_some(),
         "issue_types" => cfg.issue_types.is_some(),
         "issue_priorities" => cfg.issue_priorities.is_some(),
         "tags" => cfg.tags.is_some(),

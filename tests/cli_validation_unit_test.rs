@@ -15,6 +15,7 @@ fn cfg() -> ResolvedConfig {
                 TaskStatus::from("Done"),
             ],
         },
+        issue_done_states: None,
         issue_types: ConfigurableField {
             values: vec![
                 TaskType::from("Feature"),

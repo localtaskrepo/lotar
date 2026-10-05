@@ -9,6 +9,28 @@ use serde_yaml_ng;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+/// Parse an explicit `issue.done_states` list: non-empty, duplicate-free
+/// (case-insensitive), every entry a valid task status. An empty request is
+/// handled by the caller as "unset/inherit", never as an empty list.
+fn parse_done_states_value(value: &str) -> Result<Vec<TaskStatus>, ConfigError> {
+    let values = parse_token_list::<TaskStatus>(value, "task status")?;
+    if values.is_empty() {
+        return Err(ConfigError::ParseError(
+            "issue_done_states must list at least one terminal status; leave it unset to use the inferred completion policy"
+                .to_string(),
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    for status in &values {
+        if !seen.insert(status.as_str().to_ascii_lowercase()) {
+            return Err(ConfigError::ParseError(format!(
+                "Duplicate done state '{}' in issue_done_states",
+                status.as_str()
+            )));
+        }
+    }
+    Ok(values)
+}
 
 fn parse_token_list<T>(value: &str, label: &str) -> Result<Vec<T>, ConfigError>
 where
@@ -447,6 +469,17 @@ pub fn apply_field_to_global_config(
             let states = parse_token_list::<TaskStatus>(value, "task status")?;
             config.issue_states = ConfigurableField { values: states };
         }
+        "issue_done_states" => {
+            // An empty value unsets the explicit global list and restores the
+            // legacy inferred completion policy; an explicit list must be
+            // non-empty and duplicate-free.
+            if value.trim().is_empty() {
+                config.issue_done_states = None;
+                return Ok(());
+            }
+            let done = parse_done_states_value(value)?;
+            config.issue_done_states = Some(ConfigurableField { values: done });
+        }
         "issue_types" => {
             let types = parse_token_list::<TaskType>(value, "task type")?;
             config.issue_types = ConfigurableField { values: types };
@@ -790,6 +823,17 @@ pub fn apply_field_to_project_config(
             let states = parse_token_list::<TaskStatus>(value, "task status")?;
             config.issue_states = Some(ConfigurableField { values: states });
         }
+        "issue_done_states" => {
+            // Empty value clears the override (inherit the effective global
+            // list or the inferred policy); an explicit list must be
+            // non-empty and duplicate-free.
+            if value.trim().is_empty() {
+                config.issue_done_states = None;
+                return Ok(());
+            }
+            let done = parse_done_states_value(value)?;
+            config.issue_done_states = Some(ConfigurableField { values: done });
+        }
         "issue_types" => {
             let types = parse_token_list::<TaskType>(value, "task type")?;
             config.issue_types = Some(ConfigurableField { values: types });
@@ -1048,6 +1092,7 @@ pub const GLOBAL_CONFIG_FIELDS: &[&str] = &[
     "tags",
     "custom_fields",
     "issue_states",
+    "issue_done_states",
     "issue_types",
     "issue_priorities",
     "auto_set_reporter",
@@ -1108,6 +1153,7 @@ pub const PROJECT_CONFIG_FIELDS: &[&str] = &[
     "default_priority",
     "default_status",
     "issue_states",
+    "issue_done_states",
     "issue_types",
     "issue_priorities",
     "tags",
@@ -1437,6 +1483,13 @@ pub fn validate_field_value(field: &str, value: &str) -> Result<(), ConfigError>
         "issue_states" => {
             parse_token_list::<TaskStatus>(value, "task status")?;
         }
+        "issue_done_states" => {
+            // Non-empty requests must parse to a non-empty, duplicate-free
+            // list; empty requests mean "unset/inherit" and are valid.
+            if !value.trim().is_empty() {
+                parse_done_states_value(value)?;
+            }
+        }
         "issue_types" => {
             parse_token_list::<TaskType>(value, "task type")?;
         }
@@ -1488,6 +1541,7 @@ pub fn clear_project_override_field(
         "strict_members" => config.strict_members = None,
         // Enum list overrides
         "issue_states" => config.issue_states = None,
+        "issue_done_states" => config.issue_done_states = None,
         "issue_types" => config.issue_types = None,
         "issue_priorities" => config.issue_priorities = None,
         // String-config lists

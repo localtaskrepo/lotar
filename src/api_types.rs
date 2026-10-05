@@ -15,6 +15,12 @@ pub struct TaskDTO {
     pub status: crate::types::TaskStatus,
     pub priority: crate::types::Priority,
     pub task_type: crate::types::TaskType,
+    /// Server-computed runtime projection (DEV-21): completion flag, due
+    /// bucket, and the server-local calendar day at build time. Computed
+    /// from the task's own project configuration and the shared due
+    /// parser; never persisted in the task YAML.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub task_state: Option<TaskStateDTO>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub reporter: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -60,6 +66,48 @@ pub fn map_is_empty(map: &crate::types::CustomFields) -> bool {
     // CustomFields is a type alias for HashMap<String, Value>
     let as_hash: &HashMap<String, crate::types::CustomFieldValue> = map;
     as_hash.is_empty()
+}
+
+/// Due classification for [`TaskStateDTO`], matching the shared query
+/// executor's due-bucket vocabulary. Only the `overdue` bucket excludes
+/// terminal tasks; a task due today stays `today` even when done, and a
+/// terminal past-due task has no bucket at all.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+#[serde(rename_all = "lowercase")]
+pub enum TaskDueBucketDTO {
+    Today,
+    Soon,
+    Later,
+    Overdue,
+}
+
+/// Server-computed runtime task state (DEV-21), attached to every
+/// `TaskDTO` produced by the actual task service (get/list/create/update/
+/// bulk/reference and SSE payloads). All fields are derived from the
+/// task's own project configuration, the shared due parser, and the
+/// injected clock at DTO build time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskStateDTO {
+    /// Whether the task's status is terminal under its project's
+    /// effective `issue.done_states` policy.
+    pub is_done: bool,
+    /// The ordered EFFECTIVE completion policy actually used for THIS task
+    /// (resolved from the task's actual storage root; explicit lists keep
+    /// their configured order, inferred lists follow the inference steps).
+    /// Lets clients classify optimistic status changes for homonymous or
+    /// foreign-root tasks without borrowing a prefix-level config policy
+    /// that may belong to a different root. Never persisted in task YAML.
+    pub done_states: Vec<String>,
+    /// Due bucket from the shared due parser and server-local calendar
+    /// day; `null` when the task has no (parseable) due date or when a
+    /// terminal task is past due. Always serialized (the declared
+    /// contract marks it required-nullable).
+    pub due_bucket: Option<TaskDueBucketDTO>,
+    /// Server-local calendar day (`YYYY-MM-DD`) when this snapshot was
+    /// computed, so clients can detect day rollover.
+    pub calendar_day: String,
 }
 
 pub fn btreemap_u32_is_empty(map: &BTreeMap<u32, u32>) -> bool {

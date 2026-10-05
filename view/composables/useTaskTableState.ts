@@ -1,9 +1,10 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { TaskDTO } from '../api/types'
 import { storageGetJson, storageSetJson } from '../utils/storage'
-import { formatRelativeTime, formatTaskDate, isTaskOverdue } from '../utils/date'
+import { formatRelativeTime, formatTaskDate } from '../utils/date'
 import type { TaskTouch } from './useActivity'
 import { injectColumnStore, useColumns, type ColKey } from './useColumns'
+import { useCompletionPolicy } from './useCompletionPolicy'
 import { numericOf, projectOf } from '../utils/text'
 import { colKeyToSortBy, sortTasks } from '../utils/taskSort'
 
@@ -202,6 +203,9 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
 
     const filtered = computed(() => props.tasks || [])
 
+    // DEV-21: shared per-project completion policy drives overdue styling.
+    const completion = useCompletionPolicy({ tasks: () => filtered.value })
+
     // Standalone tables sort through the SHARED contract comparator for every
     // column with a server sort key, so header sorts and exports can never
     // disagree. (The tasks page renders the authoritative server order
@@ -309,7 +313,7 @@ export function useTaskTableState(props: Readonly<TaskTableProps>, emit: TaskTab
     }
 
     function isOverdue(task: TaskDTO) {
-        return isTaskOverdue(task)
+        return completion.isTaskOverdue(task)
     }
 
     return {

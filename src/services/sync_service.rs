@@ -4327,6 +4327,7 @@ mod sync_mapping_tests {
 
     fn sample_task() -> TaskDTO {
         TaskDTO {
+            task_state: None,
             id: "TEST-1".to_string(),
             title: "Example".to_string(),
             status: TaskStatus::from("Todo"),
@@ -4559,6 +4560,7 @@ mod tests {
 
     fn sample_task() -> TaskDTO {
         TaskDTO {
+            task_state: None,
             id: "TEST-1".to_string(),
             title: "Example".to_string(),
             status: TaskStatus::from("Todo"),

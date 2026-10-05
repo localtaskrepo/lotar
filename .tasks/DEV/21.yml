@@ -1,10 +1,11 @@
 title: Configurable done states in project config
-status: Todo
+status: Done
 priority: High
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-08-07T22:48:10.804618+00:00
-modified: 2026-09-06T13:12:54.155713+00:00
+modified: 2026-10-05T22:11:56.543247+00:00
 comments:
 - date: 2026-09-06T11:21:52.773737+00:00
   text: Backlog review retained Todo and raised priority to High because audit S13/U9 show contradictory analytics and overdue semantics. Existing inference is documented as partial, not completion. Shared policy remains owned by this existing ticket rather than a duplicate.
@@ -12,6 +13,20 @@ comments:
   text: |-
     Checklist migration: preserved the original wording below; implementation status is unchanged.
     Former TODO.md line 22: Allow to define one or more done states in the config (right now defaults to last state in the list)
+- date: 2026-10-02T23:58:06.824596+00:00
+  text: 'Approved implementation plan (2026-10-02): one project-aware completion policy shared across configuration, backend and WebUI. Proposed issue.done_states / canonical issue_done_states optional list; explicit values authoritative, omitted project inherits, fully omitted derives canonical legacy inference after project resolution. Validate nonempty subset of effective issue.states, revalidate affected project overrides in complete candidates, preserve force/dry-run boundaries and task YAML. Unify project stats, mixed-project sprint metrics/burndown/velocity, overdue query/export/CLI stats, automation dependencies/workload and cleanup eligibility. Derive current uninterrupted completion interval from existing history; reopened tasks count remaining until recompleted and terminal-to-terminal transitions do not restart timing. Align date-only/timestamp calendar semantics and injectable clock/DST coverage. WebUI consumes server-resolved policy, adds done-state configuration with provenance, shares indicators/filter semantics across tables/Board/hover/Insights/Sprints and invalidates per-project policy/query caches on config changes; browser-local Board visibility remains presentation. No new completion checkbox, no silent backlog default changes, no cancellation-kind taxonomy, no sprint/job status conflation, no DEV-68 Other rendering expansion. Keep Rust/TS/OpenAPI/help contracts synchronized, targeted project-override/mixed-project/reopen/due-today/DST/browser regressions, independent review and final lint/Rust/UI/fresh build-first smoke with zero retries and honest Git/Windows/remote exclusions. No Git commands/index writes/commits/pushes/worktrees or unrelated ticket mutations. Existing research source refs and recommendations remain in the conversation; interfaces/ownership finalized before parallel source writers.'
+- date: 2026-10-03T00:22:29.438402+00:00
+  text: 'Implementation interfaces and ownership assigned: Rust writer ses_f00eba6d2ffe8i7q9faXp9hy7x owns all src/Cargo/Rust tests; UI writer ses_f00eba681ffeRUxDTHTHAllw6K owns view incl TS contracts; parent owns docs/OpenAPI/smoke/tracking/final gates. Raw issue_done_states is optional explicit list; config show/inspect effective outputs add effective_done_states, done_states_mode explicit|inferred, live task_calendar_day. Runtime TaskDTO task_state {is_done,due_bucket nullable today|soon|later|overdue,calendar_day} is computed from actual storage root/project/server clock and never persisted to YAML; queries retain injectable clock. UI consumes these server semantics rather than browser/local last-state guesses, refreshes config/query membership on changes and calendar rollover. Parent has drafted synchronized configuration/task/sprint/stats/MCP help and OpenAPI schemas plus actual-backend smoke regressions for mixed projects, explicit Done exclusion, due-today, Insights drilldown and live config SSE membership. Remaining: writers release source and targeted proofs, align any material contract refinements, execute browser scenarios on fresh embedded build, independently review and run final gates. No validation success claimed for unfinished source; no Git operations or unrelated task changes. Evidence root target/dev21-20261003/{core,ui,parent}/.'
+- date: 2026-10-03T00:42:33.826050+00:00
+  text: 'Milestone: Rust writer published implemented config/TaskDTO interface and warning-free compile; targeted backend tests remain in progress, so this is not final verification. WebUI owner released source: reported 496/63 UI tests and clean frontend typecheck, with shared completion helper, configuration multiselect/provenance, table/Board/hover/Insights/Sprints consumers and policy invalidation. Parent started independent UI review focused on server-vs-browser calendar rollover, per-project/actual-root lookup and stale-policy races. Parent smoke coverage now six cases (mixed-project DTO/pagination/stats/no-YAML metadata; table; Insights drilldown; live config SSE membership; Board badges/non-persisted defaults; config inheritance/equal-global explicit pin). Fixed draft navigation to actual / Tasks and /boards routes before execution. API/help JSON/local refs validate. Raw smoke tsc is blocked by existing TS6 node10-resolution deprecation; one-off Vite-compatible bundler-resolution validation exposes the known 20 unrelated diagnostics and none in the new file, without changing config or masking them. Remaining: backend release, review findings, fresh embedded browser run, contract consistency review and all required full gates. No runtime success claimed for new smoke yet; no source overlap/Git/unrelated ticket mutations.'
+- date: 2026-10-03T00:53:15.790375+00:00
+  text: 'Guidance trigger during authorized browser validation: new describe.concurrent smoke cases failed with expect.poll() must be called inside a test after neighboring asynchronous cases completed (parent/browser-first.log lines 28-58). The imported global expect loses the test association across concurrent browser callbacks; test-context expect preserves it. Owner guidance is .github/instructions/smoke.instructions.md, which covers concurrency but lacks this convention. Small factual correction planned: destructure async ({ expect }) and pass/capture that instance for polling helpers in concurrent cases. No retry/concurrency/timeout changes or assertion weakening. The Insights navigation failure is separate test-fixture error (tile is non-clickable; actual drilldown is the Due date outlook row), to correct in parent-owned smoke. Check: rerun same six concurrent cases and preserve all policy/membership/JSON assertions; sequential polling remains unaffected. Git diff checks unavailable under explicit no-Git scope, verify exact patch/read instead.'
+- date: 2026-10-03T01:04:23.269938+00:00
+  text: 'Review corrections now assigned, keep InProgress. Rust findings: prefix-only done-set cache/TaskService primary-root shortcut misclassify unambiguous IDs sharing a prefix across roots; sprint status-label aggregate freezes first task done-ness across projects; claimed DST agreement case missed actual transition. Fixes include (root,prefix) caching/per-task DTO policy, per-task totals/unanimous aggregate flags, real DST boundary assertions and explicit done-policy load validation. UI findings: stale task due_bucket survives server-day change, browser-midnight mismatch; Done badge substring guess; same-tab cache clearing prevents refresh; invisible completed-past-due breakdown. Owners fixing these without relaxing scope. Coordinated API refinement adds computed TaskStateDTO.done_states[] for each task actual-root policy, letting optimistic WebUI changes avoid borrowing homonymous active-root config; no task YAML/root path exposure. Parent updated OpenAPI/help/new smoke accordingly. Parent schema correction uses true OpenAPI 3.1 null unions (not inert nullable keyword): DEV82 13/13 passed on prior interface. Six browser cases passed after correcting only test fixture navigation and test-scoped expect; these are PRE-review-fix proofs, not final gates. Guidance correction checked: concurrent original failures replayed as 6/6 passes and unchanged sequential UI basic 1/1; .github/instructions/smoke.instructions.md now documents test-scoped expect for concurrent polling. No concurrency/retries/timeouts/assertions weakened; Git diff check unavailable under no-Git instruction. Remaining corrected-owner releases, follow-up independent reviews, rebuild browser rerun and all full gates; no Git or unrelated task mutations.'
+- date: 2026-10-03T02:33:23.081333+00:00
+  text: 'Outcome: Parent recovered both interrupted source writers after z.ai five-hour limits, preserved partial work, completed all actionable Rust/UI review fixes and added edge controls. Runtime TaskStateDTO now embeds actual-root done_states; per-task/root-prefix classification and same-label mixed-project sprint counts are correct, with unanimous aggregate done flags. Read-time explicit-policy errors are rejected; legacy infallible task reads fail closed with empty embedded set/is_done false rather than builtin Done. UI empty sets are authoritative, badges do not guess Done, optimistic date-only reopening uses server day and stale timestamps remain neutral. Server-calendar global probe refreshes retained entities; config saves refresh scopes and live membership. Historical chart UTC grid remains explicit while deadline buckets use server-local day. A further reproduced semantic mismatch was fixed: completion labels match Rust ASCII case-folding without merging separator/Unicode-distinct labels; Board column normalization remains presentation. Evidence FINAL current source: lint:agent/Clippy/allfeatures/fmt pass; nextest 1239 passed, 45 actual Gitless exclusions; UI 520 passed/64 files; fresh build-first smoke 205 passed, 25 actual Git skips/50 files, including all eight real-backend/browser DEV21 cases. No retries/concurrency/timeout changes or leak/bind/unhandled failures. Logs target/dev21-20261003/parent/final-profile-{lint,test,smoke}.log. Validation exposed runner profile drift: agent inventory compiled default instead of run profile ci, causing cold-build timeout. One-line mirror fix preserves 60s budget; new red->green control and all42 Node runner tests pass (inventory-profile-{red,green}.log). Separate semantic-label red->green test retained. Guidance: factual concurrent smoke test-scoped expect note was validated by original-failure replay6/6 plus unchanged sequential1/1; no safety/review policy changed. Remaining: independent final Rust/UI follow-ups hit provider quota and remain pending, so task stays InProgress despite completed self-verification. Reviewer error reports reset 2026-10-03 11:43:21 without timezone; next scheduled availability/review attempt planned03:50UTC (provider-local interpretation, not a guaranteed reset). No Git/index/commit/push/worktree actions, no Windows/remoteCI/Git-excluded execution claims; no DEV68 expansion/unrelated task changes.'
+- date: 2026-10-05T22:11:56.516344+00:00
+  text: 'Outcome: Complete. Shared project-aware issue.done_states policy is implemented across validated configuration, task statistics, mixed-project/cross-root sprint analytics, current completion intervals and reopen replay, overdue queries/CLI/export, automation and cleanup eligibility. WebUI configuration and shared indicators/filters consume server-resolved actual-root policies, refresh on config/server-day changes and retain Board presentation preferences; no checkbox/backlog-default/cancellation taxonomy or DEV-68 expansion. Runtime TaskStateDTO done_states/is_done/nullable due_bucket/calendar_day is computed only, with no task-YAML migration. Empty/subset policies fail closed and candidate repair remains possible; fallback task reads never guess builtin Done on PolicyError. ASCII completion matching agrees with Rust without collapsing distinct labels. Rust/TS/OpenAPI 3.1/help contracts synchronized. Evidence: final Oct3 lint/Clippy-allfeatures/fmt pass; nextest 1239 passed with 45 actual Gitless exclusions and zero retries/default parallelism; UI 520 passed in 64 files; fresh build-first smoke 205 passed with 25 actual Git skips in 50 files, including all eight actual-backend/browser DEV21 scenarios; 42 runner unit tests passed. Logs target/dev21-20261003/parent/final-profile-{lint,test,smoke}.log and inventory-profile-green.log. Independent final Rust and WebUI source/test/log reviews on Oct5 explicitly SIGNOFF/no actionable findings; they executed no new checks and nothing inspected contradicted the released state. All review-found bugs resolved and regressed. The discovered validation-runner inventory profile drift is fixed by mirroring run profile ci, preserving the 60-second budget and zero-retry policy; red-to-green control retained. Remaining: no scoped blockers. Non-blocking notes retained: rare duplicate fetch from old ensure cleanup, partial prefix refresh failure may leave stale policy until refresh/remount, idle no-op probe tick, and Board wording browser-local while overdue truth is server-authoritative. These do not alter completion acceptance. Genuine Git-only cases, Windows and unpublished remote CI remain unproven; accepted pre-commit CI handoff exception retained. Guidance: smoke instruction now factually requires test-context expect for concurrent polling, backed by failure/replay and sequential counterexample; no safety/review-quality policy changed. No Git commands, index writes, commits, pushes or worktrees, and unrelated tasks remain untouched.'
 description: |-
   Existing done-state inference (last configured status, conventional names and aliases) is not explicit project-configurable terminal states. Define one project-aware terminal-state policy with backward-compatible defaults and use it across task statistics, sprint metrics/burndown/timing, overdue UI and agent cleanup. Acceptance: configured Closed/Completed/custom terminal states agree across surfaces; due-today is not overdue; completed tasks do not inflate overdue totals; reopened task histories use the current/latest completion interval rather than earliest-ever done. Update configuration contracts/docs and add project-override/reopen/DST regressions. Audit S13/U9 are owned here; DEV-57/66/68 coordinate query and rendering behavior.
 
@@ -47,3 +62,45 @@ history:
   actor: mallox
   changes:
   - field: comment_added
+- at: 2026-10-02T23:58:06.786472+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-02T23:58:06.824596+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-03T00:22:29.438402+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-03T00:42:33.826050+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-03T00:53:15.790375+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-03T01:04:23.269938+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-03T02:33:23.081333+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-05T22:11:56.516344+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-05T22:11:56.543247+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

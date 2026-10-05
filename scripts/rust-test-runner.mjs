@@ -315,7 +315,9 @@ export function inventoryAllowed(parsed) {
 }
 
 export function buildInventoryArgs(parsed) {
-  const mirrored = [];
+  // Match the agent-only build profile injected by buildRunArgs, not just
+  // user passthrough flags. Otherwise inventory builds different binaries.
+  const mirrored = parsed.agent ? ['--cargo-profile', 'ci'] : [];
   const passthrough = parsed.passthrough;
   for (let i = 0; i < passthrough.length; i += 1) {
     const token = passthrough[i];

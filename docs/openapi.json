@@ -498,7 +498,7 @@
                 "overdue"
               ]
             },
-            "description": "Smart filter on due date (local calendar buckets): today, soon (next 7 days excluding today), later (beyond 7 days), overdue (before today). Blank explicit values and invalid values return 400."
+            "description": "Smart filter on due date (server-local calendar buckets): today, soon (next 7 days excluding today), later (beyond 7 days), overdue (non-finished tasks due before today). Completion uses each task's own project done-state policy, including mixed-project results. Finished and due-today tasks never match overdue. Blank explicit values and invalid values return 400."
           },
           {
             "name": "recent",
@@ -1458,20 +1458,13 @@
                     "summary": "Resolved config",
                     "value": {
                       "data": {
-                        "default": {
-                          "project": "TEST"
-                        },
-                        "issue": {
-                          "states": [
-                            "TODO",
-                            "IN_PROGRESS",
-                            "DONE"
-                          ]
-                        },
-                        "auto": {
-                          "set_reporter": true,
-                          "assign_on_status": true
-                        }
+                        "default_project": "TEST",
+                        "issue_states": ["Todo", "InProgress", "Done"],
+                        "effective_done_states": ["Done"],
+                        "done_states_mode": "inferred",
+                        "task_calendar_day": "2026-10-03",
+                        "auto_set_reporter": true,
+                        "auto_assign_on_status": true
                       }
                     }
                   }
@@ -2451,7 +2444,20 @@
         "summary": "Inspect effective config",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/ConfigInspectResult"
+                    }
+                  },
+                  "required": ["data"]
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/InternalError"
@@ -3352,6 +3358,87 @@
   },
   "components": {
     "schemas": {
+      "TaskStateDTO": {
+        "type": "object",
+        "description": "Computed task completion and due-date snapshot. Evaluated against the task's actual storage root and resolved project policy; never persisted in task YAML. Refresh after configuration changes and server calendar rollover.",
+        "properties": {
+          "done_states": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Ordered effective done-state policy used for this task's actual storage root and project. Clients use this embedded policy for optimistic status changes rather than borrowing configuration for a homonymous project in another root."
+          },
+          "is_done": {
+            "type": "boolean",
+            "description": "Whether the current task status belongs to its effective project done-state set."
+          },
+          "due_bucket": {
+            "type": ["string", "null"],
+            "enum": ["today", "soon", "later", "overdue", null],
+            "description": "Server-local calendar bucket, or null for an absent/unparseable due date or a finished past-due task. Today never counts as overdue; soon covers the next seven calendar days excluding today."
+          },
+          "calendar_day": {
+            "type": "string",
+            "format": "date",
+            "description": "Server-local calendar day on which this snapshot was evaluated."
+          }
+        },
+        "required": ["done_states", "is_done", "due_bucket", "calendar_day"]
+      },
+      "DoneStatesConfig": {
+        "type": "object",
+        "description": "Completion-related raw configuration fields; other configuration fields remain supported.",
+        "properties": {
+          "issue_done_states": {
+            "type": ["array", "null"],
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "Optional explicit finished-status list, a subset of the effective issue_states. Absent/null project values inherit; when no explicit list exists the resolved-project legacy rule is inferred. An explicit list is authoritative, even if it equals the inherited list."
+          }
+        },
+        "additionalProperties": true
+      },
+      "ResolvedConfigCompletion": {
+        "allOf": [
+          { "$ref": "#/components/schemas/DoneStatesConfig" },
+          {
+            "type": "object",
+            "properties": {
+              "effective_done_states": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Read-only effective finished states after project resolution and any legacy inference."
+              },
+              "done_states_mode": {
+                "type": "string",
+                "enum": ["explicit", "inferred"],
+                "description": "Whether the effective policy uses an explicit configuration list or the legacy inference rule. Source-layer provenance is available through config inspect."
+              },
+              "task_calendar_day": {
+                "type": "string",
+                "format": "date",
+                "description": "Live server-local calendar day, not writable configuration or a permanently cached policy value."
+              }
+            },
+            "required": ["effective_done_states", "done_states_mode", "task_calendar_day"]
+          }
+        ]
+      },
+      "ConfigInspectResult": {
+        "type": "object",
+        "properties": {
+          "effective": { "$ref": "#/components/schemas/ResolvedConfigCompletion" },
+          "global_effective": { "$ref": "#/components/schemas/ResolvedConfigCompletion" },
+          "global_raw": { "$ref": "#/components/schemas/DoneStatesConfig" },
+          "project_raw": { "$ref": "#/components/schemas/DoneStatesConfig" },
+          "sources": {
+            "type": "object",
+            "additionalProperties": { "type": "string", "enum": ["project", "global", "built_in"] },
+            "description": "Configuration-layer provenance, including issue_done_states when available. Inferred versus explicit mode is separately reported in effective configuration."
+          }
+        },
+        "required": ["effective", "global_effective", "global_raw", "sources"],
+        "additionalProperties": true
+      },
       "TaskDTO": {
         "type": "object",
         "properties": {
@@ -3363,6 +3450,9 @@
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus"
+          },
+          "task_state": {
+            "$ref": "#/components/schemas/TaskStateDTO"
           },
           "priority": {
             "$ref": "#/components/schemas/Priority"
@@ -7464,8 +7554,7 @@
         "type": "object",
         "properties": {
           "data": {
-            "type": "object",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/ResolvedConfigCompletion"
           }
         },
         "required": [

@@ -7,8 +7,7 @@ use crate::services::sprint_analytics::{
     to_status_warning_payloads,
 };
 use crate::services::sprint_metrics::{
-    SprintBurndownMetric, compute_velocity_totals, determine_done_statuses_from_config,
-    metric_label, ratio,
+    SprintBurndownMetric, compute_velocity_totals, metric_label, ratio,
 };
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::sprint_status::{self, SprintLifecycleState};
@@ -166,7 +165,7 @@ impl VelocityComputation {
 pub fn compute_velocity(
     storage: &Storage,
     records: &[SprintRecord],
-    config: &ResolvedConfig,
+    _config: &ResolvedConfig,
     options: &VelocityOptions,
     now: DateTime<Utc>,
 ) -> VelocityComputation {
@@ -182,7 +181,6 @@ pub fn compute_velocity(
         };
     }
 
-    let done_statuses = determine_done_statuses_from_config(config);
     let mut entries = Vec::new();
     let mut skipped_incomplete = false;
 
@@ -219,7 +217,13 @@ pub fn compute_velocity(
         let relative = format_calendar_relative(&lifecycle, start, end, now);
 
         let tasks = SprintService::load_tasks_for_record(storage, record);
-        let totals = compute_velocity_totals(&tasks, &done_statuses);
+        // Each record's tasks resolve against their own project completion
+        // policy (DEV-21), so the per-task done sets are rebuilt per record.
+        let done_sets = crate::services::completion::resolve_task_done_sets(
+            storage,
+            tasks.iter().map(|(id, _)| id),
+        );
+        let totals = compute_velocity_totals(&tasks, &done_sets);
 
         let (committed, completed, capacity) = match options.metric {
             SprintBurndownMetric::Tasks => {

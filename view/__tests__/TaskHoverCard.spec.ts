@@ -1,6 +1,29 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskHoverCard from '../components/TaskHoverCard.vue'
+import { invalidateCompletionPolicies } from '../composables/useCompletionPolicy'
+
+const showConfigMock = vi.hoisted(() => vi.fn(async () => ({})))
+vi.mock('../api/client', () => ({
+    api: {
+        showConfig: showConfigMock,
+    },
+}))
+
+function dueTask(overrides: Record<string, unknown> = {}) {
+    return {
+        id: 'PRJ-9',
+        title: 'Due task',
+        tags: [],
+        status: 'Todo',
+        priority: '',
+        assignee: '',
+        due_date: '2025-12-01',
+        sprints: [],
+        modified: '',
+        ...overrides,
+    } as any
+}
 
 describe('TaskHoverCard', () => {
     it('renders updated and sprints when present', () => {
@@ -59,5 +82,61 @@ describe('TaskHoverCard', () => {
         })
         expect(shown.text()).toContain('sprint')
         expect(shown.text()).toContain('Sprint-42')
+    })
+
+    describe('overdue tone (DEV-21 shared policy)', () => {
+        beforeEach(() => {
+            vi.useFakeTimers()
+            vi.setSystemTime(new Date('2026-01-05T12:00:00'))
+            showConfigMock.mockReset()
+            showConfigMock.mockImplementation(async () => ({
+                issue_states: ['Todo', 'Doing', 'Shipped'],
+                effective_done_states: ['Shipped'],
+                done_states_mode: 'explicit',
+                task_calendar_day: '2026-01-05',
+            }))
+            invalidateCompletionPolicies()
+        })
+
+        afterEach(() => {
+            vi.useRealTimers()
+        })
+
+        it('tones past-due open tasks as overdue', async () => {
+            const wrapper = mount(TaskHoverCard, {
+                props: { task: dueTask({ status: 'Todo' }) },
+                slots: { default: '<span>trigger</span>' },
+            })
+            await flushPromises()
+
+            const due = wrapper.find('.task-hover-card__due')
+            expect(due.classes()).toContain('is-overdue')
+            expect(due.text()).toContain('days ago')
+        })
+
+        it('never tones terminal tasks as overdue, including custom names like Shipped', async () => {
+            const wrapper = mount(TaskHoverCard, {
+                props: { task: dueTask({ status: 'Shipped' }) },
+                slots: { default: '<span>trigger</span>' },
+            })
+            await flushPromises()
+
+            const due = wrapper.find('.task-hover-card__due')
+            expect(due.exists()).toBe(true)
+            expect(due.classes()).not.toContain('is-overdue')
+            expect(due.text()).toContain('days ago')
+        })
+
+        it('keeps due-today tasks out of the overdue tone', async () => {
+            const wrapper = mount(TaskHoverCard, {
+                props: { task: dueTask({ status: 'Todo', due_date: '2026-01-05' }) },
+                slots: { default: '<span>trigger</span>' },
+            })
+            await flushPromises()
+
+            const due = wrapper.find('.task-hover-card__due')
+            expect(due.classes()).not.toContain('is-overdue')
+            expect(due.classes()).toContain('is-due-today')
+        })
     })
 })

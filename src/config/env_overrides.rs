@@ -65,6 +65,11 @@ pub const ENV_OVERRIDE_DEFINITIONS: &[EnvOverrideDefinition] = &[
         &["LOTAR_DEFAULT_STATUS"],
     ),
     def("issue_states", "issue_states", &["LOTAR_ISSUE_STATES"]),
+    def(
+        "issue_done_states",
+        "issue_done_states",
+        &["LOTAR_ISSUE_DONE_STATES"],
+    ),
     def("issue_types", "issue_types", &["LOTAR_ISSUE_TYPES"]),
     def(
         "issue_priorities",

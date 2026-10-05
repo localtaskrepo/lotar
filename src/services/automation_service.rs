@@ -12,7 +12,6 @@ use crate::services::agent_job_service::{AgentJobService, AgentOrchestratorMode}
 use crate::services::agent_queue_service::AgentQueueService;
 use crate::services::automation_matching::{ChangeSet, MatchMode, matches_rule};
 use crate::services::automation_validation::{parse_cooldown, validate_rules};
-use crate::services::sprint_metrics::determine_done_statuses_from_config;
 use crate::services::sprint_service::SprintService;
 use crate::services::task_service::{CommentContext, TaskService, TaskUpdateContext};
 use crate::storage::manager::Storage;
@@ -728,6 +727,15 @@ fn simulate_action(
         simulated.tags.retain(|t| !normalized.contains(t));
         apply_relationship_action(remove, false, &mut simulated.relationships);
     }
+
+    // The simulated state must reflect the projected completion/due
+    // classification (DEV-21), not the pre-action snapshot.
+    simulated.task_state = Some(crate::services::completion::compute_task_state(
+        &simulated.status,
+        simulated.due_date.as_deref(),
+        config,
+        chrono::Utc::now(),
+    ));
 
     simulated
 }
@@ -1457,13 +1465,20 @@ fn count_terminal_jobs_for_ticket(ticket_id: &str) -> usize {
 fn find_blocked_dependencies(
     storage: &Storage,
     task: &TaskDTO,
-    config: &ResolvedConfig,
+    _config: &ResolvedConfig,
 ) -> Vec<String> {
     if task.relationships.depends_on.is_empty() {
         return Vec::new();
     }
 
-    let done_statuses = determine_done_statuses_from_config(config);
+    // DEV-21: every dependency classifies under its OWN project's
+    // completion policy (explicit issue.done_states or inferred), resolved
+    // from the tasks root that actually holds it — never the dependent
+    // task's global policy.
+    let done_sets = crate::services::completion::resolve_task_done_sets(
+        storage,
+        task.relationships.depends_on.iter().map(String::as_str),
+    );
     let mut blocked = Vec::new();
 
     for dep in &task.relationships.depends_on {
@@ -1479,9 +1494,11 @@ fn find_blocked_dependencies(
             .map(|task| task.status)
             .map(|status| status.as_str().to_ascii_lowercase());
 
-        let is_done = status
-            .as_deref()
-            .is_some_and(|value| done_statuses.contains(value));
+        let is_done = status.as_deref().is_some_and(|value| {
+            done_sets
+                .done_set(trimmed)
+                .is_some_and(|done| done.contains(value))
+        });
         if !is_done {
             blocked.push(trimmed.to_string());
         }
@@ -1618,16 +1635,16 @@ fn resolve_least_busy(config: &ResolvedConfig, storage: &Storage) -> Option<Stri
     if members.is_empty() {
         return None;
     }
-    // Count active (non-done) tasks per member
-    let done_statuses = determine_done_statuses_from_config(config);
+    // Count active (non-done) tasks per member. DEV-21: each task's
+    // activity classifies under its own project completion policy via the
+    // server-computed task state, so cross-project workloads compare
+    // fairly.
     let all_tasks = TaskService::list(storage, &crate::api_types::TaskListFilter::default());
 
     let mut counts: HashMap<String, usize> = members.iter().map(|m| (m.clone(), 0)).collect();
     for (_id, task) in &all_tasks {
         if let Some(assignee) = task.assignee.as_deref() {
-            let is_active = !done_statuses
-                .iter()
-                .any(|s| s.to_string().eq_ignore_ascii_case(&task.status.to_string()));
+            let is_active = !task.task_state.as_ref().is_some_and(|state| state.is_done);
             if is_active && let Some(count) = counts.get_mut(assignee) {
                 *count += 1;
             }
@@ -1732,5 +1749,95 @@ mod cooldown_tests {
             AutomationService::set(dir.path(), None, "automation:\n- cooldown: 30s\n").unwrap();
         assert!(outcome.updated);
         assert!(!outcome.validation.has_errors());
+    }
+}
+
+#[cfg(test)]
+mod dev21_cross_root_dependency_tests {
+    use super::*;
+    use crate::api_types::TaskDTO;
+
+    fn write_task(root: &std::path::Path, prefix: &str, num: u32, status: &str) {
+        let dir = root.join(".tasks").join(prefix);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(format!("{num}.yml")),
+            format!(
+                "title: t{num}\nstatus: {status}\npriority: medium\ntype: task\ncreated: 2026-01-01T00:00:00Z\nmodified: 2026-01-01T00:00:00Z\ntags: []\n"
+            ),
+        )
+        .unwrap();
+    }
+
+    fn write_config(root: &std::path::Path, done: &str) {
+        let tasks = root.join(".tasks");
+        std::fs::create_dir_all(&tasks).unwrap();
+        std::fs::write(
+            tasks.join("config.yml"),
+            format!("issue:\n  states: [Todo, Done, Shipped]\n  done_states: [{done}]\n"),
+        )
+        .unwrap();
+    }
+
+    fn dependent_dto(id: &str, deps: &[&str]) -> TaskDTO {
+        TaskDTO {
+            task_state: None,
+            id: id.to_string(),
+            title: "dependent".to_string(),
+            status: crate::types::TaskStatus::from("Todo"),
+            priority: crate::types::Priority::from("Medium"),
+            task_type: crate::types::TaskType::from("Feature"),
+            reporter: None,
+            assignee: None,
+            created: "2026-01-01T00:00:00Z".to_string(),
+            modified: "2026-01-01T00:00:00Z".to_string(),
+            due_date: None,
+            effort: None,
+            subtitle: None,
+            description: None,
+            tags: Vec::new(),
+            relationships: crate::types::TaskRelationships {
+                depends_on: deps.iter().map(|d| (*d).to_string()).collect(),
+                ..Default::default()
+            },
+            comments: Vec::new(),
+            references: Vec::new(),
+            acceptance_criteria: Vec::new(),
+            sprints: Vec::new(),
+            sprint_order: Default::default(),
+            history: Vec::new(),
+            custom_fields: Default::default(),
+        }
+    }
+
+    /// DEV-21 review F1: dependencies classify under the policy of the root
+    /// that actually holds them. Two IDs share prefix PX across sibling
+    /// roots with different terminal sets; both dep input orders agree.
+    #[test]
+    fn blocked_dependencies_classify_each_dep_by_actual_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Nested-workspace layout (the locator's monorepo discovery): B is a
+        // separate tasks root discovered from A.
+        let root_a = tmp.path().join("wsa");
+        let root_b = tmp.path().join("wsa").join("wsb");
+        write_config(&root_a, "Shipped");
+        write_config(&root_b, "Done");
+        // PX-1 lives in A where Done is NOT terminal; PX-2 lives in B where
+        // Done IS terminal. Different IDs, same prefix: unambiguous.
+        write_task(&root_a, "PX", 1, "Done");
+        write_task(&root_b, "PX", 2, "Done");
+
+        let storage = Storage::new(&root_a.join(".tasks"));
+        let config =
+            crate::config::resolution::load_and_merge_configs(Some(&root_a.join(".tasks")))
+                .unwrap();
+
+        for deps in [["PX-1", "PX-2"], ["PX-2", "PX-1"]] {
+            let blocked =
+                find_blocked_dependencies(&storage, &dependent_dto("PX-9", &deps), &config);
+            // PX-1 (Done, non-terminal in A) blocks; PX-2 (Done, terminal
+            // in its own root B) does not — regardless of input order.
+            assert_eq!(blocked, vec!["PX-1".to_string()], "deps: {deps:?}");
+        }
     }
 }

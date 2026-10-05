@@ -40,35 +40,12 @@ pub fn ratio_usize(done: usize, total: usize) -> Option<f64> {
     }
 }
 
+/// Effective terminal statuses for a resolved configuration. Delegates to
+/// the shared completion policy (DEV-21): an explicit `issue.done_states`
+/// is authoritative; otherwise the legacy inference runs after project
+/// resolution (see [`crate::services::completion`]).
 pub fn determine_done_statuses_from_config(config: &ResolvedConfig) -> HashSet<String> {
-    let mut done = HashSet::new();
-
-    if let Some(last) = config.issue_states.values.last() {
-        done.insert(last.as_str().to_ascii_lowercase());
-    }
-
-    for status in &config.issue_states.values {
-        if status.eq_ignore_case("done")
-            || status.eq_ignore_case("completed")
-            || status.eq_ignore_case("closed")
-        {
-            done.insert(status.as_str().to_ascii_lowercase());
-        }
-    }
-
-    for (alias, status) in &config.branch_status_aliases {
-        if alias.eq_ignore_ascii_case("done") {
-            done.insert(status.as_str().to_ascii_lowercase());
-        }
-    }
-
-    if done.is_empty() {
-        done.insert("done".to_string());
-        done.insert("completed".to_string());
-        done.insert("closed".to_string());
-    }
-
-    done
+    crate::services::completion::effective_done_statuses(config)
 }
 
 pub fn determine_blocked_statuses_from_config(config: &ResolvedConfig) -> HashSet<String> {
@@ -106,13 +83,13 @@ pub struct VelocityTotals {
 
 pub fn compute_velocity_totals(
     tasks: &[(String, StoredTask)],
-    done_statuses: &HashSet<String>,
+    done_sets: &crate::services::completion::TaskDoneSets,
 ) -> VelocityTotals {
     let mut totals = VelocityTotals::default();
 
-    for (_, task) in tasks.iter() {
+    for (id, task) in tasks.iter() {
         totals.total_tasks += 1;
-        let is_done = done_statuses.contains(&task.status.as_str().to_ascii_lowercase());
+        let is_done = done_sets.is_done(id, &task.status);
         if is_done {
             totals.done_tasks += 1;
         }

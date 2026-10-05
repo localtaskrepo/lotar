@@ -289,10 +289,11 @@ import UiLoader from '../components/UiLoader.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useActivity } from '../composables/useActivity'
 import type { ActivityFeedHandle } from '../composables/useActivity'
+import { useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { useProjects } from '../composables/useProjects'
 import { useTaskStore } from '../composables/useTaskStore'
 import type { TaskQueryHandle } from '../composables/useTaskStore'
-import { parseTaskDate, parseTaskDateToMillis, startOfLocalDay } from '../utils/date'
+import { parseTaskDate } from '../utils/date'
 import { useSuggestList } from '../composables/useSuggestList'
 import { formatMember } from '../utils/member'
 import { formatProjectLabel } from '../utils/projectLabels'
@@ -347,6 +348,10 @@ function isStaleRun(generation: number): boolean {
 const mounted = ref(false)
 
 const tasksBase = computed<TaskDTO[]>(() => taskQueryHandle.value?.tasks.value ?? [])
+// DEV-21: shared per-project completion policy so the overdue tile, the due
+// breakdown, and the TasksList `due=overdue` drill-down agree (terminal
+// tasks are never overdue; due-today is not overdue).
+const completion = useCompletionPolicy({ tasks: () => tasksBase.value })
 const tagFilters = computed<string[]>(() => parseTagInput(tagFilterInput.value))
 const tagFiltersNormalized = computed<string[]>(() => tagFilters.value.map(tag => normaliseTag(tag)))
 
@@ -497,13 +502,7 @@ const uniqueStatusCount = computed(() => {
 const assignedTasks = computed(() => filteredTasks.value.filter(t => !!t.assignee).length)
 const unassignedTasks = computed(() => filteredTasks.value.filter(t => !t.assignee).length)
 const taggedTasks = computed(() => filteredTasks.value.filter(t => (t.tags || []).length > 0).length)
-const overdueTasks = computed(() => {
-  const nowMs = Date.now()
-  return filteredTasks.value.filter((t) => {
-    const dueMs = parseTaskDateToMillis(t.due_date)
-    return dueMs !== null && dueMs < nowMs
-  }).length
-})
+const overdueTasks = computed(() => filteredTasks.value.filter(t => completion.isTaskOverdue(t)).length)
 
 const noDueDateTasks = computed(() => filteredTasks.value.filter(t => !t.due_date).length)
 
@@ -596,10 +595,8 @@ const summaryTiles = computed(() => [
 
 const dueDateBreakdown = computed(() => {
   if (!filteredTasks.value.length) return [] as Array<{ label: string; count: number; percent: number; raw: string }>
-  const todayStart = startOfLocalDay(new Date())
-  const tomorrowStart = addDays(todayStart, 1)
-  const soonCutoff = addDays(todayStart, 7)
   let overdue = 0
+  let finishedPastDue = 0
   let dueToday = 0
   let dueSoon = 0
   let dueLater = 0
@@ -609,25 +606,35 @@ const dueDateBreakdown = computed(() => {
       missing += 1
       return
     }
-    const due = parseTaskDate(task.due_date)
-    if (!due) {
-      missing += 1
-      return
-    }
-    const dueStart = startOfLocalDay(due)
-    if (dueStart < todayStart) {
+    // Shared predicate: terminal tasks past due have no bucket (they must not
+    // inflate Overdue), and a done task due today still counts as due today.
+    const bucket = completion.dueBucketFor(task)
+    if (bucket === 'overdue') {
       overdue += 1
-    } else if (dueStart < tomorrowStart) {
+    } else if (bucket === 'today') {
       dueToday += 1
-    } else if (dueStart <= soonCutoff) {
+    } else if (bucket === 'soon') {
       dueSoon += 1
-    } else {
+    } else if (bucket === 'later') {
       dueLater += 1
+    } else if (!parseTaskDate(task.due_date)) {
+      // Unparseable due value: cannot classify any further than "has a date".
+      missing += 1
+    } else if (completion.isTaskDone(task)) {
+      // Terminal past due: excluded from Overdue by contract — but visible,
+      // so the rows explain the whole denominator instead of silently
+      // vanishing from the outlook.
+      finishedPastDue += 1
     }
+    // Remaining null-bucket tasks with a parseable due (stale/unclassifiable
+    // metadata) stay excluded; the Overdue tile/drilldown stay authoritative.
   })
   const total = filteredTasks.value.length
   const rows = [
     { label: 'Overdue', count: overdue, raw: 'overdue' },
+    // No drill-down vocabulary exists for this class — deliberately not
+    // clickable (raw: '') rather than inventing a server filter value.
+    { label: 'Finished (past due)', count: finishedPastDue, raw: '' },
     { label: 'Due today', count: dueToday, raw: 'today' },
     { label: 'Due in next 7 days', count: dueSoon, raw: 'soon' },
     { label: 'Due later', count: dueLater, raw: 'later' },
@@ -722,16 +729,6 @@ function normaliseLabel(value?: string | null) {
 
 function isoDay(date: Date) {
   return date.toISOString().slice(0, 10)
-}
-
-function startOfDay(date: Date) {
-  return startOfLocalDay(date)
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
 }
 
 function toBreakdownArray(map: Record<string, number>, denominator: number) {
@@ -1205,6 +1202,7 @@ onMounted(async () => {
   border-bottom: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
 }
 .distribution tr { cursor: pointer; }
+.distribution tr:not(.clickable) { cursor: default; }
 .distribution tr:hover { background: color-mix(in oklab, var(--bg) 75%, transparent); }
 .tag-cloud {
   display: flex;

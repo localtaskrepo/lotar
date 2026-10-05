@@ -251,55 +251,25 @@ pub fn parse_optional_datetime(raw: &str) -> Option<DateTime<Utc>> {
     time::parse_human_datetime_to_utc(trimmed).ok()
 }
 
+/// Start of the task's current unbroken terminal interval (DEV-21): the
+/// latest non-terminal -> terminal transition that still holds. Reopening
+/// clears the completion, a later re-completion starts a new interval, and
+/// terminal -> terminal moves do not restart it. Tasks without usable
+/// status history fall back to the conscious modified/created estimate.
+/// Returns `None` when the task is not currently terminal (a reopened task
+/// has no current completion even though it was done earlier).
 pub fn find_done_timestamp(
     task: &StoredTask,
     done_statuses: &std::collections::HashSet<String>,
 ) -> Option<DateTime<Utc>> {
-    let mut earliest: Option<DateTime<Utc>> = None;
-
-    for entry in &task.history {
-        let timestamp = match time::parse_human_datetime_to_utc(entry.at.trim()) {
-            Ok(dt) => dt,
-            Err(_) => continue,
-        };
-
-        for change in &entry.changes {
-            if !change.field.eq_ignore_ascii_case("status") {
-                continue;
-            }
-            if let Some(new_status) = change.new.as_ref() {
-                let lowered = new_status.trim().to_ascii_lowercase();
-                if done_statuses.contains(&lowered)
-                    && earliest.map(|current| timestamp < current).unwrap_or(true)
-                {
-                    earliest = Some(timestamp);
-                }
-            }
-        }
-    }
-
-    if earliest.is_some() {
-        return earliest;
-    }
-
-    let current_status = task.status.as_str().to_ascii_lowercase();
-    if done_statuses.contains(&current_status) {
-        if let Some(modified) = parse_optional_datetime(&task.modified) {
-            return Some(modified);
-        }
-        if let Some(created) = parse_optional_datetime(&task.created) {
-            return Some(created);
-        }
-    }
-
-    None
+    crate::services::completion::current_completion_started_at(task, done_statuses)
 }
 
 pub fn resolve_burndown_window(
     record: &SprintRecord,
     lifecycle: &SprintLifecycleStatus,
     tasks: &[(String, StoredTask)],
-    done_statuses: &std::collections::HashSet<String>,
+    done_sets: &crate::services::completion::TaskDoneSets,
 ) -> Result<(DateTime<Utc>, DateTime<Utc>), String> {
     let task_created_min = tasks
         .iter()
@@ -327,7 +297,11 @@ pub fn resolve_burndown_window(
         .max();
     let done_latest = tasks
         .iter()
-        .filter_map(|(_, task)| find_done_timestamp(task, done_statuses))
+        .filter_map(|(task_id, task)| {
+            done_sets
+                .done_set(task_id)
+                .and_then(|done| find_done_timestamp(task, done))
+        })
         .max();
 
     let mut end_candidates = Vec::new();

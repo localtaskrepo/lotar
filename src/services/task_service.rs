@@ -307,7 +307,7 @@ impl TaskService {
         }
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(&id, t, Some(&sprint_lookup));
+        let dto = Self::to_dto(&id, t, Some(&sprint_lookup), &config, chrono::Utc::now());
 
         let _ = AutomationService::apply_task_update(storage, None, &dto, &config);
 
@@ -389,7 +389,13 @@ impl TaskService {
                 let sprint_lookup = Self::load_sprint_lookup(storage);
                 // Padded aliases (TP-001) surface the canonical spelling (TP-1)
                 // so all transports agree on the task identity.
-                Ok(Self::to_dto(&parsed.canonical(), t, Some(&sprint_lookup)))
+                Ok(Self::to_dto(
+                    &parsed.canonical(),
+                    t,
+                    Some(&sprint_lookup),
+                    &config,
+                    chrono::Utc::now(),
+                ))
             }
             None => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
@@ -446,7 +452,13 @@ impl TaskService {
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let dto = Self::to_dto(&canonical, outcome.after, Some(&sprint_lookup));
+        let dto = Self::to_dto(
+            &canonical,
+            outcome.after,
+            Some(&sprint_lookup),
+            &config,
+            chrono::Utc::now(),
+        );
         if context.fire_commented {
             let _ = AutomationService::apply_comment_event(storage, &dto, text, &config);
         }
@@ -496,11 +508,14 @@ impl TaskService {
             Ok(true)
         })?;
 
+        let config = Self::resolve_config_for_project(storage.root_path.as_path(), &parsed.project);
         let sprint_lookup = Self::load_sprint_lookup(storage);
         Ok(Self::to_dto(
             &canonical,
             outcome.after,
             Some(&sprint_lookup),
+            &config,
+            chrono::Utc::now(),
         ))
     }
 
@@ -906,8 +921,9 @@ impl TaskService {
         }
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        let previous_dto = Self::to_dto(&canonical, existing, Some(&sprint_lookup));
-        let dto = Self::to_dto(&canonical, t, Some(&sprint_lookup));
+        let now = chrono::Utc::now();
+        let previous_dto = Self::to_dto(&canonical, existing, Some(&sprint_lookup), &config, now);
+        let dto = Self::to_dto(&canonical, t, Some(&sprint_lookup), &config, now);
 
         if context.emit_api_event {
             let actor = resolve_current_user(Some(storage.root_path.as_path()));
@@ -1019,7 +1035,11 @@ impl TaskService {
             custom_fields: filter.custom_fields.clone(),
         };
 
-        let mut config_cache: HashMap<String, ResolvedConfig> = HashMap::new();
+        // DEV-21 review F1: cache keyed by (actual root, prefix). A
+        // prefix-only (or primary-root) key misclassifies DTO policies when
+        // two different IDs share one prefix across sibling roots.
+        let mut config_cache: HashMap<(std::path::PathBuf, String), ResolvedConfig> =
+            HashMap::new();
 
         let sprint_lookup = Self::load_sprint_lookup(storage);
         let requested_sprints: HashSet<u32> = filter.sprints.iter().copied().collect();
@@ -1051,14 +1071,22 @@ impl TaskService {
                 let project_prefix = TaskId::parse(&id)
                     .map(|parsed| parsed.project)
                     .unwrap_or_default();
+                // Actual root per task ID (nested/sibling workspaces); the
+                // primary root is only the fallback for unresolvable ids.
+                let config_root = match storage.resolve_task_location(&id) {
+                    Ok(location) => location.root,
+                    Err(_) => storage.root_path.clone(),
+                };
                 let config = config_cache
-                    .entry(project_prefix.clone())
+                    .entry((config_root.clone(), project_prefix.clone()))
                     .or_insert_with(|| {
-                        let config_root = Self::config_root_for_prefix(storage, &project_prefix);
                         Self::resolve_config_for_project(config_root.as_path(), &project_prefix)
                     });
                 Self::ensure_task_defaults(&mut t, config, false);
-                (id.clone(), Self::to_dto(&id, t, Some(&sprint_lookup)))
+                (
+                    id.clone(),
+                    Self::to_dto(&id, t, Some(&sprint_lookup), config, chrono::Utc::now()),
+                )
             })
             .collect();
 
@@ -1094,13 +1122,21 @@ impl TaskService {
         let mut task = task;
         Self::ensure_task_defaults(&mut task, &config, false);
         let sprint_lookup = Self::load_sprint_lookup(storage);
-        Self::to_dto(canonical_id, task, Some(&sprint_lookup))
+        Self::to_dto(
+            canonical_id,
+            task,
+            Some(&sprint_lookup),
+            &config,
+            chrono::Utc::now(),
+        )
     }
 
     fn to_dto(
         id: &str,
         task: Task,
         sprint_lookup: Option<&HashMap<String, BTreeMap<u32, u32>>>,
+        config: &ResolvedConfig,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> TaskDTO {
         let modified = if task.modified.is_empty() {
             task.created.clone()
@@ -1112,10 +1148,17 @@ impl TaskService {
             .cloned()
             .unwrap_or_default();
         let sprints: Vec<u32> = sprint_order.keys().copied().collect();
+        let task_state = Some(crate::services::completion::compute_task_state(
+            &task.status,
+            task.due_date.as_deref(),
+            config,
+            now,
+        ));
         TaskDTO {
             id: id.to_string(),
             title: task.title,
             status: task.status,
+            task_state,
             priority: task.priority,
             task_type: task.task_type,
             reporter: task.reporter,
@@ -1193,23 +1236,6 @@ impl TaskService {
         }
 
         map
-    }
-
-    /// The tasks root that holds `prefix`; the primary root when the project
-    /// is missing or duplicated across roots (read-only display resolution).
-    fn config_root_for_prefix(storage: &Storage, prefix: &str) -> std::path::PathBuf {
-        if prefix.is_empty() {
-            return storage.root_path.clone();
-        }
-        let roots: Vec<std::path::PathBuf> =
-            StorageLocator::candidate_task_roots(&storage.root_path)
-                .into_iter()
-                .filter(|root| root.join(prefix).is_dir())
-                .collect();
-        match roots.as_slice() {
-            [single] => single.clone(),
-            _ => storage.root_path.clone(),
-        }
     }
 
     fn format_sprint_change(values: &BTreeSet<u32>) -> Option<String> {
@@ -1382,9 +1408,17 @@ impl TaskService {
         project_prefix: &str,
     ) -> ResolvedConfig {
         crate::config::resolution::config_for_project(tasks_root, Some(project_prefix))
-            .unwrap_or_else(|_| {
+            .unwrap_or_else(|error| {
                 let mut fallback = ResolvedConfig::from_global(GlobalConfig::default());
                 crate::config::resolution::apply_cli_overrides(&mut fallback);
+                // Read-only DTO paths retain legacy defaults on load errors,
+                // but an invalid explicit completion policy must never become
+                // the built-in Done policy. Config show/inspect report the
+                // policy error; these projections conservatively finish none.
+                if matches!(error, crate::config::types::ConfigError::PolicyError(_)) {
+                    fallback.issue_done_states =
+                        Some(crate::config::types::ConfigurableField { values: Vec::new() });
+                }
                 fallback
             })
     }

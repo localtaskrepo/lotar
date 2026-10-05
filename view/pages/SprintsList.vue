@@ -557,7 +557,7 @@
                         <template v-else-if="col === 'due_date'">
                           <span
                             v-if="formatDue(task.due_date)"
-                            :class="{ 'text-overdue': isTaskOverdue(task) }"
+                            :class="{ 'text-overdue': isRowOverdue(task) }"
                           >
                             {{ formatDue(task.due_date) }}
                           </span>
@@ -736,7 +736,7 @@
                         <template v-else-if="col === 'due_date'">
                           <span
                             v-if="formatDue(task.due_date)"
-                            :class="{ 'text-overdue': isTaskOverdue(task) }"
+                            :class="{ 'text-overdue': isRowOverdue(task) }"
                           >
                             {{ formatDue(task.due_date) }}
                           </span>
@@ -795,10 +795,11 @@ import { useConfig } from '../composables/useConfig'
 import { useCopyModifier } from '../composables/useCopyModifier'
 import { buildServerFilter, listFromCsv, useProjectFilterSync } from '../composables/useFilterBuilder'
 import { useColumns } from '../composables/useColumns'
+import { ensureCompletionPolicies, useCompletionPolicy } from '../composables/useCompletionPolicy'
 import { DEFAULT_VELOCITY_PARAMS, useSprintAnalytics } from '../composables/useSprintAnalytics'
 import { useSprints } from '../composables/useSprints'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
-import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, isTaskOverdue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
+import { MS_PER_DAY, formatRelativeTime, fromDateTimeInputValue, parseTaskDate, safeTimestamp, startOfLocalDay, toDateTimeInputValue } from '../utils/date'
 import { formatMember } from '../utils/member'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
 import { numericOf, projectOf } from '../utils/text'
@@ -1006,10 +1007,6 @@ const customFilterPresets = computed(() => {
 })
 
 
-function startOfDay(date: Date) {
-  return startOfLocalDay(date)
-}
-
 function parseDateLike(value?: string | null) {
   return parseTaskDate(value || undefined)
 }
@@ -1019,6 +1016,14 @@ const timeRange = ref<TimeRangeKey>(loadStoredTimeRange())
 const tasks = ref<TaskDTO[]>([])
 const tasksLoading = ref(false)
 const initialized = ref(false)
+
+// DEV-21: shared per-project completion policy for row overdue styling and
+// the due smart filters; policies are ensured before each filtered refresh.
+const completion = useCompletionPolicy()
+
+function isRowOverdue(task: TaskDTO) {
+  return completion.isTaskOverdue(task)
+}
 
 const lifecycleBusy = reactive<Record<number, boolean>>({})
 
@@ -1962,9 +1967,6 @@ function applySprintSmartFilters(source: TaskDTO[], q: Record<string, string>): 
   const recent = q.recent || ''
   const needsSet = new Set(listFromCsv(q.needs || ''))
   const now = new Date()
-  const today = startOfDay(now)
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
-  const soonCutoff = new Date(today.getTime() + 7 * MS_PER_DAY)
   const recentCutoff = new Date(now.getTime() - 7 * MS_PER_DAY)
 
   return source.filter((task) => {
@@ -1973,30 +1975,14 @@ function applySprintSmartFilters(source: TaskDTO[], q: Record<string, string>): 
     }
 
     if (due) {
-      const dueDate = parseDateLike(task.due_date)
-      if (!dueDate) {
+      // Shared DEV-21 predicate: server due buckets win (terminal tasks are
+      // never overdue; a terminal task due today still matches 'today'), and
+      // the local start-of-day derivation is only a fallback. Tasks without
+      // a due bucket (no/unparseable due date, terminal past-due) match none
+      // of the due filters — consistent with the server-side due query.
+      const bucket = completion.dueBucketFor(task)
+      if (bucket !== due) {
         return false
-      }
-      const dueTime = startOfDay(dueDate).getTime()
-      const todayStart = today.getTime()
-      const tomorrowStart = tomorrow.getTime()
-      const soonCutoffTime = startOfDay(soonCutoff).getTime()
-      if (due === 'today') {
-        if (dueTime < todayStart || dueTime >= tomorrowStart) {
-          return false
-        }
-      } else if (due === 'soon') {
-        if (dueTime < tomorrowStart || dueTime > soonCutoffTime) {
-          return false
-        }
-      } else if (due === 'later') {
-        if (dueTime <= soonCutoffTime) {
-          return false
-        }
-      } else if (due === 'overdue') {
-        if (dueTime >= todayStart) {
-          return false
-        }
       }
     }
 
@@ -2082,6 +2068,9 @@ async function refreshTasks() {
     }
 
     const normalized: TaskDTO[] = collected.map((task) => normalizeTaskRecord(task))
+    // Resolve per-project completion policies first so the due smart filter
+    // and row styling agree with the server buckets for this exact result.
+    await ensureCompletionPolicies(normalized)
     const filtered = applySprintSmartFilters(normalized, qnorm)
     tasks.value = filtered
   } catch (error: any) {

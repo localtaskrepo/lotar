@@ -1,21 +1,5 @@
 export const MS_PER_DAY = 24 * 60 * 60 * 1000
 
-/**
- * Whether a task is overdue: has a parseable due date strictly before the
- * start of the local day and is not done. Date-only values count as local
- * midnight, so a task due today is never overdue.
- */
-export function isTaskOverdue(task: {
-    status?: string | null
-    due_date?: string | null
-}): boolean {
-    const status = (task.status || '').toLowerCase()
-    if (!task.due_date || status === 'done') return false
-    const due = parseTaskDateToMillis(task.due_date)
-    if (due === null) return false
-    return due < startOfLocalDay(new Date()).getTime()
-}
-
 const DATE_ONLY_REGEX = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/
 
 export function parseTaskDate(value?: string | null): Date | null {

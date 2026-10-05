@@ -18,6 +18,7 @@ fn make_resolver() -> ProjectResolver {
         issue_states: ConfigurableField {
             values: vec![TaskStatus::from("Todo"), TaskStatus::from("Done")],
         },
+        issue_done_states: None,
         issue_types: ConfigurableField {
             values: vec![TaskType::from("Feature"), TaskType::from("Bug")],
         },

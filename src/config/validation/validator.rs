@@ -50,6 +50,15 @@ impl ConfigValidator {
             }
         }
 
+        // An explicit done-states override must be non-empty; the subset
+        // check runs against the project's own states when both are set and
+        // otherwise defers to resolved-config validation.
+        self.validate_issue_done_states_optional(
+            config.issue_done_states.as_ref(),
+            config.issue_states.as_ref(),
+            &mut result,
+        );
+
         if let Some(types) = &config.issue_types {
             if types.values.is_empty() {
                 result.add_error(
@@ -202,6 +211,11 @@ impl ConfigValidator {
         self.warn_on_duplicate_values(
             "issue_states",
             config.issue_states.values.iter().map(|v| v.as_str()),
+            &mut result,
+        );
+        self.validate_issue_done_states(
+            config.issue_done_states.as_ref(),
+            &config.issue_states,
             &mut result,
         );
         self.warn_on_duplicate_values(
@@ -382,6 +396,12 @@ impl ConfigValidator {
 
         // This validates the final resolved configuration for consistency
         // Similar validations as global config but for the resolved state
+
+        self.validate_issue_done_states(
+            config.issue_done_states.as_ref(),
+            &config.issue_states,
+            &mut result,
+        );
 
         if !config.issue_states.values.is_empty()
             && let Some(default_status) = config.default_status.as_ref()
@@ -570,6 +590,102 @@ impl ConfigValidator {
                 )
                 .with_fix("Use only letters, numbers, underscores, and hyphens".to_string()),
             );
+        }
+    }
+
+    /// Validate an explicit `issue.done_states` list against the effective
+    /// `issue_states`: it must be non-empty and every entry must exist in the
+    /// status list (case-insensitive). `None` keeps the inferred policy and
+    /// is always valid.
+    fn validate_issue_done_states(
+        &self,
+        done: Option<&crate::config::types::ConfigurableField<crate::types::TaskStatus>>,
+        states: &crate::config::types::ConfigurableField<crate::types::TaskStatus>,
+        result: &mut ValidationResult,
+    ) {
+        let Some(done) = done else {
+            return;
+        };
+        if done.values.is_empty() {
+            result.add_error(
+                ValidationError::error(
+                    Some("issue_done_states".to_string()),
+                    "issue_done_states cannot be empty".to_string(),
+                )
+                .with_fix(
+                    "List at least one terminal status or remove issue.done_states to use the inferred completion policy"
+                        .to_string(),
+                ),
+            );
+            return;
+        }
+        self.warn_on_duplicate_values(
+            "issue_done_states",
+            done.values.iter().map(|v| v.as_str()),
+            result,
+        );
+        let invalid: Vec<String> = done
+            .values
+            .iter()
+            .filter(|value| {
+                !states
+                    .values
+                    .iter()
+                    .any(|state| state.eq_ignore_case(value.as_str()))
+            })
+            .map(|value| value.as_str().to_string())
+            .collect();
+        if !invalid.is_empty() {
+            result.add_error(
+                ValidationError::error(
+                    Some("issue_done_states".to_string()),
+                    format!(
+                        "issue_done_states contains values not present in issue_states: {}",
+                        invalid.join(", ")
+                    ),
+                )
+                .with_fix(
+                    "Add the statuses to issue_states or remove them from issue_done_states"
+                        .to_string(),
+                ),
+            );
+        }
+    }
+
+    /// Project-override variant of [`Self::validate_issue_done_states`]:
+    /// the states list may itself be an unset override, in which case only
+    /// the non-empty check applies (the subset is enforced after resolution).
+    fn validate_issue_done_states_optional(
+        &self,
+        done: Option<&crate::config::types::ConfigurableField<crate::types::TaskStatus>>,
+        states: Option<&crate::config::types::ConfigurableField<crate::types::TaskStatus>>,
+        result: &mut ValidationResult,
+    ) {
+        let Some(done) = done else {
+            return;
+        };
+        match states {
+            Some(states) => self.validate_issue_done_states(Some(done), states, result),
+            None => {
+                if done.values.is_empty() {
+                    result.add_error(
+                        ValidationError::error(
+                            Some("issue_done_states".to_string()),
+                            "Issue done states override cannot be empty".to_string(),
+                        )
+                        .with_fix(
+                            "Remove the override to inherit the global policy or add at least one terminal status"
+                                .to_string(),
+                        ),
+                    );
+                } else {
+                    self.warn_on_duplicate_values(
+                        "issue_done_states",
+                        done.values.iter().map(|v| v.as_str()),
+                        result,
+                    );
+                }
+            }
         }
     }
 

@@ -209,15 +209,21 @@
               v-model:issue-states="form.issueStates"
               v-model:issue-types="form.issueTypes"
               v-model:issue-priorities="form.issuePriorities"
+              v-model:issue-done-states="form.issueDoneStates"
               :status-suggestions="statusSuggestions"
               :type-suggestions="typeSuggestions"
               :priority-suggestions="prioritySuggestions"
               :issue-states-error="errors.issue_states"
               :issue-types-error="errors.issue_types"
               :issue-priorities-error="errors.issue_priorities"
+              :issue-done-states-error="errors.issue_done_states"
               :issue-states-source="sourceFor('issue_states')"
               :issue-types-source="sourceFor('issue_types')"
               :issue-priorities-source="sourceFor('issue_priorities')"
+              :issue-done-states-source="sourceFor('issue_done_states')"
+              :automatic-label="doneStatesAutomaticLabel"
+              :effective-summary="doneStatesEffectiveSummary"
+              :effective-done-labels="effectiveDoneLabels"
               :provenance-label="provenanceLabel"
               :provenance-class="provenanceClass"
               @validate="validateField"
@@ -435,6 +441,7 @@ import UiInput from '../components/UiInput.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { showToast } from '../components/toast'
 import { useConfigForm } from '../composables/useConfigForm'
+import { refreshCompletionPoliciesForScope } from '../composables/useCompletionPolicy'
 import { useConfigScope } from '../composables/useConfigScope'
 import { notifyProjectsChanged } from '../composables/useProjects'
 import { formatProjectLabel } from '../utils/projectLabels'
@@ -581,6 +588,9 @@ const {
   statusSuggestions,
   prioritySuggestions,
   typeSuggestions,
+  effectiveDoneLabels,
+  doneStatesAutomaticLabel,
+  doneStatesEffectiveSummary,
   peopleDescription,
   workflowDescription,
   taxonomyDescription,
@@ -822,6 +832,13 @@ async function save() {
     } else {
       showToast('Configuration saved')
     }
+
+    // DEV-21: refresh (not clear) the per-project completion policy caches for
+    // the touched scope — global saves affect every cached project policy,
+    // project saves only their own prefix. Keeps same-tab consumers on fresh
+    // policies immediately; the config_updated SSE event is coalesced by the
+    // refresh dedupe window instead of finding an emptied cache.
+    void refreshCompletionPoliciesForScope(isGlobal.value ? '' : project.value)
 
     await reload()
     await loadAutomation()
