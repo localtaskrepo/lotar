@@ -133,7 +133,24 @@
     </div>
 
     <div v-else-if="!project">
-      <UiEmptyState title="Pick a project" description="Boards are per-project. Choose a project to view its board." />
+      <UiEmptyState title="Pick a project" description="Choose a project below to open its board.">
+        <template #actions>
+          <div class="col" style="gap:4px; width:320px; max-width:100%;">
+            <label for="board-project-select">Project</label>
+            <UiSelect
+              id="board-project-select"
+              :model-value="project"
+              :disabled="loadingProjects || !projects.length"
+              @update:model-value="onFilterUpdate({ ...filter, project: $event })"
+            >
+              <option value="" disabled>{{ loadingProjects ? 'Loading projects…' : projects.length ? 'Choose a project' : 'No projects available' }}</option>
+              <option v-for="item in projects" :key="item.prefix" :value="item.prefix">
+                {{ item.name && item.name !== item.prefix ? `${item.name} (${item.prefix})` : item.prefix }}
+              </option>
+            </UiSelect>
+          </div>
+        </template>
+      </UiEmptyState>
     </div>
 
     <div v-else class="board grid" :style="gridStyle">
@@ -330,6 +347,7 @@ import { showToast } from '../components/toast'
 import UiButton from '../components/UiButton.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiSelect from '../components/UiSelect.vue'
 import { useColumns, provideColumnStore } from '../composables/useColumns'
 import { useCompletionPolicy, ensureCompletionPolicy, normalizeStatusKey } from '../composables/useCompletionPolicy'
 import { useConfig } from '../composables/useConfig'
@@ -347,7 +365,7 @@ import { formatMember, memberColor, memberInitials } from '../utils/member'
 import { findLastStatusChangeAt } from '../utils/taskHistory'
 
 const route = useRoute()
-const { projects, refresh: refreshProjects } = useProjects()
+const { projects, refresh: refreshProjects, loading: loadingProjects } = useProjects()
 const { statuses, priorities, types, customFields: availableCustomFields, refresh: refreshConfig, loading: loadingConfig } = useConfig()
 const { sprints, refresh: refreshSprints } = useSprints()
 const store = useTaskStore()
@@ -922,9 +940,6 @@ onMounted(async () => {
     window.addEventListener('click', handleBoardPopoverClick)
   }
   await refreshProjects()
-  if (!project.value) {
-    project.value = projects.value[0]?.prefix || ''
-  }
   await refreshSprints(true)
   await refreshConfig(project.value)
   await refreshBoardTasks()

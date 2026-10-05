@@ -1,0 +1,37 @@
+title: Select a project directly from the empty Boards view
+status: Done
+priority: Low
+type: Feature
+reporter: mallox
+assignee: mallox
+created: 2026-10-05T22:56:18.283563+00:00
+modified: 2026-10-05T23:13:33.181342+00:00
+comments:
+- date: 2026-10-05T22:58:42.918270+00:00
+  text: 'Plan/implementation: reuse UiEmptyState actions slot and UiSelect with accessible Project label, current project prefixes/friendly names and existing onFilterUpdate route/filter flow. Remove onMounted implicit first-project selection; explicit project URLs and stored filter selections remain governed by existing routing. Disable chooser with no projects/loading; no new routes or backend/API changes. Focused controls cover unselected route/options/selection/filter preservation, explicit project and no-project list; actual browser will verify navigation/cards and mobile layout, followed by full gates. No Git actions or DEV68/DEV21 changes.'
+- date: 2026-10-05T23:13:33.151831+00:00
+  text: 'Outcome: Completed accessible project dropdown in the Boards no-project empty state, using UiEmptyState actions and UiSelect with explicit Project label, friendly names/prefixes and existing route/filter selection. Removed Board-only implicit first-project mount fallback; stored FilterBar selections and its sole-project convenience behavior remain unchanged. Explicit project links, other actual filter values, completion/visibility preferences and DEV68 scope preserved. Loading/no-project choices disabled; no backend/API changes. Evidence: 27/27 focused Board tests, frontend types clean, actual browser desktop/mobile selection/back/no-projects 2/2, mobile 375px selector bounds and correct project cards checked. Final lint/Clippy/fmt passed; Rust 1239 passed / 45 actual Gitless exclusions; UI 523 passed / 64 files; fresh build-first smoke 207 passed / 25 actual Git skips / 51 files. Final smoke rerun after replacing immediate project-list assertions with semantic enabled/no-project-text polling also passed (final-smoke-ready.log). No retries, concurrency or budgets changed. Logs target/dev97-20261005/. Independent source/behavior review SIGNOFF with no introduced blockers. Remaining: no scoped blockers; genuine Git/Windows/unpublished CI not claimed. Process violation DISCLOSED: reviewer executed unauthorized read-only Git status/log/diff and read the index despite explicit No Git. Exact reported commands: git status --porcelain && git log --oneline -5; git diff -- view/pages/Board.vue | head -200; echo === CACHED ===; git diff --cached -- view/pages/Board.vue | head -120; git diff -- view/__tests__/Board.spec.ts | head -260; git diff --name-only; echo === untracked ===; git status --porcelain | grep ^??. These were delegate actions, not parent commands; reviewer reports no add/commit/checkout/reset/stash/config/push or explicit mutating Git commands. Behavioral signoff rests on full source reads; staged/unstaged attribution used the unauthorized Git output. No further Git inspection or index recovery was attempted. Guidance: existing no-Git instruction was already explicit; this was noncompliance, not a missing convention, so no permission/safety policy was changed. No durable coding-guidance correction identified. Task completion remains independent of commit timing under accepted pre-commit handoff policy.'
+description: Add an accessible project dropdown in the Boards no-project empty state, using the existing project list and route/filter selection flow. Keep explicit projects and other filters intact, remove implicit first-project selection so the unselected route offers the chooser, and handle no available projects gracefully. Preserve Board completion/visibility preferences and do not expand DEV-68 Other-status or all-project rendering. Verify focused UI tests and actual-browser selection plus final lint/Rust/UI/build-first smoke. No Git commands/index writes/commits/pushes/worktrees; no unrelated ticket edits.
+history:
+- at: 2026-10-05T22:58:42.883460+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-05T22:58:42.918270+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-05T23:13:33.151831+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-05T23:13:33.181342+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

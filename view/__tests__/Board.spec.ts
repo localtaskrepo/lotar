@@ -124,7 +124,10 @@ vi.mock('../components/UiLoader.vue', () => ({
 }))
 
 vi.mock('../components/UiEmptyState.vue', () => ({
-    default: { template: '<div class="empty" />' },
+    default: {
+        props: ['title', 'description'],
+        template: '<div class="empty"><h3>{{ title }}</h3><p>{{ description }}</p><slot name="actions" /></div>',
+    },
 }))
 
 vi.mock('../components/IconGlyph.vue', () => ({
@@ -149,6 +152,7 @@ vi.mock('../components/SmartListChips.vue', () => ({
 
 vi.mock('../components/FilterBar.vue', () => ({
     default: {
+        name: 'FilterBar',
         props: ['statuses', 'priorities', 'types', 'value', 'showStatus', 'emitProjectKey', 'storageKey', 'customPresets', 'enableDueSoon', 'enableRecent'],
         emits: ['update:value'],
         setup(_props: any, { expose, slots }: { expose: (api: any) => void; slots: any }) {
@@ -253,6 +257,57 @@ describe('Board field visibility', () => {
 
     afterEach(() => {
         vi.useRealTimers()
+    })
+
+    it('offers an accessible project chooser instead of selecting the first project', async () => {
+        routeState.query = {}
+        const wrapper = mount(Board)
+        await flushPromises()
+
+        const selector = wrapper.find<HTMLSelectElement>('#board-project-select')
+        expect(selector.exists()).toBe(true)
+        expect(wrapper.find('label[for="board-project-select"]').text()).toBe('Project')
+        expect(selector.element.value).toBe('')
+        expect(selector.findAll('option').map(option => option.text())).toEqual([
+            'Choose a project', 'Acme Co (ACME)', 'Beta Co (BETA)',
+        ])
+        expect(tasksStore.getQuery).not.toHaveBeenCalled()
+        expect(routerPushMock).not.toHaveBeenCalled()
+
+        const filters = wrapper.findComponent({ name: 'FilterBar' })
+        filters.vm.$emit('update:value', { due: 'overdue' })
+        await selector.setValue('BETA')
+        await flushPromises()
+        expect(routerPushMock).toHaveBeenCalledWith({ path: '/boards', query: { project: 'BETA' } })
+        expect(filters.props('value')).toMatchObject({ project: 'BETA', due: 'overdue' })
+        expect(wrapper.find('#board-project-select').exists()).toBe(false)
+        wrapper.unmount()
+    })
+
+    it('keeps an explicitly selected project without showing the chooser', async () => {
+        const wrapper = mount(Board)
+        await flushPromises()
+        expect(wrapper.find('#board-project-select').exists()).toBe(false)
+        expect(wrapper.find('h1').text()).toContain('ACME')
+        expect(tasksStore.getQuery).toHaveBeenCalledWith(expect.objectContaining({ project: 'ACME' }))
+        wrapper.unmount()
+    })
+
+    it('disables the empty-state project chooser when there are no projects', async () => {
+        const previous = projectsStore.projects.value
+        projectsStore.projects.value = []
+        routeState.query = {}
+        const wrapper = mount(Board)
+        try {
+            await flushPromises()
+            const selector = wrapper.find<HTMLSelectElement>('#board-project-select')
+            expect(selector.element.disabled).toBe(true)
+            expect(selector.text()).toContain('No projects available')
+            expect(tasksStore.getQuery).not.toHaveBeenCalled()
+        } finally {
+            wrapper.unmount()
+            projectsStore.projects.value = previous
+        }
     })
 
     it('opens the create panel with the column status prefilled when the header add button is clicked', async () => {
