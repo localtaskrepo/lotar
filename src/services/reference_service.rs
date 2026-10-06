@@ -94,7 +94,11 @@ impl ReferenceService {
         } else {
             "reference_removed"
         };
+        let canonical_guard = canonical.clone();
         let outcome = storage.mutate_task(&canonical, move |task| {
+            // Lifecycle guard (DEV-92): reference and attachment mutations
+            // refuse tombstones until the task is restored.
+            TaskService::ensure_not_deleted(task, &canonical_guard)?;
             let mut changed_values = Vec::new();
             if !apply(task, &mut changed_values) {
                 return Ok(false);

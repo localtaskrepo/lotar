@@ -29,6 +29,11 @@ pub struct Task {
     pub created: String,
     #[serde(skip_serializing_if = "String::is_empty", default)]
     pub modified: String,
+    /// Soft-deletion tombstone timestamp (UTC RFC3339, DEV-92). Present
+    /// means deleted, absent means active. Lifecycle writes set/clear this
+    /// field and append history WITHOUT touching `modified`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub deleted_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub due_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -81,6 +86,7 @@ fn is_builtin_key(key: &str) -> bool {
             | "assignee"
             | "created"
             | "modified"
+            | "deleted_at"
             | "due_date"
             | "effort"
             | "acceptance_criteria"

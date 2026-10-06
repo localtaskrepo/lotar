@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { api } from '../api/client'
 import type { TaskDTO } from '../api/types'
 import { showToast } from '../components/toast'
+import { isDeletedTask } from '../utils/text'
 
 interface UseTaskCommentsOptions {
     mode: Ref<'create' | 'edit'>
@@ -65,6 +66,8 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
 
     async function addComment() {
         if (options.mode.value !== 'edit') return
+        // DEV-92: comments are blocked on trash rows until restored.
+        if (isDeletedTask(options.task)) return
         const id = options.task.id
         if (!id) return
         const trimmed = newComment.value.trim()
@@ -85,6 +88,7 @@ export function useTaskComments(options: UseTaskCommentsOptions) {
 
     async function saveCommentEdit(index?: number) {
         if (options.mode.value !== 'edit') return
+        if (isDeletedTask(options.task)) return
         const id = options.task.id
         if (!id) return
         const targetIndex = typeof index === 'number' ? index : editingCommentIndex.value

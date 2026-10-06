@@ -28,7 +28,7 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON blob containing the saved `task` plus `metadata.appliedDefaults` (fields the server filled) and `metadata.enumHints` when available.
 
 ### `task_get`
-- **Params:** `id` (required) and optional `project` override to disambiguate numeric IDs.
+- **Params:** `id` (required), optional `project` override to disambiguate numeric IDs, and `include_deleted` (bool, default false).
 - **Response:** Pretty-printed `TaskDTO` for the requested record.
 
 ### `task_update`
@@ -77,10 +77,17 @@ Every MCP tool can be invoked directly (`method: "task/list"`) or through `tools
 - **Response:** JSON with `updated[]` and `failed[]`.
 
 ### `task_delete`
+- **Params:** `id` (required), optional `project`, and `hard` (bool, default false).
+- **Behavior:** default soft deletion sets `deleted_at`, retains content, and leaves `modified` unchanged. Hard deletion removes only the task file, retaining managed attachment blobs and incoming task relationships.
+- **Response:** JSON with `deleted`, `hard`, and `warnings[]`; hard-delete warnings list retained attachment references and detectable incoming relationships.
+
+### `task_restore`
 - **Params:** `id` (required) and optional `project`.
-- **Response:** Text payload like `deleted=true` or `deleted=false`.
+- **Behavior:** clears `deleted_at` and appends history without changing `modified`; restores the same ID and content under current project validation. Already-active tasks are unchanged.
+- **Response:** Updated `TaskDTO`.
 
 ### `task_list`
+- **Deletion visibility:** `deletion` is `active` (default), `deleted`, or `all`; invalid/blank values fail validation. Deleted tasks retain status and content but cannot be ordinarily edited until restored.
 - **Params:** filters matching `TaskListFilter`: `project`, `status`, `priority`, `type`, `tag`, `assignee`/`@me`, `search` (id/title/description/tags), `sprints`, `custom_fields`, smart filters `due` (`today|soon|later|overdue`), `recent` (`7d`), `needs` (CSV or array of `effort`,`due`), ordering `sort_by` (builtins `priority`,`status`,`effort`,`due-date`,`created`,`modified`,`assignee`,`reporter`,`title`,`type`,`project`,`id`,`tags`,`sprints` or `custom:<name>`/`field:<name>`; tags compare lexicographically and sprints numerically, empty first ascending) and `order` (`asc|desc`), `limit` (default 50, max 200), and `cursor` (string/number). Multiple values can be sent as arrays or comma-separated strings; multi-value filters (`status`, `priority`, `tags`) also accept `null` to clear the filter.
 - **Errors:** `assignee: "@me"` that cannot be resolved fails closed as a tool-execution `isError` result (never returns the unfiltered list). Invalid explicit `status`/`priority`/`type` values (with enum hints), invalid `sprints` entries, and invalid `order`/`sort_by`/`due`/`recent`/`needs` values return `-32602` instead of being silently dropped, as do explicitly blank `due`/`recent`/`needs` strings. Enum filters validate against the explicit `project`'s resolved configuration when one is requested.
 - **Response:** JSON with `status`, `count`, `total`, `cursor`, `limit`, `hasMore`, `nextCursor` (number or null), `tasks[]`, and optional `enumHints`. Pagination is 0-based; pass the returned `nextCursor` to fetch the next page. Pages iterate a deterministic global order (default `modified` desc, canonical-ID ascending tiebreak) identical to REST `/api/tasks/list` and `/api/tasks/export`.

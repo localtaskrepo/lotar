@@ -6,7 +6,7 @@ Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI
 
 - Tasks are stored under `.tasks/<PROJECT>/TASK.yml`. The project prefix is derived from the project name unless overridden (see `generate_project_prefix` in `src/project.rs`).
 - IDs always follow `PREFIX-<NUMBER>` (e.g. `AUTH-42`). CLI commands accept the numeric portion when the active project is unambiguous (`lotar status 42`), otherwise pass the fully-qualified ID or `--project`.
-- `created` timestamps are immutable and always precede or equal `modified`. Updates bump `modified` to the wall-clock time recorded by `TaskService`.
+- Content updates retain `created` and bump `modified` to the wall-clock time recorded by `TaskService`. Soft deletion and restoration preserve `modified` and append timestamped history only when the lifecycle changes.
 - **ID grammar (canonical parse):** the numeric suffix is the FINAL dash-separated segment, so prefixes may themselves contain dashes, digits, underscores, or Unicode letters (`ABC-OPS-12` -> project `ABC-OPS`, task `12`; `dev-ops-4` -> project `dev-ops`). Prefix grammar = `is_valid_project_prefix` in `src/storage/safety.rs`; the parser lives in `src/storage/identity.rs` (`TaskId::parse`).
 - **Exact case, no folding:** IDs and project prefixes match exactly (`abc` and `ABC` are different projects).
 - **Padded aliases are deliberate:** `TP-001` and `TP-1` denote the same task file (`TP/1.yml`); reads surface the canonical unpadded spelling in DTO `id` fields. Malformed IDs (empty, missing numeric suffix, non-digit suffix such as `TP-+12` or `TP-1-extra`, path traversal, `u64` overflow) fail closed.
@@ -26,7 +26,8 @@ Field | Type | Notes
 `reporter` | `string?` | Optional; resolved via identity helpers if omitted during creation.
 `assignee` | `string?` | Optional; never auto-cleared when statuses change.
 `created` | `RFC3339 string` | UTC timestamp recorded at creation.
-`modified` | `RFC3339 string` | UTC timestamp updated on any mutation.
+`modified` | `RFC3339 string` | Content-mutation timestamp; unchanged by soft delete and restore.
+`deleted_at` | `RFC3339 string?` | In-place soft-deletion timestamp; omitted for active tasks.
 `due_date` | `string?` | ISO8601 date/time or natural-language token parsed by CLI validators.
 `effort` | `string?` | Stored exactly as provided (e.g., `3h`, `5pts`).
 `subtitle` | `string?` | Short secondary label; omitted unless explicitly set.
@@ -72,6 +73,9 @@ Field | Type | Notes
 ## Invariants & best practices
 
 - `created <= modified` (enforced by `TaskService`).
+- Default reads and queries hide soft-deleted tasks. Explicit deleted/all listings and `include_deleted` lookups inspect them; ordinary mutations require restoration. Hard deletion and low-level rollback still physically remove task files; soft deletion is a separate in-place marker.
+- Soft deletion retains all content, sprint memberships, and attachment reachability. Hard deletion removes only the task file and returns warnings listing retained managed attachments and detectable incoming relationships. Restore clears `deleted_at`, validates against current project configuration, and preserves the ID and content.
+- ID allocation remains highest stored numeric filename plus one. Tombstones reserve IDs; physically removing the highest file permits reuse. Missing IDs are tolerated, but reuse can bind older relationships, automation history, or worktree associations to a new task.
 - Comments and reference mutations run through a locked read-modify-write primitive (`Storage::mutate_task`): the task file is re-parsed under the project task lock, the mutation applies to that fresh state (concurrent writes to other fields cannot be lost), and unchanged operations skip the write entirely. Pending DEV-55 transaction journals still fail these writes closed.
 - Change-log vocabulary: `comment_added` (comment append), `comment#N` (comment edit, old/new text), and `reference_added`/`reference_removed` (one entry per changed reference operation, old/new as `kind:value` displays). Changed reference operations bump `modified` once and dispatch post-commit automation (`updated` event, empty change set) plus one `task_updated` SSE event per server surface — strictly after any attachments-store lock drops. Automation comments are recorded under the `automation` actor and never re-dispatch `on.commented`.
 - `tags`, `comments`, `references`, `history`, and `relationships.*` are always arrays even when empty, simplifying client iteration.

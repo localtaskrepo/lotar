@@ -38,6 +38,13 @@ export interface TaskDTO {
   assignee?: string | null
   created: string
   modified: string
+  /**
+   * DEV-92 soft-deletion tombstone timestamp (RFC3339). Absent while the
+   * task is active; set when the task is in the trash. Soft delete and
+   * restore do NOT change `modified` — presence/absence of this field is
+   * the deletion lifecycle signal, never modified ordering.
+   */
+  deleted_at?: string | null
   /** Optional runtime completion metadata; may be omitted in test fixtures. */
   task_state?: TaskRuntimeState
   due_date?: string | null
@@ -340,7 +347,21 @@ export interface TaskListFilter {
   recent?: string
   /** CSV of missing-field filters: `effort`, `due`. */
   needs?: string
+  /**
+   * DEV-92 deletion visibility: `active` (default, server-side), `deleted`
+   * (trash only), or `all`. Part of the canonical query key, so each
+   * visibility mode owns its own query entry.
+   */
+  deletion?: 'active' | 'deleted' | 'all'
   [key: string]: any
+}
+
+/** Response of POST /api/tasks/delete (soft by default, `hard` on request). */
+export interface TaskDeleteResponse {
+  deleted: boolean
+  hard: boolean
+  /** Retained attachment blobs / incoming relationships the server detected. */
+  warnings: string[]
 }
 
 export interface TaskListResponse {

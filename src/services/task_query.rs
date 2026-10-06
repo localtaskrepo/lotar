@@ -759,6 +759,7 @@ mod tests {
     fn dto(id: &str, modified: &str) -> crate::api_types::TaskDTO {
         crate::api_types::TaskDTO {
             task_state: None,
+            deleted_at: None,
             id: id.to_string(),
             title: format!("task {id}"),
             status: crate::types::TaskStatus::from("Todo"),

@@ -334,7 +334,7 @@ describe('TaskPanel pending drop lifecycle (DEV-93)', () => {
             releaseTasks()
             await drains()
 
-            expect(apiFixtures.getTaskMock).toHaveBeenCalledWith('TP-2')
+            expect(apiFixtures.getTaskMock).toHaveBeenCalledWith('TP-2', undefined, { includeDeleted: true })
             expect(wrapper.text()).toContain('Task TP-2')
             expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
         } finally {
@@ -358,7 +358,7 @@ describe('TaskPanel pending drop lifecycle (DEV-93)', () => {
             await wrapper.setProps({ taskId: 'TP-1' })
             await drains()
 
-            expect(apiFixtures.getTaskMock).toHaveBeenCalledWith('TP-1')
+            expect(apiFixtures.getTaskMock).toHaveBeenCalledWith('TP-1', undefined, { includeDeleted: true })
             expect(apiFixtures.uploadTaskAttachmentMock).not.toHaveBeenCalled()
         } finally {
             wrapper.unmount()

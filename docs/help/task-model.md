@@ -7,7 +7,7 @@ Canonical fields, enums, and invariants for tasks returned by REST, MCP, and CLI
 
 - Tasks are stored under `.tasks/<PROJECT>/TASK.yml`. The project prefix is derived from the project name unless overridden.
 - IDs always follow `PREFIX-<NUMBER>` (e.g. `AUTH-42`). CLI commands accept the numeric portion when the active project is unambiguous (`lotar status 42`), otherwise pass the fully-qualified ID or `--project`.
-- Normal task-service mutations retain `created` and update `modified` using the current clock. Direct YAML edits and low-level storage writes are not timestamp-validated.
+- Normal content mutations retain `created` and update `modified` using the current clock. Soft deletion and restoration leave both timestamps unchanged and record their own history only when the lifecycle changes. Direct YAML edits and low-level storage writes are not timestamp-validated.
 - **ID grammar (canonical parse):** the numeric suffix is the FINAL dash-separated segment, so prefixes may themselves contain dashes, digits, underscores, or Unicode letters (`ABC-OPS-12` -> project `ABC-OPS`, task `12`; `dev-ops-4` -> project `dev-ops`). Prefixes are validated by the same grammar as project folders (1-64 characters: alphanumeric, `_`, `-`; must start alphanumeric).
 - **Exact case, no folding:** IDs and project prefixes match exactly (`abc` and `ABC` are different projects). LoTaR never case-folds an ID to find a task.
 - **Padded aliases are deliberate:** `TP-001` and `TP-1` denote the same task file (`TP/1.yml`). Reads surface the canonical unpadded spelling in DTO `id` fields. Malformed IDs (empty, missing numeric suffix, non-digit suffix such as `TP-+12` or `TP-1-extra`, path traversal, or numbers overflowing `u64`) fail closed.
@@ -27,7 +27,8 @@ Field | Type | Notes
 `reporter` | `string?` | Optional; resolved via identity helpers if omitted during creation.
 `assignee` | `string?` | Optional; never auto-cleared when statuses change.
 `created` | `RFC3339 string` | UTC timestamp recorded at creation.
-`modified` | `RFC3339 string` | UTC timestamp updated on any mutation.
+`modified` | `RFC3339 string` | Last content-mutation timestamp; unchanged by soft delete and restore.
+`deleted_at` | `RFC3339 string?` | Soft-deletion timestamp. Omitted for active tasks; persisted in YAML and exposed when deleted tasks are explicitly requested.
 `due_date` | `string?` | ISO8601 date/time or natural-language token parsed by CLI validators.
 `effort` | `string?` | CLI/service writes normalize time to hours with two decimal places (e.g., `90m` becomes `1.50h`) and points to `pt` (e.g., `5pts` becomes `5pt`). Direct YAML reads retain the stored string.
 `subtitle` | `string?` | Short secondary label; omitted unless explicitly set.
@@ -84,6 +85,8 @@ These extensions are separate from `custom_fields` and are not added to REST/MCP
 ## Invariants & best practices
 
 - Keep `created <= modified` when editing YAML manually; low-level persistence does not enforce it.
+- **Deletion lifecycle:** normal reads and queries exclude tasks with `deleted_at`. Explicit deleted/all listings expose them, and ordinary edits require restoration first. Soft deletion preserves all content and attachment reachability. Hard deletion only removes the task file and warns about retained managed attachments and detectable incoming relationships; it never deletes repository files or rewrites related tasks.
+- **Allocation and missing IDs:** IDs are allocated as the highest stored numeric filename plus one. Soft-deleted files reserve their numbers; physical removal can free the highest number for reuse. Gaps and dangling relationships are tolerated. A missing/deleted dependency is unresolved, not automatically completed. Reused IDs can also match older relationships, job records, or per-ticket worktrees.
 - **Change-log vocabulary for comments and references:** comment adds record a `comment_added` entry (the comment body is the audit trail) and comment edits record `comment#N` with old/new text. Reference attach/detach records exactly one `reference_added`/`reference_removed` entry per changed operation, with old/new carrying a `kind:value` display (e.g. `link:https://example.com`, `code:src/a.rs#10-20`, `attachment:report.pdf`); a multi-spelling code detach joins the removed displays. No-op reference operations leave the file byte-identical: no history entry, no `modified` bump, no events, no automation.
 - **Reference change events:** server surfaces emit exactly one `task_updated` SSE event per changed reference mutation (REST reference routes, upload, and remove), emitted only after every attachments-store lock has dropped. An upload that stores a blob without changing the task (`attached=false`) is a store-only change and emits no task event. Automation writes may follow with their own events. MCP watcher notifications are a separate id-based channel; LoTaR does not claim cross-channel exactly-once delivery.
 - Empty `tags`, `comments`, `references`, `history`, and relationship collections may be omitted. Relationship `parent` and `duplicate_of` are optional single values, not arrays.

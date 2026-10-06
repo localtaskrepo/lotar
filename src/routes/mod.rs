@@ -325,6 +325,9 @@ pub(super) const TASK_LIST_KNOWN_KEYS: &[&str] = &[
     "due",
     "recent",
     "needs",
+    // RESERVED lifecycle property key (DEV-92): strict active|deleted|all
+    // grammar, never interpreted as a custom-field filter.
+    "deletion",
 ];
 
 /// Parse a REST task query into a `TaskListFilter` plus a map of leftover
@@ -400,6 +403,7 @@ pub(super) fn parse_task_query(
         custom_fields: BTreeMap::new(),
         assignee: Vec::new(),
         assignee_none: false,
+        deletion: parse_deletion_query(query)?,
     };
 
     // Assignee: @me resolves to the current identity, __none__ means unassigned.
@@ -445,6 +449,30 @@ pub(super) fn parse_task_query(
     }
 
     Ok((filter, uf))
+}
+
+/// Strict `deletion` query parsing shared by list and export (DEV-92):
+/// blank/absent means the default (`active`); anything other than exactly
+/// `active`, `deleted`, or `all` is rejected. `deletion` is a RESERVED
+/// property key, so it can never be repurposed as a custom-field filter.
+pub(super) fn parse_deletion_query(
+    query: &std::collections::HashMap<String, String>,
+) -> Result<crate::api_types::DeletionFilter, String> {
+    use crate::api_types::DeletionFilter;
+    match query.get("deletion") {
+        None => Ok(DeletionFilter::default()),
+        // Blank means "no lifecycle filter" (default active), mirroring the
+        // sprints grammar; every other value must match EXACTLY.
+        Some(value) if value.trim().is_empty() => Ok(DeletionFilter::default()),
+        Some(value) => match value.as_str() {
+            "active" => Ok(DeletionFilter::Active),
+            "deleted" => Ok(DeletionFilter::Deleted),
+            "all" => Ok(DeletionFilter::All),
+            other => Err(format!(
+                "Invalid deletion filter: '{other}' (expected active, deleted, or all)"
+            )),
+        },
+    }
 }
 
 /// Strict `sprints` CSV parsing shared by list and export: every entry of a

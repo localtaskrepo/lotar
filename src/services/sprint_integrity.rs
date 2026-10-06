@@ -6,7 +6,7 @@ use serde::Serialize;
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::sprint_service::SprintRecord;
 use crate::services::task_service::TaskService;
-use crate::storage::filter::TaskFilter;
+use crate::storage::filter::{DeletionFilter, TaskFilter};
 use crate::storage::manager::Storage;
 use crate::storage::task::Task;
 
@@ -37,7 +37,13 @@ pub struct SprintCleanupOutcome {
 
 pub fn detect_missing_sprints(storage: &Storage, records: &[SprintRecord]) -> MissingSprintReport {
     let existing_ids: HashSet<u32> = records.iter().map(|record| record.id).collect();
-    let tasks = storage.search(&TaskFilter::default());
+    // Integrity scans include tombstones (DEV-92): a deleted task's sprint
+    // references are still stored invariants and must be reported (and
+    // locked for) exactly like active ones.
+    let tasks = storage.search(&TaskFilter {
+        deletion: DeletionFilter::All,
+        ..Default::default()
+    });
     build_missing_report(&tasks, &existing_ids)
 }
 
@@ -55,7 +61,10 @@ pub fn cleanup_missing_sprint_refs(
     // are only written back after a successful commit.
     let mut locked_projects: BTreeSet<String> = {
         let mut projects: BTreeSet<String> = BTreeSet::new();
-        for (task_id, task) in storage.search(&TaskFilter::default()) {
+        for (task_id, task) in storage.search(&TaskFilter {
+            deletion: DeletionFilter::All,
+            ..Default::default()
+        }) {
             if TaskService::normalize_sprint_ids(&task.sprints).is_empty() {
                 continue;
             }
@@ -77,7 +86,10 @@ pub fn cleanup_missing_sprint_refs(
             &candidate_projects,
         )?;
         let fresh_records = crate::services::sprint_service::SprintService::list(storage)?;
-        let tasks_snapshot = storage.search(&TaskFilter::default());
+        let tasks_snapshot = storage.search(&TaskFilter {
+            deletion: DeletionFilter::All,
+            ..Default::default()
+        });
 
         // Authoritative coverage check under the locks: every project that
         // still holds sprint references must be locked, otherwise abort this
@@ -210,7 +222,10 @@ fn cleanup_under_transaction(
     // Only a committed outcome updates the caller's snapshot (review L4).
     *records = working_records;
 
-    let refreshed_tasks = storage.search(&TaskFilter::default());
+    let refreshed_tasks = storage.search(&TaskFilter {
+        deletion: DeletionFilter::All,
+        ..Default::default()
+    });
     let remaining_report = build_missing_report(&refreshed_tasks, &existing_ids);
 
     let removed_by_sprint_vec = removed_by_sprint

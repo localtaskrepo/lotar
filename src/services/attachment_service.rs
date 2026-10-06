@@ -299,9 +299,11 @@ impl AttachmentService {
     /// names are only unique within one store, so a blob re-created in
     /// another store must not block reclamation here (and vice versa).
     /// Tasks sharing one configured store root still protect each other.
-    /// Any resolution failure (unparseable id, ambiguous location, config
-    /// or store error) counts conservatively as a live reference so a blob
-    /// is never deleted on uncertain grounds.
+    /// Soft-deleted tombstones COUNT as live references (DEV-92): their
+    /// blobs must survive until the task is hard-deleted or restored and
+    /// the reference removed. Any resolution failure (unparseable id,
+    /// ambiguous location, config or store error) counts conservatively as
+    /// a live reference so a blob is never deleted on uncertain grounds.
     pub fn is_hash_referenced(storage: &Storage, store_root: &Path, hash_tag: &str) -> bool {
         let target = hash_tag.trim();
         if target.len() != 32 || !target.bytes().all(|b: u8| b.is_ascii_hexdigit()) {
@@ -311,7 +313,10 @@ impl AttachmentService {
         let store_canonical = store_root
             .canonicalize()
             .unwrap_or_else(|_| store_root.to_path_buf());
-        let all = storage.search(&TaskFilter::default());
+        let all = storage.search(&TaskFilter {
+            deletion: crate::storage::DeletionFilter::All,
+            ..Default::default()
+        });
         for (id, task) in all {
             let has_match = task.references.iter().any(|reference| {
                 reference

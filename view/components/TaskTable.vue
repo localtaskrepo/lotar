@@ -130,7 +130,13 @@
               </template>
               <template v-else-if="col === 'title'">
                 <div class="task-table__title-wrapper">
-                  <span class="task-table__title-text">{{ t.title }}</span>
+                  <span class="task-table__title-text" :class="{ 'task-table__title-text--deleted': t.deleted_at != null }">{{ t.title }}</span>
+                  <span
+                    v-if="t.deleted_at != null"
+                    class="tag task-table__deleted-badge"
+                    :title="`Deleted ${fmtDateTime(t.deleted_at)}`"
+                    data-testid="task-deleted-at"
+                  >Deleted {{ relativeTime(t.deleted_at) }}</span>
                   <div v-if="touchesMap[t.id]" class="session-touch">
                     <span class="session-touch__badge" :class="touchesMap[t.id]!.kind">{{ touchBadge(touchesMap[t.id]!) }}</span>
                     <span>{{ relativeTime(touchesMap[t.id]!.time) }}</span>
@@ -198,30 +204,42 @@
                 <IconGlyph name="dots-horizontal" />
               </UiButton>
               <div v-if="isRowMenuOpen(t.id)" class="menu-popover card">
-                <button class="menu-item" @click="$emit('edit-tags', t.id); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
-                  <span class="menu-item__label">Edit tags</span>
-                </button>
-                <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
-                  <span class="menu-item__label">Assign…</span>
-                </button>
-                <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
-                  <span class="menu-item__label">Clear assignee</span>
-                </button>
-                <button class="menu-item" @click="$emit('sprint-add', t.id); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
-                  <span class="menu-item__label">Add to sprint…</span>
-                </button>
-                <button class="menu-item" @click="$emit('sprint-remove', t.id); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
-                  <span class="menu-item__label">Remove from sprint…</span>
-                </button>
-                <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">
-                  <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
-                  <span class="menu-item__label">Delete…</span>
-                </button>
+                <template v-if="t.deleted_at != null">
+                  <button class="menu-item" data-testid="task-row-restore" @click="$emit('restore', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="refresh" /></span>
+                    <span class="menu-item__label">Restore…</span>
+                  </button>
+                  <button class="menu-item danger" data-testid="task-row-delete-forever" @click="$emit('delete-forever', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                    <span class="menu-item__label">Delete permanently…</span>
+                  </button>
+                </template>
+                <template v-else>
+                  <button class="menu-item" @click="$emit('edit-tags', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="tag" /></span>
+                    <span class="menu-item__label">Edit tags</span>
+                  </button>
+                  <button class="menu-item" @click="$emit('assign', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-add" /></span>
+                    <span class="menu-item__label">Assign…</span>
+                  </button>
+                  <button class="menu-item" @click="$emit('unassign', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="user-remove" /></span>
+                    <span class="menu-item__label">Clear assignee</span>
+                  </button>
+                  <button class="menu-item" @click="$emit('sprint-add', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag" /></span>
+                    <span class="menu-item__label">Add to sprint…</span>
+                  </button>
+                  <button class="menu-item" @click="$emit('sprint-remove', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="flag-remove" /></span>
+                    <span class="menu-item__label">Remove from sprint…</span>
+                  </button>
+                  <button class="menu-item danger" @click="$emit('delete', t.id); closeRowMenu(t.id)">
+                    <span class="menu-item__icon" aria-hidden="true"><IconGlyph name="trash" /></span>
+                    <span class="menu-item__label">Delete…</span>
+                  </button>
+                </template>
               </div>
             </td>
           </tr>
@@ -489,6 +507,21 @@ onUnmounted(() => {
   }
 })
 </script>
+
+<style scoped>
+/* DEV-92: trash rows read as deleted at a glance. */
+.task-table__title-text--deleted {
+  text-decoration: line-through;
+  color: var(--color-muted, inherit);
+}
+
+.task-table__deleted-badge {
+  border: 1px solid color-mix(in oklab, var(--color-danger, #c62828) 45%, transparent);
+  color: var(--color-danger, #c62828);
+  background: color-mix(in oklab, var(--color-danger, #c62828) 10%, transparent);
+  white-space: nowrap;
+}
+</style>
 
 <style scoped>
 .table-wrap { width: 100%; }

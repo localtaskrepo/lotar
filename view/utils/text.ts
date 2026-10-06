@@ -1,3 +1,25 @@
+import type { TaskDTO } from '../api/types'
+
+/**
+ * DEV-92 deletion predicate: `deleted_at` PRESENCE decides the tombstone
+ * state (mirrors the backend's Option<String>). An empty string is a present
+ * value and therefore deleted — never use truthiness for this check.
+ */
+export function isDeletedTask(task: Pick<TaskDTO, 'deleted_at'> | null | undefined): boolean {
+    return task?.deleted_at !== undefined && task?.deleted_at !== null
+}
+
+/**
+ * Merge a server task snapshot into a reactive task object while keeping the
+ * deletion lifecycle key honest: an active DTO (no `deleted_at` key) must
+ * CLEAR a previous tombstone — plain Object.assign would keep the stale key.
+ */
+export function applyTaskSnapshot(target: TaskDTO, source: Partial<TaskDTO> | null | undefined): void {
+    if (!target || !source) return
+    Object.assign(target, source)
+    if (!isDeletedTask(source)) target.deleted_at = undefined
+}
+
 /** Capitalize the first character of a string. */
 export function titleCase(value: string): string {
     return value ? value.charAt(0).toUpperCase() + value.slice(1) : value

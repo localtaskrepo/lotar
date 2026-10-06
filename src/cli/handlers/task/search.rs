@@ -54,7 +54,20 @@ impl SearchHandler {
         project: Option<&str>,
         ctx: &TaskCommandContext,
     ) -> Result<BuiltTaskFilter, String> {
-        let mut task_filter = TaskFilter::default();
+        // Deletion view: --deleted shows only soft-deleted tasks,
+        // --include-deleted shows both; default is active-only. The flags
+        // are mutually exclusive (enforced by clap).
+        let deletion = if args.deleted {
+            crate::storage::DeletionFilter::Deleted
+        } else if args.include_deleted {
+            crate::storage::DeletionFilter::All
+        } else {
+            crate::storage::DeletionFilter::Active
+        };
+        let mut task_filter = TaskFilter {
+            deletion,
+            ..Default::default()
+        };
 
         if let Some(query) = args.query.as_ref()
             && !query.is_empty()
@@ -268,6 +281,7 @@ impl SearchHandler {
                     tags: task.tags,
                     created: task.created,
                     modified: task.modified,
+                    deleted_at: task.deleted_at,
                     custom_fields: task.custom_fields,
                 }
             })
@@ -330,6 +344,12 @@ impl SearchHandler {
 
                     if let Some(effort) = task.effort.as_deref() {
                         line.push_str(&format!(" | effort: {}", effort));
+                    }
+
+                    // Lifecycle marker for mixed views: the stored title is
+                    // never rewritten; tombstones carry their timestamp.
+                    if let Some(deleted_at) = task.deleted_at.as_deref() {
+                        line.push_str(&format!(" | deleted: {}", deleted_at));
                     }
 
                     renderer.emit_raw_stdout(line);

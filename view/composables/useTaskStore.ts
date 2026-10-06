@@ -32,11 +32,38 @@
  * `status`/`error`/`lastSyncAt`/`hydrateAll`/`hydratePage`/`forceRefresh`)
  * remains a view over the *active* (most recently hydrated) query, falling
  * back to the raw entity map before any query exists.
+ *
+ * ## DEV-92 soft deletion
+ *
+ * Deleting is soft by default: the entity is tombstoned IN PLACE with
+ * `deleted_at` (trash DTO) instead of being evicted; hard delete evicts and
+ * tombstones as before. Each query renders only entities matching its
+ * `deletion` filter mode (active/deleted/all), so a trash DTO in the shared
+ * map can never leak into an active query's rows — or vice versa. Because
+ * soft delete/restore preserve `modified`, deletion-state transitions stamp
+ * a separate `deletionRevisions` clock; `applyResponseEntity` rejects any
+ * response whose deletion state contradicts a transition newer than the
+ * request, regardless of modified ordering. The `task_deleted` SSE event is
+ * metadata-only for BOTH soft and hard deletes, so the handler marks
+ * optimistically and reconciles through `GET include_deleted` (404 ⇒ hard).
+ *
+ * Causality rules for hard evidence: a tombstone blocks a response only
+ * when stamped strictly AFTER the request started (`>`), so a fresh
+ * post-delete query can hydrate a physically deleted and recreated ID;
+ * confirmed-404 fetches never evict an entity whose revisions are newer
+ * than the request; and mutation outcomes (remove/restore/update/add) apply
+ * through the same lifecycle guards — a late response never flips a state
+ * that a newer live write already decided. Public `upsert` is the
+ * mutation-response channel: plain snapshots cannot resurrect a
+ * hard-tombstoned ID or clear a live soft tombstone; authoritative clears
+ * (`store.restore`, the panel `restored` emit) pass `{ restore: true }`,
+ * and SSE DTOs use the internal always-live write path.
  */
 import { computed, shallowRef, triggerRef, type ComputedRef, type ShallowRef } from 'vue'
 import type { ApiClient } from '../api/client'
 import { api } from '../api/client'
-import type { TaskCreate, TaskDTO, TaskListFilter, TaskUpdate } from '../api/types'
+import type { TaskCreate, TaskDTO, TaskDeleteResponse, TaskListFilter, TaskUpdate } from '../api/types'
+import { isDeletedTask } from '../utils/text'
 import { registerTaskQueryInvalidator } from './useCompletionPolicy'
 import { useSse } from './useSse'
 
@@ -130,10 +157,12 @@ export interface TaskStoreState {
   hydratePage(filter?: TaskListFilter): Promise<{ total: number }>
   /**
    * Fetch or re-fetch a single task by ID and upsert it into the entity map.
-   * Only 404/410 evicts + tombstones; transient failures keep the entity and
-   * surface the message through `fetchOneError`.
+   * On 404/410 the strict endpoint is retried with `include_deleted` (DEV-92)
+   * before the task is considered hard-deleted; only a double miss evicts +
+   * tombstones. Transient failures keep the entity and surface the message
+   * through `fetchOneError`.
    */
-  fetchOne(id: string): Promise<TaskDTO | null>
+  fetchOne(id: string, opts?: { includeDeleted?: boolean }): Promise<TaskDTO | null>
   /** Last transient fetchOne failure message (entity was retained). Cleared on the next call. */
   readonly fetchOneError: ShallowRef<string | null>
   /** Force a full reload (clears entities first). */
@@ -150,11 +179,28 @@ export interface TaskStoreState {
   // -- Mutations (API + store) -----------------------------------------------
   add(payload: TaskCreate): Promise<TaskDTO>
   update(id: string, patch: TaskUpdate): Promise<TaskDTO>
-  remove(id: string): Promise<void>
-  /** Optimistic entity upsert without an API call (TaskPanelHost, SSE). Never joins a query. */
-  upsert(task: TaskDTO): void
-  /** Remove the entity without an API call (SSE delete). Tombstones the ID. */
+  /**
+   * DEV-92: soft-delete by default (entity is tombstoned in-place with
+   * `deleted_at` and disappears from active queries); `hard: true` removes
+   * the file and evicts + tombstones the entity. Returns the server's
+   * deletion report (retained blobs / incoming relationships as warnings).
+   */
+  remove(id: string, opts?: { project?: string; hard?: boolean }): Promise<TaskDeleteResponse>
+  /** DEV-92: restore a soft-deleted task (same `modified`; lifecycle only). */
+  restore(id: string, project?: string): Promise<TaskDTO>
+  /**
+   * DEV-92: restore a soft-deleted task (same `modified`; lifecycle only).
+   * Ordinary `upsert` snapshots cannot clear a live tombstone — restore
+   * flows (`store.restore`, the panel's restored emit) pass this flag.
+   */
+  upsert(task: TaskDTO, opts?: { restore?: boolean }): void
+  /** Remove the entity without an API call (SSE hard delete). Tombstones the ID. */
   evict(id: string): void
+  /**
+   * DEV-92: hard-tombstone probe for panel lifecycle watchers. Reactive only
+   * in combination with `version` (tombstone writes bump it).
+   */
+  isHardDeleted(id: string): boolean
 
   // -- SSE lifecycle ---------------------------------------------------------
   connectSse(): void
@@ -230,6 +276,20 @@ function canonicalQueryKey(filter: TaskListFilter = {}): string {
   return parts.length ? parts.join('&') : '*'
 }
 
+/** DEV-92 deletion visibility a query was created with. */
+export type DeletionMode = 'active' | 'deleted' | 'all'
+
+export function deletionModeOfFilter(filter?: TaskListFilter): DeletionMode {
+  const value = (filter as Record<string, unknown> | undefined)?.deletion
+  return value === 'deleted' || value === 'all' ? value : 'active'
+}
+
+export function matchesDeletionMode(task: TaskDTO, mode: DeletionMode): boolean {
+  if (mode === 'all') return true
+  const deleted = isDeletedTask(task)
+  return mode === 'deleted' ? deleted : !deleted
+}
+
 function createTaskStore(client: ApiClient): TaskStoreState {
   const _map = shallowRef<Map<string, TaskDTO>>(new Map())
   const version = shallowRef(0)
@@ -243,6 +303,12 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   let writeClock = 0
   const entityRevisions = new Map<string, number>()
   const tombstones = new Map<string, number>()
+  // DEV-92 deletion lifecycle revisions: stamped whenever an entity's
+  // deleted_at presence changes (soft-delete mark, restore, trash DTO). Soft
+  // delete/restore preserve `modified`, so `compareModified` alone cannot
+  // reject a stale response that carries a different deletion state; this
+  // explicit freshness guard does.
+  const deletionRevisions = new Map<string, number>()
 
   // ---- keyed queries -------------------------------------------------------
   const queries = new Map<string, QueryEntry>()
@@ -253,8 +319,26 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   let sseHandle: ReturnType<typeof useSse> | null = null
   let sseCleaners: Array<() => void> = []
 
-  // Debounce tracker for fswatcher task_updated (ID-only events).
-  let pendingFetches = new Map<string, ReturnType<typeof setTimeout>>()
+  // Debounce tracker for single-task fetches: fswatcher task_updated
+  // (ID-only) events fetch the strict task; task_deleted events reconcile
+  // through the trash endpoint (the event is metadata-only for BOTH soft
+  // and hard deletes, so only the server can distinguish them).
+  let pendingFetches = new Map<string, { timer: ReturnType<typeof setTimeout>; includeDeleted: boolean }>()
+
+  function scheduleFetchOne(id: string, includeDeleted: boolean) {
+    const existing = pendingFetches.get(id)
+    if (existing) clearTimeout(existing.timer)
+    pendingFetches.set(
+      id,
+      {
+        timer: setTimeout(() => {
+          pendingFetches.delete(id)
+          void fetchOne(id, { includeDeleted })
+        }, FETCH_ONE_DEBOUNCE_MS),
+        includeDeleted,
+      },
+    )
+  }
 
   // Error listeners for task_error SSE events
   const errorListeners = new Set<(payload: { id: string; message: string }) => void>()
@@ -269,8 +353,13 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   /** Live entity write (SSE DTO, panel upsert, API mutation response). */
   function writeEntity(task: TaskDTO): void {
     if (!task?.id) return
+    const previous = _map.value.get(task.id)
+    const deletionTransitioned =
+      !!previous && previous.deleted_at !== task.deleted_at
     _map.value.set(task.id, task)
-    entityRevisions.set(task.id, ++writeClock)
+    const revision = ++writeClock
+    entityRevisions.set(task.id, revision)
+    if (deletionTransitioned || !previous) deletionRevisions.set(task.id, revision)
     tombstones.delete(task.id)
     bump()
   }
@@ -286,8 +375,35 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     }
     _map.value.delete(id)
     entityRevisions.delete(id)
+    deletionRevisions.delete(id)
     tombstones.set(id, ++writeClock)
     bump()
+  }
+
+  /**
+   * DEV-92: soft-delete mark. The entity stays in the map (trash queries
+   * render it) but carries `deleted_at`, so active queries hide it. The
+   * write bumps the entity + deletion revisions, which protects against
+   * stale in-flight responses resurrecting an active row.
+   */
+  function markDeleted(id: string, deletedAt?: string | null): void {
+    const existing = _map.value.get(id)
+    if (isDeletedTask(existing)) {
+      // Already soft-deleted: idempotent (repeat deletes keep the stamp).
+      return
+    }
+    const stamp =
+      typeof deletedAt === 'string' && deletedAt
+        ? deletedAt
+        : new Date().toISOString()
+    if (existing) {
+      writeEntity({ ...existing, deleted_at: stamp })
+    } else {
+      // Unknown locally: keep a minimal trash stub so active queries cannot
+      // resurrect the row from a stale response; the reconciliation fetch /
+      // authoritative refresh replaces it with the full DTO.
+      writeEntity({ id, title: '', deleted_at: stamp } as TaskDTO)
+    }
   }
 
   function compareModified(next: string | undefined, current: string | undefined): number {
@@ -308,16 +424,94 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   function applyResponseEntity(task: TaskDTO, requestClock: number): boolean {
     const id = task?.id
     if (!id) return false
+    // A tombstone stamped STRICTLY AFTER the request started makes the
+    // response pre-delete evidence; an equal/older stamp means the request
+    // was issued after the delete applied, so its snapshot is post-delete
+    // (absence or a recreated task) and must be allowed through — `>=` here
+    // would permanently block re-hydration of a physically deleted and
+    // recreated ID when no other clock write happened in between.
     const tomb = tombstones.get(id)
-    if (tomb !== undefined && tomb >= requestClock) return false
+    if (tomb !== undefined && tomb > requestClock) return false
+    // DEV-92: a deletion lifecycle transition (soft delete / restore) that
+    // happened after this request started wins over the response even when
+    // `modified` is unchanged or newer — the response's deletion state is
+    // stale by definition.
+    const deletionRev = deletionRevisions.get(id)
+    if (deletionRev !== undefined && deletionRev > requestClock) {
+      const currentDeleted = isDeletedTask(_map.value.get(id))
+      if (currentDeleted !== isDeletedTask(task)) return false
+    }
     const existing = _map.value.get(id)
-    if (existing) {
+    if (existing?.modified) {
+      // DEV-92 local tombstone stubs carry no `modified`; they are always
+      // replaceable by an authoritative DTO (the deletion-state guard above
+      // still shields the lifecycle).
       const existingRev = entityRevisions.get(id) ?? 0
       const cmp = compareModified(task.modified, existing.modified)
       if (existingRev > requestClock ? cmp <= 0 : cmp < 0) return false
     }
     writeEntity(task)
     return true
+  }
+
+  /** True when a live write newer than `requestClock` touched the entity. */
+  function hasNewerEntityWrite(id: string, requestClock: number): boolean {
+    if (!_map.value.has(id)) return false
+    if ((entityRevisions.get(id) ?? 0) > requestClock) return true
+    if ((deletionRevisions.get(id) ?? 0) > requestClock) return true
+    return false
+  }
+
+  /**
+   * DEV-92: apply a MUTATION RESPONSE (remove/restore/update/add outcome) as
+   * a live write, but never let a response that completed while a NEWER
+   * lifecycle transition (or hard delete) landed flip the current state:
+   * - a hard tombstone newer than the request blocks the write entirely;
+   * - a deletion transition newer than the request blocks a DTO whose
+   *   deleted_at presence disagrees with the current state (stale
+   *   pre-delete active snapshot after a soft delete, or a stale restore
+   *   DTO after a newer soft delete).
+   * Content-only agreement still applies through the ordinary live write.
+   */
+  function applyMutationOutcome(task: TaskDTO, requestClock: number): boolean {
+    const id = task?.id
+    if (!id) return false
+    const tomb = tombstones.get(id)
+    if (tomb !== undefined && tomb > requestClock) return false
+    const deletionRev = deletionRevisions.get(id)
+    if (deletionRev !== undefined && deletionRev > requestClock) {
+      if (isDeletedTask(_map.value.get(id)) !== isDeletedTask(task)) return false
+    }
+    writeEntity(task)
+    return true
+  }
+
+  /**
+   * DEV-92: apply a soft-delete mutation outcome. If the entity was
+   * restored/recreated by a newer live write while the request was in
+   * flight, the late `deleted:true` response must not re-delete it.
+   */
+  function applySoftDeleteOutcome(id: string, requestClock: number): boolean {
+    const tomb = tombstones.get(id)
+    if (tomb !== undefined && tomb > requestClock) return false
+    const deletionRev = deletionRevisions.get(id)
+    if (deletionRev !== undefined && deletionRev > requestClock) {
+      // A newer transition already decided the lifecycle; only honor our
+      // outcome when it agrees (already deleted).
+      return isDeletedTask(_map.value.get(id))
+    }
+    markDeleted(id)
+    return true
+  }
+
+  /**
+   * DEV-92: apply a hard-delete mutation outcome. A newer live write (e.g. a
+   * recreated/restored entity that landed while the request was in flight)
+   * wins over the late eviction.
+   */
+  function applyHardDeleteOutcome(id: string, requestClock: number): void {
+    if (hasNewerEntityWrite(id, requestClock)) return
+    tombstoneEntity(id)
   }
 
   function ensureQuery(filter: TaskListFilter = {}): QueryEntry {
@@ -444,12 +638,17 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   }
 
   function makeHandle(entry: QueryEntry): TaskQueryHandle {
+    // DEV-92: the query's deletion mode filters which entities RENDER for
+    // this handle. Membership still belongs to the server, but a trash DTO
+    // in the shared map must never leak into an active query's rows (and
+    // vice versa) during the window before the authoritative refresh lands.
+    const deletionMode = deletionModeOfFilter(entry.filter)
     const tasks = computed<TaskDTO[]>(() => {
       void version.value
       const out: TaskDTO[] = []
       for (const id of entry.ids.value) {
         const task = _map.value.get(id)
-        if (task) out.push(task)
+        if (task && matchesDeletionMode(task, deletionMode)) out.push(task)
       }
       return out
     })
@@ -493,12 +692,17 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   const items = computed<TaskDTO[]>(() => {
     void version.value
     const entry = activeEntry.value
-    if (!entry) return Array.from(_map.value.values())
+    if (!entry) {
+      // No query yet: the flat fallback only ever shows active entities —
+      // trash rows belong to deletion=deleted queries.
+      return Array.from(_map.value.values()).filter((task) => matchesDeletionMode(task, 'active'))
+    }
     void entry.ids.value
+    const mode = deletionModeOfFilter(entry.filter)
     const out: TaskDTO[] = []
     for (const id of entry.ids.value) {
       const task = _map.value.get(id)
-      if (task) out.push(task)
+      if (task && matchesDeletionMode(task, mode)) out.push(task)
     }
     return out
   })
@@ -564,11 +768,12 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     }
   }
 
-  async function fetchOne(id: string): Promise<TaskDTO | null> {
+  async function fetchOne(id: string, opts?: { includeDeleted?: boolean }): Promise<TaskDTO | null> {
     const requestClock = writeClock
     fetchOneError.value = null
+    const isNotFound = (status: unknown) => status === 404 || status === 410
     try {
-      const task = await client.getTask(id)
+      const task = await client.getTask(id, undefined, { includeDeleted: opts?.includeDeleted })
       if (task && task.id) {
         applyResponseEntity(task, requestClock)
         return task
@@ -576,10 +781,35 @@ function createTaskStore(client: ApiClient): TaskStoreState {
       return null
     } catch (err: unknown) {
       const status = (err as { status?: unknown } | null | undefined)?.status
-      if (status === 404 || status === 410) {
+      if (isNotFound(status) && !opts?.includeDeleted) {
+        // DEV-92: the strict endpoint hides soft-deleted tasks. Before
+        // declaring the task gone, ask the trash — a filesystem soft delete
+        // surfaces here as an id-only task_updated whose strict fetch 404s.
+        try {
+          const task = await client.getTask(id, undefined, { includeDeleted: true })
+          if (task && task.id) {
+            applyResponseEntity(task, requestClock)
+            return task
+          }
+          return null
+        } catch (retryErr: unknown) {
+          const retryStatus = (retryErr as { status?: unknown } | null | undefined)?.status
+          if (isNotFound(retryStatus)) {
+            // Confirmed gone — unless a newer live write (restore/recreate)
+            // landed while the requests were in flight; a late 404 must not
+            // evict it.
+            if (!hasNewerEntityWrite(id, requestClock)) tombstoneEntity(id)
+          } else {
+            fetchOneError.value =
+              retryErr instanceof Error ? retryErr.message : String(retryErr)
+          }
+          return null
+        }
+      }
+      if (isNotFound(status)) {
         // The task is gone: evict + tombstone so stale responses cannot
-        // resurrect it.
-        tombstoneEntity(id)
+        // resurrect it — again, only when no newer truth arrived meanwhile.
+        if (!hasNewerEntityWrite(id, requestClock)) tombstoneEntity(id)
       } else {
         // Transient failure (network/5xx): retain the entity and surface the
         // error instead of silently dropping data.
@@ -601,26 +831,52 @@ function createTaskStore(client: ApiClient): TaskStoreState {
   // ---- mutations ----------------------------------------------------------
 
   async function add(payload: TaskCreate): Promise<TaskDTO> {
+    const requestClock = writeClock
     const created = await client.addTask(payload)
-    writeEntity(created)
+    applyMutationOutcome(created, requestClock)
     invalidateRetainedQueries()
     return created
   }
 
   async function update(id: string, patch: TaskUpdate): Promise<TaskDTO> {
+    const requestClock = writeClock
     const updated = await client.updateTask(id, patch)
-    writeEntity(updated)
+    applyMutationOutcome(updated, requestClock)
     invalidateRetainedQueries()
     return updated
   }
 
-  async function remove(id: string): Promise<void> {
-    await client.deleteTask(id)
-    tombstoneEntity(id)
+  async function remove(id: string, opts?: { project?: string; hard?: boolean }): Promise<TaskDeleteResponse> {
+    const requestClock = writeClock
+    const response = await client.deleteTask(id, opts)
+    if (opts?.hard || response?.hard) {
+      applyHardDeleteOutcome(id, requestClock)
+    } else {
+      applySoftDeleteOutcome(id, requestClock)
+    }
     invalidateRetainedQueries()
+    return response
   }
 
-  function upsert(task: TaskDTO) {
+  async function restore(id: string, project?: string): Promise<TaskDTO> {
+    const requestClock = writeClock
+    const restored = await client.restoreTask(id, project)
+    // A soft delete that landed while the restore was in flight wins over
+    // this late active DTO; otherwise the live write clears the tombstone.
+    applyMutationOutcome(restored, requestClock)
+    invalidateRetainedQueries()
+    return restored
+  }
+
+  function upsert(task: TaskDTO, opts?: { restore?: boolean }) {
+    if (!task?.id) return
+    const current = _map.value.get(task.id)
+    // DEV-92 lifecycle guards for the mutation-response channel: an ordinary
+    // late snapshot must never resurrect a hard-deleted ID or clear a live
+    // soft-delete tombstone (restore/undelete flows pass `restore: true` —
+    // SSE live DTOs use the internal write path and are always newest).
+    if (!current && tombstones.has(task.id)) return
+    if (current && isDeletedTask(current) && !isDeletedTask(task) && !opts?.restore) return
     writeEntity(task)
     // Local panel upserts must converge membership exactly like SSE events;
     // applying a query response never schedules (no recursion).
@@ -657,15 +913,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
           invalidateRetainedQueries()
         } else {
           // Debounce per-ID so rapid writes don't flood single-task fetches.
-          const existing = pendingFetches.get(id)
-          if (existing) clearTimeout(existing)
-          pendingFetches.set(
-            id,
-            setTimeout(() => {
-              pendingFetches.delete(id)
-              void fetchOne(id)
-            }, FETCH_ONE_DEBOUNCE_MS),
-          )
+          scheduleFetchOne(id, false)
           invalidateRetainedQueries()
         }
         break
@@ -675,10 +923,16 @@ function createTaskStore(client: ApiClient): TaskStoreState {
           // Cancel any pending fetch for this task.
           const pending = pendingFetches.get(id)
           if (pending) {
-            clearTimeout(pending)
+            clearTimeout(pending.timer)
             pendingFetches.delete(id)
           }
-          tombstoneEntity(id)
+          // DEV-92: the event is metadata-only for BOTH soft and hard
+          // deletes. Optimistically mark soft-deleted so the row leaves
+          // active queries immediately, then reconcile against the server:
+          // a trash DTO confirms soft (authoritative stamp), 404 confirms
+          // hard (evict + tombstone).
+          markDeleted(id)
+          scheduleFetchOne(id, true)
         }
         invalidateRetainedQueries()
         break
@@ -740,7 +994,7 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     }
     sseConnected.value = false
     // Clear pending debounced fetches
-    for (const timer of pendingFetches.values()) clearTimeout(timer)
+    for (const entry of pendingFetches.values()) clearTimeout(entry.timer)
     pendingFetches.clear()
   }
 
@@ -765,8 +1019,10 @@ function createTaskStore(client: ApiClient): TaskStoreState {
     add,
     update,
     remove,
+    restore,
     upsert,
     evict,
+    isHardDeleted: (id: string) => tombstones.has(id),
     connectSse,
     disconnectSse,
     sseConnected,

@@ -550,7 +550,10 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         apiClient: {
             addTask: api.addTask,
             updateTask: api.updateTask,
-            getTask: api.getTask,
+            // DEV-92: the panel can open trash rows — always request the
+            // deleted task too; `include_deleted` is a strict widening flag
+            // for active tasks, so this is safe for every load.
+            getTask: (id: string) => api.getTask(id, undefined, { includeDeleted: true }),
         },
         showToast,
         buildRelationships,
@@ -687,6 +690,7 @@ export function useTaskPanelState(props: Readonly<TaskPanelProps>, emit: TaskPan
         handleSubmit,
         updateStatus,
         reloadTask,
+        invalidateTaskRequests: () => { panelGeneration.value += 1 },
         formatDate,
         formatCommit,
         formatFieldName,

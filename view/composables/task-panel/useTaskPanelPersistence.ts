@@ -2,7 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { nextTick, watch } from 'vue'
 import type { TaskDTO } from '../../api/types'
 import { fromDateInputValue, toDateInputValue } from '../../utils/date'
-import { projectOf } from '../../utils/text'
+import { applyTaskSnapshot, isDeletedTask, projectOf } from '../../utils/text'
 
 export interface TaskPanelFormState {
     id: string
@@ -23,7 +23,7 @@ export interface TaskPanelFormState {
 interface TaskPanelApiClient {
     addTask: (payload: any) => Promise<TaskDTO>
     updateTask: (id: string, patch: Record<string, unknown>) => Promise<TaskDTO>
-    getTask: (id: string) => Promise<TaskDTO>
+    getTask: (id: string, opts?: { includeDeleted?: boolean }) => Promise<TaskDTO>
 }
 
 interface TaskPanelEmitter {
@@ -108,7 +108,11 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     let loadGeneration = 0
     let createGeneration = 0
     watch(() => options.form.project, () => { createGeneration += 1 }, { flush: 'sync' })
+    // DEV-92: a soft-deleted task is read-only — every field mutation
+    // (including status patches and queued autosaves) stops here. The
+    // server also rejects mutations on deleted tasks ("restore it first").
     const canEdit = () => options.mode.value === 'edit' && options.ready.value && !options.loading.value &&
+        !isDeletedTask(options.task) &&
         options.task.id === options.getTaskId() && options.form.id === options.task.id
 
     const saveQueues = new Map<string, SaveQueueState>()
@@ -173,14 +177,21 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
                 state.pendingRevisions = null
                 const scope = options.panelGeneration.value
                 const stillCurrent = () => scope === options.panelGeneration.value && id === options.getTaskId()
+                // DEV-92: capture the lifecycle before the request; if the
+                // task was soft-deleted (external delete + authoritative
+                // panel reload) while the save was in flight, the late
+                // pre-delete response must not clear the tombstone marker or
+                // the read-only state.
+                const deletedBeforeSave = isDeletedTask(options.task)
                 let outcome: SaveOutcome
                 try {
                     const updated = await options.apiClient.updateTask(id, snapshot)
-                    if (stillCurrent()) {
+                    const lifecycleFlipped = deletedBeforeSave !== isDeletedTask(options.task)
+                    if (stillCurrent() && !lifecycleFlipped) {
                         applyServerTask(updated)
                         options.emit('updated', updated)
                     }
-                    outcome = { ok: true, stale: !stillCurrent() }
+                    outcome = { ok: true, stale: !stillCurrent() || lifecycleFlipped }
                 } catch (error: unknown) {
                     const stale = !stillCurrent()
                     if (!stale) await reconcileFailedSave(id, snapshot, state, error, stillCurrent)
@@ -195,7 +206,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
     }
 
     function applyServerTask(updated: TaskDTO) {
-        Object.assign(options.task, updated)
+        applyTaskSnapshot(options.task, updated)
         options.suppressWatch.value = true
         options.applyTask(updated)
         nextTick(() => {
@@ -220,12 +231,14 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
         options.showToast(message)
         let server: TaskDTO
         try {
-            server = await options.apiClient.getTask(id)
+            // Deleted tasks 404 on the strict endpoint; reconcile must be
+            // able to see the trash state too.
+            server = await options.apiClient.getTask(id, { includeDeleted: true })
         } catch {
             return
         }
         if (!stillCurrent()) return
-        Object.assign(options.task, server)
+        applyTaskSnapshot(options.task, server)
         const pendingFields = new Set(Object.keys(state.pending ?? {}))
         options.suppressWatch.value = true
         try {
@@ -465,7 +478,7 @@ export function useTaskPanelPersistence(options: UseTaskPanelPersistenceOptions)
             if (!current()) return undefined
             await options.refreshConfig(projectOf(id) || '')
             if (!current()) return undefined
-            Object.assign(options.task, data)
+            applyTaskSnapshot(options.task, data)
             options.applyTask(data)
             await options.loadCommitHistory(id)
             if (!current()) return undefined

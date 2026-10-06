@@ -387,7 +387,9 @@ fn tools_call_update_delete_list_and_invalid_enum() {
             .any(|t| t.get("id").unwrap() == &serde_json::Value::String(id.clone()))
     );
 
-    // Delete the task
+    // Delete the task (default soft delete): structured payload with
+    // deleted/hard/warnings so callers can discover retained attachments
+    // and incoming relationships without parsing human text.
     let delete_args = json!({ "name": "task_delete", "arguments": { "id": id, "project": "MCP" } });
     let delete_req = JsonRpcRequest {
         jsonrpc: "2.0".into(),
@@ -397,8 +399,16 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     };
     let delete_resp = dispatch(delete_req);
     assert!(delete_resp.error.is_none(), "task_delete failed");
-    let del_text = first_tool_text(&delete_resp);
-    assert!(del_text.contains("deleted=true"));
+    let del_payload = parse_tool_payload(&delete_resp);
+    assert_eq!(del_payload.get("deleted"), Some(&json!(true)));
+    assert_eq!(del_payload.get("hard"), Some(&json!(false)));
+    assert!(
+        del_payload
+            .get("warnings")
+            .and_then(|v| v.as_array())
+            .is_some(),
+        "task_delete payload must carry a warnings array"
+    );
 
     // Negative test: invalid priority
     let bad_args = json!({ "name": "task_create", "arguments": { "title": "bad", "project": "MCP", "priority": "NOT_A_PRIORITY" } });
@@ -477,6 +487,277 @@ fn tools_call_update_delete_list_and_invalid_enum() {
     assert!(error.message.to_ascii_lowercase().contains("status"));
     let data = error.data.as_ref().expect("status error data");
     assert_eq!(data.get("field").and_then(|v| v.as_str()), Some("status"));
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn tools_call_soft_delete_restore_and_deletion_views() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
+    }
+
+    let create = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(1)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_create",
+            "arguments": { "title": "DEV92 lifecycle", "project": "MCP" }
+        }),
+    });
+    assert!(create.error.is_none(), "task_create failed");
+    let id = parse_tool_payload(&create)
+        .get("task")
+        .and_then(|task| task.get("id"))
+        .and_then(|v| v.as_str())
+        .unwrap()
+        .to_string();
+
+    // Default delete is soft: structured payload, no warnings.
+    let del = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(2)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_delete",
+            "arguments": { "id": id, "project": "MCP" }
+        }),
+    });
+    assert!(del.error.is_none(), "task_delete failed");
+    let payload = parse_tool_payload(&del);
+    assert_eq!(payload.get("deleted"), Some(&json!(true)));
+    assert_eq!(payload.get("hard"), Some(&json!(false)));
+    assert_eq!(
+        payload
+            .get("warnings")
+            .and_then(|v| v.as_array())
+            .map(Vec::len),
+        Some(0),
+        "soft delete must not warn"
+    );
+
+    // task_get excludes the soft-deleted task by default (converted
+    // domain failure -> isError result, not a protocol error).
+    let get_active = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(3)),
+        method: "tools/call".into(),
+        params: json!({ "name": "task_get", "arguments": { "id": id } }),
+    });
+    assert!(get_active.error.is_none());
+    assert_eq!(
+        tool_response_payload(&get_active).get("isError"),
+        Some(&json!(true)),
+        "deleted task must not resolve without include_deleted"
+    );
+
+    // include_deleted resolves it and exposes deleted_at.
+    let get_deleted = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(4)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_get",
+            "arguments": { "id": id, "include_deleted": true }
+        }),
+    });
+    assert!(get_deleted.error.is_none());
+    let dto = parse_tool_payload(&get_deleted);
+    assert!(
+        dto.get("deleted_at").and_then(|v| v.as_str()).is_some(),
+        "soft-deleted DTO must carry deleted_at"
+    );
+
+    // task_list deletion views: active hides, deleted/all show.
+    let listed_ids = |deletion: Option<&str>| {
+        let mut arguments = json!({ "project": "MCP" });
+        if let Some(value) = deletion {
+            arguments["deletion"] = json!(value);
+        }
+        let resp = dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(5)),
+            method: "tools/call".into(),
+            params: json!({ "name": "task_list", "arguments": arguments }),
+        });
+        assert!(resp.error.is_none(), "task_list failed");
+        parse_tool_payload(&resp)
+            .get("tasks")
+            .and_then(|v| v.as_array())
+            .map(|tasks| {
+                tasks
+                    .iter()
+                    .map(|t| {
+                        t.get("id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default()
+    };
+    assert!(!listed_ids(None).contains(&id), "active view hides");
+    assert!(
+        listed_ids(Some("deleted")).contains(&id),
+        "deleted view shows"
+    );
+    assert!(listed_ids(Some("all")).contains(&id), "all view shows");
+    assert!(
+        listed_ids(Some("active")).is_empty(),
+        "active view explicit"
+    );
+
+    // Strict enum: unknown deletion value is invalid params.
+    let bogus = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(6)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_list",
+            "arguments": { "project": "MCP", "deletion": "bogus" }
+        }),
+    });
+    let error = bogus.error.expect("deletion typo must be rejected");
+    assert_eq!(error.code, -32602);
+
+    // Restore returns the DTO with deleted_at cleared and the task
+    // reappears in the active view.
+    let restore = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(7)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_restore",
+            "arguments": { "id": id, "project": "MCP" }
+        }),
+    });
+    assert!(restore.error.is_none(), "task_restore failed");
+    let restored = parse_tool_payload(&restore);
+    assert!(
+        restored
+            .get("deleted_at")
+            .map(|v| v.is_null())
+            .unwrap_or(true),
+        "restored DTO must have deleted_at null or omitted"
+    );
+    assert!(
+        listed_ids(None).contains(&id),
+        "active view shows restored task"
+    );
+
+    clear_tasks_dir_env();
+}
+
+#[test]
+fn tools_call_hard_delete_reports_warnings_and_is_final() {
+    let _lock = lock_var("LOTAR_TASKS_DIR");
+    let tmp = tempfile::tempdir().unwrap();
+    let tasks_dir = tmp.path().join(".tasks");
+    std::fs::create_dir_all(&tasks_dir).unwrap();
+    unsafe {
+        std::env::set_var("LOTAR_TASKS_DIR", &tasks_dir);
+    }
+
+    let create = |title: &str, req_id: i64| {
+        dispatch(JsonRpcRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(req_id)),
+            method: "tools/call".into(),
+            params: json!({
+                "name": "task_create",
+                "arguments": { "title": title, "project": "MCP" }
+            }),
+        })
+    };
+    let id_of = |resp: &JsonRpcResponse| {
+        parse_tool_payload(resp)
+            .get("task")
+            .and_then(|task| task.get("id"))
+            .and_then(|v| v.as_str())
+            .unwrap()
+            .to_string()
+    };
+    let target = id_of(&create("hard delete target", 1));
+    let dependent = id_of(&create("dependent task", 2));
+
+    // dependent -> depends_on target: hard-deleting target must surface
+    // the incoming relationship as a structured warning.
+    let link = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(3)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_update",
+            "arguments": {
+                "id": dependent,
+                "patch": { "relationships": { "depends_on": [target.clone()] } }
+            }
+        }),
+    });
+    assert!(link.error.is_none(), "relationship patch failed");
+
+    let del = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(4)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_delete",
+            "arguments": { "id": target, "project": "MCP", "hard": true }
+        }),
+    });
+    assert!(del.error.is_none(), "hard task_delete failed");
+    let payload = parse_tool_payload(&del);
+    assert_eq!(payload.get("deleted"), Some(&json!(true)));
+    assert_eq!(payload.get("hard"), Some(&json!(true)));
+    let warnings = payload
+        .get("warnings")
+        .and_then(|v| v.as_array())
+        .expect("hard delete payload must carry warnings");
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().is_some_and(|text| text.contains(&dependent))),
+        "warnings must name the incoming relationship from {dependent}: {warnings:?}"
+    );
+
+    // Hard deletion is final: no tombstone resolves even with
+    // include_deleted, and restore cannot bring it back.
+    let get_deleted = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(5)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_get",
+            "arguments": { "id": target, "include_deleted": true }
+        }),
+    });
+    assert!(get_deleted.error.is_none());
+    assert_eq!(
+        tool_response_payload(&get_deleted).get("isError"),
+        Some(&json!(true)),
+        "hard-deleted task must not resolve"
+    );
+    let restore = dispatch(JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(json!(6)),
+        method: "tools/call".into(),
+        params: json!({
+            "name": "task_restore",
+            "arguments": { "id": target, "project": "MCP" }
+        }),
+    });
+    assert!(restore.error.is_none());
+    assert_eq!(
+        tool_response_payload(&restore).get("isError"),
+        Some(&json!(true)),
+        "restore of a hard-deleted task must fail as a domain error"
+    );
 
     clear_tasks_dir_env();
 }

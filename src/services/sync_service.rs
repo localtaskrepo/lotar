@@ -1917,14 +1917,18 @@ fn perform_pull(
 
     let storage = Storage::new(&resolver.path.clone());
 
+    // Pull index includes tombstones (DEV-92): a remote issue whose local
+    // task is soft-deleted must MATCH its existing task instead of being
+    // re-imported as a duplicate. Deleted matches are then skipped below.
     let filter = TaskListFilter {
         project: Some(project.to_string()),
+        deletion: crate::api_types::DeletionFilter::All,
         ..Default::default()
     };
     let mut tasks = TaskService::list(&storage, &filter);
     for (id, task) in &mut tasks {
         task.id = canonical_sync_task_id(&resolver.path, project, &task.id)?;
-        *task = TaskService::get(&storage, &task.id, None)?;
+        *task = TaskService::get_including_deleted(&storage, &task.id, None)?;
         id.clone_from(&task.id);
     }
     let mut tasks_by_id: HashMap<String, TaskDTO> = HashMap::new();
@@ -1970,6 +1974,25 @@ fn perform_pull(
 
         if let Some(task_id) = reference_index.get(&reference) {
             let existing = tasks_by_id.get(task_id).cloned();
+            // Deleted matches are skipped, never updated or re-imported
+            // (DEV-92). The journal-based dry-run reference index above
+            // keeps its explicit recovery semantics unchanged.
+            if existing
+                .as_ref()
+                .is_some_and(|task| task.deleted_at.is_some())
+            {
+                recorder.record(
+                    SyncEntryStatus::Skipped,
+                    make_entry(
+                        SyncEntryStatus::Skipped,
+                        Some(task_id.clone()),
+                        Some(reference.clone()),
+                        existing.as_ref().map(|task| task.title.clone()),
+                        Some("Local task is deleted; skipped".to_string()),
+                    ),
+                );
+                continue;
+            }
             let update =
                 build_task_update_from_issue(remote.provider, remote, &issue, existing.as_ref());
             if task_update_is_empty(&update) {
@@ -4328,6 +4351,7 @@ mod sync_mapping_tests {
     fn sample_task() -> TaskDTO {
         TaskDTO {
             task_state: None,
+            deleted_at: None,
             id: "TEST-1".to_string(),
             title: "Example".to_string(),
             status: TaskStatus::from("Todo"),
@@ -4561,6 +4585,7 @@ mod tests {
     fn sample_task() -> TaskDTO {
         TaskDTO {
             task_state: None,
+            deleted_at: None,
             id: "TEST-1".to_string(),
             title: "Example".to_string(),
             status: TaskStatus::from("Todo"),

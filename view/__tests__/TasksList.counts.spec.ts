@@ -331,7 +331,11 @@ describe('TasksList counts', () => {
         vm.filter = { project: 'B' }
         finish()
         await pending
-        expect(tasksStore.remove.mock.calls).toEqual([['A-1'], ['A-2']])
+        // DEV-92: soft delete with the deletion-scope project captured per id.
+        expect(tasksStore.remove.mock.calls).toEqual([
+            ['A-1', { project: 'A', hard: false }],
+            ['A-2', { project: 'A', hard: false }],
+        ])
         expect(vm.selectedIds).toEqual([])
         wrapper.unmount()
     })

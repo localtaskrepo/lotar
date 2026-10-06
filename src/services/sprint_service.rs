@@ -193,6 +193,12 @@ impl SprintService {
                 continue;
             }
             if let Some(task) = storage.get(task_id, &project) {
+                // Sprint analytics are active-only (DEV-92): tombstones keep
+                // their sprint memberships on disk but do not count toward
+                // workload, progress, or ordering.
+                if task.deleted_at.is_some() {
+                    continue;
+                }
                 tasks.push((task_id.to_string(), task));
             }
         }

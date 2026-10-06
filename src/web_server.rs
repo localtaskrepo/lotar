@@ -831,7 +831,10 @@ fn start_tasks_watcher() {
                                         })
                                     }
                                     _ => {
-                                        // Try to load the task to check for parse errors
+                                        // Try to load the task to check for parse errors.
+                                        // Tombstones are valid files (DEV-92): a
+                                        // soft-deleted task must surface as a normal
+                                        // task_updated, never as a task_error.
                                         if let Ok(resolver) =
                                             crate::workspace::TasksDirectoryResolver::resolve(
                                                 None, None,
@@ -840,7 +843,7 @@ fn start_tasks_watcher() {
                                             let storage = crate::storage::manager::Storage::new(
                                                 &resolver.path,
                                             );
-                                            match crate::services::task_service::TaskService::get(
+                                            match crate::services::task_service::TaskService::get_including_deleted(
                                                 &storage, &task_id, None,
                                             ) {
                                                 Ok(_) => {

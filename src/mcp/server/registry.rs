@@ -1,6 +1,6 @@
 //! Authoritative MCP tool registry (DEV-63).
 //!
-//! One table binds every advertised tool definition (the 37 entries emitted by
+//! One table binds every advertised tool definition (the 38 entries emitted by
 //! `tools::build_tool_definitions`) to its handler and both documented direct
 //! wire aliases: the canonical snake_case tool name (`task_create`) and the
 //! slash method (`task/create`).
@@ -35,7 +35,7 @@ use super::handlers::{
     handle_task_bulk_reference_add, handle_task_bulk_reference_remove, handle_task_bulk_update,
     handle_task_comment_add, handle_task_comment_update, handle_task_create, handle_task_delete,
     handle_task_get, handle_task_list, handle_task_reference_add, handle_task_reference_remove,
-    handle_task_update, handle_whoami,
+    handle_task_restore, handle_task_update, handle_whoami,
 };
 use super::schema::{unsupported_keywords, validate_instance};
 use super::tools::build_tool_definitions;
@@ -138,6 +138,11 @@ pub(crate) fn tool_specs() -> &'static [ToolSpec] {
             name: "task_delete",
             method: "task/delete",
             handler: handle_task_delete,
+        },
+        ToolSpec {
+            name: "task_restore",
+            method: "task/restore",
+            handler: handle_task_restore,
         },
         ToolSpec {
             name: "task_list",
@@ -489,7 +494,7 @@ mod tests {
             })
             .collect();
         advertised.sort();
-        assert_eq!(advertised.len(), 37, "advertised tool count changed");
+        assert_eq!(advertised.len(), 38, "advertised tool count changed");
 
         let mut registered: Vec<&str> = tool_specs().iter().map(|spec| spec.name).collect();
         registered.sort_unstable();
@@ -770,6 +775,19 @@ mod tests {
                 "sync_pull",
                 json!({"remote": "origin", "task_id": "MCP-1"}),
                 "unknown property 'task_id'",
+            ),
+            // MCP task_delete has no confirmation concept; CLI-style force
+            // must be rejected instead of silently ignored.
+            (
+                "task_delete",
+                json!({"id": "MCP-1", "force": true}),
+                "unknown property 'force'",
+            ),
+            // task_restore has no hard/dry-run flags on the MCP surface.
+            (
+                "task_restore",
+                json!({"id": "MCP-1", "dry_run": true}),
+                "unknown property 'dry_run'",
             ),
             (
                 "sync_push",

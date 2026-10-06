@@ -580,6 +580,7 @@ fn query_predicates_evaluate_injected_clock_not_snapshots() {
         }),
         priority: lotar::types::Priority::from("Medium"),
         task_type: lotar::types::TaskType::from("Feature"),
+        deleted_at: None,
         reporter: None,
         assignee: None,
         created: now.to_rfc3339(),

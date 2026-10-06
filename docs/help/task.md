@@ -27,7 +27,8 @@ lotar tasks <ACTION> [OPTIONS]   # alias
 | `due-date` | Show or update due date. | `lotar due-date`. |
 | `relationships` | List dependency/parent/child links. | Relationships helper. |
 | `effort` | Show, set, or clear effort estimates. | `lotar effort`. |
-| `delete` | Remove a task (with optional dry-run). | Delete helper. |
+| `delete` | Soft-delete a task, or permanently remove it with `--hard`. | Delete helper. |
+| `restore` | Restore a soft-deleted task. | Restore helper. |
 | `history` / `history-field` | Git history utilities. | See `docs/help/history.md`. |
 | `diff` | Show the latest (or specific) git diff for a task. | History/diff helper. |
 | `at` | Print the file at a specific commit. | History helper. |
@@ -122,10 +123,26 @@ lotar task effort <TASK_ID> [NEW_EFFORT] [--clear] [--dry-run] [--explain]
 ### delete
 
 ```bash
-lotar task delete <TASK_ID> [--dry-run] [--force | --yes | -y]
+lotar task delete <TASK_ID> [--hard] [--dry-run] [--force | --yes | -y]
 ```
 
-- `--force`, `--yes`, and `-y` all skip the confirmation prompt. `--dry-run` provides a JSON/text preview of the record that would be removed.
+- Default deletion keeps the YAML file, sets `deleted_at`, and hides the task from normal views. It preserves the task's content, ID, attachment references, and sprint memberships.
+- Soft delete and restore leave `modified` unchanged. Lifecycle operations append timestamped history entries; repeating an operation that is already applied does not change history.
+- `--hard` permanently removes the task file. Attachment blobs are **not** deleted: warnings list retained attachments and detectable incoming task relationships. Related task files are not rewritten.
+- `--force`, `--yes`, and `-y` only skip confirmation; they never select hard deletion. `--dry-run` previews the selected deletion mode without writing.
+- Use `lotar list --deleted` to list deleted tasks, or `--include-deleted` to list active and deleted tasks together. These flags are mutually exclusive.
+- Physical file removal remains supported. Missing IDs do not prevent other tasks from loading. ID allocation uses the highest existing numeric filename plus one: tombstones reserve IDs, while removing the highest file permits its number to be reused. Reuse can associate old relationships, Git history, and agent records with a different task; increment the filename manually when retaining that distinction matters.
+
+### restore
+
+```bash
+lotar task restore <TASK_ID> [--dry-run]
+```
+
+- Clears `deleted_at` while keeping the same ID, content, and surviving sprint memberships. The task becomes visible normally again.
+- `--dry-run` previews restoration without changing task data.
+- Restore requires values compatible with the current project configuration; it does not invent a replacement workflow status.
+- Hard-deleted tasks cannot be restored by this command because their file is gone. User-managed history or backups remain independent recovery options.
 
 ### Git history helpers (`history`, `history-field`, `diff`, `at`)
 

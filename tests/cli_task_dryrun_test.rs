@@ -76,7 +76,8 @@ fn delete_dry_run_previews_without_delete() {
         .success()
         .stdout(predicate::str::contains("DRY RUN: Would delete task"));
 
-    // Verify the task still exists by attempting to delete for real (should succeed)
+    // Verify the task still exists by attempting to delete for real (soft
+    // delete succeeds and mentions the restore path).
     let mut del2 = crate::common::lotar_cmd().unwrap();
     del2.current_dir(temp)
         .arg("task")
@@ -85,5 +86,5 @@ fn delete_dry_run_previews_without_delete() {
         .arg("--force")
         .assert()
         .success()
-        .stdout(predicate::str::contains("deleted successfully"));
+        .stdout(predicate::str::contains("deleted (soft"));
 }

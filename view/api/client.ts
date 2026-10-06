@@ -65,6 +65,7 @@ import type {
   SyncValidateResponse,
   TaskCreate,
   TaskDTO,
+  TaskDeleteResponse,
   TaskListFilter,
   TaskListResponse,
   TaskUpdate,
@@ -156,13 +157,24 @@ async function post<T>(path: string, body: any): Promise<T> {
 export const api = {
   // Tasks
   listTasks(filter: TaskListFilter = {}): Promise<TaskListResponse> { return get('/api/tasks/list', filter as any) },
-  getTask(id: string, project?: string): Promise<TaskDTO> { return get('/api/tasks/get', { id, project }) },
+  getTask(id: string, project?: string, opts?: { includeDeleted?: boolean }): Promise<TaskDTO> {
+    return get('/api/tasks/get', { id, project, include_deleted: opts?.includeDeleted === true ? 'true' : undefined })
+  },
   addTask(payload: TaskCreate): Promise<TaskDTO> { return post('/api/tasks/add', payload) },
   updateTask(id: string, patch: TaskUpdate): Promise<TaskDTO> { return post('/api/tasks/update', { id, ...patch }) },
   addComment(id: string, text: string): Promise<TaskDTO> { return post('/api/tasks/comment', { id, text }) },
   updateComment(id: string, index: number, text: string): Promise<TaskDTO> { return post('/api/tasks/comment/update', { id, index, text }) },
   setStatus(id: string, status: string): Promise<TaskDTO> { return post('/api/tasks/status', { id, status }) },
-  deleteTask(id: string, project?: string): Promise<{ deleted: boolean }> { return post('/api/tasks/delete' + qs({ project }), { id }) },
+  /**
+   * DEV-92: deletion is soft by default (recoverable trash tombstone);
+   * `hard: true` physically removes the task. The response reports what the
+   * server retained (attachment blobs, incoming relationships) as warnings.
+   */
+  deleteTask(id: string, opts?: { project?: string; hard?: boolean }): Promise<TaskDeleteResponse> {
+    return post('/api/tasks/delete' + qs({ project: opts?.project }), { id, ...(opts?.hard ? { hard: true } : {}) })
+  },
+  /** DEV-92: restore a soft-deleted task; returns the active TaskDTO. */
+  restoreTask(id: string, project?: string): Promise<TaskDTO> { return post('/api/tasks/restore' + qs({ project }), { id }) },
   uploadTaskAttachment(payload: AttachmentUploadRequest): Promise<AttachmentUploadResponse> { return post('/api/tasks/attachments/upload', payload) },
   removeTaskAttachment(payload: AttachmentRemoveRequest): Promise<AttachmentRemoveResponse> { return post('/api/tasks/attachments/remove', payload) },
   addTaskLinkReference(payload: LinkReferenceAddRequest): Promise<LinkReferenceAddResponse> { return post('/api/tasks/references/link/add', payload) },

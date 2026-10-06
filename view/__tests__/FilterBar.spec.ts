@@ -120,6 +120,52 @@ describe('FilterBar', () => {
     expect(last?.owner).toBe('ops')
   })
 
+  describe('deletion visibility (DEV-92)', () => {
+    it('defaults to active and omits the deletion key from emissions', async () => {
+      const wrapper = mount(FilterBar, { props: { value: {} } })
+      await openPanel(wrapper)
+      const select = wrapper.find('[data-testid="task-deletion-filter"]')
+      expect(select.exists()).toBe(true)
+      expect((select.element as HTMLSelectElement).value).toBe('active')
+
+      await select.setValue('active')
+      await nextTick()
+      const events = wrapper.emitted('update:value') || []
+      const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+      expect(last?.deletion).toBeUndefined()
+    })
+
+    it('emits deletion=deleted when the trash view is selected', async () => {
+      const wrapper = mount(FilterBar, { props: { value: {} } })
+      await openPanel(wrapper)
+      await wrapper.find('[data-testid="task-deletion-filter"]').setValue('deleted')
+      await nextTick()
+      const events = wrapper.emitted('update:value') || []
+      const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+      expect(last?.deletion).toBe('deleted')
+    })
+
+    it('emits deletion=all and round-trips an incoming value without duplicating it into custom filters', async () => {
+      const wrapper = mount(FilterBar, { props: { value: { deletion: 'all' } } })
+      await openPanel(wrapper)
+      const select = wrapper.find('[data-testid="task-deletion-filter"]')
+      expect((select.element as HTMLSelectElement).value).toBe('all')
+
+      // Change away and back so the watcher fires with the incoming value.
+      await select.setValue('active')
+      await select.setValue('all')
+      await nextTick()
+      const events = wrapper.emitted('update:value') || []
+      const last = events[events.length - 1]?.[0] as Record<string, string> | undefined
+      expect(last?.deletion).toBe('all')
+
+      // The dedicated control owns the key; it must not appear in the
+      // custom-filter box.
+      const custom = findByPlaceholder(wrapper, 'Custom filters')
+      expect((custom!.element as HTMLInputElement).value).not.toContain('deletion')
+    })
+  })
+
   it('hydrates custom filters from incoming value', async () => {
     const wrapper = mount(FilterBar, {
       props: { value: { q: 'abc', 'field:iteration': 'beta', scope: 'edge' } },

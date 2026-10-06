@@ -4,7 +4,7 @@ import type { TaskListFilter } from '../api/types'
 import { normalizeSortBy, normalizeSortOrder } from '../utils/taskSort'
 
 const BUILTIN_QUERY_KEYS = new Set([
-  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints', 'sort_by', 'order',
+  'q', 'project', 'status', 'priority', 'type', 'assignee', 'tags', 'due', 'recent', 'needs', 'sprints', 'sort_by', 'order', 'deletion',
 ])
 
 
@@ -67,6 +67,12 @@ export function buildServerFilter(
     if (normalized.due) serverFilter.due = normalized.due
     if (normalized.recent) serverFilter.recent = normalized.recent
     if (normalized.needs) serverFilter.needs = normalized.needs
+    // DEV-92 deletion visibility; forwarded verbatim (strict server parser
+    // rejects invalid values) and omitted for the default `active` view so
+    // URLs stay clean.
+    if (normalized.deletion) {
+        serverFilter.deletion = normalized.deletion as TaskListFilter['deletion']
+    }
     const sortByRaw = (normalized.sort_by || '').trim()
     if (sortByRaw) serverFilter.sort_by = normalizeSortBy(sortByRaw) ?? sortByRaw
     // Forwarded verbatim — including invalid values — so explicit errors

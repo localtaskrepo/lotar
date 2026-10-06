@@ -7,6 +7,10 @@ use crate::config::types::SyncRemoteConfig;
 #[cfg(feature = "schema")]
 use schemars::JsonSchema;
 
+// Single lifecycle-visibility enum shared by the storage filter and the API
+// list filter (DEV-92). Defined in the storage layer next to `TaskFilter`.
+pub use crate::storage::filter::DeletionFilter;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskDTO {
@@ -15,6 +19,11 @@ pub struct TaskDTO {
     pub status: crate::types::TaskStatus,
     pub priority: crate::types::Priority,
     pub task_type: crate::types::TaskType,
+    /// Soft-deletion tombstone timestamp (UTC RFC3339, DEV-92). Serialized
+    /// only while the task is deleted; omitted for active tasks. Lifecycle
+    /// transitions never touch `modified`.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub deleted_at: Option<String>,
     /// Server-computed runtime projection (DEV-21): completion flag, due
     /// bucket, and the server-local calendar day at build time. Computed
     /// from the task's own project configuration and the shared due
@@ -576,6 +585,10 @@ pub struct TaskListFilter {
     pub assignee_none: bool,
     #[serde(default)]
     pub custom_fields: BTreeMap<String, Vec<String>>,
+    /// Lifecycle visibility (DEV-92): `active` (default) hides tombstones,
+    /// `deleted` selects only tombstones, `all` returns everything.
+    #[serde(default)]
+    pub deletion: DeletionFilter,
 }
 
 fn deserialize_string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
@@ -595,7 +608,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "schema", derive(JsonSchema))]
 pub struct TaskListResponse {
     pub total: usize,
@@ -603,6 +616,34 @@ pub struct TaskListResponse {
     pub offset: usize,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tasks: Vec<TaskDTO>,
+}
+
+/// Deletion request shared by REST, MCP, and UI clients (DEV-92).
+///
+/// `hard` defaults to `false`: ordinary deletion is a soft tombstone that
+/// keeps the task file, ID, sprints, and content. Hard deletion physically
+/// removes the task file while preserving attachment blobs.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskDeleteRequest {
+    pub id: String,
+    #[serde(default)]
+    pub hard: bool,
+}
+
+/// Result of a task deletion (or a read-only deletion preview, where
+/// `deleted` is `false`). All fields are always serialized. `deleted` is
+/// true whenever the task is in the deleted state after the call, so a
+/// repeated soft deletion of an already-deleted task stays `true`
+/// (idempotent). `warnings` is non-empty only for hard deletions, where it
+/// lists retained attachment blobs (with stored paths) and incoming
+/// relationships from other stored tasks; nothing is cleaned up.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "schema", derive(JsonSchema))]
+pub struct TaskDeleteResponse {
+    pub deleted: bool,
+    pub hard: bool,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

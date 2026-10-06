@@ -254,6 +254,9 @@ pub enum TaskAction {
     /// Delete a task
     Delete(TaskDeleteArgs),
 
+    /// Restore a soft-deleted task
+    Restore(TaskRestoreArgs),
+
     /// Show git history for a task file (read-only)
     History {
         /// Task ID (with or without project prefix)
@@ -620,6 +623,16 @@ pub struct TaskSearchArgs {
     #[arg(long = "effort-max")]
     pub effort_max: Option<String>,
 
+    /// Show only soft-deleted tasks
+    #[arg(long, conflicts_with = "include_deleted")]
+    #[serde(default)]
+    pub deleted: bool,
+
+    /// Include soft-deleted tasks alongside active ones
+    #[arg(long)]
+    #[serde(default)]
+    pub include_deleted: bool,
+
     /// Show task descriptions in text output
     #[arg(long)]
     #[serde(default)]
@@ -631,13 +644,29 @@ pub struct TaskDeleteArgs {
     /// Task ID to delete
     pub id: String,
 
-    /// Confirm deletion without prompt
+    /// Confirm deletion without prompt (does not imply --hard)
     #[arg(long, short = 'y', alias = "yes")]
     #[serde(default)]
     pub force: bool,
 
+    /// Physically remove the task file (default is a soft delete)
+    #[arg(long)]
+    #[serde(default)]
+    pub hard: bool,
+
     /// Preview deletion without removing the file
     #[arg(long)]
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+#[derive(Args, Deserialize, Debug)]
+pub struct TaskRestoreArgs {
+    /// Task ID to restore (with or without project prefix)
+    pub id: String,
+
+    /// Preview restore without saving
+    #[arg(long, short = 'n')]
     #[serde(default)]
     pub dry_run: bool,
 }

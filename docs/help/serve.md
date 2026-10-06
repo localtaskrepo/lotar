@@ -92,12 +92,15 @@ Exactly one case does not fail on a busy port: when **no** source configured a p
 		- `assignee` (supports `@me` to filter to current user)
 		- `tags` (CSV)
 		- `q` (free-text search)
+		- `deletion=active|deleted|all` (default `active`; invalid/blank values return HTTP 400)
 	- Notes:
 		- Invalid values for `status`, `priority`, or `type` return HTTP 400
 		- Any additional query key is treated as a property filter. Declared custom fields can be used directly (e.g., `?sprint=W35`). Multiple values allowed via CSV; matching is case- and separator-insensitive.
-- `GET /api/tasks/get?id=...` - Get task by id (returns HTTP 404 if not found)
+- `GET /api/tasks/get?id=...` - Get task by id (deleted tasks are hidden; opt in with `include_deleted=true`)
 - `POST /api/tasks/update` - Update task (body: TaskUpdateRequest: flat fields with `id` + optional properties; supports `@me` for reporter/assignee; `status`/`priority`/`type` are validated against the task's project config, `null` clears clearable fields, and list/map patches replace the whole value)
-- `POST /api/tasks/delete` - Delete task (body: { id })
+- `POST /api/tasks/delete` - Soft-delete task (body: { id, hard?: bool }); hard deletion retains attachment blobs and returns warnings listing attachments and incoming task relationships
+- `POST /api/tasks/restore` - Restore a soft-deleted task (body: { id }); delete/restore do not change `modified`
+- List/export accept `deletion=active|deleted|all` (default `active`); deleted tasks retain their workflow status and are excluded from normal statistics
 - `GET /api/projects/list` - List projects
 - `GET /api/projects/stats?project=PREFIX` - Project stats
 - `GET /api/whoami` - Resolve the identity that auto-populates reporter/assignee fields.

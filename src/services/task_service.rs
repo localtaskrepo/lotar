@@ -1,7 +1,10 @@
-use crate::api_types::{TaskCreate, TaskDTO, TaskListFilter, TaskUpdate};
+use crate::api_types::{
+    DeletionFilter, TaskCreate, TaskDTO, TaskDeleteResponse, TaskListFilter, TaskUpdate,
+};
 use crate::config::types::{GlobalConfig, ResolvedConfig};
 use crate::errors::{LoTaRError, LoTaRResult};
 use crate::services::agent_job_service::AgentJobService;
+use crate::services::attachment_service::AttachmentService;
 use crate::services::automation_service::AutomationService;
 use crate::services::sprint_service::{SprintRecord, SprintService};
 use crate::services::task_validation::{self as validation};
@@ -371,6 +374,26 @@ impl TaskService {
     }
 
     pub fn get(storage: &Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
+        Self::get_with_deletion(storage, id, project, false)
+    }
+
+    /// Fetch a task including its soft-deletion tombstone state (DEV-92).
+    /// Returns the DTO with `deleted_at` set for deleted tasks instead of
+    /// the default `TaskNotFound` projection.
+    pub fn get_including_deleted(
+        storage: &Storage,
+        id: &str,
+        project: Option<&str>,
+    ) -> LoTaRResult<TaskDTO> {
+        Self::get_with_deletion(storage, id, project, true)
+    }
+
+    fn get_with_deletion(
+        storage: &Storage,
+        id: &str,
+        project: Option<&str>,
+        include_deleted: bool,
+    ) -> LoTaRResult<TaskDTO> {
         // Canonical parse: the project prefix is everything before the FINAL
         // numeric suffix (ABCD-1 -> ABCD, ABC-OPS-12 -> ABC-OPS).
         let parsed =
@@ -378,6 +401,12 @@ impl TaskService {
         let p = project.unwrap_or(&parsed.project).to_string();
         match storage.get(id, &p) {
             Some(mut t) => {
+                // Default reads hide tombstones: a deleted task is
+                // indistinguishable from a missing one unless the caller
+                // explicitly opts into lifecycle state.
+                if !include_deleted && t.deleted_at.is_some() {
+                    return Err(LoTaRError::TaskNotFound(id.to_string()));
+                }
                 // Config and sprint memberships come from the tasks root that
                 // actually holds the task, not necessarily the primary one.
                 let config_root = match storage.resolve_task_location(id) {
@@ -399,6 +428,17 @@ impl TaskService {
             }
             None => Err(LoTaRError::TaskNotFound(id.to_string())),
         }
+    }
+
+    /// Fail closed for mutations addressed to a soft-deleted task: a
+    /// tombstone is read-only until restored (DEV-92).
+    pub(crate) fn ensure_not_deleted(task: &Task, id: &str) -> LoTaRResult<()> {
+        if task.deleted_at.is_some() {
+            return Err(LoTaRError::ValidationError(format!(
+                "Task '{id}' is deleted; restore it before modifying it"
+            )));
+        }
+        Ok(())
     }
 
     /// Add a comment to a task and fire `on.commented` automation rules.
@@ -425,7 +465,10 @@ impl TaskService {
         Self::ensure_local_task(storage, id)?;
 
         let root_path = storage.root_path.clone();
+        let canonical_guard = canonical.clone();
         let outcome = storage.mutate_task(&canonical, move |task| {
+            // Lifecycle guard (DEV-92): no comments on a tombstone.
+            Self::ensure_not_deleted(task, &canonical_guard)?;
             let now = chrono::Utc::now().to_rfc3339();
             let actor = context
                 .actor_override
@@ -482,7 +525,10 @@ impl TaskService {
         Self::ensure_local_task(storage, id)?;
 
         let root_path = storage.root_path.clone();
+        let canonical_guard = canonical.clone();
         let outcome = storage.mutate_task(&canonical, move |task| {
+            // Lifecycle guard (DEV-92): tombstones are read-only.
+            Self::ensure_not_deleted(task, &canonical_guard)?;
             if index >= task.comments.len() {
                 return Err(LoTaRError::ValidationError(format!(
                     "Invalid comment index {index}"
@@ -586,6 +632,8 @@ impl TaskService {
         let existing = storage
             .get(id, &derived)
             .ok_or_else(|| LoTaRError::TaskNotFound(id.to_string()))?;
+        // Lifecycle guard (DEV-92): a tombstone is read-only until restored.
+        Self::ensure_not_deleted(&existing, id)?;
 
         let config = Self::resolve_config_for_project(storage.root_path.as_path(), &derived);
 
@@ -1014,12 +1062,319 @@ impl TaskService {
         )))
     }
 
+    /// Legacy deletion entry point for existing callers: SOFT by default
+    /// (DEV-92). Returns whether the task is in the deleted state after the
+    /// call; a missing task maps to `Ok(false)` exactly like the previous
+    /// physical deletion contract, while cross-project/cross-root refusals
+    /// stay errors. Callers that need warnings, hard deletion, or explicit
+    /// not-found errors use [`Self::delete_with_options`].
     pub fn delete(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<bool> {
-        let derived = TaskId::parse(id)
-            .map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?
-            .project;
-        let p = project.unwrap_or(&derived);
-        storage.delete(id, p)
+        match Self::delete_with_options(storage, id, project, false) {
+            Ok(outcome) => Ok(outcome.deleted),
+            Err(LoTaRError::TaskNotFound(_)) => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
+
+    /// Shared preflight for every deletion surface: canonical identity,
+    /// project isolation, cross-root refusal, and existence (including
+    /// tombstones, which can be deleted again or hard-deleted).
+    fn ensure_deletable(
+        storage: &Storage,
+        id: &str,
+        project: Option<&str>,
+    ) -> LoTaRResult<(String, String)> {
+        let parsed =
+            TaskId::parse(id).map_err(|err| LoTaRError::InvalidTaskId(format!("{id}: {err}")))?;
+        let derived = parsed.project.clone();
+        let canonical = parsed.canonical();
+        if let Some(explicit) = project
+            && explicit != derived
+        {
+            return Err(LoTaRError::ValidationError(format!(
+                "Task ID '{id}' belongs to project '{derived}', not '{explicit}'; refusing to cross projects"
+            )));
+        }
+        match storage.resolve_task_location(&canonical) {
+            Ok(location) if !location.is_in_root(&storage.root_path) => {
+                Err(LoTaRError::ValidationError(format!(
+                    "Task '{}' is stored in workspace tasks root {} and cannot be modified from {}; run the command inside that workspace",
+                    location.full_id(),
+                    location.root.display(),
+                    storage.root_path.display()
+                )))
+            }
+            Ok(_) => Ok((canonical, derived)),
+            Err(TaskLookupError::NotFound(_)) => Err(LoTaRError::TaskNotFound(canonical.clone())),
+            Err(err) => Err(LoTaRError::ValidationError(err.to_string())),
+        }
+    }
+
+    /// Read-only deletion preview (DEV-92): validates exactly like
+    /// [`Self::delete_with_options`] but mutates nothing. Returns
+    /// `{deleted: false, hard, warnings}` where `warnings` is populated for
+    /// hard previews (retained attachment blobs with stored paths and
+    /// incoming relationships with canonical dependent IDs) and empty for
+    /// soft previews.
+    pub fn preview_delete(
+        storage: &Storage,
+        id: &str,
+        project: Option<&str>,
+        hard: bool,
+    ) -> LoTaRResult<TaskDeleteResponse> {
+        let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
+        let warnings = if hard {
+            let task = storage
+                .get(&canonical, &derived)
+                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
+            Self::hard_delete_warnings(storage, &canonical, &task)
+        } else {
+            Vec::new()
+        };
+        Ok(TaskDeleteResponse {
+            deleted: false,
+            hard,
+            warnings,
+        })
+    }
+
+    /// Delete a task (DEV-92). Soft deletion (default) writes an in-place
+    /// `deleted_at` tombstone and appends a `deleted` history entry while
+    /// leaving `modified` unchanged; a repeated soft deletion of an already
+    /// deleted task is a no-op that keeps reporting `deleted: true`. Hard
+    /// deletion physically removes the task file (`Storage::delete` stays
+    /// physical for rollback paths), preserves attachment blobs, and returns
+    /// warnings describing retained blobs and incoming relationships
+    /// detected across stored tasks (including other tombstones).
+    pub fn delete_with_options(
+        storage: &mut Storage,
+        id: &str,
+        project: Option<&str>,
+        hard: bool,
+    ) -> LoTaRResult<TaskDeleteResponse> {
+        let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
+
+        if hard {
+            let task = storage
+                .get(&canonical, &derived)
+                .ok_or_else(|| LoTaRError::TaskNotFound(canonical.clone()))?;
+            let warnings = Self::hard_delete_warnings(storage, &canonical, &task);
+            let removed = storage.delete(&canonical, &derived)?;
+            if !removed {
+                return Err(LoTaRError::TaskNotFound(canonical.clone()));
+            }
+            return Ok(TaskDeleteResponse {
+                deleted: true,
+                hard: true,
+                warnings,
+            });
+        }
+
+        // Soft delete: locked read-modify-write over the freshest state so a
+        // concurrent edit can never be lost, and a tombstone never overwrites
+        // a concurrent restore. `modified` is deliberately untouched.
+        let root_path = storage.root_path.clone();
+        storage.mutate_task(&canonical, move |task| {
+            if task.deleted_at.is_some() {
+                // Idempotent no-op: no write, no extra history entry.
+                return Ok(false);
+            }
+            let now = chrono::Utc::now().to_rfc3339();
+            task.history.push(TaskChangeLogEntry {
+                at: now.clone(),
+                actor: resolve_current_user(Some(root_path.as_path())),
+                changes: vec![TaskChange {
+                    field: "deleted".into(),
+                    old: None,
+                    new: Some(now.clone()),
+                }],
+            });
+            task.deleted_at = Some(now);
+            Ok(true)
+        })?;
+
+        Ok(TaskDeleteResponse {
+            deleted: true,
+            hard: false,
+            warnings: Vec::new(),
+        })
+    }
+
+    /// Warnings for a hard deletion: every managed attachment blob that
+    /// stays behind (with its stored path) and every stored task — active or
+    /// tombstoned — whose relationships point at the deleted task. Nothing
+    /// is cleaned up; the caller merely reports the hazards.
+    fn hard_delete_warnings(storage: &Storage, canonical: &str, task: &Task) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        let parsed = TaskId::parse(canonical).ok();
+        let config_root = match storage.resolve_task_location(canonical) {
+            Ok(location) => location.root.clone(),
+            Err(_) => storage.root_path.clone(),
+        };
+        let attachments_root = parsed.as_ref().and_then(|parsed| {
+            let config = Self::resolve_config_for_project(config_root.as_path(), &parsed.project);
+            AttachmentService::compute_attachments_root(&config_root, &config).ok()
+        });
+
+        let mut seen_blobs = std::collections::BTreeSet::new();
+        for name in task.references.iter().filter_map(|r| r.attachment.clone()) {
+            if !seen_blobs.insert(name.clone()) {
+                continue;
+            }
+            let location = match &attachments_root {
+                Some(root) => root.join(&name).display().to_string(),
+                None => name.clone(),
+            };
+            warnings.push(format!(
+                "retained attachment '{name}' ({location}); blob preserved, no cleanup performed"
+            ));
+        }
+
+        for (id, other) in storage.search(&crate::storage::TaskFilter {
+            deletion: DeletionFilter::All,
+            ..Default::default()
+        }) {
+            let mut fields: Vec<&str> = Vec::new();
+            let rel = &other.relationships;
+            if rel
+                .depends_on
+                .iter()
+                .any(|v| entry_matches_task(v, canonical))
+            {
+                fields.push("depends_on");
+            }
+            if rel.blocks.iter().any(|v| entry_matches_task(v, canonical)) {
+                fields.push("blocks");
+            }
+            if rel.related.iter().any(|v| entry_matches_task(v, canonical)) {
+                fields.push("related");
+            }
+            if rel
+                .parent
+                .as_deref()
+                .is_some_and(|v| entry_matches_task(v, canonical))
+            {
+                fields.push("parent");
+            }
+            if rel
+                .children
+                .iter()
+                .any(|v| entry_matches_task(v, canonical))
+            {
+                fields.push("children");
+            }
+            if rel.fixes.iter().any(|v| entry_matches_task(v, canonical)) {
+                fields.push("fixes");
+            }
+            if rel
+                .duplicate_of
+                .as_deref()
+                .is_some_and(|v| entry_matches_task(v, canonical))
+            {
+                fields.push("duplicate_of");
+            }
+            if fields.is_empty() {
+                continue;
+            }
+            let dependent = TaskId::parse(&id)
+                .map(|parsed| parsed.canonical())
+                .unwrap_or(id);
+            warnings.push(format!(
+                "task '{dependent}' references the deleted task via {}; left unchanged",
+                fields.join(", ")
+            ));
+        }
+
+        warnings
+    }
+
+    /// Restore a soft-deleted task (DEV-92): clears `deleted_at` and appends
+    /// a `restored` history entry while leaving `modified` unchanged. The
+    /// stored status/priority/type are validated against the project's
+    /// CURRENT config (fail closed, no status mutation). Restoring an
+    /// active task is a no-op that returns the current DTO without history.
+    pub fn restore(storage: &mut Storage, id: &str, project: Option<&str>) -> LoTaRResult<TaskDTO> {
+        let (canonical, derived) = Self::ensure_deletable(storage, id, project)?;
+
+        let config = Self::restore_config(storage.root_path.as_path(), &derived)?;
+        let root_path = storage.root_path.clone();
+        let canonical_guard = canonical.clone();
+        let outcome = storage.mutate_task(&canonical, move |task| {
+            let Some(deleted_at) = task.deleted_at.clone() else {
+                // Active task: idempotent no-op, no history entry.
+                return Ok(false);
+            };
+
+            // Validate the stored fields against the CURRENT config before
+            // clearing the tombstone; a config change that invalidated the
+            // stored values blocks the restore without any mutation.
+            Self::validate_stored_enums(task, &config, &canonical_guard)?;
+
+            let now = chrono::Utc::now().to_rfc3339();
+            task.history.push(TaskChangeLogEntry {
+                at: now.clone(),
+                actor: resolve_current_user(Some(root_path.as_path())),
+                changes: vec![TaskChange {
+                    field: "restored".into(),
+                    old: Some(deleted_at),
+                    new: None,
+                }],
+            });
+            task.deleted_at = None;
+            Ok(true)
+        })?;
+
+        Ok(Self::dto_from_task(storage, &canonical, outcome.after))
+    }
+
+    /// Restoration and its preview must not silently skip unreadable layers.
+    pub fn restore_config(root: &Path, project: &str) -> LoTaRResult<ResolvedConfig> {
+        use crate::config::{persistence, types::ConfigError};
+        let validate_layer = |result: Result<(), ConfigError>| match result {
+            Ok(()) | Err(ConfigError::FileNotFound(_)) => Ok(()),
+            Err(error) => Err(LoTaRError::ValidationError(format!(
+                "cannot restore: invalid current configuration: {error}"
+            ))),
+        };
+        validate_layer(persistence::load_global_config(Some(root)).map(|_| ()))?;
+        validate_layer(persistence::load_project_config_from_dir(project, root).map(|_| ()))?;
+        if persistence::home_config_honored() {
+            validate_layer(persistence::load_home_config().map(|_| ()))?;
+        }
+        crate::config::resolution::config_for_project(root, Some(project)).map_err(|error| {
+            LoTaRError::ValidationError(format!(
+                "cannot restore: invalid current configuration: {error}"
+            ))
+        })
+    }
+
+    /// Enum validation of already-stored values against a resolved config:
+    /// canonicalizes nothing and mutates nothing, it only fails closed with
+    /// a field-specific message.
+    fn validate_stored_enums(task: &Task, config: &ResolvedConfig, id: &str) -> LoTaRResult<()> {
+        if !task.status.is_empty() {
+            validation::parse_status(task.status.as_str(), config).map_err(|err| {
+                LoTaRError::ValidationError(format!(
+                    "cannot restore '{id}': stored status is invalid under the current config: {err}"
+                ))
+            })?;
+        }
+        if !task.priority.is_empty() {
+            validation::parse_priority(task.priority.as_str(), config).map_err(|err| {
+                LoTaRError::ValidationError(format!(
+                    "cannot restore '{id}': stored priority is invalid under the current config: {err}"
+                ))
+            })?;
+        }
+        if !task.task_type.is_empty() {
+            validation::parse_task_type(task.task_type.as_str(), config).map_err(|err| {
+                LoTaRError::ValidationError(format!(
+                    "cannot restore '{id}': stored task type is invalid under the current config: {err}"
+                ))
+            })?;
+        }
+        Ok(())
     }
 
     pub fn list(storage: &Storage, filter: &TaskListFilter) -> Vec<(String, TaskDTO)> {
@@ -1033,6 +1388,7 @@ impl TaskService {
             text_query: filter.text_query.clone(),
             sprints: Vec::new(),
             custom_fields: filter.custom_fields.clone(),
+            deletion: filter.deletion,
         };
 
         // DEV-21 review F1: cache keyed by (actual root, prefix). A
@@ -1159,6 +1515,7 @@ impl TaskService {
             title: task.title,
             status: task.status,
             task_state,
+            deleted_at: task.deleted_at,
             priority: task.priority,
             task_type: task.task_type,
             reporter: task.reporter,

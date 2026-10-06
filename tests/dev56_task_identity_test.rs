@@ -234,10 +234,13 @@ fn hyphenated_prefix_crud_comment_and_status_roundtrip() {
     ));
     assert_eq!(resp.status, 200, "comment on hyphenated id");
 
-    // Delete via REST.
+    // Delete via REST (soft by default, DEV-92): the file becomes a
+    // tombstone instead of disappearing.
     let resp = api.handle_request(&mk_req("POST", "/api/tasks/delete", &[], json!({"id": id})));
     assert_eq!(resp.status, 200, "delete hyphenated id");
-    assert!(!fx.tasks_dir.join("ABC-OPS").join("1.yml").exists());
+    assert!(fx.tasks_dir.join("ABC-OPS").join("1.yml").exists());
+    let yaml = std::fs::read_to_string(fx.tasks_dir.join("ABC-OPS").join("1.yml")).unwrap();
+    assert!(yaml.contains("deleted_at:"), "{yaml}");
 }
 
 #[test]
@@ -636,7 +639,8 @@ fn delete_project_mismatch_refused_and_bytes_unchanged() {
     );
     assert!(tp_five.exists() && dev_five.exists(), "MCP bytes unchanged");
 
-    // Correct pairing still deletes exactly the right file.
+    // Correct pairing still targets exactly the right task: soft delete
+    // writes the tombstone (DEV-92) and hard delete removes the file.
     let resp = api.handle_request(&mk_req(
         "POST",
         "/api/tasks/delete",
@@ -644,8 +648,20 @@ fn delete_project_mismatch_refused_and_bytes_unchanged() {
         json!({"id": "DEV-5"}),
     ));
     assert_eq!(resp.status, 200);
-    assert!(!dev_five.exists());
+    assert!(dev_five.exists(), "soft delete keeps the file");
+    let dev_yaml = std::fs::read_to_string(&dev_five).unwrap();
+    assert!(dev_yaml.contains("deleted_at:"), "{dev_yaml}");
     assert!(tp_five.exists(), "TP untouched by valid delete");
+
+    let resp = api.handle_request(&mk_req(
+        "POST",
+        "/api/tasks/delete",
+        &[("project", "DEV")],
+        json!({"id": "DEV-5", "hard": true}),
+    ));
+    assert_eq!(resp.status, 200);
+    assert!(!dev_five.exists(), "hard delete removes the file");
+    assert!(tp_five.exists(), "TP untouched by hard delete");
 }
 
 #[test]
@@ -870,7 +886,8 @@ fn delete_event_emits_canonical_id_for_padded_alias() {
         json!({"id": "TP-001"}),
     ));
     assert_eq!(resp.status, 200, "padded alias delete");
-    assert!(!fx.tasks_dir.join("TP").join("1.yml").exists());
+    // Soft deletion (DEV-92): the tombstone file remains on disk.
+    assert!(fx.tasks_dir.join("TP").join("1.yml").exists());
 
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {

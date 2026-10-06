@@ -23,6 +23,11 @@
                 :class="statusBadgeClass"
                 data-testid="task-panel-status-badge"
               >{{ form.status }}</span>
+              <span
+                v-if="isDeleted"
+                class="badge task-panel__deleted-badge"
+                data-testid="task-panel-deleted-badge"
+              >Deleted</span>
             </div>
             <div class="task-panel__header-actions">
               <UiButton
@@ -50,7 +55,38 @@
           </header>
 
           <section class="task-panel__body" v-if="!loading">
+            <div v-if="isDeleted" class="task-panel__deleted-banner" role="alert" data-testid="task-deleted-banner">
+              <div class="task-panel__deleted-banner-text">
+                <strong>Deleted{{ deletedAtLabel }}</strong>
+                <span class="muted">
+                  This task is in the trash and read-only. Restore it to edit, comment, or attach files.
+                </span>
+              </div>
+              <div class="task-panel__deleted-banner-actions">
+                <UiButton
+                  variant="primary"
+                  type="button"
+                  data-testid="task-restore"
+                  :disabled="restoreSubmitting"
+                  @click="restoreDeletedTask"
+                >
+                  {{ restoreSubmitting ? 'Restoring…' : 'Restore' }}
+                </UiButton>
+                <UiButton
+                  variant="danger"
+                  type="button"
+                  :disabled="restoreSubmitting"
+                  @click="hardDeleteDialogOpen = true"
+                >
+                  Delete permanently…
+                </UiButton>
+              </div>
+            </div>
             <form class="task-panel__form" @submit.prevent="handleSubmit">
+              <!-- DEV-92: a deleted task is read-only; the fieldset disables
+                   every nested form control in one place. Mutations are also
+                   rejected server-side ("restore it first"). -->
+              <fieldset class="task-panel__form-fieldset" :disabled="isDeleted">
               <TaskPanelSummarySection
                 :form="form"
                 :mode="mode"
@@ -399,6 +435,7 @@
                   {{ submitting ? 'Creating…' : 'Create task' }}
                 </UiButton>
               </footer>
+              </fieldset>
             </form>
           </section>
 
@@ -537,6 +574,58 @@
       </UiCard>
     </div>
   </Teleport>
+  <Teleport to="body">
+    <div
+      v-if="hardDeleteDialogOpen"
+      class="task-panel-dialog__overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Delete permanently"
+      @click.self="hardDeleteDialogOpen = false"
+    >
+      <UiCard class="task-panel-dialog__card">
+        <form class="task-panel-dialog__form" @submit.prevent="submitHardDelete">
+          <header class="task-panel-dialog__header">
+            <h2>Delete permanently</h2>
+            <UiButton
+              variant="ghost"
+              icon-only
+              type="button"
+              :disabled="hardDeleteSubmitting"
+              aria-label="Close dialog"
+              title="Close dialog"
+              @click="hardDeleteDialogOpen = false"
+            >
+              <IconGlyph name="close" />
+            </UiButton>
+          </header>
+          <p>
+            Permanently delete {{ task.id || 'this task' }}? The task file and its history are removed.
+            This cannot be undone.
+          </p>
+          <p class="muted">
+            Attached repository files are kept; managed attachment blobs that are still referenced by
+            other tasks are retained and reported after deletion.
+          </p>
+          <label class="task-panel-dialog__checkbox">
+            <input type="checkbox" v-model="hardDeleteConfirmed" /> I understand this cannot be undone
+          </label>
+          <footer class="task-panel-dialog__footer">
+            <UiButton
+              variant="danger"
+              type="submit"
+              :disabled="hardDeleteSubmitting || !hardDeleteConfirmed"
+            >
+              {{ hardDeleteSubmitting ? 'Deleting…' : 'Delete permanently' }}
+            </UiButton>
+            <UiButton variant="ghost" type="button" :disabled="hardDeleteSubmitting" @click="hardDeleteDialogOpen = false">
+              Cancel
+            </UiButton>
+          </footer>
+        </form>
+      </UiCard>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -550,7 +639,8 @@ import {
     readTaskPanelShowAttachmentsPreference,
     readTaskPanelShowLinksInAttachmentsPreference,
 } from '../utils/preferences'
-import { projectPrefixOfTaskId } from '../utils/text'
+import { applyTaskSnapshot, isDeletedTask, projectPrefixOfTaskId } from '../utils/text'
+import { useTaskStore } from '../composables/useTaskStore'
 import ChipListField from './ChipListField.vue'
 import IconGlyph from './IconGlyph.vue'
 import MarkdownContent from './MarkdownContent.vue'
@@ -568,8 +658,18 @@ import TaskPanelSummarySection from './task-panel/TaskPanelSummarySection.vue'
 import TaskPanelTagEditor from './task-panel/TaskPanelTagEditor.vue'
 import { showToast } from './toast'
 
-const props = defineProps<{ open: boolean; taskId?: string | null; initialProject?: string | null; initialStatus?: string | null; initialDueDate?: string | null; focusSection?: string | null }>()
-const emit = defineEmits<{ (e: 'close'): void; (e: 'created', task: TaskDTO): void; (e: 'updated', task: TaskDTO): void }>()
+const props = defineProps<{
+  open: boolean
+  taskId?: string | null
+  initialProject?: string | null
+  initialStatus?: string | null
+  initialDueDate?: string | null
+  focusSection?: string | null
+  /** DEV-92: bumped by TaskPanelHost on external lifecycle transitions. */
+  lifecycleReload?: number
+}>()
+const emit = defineEmits<{ (e: 'close'): void; (e: 'created', task: TaskDTO): void; (e: 'updated', task: TaskDTO): void; (e: 'restored', task: TaskDTO): void }>()
+const taskStore = useTaskStore()
 
 const {
   mode,
@@ -642,6 +742,7 @@ const {
   handleSubmit,
   updateStatus,
   reloadTask,
+  invalidateTaskRequests,
   formatDate,
   formatCommit,
   formatFieldName,
@@ -680,6 +781,103 @@ const {
 } = useTaskPanelState(props, emit)
 
 const taskId = computed(() => (task.id || '').trim())
+
+// -- DEV-92: deleted (trash) task mode --------------------------------------
+
+const isDeleted = computed(() => isDeletedTask(task))
+
+const deletedAtLabel = computed(() => {
+  const stamp = task.deleted_at
+  if (!stamp) return ''
+  try {
+    return ` ${formatDate(stamp)}`
+  } catch {
+    return ''
+  }
+})
+
+const restoreSubmitting = ref(false)
+
+async function restoreDeletedTask() {
+    if (!task.id || restoreSubmitting.value) return
+    const id = task.id
+    restoreSubmitting.value = true
+    try {
+    await taskStore.restore(id, projectPrefixOfTaskId(id) || undefined)
+    if (!props.open || task.id !== id || props.taskId !== id) return
+    const restored = taskStore._map.value.get(id)
+    if (!restored || isDeletedTask(restored)) {
+      await reloadTask()
+      return
+    }
+    applyTaskSnapshot(task, restored)
+    // 'restored' is the authoritative lifecycle-clearing channel: ordinary
+    // 'updated' snapshots can no longer clear a live tombstone (DEV-92).
+    emit('restored', restored)
+    emit('updated', restored)
+    showToast('Task restored')
+    await reloadTask()
+  } catch (error: any) {
+    showToast(error?.message || 'Failed to restore task')
+  } finally {
+    restoreSubmitting.value = false
+  }
+}
+
+const hardDeleteDialogOpen = ref(false)
+const hardDeleteSubmitting = ref(false)
+const hardDeleteConfirmed = ref(false)
+
+watch(hardDeleteDialogOpen, (open) => {
+  if (!open) hardDeleteConfirmed.value = false
+})
+
+async function submitHardDelete() {
+  if (!task.id || hardDeleteSubmitting.value || !hardDeleteConfirmed.value) return
+  hardDeleteSubmitting.value = true
+  try {
+    const response = await api.deleteTask(task.id, {
+      project: projectPrefixOfTaskId(task.id) || undefined,
+      hard: true,
+    })
+    const warnings = Array.isArray(response?.warnings) ? response.warnings : []
+    warnings.forEach((warning) => showToast(warning))
+    showToast('Task permanently deleted')
+    hardDeleteDialogOpen.value = false
+    closePanel()
+  } catch (error: any) {
+    showToast(error?.message || 'Failed to delete task')
+  } finally {
+    hardDeleteSubmitting.value = false
+  }
+}
+
+// DEV-92: external delete/restore while this task's panel is open. The host
+// bumps `lifecycleReload` from the SHARED store's reactivity (no duplicate
+// SSE); only the currently loaded task reloads, discarding unsaved edits on
+// external deletion (they are void — the server rejects writes on trash rows).
+watch(
+  () => props.lifecycleReload,
+  async () => {
+    if (!props.open) return
+    if (mode.value !== 'edit' || !task.id) return
+    if (props.taskId && task.id !== props.taskId) return
+    invalidateTaskRequests()
+    try {
+      await reloadTask()
+    } catch {
+      // reloadTask surfaces its own failure state; the next lifecycle
+      // transition or manual reopen retries.
+    }
+  },
+)
+
+/** DEV-92: trash rows reject attachment/link mutations before they start. */
+function rejectDeletedMutation(label: string): boolean {
+  if (!isDeleted.value) return false
+  showToast(`Restore the task before ${label}`)
+  return true
+}
 
 const sprintDialogOpen = ref(false)
 const sprintDialogSubmitting = ref(false)
@@ -806,7 +1004,7 @@ function applyReferencesFromTaskResponse(updated: Partial<TaskDTO> | null | unde
 }
 
 function onReferencesUpdated(updated: TaskDTO) {
-  Object.assign(task, updated)
+  applyTaskSnapshot(task, updated)
   applyReferencesFromTaskResponse(updated)
   emit('updated', updated)
 }
@@ -884,6 +1082,7 @@ async function removeAttachment(relPath: string) {
   if (!path) return
   if (attachmentsUploading.value) return
   if (removingAttachmentPath.value) return
+  if (rejectDeletedMutation('removing attachments')) return
 
   if (mode.value !== 'edit' || !task.id) {
     showToast('Save the task before removing attachments')
@@ -1095,6 +1294,7 @@ async function removeLinkReference(url: string) {
   if (attachmentsUploading.value) return
   if (addingLinkReferences.value) return
   if (removingLinkUrl.value) return
+  if (rejectDeletedMutation('removing links')) return
 
   if (mode.value !== 'edit' || !task.id) {
     showToast('Save the task before removing links')
@@ -1228,6 +1428,11 @@ async function onAttachmentsDrop(event: DragEvent) {
 
   event.preventDefault()
   resetAttachmentsDragState()
+
+  if (isDeleted.value) {
+    showToast('Restore the task before attaching files or links')
+    return
+  }
 
   if (mode.value !== 'edit') {
     showToast(hasFiles ? 'Save the task before attaching files' : 'Save the task before attaching links')
@@ -1396,6 +1601,10 @@ function onDescriptionInput() {
 
 function startEditingDescription() {
   if (editingDescription.value) return
+  if (isDeleted.value) {
+    showToast('Restore the task before editing the description')
+    return
+  }
   editingDescription.value = true
   descriptionPreview.value = false
   nextTick(() => {
@@ -1493,6 +1702,7 @@ const sprintDialogTitle = computed(() =>
 )
 
 function openSprintDialog(mode: 'add' | 'remove') {
+  if (rejectDeletedMutation('managing sprints')) return
   if (!hasSprints.value && mode === 'add') {
     showToast('No sprints available yet')
     return
@@ -1605,6 +1815,7 @@ function formatRemote(remote: SyncRemoteConfig): string {
 }
 
 function openSyncDialog() {
+  if (rejectDeletedMutation('syncing')) return
   if (!hasSyncRemotes.value) {
     showToast('No sync remotes configured for this project')
     return
@@ -1662,6 +1873,7 @@ async function submitSyncDialog() {
 
 async function removeSprintChip(sprintId: number) {
   if (removingSprintId.value !== null) return
+  if (rejectDeletedMutation('managing sprints')) return
   const taskId = form.id || props.taskId
   if (!taskId || taskId === 'new') {
     showToast('Save the task before managing sprints')
@@ -1893,6 +2105,53 @@ async function removeSprintChip(sprintId: number) {
   display: flex;
   flex-direction: column;
   gap: var(--space-4, 1rem);
+}
+
+/* DEV-92: read-only shell + trash banner for deleted tasks. */
+.task-panel__form-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+.task-panel__form-fieldset:disabled {
+  opacity: 0.75;
+}
+
+.task-panel__deleted-badge {
+  border: 1px solid color-mix(in oklab, var(--color-danger, #c62828) 45%, transparent);
+  background: color-mix(in oklab, var(--color-danger, #c62828) 12%, transparent);
+  color: var(--color-danger, #c62828);
+}
+
+.task-panel__deleted-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  flex-wrap: wrap;
+  padding: var(--space-3, 0.75rem);
+  margin-bottom: var(--space-3, 0.75rem);
+  border: 1px solid color-mix(in oklab, var(--color-danger, #c62828) 40%, transparent);
+  border-left: 3px solid var(--color-danger, #c62828);
+  border-radius: var(--radius-md, 0.375rem);
+  background: color-mix(in oklab, var(--color-danger, #c62828) 8%, transparent);
+}
+
+.task-panel__deleted-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.task-panel__deleted-banner-actions {
+  display: flex;
+  gap: var(--space-2, 0.5rem);
+  flex-wrap: wrap;
 }
 
 .task-panel__group {

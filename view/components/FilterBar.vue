@@ -201,6 +201,17 @@
           <option value="asc">Oldest</option>
         </UiSelect>
 
+        <UiSelect
+          v-model="deletion"
+          aria-label="Deletion visibility"
+          data-testid="task-deletion-filter"
+          title="Show active tasks, deleted tasks (trash), or both"
+        >
+          <option value="active">Active tasks</option>
+          <option value="deleted">Deleted tasks</option>
+          <option value="all">All tasks</option>
+        </UiSelect>
+
         <UiInput v-model="tags" placeholder="Tags" />
 
         <div class="filter-bar__custom">
@@ -299,6 +310,10 @@ const priority = ref('')
 const type = ref('')
 const sprintFilter = ref('')
 const order = ref<'asc'|'desc'>('desc')
+// DEV-92 deletion visibility: 'active' (default) never emits a filter key —
+// the server default and clean URLs stay untouched; 'deleted'/'all' become
+// part of the filter value (and therefore the query key and URL).
+const deletion = ref<'active' | 'deleted' | 'all'>('active')
 // Server sort key (`sort_by` wire value). The table headers own the value; the
 // filter bar only preserves it across re-emits so it survives filter edits.
 const sortBy = ref('')
@@ -313,7 +328,7 @@ const customFilterInput = ref<{ focus: () => void } | null>(null)
 let lastSyncedExtras = ''
 // Keys that have dedicated UI controls and must not fall through to the
 // custom-filter box. Derived from the grammar so aliases stay in one place.
-const CUSTOM_UI_KEYS = new Set(['q', 'order', 'sort_by', ...GRAMMAR_KEYS.map((meta) => meta.key)])
+const CUSTOM_UI_KEYS = new Set(['q', 'order', 'deletion', 'sort_by', ...GRAMMAR_KEYS.map((meta) => meta.key)])
 // Normalized alias -> canonical field, shared with the grammar's alias table.
 const RESERVED_FIELD_ALIASES: Record<string, string> = (() => {
   const map: Record<string, string> = {
@@ -587,10 +602,11 @@ onMounted(() => {
         type.value = asText(saved.type)
         sprintFilter.value = asText(saved.sprints)
         assignee.value = asText(saved.assignee)
-        tags.value = asText(saved.tags)
-        dueDate.value = asText(saved.due)
-        recent.value = asText(saved.recent)
-        needs.value = asText(saved.needs)
+    tags.value = asText(saved.tags)
+    dueDate.value = asText(saved.due)
+    recent.value = asText(saved.recent)
+    needs.value = asText(saved.needs)
+    deletion.value = normalizeDeletionValue(saved.deletion)
         // Sort persistence has a single owner: the page's per-project sort
         // storage (`lotar.tasks.sort::*`). Deliberately do NOT restore
         // sort_by/order from this snapshot — a stale one must never override
@@ -678,6 +694,7 @@ watchEffect(() => {
     dueDate.value = props.value.due || ''
     recent.value = props.value.recent || ''
     needs.value = props.value.needs || ''
+    deletion.value = normalizeDeletionValue(props.value.deletion)
     const o = props.value.order
     order.value = (o === 'asc' || o === 'desc') ? o : order.value
     sortBy.value = props.value.sort_by || ''
@@ -1033,6 +1050,7 @@ function emitFilter(){
   if (dueDate.value) v.due = dueDate.value
   if (recent.value) v.recent = recent.value
   if (needs.value) v.needs = needs.value
+  if (deletion.value !== 'active') v.deletion = deletion.value
   v.order = order.value
   if (sortBy.value) {
     v.sort_by = sortBy.value
@@ -1064,6 +1082,7 @@ function onClear(){
   needs.value = ''
   order.value = 'desc'
   sortBy.value = ''
+  deletion.value = 'active'
   extraFilters.value = ''
   lastSyncedExtras = ''
   customFilterErrors.value = []
@@ -1073,8 +1092,12 @@ function onClear(){
   emit('update:value', empty)
 }
 
+function normalizeDeletionValue(value: unknown): 'active' | 'deleted' | 'all' {
+  return value === 'deleted' || value === 'all' ? value : 'active'
+}
+
 // Emit whenever any field changes; parent debounces/refetches
-watch([query, project, status, priority, type, sprintFilter, order, sortBy, tags, extraFilters, assignee, dueDate, recent, needs], emitFilter, { deep: false })
+watch([query, project, status, priority, type, sprintFilter, order, sortBy, tags, extraFilters, assignee, dueDate, recent, needs, deletion], emitFilter, { deep: false })
 
 defineExpose({ appendCustomFilter, clear: onClear })
 </script>

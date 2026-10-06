@@ -376,7 +376,7 @@ fn initialize_response_and_await_window_before_initialized_notification() {
         .and_then(|result| result.get("tools"))
         .and_then(|tools| tools.as_array())
         .expect("tools array");
-    assert_eq!(tools.len(), 37, "advertised tool count");
+    assert_eq!(tools.len(), 38, "advertised tool count");
 }
 
 #[test]

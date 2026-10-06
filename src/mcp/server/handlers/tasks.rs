@@ -634,6 +634,11 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
         return err(req.id, -32602, "Missing id", None);
     };
     let project = req.params.get("project").and_then(|v| v.as_str());
+    let include_deleted = req
+        .params
+        .get("include_deleted")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
         Err(e) => {
@@ -646,7 +651,12 @@ pub(crate) fn handle_task_get(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
     let storage = Storage::new(&resolver.path);
-    match TaskService::get(&storage, id, project) {
+    let outcome = if include_deleted {
+        TaskService::get_including_deleted(&storage, id, project)
+    } else {
+        TaskService::get(&storage, id, project)
+    };
+    match outcome {
         Ok(task) => ok(
             req.id,
             json!({
@@ -1560,6 +1570,11 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         return err(req.id, -32602, "Missing id", None);
     };
     let project = req.params.get("project").and_then(|v| v.as_str());
+    let hard = req
+        .params
+        .get("hard")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let resolver = match TasksDirectoryResolver::resolve(None, None) {
         Ok(r) => r,
         Err(e) => {
@@ -1572,17 +1587,57 @@ pub(crate) fn handle_task_delete(req: JsonRpcRequest) -> JsonRpcResponse {
         }
     };
     let mut storage = Storage::new(&resolver.path);
-    match TaskService::delete(&mut storage, id, project) {
-        Ok(deleted) => ok(
-            req.id,
-            json!({
-                "content": [ { "type": "text", "text": format!("deleted={}", deleted) } ]
-            }),
-        ),
+    match TaskService::delete_with_options(&mut storage, id, project, hard) {
+        Ok(outcome) => {
+            let payload = json!({
+                "deleted": outcome.deleted,
+                "hard": outcome.hard,
+                "warnings": outcome.warnings,
+            });
+            ok(
+                req.id,
+                json!({
+                    "content": [ { "type": "text", "text": serde_json::to_string_pretty(&payload).unwrap_or_else(|_| "{}".into()) } ]
+                }),
+            )
+        }
         Err(e) => err(
             req.id,
             -32006,
             "Task delete failed",
+            Some(json!({"message": e.to_string()})),
+        ),
+    }
+}
+
+pub(crate) fn handle_task_restore(req: JsonRpcRequest) -> JsonRpcResponse {
+    let Some(id) = req.params.get("id").and_then(|v| v.as_str()) else {
+        return err(req.id, -32602, "Missing id", None);
+    };
+    let project = req.params.get("project").and_then(|v| v.as_str());
+    let resolver = match TasksDirectoryResolver::resolve(None, None) {
+        Ok(r) => r,
+        Err(e) => {
+            return err(
+                req.id,
+                -32603,
+                "Internal error",
+                Some(json!({"message": e})),
+            );
+        }
+    };
+    let mut storage = Storage::new(&resolver.path);
+    match TaskService::restore(&mut storage, id, project) {
+        Ok(task) => ok(
+            req.id,
+            json!({
+                "content": [ { "type": "text", "text": serde_json::to_string_pretty(&task).unwrap_or_else(|_| "{}".into()) } ]
+            }),
+        ),
+        Err(e) => err(
+            req.id,
+            -32007,
+            "Task restore failed",
             Some(json!({"message": e.to_string()})),
         ),
     }
@@ -1735,6 +1790,34 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         Ok(v) => v,
         Err(resp) => return resp,
     };
+    // Deletion view (strict): active | deleted | all. The schema layer
+    // already rejects unknown values; the handler still fails closed so a
+    // direct call can never silently widen the view.
+    let deletion = match req.params.get("deletion") {
+        None | Some(Value::Null) => crate::storage::DeletionFilter::default(),
+        Some(Value::String(raw)) => match raw.trim() {
+            "active" => crate::storage::DeletionFilter::Active,
+            "deleted" => crate::storage::DeletionFilter::Deleted,
+            "all" => crate::storage::DeletionFilter::All,
+            other => {
+                return err(
+                    req.id,
+                    -32602,
+                    &format!("deletion must be one of: active, deleted, all (found '{other}')"),
+                    None,
+                );
+            }
+        },
+        Some(_) => {
+            return err(
+                req.id,
+                -32602,
+                "deletion must be a string (active|deleted|all)",
+                None,
+            );
+        }
+    };
+
     let tags = parse_tags_params(&req.params);
     let text_query = req
         .params
@@ -1792,6 +1875,7 @@ pub(crate) fn handle_task_list(req: JsonRpcRequest) -> JsonRpcResponse {
         priority,
         task_type,
         project: project.clone(),
+        deletion,
         tags,
         text_query,
         sprints: match parse_sprint_ids_strict(req.params.get("sprints")) {

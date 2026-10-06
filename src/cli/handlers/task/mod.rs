@@ -20,12 +20,14 @@ mod history;
 pub(crate) mod mutation;
 mod reference;
 pub(crate) mod render;
+mod restore;
 mod search;
 
 use delete::DeleteHandler;
 use edit::EditHandler;
 use history::{handle_at, handle_diff, handle_history, handle_history_by_field};
 use reference::handle_reference;
+use restore::RestoreHandler;
 use search::SearchHandler;
 
 /// Handler for all task subcommands
@@ -136,6 +138,9 @@ impl CommandHandler for TaskHandler {
             }
             TaskAction::Delete(delete_args) => {
                 DeleteHandler::execute(delete_args, project, resolver, renderer)
+            }
+            TaskAction::Restore(restore_args) => {
+                RestoreHandler::execute(restore_args, project, resolver, renderer)
             }
             TaskAction::Comment {
                 id,

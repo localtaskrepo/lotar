@@ -42,6 +42,7 @@ pub(super) fn build_tool_definitions(enum_hints: Option<&EnumHints>) -> Vec<Valu
         make_task_reference_add_tool(enum_hints),
         make_task_reference_remove_tool(enum_hints),
         make_task_delete_tool(enum_hints),
+        make_task_restore_tool(enum_hints),
         make_task_list_tool(enum_hints),
         make_sprint_list_tool(),
         make_sprint_get_tool(),
@@ -282,12 +283,16 @@ fn make_task_create_tool(enum_hints: Option<&EnumHints>) -> Value {
 fn make_task_get_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_get",
-        "description": "Fetch a task DTO by id (optionally override project prefix). Returns the canonical persisted representation.",
+        "description": "Fetch a task DTO by id (optionally override project prefix). Soft-deleted tasks are excluded unless include_deleted=true. Returns the canonical persisted representation (deleted_at is set for soft-deleted tasks).",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "id": {"type": "string"},
-                "project": {"type": ["string", "null"]}
+                "project": {"type": ["string", "null"]},
+                "include_deleted": {
+                    "type": ["boolean", "null"],
+                    "description": "Also resolve soft-deleted tasks. Defaults to false."
+                }
             },
             "required": ["id"],
             "additionalProperties": false
@@ -479,7 +484,42 @@ fn make_task_update_tool(enum_hints: Option<&EnumHints>) -> Value {
 fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
     let mut tool = json!({
         "name": "task_delete",
-        "description": "Delete a task by id (optional project override). Returns a text payload indicating deleted=true/false.",
+        "description": "Delete a task by id (optional project override). Default is a soft delete: the task is marked deleted_at, hidden from active views, and recoverable via task_restore. Pass hard=true to physically remove the task file; hard deletion lists retained attachment references and incoming relationships in warnings. Returns {deleted, hard, warnings}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "project": {"type": ["string", "null"]},
+                "hard": {
+                    "type": ["boolean", "null"],
+                    "description": "Physically remove the task file instead of soft deleting. Defaults to false."
+                }
+            },
+            "required": ["id"],
+            "additionalProperties": false
+        }
+    });
+
+    let mut field_hints = JsonMap::new();
+    insert_field_hint(
+        &mut field_hints,
+        "project",
+        enum_hints.map(|h| h.projects.as_slice()),
+        false,
+    );
+    attach_field_hints(&mut tool, field_hints);
+
+    if let Some(hints) = enum_hints {
+        append_hint_descriptions(&mut tool, &[(hints.projects.as_slice(), "projects")]);
+    }
+
+    tool
+}
+
+fn make_task_restore_tool(enum_hints: Option<&EnumHints>) -> Value {
+    let mut tool = json!({
+        "name": "task_restore",
+        "description": "Restore a soft-deleted task by id (optional project override). Clears deleted_at while preserving the task id and content. Returns the restored task DTO.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -508,10 +548,18 @@ fn make_task_delete_tool(enum_hints: Option<&EnumHints>) -> Value {
 }
 
 fn make_task_list_tool(enum_hints: Option<&EnumHints>) -> Value {
-    let description = "List tasks using optional filters. status/priority/type accept a single string, comma-separated string, or array and are validated via project config (invalid values error). assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids. due (today|soon|later|overdue; overdue excludes terminal tasks under the task's project issue.done_states policy), recent (7d), and needs (CSV of effort,due) are smart filters. sort_by orders globally (builtins: priority, status, effort, due-date, created, modified, assignee, type, project, id; or custom:<name> / field:<name>); order is asc|desc. Default: modified desc with canonical-ID ascending tiebreak. Invalid explicit filter/sort values error instead of being dropped.\n\nPAGINATION: Results are paginated over that deterministic global order. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
+    let description = "List tasks using optional filters. deletion selects the deletion view: active (default) excludes soft-deleted tasks, deleted returns only soft-deleted tasks, all returns both. status/priority/type accept a single string, comma-separated string, or array and are validated via project config (invalid values error). assignee accepts '@me'. tags can be provided as tag (single) or tags (multi). search performs a text match across id/title/description/tags. custom_fields filters require string or array-of-string values. sprints filters by numeric sprint ids. due (today|soon|later|overdue; overdue excludes terminal tasks under the task's project issue.done_states policy), recent (7d), and needs (CSV of effort,due) are smart filters. sort_by orders globally (builtins: priority, status, effort, due-date, created, modified, assignee, type, project, id; or custom:<name> / field:<name>); order is asc|desc. Default: modified desc with canonical-ID ascending tiebreak. Invalid explicit filter/sort values error instead of being dropped.\n\nPAGINATION: Results are paginated over that deterministic global order. Default page size is 50 (max 200). The response includes `total`, `count`, `cursor`, `limit`, `hasMore`, and `nextCursor`. When `hasMore` is true, call the tool again with `cursor: <nextCursor>` (or `offset`) to fetch the next page. The `message` field summarizes what is shown vs. total. Do NOT assume the first response contains every matching task — always check `hasMore`/`total` before reasoning about completeness.".to_string();
 
     let mut properties = JsonMap::new();
     properties.insert("project".into(), json!({"type": ["string", "null"]}));
+    properties.insert(
+        "deletion".into(),
+        json!({
+            "type": ["string", "null"],
+            "enum": ["active", "deleted", "all", null],
+            "description": "Deletion view: active (default) excludes soft-deleted tasks, deleted returns only soft-deleted tasks, all returns both."
+        }),
+    );
     properties.insert("status".into(), multi_value_string_schema());
     properties.insert("assignee".into(), json!({"type": ["string", "null"]}));
     properties.insert("priority".into(), multi_value_string_schema());

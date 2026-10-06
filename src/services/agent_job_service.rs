@@ -2143,6 +2143,7 @@ mod tests {
     fn sample_task() -> crate::api_types::TaskDTO {
         crate::api_types::TaskDTO {
             task_state: None,
+            deleted_at: None,
             id: "TEST-1".to_string(),
             title: "Test task".to_string(),
             status: crate::types::TaskStatus::from("Todo"),

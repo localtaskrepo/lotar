@@ -67,7 +67,7 @@ Notes:
 
 ## Tool Surface
 
-The registry binds all 37 advertised tools to their handlers; `tools/list` returns exactly this set (see [MCP Tools Reference](./mcp-tools.md) for full schemas):
+The registry binds all 38 advertised tools to their handlers; `tools/list` returns exactly this set (see [MCP Tools Reference](./mcp-tools.md) for full schemas):
 
 | Tool | Purpose |
 |------|---------|
@@ -83,7 +83,8 @@ The registry binds all 37 advertised tools to their handlers; `tools/list` retur
 | `task_bulk_comment_add` | Add the same comment to multiple tasks. |
 | `task_bulk_reference_add` | Add the same reference to multiple tasks. |
 | `task_bulk_reference_remove` | Remove the same reference from multiple tasks. |
-| `task_delete` | Delete by id/project, returning `deleted=true/false`. |
+| `task_delete` | Soft-delete by default; explicit `hard` removes the file and returns retained-attachment/incoming-relationship warnings. |
+| `task_restore` | Restore a soft-deleted task without changing its content-modification timestamp. |
 | `task_list` | Filtered, paginated listing (limit default 50, max 200) with enum hints. |
 | `sprint_list` | List sprints with pagination + integrity hints. |
 | `sprint_get` | Fetch one sprint by id. |

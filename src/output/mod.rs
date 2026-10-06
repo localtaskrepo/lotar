@@ -72,6 +72,9 @@ pub struct TaskDisplayInfo {
     pub tags: Vec<String>,
     pub created: String,
     pub modified: String,
+    /// Soft-deletion tombstone timestamp; omitted for active tasks.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deleted_at: Option<String>,
     pub custom_fields: crate::types::CustomFields,
 }
 

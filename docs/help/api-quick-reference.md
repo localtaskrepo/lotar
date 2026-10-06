@@ -7,9 +7,10 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
   omitted when the page is empty (treat missing as `[]`); empty page:
   `{ "data": { "total": 0, "limit": 50, "offset": 0 } }`, populated page:
   `{ "data": { "total": 1, "limit": 50, "offset": 0, "tasks": [ { "id": "QA-1", "title": "Wire contract tests", "status": "Todo", "priority": "Medium", "task_type": "Feature", "created": "2026-09-15T10:00:00+00:00", "modified": "2026-09-15T11:30:00+00:00" } ] } }`
-- GET  /api/tasks/get?id=ID[&project=PREFIX] -> { data: TaskDTO }
+- GET  /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true] -> { data: TaskDTO }; deleted tasks are hidden unless explicitly included
 - POST /api/tasks/update (TaskUpdateRequest) -> { data: TaskDTO }
-- POST /api/tasks/delete ({ id }[?project=PREFIX]) -> { data: { deleted: bool } }; 400 for invalid/mismatched/ambiguous/cross-root IDs, 404 when absent
+- POST /api/tasks/delete ({ id, hard?: bool }[?project=PREFIX]) -> { data: { deleted: bool, hard: bool, warnings: string[] } }; defaults to soft delete; hard deletion retains attachment blobs and warns about their references and incoming task relationships
+- POST /api/tasks/restore ({ id }[?project=PREFIX]) -> { data: TaskDTO }; restores a soft-deleted task without changing `modified`
 - POST /api/tasks/references/file/add (FileReferenceAddRequest) -> { data: FileReferenceAddResponse }; 400 when the path resolves inside the managed attachments store
 - POST /api/tasks/references/file/remove (FileReferenceRemoveRequest) -> { data: FileReferenceRemoveResponse }; repository files are never deleted
 - POST /api/tasks/attachments/upload ({ id, filename, content_base64 }) -> { data: { stored_path, attached, task } }; uploads attach typed `attachment` references
@@ -42,6 +43,7 @@ Endpoints with quick examples. For full schema see [OpenAPI](../openapi.json).
 - GET  /api/events -> text/event-stream (see SSE Events)
 
 Notes
+- List and export accept `deletion=active|deleted|all` (default `active`). Blank or invalid values return 400. Delete/restore preserve `modified` and append lifecycle history; deleted tasks require restoration before ordinary mutations.
 - People fields accept `@me`.
 - /api/tasks/list accepts additional query keys beyond the documented ones: declared custom field names can be used directly (e.g., `?sprint=W35`). Values support CSV and fuzzy matching (case/sep-insensitive).
 - Task mutations (add/update/status) validate `status`/`priority`/`type` strings against the target project's resolved configuration, so project-only enum values are accepted and out-of-set values return 400.

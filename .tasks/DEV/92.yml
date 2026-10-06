@@ -1,7 +1,49 @@
 title: Support/Verify soft delete
-status: Todo
+status: Done
 priority: High
 type: Feature
 reporter: mallox
+assignee: mallox
 created: 2026-09-20T05:36:29.977698+00:00
+modified: 2026-10-06T01:38:24.724436+00:00
+comments:
+- date: 2026-10-06T00:01:49.343619+00:00
+  text: 'Plan: Implement in-place optional deleted_at (UTC RFC3339) with default soft deletion, explicit hard deletion, deleted/all listing and restore across service/CLI/REST/MCP/UI. User correction: soft delete AND restore leave modified unchanged; append lifecycle history without timestamp churn. Hard deletion retains managed blobs and returns warnings listing retained attachments and detected incoming task relationships. Existing max-file-ID+1 allocation and physical-file removal supported; tombstones reserve IDs; low-level delete remains physical for rollback. Shared visibility defaults active; preserve deleted task content/sprint membership; block edits under locks; attachment reachability includes tombstones; sync pull indexes tombstones without duplicate import; watchers recognize valid tombstones; shared UI cache/query lifecycle handles unchanged modified and races. Basic deleted filter/read-only details/restore, not retention schedules/new ID scheme. Contract sync Rust/UI/OpenAPI/help plus registry schemas. Validate targeted lifecycle/race/attachment/sync/ID tests and real-browser flows, then warning-free lint, full native-nextest/UI and build-first smoke. Strict no Git commands/index inspection, no commits/pushes/worktrees; isolated test Git probes/fixtures allowed with honest exclusions. Coordinator alone updates DEV ticket. Preserve pre-existing/staged work. Remaining: implement and verify; no durable guidance correction yet.'
+- date: 2026-10-06T00:11:26.833495+00:00
+  text: 'Progress: Approved contracts/help/OpenAPI and four new actual-backend/browser smoke cases added. Baseline smoke run against previous binary fails all four cases as intended: deletion response lacks lifecycle mode/warnings, old deletion physically removes target, shared blob is reclaimed after the other owner detaches, and external deleted_at edits remain visible. Evidence target/dev92-20261006/smoke-red.log; this is red proof, not a passing gate. Implementation workers own disjoint backend, UI, CLI/MCP source; no repository Git commands authorized. Remaining: integration and green targeted/full verification; modified must remain unchanged on both lifecycle operations.'
+- date: 2026-10-06T00:49:27.118119+00:00
+  text: 'Progress: Backend lifecycle landed: optional deleted_at, active/deleted/all query grammar, guarded soft delete/restore preserving modified and history idempotency, explicit hard delete/preview warnings, retained shared blobs, tombstone-aware sync/integrity and watcher behavior. Backend self-verification: 1255 Rust passed / 45 Git-gated skipped in gitless profile; fmt/clippy clean. Initial UI: 542 tests / 65 files and types passed; initial CLI/MCP focused suites passed with one explicitly reported environment Git-probe failure outside selector. Integration found and assigned corrective coverage: stale lifecycle responses/404s and post-hard-delete ID reuse in cache; CLI deleted_at output/markers and repeated soft-delete no-op; normal CLI lookup must reject tombstones before configuration side effects, without numeric fallback redirect. Docs independent review corrected omitted delete project query param and checked links/38 tools. Four baseline smoke reds preserved; five final cross-surface/browser scenarios prepared. Remaining: corrective UI/CLI completion, independent backend safety review, fresh build/browser and final lint/native-nextest/UI/full smoke. No Git commands/index inspection authorized or reported in DEV92 implementation.'
+- date: 2026-10-06T01:38:24.699143+00:00
+  text: 'Outcome: Implemented default in-place soft deletion and restore across CLI/REST/MCP/UI. deleted_at is optional, active tasks omit it, and delete/restore preserve modified (including originally absent YAML field) while appending history only on actual transitions. Repeated soft delete is idempotent and keeps deleted:true; no implicit hard escalation. Explicit --hard / hard:true removes only the task file; retained managed-blob paths and detected incoming task relationships are listed in warnings; neither blobs nor related tasks are cleaned up. Trash visibility active/deleted/all, CLI --deleted/--include-deleted and JSON deleted_at/human markers, restored enum validation and strict unreadable-config rejection, 38-tool registry and synchronized OpenAPI/help. Normal CLI lookups reject tombstones before member/config side effects without numeric cross-project redirect; raw-storage automation dependency reads now treat deleted terminal tasks as unresolved. Shared attachment reachability and sync indexes include tombstones; sync skips deleted matches. Shared cache guards stale queries/mutations/404s and ID reuse without modified churn; open panels reload read-only on external deletion, hard disappearance closes them, restore cannot override a newer delete, and prior save responses are scope-invalidated. Max-existing-filename+1 allocation unchanged; manual removal/gaps/tail reuse tested. Evidence: final-lint.log frontend types, all-target/all-feature Clippy -D warnings and fmt clean; final-types-green.log clean after last UI-only adjustment. final-test-green.log native nextest 1263 passed / 45 actual Gitless exclusions and UI 558 passed / 66 files. final-smoke-green.log fresh web/compressed/embed/smoke build 212 passed / 25 actual Git-dependent skips / 52 files. final-browser-artifacts.log repeats all 5 new cross-surface/browser cases after screenshot-only privacy mask change, 5/5. Targeted CLI 8/8, panel/store/host 86/86, review fixes 20/20. Actual desktop/mobile screenshots inspected at target/smoke-artifacts/soft-delete/; target/dev92-20261006/ contains red proofs, failures/fixes and final logs. Manual file-event fixture uses documented LOTAR_ENABLE_POLL_WATCH=1 after sandbox native watcher produced no events; no sleeps, retry/concurrency/budget weakening. Remaining: no scoped implementation blocker. Git-capable cases, genuine Windows and unpublished CI are not claimed passed. Eight Vue router-context warnings from useProjectFilterSync unit fixtures remain visible in passing UI run; production/build/lint are warning-free. Additional independent backend review and final UI delegate continuation hit provider usage quota; coordinator completed source review, preserved partial edits, added corrective tests and ran all final gates locally. Documentation independent review passed after delete-project query-param omission fix. No repository Git commands/index inspection/staging/commits/pushes/worktrees performed or reported in DEV92; automated isolated Git capability probes/fixtures only. Guidance: no safety/permission/quality policy change and no durable instruction correction identified; existing poll-watcher test aid was used. No retention schedule, new ID registry, all-project Board change or unrelated ticket work.'
 description: Issues can be deleted. By default they should be soft deleted so that the client doesn't show them anymore (except maybe via a filter/flag). The system should however still support hard deletes, e.g. when a developer just deletes a task file, without breaking. It's their responsibility to handle this and there is always the git history that users can rely on. This also means that missing ticket IDs should not cause any problems. ID counters can be based on highest ID+1 so that we reuse ticket ID numbers if they're not in the system, which allows gaps, but doesn't increase count if the tickets are not stored. Yes, this can mean that the git history may have a different ticket with the same ID, if I delete the newest one and add a different one, but I think this okay, as the issues will be raised through the git diff, which will still allow a user to increment the ID number manually, which they are probably comfortable with if they already mess with the files directly. Instead of delete flag we can use a deletedAt timestamp, which is more flexible and allows for future features like "undelete" or "restore". The system should also support a way to list all deleted issues, maybe with a filter or a separate command. This will allow users to see what has been deleted and potentially restore them if needed.
+history:
+- at: 2026-10-06T00:01:49.303941+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-06T00:01:49.343619+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T00:11:26.833495+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T00:49:27.118119+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T01:38:24.699143+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-06T01:38:24.724436+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

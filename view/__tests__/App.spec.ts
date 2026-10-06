@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import App from '../App.vue'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
@@ -9,6 +10,9 @@ vi.mock('../composables/useTaskStore', () => ({
     connectSse: vi.fn(),
     disconnectSse: vi.fn(),
     onTaskError: vi.fn(() => vi.fn()),
+    version: ref(0),
+    _map: ref(new Map()),
+    isHardDeleted: vi.fn(() => false),
   }),
 }))
 

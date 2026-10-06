@@ -39,6 +39,10 @@ export interface TaskTableEmit {
     (event: 'update:sort', value: { key: ColKey | null; dir: 'asc' | 'desc' }): void
     (event: 'open', id: string): void
     (event: 'delete', id: string): void
+    /** DEV-92: restore a soft-deleted row (deleted context only). */
+    (event: 'restore', id: string): void
+    /** DEV-92: permanently delete a soft-deleted row (deleted context only). */
+    (event: 'delete-forever', id: string): void
     (event: 'update-tags', payload: { id: string; tags: string[] }): void
     (event: 'edit-tags', id: string): void
     (event: 'set-status', payload: { id: string; status: string }): void

@@ -1,4 +1,5 @@
 use crate::storage::TaskFilter;
+use crate::storage::filter::DeletionFilter;
 use crate::storage::locator::StorageLocator;
 use crate::storage::task::Task;
 #[cfg(feature = "parallel")]
@@ -194,6 +195,14 @@ impl StorageSearch {
 
     /// Helper method to check if a task matches all filter criteria
     pub fn task_matches_filter(task_id: &str, task: &Task, filter: &TaskFilter) -> bool {
+        // Lifecycle visibility (DEV-92): default hides tombstones, `Deleted`
+        // selects only tombstones, `All` returns everything.
+        match filter.deletion {
+            DeletionFilter::Active if task.deleted_at.is_some() => return false,
+            DeletionFilter::Deleted if task.deleted_at.is_none() => return false,
+            _ => {}
+        }
+
         // Check status filter (OR logic - match any of the specified statuses)
         if !filter.status.is_empty() && !filter.status.contains(&task.status) {
             return false;

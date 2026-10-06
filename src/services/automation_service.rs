@@ -1491,6 +1491,7 @@ fn find_blocked_dependencies(
             .unwrap_or_default();
         let status = storage
             .get(trimmed, &prefix)
+            .filter(|task| task.deleted_at.is_none())
             .map(|task| task.status)
             .map(|status| status.as_str().to_ascii_lowercase());
 
@@ -1782,6 +1783,7 @@ mod dev21_cross_root_dependency_tests {
     fn dependent_dto(id: &str, deps: &[&str]) -> TaskDTO {
         TaskDTO {
             task_state: None,
+            deleted_at: None,
             id: id.to_string(),
             title: "dependent".to_string(),
             status: crate::types::TaskStatus::from("Todo"),
@@ -1839,5 +1841,28 @@ mod dev21_cross_root_dependency_tests {
             // in its own root B) does not — regardless of input order.
             assert_eq!(blocked, vec!["PX-1".to_string()], "deps: {deps:?}");
         }
+    }
+
+    #[test]
+    fn deleted_terminal_and_missing_dependencies_remain_unresolved() {
+        let tmp = tempfile::tempdir().unwrap();
+        write_config(tmp.path(), "Done");
+        write_task(tmp.path(), "PX", 1, "Done");
+        write_task(tmp.path(), "PX", 2, "Done");
+        let file = tmp.path().join(".tasks/PX/2.yml");
+        let mut yaml = std::fs::read_to_string(&file).unwrap();
+        yaml.push_str("deleted_at: 2026-10-01T00:00:00Z\n");
+        std::fs::write(file, yaml).unwrap();
+        let storage = Storage::new(&tmp.path().join(".tasks"));
+        let config =
+            crate::config::resolution::config_for_project(&storage.root_path, Some("PX")).unwrap();
+        assert_eq!(
+            find_blocked_dependencies(
+                &storage,
+                &dependent_dto("PX-9", &["PX-1", "PX-2", "PX-3"]),
+                &config
+            ),
+            vec!["PX-2".to_string(), "PX-3".to_string()]
+        );
     }
 }

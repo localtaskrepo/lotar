@@ -159,19 +159,40 @@ pub(super) fn register(api_server: &mut ApiServer) {
     HttpResponse { status: 200, headers, body: wtr.into_bytes() }
 });
 
-    // GET /api/tasks/get?id=ID[&project=PREFIX]
+    // GET /api/tasks/get?id=ID[&project=PREFIX][&include_deleted=true]
 
     api_server.register_handler("GET", "/api/tasks/get", |req: &HttpRequest| {
         let id = match req.query.get("id") {
             Some(v) if !v.is_empty() => v.clone(),
             _ => return bad_request("Missing id".into()),
         };
+        // Strict boolean (DEV-92): only the exact spellings are accepted so a
+        // typo can never silently widen or narrow lifecycle visibility.
+        let include_deleted = match req.query.get("include_deleted").map(|s| s.as_str()) {
+            None => false,
+            Some("true") => true,
+            Some("false") => false,
+            Some(other) => {
+                return bad_request(format!(
+                    "Invalid include_deleted value: '{other}' (expected true or false)"
+                ));
+            }
+        };
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
             Ok(r) => r,
             Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
         };
         let storage = crate::storage::manager::Storage::new(&resolver.path);
-        match TaskService::get(&storage, &id, req.query.get("project").map(|s| s.as_str())) {
+        let outcome = if include_deleted {
+            TaskService::get_including_deleted(
+                &storage,
+                &id,
+                req.query.get("project").map(|s| s.as_str()),
+            )
+        } else {
+            TaskService::get(&storage, &id, req.query.get("project").map(|s| s.as_str()))
+        };
+        match outcome {
             Ok(task) => ok_json(200, json!({"data": task})),
             Err(e) => match e {
                 LoTaRError::TaskNotFound(_) => not_found(e.to_string()),
@@ -1077,7 +1098,7 @@ pub(super) fn register(api_server: &mut ApiServer) {
         ok_json(200, json!({"data": dto}))
     });
 
-    // POST /api/tasks/delete
+    // POST /api/tasks/delete {id, hard?=false}
 
     api_server.register_handler("POST", "/api/tasks/delete", |req: &HttpRequest| {
         let resolver = match TasksDirectoryResolver::resolve(None, None) {
@@ -1086,14 +1107,18 @@ pub(super) fn register(api_server: &mut ApiServer) {
         };
         let mut storage = crate::storage::manager::Storage::new(&resolver.path);
         let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
-        let del: crate::cli::TaskDeleteArgs = match serde_json::from_value(body.clone()) {
+        let payload: crate::api_types::TaskDeleteRequest = match serde_json::from_value(body) {
             Ok(v) => v,
             Err(e) => return bad_request(format!("Invalid body: {}", e)),
         };
-        let deleted = match TaskService::delete(
+        if payload.id.trim().is_empty() {
+            return bad_request("Missing id".into());
+        }
+        let outcome = match TaskService::delete_with_options(
             &mut storage,
-            &del.id,
+            payload.id.trim(),
             req.query.get("project").map(|s| s.as_str()),
+            payload.hard,
         ) {
             Ok(value) => value,
             Err(err) => {
@@ -1105,16 +1130,48 @@ pub(super) fn register(api_server: &mut ApiServer) {
                 };
             }
         };
-        if deleted {
+        if outcome.deleted {
             // Emit the CANONICAL id: a padded request alias (TP-001) must not
-            // leak into UI event streams as a stale identity.
-            let canonical_id = crate::storage::TaskId::parse(del.id.trim())
+            // leak into UI event streams as a stale identity. Soft and hard
+            // deletion both surface as task_deleted; the tombstone state and
+            // the physical file removal are distinguished by the response.
+            let canonical_id = crate::storage::TaskId::parse(payload.id.trim())
                 .map(|parsed| parsed.canonical())
-                .unwrap_or_else(|_| del.id.clone());
+                .unwrap_or_else(|_| payload.id.clone());
             let actor = crate::utils::identity::resolve_current_user(None);
             crate::api_events::emit_task_deleted(&canonical_id, actor.as_deref());
         }
-        ok_json(200, json!({"data": {"deleted": deleted}}))
+        ok_json(200, json!({"data": outcome}))
+    });
+
+    // POST /api/tasks/restore {id}[?project=PREFIX]
+
+    api_server.register_handler("POST", "/api/tasks/restore", |req: &HttpRequest| {
+        let resolver = match TasksDirectoryResolver::resolve(None, None) {
+            Ok(r) => r,
+            Err(e) => return internal(json!({"error": {"code": "INTERNAL", "message": e}})),
+        };
+        let mut storage = crate::storage::manager::Storage::new(&resolver.path);
+        let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or(json!({}));
+        let id = match body.get("id").and_then(|v| v.as_str()) {
+            Some(s) if !s.trim().is_empty() => s.trim().to_string(),
+            _ => return bad_request("Missing id".into()),
+        };
+        match TaskService::restore(
+            &mut storage,
+            &id,
+            req.query.get("project").map(|s| s.as_str()),
+        ) {
+            Ok(dto) => {
+                let actor = crate::utils::identity::resolve_current_user(None);
+                crate::api_events::emit_task_updated(&dto, actor.as_deref());
+                ok_json(200, json!({"data": dto}))
+            }
+            Err(err) => match err {
+                LoTaRError::TaskNotFound(_) => not_found(err.to_string()),
+                _ => bad_request(err.to_string()),
+            },
+        }
     });
 
     // GET /api/config/show

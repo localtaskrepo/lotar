@@ -1,0 +1,7 @@
+title: Remove duplicate "Custom filters" input
+status: Todo
+priority: Low
+type: Chore
+reporter: mallox
+created: 2026-10-06T02:15:15.915372+00:00
+description: The Tasks (and probably other) filters panel has a field for "custom filters" which should already be covered by the normal search bar, so this one can probably be removed.

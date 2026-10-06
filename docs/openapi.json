@@ -386,6 +386,16 @@
         "description": "List tasks with the shared query grammar (DEV-57). Built-in filters via named query params (status, priority, type, assignee, tags, project, q, sprints); any other query key is treated as a property filter: declared custom field names can be used directly (e.g., sprint=W35). Assignee supports @me (unresolvable @me returns 400) and __none__ for unassigned. Multiple values can be provided as CSV and values are matched using case- and separator-insensitive fuzzy matching. Smart filters: due=today|soon|later|overdue (local-date buckets; soon covers the next 7 days excluding today), recent=7d (modified within the last 7 days, inclusive), needs=effort,due (CSV; tasks missing ALL listed fields). Ordering: sort_by selects a builtin key (priority, status, effort, due-date, created, modified, assignee, reporter, title, type, project, id, tags, sprints) or a custom field via custom:<name> (alias field:<name>); order is asc|desc. Default: modified desc with a canonical-ID lexical ascending tiebreak that never flips with order. Invalid explicit enum values, sprint entries, smart filters, order, sort_by, or page params return 400 INVALID_ARGUMENT (limit must be 1-200).",
         "parameters": [
           {
+            "name": "deletion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "deleted", "all"],
+              "default": "active"
+            },
+            "description": "Task lifecycle visibility. Deleted tasks are hidden by default. Invalid or blank explicit values return 400."
+          },
+          {
             "name": "project",
             "in": "query",
             "schema": {
@@ -587,6 +597,15 @@
       "get": {
         "summary": "Get task by id",
         "parameters": [
+          {
+            "name": "include_deleted",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Opt in to reading a soft-deleted task. Default reads hide deleted tasks; restore is required before ordinary mutations."
+          },
           {
             "name": "id",
             "in": "query",
@@ -942,7 +961,15 @@
     },
     "/api/tasks/delete": {
       "post": {
-        "summary": "Delete a task by id",
+        "summary": "Soft-delete a task, or explicitly remove its file permanently",
+        "description": "Default deletion sets deleted_at and appends history without changing modified. Repeating soft deletion is a no-op. With hard=true the task file is removed, attachment blobs are retained, and warnings list retained attachment references and detectable incoming task relationships. Relationships and other files are not rewritten.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -991,6 +1018,40 @@
           "500": {
             "$ref": "#/components/responses/InternalError"
           }
+        }
+      }
+    },
+    "/api/tasks/restore": {
+      "post": {
+        "summary": "Restore a soft-deleted task",
+        "description": "Clears deleted_at and records history without changing modified or the task ID. Content and surviving sprint memberships are retained. Restored values must satisfy the current project configuration. No-op restoration does not append history.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "query",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TaskRestoreRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Restored task",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EnvelopeTask" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
         }
       }
     },
@@ -2565,6 +2626,16 @@
         },
         "parameters": [
           {
+            "name": "deletion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "deleted", "all"],
+              "default": "active"
+            },
+            "description": "Same lifecycle visibility as /api/tasks/list; deleted tasks are excluded by default."
+          },
+          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -3474,6 +3545,11 @@
           "modified": {
             "type": "string"
           },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Soft-deletion timestamp; omitted for active tasks. Delete and restore do not change modified."
+          },
           "due_date": {
             "type": "string"
           },
@@ -3869,11 +3945,36 @@
         "properties": {
           "id": {
             "type": "string"
+          },
+          "hard": {
+            "type": "boolean",
+            "default": false,
+            "description": "Permanently remove the task file instead of soft-deleting it. Attachment blobs and incoming relationships remain untouched."
           }
         },
         "required": [
           "id"
         ]
+      },
+      "TaskRestoreRequest": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }
+        },
+        "required": ["id"]
+      },
+      "TaskDeleteResponse": {
+        "type": "object",
+        "properties": {
+          "deleted": { "type": "boolean" },
+          "hard": { "type": "boolean" },
+          "warnings": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Hard-delete warnings identify retained attachment references and detectable incoming relationships. Empty when there are no warnings."
+          }
+        },
+        "required": ["deleted", "hard", "warnings"]
       },
       "LinkReferenceAddRequest": {
         "type": "object",
@@ -7136,15 +7237,7 @@
         "type": "object",
         "properties": {
           "data": {
-            "type": "object",
-            "properties": {
-              "deleted": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "deleted"
-            ]
+            "$ref": "#/components/schemas/TaskDeleteResponse"
           }
         },
         "required": [

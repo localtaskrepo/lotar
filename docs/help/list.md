@@ -28,6 +28,7 @@ lotar --format json list --due-soon --tag release
 | Project or workspace | `--project/-p`, `--tasks-dir`, `--tag/-i` |
 | Status & priority | `--status/-s`, `--priority/-P`, plus shortcuts `--high` and `--critical` |
 | Type & ownership | `--type/-t`, `--assignee/-a`, `--mine/-m`, `--where assignee=""` for unassigned |
+| Deletion | Active tasks by default; `--deleted` for deleted tasks only, or `--include-deleted` for both (mutually exclusive) |
 | Dates | `--overdue` (due before today), `--due-soon[=days]` (due today through today+days inclusive) |
 | Custom data | `--where key=value` or `--where field:<name>=value` (repeat as needed) |
 | Effort windows | `--effort-min 2h`, `--effort-max 1d`, accepts time or points |
@@ -49,6 +50,8 @@ Tips:
 | `json` | Trigger automation or feed dashboards. |
 
 All formats show canonical IDs (`AUTH-12`), even if you entered `12`.
+
+Deleted tasks retain their original status and `modified` timestamp. Deletion is a separate lifecycle, not a completion status; explicitly listing deleted tasks does not add them to normal project statistics or automation workload.
 
 Default order (no `--sort-by`) is newest-modified first, matching the REST and MCP list endpoints; ties break by canonical ID ascending. `--assignee`/`--mine` match assignees fuzzily (case and `@`-insensitive), like the API. An unknown `--sort-by` key is an error unless it names a configured custom field (bare name, `field:<name>`, or `custom:<name>`).
 

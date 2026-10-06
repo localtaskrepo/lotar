@@ -172,6 +172,8 @@
           @update:selected-ids="setSelectedIds"
         @open="view"
         @delete="openSingleDelete"
+        @restore="restoreTask"
+        @delete-forever="openSingleDeleteForever"
         @update-title="onUpdateTitle"
         @update-tags="onUpdateTags"
         @edit-tags="onEditTags"
@@ -311,7 +313,12 @@
             <header class="row tasks-modal__header">
               <div class="col" style="gap: 4px;">
                 <h2>{{ deleteDialogTitle }}</h2>
-                <p class="muted tasks-modal__hint">This cannot be undone.</p>
+                <p v-if="!deleteDialogHard" class="muted tasks-modal__hint">
+                  Deleted tasks move to the trash. Restore them any time from the Deleted filter.
+                </p>
+                <p v-else class="muted tasks-modal__hint tasks-modal__hint--danger">
+                  This permanently removes the task and its history. This cannot be undone.
+                </p>
               </div>
               <UiButton
                 variant="ghost"
@@ -325,10 +332,28 @@
                 <IconGlyph name="close" />
               </UiButton>
             </header>
-            <p>Are you sure you want to delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?</p>
+            <p v-if="!deleteDialogHard">
+              Are you sure you want to delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?
+            </p>
+            <div v-else class="col" style="gap: 8px;">
+              <p>
+                Permanently delete the selected task{{ deleteDialogIds.length === 1 ? '' : 's' }}?
+                Attached repository files are kept; managed attachment blobs that are still referenced
+                elsewhere are retained.
+              </p>
+              <label class="row tasks-modal__checkbox">
+                <input type="checkbox" v-model="deleteDialogConfirmed" />
+                I understand this cannot be undone
+              </label>
+            </div>
             <footer class="row tasks-modal__footer">
-              <UiButton variant="danger" type="button" :disabled="deleteDialogSubmitting" @click="submitDeleteDialog">
-                {{ deleteDialogSubmitting ? 'Deleting…' : 'Delete' }}
+              <UiButton
+                variant="danger"
+                type="button"
+                :disabled="deleteDialogSubmitting || (deleteDialogHard && !deleteDialogConfirmed)"
+                @click="submitDeleteDialog"
+              >
+                {{ deleteDialogSubmitting ? 'Deleting…' : deleteDialogHard ? 'Delete permanently' : 'Delete' }}
               </UiButton>
               <UiButton variant="ghost" type="button" :disabled="deleteDialogSubmitting" @click="closeDeleteDialog">Cancel</UiButton>
             </footer>
@@ -371,7 +396,7 @@ import {
     sortByToColKey,
 } from '../utils/taskSort'
 import { onPreferencesChanged, readTasksPageSizePreference } from '../utils/preferences'
-import { projectOf, titleCase } from '../utils/text'
+import { isDeletedTask, projectOf, titleCase } from '../utils/text'
 import { storageGet, storageGetJson, storageRemove, storageSet, storageSetJson } from '../utils/storage'
 
 const router = useRouter()
@@ -809,8 +834,18 @@ async function exportCsv() {
   }
 }
 
+/** DEV-92: block quick edits on trash rows (server rejects them too). */
+function deletedTaskGuard(id: string): boolean {
+  if (isDeletedTask(store._map.value.get(id))) {
+    showToast('Restore the task before editing it')
+    return true
+  }
+  return false
+}
+
 async function onUpdateTitle(payload: { id: string; title: string }){
   const { id, title } = payload
+  if (deletedTaskGuard(id)) return
   try {
     const updated = await api.updateTask(id, { title })
     store.upsert(updated)
@@ -822,6 +857,7 @@ async function onUpdateTitle(payload: { id: string; title: string }){
 
 async function onUpdateTags(payload: { id: string; tags: string[] }){
   const { id, tags } = payload
+  if (deletedTaskGuard(id)) return
   try {
     const updated = await api.updateTask(id, { tags })
     store.upsert(updated)
@@ -833,6 +869,7 @@ async function onUpdateTags(payload: { id: string; tags: string[] }){
 
 async function onQuickStatus(payload: { id: string; status: string }){
   const { id, status } = payload
+  if (deletedTaskGuard(id)) return
   try {
     const updated = await api.setStatus(id, status)
     store.upsert(updated)
@@ -1205,14 +1242,25 @@ const deleteDialogOpen = ref(false)
 const deleteDialogSubmitting = ref(false)
 const deleteDialogIds = ref<string[]>([])
 const deleteDialogMode = ref<'single' | 'bulk'>('single')
-
-const deleteDialogTitle = computed(() =>
-  deleteDialogMode.value === 'single'
-    ? 'Delete task'
-    : `Delete ${deleteDialogIds.value.length} selected task${deleteDialogIds.value.length === 1 ? '' : 's'}`,
+// DEV-92: permanent deletion is offered only from a deleted context (row
+// menu of a deleted task / bulk delete while the Deleted filter is active).
+const deleteDialogHard = ref(false)
+const deleteDialogConfirmed = ref(false)
+const deletionMode = computed(() =>
+  filter.value.deletion === 'deleted' ? 'deleted' : filter.value.deletion === 'all' ? 'all' : 'active',
 )
 
-function openDeleteDialog(ids: string[], mode: 'single' | 'bulk') {
+const deleteDialogTitle = computed(() => {
+  const noun = deleteDialogHard.value
+    ? 'Permanently delete'
+    : 'Delete'
+  const suffix = deleteDialogMode.value === 'single'
+    ? 'task'
+    : `${deleteDialogIds.value.length} selected task${deleteDialogIds.value.length === 1 ? '' : 's'}`
+  return `${noun} ${suffix}`
+})
+
+function openDeleteDialog(ids: string[], mode: 'single' | 'bulk', hard = false) {
   if (deleteDialogSubmitting.value) return
   const unique = Array.from(new Set(ids))
   if (!unique.length) {
@@ -1221,6 +1269,8 @@ function openDeleteDialog(ids: string[], mode: 'single' | 'bulk') {
   }
   deleteDialogIds.value = unique
   deleteDialogMode.value = mode
+  deleteDialogHard.value = hard
+  deleteDialogConfirmed.value = false
   deleteDialogOpen.value = true
 }
 
@@ -1229,32 +1279,50 @@ function closeDeleteDialog(force?: boolean | Event) {
   if (deleteDialogSubmitting.value && !forced) return
   deleteDialogOpen.value = false
   deleteDialogIds.value = []
+  deleteDialogConfirmed.value = false
 }
 
-async function deleteTasks(ids: string[]) {
+function deletionProject(id: string): string | undefined {
+  // The task's own prefix is stable even if the view's project filter
+  // changes mid-dialog; the filter only fills in for unprefixed ids.
+  return projectOf(id) || filter.value.project || undefined
+}
+
+async function deleteTasks(ids: string[], hard = false) {
   const scope = filterGeneration
   const unique = Array.from(new Set(ids))
   const failures: Array<{ id: string; error: unknown }> = []
+  const warnings: string[] = []
   let success = 0
   for (const id of unique) {
     try {
-      await store.remove(id)
+      const response = await store.remove(id, { project: deletionProject(id), hard })
       success += 1
+      if (Array.isArray(response?.warnings)) warnings.push(...response.warnings)
       if (scope === filterGeneration) selectedIds.value = selectedIds.value.filter((value) => value !== id)
     } catch (error) {
       failures.push({ id, error })
     }
   }
-  return { success, failures }
+  return { success, failures, warnings }
 }
 
 async function submitDeleteDialog() {
   if (deleteDialogSubmitting.value || !deleteDialogOpen.value || !deleteDialogIds.value.length) return
+  if (deleteDialogHard.value && !deleteDialogConfirmed.value) return
   deleteDialogSubmitting.value = true
   try {
-    const { success, failures } = await deleteTasks(deleteDialogIds.value)
+    const hard = deleteDialogHard.value
+    const { success, failures, warnings } = await deleteTasks(deleteDialogIds.value, hard)
     if (success) {
-      showToast(`Deleted ${success} task${success === 1 ? '' : 's'}`)
+      showToast(
+        hard
+          ? `Permanently deleted ${success} task${success === 1 ? '' : 's'}`
+          : `Deleted ${success} task${success === 1 ? '' : 's'} — recoverable from the Deleted filter`,
+      )
+      // Server-reported retention warnings (managed blobs still referenced
+      // elsewhere, detected incoming relationships) — surfaced, never acted on.
+      warnings.forEach((warning) => showToast(warning))
     }
     if (failures.length) {
       showToast(`Failed to delete ${failures.length} task${failures.length === 1 ? '' : 's'}`)
@@ -1267,11 +1335,24 @@ async function submitDeleteDialog() {
 }
 
 function openSingleDelete(id: string) {
-  openDeleteDialog([id], 'single')
+  openDeleteDialog([id], 'single', false)
+}
+
+function openSingleDeleteForever(id: string) {
+  openDeleteDialog([id], 'single', true)
+}
+
+async function restoreTask(id: string) {
+  try {
+    const restored = await store.restore(id, deletionProject(id))
+    showToast(`Restored ${restored.id}`)
+  } catch (e: any) {
+    showToast(e?.message || 'Failed to restore task')
+  }
 }
 
 function openBulkDelete() {
-  openDeleteDialog(scopedSelection.value, 'bulk')
+  openDeleteDialog(scopedSelection.value, 'bulk', deletionMode.value === 'deleted')
 }
 
 const { refresh: refreshProjects } = useProjects()
@@ -1651,6 +1732,10 @@ const handleTaskUpdated = (task: TaskDTO) => {
 
 .tasks-modal__hint {
   font-size: var(--text-sm, 0.875rem);
+}
+
+.tasks-modal__hint--danger {
+  color: var(--color-danger, #c62828);
 }
 
 .tasks-modal__checkbox {

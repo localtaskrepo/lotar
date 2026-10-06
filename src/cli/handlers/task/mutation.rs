@@ -1,3 +1,4 @@
+use crate::api_types::TaskDTO;
 use crate::cli::handlers::task::context::TaskCommandContext;
 use crate::output::OutputRenderer;
 use crate::services::task_service::TaskService;
@@ -7,6 +8,71 @@ pub struct LoadedTask {
     pub full_id: String,
     pub project_prefix: String,
     pub task: Task,
+}
+
+/// A task loaded through the deletion-aware lookup: soft-deleted tasks
+/// resolve too, and `task.deleted_at` distinguishes them.
+pub struct LoadedDeletedAwareTask {
+    pub full_id: String,
+    pub project_prefix: String,
+    pub task: TaskDTO,
+}
+
+/// Same resolution pipeline as [`load_task`] (prefix resolution, numeric-id
+/// fallback, effective-project update) but resolving through
+/// `TaskService::get_including_deleted` so soft-deleted tasks remain
+/// addressable for delete/restore flows.
+pub fn load_task_including_deleted(
+    ctx: &mut TaskCommandContext,
+    raw_id: &str,
+    project: Option<&str>,
+) -> Result<LoadedDeletedAwareTask, String> {
+    ctx.project_resolver
+        .validate_task_id_format(raw_id)
+        .map_err(|e| format!("Invalid task ID: {}", e))?;
+
+    let mut full_id = ctx.resolve_full_task_id(raw_id, project)?;
+    let mut project_prefix = crate::storage::TaskId::parse(&full_id)
+        .map(|parsed| parsed.project)
+        .unwrap_or_default();
+
+    let mut task_opt =
+        TaskService::get_including_deleted(&ctx.storage, &full_id, Some(project_prefix.as_str()))
+            .ok();
+
+    if task_opt.is_none() && raw_id.chars().all(|c| c.is_ascii_digit()) {
+        // Clear fail-closed diagnostics for numeric lookups: ambiguous
+        // numbers (stored by more than one project/root) are refused. The
+        // numeric resolver only sees active tasks; a soft-deleted task must
+        // be addressed by its full or prefixed ID.
+        match ctx.storage.resolve_numeric_id(raw_id) {
+            Ok((actual_id, _)) => {
+                project_prefix = crate::storage::TaskId::parse(&actual_id)
+                    .map(|parsed| parsed.project)
+                    .unwrap_or_default();
+                full_id = actual_id;
+                task_opt = TaskService::get_including_deleted(
+                    &ctx.storage,
+                    &full_id,
+                    Some(project_prefix.as_str()),
+                )
+                .ok();
+            }
+            Err(err) => {
+                return Err(format!("Task '{}' not found: {}", raw_id, err));
+            }
+        }
+    }
+
+    let task = task_opt.ok_or_else(|| format!("Task '{}' not found", raw_id))?;
+
+    ctx.update_effective_project(Some(project_prefix.as_str()))?;
+
+    Ok(LoadedDeletedAwareTask {
+        full_id,
+        project_prefix,
+        task,
+    })
 }
 
 pub fn load_task(
@@ -43,6 +109,13 @@ pub fn load_task(
     }
 
     let task = task_opt.ok_or_else(|| format!("Task '{}' not found", raw_id))?;
+
+    if task.deleted_at.is_some() {
+        return Err(format!(
+            "Task '{}' is soft-deleted; restore it before reading or editing it",
+            raw_id
+        ));
+    }
 
     ctx.update_effective_project(Some(project_prefix.as_str()))?;
 

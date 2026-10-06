@@ -19,5 +19,5 @@ pub mod task;
 pub mod transaction;
 
 // Re-export commonly used types and operations for convenience
-pub use filter::TaskFilter;
+pub use filter::{DeletionFilter, TaskFilter};
 pub use identity::{TaskId, TaskLocation};

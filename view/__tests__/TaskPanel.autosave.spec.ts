@@ -93,6 +93,37 @@ describe('TaskPanel atomic create status', () => {
 })
 
 describe('TaskPanel autosave queue', () => {
+  it('a late pre-delete save response cannot clear the deletion marker (DEV-92)', async () => {
+    currentTask = task('A-1')
+    const wrapper = panel('A-1')
+    await flushPromises()
+    const vm = wrapper.vm as any
+    api.updateTask.mockClear()
+
+    const pending = deferred()
+    api.updateTask.mockReturnValueOnce(pending.promise)
+    vm.form.title = 'Edited during flight'
+    void vm.onFieldBlurBase('title')
+    await flushPromises()
+    expect(api.updateTask).toHaveBeenCalledExactlyOnceWith('A-1', { title: 'Edited during flight' })
+
+    // External soft deletion lands while the save is in flight: the
+    // authoritative panel reload applies the tombstone marker.
+    currentTask = { ...task('A-1', 'Edited during flight'), deleted_at: '2026-10-05T10:00:00Z' }
+    await vm.reloadTask()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="task-deleted-banner"]').exists()).toBe(true)
+
+    // The pre-delete save response resolves AFTER the deletion: it must not
+    // clear the marker or the read-only state.
+    pending.resolve({ ...task('A-1', 'Edited during flight') })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="task-deleted-banner"]').exists()).toBe(true)
+    expect(wrapper.find('fieldset[disabled]').exists()).toBe(true)
+    expect((vm.task as Record<string, unknown>).deleted_at).toBe('2026-10-05T10:00:00Z')
+  })
+
   it('serializes autosaves and coalesces fields queued while a request is in flight', async () => {
     currentTask = task('A-1')
     const wrapper = panel('A-1')
@@ -205,7 +236,7 @@ describe('TaskPanel autosave queue', () => {
     await flushPromises()
 
     expect(toast).toHaveBeenCalledWith('save failed')
-    expect(api.getTask).toHaveBeenCalledWith('A-1')
+    expect(api.getTask).toHaveBeenCalledWith('A-1', undefined, { includeDeleted: true })
     // Failed field with no newer intent is reverted to the server value.
     expect(vm.form.title).toBe('A-1')
     expect(vm.task.title).toBe('A-1')
