@@ -146,12 +146,19 @@
       </div>
     </details>
 
-    <div v-if="dialogOpen" class="automation-builder__dialog-backdrop" @click.self="closeDialog">
-      <div class="automation-builder__dialog card" role="dialog" aria-modal="true">
+    <UiModal
+      :open="dialogOpen"
+      size="xl"
+      aria-label="Automation rule builder"
+      :aria-labelledby="ruleDialogTitleId"
+      :aria-describedby="ruleDialogDescId"
+      @close="closeDialog"
+    >
+      <div class="automation-builder__dialog">
         <header class="automation-builder__dialog-header">
           <div>
-            <h2>{{ editingIndex === null ? 'Create automation rule' : 'Edit automation rule' }}</h2>
-            <p class="muted">Focus on the common path first. Use Custom only when you really need multiple triggers or mixed actions.</p>
+            <h2 :id="ruleDialogTitleId">{{ editingIndex === null ? 'Create automation rule' : 'Edit automation rule' }}</h2>
+            <p :id="ruleDialogDescId" class="muted">Focus on the common path first. Use Custom only when you really need multiple triggers or mixed actions.</p>
           </div>
           <UiButton variant="ghost" icon-only type="button" aria-label="Close dialog" title="Close dialog" @click="closeDialog">
             <IconGlyph name="close" />
@@ -632,12 +639,12 @@
           </div>
         </footer>
       </div>
-    </div>
+    </UiModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import { listFromCsv } from '../composables/useFilterBuilder'
 import {
     automationConditionFieldOptions,
@@ -674,7 +681,11 @@ import UiButton from './UiButton.vue'
 import UiCard from './UiCard.vue'
 import UiEmptyState from './UiEmptyState.vue'
 import UiInput from './UiInput.vue'
+import UiModal from './UiModal.vue'
 import UiSelect from './UiSelect.vue'
+
+const ruleDialogTitleId = useId()
+const ruleDialogDescId = useId()
 
 type GuidedRecipe = 'status' | 'assignment' | 'tags' | 'comment' | 'command' | 'custom'
 
@@ -1554,23 +1565,8 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
   opacity: 0.85;
 }
 
-.automation-builder__dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.46);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 40;
-}
-
+/* Dialog shell is provided by UiModal; this is content layout only. */
 .automation-builder__dialog {
-  width: min(980px, 100%);
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -1781,10 +1777,6 @@ function cloneDraft(draft: AutomationRuleDraft): AutomationRuleDraft {
 }
 
 @media (max-width: 640px) {
-  .automation-builder__dialog {
-    padding: 16px;
-  }
-
   .automation-builder__stepper {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -265,26 +265,34 @@
     </div>
 
     <!-- Run confirmation dialog -->
-    <div v-if="showRunConfirmDialog" class="scan-dialog-overlay" @click.self="cancelRunConfirm">
+    <UiModal
+      :open="showRunConfirmDialog"
+      size="sm"
+      aria-label="Run scan?"
+      :aria-labelledby="runConfirmTitleId"
+      :aria-describedby="runConfirmDescId"
+      :dismissible="!loading"
+      @close="cancelRunConfirm"
+    >
       <div class="scan-dialog">
-        <h3>Run scan?</h3>
-        <p>This will create or update tasks in your project.</p>
+        <h3 :id="runConfirmTitleId">Run scan?</h3>
+        <p :id="runConfirmDescId">This will create or update tasks in your project.</p>
         <p class="muted">Tip: Use "Dry run" first to preview changes safely.</p>
         <label class="scan-dialog__checkbox">
           <input v-model="skipFutureConfirm" type="checkbox" />
           Don't show this again
         </label>
         <div class="scan-dialog__actions">
-          <UiButton type="button" @click="cancelRunConfirm">Cancel</UiButton>
+          <UiButton type="button" data-autofocus @click="cancelRunConfirm">Cancel</UiButton>
           <UiButton variant="primary" type="button" @click="handleRunConfirm(skipFutureConfirm)">Run</UiButton>
         </div>
       </div>
-    </div>
+    </UiModal>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import type { ConfigInspectResult, ProjectDTO, ReferenceSnippet, ScanEntry, ScanRequest, ScanResponse, ScanTarget } from '../api/types'
 import IconGlyph from '../components/IconGlyph.vue'
@@ -293,8 +301,12 @@ import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiInput from '../components/UiInput.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useProjects } from '../composables/useProjects'
+
+const runConfirmTitleId = useId()
+const runConfirmDescId = useId()
 
 const { projects, refresh: refreshProjects } = useProjects()
 const project = ref('')
@@ -540,6 +552,7 @@ function confirmRun() {
 }
 
 function handleRunConfirm(skipFuture: boolean) {
+  if (!showRunConfirmDialog.value) return
   showRunConfirmDialog.value = false
   if (skipFuture) {
     localStorage.setItem(SKIP_RUN_CONFIRM_KEY, 'true')

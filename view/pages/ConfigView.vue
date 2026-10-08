@@ -332,12 +332,20 @@
       </div>
     </div>
 
-    <div v-if="createOpen" class="dialog-backdrop" @click.self="closeCreateDialog">
-      <div class="dialog-card card" role="dialog" aria-modal="true">
+    <UiModal
+      :open="createOpen"
+      size="lg"
+      aria-label="Create a project"
+      :aria-labelledby="createTitleId"
+      :aria-describedby="createDescId"
+      :dismissible="!creatingProject"
+      @close="closeCreateDialog"
+    >
+      <div class="dialog-card">
         <header class="dialog-header">
           <div>
-            <h2>Create a project</h2>
-            <p class="muted">New projects inherit the global defaults shown below.</p>
+            <h2 :id="createTitleId">Create a project</h2>
+            <p :id="createDescId" class="muted">New projects inherit the global defaults shown below.</p>
           </div>
           <UiButton
             variant="ghost"
@@ -354,13 +362,13 @@
         <form class="dialog-form" @submit.prevent="submitCreateProject">
           <div class="field-grid">
             <div class="field">
-              <label class="field-label">Project name</label>
-              <UiInput v-model="createName" maxlength="100" placeholder="Marketing website" />
+              <label class="field-label" for="create-project-name">Project name</label>
+              <UiInput id="create-project-name" v-model="createName" maxlength="100" placeholder="Marketing website" />
               <p v-if="createErrors.name" class="field-error">{{ createErrors.name }}</p>
             </div>
             <div class="field">
-              <label class="field-label">Project prefix</label>
-              <UiInput :modelValue="createPrefix" maxlength="20" @update:modelValue="handleCreatePrefixInput" placeholder="AUTO" />
+              <label class="field-label" for="create-project-prefix">Project prefix</label>
+              <UiInput id="create-project-prefix" :modelValue="createPrefix" maxlength="20" @update:modelValue="handleCreatePrefixInput" placeholder="AUTO" />
               <p class="field-hint">Uppercase letters, numbers, hyphen or underscore.</p>
               <p v-if="createErrors.prefix" class="field-error">{{ createErrors.prefix }}</p>
             </div>
@@ -389,14 +397,21 @@
           </footer>
         </form>
       </div>
-    </div>
+    </UiModal>
 
-    <div v-if="helpOpen" class="help-backdrop" @click.self="helpOpen = false">
-      <div class="help-card card" role="dialog" aria-modal="true">
+    <UiModal
+      :open="helpOpen"
+      size="lg"
+      aria-label="Configuration help"
+      :aria-labelledby="helpTitleId"
+      :aria-describedby="helpDescId"
+      @close="helpOpen = false"
+    >
+      <div class="help-card">
         <header class="help-header">
           <div>
-            <h2>Configuration help</h2>
-            <p class="muted">Highlights from the CLI docs plus handy tips for the UI editor.</p>
+            <h2 :id="helpTitleId">Configuration help</h2>
+            <p :id="helpDescId" class="muted">Highlights from the CLI docs plus handy tips for the UI editor.</p>
           </div>
           <UiButton
             variant="ghost"
@@ -418,12 +433,12 @@
           </section>
         </div>
       </div>
-    </div>
+    </UiModal>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, useId, watch } from 'vue'
 import { api } from '../api/client'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
 import ConfigAutomationSection from '../components/ConfigAutomationSection.vue'
@@ -438,6 +453,7 @@ import IconGlyph from '../components/IconGlyph.vue'
 import ReloadButton from '../components/ReloadButton.vue'
 import UiButton from '../components/UiButton.vue'
 import UiInput from '../components/UiInput.vue'
+import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { showToast } from '../components/toast'
 import { useConfigForm } from '../composables/useConfigForm'
@@ -446,6 +462,11 @@ import { useConfigScope } from '../composables/useConfigScope'
 import { notifyProjectsChanged } from '../composables/useProjects'
 import { formatProjectLabel } from '../utils/projectLabels'
 import { detectPrefixConflict, normalizePrefixInput, suggestUniquePrefix, validateProjectName, validateProjectPrefix } from '../utils/projectPrefix'
+
+const createTitleId = useId()
+const createDescId = useId()
+const helpTitleId = useId()
+const helpDescId = useId()
 
 const { projects, project, loading, error: loadError, inspectData, lastLoadedAt, reload } = useConfigScope()
 const saving = ref(false)
@@ -541,6 +562,7 @@ const createDisabled = computed(() => {
 })
 
 async function submitCreateProject() {
+  if (creatingProject.value) return
   createError.value = null
   const nameError = validateProjectName(trimmedCreateName.value, projects.value)
   createErrors.name = nameError
@@ -1101,25 +1123,11 @@ watch(
   }
 }
 
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--color-dialog-overlay);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 64px 16px;
-  z-index: var(--z-modal-max);
-}
-
+/* Dialog shells are provided by UiModal; these are content layout only. */
 .dialog-card {
-  width: min(720px, 100%);
-  padding: 20px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-height: 80vh;
-  overflow: auto;
 }
 
 .dialog-header {
@@ -1182,23 +1190,9 @@ watch(
   gap: 8px;
 }
 
-.help-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--color-dialog-overlay);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 16px;
-  z-index: var(--z-modal-high);
-}
-
 .help-card {
-  max-width: 720px;
-  width: 100%;
-  padding: 20px;
-  max-height: 80vh;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .help-header {

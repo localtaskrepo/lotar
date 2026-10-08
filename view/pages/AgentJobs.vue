@@ -171,10 +171,45 @@
       </UiCard>
     </div>
   </section>
+
+  <UiModal
+    :open="stopAllDialogOpen"
+    aria-label="Stop all agent jobs"
+    :aria-labelledby="stopAllHeadingId"
+    :aria-describedby="stopAllBodyId"
+    size="sm"
+    :dismissible="!stopAllSubmitting"
+    @close="closeStopAllDialog"
+  >
+    <div class="stop-all-dialog">
+      <h2 :id="stopAllHeadingId" class="stop-all-dialog__title">Stop all agent jobs</h2>
+      <p :id="stopAllBodyId" class="stop-all-dialog__message">Stop all queued and running agent jobs?</p>
+      <p v-if="stopAllError" class="error stop-all-dialog__error" data-testid="stop-all-dialog-error">{{ stopAllError }}</p>
+      <div class="stop-all-dialog__actions">
+        <UiButton
+          variant="ghost"
+          type="button"
+          data-autofocus
+          :disabled="stopAllSubmitting"
+          @click="closeStopAllDialog"
+        >
+          Cancel
+        </UiButton>
+        <UiButton
+          variant="danger"
+          type="button"
+          :disabled="stopAllSubmitting"
+          @click="confirmStopAll"
+        >
+          {{ stopAllSubmitting ? 'Stopping…' : 'Stop all' }}
+        </UiButton>
+      </div>
+    </div>
+  </UiModal>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { api } from '../api/client'
 import { formatDateTime } from '../utils/date'
 import type { AgentJob, AgentJobLogEntry, AgentQueueStats } from '../api/types'
@@ -183,6 +218,7 @@ import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiEmptyState from '../components/UiEmptyState.vue'
 import UiInput from '../components/UiInput.vue'
+import UiModal from '../components/UiModal.vue'
 import { useSse } from '../composables/useSse'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
 
@@ -428,20 +464,43 @@ async function cancel(id: string) {
   }
 }
 
-async function cancelAll() {
-  if (!hasCancelableJobs.value) return
-  if (typeof window !== 'undefined') {
-    const confirmed = window.confirm('Stop all queued and running agent jobs?')
-    if (!confirmed) return
-  }
+const stopAllDialogOpen = ref(false)
+const stopAllSubmitting = ref(false)
+const stopAllError = ref<string | null>(null)
+const stopAllHeadingId = useId()
+const stopAllBodyId = useId()
 
+function cancelAll() {
+  if (!hasCancelableJobs.value) return
+  stopAllError.value = null
+  stopAllDialogOpen.value = true
+}
+
+function closeStopAllDialog() {
+  if (stopAllSubmitting.value) return
+  stopAllDialogOpen.value = false
+}
+
+async function confirmStopAll() {
+  if (stopAllSubmitting.value) return
+  // Jobs may have finished while the dialog was open; never mutate without work to do.
+  if (!hasCancelableJobs.value) {
+    stopAllDialogOpen.value = false
+    return
+  }
+  stopAllError.value = null
+  stopAllSubmitting.value = true
   try {
     const response = await api.cancelAllAgentJobs()
     jobs.value = sortJobs(response.jobs)
     const statsResponse = await api.listAgentJobs()
     queueStats.value = statsResponse.queue_stats || null
+    stopAllDialogOpen.value = false
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    // Keep the dialog open so the failure is visible and retry remains possible.
+    stopAllError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    stopAllSubmitting.value = false
   }
 }
 
@@ -753,5 +812,31 @@ onBeforeUnmount(() => {
 .log-message {
   color: var(--text);
   word-break: break-word;
+}
+
+.stop-all-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stop-all-dialog__title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.stop-all-dialog__message {
+  margin: 0;
+  color: var(--muted);
+}
+
+.stop-all-dialog__error {
+  margin: 0;
+}
+
+.stop-all-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 </style>

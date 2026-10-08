@@ -543,7 +543,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     await page.locator('input[placeholder="Optional filter"]').fill('labels in dev67');
                     await page.getByRole('button', { name: 'Save remote' }).click();
                     await page.waitForSelector('.toast-card:has-text("Remote saved")', { timeout: 15_000 });
-                    await page.waitForSelector('.sync-remote-dialog__overlay', { state: 'detached' });
+                    await page.waitForSelector('.sync-remote-dialog__form', { state: 'detached' });
 
                     const globalConfig = parse(await workspace.read('.tasks/config.yml')) as {
                         remotes?: Record<string, { project?: string; filter?: string }>;
@@ -601,7 +601,7 @@ describe('UI sync scope isolation (DEV-67)', () => {
                     await page.locator('input[placeholder="DEMO"]').fill('JG2');
                     await page.getByRole('button', { name: 'Save remote' }).click();
                     await page.waitForSelector('.toast-card:has-text("Remote saved")', { timeout: 15_000 });
-                    await page.waitForSelector('.sync-remote-dialog__overlay', { state: 'detached' });
+                    await page.waitForSelector('.sync-remote-dialog__form', { state: 'detached' });
 
                     const globalConfig = parse(await workspace.read('.tasks/config.yml')) as {
                         remotes?: Record<string, { project?: string }>;

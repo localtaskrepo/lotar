@@ -1,11 +1,18 @@
 title: Consolidate accessible dialogs and destructive confirmations
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.680124+00:00
+modified: 2026-10-08T18:25:41.662611+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-10-08T17:43:42.325063+00:00
+  text: 'Plan: strengthen existing UiModal rather than introduce a competing primitive: visible-title binding, dialog focus fallback/initial focus, dynamic Tab/focus containment, topmost Escape/backdrop dismissal with busy guard, focus restoration, scroll locking and background inertness with safe nested cleanup. Preserve existing card/theme/size classes. Migrate named Config create/help, Scan confirmation, Automation rule editor, SyncHub remote editor and AgentJobs native stop-all confirmation; remove duplicate overlay/card-shell CSS and conflicting dialog listeners. Keep destructive actions explicit, Cancel safe, mutation scope/in-flight guards and project/cache/query contracts unchanged. Add focused primitive/migration unit regressions and actual keyboard/accessibility desktop/mobile browser smoke with synthetic fixture screenshots; run types, required lint/Rust/UI/build-first fullsmoke and readonly review before Done. No repositoryGit/index commands, commits, pushes or worktrees; trackDEV69only.'
+- date: 2026-10-08T18:25:41.638826+00:00
+  text: 'Outcome: existing UiModal is the shared accessible primitive for named Config create/help, Scan confirmation, Automation builder, SyncHub editor and AgentJobs stop-all; duplicate overlay/card-shell CSS removed. Bound visible title/description IDs; dynamic topmost Tab/focus containment and Escape; guarded overlay pointer start; opener/parent restoration and nested/unmount cleanup; background inert/overflow ownership preserved; busy dismissal blocked; safe Cancel defaults and once-only destructive confirmation. Existing mutation/query/project/preferences contracts unchanged. Added xl980 size to retain automation desktop width, border-box/min-height0 viewport bounds, dynamic focus repair for disabled/hidden/inert controls and ignored busy dismissal. Evidence: legacy primitive12cases11fail->12green;18 final primitive cases plus migration regressions total45new UI tests; actualdesktop/mobile2new smoke exercise5dialogs40Tabdirections/title+AX tree/restore/backdrop/EnterCancel/noAPIwrites and realheld-projectcreate busy lock, plus enhanced existing realgatedNode stop-all case proves cancel/Escape/backdrop zeroAPI thenconfirmonce/cancel2jobs. Initialactualbrowser2failures (busy focus fell to body and mobilecontent-box overflow) fixed ratherthan assertionweakening; sourceES2020 type issues fixed. Finalfirst-run lintclean(types/alltargets-allfeaturesClippy-Dwarnings/fmt),1311Rustpass45actualGit exclusions,611UIpass69files,224freshbuild smokepass25Git skips52passed6skippedfiles. Focusedbrowser22pass1Git-dependent skip; all10syntheticdesktop/mobile screenshots inspected, finalSyncmobile framingrechecked; longcards intentionallyscrollinsidebounds. Logs target/dev69-20261008/; screenshots target/smoke-artifacts/dialogs/. Independentstaticreview SIGNOFF includingpostbrowserobserver/CSS; low inert-filter note addressed and regressionpinned. Remaining:no scoped blocker; Chromiumkeyboard/ARIA/accessibility-tree checks are not physicalscreen-reader/Safari/Firefox/remoteCI/Windows verification. Latentfuture detachedKeepAlive activation/genericfallbacktitle and inertedbackground-toast announcements noted; separateTaskPanel/drawer/custom-popover patterns outside named5surface scope remain unchanged. No repositoryGit/index/staging/commit/push/worktrees, externalLLM agent sessions or APIshapechanges. Guidance:no durableinstructionfinding/policychange.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U14.
@@ -16,3 +23,26 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-08T17:43:42.288753+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-08T17:43:42.325063+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T18:25:41.638826+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T18:25:41.662611+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done

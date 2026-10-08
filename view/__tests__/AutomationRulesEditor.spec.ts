@@ -1,6 +1,15 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import AutomationRulesEditor from '../components/AutomationRulesEditor.vue'
+
+vi.mock('../components/UiModal.vue', () => ({
+    default: {
+        name: 'UiModal',
+        props: ['open', 'ariaLabel', 'ariaLabelledby', 'ariaDescribedby', 'dismissible', 'initialFocus', 'size'],
+        emits: ['close'],
+        template: '<div v-if="open" class="ui-modal-stub"><slot /></div>',
+    },
+}))
 
 function findButton(wrapper: ReturnType<typeof mount>, text: string) {
     return wrapper.findAll('button').find((button) => button.text().includes(text))
@@ -182,6 +191,100 @@ describe('AutomationRulesEditor', () => {
         const chipField = wrapper.findComponent({ name: 'ChipListField' })
         expect(chipField.exists()).toBe(true)
         expect(chipField.props('suggestions')).toEqual(['urgent', 'ready-for-review', 'needs-qa'])
+
+        wrapper.unmount()
+    })
+})
+
+describe('AutomationRulesEditor dialog migration', () => {
+    it('renders the rule dialog through UiModal with a bound title id', async () => {
+        const wrapper = mount(AutomationRulesEditor, {
+            props: { modelValue: '' },
+            attachTo: document.body,
+        })
+
+        await findButton(wrapper, 'New rule')?.trigger('click')
+        await flushPromises()
+
+        const modal = wrapper.findComponent({ name: 'UiModal' })
+        expect(modal.props('open')).toBe(true)
+
+        const heading = wrapper.find('.automation-builder__dialog-header h2')
+        expect(heading.text()).toBe('Create automation rule')
+        expect(heading.attributes('id')).toBeTruthy()
+        expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
+
+        // migrated shell: UiModal owns the overlay, the content hook class remains
+        expect(wrapper.find('.automation-builder__dialog').exists()).toBe(true)
+        expect(wrapper.find('.automation-builder__dialog-backdrop').exists()).toBe(false)
+
+        wrapper.unmount()
+    })
+
+    it('keeps the bound title id in sync when editing an existing rule', async () => {
+        const existingYaml = `automation:
+  rules:
+    - name: Close after complete
+      on:
+        complete:
+          set:
+            status: Done`
+
+        const wrapper = mount(AutomationRulesEditor, {
+            props: { modelValue: existingYaml },
+            attachTo: document.body,
+        })
+        await flushPromises()
+
+        await findButton(wrapper, 'Edit')?.trigger('click')
+        await flushPromises()
+
+        const modal = wrapper.findComponent({ name: 'UiModal' })
+        expect(modal.props('open')).toBe(true)
+
+        const heading = wrapper.find('.automation-builder__dialog-header h2')
+        expect(heading.text()).toBe('Edit automation rule')
+        expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
+
+        wrapper.unmount()
+    })
+
+    it('closes safely from the UiModal close event without emitting yaml', async () => {
+        const wrapper = mount(AutomationRulesEditor, {
+            props: { modelValue: '' },
+            attachTo: document.body,
+        })
+
+        await findButton(wrapper, 'New rule')?.trigger('click')
+        await flushPromises()
+        await wrapper.findAll('button').find((button) => button.text().includes('Move a task'))?.trigger('click')
+        await flushPromises()
+
+        wrapper.findComponent({ name: 'UiModal' }).vm.$emit('close')
+        await flushPromises()
+
+        expect(wrapper.find('.automation-builder__dialog').exists()).toBe(false)
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
+        wrapper.unmount()
+    })
+
+    it('closes safely from the Cancel button without emitting yaml', async () => {
+        const wrapper = mount(AutomationRulesEditor, {
+            props: { modelValue: '' },
+            attachTo: document.body,
+        })
+
+        await findButton(wrapper, 'New rule')?.trigger('click')
+        await flushPromises()
+        await wrapper.findAll('button').find((button) => button.text().includes('Move a task'))?.trigger('click')
+        await flushPromises()
+
+        await findButton(wrapper, 'Cancel')?.trigger('click')
+        await flushPromises()
+
+        expect(wrapper.find('.automation-builder__dialog').exists()).toBe(false)
+        expect(wrapper.emitted('update:modelValue')).toBeUndefined()
 
         wrapper.unmount()
     })

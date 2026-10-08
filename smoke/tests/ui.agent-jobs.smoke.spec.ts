@@ -482,7 +482,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
         }
     });
 
-    it('stops queued and running jobs from the Agents page', async () => {
+    it('stops queued and running jobs only after accessible confirmation', async ({ expect }) => {
         const gate = await createGateFixture('lotar-smoke-gate-stopall-');
         const agents = await createFixtureAgents(
             {
@@ -524,9 +524,41 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                 );
 
                 await withPage(`${server.url}/agents`, async (page) => {
-                    page.on('dialog', (dialog) => dialog.accept());
+                    let cancelRequests = 0;
+                    page.on('request', request => {
+                        if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/jobs/cancel-all') cancelRequests += 1;
+                    });
+                    const trigger = page.getByRole('button', { name: 'Stop all', exact: true });
+                    for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
+                        await page.setViewportSize(viewport);
+                        await trigger.click();
+                        const dialog = page.getByRole('dialog', { name: 'Stop all agent jobs', exact: true });
+                        await dialog.waitFor({ state: 'visible' });
+                        expect(await dialog.getByRole('button', { name: 'Cancel', exact: true }).evaluate(el => el === document.activeElement)).toBe(true);
+                        expect(await dialog.ariaSnapshot()).toContain('Stop all queued and running agent jobs?');
+                        await page.keyboard.press('Shift+Tab');
+                        expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+                        await page.keyboard.press('Tab');
+                        await page.keyboard.press('Enter');
+                        await dialog.waitFor({ state: 'detached' });
+                        expect(cancelRequests).toBe(0);
+                        expect(await trigger.evaluate(el => el === document.activeElement)).toBe(true);
 
-                    await page.click('button:has-text("Stop all")');
+                        await trigger.click();
+                        await dialog.waitFor({ state: 'visible' });
+                        await page.keyboard.press('Escape');
+                        await dialog.waitFor({ state: 'detached' });
+                        expect(cancelRequests).toBe(0);
+                        await trigger.click();
+                        await dialog.waitFor({ state: 'visible' });
+                        await page.mouse.click(4, 4);
+                        await dialog.waitFor({ state: 'detached' });
+                        expect(cancelRequests).toBe(0);
+                    }
+
+                    await trigger.click();
+                    await page.getByRole('dialog', { name: 'Stop all agent jobs', exact: true })
+                        .getByRole('button', { name: 'Stop all', exact: true }).click();
 
                     await waitUntil(
                         'stop-all to cancel every job',
@@ -536,6 +568,7 @@ describe.concurrent('UI Agent Jobs page smoke tests', () => {
                             return jobs.length === 2 && jobs.every((job) => job.status === 'cancelled');
                         },
                     );
+                    expect(cancelRequests).toBe(1);
                 });
             } finally {
                 await server.stop();

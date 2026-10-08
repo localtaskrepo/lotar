@@ -883,27 +883,7 @@ main {
 	padding-left: 1.25rem;
 }
 
-/* Scan confirmation dialog */
-.scan-dialog-overlay {
-	position: fixed;
-	inset: 0;
-	background: rgba(0, 0, 0, 0.5);
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	z-index: 100;
-}
-
-.scan-dialog {
-	background: var(--color-surface);
-	border: 1px solid var(--color-border);
-	border-radius: var(--radius-lg);
-	padding: var(--space-5);
-	max-width: 400px;
-	width: 90%;
-	box-shadow: var(--shadow-lg);
-}
-
+/* Scan confirmation dialog content (shell provided by UiModal) */
 .scan-dialog h3 {
 	margin: 0 0 var(--space-3);
 }

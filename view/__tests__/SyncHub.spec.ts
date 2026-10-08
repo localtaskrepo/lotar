@@ -282,7 +282,7 @@ function triggerReconnect() {
     currentSse().opts.onReconnect?.()
 }
 
-async function mountSyncHub(route = '/sync') {
+async function mountSyncHub(route = '/sync', options: { attachTo?: HTMLElement } = {}) {
     const router = createRouter({
         history: createMemoryHistory(),
         routes: [{ path: '/sync', component: SyncHub }],
@@ -291,6 +291,7 @@ async function mountSyncHub(route = '/sync') {
     await router.isReady()
 
     const wrapper = mount(SyncHub, {
+        attachTo: options.attachTo,
         global: {
             plugins: [router],
             stubs,
@@ -322,6 +323,16 @@ function dialogButton(wrapper: ReturnType<typeof mount>, label: string) {
     const button = wrapper.findAll('button').find((candidate) => candidate.text().includes(label))
     expect(button, `dialog button ${label}`).toBeTruthy()
     return button!
+}
+
+/** Dispatch Escape in a way that reaches whichever element the modal primitive listens on. */
+async function pressEscape(wrapper: ReturnType<typeof mount>) {
+    const target = wrapper.find('[role="dialog"]')
+    if (target.exists()) {
+        await target.trigger('keydown', { key: 'Escape' })
+    }
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await flushPromises()
 }
 
 async function switchScope(wrapper: ReturnType<typeof mount>, value: string) {
@@ -882,6 +893,125 @@ describe('SyncHub remote editor', () => {
         await flushPromises()
         expect(api.setConfig).toHaveBeenCalledTimes(1)
         expect(wrapper.find('[data-testid="remote-dialog-error"]').text()).toContain('was already removed')
+        wrapper.unmount()
+    })
+})
+
+describe('SyncHub remote dialog migration (DEV-69)', () => {
+    // Attached mounting lets the shared modal primitive activate its dialog stack,
+    // focus management and Escape handling the way a real document would.
+    async function mountAttachedSyncHub(route = '/sync') {
+        return mountSyncHub(route, { attachTo: document.body })
+    }
+
+    it('closes on backdrop click and Escape when idle', async () => {
+        configState.globalRemotes = { g1: jiraRemote('DEMO') }
+        const wrapper = await mountAttachedSyncHub()
+
+        await rowButton(remoteRow(wrapper, 'g1'), 'Edit').trigger('click')
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+
+        await wrapper.find('.ui-modal__overlay').trigger('click')
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+        await rowButton(remoteRow(wrapper, 'g1'), 'Edit').trigger('click')
+        await flushPromises()
+        await pressEscape(wrapper)
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        wrapper.unmount()
+    })
+
+    it('binds the dialog name to the visible heading and target banner', async () => {
+        configState.globalRemotes = { g1: jiraRemote('DEMO') }
+        const wrapper = await mountAttachedSyncHub()
+
+        await rowButton(remoteRow(wrapper, 'g1'), 'Edit').trigger('click')
+        await flushPromises()
+
+        const dialogEl = wrapper.find('[role="dialog"]')
+        const labelledBy = dialogEl.attributes('aria-labelledby')
+        expect(labelledBy).toBeTruthy()
+        const heading = wrapper.find('.sync-remote-dialog__header h2')
+        expect(heading.attributes('id')).toBe(labelledBy)
+        expect(heading.text()).toBe('Edit remote')
+        const describedBy = dialogEl.attributes('aria-describedby')
+        expect(describedBy).toBeTruthy()
+        expect(wrapper.find('[data-testid="remote-dialog-target"]').attributes('id')).toBe(describedBy)
+        // The aria-label fallback stays bound for contexts without the heading id.
+        expect(dialogEl.attributes('aria-label')).toBe('Edit remote')
+        wrapper.unmount()
+    })
+
+    it('is not dismissible while a save is submitting', async () => {
+        configState.globalRemotes = { g1: jiraRemote('DEMO') }
+        const save = deferred<any>()
+        ;(api.setConfig as any).mockReturnValue(save.promise)
+        const wrapper = await mountAttachedSyncHub()
+
+        await rowButton(remoteRow(wrapper, 'g1'), 'Edit').trigger('click')
+        await flushPromises()
+        await submitDialog(wrapper)
+
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+        await pressEscape(wrapper)
+        await wrapper.find('.ui-modal__overlay').trigger('click')
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+        expect(api.setConfig).toHaveBeenCalledTimes(1)
+
+        save.resolve({ updated: true, warnings: [], info: [], errors: [] })
+        await flushPromises()
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        wrapper.unmount()
+    })
+
+    it('is not dismissible while a removal is deleting', async () => {
+        configState.projectRemotes = { ALPHA: { p1: jiraRemote('ALPHA') } }
+        const remove = deferred<any>()
+        ;(api.setConfig as any).mockReturnValue(remove.promise)
+        const wrapper = await mountAttachedSyncHub('/sync?project=ALPHA')
+
+        await rowButton(remoteRow(wrapper, 'p1'), 'Edit').trigger('click')
+        await flushPromises()
+        await dialogButton(wrapper, 'Remove from Project ALPHA').trigger('click')
+        await flushPromises()
+
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+        await pressEscape(wrapper)
+        await wrapper.find('.ui-modal__overlay').trigger('click')
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(true)
+        expect(api.setConfig).toHaveBeenCalledTimes(1)
+
+        remove.resolve({ updated: true, warnings: [], info: [], errors: [] })
+        await flushPromises()
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+        wrapper.unmount()
+    })
+
+    it('stays closable while validating (closability preserved from the bespoke dialog)', async () => {
+        configState.globalRemotes = { g1: jiraRemote('DEMO') }
+        const validate = deferred<any>()
+        ;(api.syncValidate as any).mockReturnValue(validate.promise)
+        const wrapper = await mountAttachedSyncHub()
+
+        await rowButton(remoteRow(wrapper, 'g1'), 'Edit').trigger('click')
+        await flushPromises()
+        await dialogButton(wrapper, 'Validate').trigger('click')
+        await flushPromises()
+        expect(wrapper.text()).toContain('Validating…')
+
+        // Validation is read-only: the dialog remains dismissible mid-flight.
+        await wrapper.find('.ui-modal__overlay').trigger('click')
+        await flushPromises()
+        expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
+
+        validate.resolve({ status: 'ok', provider: 'jira', remote: 'g1', checked_at: new Date().toISOString(), warnings: [] })
+        await flushPromises()
         wrapper.unmount()
     })
 })

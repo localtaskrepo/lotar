@@ -234,19 +234,18 @@
       </UiCard>
     </div>
   </section>
-  <Teleport to="body">
-    <div
-      v-if="remoteDialogOpen"
-      class="sync-remote-dialog__overlay"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="remoteDialogTitle"
-      @click.self="closeRemoteDialog"
-    >
-      <UiCard class="sync-remote-dialog__card">
-        <form class="sync-remote-dialog__form" @submit.prevent="submitRemoteDialog">
+  <UiModal
+    :open="remoteDialogOpen"
+    :aria-label="remoteDialogTitle"
+    :aria-labelledby="remoteDialogHeadingId"
+    :aria-describedby="remoteDialogTargetId"
+    size="lg"
+    :dismissible="!remoteDialogSubmitting && !remoteDialogDeleting"
+    @close="closeRemoteDialog"
+  >
+    <form class="sync-remote-dialog__form" @submit.prevent="submitRemoteDialog">
           <header class="sync-remote-dialog__header">
-            <h2>{{ remoteDialogTitle }}</h2>
+            <h2 :id="remoteDialogHeadingId">{{ remoteDialogTitle }}</h2>
             <UiButton
               variant="ghost"
               icon-only
@@ -260,7 +259,7 @@
             </UiButton>
           </header>
 
-          <p class="sync-remote-dialog__target" data-testid="remote-dialog-target">{{ dialogTargetBanner }}</p>
+          <p :id="remoteDialogTargetId" class="sync-remote-dialog__target" data-testid="remote-dialog-target">{{ dialogTargetBanner }}</p>
 
           <div v-if="dialogNeedsTargetChoice" class="sync-remote-dialog__choice" data-testid="remote-dialog-choice">
             <p class="muted">This remote is inherited from the Global config. Choose where your changes apply:</p>
@@ -372,17 +371,15 @@
               </UiButton>
             </div>
           </footer>
-        </form>
-      </UiCard>
-      <datalist id="sync-auth-profile-options">
-        <option v-for="profile in authProfileOptions" :key="profile" :value="profile" />
-      </datalist>
-    </div>
-  </Teleport>
+    </form>
+    <datalist id="sync-auth-profile-options">
+      <option v-for="profile in authProfileOptions" :key="profile" :value="profile" />
+    </datalist>
+  </UiModal>
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import { api } from '../api/client'
 import type {
@@ -403,6 +400,7 @@ import UiButton from '../components/UiButton.vue'
 import UiCard from '../components/UiCard.vue'
 import UiInput from '../components/UiInput.vue'
 import UiLoader from '../components/UiLoader.vue'
+import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useConfigScope } from '../composables/useConfigScope'
 import { useTaskPanelController } from '../composables/useTaskPanelController'
@@ -579,6 +577,10 @@ watch(
 const remoteDialogTitle = computed(() =>
   remoteDialogMode.value === 'add' ? 'Add remote' : 'Edit remote',
 )
+
+/** Stable ids binding the dialog's accessible name/description to its heading and target banner. */
+const remoteDialogHeadingId = useId()
+const remoteDialogTargetId = useId()
 
 /** Saving is paused while the scope config is (re)loading, e.g. during a project switch. */
 const editorBlocked = computed(() => scopeLoading.value)
@@ -1888,23 +1890,6 @@ async function handleReload() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.sync-remote-dialog__overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: var(--color-dialog-overlay);
-  z-index: var(--z-modal);
-}
-
-.sync-remote-dialog__card {
-  width: min(640px, 100%);
-  max-height: calc(100vh - 32px);
-  overflow-y: auto;
 }
 
 .sync-remote-dialog__form {

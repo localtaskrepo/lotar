@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ConfigInspectResult, GlobalConfigRaw, ResolvedConfigDTO } from '../api/types'
 import ScanView from '../pages/ScanView.vue'
@@ -10,6 +10,15 @@ vi.mock('../api/client', () => ({
     referenceSnippet: vi.fn(),
     listProjects: vi.fn(),
     inspectConfig: vi.fn(),
+  },
+}))
+
+vi.mock('../components/UiModal.vue', () => ({
+  default: {
+    name: 'UiModal',
+    props: ['open', 'ariaLabel', 'ariaLabelledby', 'ariaDescribedby', 'dismissible', 'initialFocus', 'size'],
+    emits: ['close'],
+    template: '<div v-if="open" class="ui-modal-stub"><slot /></div>',
   },
 }))
 
@@ -28,6 +37,7 @@ const stubs = {
   },
   UiButton: {
     template: '<button type="button" @click="$emit(\'click\')"><slot /></button>',
+    emits: ['click'],
   },
   UiCard: { template: '<section><slot /></section>' },
   UiLoader: { template: '<div><slot /></div>' },
@@ -168,5 +178,140 @@ describe('ScanView', () => {
     expect(api.scanRun).toHaveBeenCalled()
     expect(wrapper.text()).toContain('Add feature')
     expect(wrapper.text()).toContain('src/lib.rs:12')
+  })
+})
+
+describe('ScanView run confirmation dialog', () => {
+  const SKIP_KEY = 'scan-skip-run-confirm'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.removeItem(SKIP_KEY)
+    ; (api.listProjects as any).mockResolvedValue({ projects: [], limit: 0, offset: 0, total: 0 })
+      ; (api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+  })
+
+  async function mountScanView() {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/scan', component: ScanView }],
+    })
+    await router.push('/scan')
+    await router.isReady()
+    const wrapper = mount(ScanView, { global: { plugins: [router], stubs } })
+    await flushPromises()
+    return wrapper
+  }
+
+  function mainRunButton(wrapper: ReturnType<typeof mount>) {
+    return wrapper.findAll('button').find((btn) => btn.text() === 'Run')
+  }
+
+  async function openRunConfirm(wrapper: ReturnType<typeof mount>) {
+    await mainRunButton(wrapper)?.trigger('click')
+    await flushPromises()
+  }
+
+  it('binds the dialog title through aria-labelledby and autofocuses Cancel', async () => {
+    const wrapper = await mountScanView()
+    await openRunConfirm(wrapper)
+
+    const modal = wrapper.findComponent({ name: 'UiModal' })
+    expect(modal.props('open')).toBe(true)
+
+    const heading = wrapper.find('.scan-dialog h3')
+    expect(heading.text()).toBe('Run scan?')
+    expect(heading.attributes('id')).toBeTruthy()
+    expect(modal.props('ariaLabelledby')).toBe(heading.attributes('id'))
+    expect(modal.props('ariaDescribedby')).toBe(wrapper.find('.scan-dialog p').attributes('id'))
+
+    const autofocus = wrapper.findAll('.scan-dialog [data-autofocus]')
+    expect(autofocus.length).toBe(1)
+    expect(autofocus[0]!.text()).toBe('Cancel')
+
+    wrapper.unmount()
+  })
+
+  it('cancels safely without running the scan or persisting the skip flag', async () => {
+    const wrapper = await mountScanView()
+    await openRunConfirm(wrapper)
+
+    const cancelButton = wrapper.findAll('.scan-dialog__actions button').find((btn) => btn.text() === 'Cancel')
+    await cancelButton?.trigger('click')
+    await flushPromises()
+
+    expect(api.scanRun).not.toHaveBeenCalled()
+    expect(localStorage.getItem(SKIP_KEY)).toBeNull()
+    expect(wrapper.findComponent({ name: 'UiModal' }).props('open')).toBe(false)
+    expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('confirms the destructive run exactly once and persists the skip flag', async () => {
+      ; (api.scanRun as any).mockResolvedValue({
+        status: 'ok',
+        dry_run: false,
+        project: '',
+        summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
+        warnings: [],
+        info: [],
+        entries: [],
+      })
+    const wrapper = await mountScanView()
+    await openRunConfirm(wrapper)
+
+    const checkbox = wrapper.find('.scan-dialog__checkbox input')
+    await checkbox.setValue(true)
+
+    const confirmButton = wrapper.findAll('.scan-dialog__actions button').find((btn) => btn.text() === 'Run')
+    await confirmButton?.trigger('click')
+    await confirmButton?.trigger('click')
+    await flushPromises()
+
+    expect(api.scanRun).toHaveBeenCalledTimes(1)
+    expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
+    expect(localStorage.getItem(SKIP_KEY)).toBe('true')
+    expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('marks the dialog non-dismissible while a scan mutation is busy', async () => {
+      ; (api.scanRun as any).mockImplementation(() => new Promise(() => {}))
+    const wrapper = await mountScanView()
+    await openRunConfirm(wrapper)
+
+    const modal = wrapper.findComponent({ name: 'UiModal' })
+    expect(modal.props('dismissible')).toBe(true)
+
+    ; (wrapper.vm as any).loading = true
+    await wrapper.vm.$nextTick()
+    expect(modal.props('dismissible')).toBe(false)
+
+    wrapper.unmount()
+  })
+
+  it('skips the confirmation dialog when the saved preference is set', async () => {
+    localStorage.setItem(SKIP_KEY, 'true')
+      ; (api.scanRun as any).mockResolvedValue({
+        status: 'ok',
+        dry_run: false,
+        project: '',
+        summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
+        warnings: [],
+        info: [],
+        entries: [],
+      })
+    const wrapper = await mountScanView()
+
+    await mainRunButton(wrapper)?.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+    expect(api.scanRun).toHaveBeenCalledTimes(1)
+    expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
+
+    wrapper.unmount()
   })
 })
