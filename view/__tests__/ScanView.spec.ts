@@ -1,5 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ConfigInspectResult, GlobalConfigRaw, ResolvedConfigDTO } from '../api/types'
 import ScanView from '../pages/ScanView.vue'
@@ -189,7 +189,14 @@ describe('ScanView run confirmation dialog', () => {
     localStorage.removeItem(SKIP_KEY)
     ; (api.listProjects as any).mockResolvedValue({ projects: [], limit: 0, offset: 0, total: 0 })
       ; (api.inspectConfig as any).mockResolvedValue(baseConfigInspect())
+      ; (api.scanRun as any).mockResolvedValue({
+        status: 'ok', dry_run: false, project: '',
+        summary: { created: 0, updated: 0, skipped: 0, failed: 0 },
+        warnings: [], info: [], entries: [],
+      })
   })
+
+  afterEach(() => vi.restoreAllMocks())
 
   async function mountScanView() {
     const router = createRouter({
@@ -313,5 +320,64 @@ describe('ScanView run confirmation dialog', () => {
     expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
 
     wrapper.unmount()
+  })
+
+  for (const failure of ['getItem', 'storage getter'] as const) {
+    it(`shows safe confirmation and runs once when ${failure} is denied`, async () => {
+      const wrapper = await mountScanView()
+      try {
+        const denied = () => { throw new DOMException('Storage unavailable', 'SecurityError') }
+        if (failure === 'getItem') vi.spyOn(localStorage, 'getItem').mockImplementation(denied)
+        else vi.spyOn(globalThis, 'localStorage', 'get').mockImplementation(denied)
+        expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+        await flushPromises()
+        expect(wrapper.find('.scan-dialog').exists()).toBe(true)
+        expect(api.scanRun).not.toHaveBeenCalled()
+        expect(() => (wrapper.vm as any).handleRunConfirm(false)).not.toThrow()
+        ; (wrapper.vm as any).handleRunConfirm(false)
+        await flushPromises()
+        expect(api.scanRun).toHaveBeenCalledTimes(1)
+        expect(api.scanRun).toHaveBeenCalledWith(expect.objectContaining({ dry_run: false }))
+      } finally {
+        wrapper.unmount()
+      }
+    })
+  }
+
+  it('keeps one approved scan submission when preference persistence exceeds quota', async () => {
+    const wrapper = await mountScanView()
+    try {
+      await openRunConfirm(wrapper)
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new DOMException('Quota exceeded', 'QuotaExceededError')
+      })
+      expect(() => (wrapper.vm as any).handleRunConfirm(true)).not.toThrow()
+      ; (wrapper.vm as any).handleRunConfirm(true)
+      await flushPromises()
+      expect(api.scanRun).toHaveBeenCalledTimes(1)
+      expect(wrapper.find('.scan-dialog').exists()).toBe(false)
+      expect(localStorage.getItem(SKIP_KEY)).toBeNull()
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('preserves safe Cancel and one subsequent confirmation when all storage operations fail', async () => {
+    const wrapper = await mountScanView()
+    try {
+      const denied = () => { throw new DOMException('Storage unavailable', 'SecurityError') }
+      vi.spyOn(localStorage, 'getItem').mockImplementation(denied)
+      vi.spyOn(localStorage, 'setItem').mockImplementation(denied)
+      expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+      ; (wrapper.vm as any).cancelRunConfirm()
+      expect(api.scanRun).not.toHaveBeenCalled()
+      expect(() => (wrapper.vm as any).confirmRun()).not.toThrow()
+      expect(() => (wrapper.vm as any).handleRunConfirm(true)).not.toThrow()
+      ; (wrapper.vm as any).handleRunConfirm(true)
+      await flushPromises()
+      expect(api.scanRun).toHaveBeenCalledTimes(1)
+    } finally {
+      wrapper.unmount()
+    }
   })
 })

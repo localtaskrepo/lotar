@@ -304,6 +304,7 @@ import UiLoader from '../components/UiLoader.vue'
 import UiModal from '../components/UiModal.vue'
 import UiSelect from '../components/UiSelect.vue'
 import { useProjects } from '../composables/useProjects'
+import { storageGetFlag, storageSetFlag } from '../utils/storage'
 
 const runConfirmTitleId = useId()
 const runConfirmDescId = useId()
@@ -542,7 +543,7 @@ async function saveAllSettings() {
 }
 
 function confirmRun() {
-  const skipConfirm = localStorage.getItem(SKIP_RUN_CONFIRM_KEY) === 'true'
+  const skipConfirm = storageGetFlag(SKIP_RUN_CONFIRM_KEY)
   if (skipConfirm) {
     runScan(false)
     return
@@ -555,7 +556,7 @@ function handleRunConfirm(skipFuture: boolean) {
   if (!showRunConfirmDialog.value) return
   showRunConfirmDialog.value = false
   if (skipFuture) {
-    localStorage.setItem(SKIP_RUN_CONFIRM_KEY, 'true')
+    storageSetFlag(SKIP_RUN_CONFIRM_KEY, true)
   }
   runScan(false)
 }

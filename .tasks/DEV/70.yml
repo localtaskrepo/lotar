@@ -1,11 +1,18 @@
 title: Make Scan run-confirm preferences tolerate unavailable localStorage
-status: Todo
-relationships:
-  parent: DEV-53
+status: Done
 priority: Medium
 type: Bug
 reporter: mallox
+assignee: mallox
 created: 2026-09-06T11:10:31.696636+00:00
+modified: 2026-10-08T21:52:45.124496+00:00
+relationships:
+  parent: DEV-53
+comments:
+- date: 2026-10-08T21:41:42.782468+00:00
+  text: 'Plan: replace only ScanView confirm preference direct get/set with existing storageGetFlag/storageSetFlag. Existing key and true/false string representation stay compatible; unavailable reads default to showing safe confirmation, write failures cannot block one explicit scan submission. Add real component denied-get/denied-property/quota-set/combined-denial regressions plus saved-preference guard, actualbackend/browser scan coverage with injected storage failures and exact HTTP count/file effects. Preserve DEV69 focus/Cancel/once/busy guarantees, scanner configuration/source mutation safety and all other tickets. Run targeted UI/browser then warning-free lint, native nextest/Rust+UI and fresh fullsmoke, readonly review if useful. No new storage abstraction or repositoryGit/index/commit/push/worktrees. Guidance no finding sofar.'
+- date: 2026-10-08T21:52:45.093014+00:00
+  text: 'Outcome: ScanView now uses existing storageGetFlag/storageSetFlag for only the confirmation preference; no new abstraction, key/true-false representation unchanged. Denied reads/getter fall back to explicit safe confirmation; quota/security failures while saving opt-out cannot block one approved scan. Cancel remains zero submissions; existing available-storage opt-out preserved. Evidence: corrected legacy component baseline4fail6pass ->10/10green (initial test draft incorrectly spied Storage.prototype instead of suite MemoryStorage, corrected before production fix; logs retained). Four new unit cases deniedget/getter/quota/combined plus3actualChromium+realbackend cases inject native getItem/setItem/window getter failures, prove Cancel no task/source changes, explicitconfirm creates exactly1task/1HTTPscan and laterCancel no secondsubmission. Finalfirst-run lintclean(types/Clippy alltargets-allfeatures-Dwarnings/fmt),1311Rustpass45actualGit-dependent exclusions,615UIpass69files,227freshbuild smokepass25Git-dependent skips53passed6skippedfiles. Logs target/dev70-20261008/{red-corrected,green,browser,lint,test,smoke}.log. Remaining:no scoped implementation/verification blocker; Git-capable/Windows/remoteCI not claimed. Other tickets/source semantics/config and DEV69 keyboard/busy/confirmation guarantees retained. No repositoryGit/index/staging/commits/pushes/worktrees or RESTshapechange. Guidance:no durableinstructionfinding.'
 description: |-
   DEV-53 second-pass audit follow-up.
   Audit findings: U13.
@@ -16,3 +23,26 @@ description: |-
   Definition of done: regression coverage, relevant docs/contracts, and repository lint/test/smoke gates; preserve user-owned data.
 tags:
 - audit-pass-2
+history:
+- at: 2026-10-08T21:41:42.747201+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: Todo
+    new: InProgress
+  - field: assignee
+    new: mallox
+- at: 2026-10-08T21:41:42.782468+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T21:52:45.093014+00:00
+  actor: mallox
+  changes:
+  - field: comment_added
+- at: 2026-10-08T21:52:45.124496+00:00
+  actor: mallox
+  changes:
+  - field: status
+    old: InProgress
+    new: Done
